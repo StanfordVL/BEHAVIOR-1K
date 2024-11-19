@@ -32,7 +32,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         fixed_base=False,
         # Unique to USDObject hierarchy
@@ -50,9 +50,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-        # Unique to ArticulatedTrunkRobot
-        rigid_trunk=False,
-        default_trunk_offset=0.2,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         # Unique to UntuckedArmPoseRobot
@@ -102,8 +99,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
-            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
-            default_trunk_offset (float): The default height of the robot's trunk
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -134,8 +129,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
-            rigid_trunk=rigid_trunk,
-            default_trunk_offset=default_trunk_offset,
             default_reset_mode=default_reset_mode,
             default_arm_pose=default_arm_pose,
             **kwargs,
@@ -166,7 +159,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def untucked_default_joint_pos(self):
         pos = super().untucked_default_joint_pos
         pos[self.base_control_idx] = 0.0
-        pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
+        pos[self.trunk_control_idx] = 0.385
         pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
         pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
         return pos
@@ -207,9 +200,9 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
         raise ValueError("Fetch does not support discrete actions!")
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # Ordered by general robot kinematics chain
-        return ["base", "camera", "arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
+        return ["base", "trunk", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
 
     @property
     def _default_controllers(self):
@@ -218,9 +211,10 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
 
         # We use multi finger gripper, differential drive, and IK controllers as default
         controllers["base"] = "DifferentialDriveController"
+        controllers["trunk"] = "JointController"
         controllers["camera"] = "JointController"
-        controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
-        controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
+        controllers[f"arm_{self.default_arm}"] = "InverseKinematicsController"
+        controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
 
         return controllers
 

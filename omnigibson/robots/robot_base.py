@@ -56,7 +56,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         visible=True,
         fixed_base=False,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,

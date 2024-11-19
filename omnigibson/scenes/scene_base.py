@@ -456,6 +456,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._pose_inv = th.linalg.inv_ex(self._pose).inverse
 
         if gm.ENABLE_TRANSITION_RULES:
+            assert gm.ENABLE_OBJECT_STATES, "Transition rules require object states to be enabled!"
             self._transition_rule_api = TransitionRuleAPI(scene=self)
 
         # Always stop the sim if we started it internally

@@ -39,7 +39,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         raise ValueError("Stretch does not support discrete actions!")
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # Ordered by general robot kinematics chain
         return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
 
@@ -117,9 +117,14 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["link_arm_l4", "link_arm_l3"],
             ["link_arm_l4", "link_arm_l2"],
             ["link_arm_l4", "link_arm_l1"],
+            ["link_arm_l4", "link_aruco_inner_wrist"],
             ["link_arm_l3", "link_arm_l2"],
             ["link_arm_l3", "link_arm_l1"],
+            ["link_arm_l3", "link_aruco_top_wrist"],
+            ["link_arm_l3", "link_aruco_inner_wrist"],
             ["link_arm_l2", "link_arm_l1"],
+            ["link_arm_l2", "link_aruco_top_wrist"],
+            ["link_arm_l2", "link_aruco_inner_wrist"],
             ["link_arm_l0", "link_arm_l1"],
             ["link_arm_l0", "link_arm_l2"],
             ["link_arm_l0", "link_arm_l3"],
@@ -131,6 +136,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["link_arm_l0", "link_wrist_yaw_bottom"],
             ["link_arm_l0", "link_wrist_pitch"],
             ["link_wrist_yaw_bottom", "link_wrist_pitch"],
+            ["link_wrist_yaw_bottom", "link_arm_l4"],
+            ["link_wrist_yaw_bottom", "link_arm_l3"],
             ["gripper_camera_link", "link_gripper_s3_body"],
             ["link_gripper_s3_body", "link_aruco_d405"],
             ["link_gripper_s3_body", "link_gripper_finger_left"],

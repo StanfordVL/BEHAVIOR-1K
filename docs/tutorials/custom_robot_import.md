@@ -134,8 +134,8 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
             raise ValueError("Stretch does not support discrete actions!")
     
         @property
-        def controller_order(self):
-            # Controller ordering. Usually determined by general robot kinematics chain
+        def _raw_controller_order(self):
+            # Raw controller ordering. Usually determined by general robot kinematics chain
             # You can usually simply take a subset of these based on the type of robot interfaces inherited for your robot class
             return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
     
