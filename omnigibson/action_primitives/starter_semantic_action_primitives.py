@@ -1,7 +1,7 @@
 """
 WARNING!
 The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with Fetch, Tiago, and R1 with their JointControllers set to 1. absolute mode 2. position control with impedance. 
+It currently only works with Fetch, Tiago, and R1 with their JointControllers set to absolute position mode with impedance.
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
@@ -150,7 +150,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
-            "It currently only works with Fetch and Tiago with their JointControllers set to delta mode."
+            "It currently only works with Fetch, Tiago, and R1 with their JointControllers set to absolute position mode with impedance."
         )
         super().__init__(robot)
         self._motion_generator = CuRoboMotionGenerator(robot=self.robot, batch_size=planning_batch_size)
@@ -750,21 +750,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """The appropriate manipulation control idx for the current settings."""
         if arm is None:
             arm = self.arm
-        # TODO: look into this
-        if isinstance(self.robot, Tiago):
-            if arm == "left":
-                return (
-                    self.robot.arm_control_idx["left"]
-                    if m.TORSO_FIXED
-                    else th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx["left"]])
-                )
-            else:
-                return self.robot.arm_control_idx["right"]
-        if isinstance(self.robot, Fetch):
-            return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
-        # Otherwise just return the default arm control idx
-        return self.robot.arm_control_idx[arm]
+        if m.TORSO_FIXED or arm == "right":
+            return self.robot.arm_control_idx[arm]
+        else:
+            # Only append trunk control idx if it is not fixed and the arm is left
+            if hasattr(self.robot, "trunk_control_idx"):
+                return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[arm]])
 
     def _ik_solver_cartesian_to_joint_space(self, relative_target_pose, arm=None):
         """
@@ -780,6 +772,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if arm is None:
             arm = self.arm
+        # TODO: make sure descriptor file match torso & arm setting
         ik_solver = IKSolver(
             robot_description_path=self.robot.robot_arm_descriptor_yamls[arm],
             robot_urdf_path=self.robot.urdf_path,

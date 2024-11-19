@@ -32,7 +32,7 @@ scene:
 
 robots:
   - type: Tiago
-    obs_modalities: [rgb, depth, seg_semantic, normal, seg_instance, seg_instance_id]
+    obs_modalities: [rgb]
     scale: 1.0
     self_collisions: true
     action_normalize: false

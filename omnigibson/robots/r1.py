@@ -202,6 +202,33 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
+    @property
+    def manipulation_link_names(self):
+        return [
+            "torso_link1",
+            "torso_link2",
+            "torso_link3",
+            "torso_link4",
+            "left_arm_link1",
+            "left_arm_link2",
+            "left_arm_link3",
+            "left_arm_link4",
+            "left_arm_link5",
+            "left_arm_link6",
+            "left_gripper_link1",
+            "left_gripper_link2",
+            "left_hand",
+            "right_arm_link1",
+            "right_arm_link2",
+            "right_arm_link3",
+            "right_arm_link4",
+            "right_arm_link5",
+            "right_arm_link6",
+            "right_gripper_link1",
+            "right_gripper_link2",
+            "right_hand",
+        ]
+
     @classproperty
     def n_arms(cls):
         return 2
@@ -259,7 +286,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def arm_workspace_range(self):
-        return {arm: th.tensor([th.deg2rad(th.tensor(-45)), th.deg2rad(th.tensor(45))]) for arm in self.arm_names}
+        return {arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32)) for arm in self.arm_names}
 
     @property
     def eef_usd_path(self):
@@ -271,7 +298,33 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return [
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
+            ["base_link", "torso_link1"],
+            ["base_link", "servo_link1"],
+            ["base_link", "wheel_link3"],
+            ["base_link", "servo_link3"],
+            ["base_link", "servo_link2"],
             ["base_link", "wheel_link1"],
             ["base_link", "wheel_link2"],
-            ["base_link", "wheel_link3"],
+            ["servo_link1", "wheel_link1"],
+            ["servo_link2", "wheel_link2"],
+            ["servo_link3", "wheel_link3"],
+            ["torso_link1", "torso_link2"],
+            ["torso_link2", "torso_link3"],
+            ["torso_link3", "torso_link4"],
+            ["torso_link4", "left_arm_link1"],
+            ["left_arm_link1", "left_arm_link2"],
+            ["left_arm_link2", "left_arm_link3"],
+            ["left_arm_link3", "left_arm_link4"],
+            ["left_arm_link4", "left_arm_link5"],
+            ["left_arm_link5", "left_arm_link6"],
+            ["left_arm_link6", "left_gripper_link1"],
+            ["left_arm_link6", "left_gripper_link2"],
+            ["torso_link4", "right_arm_link1"],
+            ["right_arm_link1", "right_arm_link2"],
+            ["right_arm_link2", "right_arm_link3"],
+            ["right_arm_link3", "right_arm_link4"],
+            ["right_arm_link4", "right_arm_link5"],
+            ["right_arm_link5", "right_arm_link6"],
+            ["right_arm_link6", "right_gripper_link1"],
+            ["right_arm_link6", "right_gripper_link2"],
         ]
