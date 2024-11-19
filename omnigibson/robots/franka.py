@@ -213,14 +213,14 @@ class FrankaPanda(ManipulationRobot):
         raise ValueError("Franka does not support discrete actions!")
 
     @property
-    def controller_order(self):
-        return ["arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
+    def _raw_controller_order(self):
+        return [f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
 
     @property
     def _default_controllers(self):
         controllers = super()._default_controllers
-        controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
-        controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
+        controllers[f"arm_{self.default_arm}"] = "InverseKinematicsController"
+        controllers[f"gripper_{self.default_arm}"] = "MultiFingerGripperController"
         return controllers
 
     @property

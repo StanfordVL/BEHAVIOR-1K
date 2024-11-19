@@ -291,8 +291,6 @@ class CuRoboMotionGenerator:
                 be ignored when updating obstacles
         """
         print("Updating CuRobo world, reading w.r.t.", self.robot.prim_path)
-        emb_sel = CuroboEmbodimentSelection.DEFAULT  # all embodiment selections share the same world collision checker
-
         ignore_paths = [] if ignore_paths is None else ignore_paths
 
         # Ignore any visual only objects and any objects not part of the robot's current scene
@@ -312,12 +310,13 @@ class CuRoboMotionGenerator:
                 *ignore_paths,  # Don't include any additional specified paths
             ],
         )
-        self.mg[emb_sel].update_world(obstacles)
+        # All embodiment selections share the same world collision checker
+        self.mg[CuroboEmbodimentSelection.DEFAULT].update_world(obstacles)
         print("Synced CuRobo world from stage.")
 
     def update_obstacles_fast(self):
-        emb_sel = CuroboEmbodimentSelection.DEFAULT
-        world_coll_checker = self.mg[emb_sel].world_coll_checker
+        # All embodiment selections share the same world collision checker
+        world_coll_checker = self.mg[CuroboEmbodimentSelection.DEFAULT].world_coll_checker
         for i, prim_path in enumerate(world_coll_checker._env_mesh_names[0]):
             if prim_path is None:
                 continue
@@ -391,10 +390,18 @@ class CuRoboMotionGenerator:
         return collision_results  # shape (B,)
 
     def update_locked_joints(self, cu_joint_state, emb_sel):
+        """
+        Updates the locked joints and fixed transforms for the given embodiment selection
+        This is needed to update curobo robot model about the current joint positions from Isaac.
+
+        Args:
+            cu_joint_state (JointState): JointState object representing the current joint positions
+            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for updating locked joints
+        """
         kc = self.mg[emb_sel].kinematics.kinematics_config
         # Update the lock joint state position
         kc.lock_jointstate.position = cu_joint_state.get_ordered_joint_state(kc.lock_jointstate.joint_names).position[0]
-        # Uodate all the fixed transforms between the parent links and the child links of these joints
+        # Update all the fixed transforms between the parent links and the child links of these joints
         for joint_name in kc.lock_jointstate.joint_names:
             joint = self.robot.joints[joint_name]
             parent_link_name, child_link_name = joint.body0.split("/")[-1], joint.body1.split("/")[-1]
@@ -422,6 +429,7 @@ class CuRoboMotionGenerator:
         success_ratio=None,
         attached_obj=None,
         motion_constraint=None,
+        attached_obj_scale=None,
         emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -453,6 +461,9 @@ class CuRoboMotionGenerator:
                 successes
             attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding scale to apply to the attached object
+            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for computing trajectories
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
                 object(s) computed from internal batch trajectory computations. If it is False, will return 2-tuple
@@ -573,13 +584,12 @@ class CuRoboMotionGenerator:
                 # xyzw to wxyz
                 quaternion = quaternion[[3, 0, 1, 2]]
                 ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
-
                 self.mg[emb_sel].attach_objects_to_robot(
                     joint_state=cu_js_batch,
                     object_names=obj_paths,
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=0.99,
+                    scale=0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
                 )
 
         all_rollout_fns = [
@@ -682,10 +692,6 @@ class CuRoboMotionGenerator:
             # If result.interpolated_plan is be None (e.g. IK failure), return Nones
             if result.interpolated_plan is None:
                 paths += [None] * end_idx
-            # If batch size is 1, result.interpolated_plan is of shape (T, D) instead of (B, T, D),
-            # where B is batch_size, T is interpolation_steps and D is the number of robot joints.
-            elif self.batch_size == 1:
-                paths += [result.interpolated_plan.trim_trajectory(0, result.path_buffer_last_tstep[0])]
             else:
                 paths += result.get_paths()[:end_idx]
 

@@ -38,9 +38,6 @@ class InverseKinematicsController(JointController, ManipulationController):
     def __init__(
         self,
         task_name,
-        robot_description_path,
-        robot_urdf_path,
-        eef_name,
         control_freq,
         reset_joint_pos,
         control_limits,
@@ -64,9 +61,6 @@ class InverseKinematicsController(JointController, ManipulationController):
             task_name (str): name assigned to this task frame for computing IK control. During control calculations,
                 the inputted control_dict should include entries named <@task_name>_pos_relative and
                 <@task_name>_quat_relative. See self._command_to_control() for what these values should entail.
-            robot_description_path (str): path to robot descriptor yaml file
-            robot_urdf_path (str): path to robot urdf file
-            eef_name (str): end effector frame name
             control_freq (int): controller loop frequency
             reset_joint_pos (Array[float]): reset joint positions, used as part of nullspace controller in IK.
                 Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx

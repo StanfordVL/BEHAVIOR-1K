@@ -56,7 +56,7 @@ class LocomotionRobot(BaseRobot):
         return obs_keys + ["base_qpos_sin", "base_qpos_cos", "robot_lin_vel", "robot_ang_vel"]
 
     @property
-    def controller_order(self):
+    def _raw_controller_order(self):
         # By default, only base is supported
         return ["base"]
 
@@ -183,6 +183,22 @@ class LocomotionRobot(BaseRobot):
         quat = self.get_position_orientation()[1]
         quat = quat_multiply((euler2quat(delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
+
+    @property
+    def non_floor_touching_base_links(self):
+        return [self.links[name] for name in self.non_floor_touching_base_link_names]
+
+    @property
+    def non_floor_touching_base_link_names(self):
+        raise [self.base_footprint_link_name]
+
+    @property
+    def floor_touching_base_links(self):
+        return [self.links[name] for name in self.floor_touching_base_link_names]
+
+    @property
+    def floor_touching_base_link_names(self):
+        raise NotImplementedError
 
     @property
     def base_action_idx(self):

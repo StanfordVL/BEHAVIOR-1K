@@ -46,8 +46,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
-        # Unique to ArticulatedTrunkRobot
-        rigid_trunk=True,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         **kwargs,
@@ -94,7 +92,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
-            rigid_trunk (bool): If True, will prevent the trunk from moving during execution.
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -121,8 +118,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
-            rigid_trunk=rigid_trunk,
-            default_trunk_offset=0.0,  # not applicable for R1
             default_reset_mode=default_reset_mode,
             **kwargs,
         )
@@ -141,8 +136,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         raise ValueError("R1 does not support discrete actions!")
 
     @property
-    def controller_order(self):
-        controllers = ["base"]
+    def _raw_controller_order(self):
+        controllers = ["base", "trunk"]
         for arm in self.arm_names:
             controllers += [f"arm_{arm}", f"gripper_{arm}"]
         return controllers
@@ -152,6 +147,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         controllers = super()._default_controllers
         # We use joint controllers for base as default
         controllers["base"] = "JointController"
+        controllers["trunk"] = "JointController"
         # We use IK and multi finger gripper controllers as default
         for arm in self.arm_names:
             controllers["arm_{}".format(arm)] = "InverseKinematicsController"
@@ -199,6 +195,14 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         }
 
     @property
+    def floor_touching_base_link_names(self):
+        return ["wheel_link1", "wheel_link2", "wheel_link3"]
+
+    @property
+    def trunk_link_names(self):
+        return ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
+
+    @property
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
@@ -239,7 +243,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def arm_link_names(self):
-        return {arm: [f"{arm}_arm_link{i}" for i in range(1, 3)] for arm in self.arm_names}
+        return {arm: [f"{arm}_arm_link{i}" for i in range(1, 7)] for arm in self.arm_names}
 
     @property
     def arm_joint_names(self):

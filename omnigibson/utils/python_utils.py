@@ -581,6 +581,7 @@ class CachedFunctions:
     def __init__(self, **kwargs):
         # Create internal dict to store functions
         self._fcns = dict()
+        self._cache = dict()
         for kwarg in kwargs:
             self._fcns[kwarg] = kwargs[kwarg]
 
@@ -590,20 +591,20 @@ class CachedFunctions:
     def __setitem__(self, key, value):
         self.add_fcn(name=key, fcn=value)
 
-    def get(self, name, *args, **kwargs):
+    def get(self, name):
         """
         Computes the function referenced by @name with the corresponding @args and @kwargs. Note that for a unique
         set of arguments, this value will be internally cached
 
         Args:
             name (str): The name of the function to call
-            *args (tuple): Positional arguments to pass into the function call
-            **kwargs (tuple): Keyword arguments to pass into the function call
 
         Returns:
             any: Output of the function referenced by @name
         """
-        return self._fcns[name](*args, **kwargs)
+        if name not in self._cache:
+            self._cache[name] = self._fcns[name]()
+        return self._cache[name]
 
     def get_fcn(self, name):
         """
