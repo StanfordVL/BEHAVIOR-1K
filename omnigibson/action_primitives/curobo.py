@@ -590,7 +590,8 @@ class CuRoboMotionGenerator:
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
                     scale=0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
-                    pitch_scale=0.8,
+                    pitch_scale=1.0,
+                    merge_meshes=True,
                 )
 
         all_rollout_fns = [
