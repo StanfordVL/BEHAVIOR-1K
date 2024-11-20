@@ -23,6 +23,32 @@ ENV MAMBA_ROOT_PREFIX /micromamba
 RUN micromamba create -n omnigibson -c conda-forge python=3.10
 RUN micromamba shell init --shell=bash
 
+# Install evdev, which is a dependency of telemoma. It cannot be
+# installed afterwards because it depends on some C compilation that
+# fails if kernel headers ("sysroot") is present inside the conda env.
+# The CUDA installation will add the kernel headers to the conda env.
+# So we install evdev before installing CUDA.
+RUN micromamba run -n omnigibson pip install evdev
+
+# Remove the ml-archive extension. It includes a version of torch
+# that we don't want to use.
+RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive
+
+# Install CUDA and torch
+RUN micromamba run -n omnigibson micromamba install \
+  pytorch torchvision pytorch-cuda=12.1 cuda=12.1.0 \
+  -c pytorch -c nvidia -c conda-forge
+
+# Install curobo. This can normally be installed when OmniGibson is pip
+# installed, but we need to install it beforehand here so that it doesn't
+# have to happen on every time a CI action is run (otherwise it's just
+# very slow)
+# Here we also compile this such that it is compatible with GPU architectures
+# Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
+# TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6;8.7;8.9;7.5+PTX;8.0+PTX;8.6+PTX;8.7+PTX;8.9+PTX'
+RUN TORCH_CUDA_ARCH_LIST='7.5+PTX' \
+  micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
+
 # Make sure isaac gets properly sourced every time omnigibson gets called
 ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"
 RUN mkdir -p "/micromamba/envs/omnigibson/etc/conda/activate.d"
@@ -32,31 +58,6 @@ RUN echo '#!/bin/sh' > $CONDA_ACT_FILE
 RUN echo "source /isaac-sim/setup_conda_env.sh" >> $CONDA_ACT_FILE
 
 RUN echo "micromamba activate omnigibson" >> /root/.bashrc
-
-# Prepare to build OMPL
-ENV CXX="g++"
-ENV MAKEFLAGS="-j `nproc`"
-RUN micromamba run -n omnigibson micromamba install -c conda-forge boost && \
-    micromamba run -n omnigibson pip install pyplusplus && \
-    git clone https://github.com/ompl/ompl.git /ompl && \
-    mkdir -p /ompl/build/Release && \
-    sed -i "s/find_program(PYPY/# find_program(PYPY/g" /ompl/CMakeModules/Findpypy.cmake
-
-# Build and install OMPL 
-RUN micromamba run -n omnigibson /bin/bash --login -c 'source /isaac-sim/setup_conda_env.sh && (which python > /root/PYTHON_EXEC) && (echo $PYTHONPATH > /root/PYTHONPATH)' && \
-    cd /ompl/build/Release && \
-    micromamba run -n omnigibson cmake ../.. \
-      -DCMAKE_INSTALL_PREFIX="$CONDA_PREFIX" \
-      -DBOOST_ROOT="$CONDA_PREFIX" \
-      -DPYTHON_EXEC=$(cat /root/PYTHON_EXEC) \
-      -DPYTHONPATH=$(cat /root/PYTHONPATH) && \
-    micromamba run -n omnigibson make -j 4 update_bindings && \
-    micromamba run -n omnigibson make -j 4 && \
-    cd py-bindings && \
-    micromamba run -n omnigibson make install
-
-# Test OMPL
-RUN micromamba run -n omnigibson python -c "from ompl import base"
 
 # Copy over omnigibson source
 ADD . /omnigibson-src
@@ -72,7 +73,7 @@ ENV DEV_MODE=${DEV_MODE}
 ARG WORKDIR_PATH=/omnigibson-src
 RUN if [ "$DEV_MODE" != "1" ]; then \
       echo "OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/download_datasets.py" >> /root/.bashrc; \
-      micromamba run -n omnigibson pip install -e .[dev]; \
+      micromamba run -n omnigibson pip install -e .[dev,primitives]; \
     else \
       WORKDIR_PATH=/; \
       cd / && rm -rf /omnigibson-src; \

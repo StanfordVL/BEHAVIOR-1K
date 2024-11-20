@@ -51,7 +51,7 @@ jobs:
 
       - name: Install
         working-directory: omnigibson-src
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Print env
         run: printenv

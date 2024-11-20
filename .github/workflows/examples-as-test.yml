@@ -28,7 +28,7 @@ jobs:
              
       - name: Install
         working-directory: omnigibson-src
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Generate example tests
         working-directory: omnigibson-src
@@ -76,7 +76,7 @@ jobs:
 
       - name: Install
         working-directory: omnigibson-src
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Run tests
         working-directory: omnigibson-src

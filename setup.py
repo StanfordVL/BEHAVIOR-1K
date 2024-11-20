@@ -62,7 +62,11 @@ setup(
             "mkdocs-section-index",
             "mkdocs-literate-nav",
             "telemoma~=0.1.2",
-        ]
+        ],
+        "primitives": [
+            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5",
+            "ompl @ https://storage.googleapis.com/gibson_scenes/ompl-1.6.0-cp310-cp310-manylinux_2_28_x86_64.whl",
+        ],
     },
     tests_require=[],
     python_requires=">=3",
