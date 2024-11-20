@@ -7,6 +7,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   && rm -rf /var/lib/apt/lists/*
 
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym*
+RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/torch*
 RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy*
 RUN /isaac-sim/python.sh -m pip install click~=8.1.3
 
@@ -29,10 +30,6 @@ RUN micromamba shell init --shell=bash
 # The CUDA installation will add the kernel headers to the conda env.
 # So we install evdev before installing CUDA.
 RUN micromamba run -n omnigibson pip install evdev
-
-# Remove the ml-archive extension. It includes a version of torch
-# that we don't want to use.
-RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive
 
 # Install CUDA and torch
 RUN micromamba run -n omnigibson micromamba install \
