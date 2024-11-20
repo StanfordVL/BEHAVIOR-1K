@@ -8,6 +8,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym*
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/torch*
+RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/functorch*
 RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy*
 RUN /isaac-sim/python.sh -m pip install click~=8.1.3
 
@@ -33,7 +34,7 @@ RUN micromamba run -n omnigibson pip install evdev
 
 # Install CUDA and torch
 RUN micromamba run -n omnigibson micromamba install \
-  pytorch torchvision pytorch-cuda=12.1 cuda=12.1.0 \
+  pytorch torchvision pytorch-cuda=11.8 cuda=11.8.0 \
   -c pytorch -c nvidia -c conda-forge
 
 # Install curobo. This can normally be installed when OmniGibson is pip
@@ -43,7 +44,7 @@ RUN micromamba run -n omnigibson micromamba install \
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
 # TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6;8.7;8.9;7.5+PTX;8.0+PTX;8.6+PTX;8.7+PTX;8.9+PTX'
-RUN TORCH_CUDA_ARCH_LIST='7.5+PTX' \
+RUN TORCH_CUDA_ARCH_LIST='7.5,8.0;8.6;8.7;8.9+PTX' \
   micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
