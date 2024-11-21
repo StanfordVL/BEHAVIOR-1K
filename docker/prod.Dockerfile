@@ -32,10 +32,16 @@ RUN micromamba shell init --shell=bash
 # So we install evdev before installing CUDA.
 RUN micromamba run -n omnigibson pip install evdev
 
-# Install CUDA and torch
+# Install torch
 RUN micromamba run -n omnigibson micromamba install \
-  pytorch torchvision pytorch-cuda=11.8 cuda=11.8.0 \
+  pytorch torchvision pytorch-cuda=11.8 \
   -c pytorch -c nvidia -c conda-forge
+
+# Install cuda for compiling curobo
+RUN wget -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
+  sh /cuda.run --silent --toolkit && rm /cuda.run
+ENV PATH=/usr/local/cuda-11.8/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
 
 # Install curobo. This can normally be installed when OmniGibson is pip
 # installed, but we need to install it beforehand here so that it doesn't
@@ -44,7 +50,7 @@ RUN micromamba run -n omnigibson micromamba install \
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
 # TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6;8.7;8.9;7.5+PTX;8.0+PTX;8.6+PTX;8.7+PTX;8.9+PTX'
-RUN TORCH_CUDA_ARCH_LIST='7.5,8.0;8.6;8.7;8.9+PTX' \
+RUN TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' \
   micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
