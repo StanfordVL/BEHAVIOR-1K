@@ -481,8 +481,8 @@ def vec2quat(vec: torch.Tensor, up: torch.Tensor = torch.tensor([0.0, 0.0, 1.0])
     if up.dim() == 1:
         up = up.unsqueeze(0)
 
-    vec_n = torch.nn.functional.normalize(vec, dim=-1, eps=1e-10)
-    up_n = torch.nn.functional.normalize(up, dim=-1, eps=1e-10)
+    vec_n = normalize(vec, dim=-1, eps=1e-10)
+    up_n = normalize(up, dim=-1, eps=1e-10)
 
     s_n = torch.cross(up_n, vec_n, dim=-1)
     u_n = torch.cross(vec_n, s_n, dim=-1)
