@@ -19,6 +19,12 @@ ENV OMNIGIBSON_ASSET_PATH /data/assets
 ENV GIBSON_DATASET_PATH /data/g_dataset
 ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 
+# Install cuda for compiling curobo
+RUN wget -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
+  sh /cuda.run --silent --toolkit && rm /cuda.run
+ENV PATH=/usr/local/cuda-11.8/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
+
 # Install Mamba (light conda alternative)
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C / bin/micromamba
 ENV MAMBA_ROOT_PREFIX /micromamba
@@ -29,12 +35,6 @@ RUN micromamba shell init --shell=bash
 RUN micromamba run -n omnigibson micromamba install \
   pytorch torchvision pytorch-cuda=11.8 \
   -c pytorch -c nvidia -c conda-forge
-
-# Install cuda for compiling curobo
-RUN wget -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
-  sh /cuda.run --silent --toolkit && rm /cuda.run
-ENV PATH=/usr/local/cuda-11.8/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
 
 # Install curobo. This can normally be installed when OmniGibson is pip
 # installed, but we need to install it beforehand here so that it doesn't
