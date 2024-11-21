@@ -659,6 +659,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         directly_move_hand_pose = None
         while len(pose_candidates) < 20:
             obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
+            # TODO: Look into this orientation, why do we need to sample it?
+            obj_pose = (obj_pose[0], obj_in_hand.get_position_orientation()[1])
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
             if self._target_in_reach_of_robot(hand_pose)[self.arm]:
                 directly_move_hand_pose = hand_pose
@@ -677,6 +679,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     yield from self._navigate_to_pose(valid_navigation_pose)
                     yield from self._move_hand(candidate)
                     break
+
+        if valid_navigation_pose is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "Could not find a valid pose to place the object",
+                {"target object": obj.name},
+            )
 
         yield from self._execute_release()
 
@@ -814,11 +823,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if arm is None:
             arm = self.arm
         if avoid_collision:
-            # If an object is grasped, we need to pass it to the motion planner
-            obj_in_hand = self._get_obj_in_hand()
-            if obj_in_hand is not None:
-                # TODO: this root link logic is bad, fix it
-                attached_obj = {self.robot.eef_link_names[arm]: obj_in_hand.root_link}
             yield from self._settle_robot()
             # curobo motion generator takes a pose but outputs joint positions
             if not lock_auxiliary_arm:
@@ -845,7 +849,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 target_pos=target_pos,
                 target_quat=target_quat,
                 embodiment_selection=CuroboEmbodimentSelection.ARM,
-                attached_obj=attached_obj,
                 motion_constraint=motion_constraint,
             ).cpu()
         else:
@@ -866,6 +869,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         attached_obj=None,
         motion_constraint=None,
     ):
+        if attached_obj is None:
+            # If an object is grasped, we need to pass it to the motion planner
+            obj_in_hand = self._get_obj_in_hand()
+            if obj_in_hand is not None:
+                # TODO: this root link logic is bad, fix it
+                attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link}
         planning_attempts = 0
         success = False
         traj_path = None
@@ -874,7 +883,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_quat = {
             k: th.stack([v for _ in range(self._motion_generator.batch_size)]) for k, v in target_quat.items()
         }
+
         # TODO: call curobo with batch_size > 1 instead of iterating
+        self._motion_generator.update_obstacles()
         while not success and planning_attempts < m.MAX_PLANNING_ATTEMPTS:
             successes, traj_paths = self._motion_generator.compute_trajectories(
                 target_pos=target_pos,
@@ -889,6 +900,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 success_ratio=1.0,
                 attached_obj=attached_obj,
                 motion_constraint=motion_constraint,
+                skip_obstacle_update=True,
                 emb_sel=embodiment_selection,
             )
             # Grab the first successful trajectory, if not found, then continue planning
@@ -1780,6 +1792,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
         attempt = 0
+        # Update obstacle once before sampling
+        self._motion_generator.update_obstacles()
         while attempt < m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT:
             candidate_poses = []
             for _ in range(self._collision_check_batch_size):
@@ -1800,7 +1814,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         break
                 candidate_poses.append(candidate_2d_pose)
 
-            result = self._validate_poses(candidate_poses, pose_on_obj=target_pose, **kwargs)
+            result = self._validate_poses(candidate_poses, pose_on_obj=target_pose, skip_obstacle_update=True, **kwargs)
 
             # If anything in result is true, return the pose
             for i, res in enumerate(result):
@@ -1809,16 +1823,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     return candidate_poses[i]
 
             attempt += self._collision_check_batch_size
-
-        raise ActionPrimitiveError(
-            ActionPrimitiveError.Reason.SAMPLING_ERROR,
-            "Could not find valid position near object.",
-            {
-                "target object": obj.name,
-                "target pos": obj.get_position_orientation()[0],
-                "pose on target": pose_on_obj,
-            },
-        )
+        return None
 
     @staticmethod
     def _sample_position_on_aabb_side(target_obj):
@@ -1919,7 +1924,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    def _validate_poses(self, candidate_poses, pose_on_obj=None, arm=None):
+    def _validate_poses(self, candidate_poses, pose_on_obj=None, arm=None, skip_obstacle_update=False):
         """
         Determines whether the robot can reach all poses on the objects and is not in collision at the specified 2d poses
 
@@ -1946,7 +1951,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         candidate_joint_positions = th.stack(candidate_joint_positions)
         invalid_results = self._motion_generator.check_collisions(
-            candidate_joint_positions, check_self_collision=False
+            candidate_joint_positions, check_self_collision=False, skip_obstacle_update=skip_obstacle_update
         ).cpu()
 
         # For each candidate that passed collision check, verify reachability

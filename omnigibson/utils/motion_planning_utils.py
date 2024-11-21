@@ -429,28 +429,28 @@ def plan_arm_motion_ik(robot, end_conf, context, planning_time=15.0, torso_fixed
     return None
 
 
-def set_base_and_detect_collision(context, pose, verbose=False):
-    """
-    Moves the robot and detects robot collisions with the environment and itself
+# def set_base_and_detect_collision(context, pose, verbose=False):
+#     """
+#     Moves the robot and detects robot collisions with the environment and itself
 
-    Args:
-        context (PlanningContext): Context to plan in that includes the robot copy
-        pose (Array): Pose in the world frame to check for collisions at
-        verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
+#     Args:
+#         context (PlanningContext): Context to plan in that includes the robot copy
+#         pose (Array): Pose in the world frame to check for collisions at
+#         verbose (bool): Whether the collision detector should output information about collisions or not. The verbose mode is too noisy in sampling so it is default to False
 
-    Returns:
-        bool: Whether the robot is in collision
-    """
-    # make a copy of the robot, set it to the goal pose, and check for possible collision
-    robot_copy = context.robot_copy
-    robot_copy_type = context.robot_copy_type
+#     Returns:
+#         bool: Whether the robot is in collision
+#     """
+#     # make a copy of the robot, set it to the goal pose, and check for possible collision
+#     robot_copy = context.robot_copy
+#     robot_copy_type = context.robot_copy_type
 
-    translation = lazy.pxr.Gf.Vec3d(pose[0].tolist())
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
+#     translation = lazy.pxr.Gf.Vec3d(pose[0].tolist())
+#     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = pose[1][[3, 0, 1, 2]]
-    robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
-    return detect_robot_collision(context, verbose=verbose)
+#     orientation = pose[1][[3, 0, 1, 2]]
+#     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*orientation.tolist()))
+#     return detect_robot_collision(context, verbose=verbose)
 
 
 def set_arm_and_detect_collision(context, joint_pos, verbose=False):

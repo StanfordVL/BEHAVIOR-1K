@@ -228,7 +228,7 @@ class CuRoboMotionGenerator:
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
                 interpolation_dt=0.03,
-                collision_activation_distance=0.005,
+                collision_activation_distance=0.05,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
                 fixed_iters_trajopt=True,
@@ -336,6 +336,7 @@ class CuRoboMotionGenerator:
         self,
         q,
         check_self_collision=True,
+        skip_obstacle_update=False,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -353,7 +354,8 @@ class CuRoboMotionGenerator:
         emb_sel = CuroboEmbodimentSelection.DEFAULT
 
         # Update obstacles
-        self.update_obstacles()
+        if not skip_obstacle_update:
+            self.update_obstacles()
 
         q_pos = self.robot.get_joint_positions().unsqueeze(0)
         cu_joint_state = lazy.curobo.types.state.JointState(
@@ -430,6 +432,7 @@ class CuRoboMotionGenerator:
         attached_obj=None,
         motion_constraint=None,
         attached_obj_scale=None,
+        skip_obstacle_update=False,
         emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -518,7 +521,8 @@ class CuRoboMotionGenerator:
         )
         plan_cfg.pose_cost_metric = pose_cost_metric
 
-        self.update_obstacles()
+        if not skip_obstacle_update:
+            self.update_obstacles()
 
         for link_name in target_pos.keys():
             target_pos_link = target_pos[link_name]
@@ -589,9 +593,12 @@ class CuRoboMotionGenerator:
                     object_names=obj_paths,
                     ee_pose=ee_pose,
                     link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
+                    scale=1.0 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
                     pitch_scale=1.0,
                     merge_meshes=True,
+                    world_objects_pose_offset=lazy.curobo.types.math.Pose.from_list(
+                        [0, 0, 0.01, 1, 0, 0, 0], self._tensor_args
+                    ),
                 )
 
         all_rollout_fns = [
