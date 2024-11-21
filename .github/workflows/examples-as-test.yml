@@ -26,7 +26,7 @@ jobs:
           submodules: true
              
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Generate example tests
         run: python tests/create_tests_of_examples.py
@@ -70,7 +70,7 @@ jobs:
           submodules: true
 
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Run tests
         run: pytest -s tests/tests_of_examples/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/

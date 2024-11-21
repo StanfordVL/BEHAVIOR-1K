@@ -49,7 +49,7 @@ jobs:
           submodules: true
 
       - name: Install
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
 
       - name: Print env
         run: printenv
