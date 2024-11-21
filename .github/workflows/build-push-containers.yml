@@ -49,6 +49,8 @@ jobs:
         name: Check disk space
         run: |
           df . -h
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       -
         name: Checkout
         uses: actions/checkout@v4
