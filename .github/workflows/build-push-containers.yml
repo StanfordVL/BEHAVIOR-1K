@@ -23,7 +23,7 @@ jobs:
           sudo rm -rf \
             /usr/share/dotnet /usr/local/lib/android /opt/ghc \
             /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
-            /usr/lib/jvm || true
+            /usr/lib/jvm /opt/hostedtoolcache/CodeQL || true
           echo "some directories deleted"
           sudo apt install aptitude -y >/dev/null 2>&1
           sudo aptitude purge aria2 ansible azure-cli shellcheck rpm xorriso zsync \
@@ -49,8 +49,6 @@ jobs:
         name: Check disk space
         run: |
           df . -h
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
       -
         name: Checkout
         uses: actions/checkout@v4
