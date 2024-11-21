@@ -25,13 +25,6 @@ ENV MAMBA_ROOT_PREFIX /micromamba
 RUN micromamba create -n omnigibson -c conda-forge python=3.10
 RUN micromamba shell init --shell=bash
 
-# Install evdev, which is a dependency of telemoma. It cannot be
-# installed afterwards because it depends on some C compilation that
-# fails if kernel headers ("sysroot") is present inside the conda env.
-# The CUDA installation will add the kernel headers to the conda env.
-# So we install evdev before installing CUDA.
-RUN micromamba run -n omnigibson pip install evdev
-
 # Install torch
 RUN micromamba run -n omnigibson micromamba install \
   pytorch torchvision pytorch-cuda=11.8 \
@@ -49,7 +42,6 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
 # very slow)
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
-# TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6;8.7;8.9;7.5+PTX;8.0+PTX;8.6+PTX;8.7+PTX;8.9+PTX'
 RUN TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' \
   micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
 
