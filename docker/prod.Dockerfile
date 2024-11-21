@@ -19,12 +19,6 @@ ENV OMNIGIBSON_ASSET_PATH /data/assets
 ENV GIBSON_DATASET_PATH /data/g_dataset
 ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 
-# Install cuda for compiling curobo
-RUN wget --no-verbose -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
-  sh /cuda.run --silent --toolkit && rm /cuda.run
-ENV PATH=/usr/local/cuda-11.8/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
-
 # Install Mamba (light conda alternative)
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C / bin/micromamba
 ENV MAMBA_ROOT_PREFIX /micromamba
@@ -39,14 +33,20 @@ RUN micromamba run -n omnigibson micromamba install \
 # Install curobo. This can normally be installed when OmniGibson is pip
 # installed, but we need to install it beforehand here so that it doesn't
 # have to happen on every time a CI action is run (otherwise it's just
-# very slow)
+# very slow).
+# This also allows us to uninstall the cuda toolkit after curobo is built
+# to save space (meaning curobo will not be able to be rebuilt at runtime).
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
 # We also suppress the output of the installation to avoid the log limit.
-RUN TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' \
-  micromamba run -n omnigibson pip install \
-  git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo \
-  --no-build-isolation > /dev/null
+RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \ 
+  dpkg -i /cuda-keyring.deb && rm /cuda-keyring.deb && apt-get update && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-toolkit-11-8 && \
+  TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' PATH=/usr/local/cuda-11.8/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH \
+    micromamba run -n omnigibson pip install \
+    git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo \
+    --no-build-isolation > /dev/null && \
+  apt-get remove -y cuda-toolkit && apt-get autoremove -y && apt-get autoclean -y && rm -rf /var/lib/apt/lists/*
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
 ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"
