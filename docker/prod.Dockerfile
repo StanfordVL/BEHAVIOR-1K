@@ -20,7 +20,7 @@ ENV GIBSON_DATASET_PATH /data/g_dataset
 ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 
 # Install cuda for compiling curobo
-RUN wget -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
+RUN wget --no-verbose -O /cuda.run https://developer.download.nvidia.com/compute/cuda/11.8.0/local_installers/cuda_11.8.0_520.61.05_linux.run && \
   sh /cuda.run --silent --toolkit && rm /cuda.run
 ENV PATH=/usr/local/cuda-11.8/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
@@ -42,8 +42,11 @@ RUN micromamba run -n omnigibson micromamba install \
 # very slow)
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
+# We also suppress the output of the installation to avoid the log limit.
 RUN TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' \
-  micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
+  micromamba run -n omnigibson pip install \
+  git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo \
+  --no-build-isolation > /dev/null
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
 ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"
