@@ -43,7 +43,7 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
 RUN TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' \
-  micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo --no-build-isolation
+  micromamba run -n omnigibson pip install git+https://github.com/StanfordVL/curobo@6a4eb2ca8677829b0f57451ad107e0a3186525e9#egg=nvidia_curobo --no-build-isolation
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
 ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"
