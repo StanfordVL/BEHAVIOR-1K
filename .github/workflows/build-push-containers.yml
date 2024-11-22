@@ -108,8 +108,8 @@ jobs:
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
 
       -
         name: Build and push dev image
@@ -122,8 +122,8 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
 
       - name: Update vscode image Dockerfile with prod image tag
         run: |
