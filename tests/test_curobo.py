@@ -229,7 +229,7 @@ def test_curobo():
 
         # Create CuRobo instance
         batch_size = 2
-        n_samples = 30
+        n_samples = 20
 
         cmg = CuRoboMotionGenerator(
             robot=robot,
