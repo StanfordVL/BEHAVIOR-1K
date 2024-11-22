@@ -107,6 +107,9 @@ jobs:
         with:
           images: |
             stanfordvl/omnigibson-gha
+          tags: |
+            # We only push to the latest tag for the actions image
+            type=raw,value=latest
       -
         name: Build and push prod image
         id: build-prod
@@ -164,7 +167,7 @@ jobs:
         with:
           context: docker/gh-actions
           push: true
-          tags: latest  # here we only push from og-develop, and only to the `latest` tag
+          tags: ${{ steps.meta-actions.outputs.tags }}
           labels: ${{ steps.meta-actions.outputs.labels }}
           file: docker/gh-actions/Dockerfile
           cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
