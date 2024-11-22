@@ -228,7 +228,7 @@ def test_curobo():
         env.scene.reset()
 
         # Create CuRobo instance
-        batch_size = 10
+        batch_size = 2
         n_samples = 30
 
         cmg = CuRoboMotionGenerator(
