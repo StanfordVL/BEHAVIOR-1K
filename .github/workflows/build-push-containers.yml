@@ -103,7 +103,7 @@ jobs:
         id: meta-actions
         uses: docker/metadata-action@v5
         # The actions image should only be built if the push is to og-develop
-        if: github.ref == 'refs/heads/og-develop'
+        # if: github.ref == 'refs/heads/og-develop'
         with:
           images: |
             stanfordvl/omnigibson-gha
@@ -152,7 +152,7 @@ jobs:
 
       - name: Update actions image Dockerfile with dev image tag
         # The actions image should only be built if the push is to og-develop
-        if: github.ref == 'refs/heads/og-develop'
+        # if: github.ref == 'refs/heads/og-develop'
         run: |
           sed -i "s/omnigibson-dev:og-develop/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/gh-actions/Dockerfile && cat docker/gh-actions/Dockerfile
       -
@@ -160,7 +160,7 @@ jobs:
         id: build-actions
         uses: docker/build-push-action@v5
         # The actions image should only be built if the push is to og-develop
-        if: github.ref == 'refs/heads/og-develop'
+        # if: github.ref == 'refs/heads/og-develop'
         with:
           context: docker/gh-actions
           push: true
