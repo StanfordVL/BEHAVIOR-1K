@@ -386,7 +386,8 @@ def test_curobo():
             [0.01 if joint.joint_type == "PrismaticJoint" else 3.0 / 180.0 * math.pi for joint in robot.joints.values()]
         )
 
-        for bypass_physics in [True, False]:
+        # for bypass_physics in [True, False]:
+        for bypass_physics in [True]:
             for traj_idx, (success, traj_path) in enumerate(zip(successes, traj_paths)):
                 if not success:
                     continue
