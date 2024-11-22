@@ -43,8 +43,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
-        kp=None,
-        damping_ratio=None,
+        pos_kp=None,
+        pos_damping_ratio=None,
+        vel_kp=None,
         use_impedances=False,
         use_gravity_compensation=False,
         use_cc_compensation=True,
@@ -74,10 +75,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
-            kp (None or float): If @motor_type is "position" or "velocity" and @use_impedances=True, this is the
+            pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
-            damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+            pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 damping ratio applied to the joint controller. If None, a default value will be used.
+            vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
@@ -97,16 +100,20 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         # Store control gains
         if self._motor_type == "position":
-            kp = m.DEFAULT_JOINT_POS_KP if kp is None else kp
-            damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if damping_ratio is None else damping_ratio
+            pos_kp = m.DEFAULT_JOINT_POS_KP if pos_kp is None else pos_kp
+            pos_damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if pos_damping_ratio is None else pos_damping_ratio
         elif self._motor_type == "velocity":
-            kp = m.DEFAULT_JOINT_VEL_KP if kp is None else kp
-            assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=velocity!"
+            vel_kp = m.DEFAULT_JOINT_VEL_KP if vel_kp is None else vel_kp
+            assert (
+                pos_damping_ratio is None
+            ), "Cannot set pos_damping_ratio for JointController with motor_type=velocity!"
         else:  # effort
-            assert kp is None, "Cannot set kp for JointController with motor_type=effort!"
-            assert damping_ratio is None, "Cannot set damping_ratio for JointController with motor_type=effort!"
-        self.kp = kp
-        self.kd = None if damping_ratio is None else 2 * math.sqrt(self.kp) * damping_ratio
+            assert pos_kp is None, "Cannot set pos_kp for JointController with motor_type=effort!"
+            assert pos_damping_ratio is None, "Cannot set pos_damping_ratio for JointController with motor_type=effort!"
+            assert vel_kp is None, "Cannot set vel_kp for JointController with motor_type=effort!"
+        self.pos_kp = pos_kp
+        self.pos_kd = None if pos_kp is None or pos_damping_ratio is None else 2 * math.sqrt(pos_kp) * pos_damping_ratio
+        self.vel_kp = vel_kp
         self._use_impedances = use_impedances
         self._use_gravity_compensation = use_gravity_compensation
         self._use_cc_compensation = use_cc_compensation
@@ -134,11 +141,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         )
 
     def _update_goal(self, command, control_dict):
-        # Compute the base value for the command
-        base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
-
         # If we're using delta commands, add this value
         if self._use_delta_commands:
+            # Compute the base value for the command
+            base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
 
             # Apply the command to the base value.
             target = base_value + command
@@ -198,11 +204,11 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
                 vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
-                u = position_error * self.kp + vel_pos_error * self.kd
+                u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
                 velocity_error = target - base_value
-                u = velocity_error * self.kp
+                u = velocity_error * self.vel_kp
             else:  # effort
                 u = target
 

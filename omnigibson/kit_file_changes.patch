@@ -1,20 +1,34 @@
---- /scr/OmniGibson/omnigibson/omnigibson.kit	2024-05-31 13:49:52.291417266 -0700
-+++ /scr/home/yinhang/.local/share/ov/pkg/isaac_sim-2023.1.1/apps/omni.isaac.sim.python.kit	2024-03-16 12:03:21.560061977 -0700
-@@ -12,6 +12,7 @@
- "omni.kit.renderer.core" = {}
- 
- # Livestream - OV Streaming Client
-+"omni.kit.livestream.native" = {version = "2.4.0", exact = true}
- "omni.kit.streamsdk.plugins" = {version = "2.5.2", exact = true}
- 
- # Status Bar
-
-@@ -596,7 +597,7 @@
- "omni.isaac.cortex.sample_behaviors" = {}
- "omni.isaac.dofbot" = {}
- "omni.isaac.surface_gripper" = {}
--# "omni.kit.property.isaac" = {}
-+"omni.kit.property.isaac" = {}
- "omni.isaac.scene_blox" = {}
- "omni.isaac.sensor" = {}
- "omni.isaac.debug_draw" = {}
+2,3c2,3
+< title = "OmniGibson"
+< description = "A platform for accelerating Embodied AI research"
+---
+> title = "Isaac Sim Python"
+> description = "A trimmed down app for use with python samples"
+13c13
+< ## "omni.isaac.core_archive" = {}
+---
+> "omni.isaac.core_archive" = {}
+18d17
+< ## "omni.isaac.dofbot" = {}
+25c24
+< ## "omni.isaac.ml_archive" = {}
+---
+> "omni.isaac.ml_archive" = {}
+38,40c37,39
+< ## "omni.kit.property.isaac" = {}
+< ## "omni.pip.cloud" = {}
+< ## "omni.pip.compute" = {}
+---
+> "omni.kit.property.isaac" = {}
+> "omni.pip.cloud" = {}
+> "omni.pip.compute" = {}
+79d77
+< 
+82d79
+< 
+158c155
+< title = "OmniGibson"
+---
+> title = "Isaac Sim Python"
+271d267
+< pathStatCacheEnabled = false

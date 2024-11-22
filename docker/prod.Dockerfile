@@ -44,7 +44,7 @@ RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com
   DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-toolkit-11-8 && \
   TORCH_CUDA_ARCH_LIST='7.5;8.0;8.6+PTX' PATH=/usr/local/cuda-11.8/bin:$PATH LD_LIBRARY_PATH=/usr/local/cuda-11.8/lib64:$LD_LIBRARY_PATH \
     micromamba run -n omnigibson pip install \
-    git+https://github.com/StanfordVL/curobo@06d8c79b660db60c2881e9319e60899cbde5c5b5#egg=nvidia_curobo \
+    git+https://github.com/StanfordVL/curobo@6a4eb2ca8677829b0f57451ad107e0a3186525e9#egg=nvidia_curobo \
     --no-build-isolation > /dev/null && \
   apt-get remove -y cuda-toolkit-11-8 && apt-get autoremove -y && apt-get autoclean -y && rm -rf /var/lib/apt/lists/*
 

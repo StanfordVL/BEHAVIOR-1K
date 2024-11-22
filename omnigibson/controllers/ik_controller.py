@@ -47,8 +47,9 @@ class InverseKinematicsController(JointController, ManipulationController):
             th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], dtype=th.float32),
             th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], dtype=th.float32),
         ),
-        kp=None,
-        damping_ratio=None,
+        pos_kp=None,
+        pos_damping_ratio=None,
+        vel_kp=None,
         use_impedances=True,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
@@ -82,10 +83,12 @@ class InverseKinematicsController(JointController, ManipulationController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
-            kp (None or float): The proportional gain applied to the joint controller. If None, a default value
-                will be used. Only relevant if @use_impedances=True
-            damping_ratio (None or float): The damping ratio applied to the joint controller. If None, a default
-                value will be used. Only relevant if @use_impedances=True
+            pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
+            pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+                damping ratio applied to the joint controller. If None, a default value will be used.
+            vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
             mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
@@ -172,8 +175,9 @@ class InverseKinematicsController(JointController, ManipulationController):
             control_freq=control_freq,
             control_limits=control_limits,
             dof_idx=dof_idx,
-            kp=kp,
-            damping_ratio=damping_ratio,
+            pos_kp=pos_kp,
+            pos_damping_ratio=pos_damping_ratio,
+            vel_kp=vel_kp,
             motor_type="position",
             use_delta_commands=False,
             use_impedances=use_impedances,

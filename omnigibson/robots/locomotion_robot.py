@@ -185,11 +185,19 @@ class LocomotionRobot(BaseRobot):
         self.set_position_orientation(orientation=quat)
 
     @property
-    def base_links(self):
-        return [self.links[name] for name in self.base_link_names]
+    def non_floor_touching_base_links(self):
+        return [self.links[name] for name in self.non_floor_touching_base_link_names]
 
     @property
-    def base_link_names(self):
+    def non_floor_touching_base_link_names(self):
+        raise [self.base_footprint_link_name]
+
+    @property
+    def floor_touching_base_links(self):
+        return [self.links[name] for name in self.floor_touching_base_link_names]
+
+    @property
+    def floor_touching_base_link_names(self):
         raise NotImplementedError
 
     @property
