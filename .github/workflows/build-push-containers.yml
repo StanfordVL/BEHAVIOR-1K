@@ -22,7 +22,7 @@ jobs:
           sudo rm -rf \
             /usr/share/dotnet /usr/local/lib/android /opt/ghc \
             /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
-            /usr/lib/jvm || true
+            /usr/lib/jvm /opt/hostedtoolcache/CodeQL || true
           echo "some directories deleted"
           sudo apt install aptitude -y >/dev/null 2>&1
           sudo aptitude purge aria2 ansible azure-cli shellcheck rpm xorriso zsync \
@@ -98,6 +98,18 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
       -
+        name: Metadata for actions Image
+        id: meta-actions
+        uses: docker/metadata-action@v5
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        with:
+          images: |
+            stanfordvl/omnigibson-gha
+          tags: |
+            # We only push to the latest tag for the actions image
+            type=raw,value=latest
+      -
         name: Build and push prod image
         id: build-prod
         uses: docker/build-push-action@v5
@@ -107,8 +119,8 @@ jobs:
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
 
       -
         name: Build and push dev image
@@ -121,8 +133,8 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/prod.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
 
       - name: Update vscode image Dockerfile with prod image tag
         run: |
@@ -137,5 +149,25 @@ jobs:
           tags: ${{ steps.meta-vscode.outputs.tags }}
           labels: ${{ steps.meta-vscode.outputs.labels }}
           file: docker/vscode.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
+
+      - name: Update actions image Dockerfile with dev image tag
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        run: |
+          sed -i "s/omnigibson-dev:og-develop/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/gh-actions/Dockerfile && cat docker/gh-actions/Dockerfile
+      -
+        name: Build and push actions image
+        id: build-actions
+        uses: docker/build-push-action@v5
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        with:
+          context: docker/gh-actions
+          push: true
+          tags: ${{ steps.meta-actions.outputs.tags }}
+          labels: ${{ steps.meta-actions.outputs.labels }}
+          file: docker/gh-actions/Dockerfile
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
