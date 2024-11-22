@@ -99,6 +99,15 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
       -
+        name: Metadata for actions Image
+        id: meta-actions
+        uses: docker/metadata-action@v5
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        with:
+          images: |
+            stanfordvl/omnigibson-gha
+      -
         name: Build and push prod image
         id: build-prod
         uses: docker/build-push-action@v5
@@ -138,5 +147,25 @@ jobs:
           tags: ${{ steps.meta-vscode.outputs.tags }}
           labels: ${{ steps.meta-vscode.outputs.labels }}
           file: docker/vscode.Dockerfile
-          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
-          cache-to: type=inline
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
+
+      - name: Update actions image Dockerfile with dev image tag
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        run: |
+          sed -i "s/omnigibson-dev:og-develop/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/gh-actions/Dockerfile && cat docker/gh-actions/Dockerfile
+      -
+        name: Build and push actions image
+        id: build-actions
+        uses: docker/build-push-action@v5
+        # The actions image should only be built if the push is to og-develop
+        if: github.ref == 'refs/heads/og-develop'
+        with:
+          context: docker/gh-actions
+          push: true
+          tags: latest  # here we only push from og-develop, and only to the `latest` tag
+          labels: ${{ steps.meta-actions.outputs.labels }}
+          file: docker/gh-actions/Dockerfile
+          cache-from: type=registry,ref=stanfordvl/omnigibson:build-cache  # OK to share cache here.
+          cache-to: type=registry,ref=stanfordvl/omnigibson:build-cache,mode=max
