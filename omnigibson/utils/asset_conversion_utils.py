@@ -23,6 +23,7 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.scenes import Scene
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.urdfpy_utils import URDF
 from omnigibson.utils.usd_utils import create_primitive_mesh
 
 # Create module logger
@@ -959,13 +960,14 @@ def _process_glass_link(prim):
         )
 
 
-def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_channels=False):
+def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_render_channels=False):
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
     iGibson and OmniGibson datasets.
 
     Args:
+        usd_path (str): Path to USD file
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
@@ -979,7 +981,6 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
     """
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-    usd_path = f"{model_root_path}/usd/{obj_model}.usd"
     log.debug("Loading", usd_path, "for metadata import.")
 
     # Load model
@@ -1071,11 +1072,18 @@ def import_obj_metadata(obj_category, obj_model, dataset_root, import_render_cha
         if "glass" in link_tags:
             _process_glass_link(prim.GetChild(link))
 
+    # Rename model to be named <model>
+    old_prim_path = prim.GetPrimPath().pathString
+    new_prim_path = "/".join(old_prim_path.split("/")[:-1]) + f"/{obj_model}"
+    lazy.omni.kit.commands.execute("MovePrim", path_from=old_prim_path, path_to=new_prim_path)
+
+    prim = stage.GetDefaultPrim()
+
     # Save stage
     stage.Save()
 
-    # Delete stage reference and clear the sim stage variable, opening the dummy stage along the way
-    del stage
+    # Return the root prim
+    return prim
 
 
 def _recursively_replace_list_of_dict(dic):
@@ -1145,7 +1153,7 @@ def _recursively_replace_list_of_dict(dic):
     return dic
 
 
-def _create_urdf_import_config():
+def _create_urdf_import_config(use_convex_decomposition=False):
     """
     Creates and configures a URDF import configuration.
 
@@ -1154,6 +1162,10 @@ def _create_urdf_import_config():
     joint merging, convex decomposition, base fixing, inertia tensor import, distance scale,
     density, drive strength, position drive damping, self-collision, up vector, default prim
     creation, and physics scene creation.
+
+    Args:
+        use_convex_decomposition (bool): Whether to have omniverse use internal convex decomposition
+            on any collision meshes
 
     Returns:
         import_config: The configured URDF import configuration object.
@@ -1165,7 +1177,7 @@ def _create_urdf_import_config():
     )  # Hacky way to get class for default drive type, options are JOINT_DRIVE_{NONE / POSITION / VELOCITY}
 
     import_config.set_merge_fixed_joints(False)
-    import_config.set_convex_decomp(True)
+    import_config.set_convex_decomp(use_convex_decomposition)
     import_config.set_fix_base(False)
     import_config.set_import_inertia_tensor(False)
     import_config.set_distance_scale(1.0)
@@ -1180,24 +1192,28 @@ def _create_urdf_import_config():
     return import_config
 
 
-def import_obj_urdf(obj_category, obj_model, dataset_root):
+def import_obj_urdf(urdf_path, obj_category, obj_model, dataset_root=gm.EXTERNAL_DATASET_PATH, use_omni_convex_decomp=False, use_usda=False):
     """
     Imports an object from a URDF file into the current stage.
 
     Args:
+        urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
+        use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
+        use_usda (bool): If set, will write files to .usda files instead of .usd
+            (bigger memory footprint, but human-readable)
 
     Returns:
-        None
+        str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for metalinks
-    urdf_path = _add_metalinks_to_urdf(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
+    urdf_path = _add_metalinks_to_urdf(urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
     # Import URDF
-    cfg = _create_urdf_import_config()
+    cfg = _create_urdf_import_config(use_convex_decomposition=use_omni_convex_decomp)
     # Check if filepath exists
-    usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
+    usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.{'usda' if use_usda else 'usd'}"
     if _SPLIT_COLLISION_MESHES:
         log.debug(f"Converting collision meshes from {obj_category}, {obj_model}...")
         urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
@@ -1210,6 +1226,8 @@ def import_obj_urdf(obj_category, obj_model, dataset_root):
         dest_path=usd_path,
     )
     log.debug(f"Imported {obj_category}, {obj_model}")
+
+    return usd_path
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
@@ -1426,7 +1444,7 @@ def _save_xmltree_as_urdf(root_element, name, dirpath, unique_urdf=False):
     return fpath
 
 
-def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
+def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     """
     Adds meta links to a URDF file based on metadata.
 
@@ -1434,6 +1452,7 @@ def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
     saves an updated version of the URDF file with these meta links.
 
     Args:
+        urdf_path (str): Path to URDF
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
@@ -1443,7 +1462,6 @@ def _add_metalinks_to_urdf(obj_category, obj_model, dataset_root):
     """
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-    urdf_path = f"{model_root_path}/{obj_model}.urdf"
 
     # Load urdf
     tree = ET.parse(urdf_path)
@@ -1720,50 +1738,310 @@ def _get_joint_info(joint_element):
     return child, pos, quat, fixed_jnt
 
 
-def generate_collision_meshes(trimesh_mesh, hull_count=32, discard_not_volume=True):
+def make_mesh_positive(mesh_fpath, scale, output_suffix="mirror"):
+    assert "." not in mesh_fpath
+    for sc, letter in zip(scale, "xyz"):
+        if sc < 0:
+            output_suffix += f"_{letter}"
+    for filetype in [".obj", ".stl", ".dae"]:
+        fpath = f"{mesh_fpath}{filetype}"
+        out_fpath = f"{mesh_fpath}_{output_suffix}{filetype}"
+        kwargs = dict()
+        if filetype == ".dae":
+            kwargs["force"] = "mesh"
+        if os.path.exists(fpath):
+            try:
+                tm = trimesh.load(fpath, **kwargs)
+                tm.apply_scale(scale)
+                tm.export(out_fpath)
+                if filetype == ".obj":
+                    # Update header lines
+                    lines = []
+                    with open(fpath, "r") as f:
+                        for line in f.readlines():
+                            if line.startswith("v "):
+                                break
+                            lines.append(line)
+                    start = False
+                    with open(out_fpath, "r") as f:
+                        for line in f.readlines():
+                            if line.startswith("v "):
+                                start = True
+                            if start:
+                                lines.append(line)
+                    with open(out_fpath, "w+") as f:
+                        f.writelines(lines)
+            except KeyError:
+                # Degenerate mesh, so immediately return
+                return None
+    return output_suffix
+
+def make_asset_positive(urdf_fpath, output_suffix="mirror"):
+    assert urdf_fpath.endswith(".urdf")
+    out_lines = []
+
+    with open(urdf_fpath, "r") as f:
+        for line in f.readlines():
+            # print(line)
+            out_line = line
+            if "<mesh " in line and "scale=" in line:
+                # Grab the scale, and possibly convert negative values
+                scale_str = line.split("scale=")[1].split('"')[1]
+                scale = _space_string_to_tensor(scale_str)
+                if th.any(scale < 0).item():
+                    mesh_rel_fpath = line.split("filename=")[1].split('"')[1]
+                    base_fpath = f"{os.path.dirname(urdf_fpath)}/"
+                    mesh_abs_fpath = f"{base_fpath}{mesh_rel_fpath}"
+                    filetype = mesh_abs_fpath.split(".")[-1]
+                    mesh_output_suffix = make_mesh_positive(mesh_abs_fpath.split(".")[0], scale.cpu().numpy(), output_suffix)
+                    new_mesh_abs_fpath = mesh_abs_fpath.replace(f".{filetype}", f"_{mesh_output_suffix}.{filetype}")
+                    new_mesh_rel_fpath = new_mesh_abs_fpath.split(base_fpath)[1]
+                    out_line = line.replace(mesh_rel_fpath, new_mesh_rel_fpath).replace(scale_str, "1 1 1")
+            out_lines.append(out_line)
+
+    # Write to output file
+    out_file = urdf_fpath.replace(".urdf", f"_{output_suffix}.urdf")
+    with open(out_file, "w+") as f:
+        f.writelines(out_lines)
+
+    return out_file
+
+
+def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, discard_not_volume=True):
     """
     Generates a set of collision meshes from a trimesh mesh using CoACD.
 
     Args:
         trimesh_mesh (trimesh.Trimesh): The trimesh mesh to generate the collision mesh from.
+        method (str): Method to generate collision meshes. Valid options are {"coacd", "convex"}
+        hull_count (int): If @method="coacd", this sets the max number of hulls to generate
+        discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
+            that are not proper volumes
 
     Returns:
         List[trimesh.Trimesh]: The collision meshes.
     """
-    try:
-        import coacd
-    except ImportError:
-        raise ImportError("Please install the `coacd` package to use this function.")
+    # If the mesh is convex or the mesh is a proper volume and similar to its convex hull, simply return that directly
+    if trimesh_mesh.is_convex or (trimesh_mesh.is_volume and (trimesh_mesh.volume / trimesh_mesh.convex_hull.volume) > 0.90):
+        hulls = [trimesh_mesh.convex_hull]
 
-    # Get the vertices and faces
-    coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
+    elif method == "coacd":
+        try:
+            import coacd
+        except ImportError:
+            raise ImportError("Please install the `coacd` package to use this function.")
 
-    # Run CoACD with the hull count
-    result = coacd.run_coacd(
-        coacd_mesh,
-        max_convex_hull=hull_count,
-    )
+        # Get the vertices and faces
+        coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
 
-    # Convert the returned vertices and faces to trimesh meshes
-    # and assert that they are volumes (and if not, discard them if required)
-    hulls = []
-    for vs, fs in result:
-        hull = trimesh.Trimesh(vertices=vs, faces=fs, process=False)
-        if discard_not_volume and not hull.is_volume:
-            continue
-        hulls.append(hull)
+        # Run CoACD with the hull count
+        result = coacd.run_coacd(
+            coacd_mesh,
+            max_convex_hull=hull_count,
+        )
 
-    # Assert that we got _some_ collision meshes
-    assert len(hulls) > 0, "No collision meshes generated!"
+        # Convert the returned vertices and faces to trimesh meshes
+        # and assert that they are volumes (and if not, discard them if required)
+        hulls = []
+        coacd_vol = 0.0
+        for vs, fs in result:
+            hull = trimesh.Trimesh(vertices=vs, faces=fs, process=False)
+            if discard_not_volume and not hull.is_volume:
+                continue
+            hulls.append(hull)
+            coacd_vol += hull.convex_hull.volume
+
+        # Assert that we got _some_ collision meshes
+        assert len(hulls) > 0, "No collision meshes generated!"
+
+        # Compare coacd's generation compared to the original mesh's convex hull
+        # If the difference is small (<10% volume difference), simply keep the convex hull
+        vol_ratio = coacd_vol / trimesh_mesh.convex_hull.volume
+        if 0.95 < vol_ratio < 1.05:
+            print("MINIMAL CHANGE -- USING CONVEX HULL INSTEAD")
+            # from IPython import embed; embed()
+            hulls = [trimesh_mesh.convex_hull]
+
+    elif method == "convex":
+        hulls = [trimesh_mesh.convex_hull]
+
+    else:
+        raise ValueError(f"Invalid collision mesh generation method specified: {method}")
 
     return hulls
 
 
-def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
+def get_collision_approximation_for_urdf(
+        urdf_path,
+        collision_method="coacd",
+        hull_count=32,
+        coacd_links=None,
+        convex_links=None,
+        no_decompose_links=None,
+        visual_only_links=None,
+        ignore_links=None,
+):
+    """
+    Computes collision approximation for all collision meshes (which are assumed to be non-convex) in
+    the given URDF.
+
+    NOTE: This is an in-place operation! It will overwrite @urdf_path
+
+    Args:
+        urdf_path (str): Absolute path to the URDF to decompose
+        collision_method (str): Default collision method to use. Valid options are: {"coacd", "convex"}
+        hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
+            Only relevant if @collision_method is "coacd"
+        coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
+        convex_links (None or list of str): If specified, links that should use convex hull to decompose collision meshes
+        no_decompose_links (None or list of str): If specified, links that should not have any special collision
+            decomposition applied. This will only use the convex hull
+        visual_only_links (None or list of str): If specified, link names corresponding to links that should have
+            no collision associated with them (so any pre-existing collisions will be removed!)
+        ignore_links (None or list of str): If specified, link names corresponding to links that should be skipped
+            during collision generation process
+    """
+    # Load URDF
+    tree = ET.parse(urdf_path)
+    root = tree.getroot()
+
+    # Next, iterate over each visual mesh and define collision meshes for them
+    coacd_links = set() if coacd_links is None else set(coacd_links)
+    convex_links = set() if convex_links is None else set(convex_links)
+    no_decompose_links = set() if no_decompose_links is None else set(no_decompose_links)
+    visual_only_links = set() if visual_only_links is None else set(visual_only_links)
+    ignore_links = set() if ignore_links is None else set(ignore_links)
+    col_mesh_folder = pathlib.Path(os.path.dirname(urdf_path)) / "meshes" / "collision"
+    col_mesh_folder.mkdir(exist_ok=True, parents=True)
+    for link in root.findall("link"):
+        link_name = link.attrib["name"]
+        old_cols = link.findall("collision")
+        # Completely skip this link if this a link to explicitly skip or we have no collision tags
+        if link_name in ignore_links or len(old_cols) == 0:
+            continue
+
+        print(f"Generating collision approximation for link {link_name}...")
+        generated_new_col = False
+        idx = 0
+        if link_name not in visual_only_links:
+            for vis in link.findall(f"visual"):
+                # Get origin
+                origin = vis.find("origin")
+                # Check all geometries
+                geoms = vis.findall("geometry/*")
+                # We should only have a single geom, so assert here
+                assert len(geoms) == 1
+                # Check whether we actually need to generate a collision approximation
+                # No need if the geom type is not a mesh (i.e.: it's a primitive -- so we assume if a collision is already
+                # specified, it's that same primitive)
+                geom = geoms[0]
+                if geom.tag != "mesh":
+                    continue
+                mesh_path = os.path.join(os.path.dirname(urdf_path), geom.attrib["filename"])
+                tm = trimesh.load(mesh_path, force="mesh", process=False)
+
+                if link_name in coacd_links:
+                    method = "coacd"
+                elif link_name in convex_links:
+                    method = "convex"
+                elif link_name in no_decompose_links:
+                    # Output will just be ignored, so skip
+                    continue
+                else:
+                    method = collision_method
+
+                collision_meshes = generate_collision_meshes(
+                    trimesh_mesh=tm,
+                    method=method,
+                    hull_count=hull_count,
+                )
+                # Save and merge precomputed collision mesh
+                collision_filenames_and_scales = []
+                for i, collision_mesh in enumerate(collision_meshes):
+                    processed_collision_mesh = collision_mesh.copy()
+                    processed_collision_mesh._cache.cache["vertex_normals"] = processed_collision_mesh.vertex_normals
+                    collision_filename = f"{link_name}-col-{idx}.obj"
+
+                    # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
+                    bounding_box = processed_collision_mesh.bounding_box.extents
+                    assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
+                    collision_scale = 1.0 / bounding_box
+                    collision_scale_matrix = th.eye(4)
+                    collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
+                    processed_collision_mesh.apply_transform(collision_scale_matrix.numpy())
+                    processed_collision_mesh.export(col_mesh_folder / collision_filename, file_type="obj")
+                    collision_filenames_and_scales.append((collision_filename, 1 / collision_scale))
+
+                    idx += 1
+
+                for collision_filename, collision_scale in collision_filenames_and_scales:
+                    collision_xml = ET.SubElement(link, "collision")
+                    collision_xml.attrib = {"name": collision_filename.replace(".obj", "")}
+                    # Add origin info if defined
+                    if origin is not None:
+                        collision_xml.append(deepcopy(origin))
+                    collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
+                    collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
+                    collision_mesh_xml.attrib = {
+                        "filename": str(col_mesh_folder / collision_filename),
+                        "scale": " ".join([str(item) for item in collision_scale]),
+                    }
+
+                if link_name not in no_decompose_links:
+                    generated_new_col = True
+
+        # If we generated a new set of collision meshes, remove the old ones
+        if generated_new_col or link_name in visual_only_links:
+            for col in old_cols:
+                link.remove(col)
+
+    # Save the URDF file
+    _save_xmltree_as_urdf(
+        root_element=root,
+        name=os.path.splitext(os.path.basename(urdf_path))[0],
+        dirpath=os.path.dirname(urdf_path),
+        unique_urdf=False,
+    )
+
+
+def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False):
     # Create a directory for the object
-    obj_dir = pathlib.Path(gm.USER_ASSETS_PATH) / "objects" / category / mdl
-    assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
-    obj_dir.mkdir(parents=True)
+    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
+    if not overwrite:
+        assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
+    obj_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy over all relevant meshes to new obj directory
+    old_urdf_dir = pathlib.Path(os.path.dirname(urdf_path))
+
+    # Load urdf
+    tree = ET.parse(urdf_path)
+    root = tree.getroot()
+
+    # Find all mesh paths, and replace them with new obj directory
+    new_dirs = set()
+    for mesh_type in ["visual", "collision"]:
+        for mesh_element in root.findall(f"link/{mesh_type}/geometry/mesh"):
+            mesh_root_dir = mesh_element.attrib["filename"].split("/")[0]
+            new_dirs.add(mesh_root_dir)
+    for new_dir in new_dirs:
+        shutil.copytree(old_urdf_dir / new_dir, obj_dir / new_dir, dirs_exist_ok=overwrite)
+
+    # Export this URDF
+    return _save_xmltree_as_urdf(
+        root_element=root,
+        name=mdl,
+        dirpath=obj_dir,
+        unique_urdf=False,
+    )
+
+
+def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False):
+    # Create a directory for the object
+    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
+    if not overwrite:
+        assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
+    obj_dir.mkdir(parents=True, exist_ok=True)
 
     obj_name = "-".join([category, mdl])
 
@@ -1926,8 +2204,49 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
     with open(obj_dir / f"{mdl}.urdf", "wb") as f:
         tree.write(f, xml_declaration=True)
 
-    base_link_offset = visual_mesh.bounding_box.centroid
-    bbox_size = visual_mesh.bounding_box.extents
+
+def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", overwrite=False):
+    """
+    Records object metadata and writes it to misc/metadata.json within the object directory.
+
+    Args:
+        urdf_path (str): Path to object URDF
+        obj_dir (str): Absolute path to the object's root directory
+        joint_setting (str): Setting for joints when calculating canonical metadata. Valid options
+            are {"low", "zero", "high"} (i.e.: lower joint limit, all 0 values, or upper joint limit)
+        overwrite (bool): Whether to overwrite any pre-existing data
+    """
+    # Load the URDF file into urdfpy
+    robot = URDF.load(urdf_path)
+
+    # Do FK with everything at desired configuration
+    if joint_setting == "zero":
+        val = lambda jnt: 0.0
+    elif joint_setting == "low":
+        val = lambda jnt: jnt.limit.lower
+    elif joint_setting == "high":
+        val = lambda jnt: jnt.limit.upper
+    else:
+        raise ValueError(f"Got invalid joint_setting: {joint_setting}! Valid options are ['low', 'zero', 'high']")
+    joint_cfg = {
+        joint.name: val(joint)
+        for joint in robot.joints
+        if joint.joint_type in ("prismatic", "revolute")
+    }
+    vfk = robot.visual_trimesh_fk(cfg=joint_cfg)
+
+    scene = trimesh.Scene()
+    for mesh, transform in vfk.items():
+        scene.add_geometry(geometry=mesh, transform=transform)
+
+    # Calculate relevant metadata
+
+    # Base link offset is pos offset from robot root link -> overall AABB center
+    # Since robot is placed at origin, this is simply the AABB centroid
+    base_link_offset = scene.bounding_box.centroid
+
+    # BBox size is simply the extent of the overall AABB
+    bbox_size = scene.bounding_box.extents
 
     # Save metadata json
     out_metadata = {
@@ -1938,7 +2257,116 @@ def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl):
         "bbox_size": bbox_size.tolist(),
         "orientations": [],
     }
-    misc_dir = obj_dir / "misc"
-    misc_dir.mkdir()
+    misc_dir = pathlib.Path(obj_dir) / "misc"
+    misc_dir.mkdir(exist_ok=overwrite)
     with open(misc_dir / "metadata.json", "w") as f:
         json.dump(out_metadata, f)
+
+
+def import_og_asset_from_urdf(
+    category,
+    model,
+    urdf_path=None,
+    collision_method="coacd",
+    coacd_links=None,
+    convex_links=None,
+    no_decompose_links=None,
+    visual_only_links=None,
+    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    hull_count=32,
+    overwrite=False,
+    use_usda=False,
+):
+    """
+    Imports an asset from URDF format into OmniGibson-compatible USD format. This will write the new USD
+    (and copy the URDF if it does not already exist within @dataset_root) to @dataset_root
+
+    Args:
+        category (str): Category to assign to imported asset
+        model (str): Model name to assign to imported asset
+        urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
+            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
+        collision_method (None or str): If specified, collision decomposition method to use to generate
+            OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
+        coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
+        convex_links (None or list of str): If specified, links that should use convex hull to decompose collision meshes
+        no_decompose_links (None or list of str): If specified, links that should not have any special collision
+            decomposition applied. This will only use the convex hull
+        visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
+        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is external dataset
+            path set from the global macros
+        hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
+            Only relevant if @collision_method is "coacd"
+        overwrite (bool): If set, will overwrite any pre-existing files
+        use_usda (bool): If set, will write files to .usda files instead of .usd
+            (bigger memory footprint, but human-readable)
+
+    Returns:
+        2-tuple:
+            - str: Absolute path to generated USD file
+            - Usd.Prim: Generated root USD prim (currently on active stage)
+    """
+    # If URDF already exists, write it to the dataset
+    if urdf_path is not None:
+        print(f"Copying URDF to dataset root {dataset_root}...")
+        urdf_path = copy_urdf_to_dataset(
+            urdf_path=urdf_path,
+            category=category,
+            mdl=model,
+            dataset_root=dataset_root,
+            overwrite=overwrite,
+        )
+    else:
+        # Verify that the object exists at the expected location
+        # This is <dataset_root>/objects/<category>/<model>/<model>.urdf
+        urdf_path = os.path.join(dataset_root, "objects", category, model, f"{model}.urdf")
+        assert os.path.exists(urdf_path), f"Expected urdf at dataset location {urdf_path}, but none was found!"
+
+    # Make sure all scaling is positive
+    urdf_path = make_asset_positive(urdf_fpath=urdf_path)
+
+    # Update collisions if requested
+    if collision_method is not None:
+        print("Generating collision approximation for URDF...")
+        get_collision_approximation_for_urdf(
+            urdf_path=urdf_path,
+            collision_method=collision_method,
+            hull_count=hull_count,
+            coacd_links=coacd_links,
+            convex_links=convex_links,
+            no_decompose_links=no_decompose_links,
+            visual_only_links=visual_only_links,
+        )
+
+    # Generate metadata
+    print("Recording object metadata from URDF...")
+    record_obj_metadata_from_urdf(
+        urdf_path=urdf_path,
+        obj_dir=os.path.dirname(urdf_path),
+        joint_setting="zero",
+        overwrite=overwrite,
+    )
+
+    # Convert to USD
+    print("Converting obj URDF to USD...")
+    og.launch()
+    assert len(og.sim.scenes) == 0
+    usd_path = import_obj_urdf(
+        urdf_path=urdf_path,
+        obj_category=category,
+        obj_model=model,
+        dataset_root=dataset_root,
+        use_omni_convex_decomp=False,       # We already pre-decomposed the values, so don' use omni convex decomp
+        use_usda=use_usda,
+    )
+
+    prim = import_obj_metadata(
+        usd_path=usd_path,
+        obj_category=category,
+        obj_model=model,
+        dataset_root=dataset_root,
+        import_render_channels=False,        # TODO: Make this True once we find a systematic / robust way to import materials of different source formats
+    )
+    print(f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n")
+
+    return usd_path, prim
