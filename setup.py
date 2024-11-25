@@ -47,6 +47,7 @@ setup(
         "rtree>=1.2.0",
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
+        "lxml",
     ],
     extras_require={
         "dev": [
