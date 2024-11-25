@@ -5,6 +5,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
@@ -116,7 +117,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
-            default_trunk_offset=0.0,  # not applicable for R1
             default_reset_mode=default_reset_mode,
             **kwargs,
         )
@@ -177,8 +177,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def assisted_grasp_start_points(self):
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.01])),
+                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.01])),
             ]
             for arm in self.arm_names
         }
@@ -187,15 +187,15 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def assisted_grasp_end_points(self):
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.009])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.009])),
+                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([-0.032, 0.0, -0.01])),
+                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([0.025, 0.0, -0.01])),
             ]
             for arm in self.arm_names
         }
 
     @property
-    def base_link_names(self):
-        return ["base_link"]  # , "wheel_link1", "wheel_link2", "wheel_link3"]
+    def floor_touching_base_link_names(self):
+        return ["wheel_link1", "wheel_link2", "wheel_link3"]
 
     @property
     def trunk_link_names(self):
@@ -238,8 +238,23 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/r1/r1.usd")
 
     @property
+    def curobo_path(self):
+        return {
+            emb_sel: os.path.join(gm.ASSET_PATH, f"models/r1/r1_description_curobo_{emb_sel.value}.yaml")
+            for emb_sel in CuroboEmbodimentSelection
+        }
+
+    @property
+    def curobo_attached_object_link_names(self):
+        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
+
+    @property
     def robot_arm_descriptor_yamls(self):
-        return {arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names}
+        descriptor_yamls = {
+            arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names
+        }
+        descriptor_yamls["combined"]: os.path.join(gm.ASSET_PATH, "models/r1/r1_combined_descriptor.yaml")
+        return descriptor_yamls
 
     @property
     def urdf_path(self):

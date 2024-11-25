@@ -151,9 +151,9 @@ def create_object_from_init_info(init_info):
 
 def safe_equal(a, b):
     if isinstance(a, th.Tensor) and isinstance(b, th.Tensor):
-        return (a == b).all().item()
+        return a.shape == b.shape and (a == b).all().item()
     elif isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
-        return all(safe_equal(a_item, b_item) for a_item, b_item in zip(a, b))
+        return len(a) == len(b) and all(safe_equal(a_item, b_item) for a_item, b_item in zip(a, b))
     else:
         return a == b
 
