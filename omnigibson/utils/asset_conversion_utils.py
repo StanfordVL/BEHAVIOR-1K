@@ -1192,7 +1192,14 @@ def _create_urdf_import_config(use_convex_decomposition=False):
     return import_config
 
 
-def import_obj_urdf(urdf_path, obj_category, obj_model, dataset_root=gm.EXTERNAL_DATASET_PATH, use_omni_convex_decomp=False, use_usda=False):
+def import_obj_urdf(
+    urdf_path,
+    obj_category,
+    obj_model,
+    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    use_omni_convex_decomp=False,
+    use_usda=False,
+):
     """
     Imports an object from a URDF file into the current stage.
 
@@ -1209,7 +1216,9 @@ def import_obj_urdf(urdf_path, obj_category, obj_model, dataset_root=gm.EXTERNAL
         str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for metalinks
-    urdf_path = _add_metalinks_to_urdf(urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
+    urdf_path = _add_metalinks_to_urdf(
+        urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
+    )
     # Import URDF
     cfg = _create_urdf_import_config(use_convex_decomposition=use_omni_convex_decomp)
     # Check if filepath exists
@@ -1776,6 +1785,7 @@ def make_mesh_positive(mesh_fpath, scale, output_suffix="mirror"):
                 return None
     return output_suffix
 
+
 def make_asset_positive(urdf_fpath, output_suffix="mirror"):
     assert urdf_fpath.endswith(".urdf")
     out_lines = []
@@ -1793,7 +1803,9 @@ def make_asset_positive(urdf_fpath, output_suffix="mirror"):
                     base_fpath = f"{os.path.dirname(urdf_fpath)}/"
                     mesh_abs_fpath = f"{base_fpath}{mesh_rel_fpath}"
                     filetype = mesh_abs_fpath.split(".")[-1]
-                    mesh_output_suffix = make_mesh_positive(mesh_abs_fpath.split(".")[0], scale.cpu().numpy(), output_suffix)
+                    mesh_output_suffix = make_mesh_positive(
+                        mesh_abs_fpath.split(".")[0], scale.cpu().numpy(), output_suffix
+                    )
                     new_mesh_abs_fpath = mesh_abs_fpath.replace(f".{filetype}", f"_{mesh_output_suffix}.{filetype}")
                     new_mesh_rel_fpath = new_mesh_abs_fpath.split(base_fpath)[1]
                     out_line = line.replace(mesh_rel_fpath, new_mesh_rel_fpath).replace(scale_str, "1 1 1")
@@ -1822,7 +1834,9 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
         List[trimesh.Trimesh]: The collision meshes.
     """
     # If the mesh is convex or the mesh is a proper volume and similar to its convex hull, simply return that directly
-    if trimesh_mesh.is_convex or (trimesh_mesh.is_volume and (trimesh_mesh.volume / trimesh_mesh.convex_hull.volume) > 0.90):
+    if trimesh_mesh.is_convex or (
+        trimesh_mesh.is_volume and (trimesh_mesh.volume / trimesh_mesh.convex_hull.volume) > 0.90
+    ):
         hulls = [trimesh_mesh.convex_hull]
 
     elif method == "coacd":
@@ -1872,14 +1886,14 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
 
 
 def get_collision_approximation_for_urdf(
-        urdf_path,
-        collision_method="coacd",
-        hull_count=32,
-        coacd_links=None,
-        convex_links=None,
-        no_decompose_links=None,
-        visual_only_links=None,
-        ignore_links=None,
+    urdf_path,
+    collision_method="coacd",
+    hull_count=32,
+    coacd_links=None,
+    convex_links=None,
+    no_decompose_links=None,
+    visual_only_links=None,
+    ignore_links=None,
 ):
     """
     Computes collision approximation for all collision meshes (which are assumed to be non-convex) in
@@ -1964,7 +1978,9 @@ def get_collision_approximation_for_urdf(
 
                     # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
                     bounding_box = processed_collision_mesh.bounding_box.extents
-                    assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
+                    assert all(
+                        x > 0 for x in bounding_box
+                    ), f"Bounding box extents are not all positive: {bounding_box}"
                     collision_scale = 1.0 / bounding_box
                     collision_scale_matrix = th.eye(4)
                     collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
@@ -2036,7 +2052,9 @@ def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATA
     )
 
 
-def generate_urdf_for_obj(visual_mesh, collision_meshes, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False):
+def generate_urdf_for_obj(
+    visual_mesh, collision_meshes, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False
+):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
     if not overwrite:
@@ -2228,11 +2246,7 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
         val = lambda jnt: jnt.limit.upper
     else:
         raise ValueError(f"Got invalid joint_setting: {joint_setting}! Valid options are ['low', 'zero', 'high']")
-    joint_cfg = {
-        joint.name: val(joint)
-        for joint in robot.joints
-        if joint.joint_type in ("prismatic", "revolute")
-    }
+    joint_cfg = {joint.name: val(joint) for joint in robot.joints if joint.joint_type in ("prismatic", "revolute")}
     vfk = robot.visual_trimesh_fk(cfg=joint_cfg)
 
     scene = trimesh.Scene()
@@ -2356,7 +2370,7 @@ def import_og_asset_from_urdf(
         obj_category=category,
         obj_model=model,
         dataset_root=dataset_root,
-        use_omni_convex_decomp=False,       # We already pre-decomposed the values, so don' use omni convex decomp
+        use_omni_convex_decomp=False,  # We already pre-decomposed the values, so don' use omni convex decomp
         use_usda=use_usda,
     )
 
@@ -2365,8 +2379,10 @@ def import_og_asset_from_urdf(
         obj_category=category,
         obj_model=model,
         dataset_root=dataset_root,
-        import_render_channels=False,        # TODO: Make this True once we find a systematic / robust way to import materials of different source formats
+        import_render_channels=False,  # TODO: Make this True once we find a systematic / robust way to import materials of different source formats
     )
-    print(f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n")
+    print(
+        f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
+    )
 
     return usd_path, prim

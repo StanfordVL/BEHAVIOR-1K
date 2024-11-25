@@ -60,7 +60,9 @@ def determine_gm_path(default_path, env_var_name):
 # can override assets_path and dataset_path from environment variable
 gm.ASSET_PATH = determine_gm_path(os.path.join("data", "assets"), "OMNIGIBSON_ASSET_PATH")
 gm.DATASET_PATH = determine_gm_path(os.path.join("data", "og_dataset"), "OMNIGIBSON_DATASET_PATH")
-gm.EXTERNAL_DATASET_PATH = determine_gm_path(os.path.join("data", "external_dataset"), "OMNIGIBSON_EXTERNAL_DATASET_PATH")
+gm.EXTERNAL_DATASET_PATH = determine_gm_path(
+    os.path.join("data", "external_dataset"), "OMNIGIBSON_EXTERNAL_DATASET_PATH"
+)
 gm.KEY_PATH = determine_gm_path(os.path.join("data", "omnigibson.key"), "OMNIGIBSON_KEY_PATH")
 
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either

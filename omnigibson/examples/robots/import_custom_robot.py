@@ -1,26 +1,24 @@
 """
 Helper script to download OmniGibson dataset and assets.
 """
-from pathlib import Path
+
 from copy import deepcopy
+from pathlib import Path
 
 import yaml
-yaml.Dumper.ignore_aliases = lambda *args : True
-from addict import Dict
 
+yaml.Dumper.ignore_aliases = lambda *args: True
 import click
 import torch as th
+from addict import Dict
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import gm
+from omnigibson.utils.asset_conversion_utils import _add_xform_properties, import_og_asset_from_urdf
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.usd_utils import create_primitive_mesh, create_joint
-from omnigibson.utils.asset_conversion_utils import (
-    import_og_asset_from_urdf,
-    _add_xform_properties,
-)
+from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
 
 # Make sure flatcache is NOT used so we write directly to USD
 gm.ENABLE_FLATCACHE = False
@@ -88,8 +86,9 @@ def create_rigid_prim(stage, link_prim_path):
     """
     # Make sure link prim does NOT already exist (this should be a new link)
     link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
-    assert not link_prim_exists, \
-        f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"
+    assert (
+        not link_prim_exists
+    ), f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"
 
     # Manually create a new prim (specified offset)
     link_prim = lazy.pxr.UsdGeom.Xform.Define(stage, link_prim_path).GetPrim()
@@ -105,12 +104,12 @@ def create_rigid_prim(stage, link_prim_path):
 def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, pos_offset=None, ori_offset=None):
     """
     Adds sensor to robot. This is an in-place operation on @root_prim
-    
+
     Args:
         stage (Usd.Stage): Current active omniverse stage
         root_prim (Usd.Prim): Root prim of the current robot, assumed to be on the current stage
         sensor_type (str): Sensor to create. Valid options are: {Camera, Lidar, VisualSphere}
-        link_name (str): Link to attach the created sensor prim to. If this link does not already exist in the robot's 
+        link_name (str): Link to attach the created sensor prim to. If this link does not already exist in the robot's
             current set of links, a new one will be created as a child of @parent_link_name's link
         parent_link_name (None or str): If specified, parent link from which to create a new child link @link_name. If
             set, @link_name should NOT be a link already found on the robot!
@@ -122,9 +121,9 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             If only @link_name is specified, defines offset of the sensor prim wrt @link_name
     """
     # Make sure pos and ori offsets are defined
-    if pos_offset is None or pos_offset == {}:                        # May be {} from empty addict key
+    if pos_offset is None or pos_offset == {}:  # May be {} from empty addict key
         pos_offset = (0, 0, 0)
-    if ori_offset is None or ori_offset == {}:                        # May be {} from empty addict key
+    if ori_offset is None or ori_offset == {}:  # May be {} from empty addict key
         ori_offset = (0, 0, 0, 1)
 
     pos_offset = th.tensor(pos_offset, dtype=th.float)
@@ -132,18 +131,22 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     # Sanity check link / parent link combos
     root_prim_path = root_prim.GetPrimPath().pathString
-    if parent_link_name is None or parent_link_name == {}:            # May be {} from empty addict key
+    if parent_link_name is None or parent_link_name == {}:  # May be {} from empty addict key
         parent_link_prim = None
     else:
         parent_path = f"{root_prim_path}/{parent_link_name}"
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(parent_path), f"Could not find parent link within robot with name {parent_link_name}!"
+        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(
+            parent_path
+        ), f"Could not find parent link within robot with name {parent_link_name}!"
         parent_link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(parent_path)
 
     # If parent link is defined, link prim should NOT exist (this should be a new link)
     link_prim_path = f"{root_prim_path}/{link_name}"
     link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
-        assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        assert (
+            not link_prim_exists
+        ), f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
         link_prim = create_rigid_prim(
             stage=stage,
@@ -174,12 +177,16 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     else:
         # Otherwise, link prim MUST exist
-        assert link_prim_exists, f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
+        assert (
+            link_prim_exists
+        ), f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
         link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(link_prim_path)
 
     # Define functions to generate the desired sensor prim
     if sensor_type == "Camera":
-        create_sensor_prim = lambda parent_prim_path: lazy.pxr.UsdGeom.Camera.Define(stage, f"{parent_prim_path}/Camera").GetPrim()
+        create_sensor_prim = lambda parent_prim_path: lazy.pxr.UsdGeom.Camera.Define(
+            stage, f"{parent_prim_path}/Camera"
+        ).GetPrim()
     elif sensor_type == "Lidar":
         create_sensor_prim = lambda parent_prim_path: lazy.omni.kit.commands.execute(
             "RangeSensorCreateLidar",
@@ -196,7 +203,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             rotation_rate=0.0,
             high_lod=False,
             yaw_offset=0.0,
-            enable_semantics=False
+            enable_semantics=False,
         )[1].GetPrim()
     elif sensor_type == "VisualSphere":
         create_sensor_prim = lambda parent_prim_path: create_primitive_mesh(
@@ -224,7 +231,9 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
     # If we didn't have a parent prim defined, we need to add the offset directly to this sensor
     if parent_link_prim is None:
         sensor_prim.GetAttribute("xformOp:translate").Set(lazy.pxr.Gf.Vec3d(*pos_offset.tolist()))
-        sensor_prim.GetAttribute("xformOp:orient").Set(lazy.pxr.Gf.Quatd(*ori_offset[[3, 0, 1, 2]].tolist()))  # expects (w,x,y,z)
+        sensor_prim.GetAttribute("xformOp:orient").Set(
+            lazy.pxr.Gf.Quatd(*ori_offset[[3, 0, 1, 2]].tolist())
+        )  # expects (w,x,y,z)
 
 
 def _find_prim_with_condition(condition, root_prim):
@@ -302,7 +311,9 @@ def find_articulation_root_prim(root_prim):
     Returns:
         None or Usd.Prim: If found, articulation root prim
     """
-    return _find_prim_with_condition(condition=lambda prim: prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI), root_prim=root_prim)
+    return _find_prim_with_condition(
+        condition=lambda prim: prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI), root_prim=root_prim
+    )
 
 
 def find_all_prim_children_with_type(prim_type, root_prim):
@@ -342,78 +353,80 @@ def make_joint_fixed(stage, root_prim, joint_name):
     # Remove its Joint APIs and add Fixed Joint API
     joint_type = joint_prim.GetTypeName()
     if joint_type != "PhysicsFixedJoint":
-        assert joint_type in {"PhysicsRevoluteJoint", "PhysicsPrismaticJoint"}, \
-            f"Got invalid joint type: {joint_type}. Only PhysicsRevoluteJoint and PhysicsPrismaticJoint are supported!"
+        assert joint_type in {
+            "PhysicsRevoluteJoint",
+            "PhysicsPrismaticJoint",
+        }, f"Got invalid joint type: {joint_type}. Only PhysicsRevoluteJoint and PhysicsPrismaticJoint are supported!"
 
         lazy.omni.kit.commands.execute("RemovePhysicsComponentCommand", usd_prim=joint_prim, component=joint_type)
         lazy.pxr.UsdPhysics.FixedJoint.Define(stage, joint_prim.GetPrimPath().pathString)
 
 
 def set_link_collision_approximation(stage, root_prim, link_name, approximation_type):
-        """
-        Sets all collision geoms under @link_name to be @approximation type
-        Args:
-            approximation_type (str): approximation used for collision.
-                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
-                    "boundingSphere", "boundingCube"}
-                If None, the approximation will use the underlying triangle mesh.
-        """
-        # Sanity check approximation type
-        assert_valid_key(
-            key=approximation_type,
-            valid_keys={
-                "none",
-                "convexHull",
-                "convexDecomposition",
-                "meshSimplification",
-                "sdf",
-                "boundingSphere",
-                "boundingCube",
-            },
-            name="collision approximation type",
-        )
+    """
+    Sets all collision geoms under @link_name to be @approximation type
+    Args:
+        approximation_type (str): approximation used for collision.
+            Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
+                "boundingSphere", "boundingCube"}
+            If None, the approximation will use the underlying triangle mesh.
+    """
+    # Sanity check approximation type
+    assert_valid_key(
+        key=approximation_type,
+        valid_keys={
+            "none",
+            "convexHull",
+            "convexDecomposition",
+            "meshSimplification",
+            "sdf",
+            "boundingSphere",
+            "boundingCube",
+        },
+        name="collision approximation type",
+    )
 
-        # Find the link prim first
-        link_prim = find_prim_with_name(name=link_name, root_prim=root_prim)
-        assert link_prim is not None, f"Could not find link prim with name {link_name}!"
+    # Find the link prim first
+    link_prim = find_prim_with_name(name=link_name, root_prim=root_prim)
+    assert link_prim is not None, f"Could not find link prim with name {link_name}!"
 
-        # Iterate through all children that are mesh prims
-        mesh_prims = find_all_prim_children_with_type(prim_type="Mesh", root_prim=link_prim)
+    # Iterate through all children that are mesh prims
+    mesh_prims = find_all_prim_children_with_type(prim_type="Mesh", root_prim=link_prim)
 
-        # For each mesh prim, check if it is collision -- if so, update the approximation type appropriately
-        for mesh_prim in mesh_prims:
-            if not mesh_prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI):
-                # This is a visual mesh, so skip
-                continue
-            mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI(mesh_prim)
+    # For each mesh prim, check if it is collision -- if so, update the approximation type appropriately
+    for mesh_prim in mesh_prims:
+        if not mesh_prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI):
+            # This is a visual mesh, so skip
+            continue
+        mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI(mesh_prim)
 
-            # Make sure to add the appropriate API if we're setting certain values
-            if approximation_type == "convexHull" and not mesh_prim.HasAPI(
-                lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
-            ):
-                lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(mesh_prim)
-            elif approximation_type == "convexDecomposition" and not mesh_prim.HasAPI(
-                lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
-            ):
-                lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(mesh_prim)
-            elif approximation_type == "meshSimplification" and not mesh_prim.HasAPI(
-                lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
-            ):
-                lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(mesh_prim)
-            elif approximation_type == "sdf" and not mesh_prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
-                lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(mesh_prim)
-            elif approximation_type == "none" and not mesh_prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
-                lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(mesh_prim)
+        # Make sure to add the appropriate API if we're setting certain values
+        if approximation_type == "convexHull" and not mesh_prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI
+        ):
+            lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(mesh_prim)
+        elif approximation_type == "convexDecomposition" and not mesh_prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI
+        ):
+            lazy.pxr.PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(mesh_prim)
+        elif approximation_type == "meshSimplification" and not mesh_prim.HasAPI(
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI
+        ):
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(mesh_prim)
+        elif approximation_type == "sdf" and not mesh_prim.HasAPI(lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(mesh_prim)
+        elif approximation_type == "none" and not mesh_prim.HasAPI(lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI):
+            lazy.pxr.PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(mesh_prim)
 
-            if approximation_type == "convexHull":
-                pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(mesh_prim)
-                # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
-                # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
-                if pch_api.GetHullVertexLimitAttr().Get() is None:
-                    pch_api.CreateHullVertexLimitAttr()
-                pch_api.GetHullVertexLimitAttr().Set(60)
+        if approximation_type == "convexHull":
+            pch_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI(mesh_prim)
+            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
+            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
+            if pch_api.GetHullVertexLimitAttr().Get() is None:
+                pch_api.CreateHullVertexLimitAttr()
+            pch_api.GetHullVertexLimitAttr().Set(60)
 
-            mesh_collision_api.GetApproximationAttr().Set(approximation_type)
+        mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
 def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic=False):
@@ -440,10 +453,16 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
         root_prim=robot_prim,
     )
 
-    all_collision_links = [link for link in all_links if _find_prim_with_condition(
-            condition=lambda prim: prim.GetPrimTypeInfo().GetTypeName() == "Mesh" and prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI),
+    all_collision_links = [
+        link
+        for link in all_links
+        if _find_prim_with_condition(
+            condition=lambda prim: prim.GetPrimTypeInfo().GetTypeName() == "Mesh"
+            and prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI),
             root_prim=link,
-        ) is not None]
+        )
+        is not None
+    ]
     all_collision_link_names = [link.GetName() for link in all_collision_links]
 
     def is_articulated_joint(prim):
@@ -502,7 +521,7 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
         default_generated_cfg["robot_cfg"]["extra_links"][attached_obj_link_name] = {
             "parent_link_name": eef_link_name,
             "link_name": attached_obj_link_name,
-            "fixed_transform": [0, 0, 0, 1, 0, 0, 0],   # (x,y,z,w,x,y,z)
+            "fixed_transform": [0, 0, 0, 1, 0, 0, 0],  # (x,y,z,w,x,y,z)
             "joint_type": "FIXED",
             "joint_name": f"{attached_obj_link_name}_joint",
         }
@@ -517,7 +536,8 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
     # Save generated file
     Path(save_dir).mkdir(parents=True, exist_ok=True)
     save_fpath = f"{save_dir}/{robot_name}_description_curobo_default.yaml"
-    with open(save_fpath, "w+") as f: yaml.dump(default_generated_cfg, f, default_flow_style=False)
+    with open(save_fpath, "w+") as f:
+        yaml.dump(default_generated_cfg, f, default_flow_style=False)
 
     # Permute the default config to have additional base only / arm only configs
     # Only relevant if robot is holonomic
@@ -544,7 +564,12 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
 
 
 @click.command(help=_DOCSTRING)
-@click.option("--config", required=True, type=click.Path(exists=True, dir_okay=False), help="Absolute path to robot URDF file to import")
+@click.option(
+    "--config",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Absolute path to robot URDF file to import",
+)
 def import_custom_robot(config):
     # Load config
     with open(config, "r") as f:
