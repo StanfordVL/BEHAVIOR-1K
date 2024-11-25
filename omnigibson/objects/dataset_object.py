@@ -1,6 +1,7 @@
 import math
 import os
 import random
+from enum import IntEnum
 
 import torch as th
 
@@ -24,6 +25,11 @@ m = create_module_macros(module_path=__file__)
 m.MIN_OBJ_MASS = 0.4
 
 
+class DatasetType(IntEnum):
+    BEHAVIOR = 0
+    EXTERNAL = 1
+
+
 class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
@@ -37,6 +43,7 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
+        dataset_type=DatasetType.BEHAVIOR,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -49,7 +56,6 @@ class DatasetObject(USDObject):
         include_default_states=True,
         bounding_box=None,
         in_rooms=None,
-        user_added=False,
         **kwargs,
     ):
         """
@@ -63,6 +69,9 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
+            dataset_type (DatasetType): Dataset to search for this object. Default is BEHAVIOR, corresponding to the
+                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, EXTERNAL}.
+                If EXTERNAL, assumes asset is found at gm.EXTERNAL_DATASET_PATH and additionally not encrypted.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -85,8 +94,6 @@ class DatasetObject(USDObject):
                 -- not both!
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
                 a list of room type(s) or a single room type
-            user_added (bool): Whether this object was added by the user or not. If True, then this object will be found
-                in the user_assets dir instead of og_dataset, and will not be encrypted.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -102,7 +109,7 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
-        load_config["user_added"] = user_added
+        load_config["dataset_type"] = dataset_type
         # All DatasetObjects should have xform properties pre-loaded
         load_config["xform_props_pre_loaded"] = True
 
@@ -123,13 +130,13 @@ class DatasetObject(USDObject):
             )
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model, user_added=user_added)
+        usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
 
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=not user_added,
+            encrypted=dataset_type == DatasetType.BEHAVIOR,
             name=name,
             category=category,
             scale=scale,
@@ -146,7 +153,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model, user_added=False):
+    def get_usd_path(cls, category, model, dataset_type=DatasetType.BEHAVIOR):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -155,11 +162,12 @@ class DatasetObject(USDObject):
         Args:
             category (str): Category for the object
             model (str): Specific model ID of the object
+            dataset_type (DatasetType): Dataset type, used to infer dataset directory to search for @category and @model
 
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        dataset_path = gm.USER_ASSETS_PATH if user_added else gm.DATASET_PATH
+        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.EXTERNAL_DATASET_PATH
         return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
