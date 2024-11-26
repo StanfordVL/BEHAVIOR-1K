@@ -1,6 +1,7 @@
 """
 Helper script to download OmniGibson dataset and assets.
 """
+
 import math
 from typing import Literal
 
@@ -8,25 +9,40 @@ import click
 import trimesh
 
 import omnigibson as og
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.asset_conversion_utils import (
     generate_collision_meshes,
     generate_urdf_for_obj,
     import_og_asset_from_urdf,
 )
+from omnigibson.utils.python_utils import assert_valid_key
 
 
 @click.command()
-@click.option("--asset-path", required=True, type=click.Path(exists=True, dir_okay=False), help="Absolute path to asset file to import. This can be a raw visual mesh (for single-bodied, static objects), e.g. .obj, .glb, etc., or a more complex (such as articulated) objects defined in .urdf format.")
+@click.option(
+    "--asset-path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False),
+    help="Absolute path to asset file to import. This can be a raw visual mesh (for single-bodied, static objects), e.g. .obj, .glb, etc., or a more complex (such as articulated) objects defined in .urdf format.",
+)
 @click.option("--category", required=True, type=click.STRING, help="Category name to assign to the imported asset")
-@click.option("--model", required=True, type=click.STRING, help="Model name to assign to the imported asset. This MUST be a 6-character long string that exclusively contains letters, and must be unique within the given @category")
+@click.option(
+    "--model",
+    required=True,
+    type=click.STRING,
+    help="Model name to assign to the imported asset. This MUST be a 6-character long string that exclusively contains letters, and must be unique within the given @category",
+)
 @click.option(
     "--collision-method",
     type=click.Choice(["coacd", "convex", "none"]),
     default="coacd",
     help="Method to generate the collision mesh. 'coacd' generates a set of convex decompositions, while 'convex' generates a single convex hull. 'none' will not generate any explicit mesh",
 )
-@click.option("--hull-count", type=int, default=32, help="Maximum number of convex hulls to decompose individual visual meshes into. Only relevant if --collision-method=coacd")
+@click.option(
+    "--hull-count",
+    type=int,
+    default=32,
+    help="Maximum number of convex hulls to decompose individual visual meshes into. Only relevant if --collision-method=coacd",
+)
 @click.option("--scale", type=float, default=1.0, help="Scale factor to apply to the mesh.")
 @click.option("--up-axis", type=click.Choice(["z", "y"]), default="z", help="Up axis for the mesh.")
 @click.option("--headless", is_flag=True, help="Run the script in headless mode.")
@@ -63,8 +79,11 @@ def import_custom_object(
         visual_mesh: trimesh.Trimesh = trimesh.load(asset_path, force="mesh", process=False)
 
         # Generate collision meshes if requested
-        collision_meshes = generate_collision_meshes(visual_mesh, method=collision_method, hull_count=hull_count) \
-            if collision_method is not None else []
+        collision_meshes = (
+            generate_collision_meshes(visual_mesh, method=collision_method, hull_count=hull_count)
+            if collision_method is not None
+            else []
+        )
 
         # If the up axis is y, we need to rotate the meshes
         if up_axis == "y":
