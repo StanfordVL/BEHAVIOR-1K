@@ -198,6 +198,10 @@ class VX300S(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")
 
     @property
+    def curobo_attached_object_link_names(self):
+        return {"ee_gripper_link": "attached_object"}
+
+    @property
     def eef_usd_path(self):
         # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
         raise NotImplementedError

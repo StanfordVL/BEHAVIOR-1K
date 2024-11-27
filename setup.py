@@ -47,6 +47,7 @@ setup(
         "rtree>=1.2.0",
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
+        "lxml",
     ],
     extras_require={
         "dev": [
@@ -62,7 +63,11 @@ setup(
             "mkdocs-section-index",
             "mkdocs-literate-nav",
             "telemoma~=0.1.2",
-        ]
+        ],
+        "primitives": [
+            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@6a4eb2ca8677829b0f57451ad107e0a3186525e9",
+            "ompl @ https://storage.googleapis.com/gibson_scenes/ompl-1.6.0-cp310-cp310-manylinux_2_28_x86_64.whl",
+        ],
     },
     tests_require=[],
     python_requires=">=3",

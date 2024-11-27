@@ -703,6 +703,18 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
+    def get_eef_pose(self, arm="default"):
+        """
+        Args:
+            arm (str): specific arm to grab eef pose. Default is "default" which corresponds to the first entry
+                in self.arm_names
+
+        Returns:
+            2-tuple: End-effector pose, in (pos, quat) format, corresponding to arm @arm
+        """
+        arm = self.default_arm if arm == "default" else arm
+        return self._links[self.eef_link_names[arm]].get_position_orientation()
+
     def get_eef_position(self, arm="default"):
         """
         Args:
@@ -714,7 +726,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_position_orientation()[0]
+        return self.get_eef_pose(arm=arm)[0]
 
     def get_eef_orientation(self, arm="default"):
         """
@@ -727,7 +739,7 @@ class ManipulationRobot(BaseRobot):
                 to arm @arm
         """
         arm = self.default_arm if arm == "default" else arm
-        return self._links[self.eef_link_names[arm]].get_position_orientation()[1]
+        return self.get_eef_pose(arm=arm)[1]
 
     def get_relative_eef_pose(self, arm="default", mat=False):
         """
@@ -1289,9 +1301,17 @@ class ManipulationRobot(BaseRobot):
             if controller.control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
-                applying_grasp = th.any(controller.control < threshold)
+                applying_grasp = (
+                    th.any(controller.control < threshold)
+                    if controller.control_type == ControlType.POSITION
+                    else th.any(controller.control < 0)
+                )
             else:
-                applying_grasp = th.any(controller.control > threshold)
+                applying_grasp = (
+                    th.any(controller.control > threshold)
+                    if controller.control_type == ControlType.POSITION
+                    else th.any(controller.control > 0)
+                )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
                 if self._ag_release_counter[arm] is not None:

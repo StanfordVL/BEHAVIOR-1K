@@ -514,11 +514,11 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
     @classmethod
     def get_max_contact_data_count(cls):
-        # 2x per finger link, to be safe.
-        # 2 here is not the finger count, it's the number of items we will record contacts with, per finger.
+        # 4x per finger link, to be safe.
+        # 4 here is not the finger count, it's the number of items we will record contacts with, per finger.
         # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
-        # This number should very rarely go above 2.
-        return len(cls.get_column_filters()[0]) * 2
+        # This number should very rarely go above 4.
+        return len(cls.get_column_filters()[0]) * 4
 
 
 # Instantiate the GripperRigidContactAPI
@@ -1615,13 +1615,25 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         )
     )
 
-    # Modify values so that all faces are triangular
+    return triangularize_mesh(mesh)
+
+
+def triangularize_mesh(mesh):
+    """
+    Triangulates the mesh @mesh, modification in-place
+    """
     tm = mesh_prim_to_trimesh_mesh(mesh.GetPrim())
+
     face_vertex_counts = np.array([len(face) for face in tm.faces], dtype=int)
     mesh.GetFaceVertexCountsAttr().Set(face_vertex_counts)
     mesh.GetFaceVertexIndicesAttr().Set(tm.faces.flatten())
     mesh.GetNormalsAttr().Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals[tm.faces.flatten()]))
-    mesh.GetPrim().GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()]))
+
+    # Modify the UV mapping if it exists
+    if isinstance(tm.visual, trimesh.visual.TextureVisuals):
+        mesh.GetPrim().GetAttribute("primvars:st").Set(
+            lazy.pxr.Vt.Vec2fArray.FromNumpy(tm.visual.uv[tm.faces.flatten()])
+        )
 
     return mesh
 
@@ -1638,8 +1650,8 @@ def add_asset_to_stage(asset_path, prim_path):
         Usd.Prim: Loaded prim as a USD prim
     """
     # Make sure this is actually a supported asset type
-    assert asset_path[-4:].lower() in {".usd", ".obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
-    asset_type = asset_path[-3:]
+    asset_type = asset_path.split(".")[-1]
+    assert asset_type in {"usd", "usda", "obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"

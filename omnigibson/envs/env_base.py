@@ -266,11 +266,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             assert og.sim.is_stopped(), "Simulator must be stopped before loading robots!"
 
             # Iterate over all robots to generate in the robot config
-            for i, robot_config in enumerate(self.robots_config):
+            for robot_config in self.robots_config:
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = "robot_" + "".join(random.choices(string.ascii_lowercase, k=6))
-
+                robot_config = deepcopy(robot_config)
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 pose_frame = robot_config.pop("pose_frame", "scene")
                 if position is not None:
@@ -303,6 +303,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             if "name" not in obj_config:
                 obj_config["name"] = f"obj{i}"
             # Pop the desired position and orientation
+            obj_config = deepcopy(obj_config)
             position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
             obj = create_class_from_registry_and_config(
@@ -334,6 +335,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "relative_prim_path" not in sensor_config:
                     sensor_config["relative_prim_path"] = f"/{sensor_config['name']}"
                 # Pop the desired position and orientation
+                sensor_config = deepcopy(sensor_config)
                 position, orientation = sensor_config.pop("position", None), sensor_config.pop("orientation", None)
                 pose_frame = sensor_config.pop("pose_frame", "scene")
                 # Pop whether or not to include this sensor in the observation
