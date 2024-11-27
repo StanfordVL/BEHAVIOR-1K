@@ -223,7 +223,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {arm: f"{arm}_hand" for arm in self.arm_names}
+        return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
     @property
     def finger_link_names(self):
@@ -235,7 +235,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/r1/r1.usd")
+        return os.path.join(gm.ASSET_PATH, "models/r1/r1_pro.usda")
 
     @property
     def curobo_path(self):

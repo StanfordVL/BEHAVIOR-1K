@@ -190,7 +190,7 @@ class LocomotionRobot(BaseRobot):
 
     @property
     def non_floor_touching_base_link_names(self):
-        raise [self.base_footprint_link_name]
+        return [self.base_footprint_link_name]
 
     @property
     def floor_touching_base_links(self):

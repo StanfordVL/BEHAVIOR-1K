@@ -417,7 +417,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
 
     @property
     def eef_link_names(self):
-        return {arm: "gripper_{}_grasping_frame".format(arm) for arm in self.arm_names}
+        return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
     @property
     def finger_link_names(self):
@@ -439,7 +439,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
 
         # Default variant
         return os.path.join(
-            gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd"
+            gm.ASSET_PATH, "models/tiago/tiago.usda"
         )
 
     @property
