@@ -9,6 +9,10 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
+gm.ENABLE_FLATCACHE = True
+
+# import torch._dynamo
+# torch._dynamo.config.suppress_errors = True
 
 
 def main():
@@ -16,8 +20,8 @@ def main():
     Spawn a BehaviorRobot in Rs_int and users can navigate around and interact with the scene using VR.
     """
     # Create the config for generating the environment we want
-    # scene_cfg = {"type": "Scene"}
-    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int", "load_object_categories": ["floors", "walls", "ceilings"]}
+    scene_cfg = {"type": "Scene"}
+    # scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int", "load_object_categories": ["floors", "walls", "ceilings"]}
     robot0_cfg = {
         "type": "R1",
         "obs_modalities": ["rgb"],
@@ -33,6 +37,9 @@ def main():
 
     # Create the environment
     env = og.Environment(configs=cfg)
+    og.sim.stop()
+    env.robots[0].base_footprint_link.mass = 250.0
+    og.sim.play()
     env.reset()
     # start vrsys
     vrsys = OVXRSystem(
@@ -41,7 +48,7 @@ def main():
     vrsys.start()
 
     # main simulation loop
-    for _ in range(1000):
+    while True:
         # update the VR system
         vrsys.update()
         # get the action from the VR system and step the environment

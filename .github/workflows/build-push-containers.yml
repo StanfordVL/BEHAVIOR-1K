@@ -78,6 +78,16 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
       -
+        name: Metadata for dev Image
+        id: meta-dev
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            stanfordvl/omnigibson-dev
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+      -
         name: Metadata for vscode Image
         id: meta-vscode
         uses: docker/metadata-action@v5
@@ -97,8 +107,22 @@ jobs:
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop
+          cache-to: type=inline
+
+      -
+        name: Build and push dev image
+        id: build-dev
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          build-args: "DEV_MODE=1"
+          push: true
+          tags: ${{ steps.meta-dev.outputs.tags }}
+          labels: ${{ steps.meta-dev.outputs.labels }}
+          file: docker/prod.Dockerfile
+          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
+          cache-to: type=inline
 
       - name: Update vscode image Dockerfile with prod image tag
         run: |
@@ -113,5 +137,5 @@ jobs:
           tags: ${{ steps.meta-vscode.outputs.tags }}
           labels: ${{ steps.meta-vscode.outputs.labels }}
           file: docker/vscode.Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=min
+          cache-from: type=registry,ref=stanfordvl/omnigibson:og-develop  # OK to share cache here.
+          cache-to: type=inline
