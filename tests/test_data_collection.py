@@ -29,7 +29,7 @@ def test_data_collect_and_playback():
         "task": {
             "type": "BehaviorTask",
             # BehaviorTask-specific
-            "activity_name": "assembling_gift_baskets",
+            "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
         },
     }
