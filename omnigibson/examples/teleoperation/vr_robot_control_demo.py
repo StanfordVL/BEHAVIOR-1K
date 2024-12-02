@@ -1,6 +1,7 @@
 """
 Example script for interacting with OmniGibson scenes with VR and BehaviorRobot.
 """
+
 import torch as th
 
 import omnigibson as og
@@ -26,12 +27,22 @@ def main():
         "type": "R1",
         "obs_modalities": ["rgb"],
         "controller_config": {
-            "arm_left": {"name": "InverseKinematicsController", "mode": "absolute_pose", "command_input_limits": None, "command_output_limits": None},
-            "arm_right": {"name": "InverseKinematicsController", "mode": "absolute_pose", "command_input_limits": None, "command_output_limits": None},
+            "arm_left": {
+                "name": "InverseKinematicsController",
+                "mode": "absolute_pose",
+                "command_input_limits": None,
+                "command_output_limits": None,
+            },
+            "arm_right": {
+                "name": "InverseKinematicsController",
+                "mode": "absolute_pose",
+                "command_input_limits": None,
+                "command_output_limits": None,
+            },
             "gripper_left": {"command_input_limits": "default"},
             "gripper_right": {"command_input_limits": "default"},
         },
-        "action_normalize": False
+        "action_normalize": False,
     }
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
@@ -43,7 +54,11 @@ def main():
     env.reset()
     # start vrsys
     vrsys = OVXRSystem(
-        robot=env.robots[0], show_control_marker=True, system="SteamVR", eef_tracking_mode="controller", align_anchor_to="camera"
+        robot=env.robots[0],
+        show_control_marker=True,
+        system="SteamVR",
+        eef_tracking_mode="controller",
+        align_anchor_to="camera",
     )
     vrsys.start()
 
