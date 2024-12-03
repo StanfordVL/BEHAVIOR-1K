@@ -13,9 +13,9 @@ from os.path import exists
 from pathlib import Path
 from xml.dom import minidom
 
+import pymeshlab
 import torch as th
 import trimesh
-import pymeshlab
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1155,8 +1155,8 @@ def _recursively_replace_list_of_dict(dic):
 
 
 def _create_urdf_import_config(
-        use_convex_decomposition=False,
-        merge_fixed_joints=False,
+    use_convex_decomposition=False,
+    merge_fixed_joints=False,
 ):
     """
     Creates and configures a URDF import configuration.
@@ -1844,7 +1844,7 @@ def simplify_convex_hull(tm, max_faces=64):
     # Use pymeshlab to reduce
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
-    ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+    ms.apply_filter("meshing_decimation_quadric_edge_collapse", targetfacenum=max_faces)
     vertices_reduced = ms.current_mesh().vertex_matrix()
     faces_reduced = ms.current_mesh().face_matrix()
     vertex_normals_reduced = ms.current_mesh().vertex_normal_matrix()

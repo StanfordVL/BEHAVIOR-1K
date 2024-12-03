@@ -5,11 +5,9 @@ Helper script to download OmniGibson dataset and assets.
 from copy import deepcopy
 from pathlib import Path
 
-import yaml
-from addict import Dict
-
 import click
 import torch as th
+import yaml
 from addict import Dict
 
 import omnigibson as og
