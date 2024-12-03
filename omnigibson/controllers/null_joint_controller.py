@@ -1,5 +1,4 @@
-import torch as th
-
+from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers import JointController
 
 
@@ -58,7 +57,7 @@ class NullJointController(JointController):
                 applied
         """
         # Store values
-        self._default_command = th.zeros(len(dof_idx)) if default_command is None else default_command
+        self._default_command = cb.zeros(len(dof_idx)) if default_command is None else default_command
 
         # Run super init
         super().__init__(
@@ -81,7 +80,7 @@ class NullJointController(JointController):
 
     def _preprocess_command(self, command):
         # Override super and force the processed command to be internal stored default value
-        return th.tensor(self._default_command)
+        return cb.array(self._default_command)
 
     def update_default_goal(self, target):
         """
@@ -95,4 +94,4 @@ class NullJointController(JointController):
             len(target) == self.control_dim
         ), f"Default control must be length: {self.control_dim}, got length: {len(target)}"
 
-        self._default_command = th.tensor(target)
+        self._default_command = cb.array(target)

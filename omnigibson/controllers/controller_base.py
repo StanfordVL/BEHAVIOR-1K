@@ -3,8 +3,12 @@ from collections.abc import Iterable
 from enum import IntEnum
 
 import torch as th
+import numpy as np
 
-from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty, \
+    recursively_convert_from_torch
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -32,6 +36,108 @@ class IsGraspingState(IntEnum):
     TRUE = 1
     UNKNOWN = 0
     FALSE = -1
+
+
+class _ControllerBackend:
+    array = None
+    int_array = None
+    prod = None
+    cat = None
+    zeros = None
+    ones = None
+    to_numpy = None
+    from_numpy = None
+    to_torch = None
+    from_torch = None
+    from_torch_recursive = None
+    allclose = None
+    arr_type = None
+    as_int = None
+    as_float32 = None
+    pinv = None
+    meshgrid = None
+    full = None
+    logical_or = None
+    all = None
+    abs = None
+    sqrt = None
+    mean = None
+    copy = None
+    eye = None
+    view = None
+    T = None
+
+    @classmethod
+    def set_methods(cls, backend):
+        for attr, fcn in backend.__dict__.items():
+            # Do not override reserved functions
+            if attr.startswith("__"):
+                continue
+            # Set function to this backend
+            setattr(cls, attr, fcn)
+
+
+class _ControllerTorchBackend(_ControllerBackend):
+    array = lambda *args: th.tensor(*args, dtype=th.float32)
+    int_array = lambda *args: th.tensor(*args, dtype=th.int)
+    prod = th.prod
+    cat = th.cat
+    zeros = lambda *args: th.zeros(*args, dtype=th.float32)
+    ones = lambda *args: th.ones(*args, dtype=th.float32)
+    to_numpy = lambda x: x.numpy()
+    from_numpy = lambda x: th.from_numpy()
+    to_torch = lambda x: x
+    from_torch = lambda x: x
+    from_torch_recursive = lambda dic: dic
+    allclose = th.allclose
+    arr_type = th.Tensor
+    as_int = lambda arr: arr.int()
+    as_float32 = lambda arr: arr.float()
+    pinv = th.linalg.pinv
+    meshgrid = lambda idx_a, idx_b: th.meshgrid(idx_a, idx_b, indexing="xy")
+    full = lambda shape, fill_value: th.full(shape, fill_value, dtype=th.float32)
+    logical_or = th.logical_or
+    all = th.all
+    abs = th.abs
+    sqrt = th.sqrt
+    mean = lambda val, dim=None, keepdim=False: th.mean(val, dim=dim, keepdim=keepdim)
+    copy = lambda arr: arr.clone()
+    eye = th.eye
+    view = lambda arr, shape: arr.view(shape)
+    T = TT
+
+
+class _ControllerNumpyBackend(_ControllerBackend):
+    array = lambda *args: np.array(*args, dtype=np.float32)
+    int_array = lambda *args: np.array(*args, dtype=int)
+    prod = np.prod
+    cat = np.concatenate
+    zeros = lambda *args: np.zeros(*args, dtype=np.float32)
+    ones = lambda *args: np.ones(*args, dtype=np.float32)
+    to_numpy = lambda x: x
+    from_numpy = lambda x: x
+    to_torch = lambda x: th.from_numpy(x)
+    from_torch = lambda x: x.numpy()
+    from_torch_recursive = recursively_convert_from_torch
+    allclose = np.allclose
+    arr_type = np.ndarray
+    as_int = lambda arr: arr.astype(int)
+    as_float32 = lambda arr: arr.astype(np.float32)
+    pinv = np.linalg.pinv
+    meshgrid = lambda idx_a, idx_b: np.ix_(idx_a, idx_b)
+    full = lambda shape, fill_value: np.full(shape, fill_value, dtype=np.float32)
+    logical_or = np.logical_or
+    all = np.all
+    abs = np.abs
+    sqrt = np.sqrt
+    mean = lambda val, dim=None, keepdim=False: np.mean(val, axis=dim, keepdims=keepdim)
+    copy = lambda arr: np.array(arr)
+    eye = np.eye
+    view = lambda arr, shape: arr.reshape(shape)
+    T = NT
+
+
+_controller_backend = _ControllerBackend
 
 
 # Define macros
@@ -112,11 +218,11 @@ class BaseController(Serializable, Registerable, Recreatable):
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = dof_idx.int()
+        self._dof_idx = _controller_backend.as_int(dof_idx)
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(sum(th.prod(th.tensor(shape)) for shape in self._goal_shapes.values()))
+        self._goal_dim = int(sum(_controller_backend.prod(_controller_backend.array(shape)) for shape in self._goal_shapes.values()))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -169,7 +275,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             Array[float]: Processed command vector
         """
         # Make sure command is a th.tensor
-        command = th.tensor([command], dtype=th.float32) if type(command) in {int, float} else command
+        command = _controller_backend.array([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -365,12 +471,12 @@ class BaseController(Serializable, Registerable, Recreatable):
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            th.cat([goal_state.flatten() for goal_state in self._goal.values()])
+            _controller_backend.cat([goal_state.flatten() for goal_state in self._goal.values()])
             if (state)["goal_is_valid"]
-            else th.zeros(self.goal_dim)
+            else _controller_backend.zeros(self.goal_dim)
         )
 
-        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
+        return _controller_backend.cat([_controller_backend.array([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])
@@ -419,11 +525,11 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Else, input is a single value, so we map to a numpy array of correct size and return
         return (
             nums
-            if isinstance(nums, th.Tensor)
+            if isinstance(nums, _controller_backend.arr_type)
             else (
-                th.tensor(nums, dtype=th.float32)
+                _controller_backend.array(nums)
                 if isinstance(nums, Iterable)
-                else th.ones(dim, dtype=th.float32) * nums
+                else _controller_backend.ones(dim) * nums
             )
         )
 

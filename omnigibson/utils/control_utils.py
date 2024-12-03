@@ -138,33 +138,3 @@ class IKSolver:
             return th.tensor(ik_results.cspace_position, dtype=th.float32)
         else:
             return None
-
-
-@th.jit.script
-def orientation_error(desired, current):
-    """
-    This function calculates a 3-dimensional orientation error vector for use in the
-    impedance controller. It does this by computing the delta rotation between the
-    inputs and converting that rotation to exponential coordinates (axis-angle
-    representation, where the 3d vector is axis * angle).
-    See https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation for more information.
-    Optimized function to determine orientation error from matrices
-
-    Args:
-        desired (tensor): (..., 3, 3) where final two dims are 2d array representing target orientation matrix
-        current (tensor): (..., 3, 3) where final two dims are 2d array representing current orientation matrix
-    Returns:
-        tensor: (..., 3) where final dim is (ax, ay, az) axis-angle representing orientation error
-    """
-    # Compute batch size
-    batch_size = desired.numel() // 9  # Each 3x3 matrix has 9 elements
-
-    desired_flat = desired.reshape(batch_size, 3, 3)
-    current_flat = current.reshape(batch_size, 3, 3)
-
-    rc1, rc2, rc3 = current_flat[:, :, 0], current_flat[:, :, 1], current_flat[:, :, 2]
-    rd1, rd2, rd3 = desired_flat[:, :, 0], desired_flat[:, :, 1], desired_flat[:, :, 2]
-
-    error = 0.5 * (th.linalg.cross(rc1, rd1) + th.linalg.cross(rc2, rd2) + th.linalg.cross(rc3, rd3))
-
-    return error.reshape(desired.shape[:-2] + (3,))

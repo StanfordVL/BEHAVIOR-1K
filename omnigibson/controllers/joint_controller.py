@@ -1,8 +1,6 @@
 import math
 
-import torch as th
-
-import omnigibson.utils.transform_utils as T
+from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -158,10 +156,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 delta_rots = command[[rx_ind, ry_ind, rz_ind]]
 
                 # Compute the final rotations in the quaternion space.
-                _, end_quat = T.pose_transform(
-                    th.zeros(3), T.euler2quat(delta_rots), th.zeros(3), T.euler2quat(start_rots)
+                _, end_quat = cb.T.pose_transform(
+                    cb.zeros(3), cb.T.euler2quat(delta_rots), cb.zeros(3), cb.T.euler2quat(start_rots)
                 )
-                end_rots = T.quat2euler(end_quat)
+                end_rots = cb.T.quat2euler(end_quat)
 
                 # Update the command
                 target[[rx_ind, ry_ind, rz_ind]] = end_rots
@@ -212,7 +210,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = th.meshgrid(self.dof_idx, self.dof_idx, indexing="xy")
+            dof_idxs_mat = cb.meshgrid(self.dof_idx, self.dof_idx)
             mm = control_dict["mass_matrix"][dof_idxs_mat]
             u = mm @ u
 
@@ -238,21 +236,21 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         else:
             # For velocity / effort, directly set to 0
-            target = th.zeros(self.control_dim)
+            target = cb.zeros(self.control_dim)
 
         return dict(target=target)
 
     def _compute_no_op_action(self, control_dict):
         if self.motor_type == "position":
             if self._use_delta_commands:
-                return th.zeros(self.command_dim)
+                return cb.zeros(self.command_dim)
             else:
                 return control_dict[f"joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
                 return -control_dict[f"joint_velocity"][self.dof_idx]
             else:
-                return th.zeros(self.command_dim)
+                return cb.zeros(self.command_dim)
 
         raise ValueError("Cannot compute noop action for effort motor type.")
 
