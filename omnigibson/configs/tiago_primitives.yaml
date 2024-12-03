@@ -51,13 +51,13 @@ robots:
         name: JointController
       arm_left:
         name: JointController
+        subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         command_output_limits: null
         use_delta_commands: false
       arm_right:
         name: JointController
-        subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         command_output_limits: null

@@ -68,8 +68,9 @@ class NullJointController(JointController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
-            kp=kp,
-            damping_ratio=damping_ratio,
+            pos_kp=pos_kp,
+            pos_damping_ratio=pos_damping_ratio,
+            vel_kp=vel_kp,
             use_impedances=use_impedances,
             use_delta_commands=False,
         )

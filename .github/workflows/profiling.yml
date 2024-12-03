@@ -34,7 +34,7 @@ jobs:
 
       - name: Install
         working-directory: omnigibson-src
-        run: pip install -e .[dev]
+        run: pip install -e .[dev,primitives]
       
       - name: Run performance benchmark
         run: bash scripts/profiling.sh
