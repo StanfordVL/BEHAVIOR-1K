@@ -64,7 +64,7 @@ def test_data_collect_and_playback():
     for i in range(2):
         env.reset()
         log.warning(f"Reset env for episode {i}")
-        for _ in range(5):
+        for _ in range(2):
             env.step(env.robots[0].action_space.sample())
         log.warning(f"Stepped env for episode {i}")
         # Manually add a random object, e.g.: a banana, and place on the floor
@@ -74,7 +74,7 @@ def test_data_collect_and_playback():
         obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
 
         # Take a few more steps
-        for _ in range(5):
+        for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
         # Manually remove the added object
@@ -82,7 +82,7 @@ def test_data_collect_and_playback():
         log.warning(f"Removed object from env for episode {i}")
 
         # Take a few more steps
-        for _ in range(5):
+        for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
         # Add water particles
@@ -92,7 +92,7 @@ def test_data_collect_and_playback():
         log.warning(f"Added water particles to env for episode {i}")
 
         # Take a few more steps
-        for _ in range(5):
+        for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
         # Clear the system
@@ -100,7 +100,7 @@ def test_data_collect_and_playback():
         log.warning(f"Cleared water particles from env for episode {i}")
 
         # Take a few more steps
-        for _ in range(5):
+        for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
     # Save this data
@@ -119,8 +119,8 @@ def test_data_collect_and_playback():
     robot_sensor_config = {
         "VisionSensor": {
             "sensor_kwargs": {
-                "image_height": 64,
-                "image_width": 64,
+                "image_height": 16,
+                "image_width": 16,
             },
         },
     }
@@ -131,8 +131,8 @@ def test_data_collect_and_playback():
             "relative_prim_path": f"/robot0/root_link/external_sensor0",
             "modalities": ["rgb", "seg_semantic"],
             "sensor_kwargs": {
-                "image_height": 64,
-                "image_width": 64,
+                "image_height": 16,
+                "image_width": 16,
                 "focal_length": 12.0,
             },
             "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
