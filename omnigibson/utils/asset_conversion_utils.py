@@ -15,6 +15,7 @@ from xml.dom import minidom
 
 import torch as th
 import trimesh
+import pymeshlab
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1153,7 +1154,10 @@ def _recursively_replace_list_of_dict(dic):
     return dic
 
 
-def _create_urdf_import_config(use_convex_decomposition=False):
+def _create_urdf_import_config(
+        use_convex_decomposition=False,
+        merge_fixed_joints=False,
+):
     """
     Creates and configures a URDF import configuration.
 
@@ -1166,6 +1170,7 @@ def _create_urdf_import_config(use_convex_decomposition=False):
     Args:
         use_convex_decomposition (bool): Whether to have omniverse use internal convex decomposition
             on any collision meshes
+        merge_fixed_joints (bool): Whether to merge fixed joints or not
 
     Returns:
         import_config: The configured URDF import configuration object.
@@ -1176,7 +1181,7 @@ def _create_urdf_import_config(use_convex_decomposition=False):
         import_config.default_drive_type.__class__
     )  # Hacky way to get class for default drive type, options are JOINT_DRIVE_{NONE / POSITION / VELOCITY}
 
-    import_config.set_merge_fixed_joints(False)
+    import_config.set_merge_fixed_joints(merge_fixed_joints)
     import_config.set_convex_decomp(use_convex_decomposition)
     import_config.set_fix_base(False)
     import_config.set_import_inertia_tensor(False)
@@ -1199,6 +1204,7 @@ def import_obj_urdf(
     dataset_root=gm.EXTERNAL_DATASET_PATH,
     use_omni_convex_decomp=False,
     use_usda=False,
+    merge_fixed_joints=False,
 ):
     """
     Imports an object from a URDF file into the current stage.
@@ -1211,6 +1217,7 @@ def import_obj_urdf(
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
+        merge_fixed_joints (bool): whether to merge fixed joints or not
 
     Returns:
         str: Absolute path to the imported USD file
@@ -1220,7 +1227,10 @@ def import_obj_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
     # Import URDF
-    cfg = _create_urdf_import_config(use_convex_decomposition=use_omni_convex_decomp)
+    cfg = _create_urdf_import_config(
+        use_convex_decomposition=use_omni_convex_decomp,
+        merge_fixed_joints=merge_fixed_joints,
+    )
     # Check if filepath exists
     usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.{'usda' if use_usda else 'usd'}"
     if _SPLIT_COLLISION_MESHES:
@@ -1819,6 +1829,32 @@ def make_asset_positive(urdf_fpath, output_suffix="mirror"):
     return out_file
 
 
+def simplify_convex_hull(tm, max_faces=64):
+    """
+    Simplifies a convex hull mesh by using quadric edge collapse to reduce the number of faces
+
+    Args:
+        tm (Trimesh): Trimesh mesh to simply. Should be convex hull
+        max_faces (int): Maximum number of faces to generate
+    """
+    # If number of faces is less than or equal to @max_faces, simply return directly
+    if len(tm.faces) <= max_faces:
+        return tm
+
+    # Use pymeshlab to reduce
+    ms = pymeshlab.MeshSet()
+    ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
+    ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+    vertices_reduced = ms.current_mesh().vertex_matrix()
+    faces_reduced = ms.current_mesh().face_matrix()
+    vertex_normals_reduced = ms.current_mesh().vertex_normal_matrix()
+    return trimesh.Trimesh(
+        vertices=vertices_reduced,
+        faces=faces_reduced,
+        vertex_normals=vertex_normals_reduced,
+    ).convex_hull
+
+
 def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, discard_not_volume=True):
     """
     Generates a set of collision meshes from a trimesh mesh using CoACD.
@@ -1852,6 +1888,7 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
         result = coacd.run_coacd(
             coacd_mesh,
             max_convex_hull=hull_count,
+            max_ch_vertex=60,
         )
 
         # Convert the returned vertices and faces to trimesh meshes
@@ -1882,7 +1919,16 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
     else:
         raise ValueError(f"Invalid collision mesh generation method specified: {method}")
 
-    return hulls
+    # Sanity check all convex hulls
+    # For whatever reason, some convex hulls are not true volumes, so we take the convex hull again
+    # See https://github.com/mikedh/trimesh/issues/535
+    hulls = [hull.convex_hull if not hull.is_volume else hull for hull in hulls]
+
+    # For each hull, simplify so that the complexity is more likely to be Omniverse-GPU compatible
+    # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/rigid-bodies.html#collision-settings
+    simplified_hulls = [simplify_convex_hull(hull) for hull in hulls]
+
+    return simplified_hulls
 
 
 def get_collision_approximation_for_urdf(
@@ -1963,7 +2009,6 @@ def get_collision_approximation_for_urdf(
                     continue
                 else:
                     method = collision_method
-
                 collision_meshes = generate_collision_meshes(
                     trimesh_mesh=tm,
                     method=method,
@@ -2286,6 +2331,7 @@ def import_og_asset_from_urdf(
     convex_links=None,
     no_decompose_links=None,
     visual_only_links=None,
+    merge_fixed_joints=False,
     dataset_root=gm.EXTERNAL_DATASET_PATH,
     hull_count=32,
     overwrite=False,
@@ -2307,6 +2353,7 @@ def import_og_asset_from_urdf(
         no_decompose_links (None or list of str): If specified, links that should not have any special collision
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
+        merge_fixed_joints (bool): Whether to merge fixed joints or not
         dataset_root (str): Dataset root directory to use for writing imported USD file. Default is external dataset
             path set from the global macros
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
@@ -2372,6 +2419,7 @@ def import_og_asset_from_urdf(
         dataset_root=dataset_root,
         use_omni_convex_decomp=False,  # We already pre-decomposed the values, so don' use omni convex decomp
         use_usda=use_usda,
+        merge_fixed_joints=merge_fixed_joints,
     )
 
     prim = import_obj_metadata(

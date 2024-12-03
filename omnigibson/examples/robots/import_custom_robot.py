@@ -6,8 +6,8 @@ from copy import deepcopy
 from pathlib import Path
 
 import yaml
+from addict import Dict
 
-yaml.Dumper.ignore_aliases = lambda *args: True
 import click
 import torch as th
 from addict import Dict
@@ -429,6 +429,18 @@ def set_link_collision_approximation(stage, root_prim, link_name, approximation_
         mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
+def is_articulated_joint(prim):
+    prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
+    return "joint" in prim_type and "fixed" not in prim_type
+
+
+def find_all_articulated_joints(root_prim):
+    return _find_prims_with_condition(
+        condition=is_articulated_joint,
+        root_prim=root_prim,
+    )
+
+
 def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic=False):
     """
     Creates a set of curobo configs based on @robot_prim and @curobo_cfg
@@ -453,29 +465,15 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
         root_prim=robot_prim,
     )
 
-    all_collision_links = [
-        link
-        for link in all_links
-        if _find_prim_with_condition(
-            condition=lambda prim: prim.GetPrimTypeInfo().GetTypeName() == "Mesh"
-            and prim.HasAPI(lazy.pxr.UsdPhysics.MeshCollisionAPI),
-            root_prim=link,
-        )
-        is not None
-    ]
-    all_collision_link_names = [link.GetName() for link in all_collision_links]
+    # Generate list of collision link names -- this is simply the list of all link names from the
+    # collision spheres specification
+    collision_spheres = curobo_cfg.collision_spheres.to_dict()
+    all_collision_link_names = list(collision_spheres.keys())
 
-    def is_articulated_joint(prim):
-        prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
-        return "joint" in prim_type and "fixed" not in prim_type
-
-    joint_prims = _find_prims_with_condition(
-        condition=is_articulated_joint,
-        root_prim=robot_prim,
-    )
+    joint_prims = find_all_articulated_joints(robot_prim)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
     retract_cfg = curobo_cfg.default_qpos
-    lock_joints = dict(curobo_cfg.lock_joints)
+    lock_joints = curobo_cfg.lock_joints.to_dict()
     if is_holonomic:
         # Move the final six joints to the beginning, since the holonomic joints are added at the end
         all_joint_names = list(reversed(all_joint_names[-6:])) + all_joint_names[:-6]
@@ -496,14 +494,14 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
             "link_names": ee_links[1:],
             "lock_joints": lock_joints,
             "extra_links": {},
-            "collision_link_names": all_collision_link_names,
-            "collision_spheres": dict(curobo_cfg.collision_spheres),
+            "collision_link_names": deepcopy(all_collision_link_names),
+            "collision_spheres": collision_spheres,
             "collision_sphere_buffer": 0.002,
             "extra_collision_spheres": {},
-            "self_collision_ignore": dict(curobo_cfg.self_collision_ignore),
+            "self_collision_ignore": curobo_cfg.self_collision_ignore.to_dict(),
             "self_collision_buffer": {root_link: 0.02},
             "use_global_cumul": True,
-            "mesh_link_names": all_collision_link_names,
+            "mesh_link_names": deepcopy(all_collision_link_names),
             "external_asset_path": None,
             "cspace": all_joint_names,
             "retract_config": retract_cfg,
@@ -537,7 +535,7 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
     Path(save_dir).mkdir(parents=True, exist_ok=True)
     save_fpath = f"{save_dir}/{robot_name}_description_curobo_default.yaml"
     with open(save_fpath, "w+") as f:
-        yaml.dump(default_generated_cfg, f, default_flow_style=False)
+        yaml.dump(default_generated_cfg, f)
 
     # Permute the default config to have additional base only / arm only configs
     # Only relevant if robot is holonomic
@@ -585,6 +583,7 @@ def import_custom_robot(config):
         convex_links=cfg.collision.convex_links,
         no_decompose_links=cfg.collision.no_decompose_links,
         visual_only_links=cfg.collision.no_collision_links,
+        merge_fixed_joints=cfg.merge_fixed_joints,
         hull_count=cfg.collision.hull_count,
         overwrite=cfg.overwrite,
         use_usda=True,
