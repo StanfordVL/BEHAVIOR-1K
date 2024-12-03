@@ -107,8 +107,8 @@ def test_data_collect_and_playback():
     robot_sensor_config = {
         "VisionSensor": {
             "sensor_kwargs": {
-                "image_height": 128,
-                "image_width": 128,
+                "image_height": 64,
+                "image_width": 64,
             },
         },
     }
@@ -119,8 +119,8 @@ def test_data_collect_and_playback():
             "relative_prim_path": f"/robot0/root_link/external_sensor0",
             "modalities": ["rgb", "seg_semantic"],
             "sensor_kwargs": {
-                "image_height": 128,
-                "image_width": 128,
+                "image_height": 64,
+                "image_width": 64,
                 "focal_length": 12.0,
             },
             "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
