@@ -438,9 +438,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             )
 
         # Default variant
-        return os.path.join(
-            gm.ASSET_PATH, "models/tiago/tiago.usda"
-        )
+        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago.usda")
 
     @property
     def curobo_path(self):
