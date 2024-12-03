@@ -767,33 +767,6 @@ class CuRoboMotionGenerator:
 
         return th.concatenate([positions, orientations], dim=-1)
 
-    def solve_ik(self, target_pos, target_quat, emb_sel=CuroboEmbodimentSelection.ARM):
-        # # If target_pos and target_quat are torch tensors, it's assumed that they correspond to the default ee_link
-        # if isinstance(target_pos, th.Tensor):
-        #     target_pos = {self.ee_link[emb_sel]: target_pos}
-        # if isinstance(target_quat, th.Tensor):
-        #     target_quat = {self.ee_link[emb_sel]: target_quat}
-
-        # # Refresh the collision state
-        # self.update_obstacles(ignore_paths=None, emb_sel=emb_sel)
-
-        # assert target_pos.keys() == target_quat.keys(), "Expected target_pos and target_quat to have the same keys!"
-
-        # # TODO: fill these in
-        # solve_state = self.mg[emb_sel]._get_solve_state(lazy.curobo.ReacherSolveType.GOALSET, plan_config, goal_pose, start_state)
-
-        # ik_result = self.mg[emb_sel]._solve_ik_from_solve_state(
-        #     goal_pose=,
-        #     solve_state=solve_state,
-        #     start_state=,
-        #     use_nn_seed=False,
-        #     partial_ik_opt=False,
-        #     link_poses=,
-        # )
-
-        # breakpoint()
-        return
-
     @property
     def tensor_args(self):
         """

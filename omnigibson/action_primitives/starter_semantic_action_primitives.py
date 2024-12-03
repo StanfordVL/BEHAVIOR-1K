@@ -1,7 +1,7 @@
 """
 WARNING!
 The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with Fetch, Tiago, and R1 with their JointControllers set to absolute position mode with impedance.
+It currently only works with Tiago and R1 with their JointControllers set to absolute position mode with impedance.
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
@@ -42,7 +42,6 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 m = create_module_macros(module_path=__file__)
 
-# TODO: figure out why this was 0.01
 m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.0
 
 m.KP_LIN_VEL = {
@@ -84,6 +83,7 @@ m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 100
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
+m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE = 20
 m.PREDICATE_SAMPLING_Z_OFFSET = 0.02
 
 m.GRASP_APPROACH_DISTANCE = 0.01
@@ -128,9 +128,9 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(
         self,
+        env,
         robot,
         enable_head_tracking=True,
-        # TODO: fix this later
         always_track_eef=False,
         task_relevant_objects_only=False,
         planning_batch_size=3,
@@ -141,18 +141,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Initializes a StarterSemanticActionPrimitives generator.
 
         Args:
+            env (Environment): The environment that the primitives will run on.
             robot (BaseRobot): The robot that the primitives will run on.
             enable_head_tracking (bool): Whether to enable head tracking. Defaults to True.
             always_track_eef (bool, optional): Whether to always track the end effector, as opposed
               to switching between target object and end effector based on context. Defaults to False.
             task_relevant_objects_only (bool): Whether to only consider objects relevant to the task
               when computing the action space. Defaults to False.
+            planning_batch_size (int): The batch size for curobo motion planning. Defaults to 3.
+            collision_check_batch_size (int): The batch size for curobo collision checking. Defaults to 5.
+            debug_visual_marker (PrimitiveObject): The object to use for debug visual markers. Defaults to None.
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
-            "It currently only works with Fetch, Tiago, and R1 with their JointControllers set to absolute position mode with impedance."
+            "It currently only works with Tiago and R1 with their JointControllers set to absolute position mode with impedance."
         )
-        super().__init__(robot)
+        super().__init__(env, robot)
         self._motion_generator = CuRoboMotionGenerator(robot=self.robot, batch_size=planning_batch_size)
         self.controller_functions = {
             StarterSemanticActionPrimitiveSet.GRASP: self._grasp,
@@ -220,23 +224,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._overwrite_head_action(action)
         return action
 
-    # def get_action_space(self):
-    #     # TODO: Figure out how to implement what happens when the set of objects in scene changes.
-    #     if self._task_relevant_objects_only:
-    #         assert isinstance(
-    #             self.env.task, BehaviorTask
-    #         ), "Activity relevant objects can only be used for BEHAVIOR tasks"
-    #         self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
-    #     else:
-    #         self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
+    def get_action_space(self):
+        # TODO: Figure out how to implement what happens when the set of objects in scene changes.
+        if self._task_relevant_objects_only:
+            assert isinstance(
+                self.env.task, BehaviorTask
+            ), "Activity relevant objects can only be used for BEHAVIOR tasks"
+            self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
+        else:
+            self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 
-    #     # Filter out the robots.
-    #     self.addressable_objects = [obj for obj in self.addressable_objects if not isinstance(obj, BaseRobot)]
+        # Filter out the robots.
+        self.addressable_objects = [obj for obj in self.addressable_objects if not isinstance(obj, BaseRobot)]
 
-    #     self.num_objects = len(self.addressable_objects)
-    #     return gym.spaces.Tuple(
-    #         [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(StarterSemanticActionPrimitiveSet))]
-    #     )
+        self.num_objects = len(self.addressable_objects)
+        return gym.spaces.Tuple(
+            [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(StarterSemanticActionPrimitiveSet))]
+        )
 
     def get_action_from_primitive_and_object(self, primitive: StarterSemanticActionPrimitiveSet, obj: BaseObject):
         assert obj in self.addressable_objects
@@ -291,12 +295,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             except ActionPrimitiveError as e:
                 errors.append(e)
 
-            #     # try:
-            #     #     # If we're not holding anything, release the hand so it doesn't stick to anything else.
-            #     #     if not self._get_obj_in_hand():
-            #     #         yield from self._execute_release()
-            #     # except ActionPrimitiveError:
-            #     #     pass
+            try:
+                # If we're not holding anything, release the hand so it doesn't stick to anything else.
+                if not self._get_obj_in_hand():
+                    yield from self._execute_release()
+            except ActionPrimitiveError:
+                pass
 
             try:
                 # Make sure we retract the arms after every step
@@ -520,7 +524,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_pose = (grasp_pos, grasp_quat)
 
         # Prepare data for the approach later.
-        # TODO: fix this threshold
         approach_pos = grasp_pose[0] + object_direction * grasp_offset_in_z
         approach_pose = (approach_pos, grasp_pose[1])
 
@@ -542,8 +545,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand(approach_pose, avoid_collision=False)
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
-            # TODO: implement linear cartesian motion with curobo constrained planning
-            yield from self._move_hand(approach_pose)  # motion_constraint=[0, 0, 0, 0, 0, 1]
+            yield from self._move_hand(approach_pose, motion_constraint=[0, 0, 0, 0, 0, 1])
             yield from self._execute_grasp()
 
         # Step a few times to update
@@ -657,9 +659,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Sample location to place object
         pose_candidates = []
         directly_move_hand_pose = None
-        while len(pose_candidates) < 20:
+        while len(pose_candidates) < m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE:
             obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
-            # TODO: Look into this orientation, why do we need to sample it?
+            # TODO: why do we sample this orientation?
             obj_pose = (obj_pose[0], obj_in_hand.get_position_orientation()[1])
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
             if self._target_in_reach_of_robot(hand_pose)[self.arm]:
@@ -884,7 +886,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             k: th.stack([v for _ in range(self._motion_generator.batch_size)]) for k, v in target_quat.items()
         }
 
-        # TODO: call curobo with batch_size > 1 instead of iterating
         self._motion_generator.update_obstacles()
         while not success and planning_attempts < m.MAX_PLANNING_ATTEMPTS:
             successes, traj_paths = self._motion_generator.compute_trajectories(
@@ -1254,7 +1255,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         q = self.robot.get_joint_positions()
         joint_names = list(self.robot.joints.keys())
-        for finger_joints in self.robot.finger_joints.values():
+        for finger_joints in self.robot.finger_joints[self.arm]:
             for finger_joint in finger_joints:
                 idx = joint_names.index(finger_joint.joint_name)
                 q[idx] = getattr(finger_joint, f"{limit_type}_limit")
@@ -1587,10 +1588,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
-
-        # TODO: Change curobo implementation so that base motion plannning take a 2D pose instead of 3D?
         pose_3d = self._get_robot_pose_from_2d_pose(pose_2d)
-        # TODO: change defualt to 0.0? Why is it 0.1?
+        # TODO: why was this 0.1?
         pose_3d[0][2] = 0.0
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*pose_3d)
@@ -1600,7 +1599,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         q_traj = self._plan_joint_motion(target_pos, target_quat, CuroboEmbodimentSelection.BASE).cpu()
         yield from self._execute_motion_plan(q_traj, stop_on_contact=True)
 
-    # TODO: implement this for curobo?
     def _draw_plan(self, plan):
         SEARCHED = []
         trav_map = self.robot.scene._trav_map
@@ -1735,11 +1733,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             action = self._empty_action()
 
-            # TODO: test to see if we still need this
-            # if isinstance(self.robot, Locobot) or isinstance(self.robot, Freight):
-            #     # Locobot and Freight wheel joints are reversed
-            #     ang_vel = -ang_vel
-
             base_action = action[self.robot.controller_action_idx["base"]]
 
             assert (
@@ -1779,7 +1772,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
         # TODO: make this a macro
-        distance_lo, distance_hi = 0.0, 1.5
+        distance_lo, distance_hi = 0.0, 2.0
         yaw_lo, yaw_hi = -math.pi, math.pi
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 

@@ -28,19 +28,17 @@ def get_grasp_poses_for_object_sticky(target_obj):
     Returns:
         List of grasp candidates, where each grasp candidate is a tuple containing the grasp pose and the approach direction.
     """
-    bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
-        visual=False
-    )
 
-    # TODO: why base frame aabb?
-    bbox_extent_in_world_frame = target_obj.aabb_extent
+    aabb_min_world, aabb_max_world = target_obj.aabb
 
-    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, bbox_extent_in_world_frame[2] / 2])
-    towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
+    bbox_center_world = (aabb_min_world + aabb_max_world) / 2
+    bbox_extent_world = aabb_max_world - aabb_min_world
+
+    grasp_center_pos = bbox_center_world + th.tensor([0, 0, bbox_extent_world[2] / 2])
+    towards_object_in_world_frame = bbox_center_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
-    # TODO: figure out why this was pi/2 in the y-axis
-    # grasp_quat = T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32))
+    # TODO: why was this pi/2 in the y-axis?
     grasp_quat = T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32))
 
     grasp_pose = (grasp_center_pos, grasp_quat)

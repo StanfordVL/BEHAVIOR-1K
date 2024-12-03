@@ -58,13 +58,14 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
         if not inspect.isabstract(cls):
             REGISTERED_PRIMITIVE_SETS[cls.__name__] = cls
 
-    def __init__(self, robot):
+    def __init__(self, env, robot):
+        self.env = env
         self.robot = robot
 
-    # @abstractmethod
-    # def get_action_space(self):
-    #     """Get the higher-level action space as an OpenAI Gym Space object."""
-    #     pass
+    @abstractmethod
+    def get_action_space(self):
+        """Get the higher-level action space as an OpenAI Gym Space object."""
+        pass
 
     @abstractmethod
     def apply(self, action):
