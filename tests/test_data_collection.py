@@ -118,6 +118,7 @@ def test_data_collect_and_playback():
     # Define robot sensor config and external sensors to use during playback
     robot_sensor_config = {
         "VisionSensor": {
+            "modalities": ["rgb"],
             "sensor_kwargs": {
                 "image_height": 16,
                 "image_width": 16,
@@ -129,11 +130,10 @@ def test_data_collect_and_playback():
             "sensor_type": "VisionSensor",
             "name": "external_sensor0",
             "relative_prim_path": f"/robot0/root_link/external_sensor0",
-            "modalities": ["rgb", "seg_semantic"],
+            "modalities": ["rgb"],
             "sensor_kwargs": {
                 "image_height": 16,
                 "image_width": 16,
-                "focal_length": 12.0,
             },
             "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
             "orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
