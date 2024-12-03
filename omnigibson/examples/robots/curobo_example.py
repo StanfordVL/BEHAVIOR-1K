@@ -254,8 +254,8 @@ def test_curobo():
     table = env.scene.object_registry("name", "table")
     cologne = env.scene.object_registry("name", "cologne")
     fridge = env.scene.object_registry("name", "fridge")
-    cologne_scale = 0.99
-    fridge_door_scale = 0.7
+    cologne_scale = 0.8
+    fridge_door_scale = 0.8
     if robot_type == "R1":
         table_local_pose = (th.tensor([-0.8, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
         cologne_local_pose = (th.tensor([-0.03, 0.0, 0.052]), T.euler2quat(th.tensor([math.pi, -math.pi / 2.0, 0.0])))
