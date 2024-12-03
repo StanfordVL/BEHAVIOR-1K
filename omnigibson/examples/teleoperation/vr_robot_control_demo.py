@@ -21,8 +21,7 @@ def main():
     Spawn a BehaviorRobot in Rs_int and users can navigate around and interact with the scene using VR.
     """
     # Create the config for generating the environment we want
-    scene_cfg = {"type": "Scene"}
-    # scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int", "load_object_categories": ["floors", "walls", "ceilings"]}
+    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int"}
     robot0_cfg = {
         "type": "R1",
         "obs_modalities": ["rgb"],
@@ -30,27 +29,56 @@ def main():
             "arm_left": {
                 "name": "InverseKinematicsController",
                 "mode": "absolute_pose",
+                "pos_kp": 5.0,
+                "vel_kp": 0.0,
                 "command_input_limits": None,
                 "command_output_limits": None,
             },
             "arm_right": {
                 "name": "InverseKinematicsController",
                 "mode": "absolute_pose",
+                "pos_kp": 5.0,
+                "vel_kp": 0.0,
                 "command_input_limits": None,
                 "command_output_limits": None,
             },
-            "gripper_left": {"command_input_limits": "default"},
-            "gripper_right": {"command_input_limits": "default"},
+            "gripper_left": {"name": "MultiFingerGripperController", "command_input_limits": "default"},
+            "gripper_right": {"name": "MultiFingerGripperController", "command_input_limits": "default"},
         },
         "action_normalize": False,
+        "reset_joint_pos": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            -1.8000,
+            -0.8000,
+            0.0000,
+            -0.0068,
+            0.0059,
+            2.6054,
+            2.5988,
+            -1.4515,
+            -1.4478,
+            -0.0065,
+            0.0052,
+            1.5670,
+            -1.5635,
+            -1.1428,
+            1.1610,
+            0.0087,
+            0.0087,
+            0.0087,
+            0.0087,
+        ],
     }
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)
-    og.sim.stop()
-    env.robots[0].base_footprint_link.mass = 250.0
-    og.sim.play()
     env.reset()
     # start vrsys
     vrsys = OVXRSystem(
@@ -62,14 +90,13 @@ def main():
     )
     vrsys.start()
 
-    # main simulation loop
-    while True:
+    for _ in range(3000):
         # update the VR system
         vrsys.update()
         # get the action from the VR system and step the environment
         env.step(vrsys.get_robot_teleop_action())
 
-    # Shut down the environment cleanly at the end
+    print("Cleaning up...")
     vrsys.stop()
     og.clear()
 
