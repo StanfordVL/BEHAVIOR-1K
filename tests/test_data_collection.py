@@ -7,6 +7,9 @@ import omnigibson as og
 from omnigibson.envs import DataCollectionWrapper, DataPlaybackWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.utils.ui_utils import create_module_logger
+
+log = create_module_logger(module_name=__name__)
 
 
 def test_data_collect_and_playback():
@@ -49,21 +52,25 @@ def test_data_collect_and_playback():
 
     # Create the environment (wrapped as a DataCollection env)
     env = og.Environment(configs=cfg)
+    log.warning("Created env")
     env = DataCollectionWrapper(
         env=env,
         output_path=collect_hdf5_path,
         only_successes=False,
     )
+    log.warning("Wrapped env")
 
     # Record 2 episodes
     for i in range(2):
         env.reset()
+        log.warning(f"Reset env for episode {i}")
         for _ in range(5):
             env.step(env.robots[0].action_space.sample())
-
+        log.warning(f"Stepped env for episode {i}")
         # Manually add a random object, e.g.: a banana, and place on the floor
         obj = DatasetObject(name="banana", category="banana")
         env.scene.add_object(obj)
+        log.warning(f"Added object to env for episode {i}")
         obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
 
         # Take a few more steps
@@ -72,6 +79,7 @@ def test_data_collect_and_playback():
 
         # Manually remove the added object
         env.scene.remove_object(obj)
+        log.warning(f"Removed object from env for episode {i}")
 
         # Take a few more steps
         for _ in range(5):
@@ -81,6 +89,7 @@ def test_data_collect_and_playback():
         water = env.scene.get_system("water")
         pos = th.rand(10, 3, dtype=th.float32) * 10.0
         water.generate_particles(positions=pos)
+        log.warning(f"Added water particles to env for episode {i}")
 
         # Take a few more steps
         for _ in range(5):
@@ -88,6 +97,7 @@ def test_data_collect_and_playback():
 
         # Clear the system
         env.scene.clear_system("water")
+        log.warning(f"Cleared water particles from env for episode {i}")
 
         # Take a few more steps
         for _ in range(5):
@@ -95,6 +105,7 @@ def test_data_collect_and_playback():
 
     # Save this data
     env.save_data()
+    log.warning("Saved data")
 
     # Clear the sim
     og.clear(
@@ -102,6 +113,7 @@ def test_data_collect_and_playback():
         rendering_dt=0.001,
         sim_step_dt=0.001,
     )
+    log.warning("Cleared sim")
 
     # Define robot sensor config and external sensors to use during playback
     robot_sensor_config = {
@@ -138,5 +150,8 @@ def test_data_collect_and_playback():
         n_render_iterations=1,
         only_successes=False,
     )
+    log.warning("Created playback env")
     env.playback_dataset(record=True)
+    log.warning("Played back data")
     env.save_data()
+    log.warning("Saved data")
