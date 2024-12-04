@@ -48,6 +48,8 @@ setup(
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
         "lxml",
+        "numba",
+        "cffi==1.16.0",
     ],
     extras_require={
         "dev": [

@@ -36,7 +36,7 @@ from omnigibson.robots import *
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
-from omnigibson.utils.control_utils import FKSolver, IKSolver, orientation_error
+from omnigibson.utils.control_utils import FKSolver, IKSolver
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import (
     detect_robot_collision_in_sim,
@@ -1472,7 +1472,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
                     delta_pos = target_pos - current_pos
                     if controller.mode == "pose_delta_ori":
-                        delta_orn = orientation_error(
+                        delta_orn = T.orientation_error(
                             T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
                         )
                         partial_action = th.cat((delta_pos, delta_orn))

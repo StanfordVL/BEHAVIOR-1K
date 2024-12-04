@@ -1,6 +1,5 @@
-import torch as th
-
 from omnigibson.controllers import ControlType, LocomotionController
+from omnigibson.controllers.controller_base import _controller_backend as cb
 
 
 class DifferentialDriveController(LocomotionController):
@@ -107,14 +106,14 @@ class DifferentialDriveController(LocomotionController):
         right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
         # Return desired velocities
-        return th.tensor([left_wheel_joint_vel, right_wheel_joint_vel])
+        return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
 
     def compute_no_op_goal(self, control_dict):
         # This is zero-vector, since we want zero linear / angular velocity
-        return dict(vel=th.zeros(2))
+        return dict(vel=cb.zeros(2))
 
     def _compute_no_op_action(self, control_dict):
-        return th.zeros(2, dtype=th.float32)
+        return cb.zeros(2)
 
     def _get_goal_shapes(self):
         # Add (2, )-array representing linear, angular velocity

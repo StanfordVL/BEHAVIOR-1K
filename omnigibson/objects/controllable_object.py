@@ -10,6 +10,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
@@ -277,7 +278,7 @@ class ControllableObject(BaseObject):
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
 
             # Create the controller
-            controller = create_controller(**cfg)
+            controller = create_controller(**cb.from_torch_recursive(cfg))
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
                 assert self._joints[
@@ -409,8 +410,8 @@ class ControllableObject(BaseObject):
 
         return gym.spaces.Box(
             shape=(self.action_dim,),
-            low=th.cat(low).cpu().numpy(),
-            high=th.cat(high).cpu().numpy(),
+            low=cb.to_numpy(cb.cat(low)),
+            high=cb.to_numpy(cb.cat(high)),
             dtype=NumpyTypes.FLOAT32,
         )
 
@@ -440,6 +441,9 @@ class ControllableObject(BaseObject):
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
             self.action_dim, len(action)
         )
+
+        # Convert action from torch if necessary
+        action = cb.from_torch(action)
 
         # First, loop over all controllers, and update the desired command
         idx = 0
@@ -488,9 +492,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = th.zeros(self.n_dof)
+        u_vec = cb.zeros(self.n_dof)
         # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
-        u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
+        u_type_vec = cb.array([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -549,9 +553,12 @@ class ControllableObject(BaseObject):
         """
         # Run sanity check
         assert len(control) == len(control_type) == self.n_dof, (
-            "Control signals, control types, and number of DOF should all be the same!"
-            "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
+            f"Control signals, control types, and number of DOF should all be the same!"
+            f"Got {len(control)}, {len(control_type)}, and {self.n_dof} respectively."
         )
+        # Cast control type to numpy to avoid having to call .item() individually on torch tensors
+        control_type = cb.to_numpy(control_type)
+
         # Set indices manually so that we're standardized
         indices = range(self.n_dof)
 
@@ -561,9 +568,24 @@ class ControllableObject(BaseObject):
         # Loop through controls and deploy
         # We have to use delicate logic to account for the edge cases where a single joint may contain > 1 DOF
         # (e.g.: spherical joint)
-        pos_vec, pos_idxs, using_pos = [], [], False
-        vel_vec, vel_idxs, using_vel = [], [], False
-        eff_vec, eff_idxs, using_eff = [], [], False
+        ctrl_to_execute = {
+            ControlType.EFFORT: {
+                "vals": [],
+                "idxs": [],
+            },
+            ControlType.POSITION: {
+                "vals": [],
+                "idxs": [],
+            },
+            ControlType.VELOCITY: {
+                "vals": [],
+                "idxs": [],
+            },
+            ControlType.NONE: {
+                "vals": [],
+                "idxs": [],
+            },
+        }
         cur_indices_idx = 0
         while cur_indices_idx != n_indices:
             # Grab the current DOF index we're controlling and find the corresponding joint
@@ -596,40 +618,29 @@ class ControllableObject(BaseObject):
             ctrl_type = control_type[
                 cur_ctrl_idx
             ]  # In multi-DOF joint case all values were already checked to be the same
-            if ctrl_type == ControlType.EFFORT:
-                eff_vec.append(ctrl)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            elif ctrl_type == ControlType.VELOCITY:
-                vel_vec.append(ctrl)
-                vel_idxs.append(cur_ctrl_idx)
-                using_vel = True
-            elif ctrl_type == ControlType.POSITION:
-                pos_vec.append(ctrl)
-                pos_idxs.append(cur_ctrl_idx)
-                using_pos = True
-            elif ctrl_type == ControlType.NONE:
-                # Set zero efforts
-                eff_vec.append(0)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            else:
-                raise ValueError("Invalid control type specified: {}".format(ctrl_type))
+            ctrl_to_execute[ctrl_type]["vals"].append(ctrl)
+            ctrl_to_execute[ctrl_type]["idxs"].append(cur_ctrl_idx)
             # Finally, increment the current index based on how many DOFs were just controlled
             cur_indices_idx += joint_dof
 
         # set the targets for joints
-        if using_pos:
+        if len(ctrl_to_execute[ControlType.POSITION]) > 0:
             ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path, positions=th.tensor(pos_vec, dtype=th.float), indices=th.tensor(pos_idxs)
+                self.articulation_root_path,
+                positions=cb.array(ctrl_to_execute[ControlType.POSITION]["vals"]),
+                indices=cb.int_array(ctrl_to_execute[ControlType.POSITION]["idxs"]),
             )
-        if using_vel:
+        if len(ctrl_to_execute[ControlType.VELOCITY]) > 0:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path, velocities=th.tensor(vel_vec, dtype=th.float), indices=th.tensor(vel_idxs)
+                self.articulation_root_path,
+                velocities=cb.array(ctrl_to_execute[ControlType.VELOCITY]["vals"]),
+                indices=cb.int_array(ctrl_to_execute[ControlType.VELOCITY]["idxs"]),
             )
-        if using_eff:
+        if len(ctrl_to_execute[ControlType.VELOCITY]) > 0 or len(ctrl_to_execute[ControlType.NONE]) > 0:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path, efforts=th.tensor(eff_vec, dtype=th.float), indices=th.tensor(eff_idxs)
+                self.articulation_root_path,
+                efforts=cb.cat([cb.array(ctrl_to_execute[ControlType.EFFORT]["vals"]), cb.array(ctrl_to_execute[ControlType.NONE]["vals"])]),
+                indices=cb.cat([cb.int_array(ctrl_to_execute[ControlType.EFFORT]["idxs"]), cb.int_array(ctrl_to_execute[ControlType.NONE]["idxs"])]),
             )
 
     def get_control_dict(self):
@@ -756,9 +767,9 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = th.cat(
+        controller_states_flat = cb.to_torch(cb.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
-        )
+        ))
 
         # Concatenate and return
         return th.cat([state_flat, controller_states_flat])
@@ -770,7 +781,7 @@ class ControllableObject(BaseObject):
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
+            controller_states[c_name], deserialized_items = c.deserialize(state=cb.from_torch(state[idx:]))
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 

@@ -6,11 +6,12 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
+from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 m = create_module_macros(module_path=__file__)
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
@@ -250,10 +251,11 @@ class HolonomicBaseRobot(LocomotionRobot):
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
             joint_pos, joint_orn = self.root_link.get_position_orientation()
-            inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
+            joint_pos, joint_orn = cb.from_torch(joint_pos), cb.from_torch(joint_orn)
+            inv_joint_pos, inv_joint_orn = cb.T.mat2pose(cb.T.pose_inv(cb.T.pose2mat((joint_pos, joint_orn))))
 
-            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
-            relative_rpy = T.quat2euler(relative_orn)
+            relative_pos, relative_orn = cb.T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
+            relative_rpy = cb.T.quat2euler(relative_orn)
             self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
             self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
             self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
@@ -276,8 +278,8 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = self.root_link.get_position_orientation()[1]
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
+        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
+        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
         self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
@@ -288,8 +290,8 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
         # See comments of self.set_linear_velocity
-        orn = self.root_link.get_position_orientation()[1]
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
+        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
+        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
         self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
@@ -303,23 +305,23 @@ class HolonomicBaseRobot(LocomotionRobot):
         u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
 
         # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = self.base_footprint_link.get_position_orientation()[1]
-        root_link_orn = self.root_link.get_position_orientation()[1]
+        base_orn = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)[1]
+        root_link_orn = ControllableObjectViewAPI.get_root_position_orientation(self.articulation_root_path)[1]
 
-        cur_orn_mat = T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn)
-        cur_pose = th.zeros((2, 4, 4))
+        cur_orn_mat = cb.T.quat2mat(root_link_orn).T @ cb.T.quat2mat(base_orn)
+        cur_pose = cb.zeros((2, 4, 4))
         cur_pose[:, :3, :3] = cur_orn_mat
         cur_pose[:, 3, 3] = 1.0
 
-        local_pose = th.zeros((2, 4, 4))
-        local_pose[:] = th.eye(4)
-        local_pose[:, :3, 3] = u_vec[self.base_idx].view(2, 3)
+        local_pose = cb.zeros((2, 4, 4))
+        local_pose[:] = cb.eye(4)
+        local_pose[:, :3, 3] = cb.view(u_vec[cb.from_torch(self.base_idx)], (2, 3))
 
         # Rotate the linear and angular velocity to the desired frame
         global_pose = cur_pose @ local_pose
         lin_vel_global, ang_vel_global = global_pose[0, :3, 3], global_pose[1, :3, 3]
 
-        u_vec[self.base_control_idx] = th.tensor([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
+        u_vec[cb.from_torch(self.base_control_idx)] = cb.array([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
 
         return u_vec, u_type_vec
 

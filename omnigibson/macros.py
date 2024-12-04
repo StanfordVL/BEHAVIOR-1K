@@ -79,6 +79,10 @@ gm.REMOTE_STREAMING = os.getenv("OMNIGIBSON_REMOTE_STREAMING", None)
 gm.HTTP_PORT = os.getenv("OMNIGIBSON_HTTP_PORT", 8211)
 gm.WEBRTC_PORT = os.getenv("OMNIGIBSON_WEBRTC_PORT", 49100)
 
+# Whether to use numpy or torch controller backend. Numpy is significantly faster and should be used
+# for single-threaded (i.e.: non-large scale parallelized env) purposes
+gm.USE_NUMPY_CONTROLLER_BACKEND = True
+
 # Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
 # CANNOT be set at runtime
 gm.GUI_VIEWPORT_ONLY = False
