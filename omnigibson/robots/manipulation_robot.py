@@ -1,5 +1,6 @@
 import math
 from abc import abstractmethod
+from functools import cached_property
 from collections import namedtuple
 from typing import Literal
 
@@ -592,7 +593,7 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     def arm_control_idx(self):
         """
         Returns:
@@ -604,7 +605,7 @@ class ManipulationRobot(BaseRobot):
             for arm in self.arm_names
         }
 
-    @property
+    @cached_property
     def gripper_control_idx(self):
         """
         Returns:
