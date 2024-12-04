@@ -1,5 +1,6 @@
 import os
 
+import torch as th
 import yaml
 
 import omnigibson as og
@@ -8,6 +9,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitiveSet,
 )
 from omnigibson.macros import gm
+from omnigibson.robots.tiago import Tiago
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -26,19 +28,19 @@ def main():
     It loads Rs_int with a robot, and the robot picks and places an apple.
     """
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "fetch_primitives.yaml")
+    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    # Update it to run a grocery shopping task
     config["scene"]["scene_model"] = "Rs_int"
-    config["scene"]["not_load_object_categories"] = ["ceilings"]
+    config["scene"]["not_load_object_categories"] = ["ceilings", "loudspeaker", "standing_tv", "pot_plant"]
+    # config["scene"]["load_object_categories"] = ["floors", "breakfast_table", "bottom_cabinet", "walls"]
     config["objects"] = [
         {
             "type": "DatasetObject",
             "name": "apple",
             "category": "apple",
             "model": "agveuv",
-            "position": [-0.3, -1.1, 0.5],
+            "position": [1.2, 0.0, 0.75],
             "orientation": [0, 0, 0, 1],
         },
     ]
@@ -48,11 +50,31 @@ def main():
     scene = env.scene
     robot = env.robots[0]
 
+    # Open the gripper(s) to match cuRobo's default state
+    for arm_name in robot.gripper_control_idx.keys():
+        grpiper_control_idx = robot.gripper_control_idx[arm_name]
+        robot.set_joint_positions(th.ones_like(grpiper_control_idx), indices=grpiper_control_idx, normalized=True)
+    robot.keep_still()
+
+    for _ in range(5):
+        og.sim.step()
+
+    env.scene.update_initial_state()
+    env.scene.reset()
+
+    og.sim.viewer_camera.set_position_orientation(
+        th.tensor([-0.6084, -3.3571, 1.2033]), th.tensor([0.6349, -0.1778, -0.2027, 0.7240])
+    )
+
+    # Let the object settle
+    for _ in range(30):
+        og.sim.step()
+
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(robot, enable_head_tracking=False)
-    cabinet = scene.object_registry("name", "bottom_cabinet_slgzfc_0")
+    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=isinstance(robot, Tiago))
+    cabinet = scene.object_registry("name", "bottom_cabinet_jhymlr_0")
     apple = scene.object_registry("name", "apple")
 
     # Grasp apple

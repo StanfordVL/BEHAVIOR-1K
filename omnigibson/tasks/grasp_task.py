@@ -90,7 +90,7 @@ class GraspTask(BaseTask):
         # Otherwise, reset using the primitive controller.
         else:
             if self._primitive_controller is None:
-                self._primitive_controller = StarterSemanticActionPrimitives(robot, enable_head_tracking=False)
+                self._primitive_controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=False)
 
             # Randomize the robots joint positions
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])

@@ -6,7 +6,6 @@ env:
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
   flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
   use_external_obs: false               # (bool): Whether to use external observations or not
-  initial_pos_z_offset: 0.1
   external_sensors: null                # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
 
 render:
@@ -31,42 +30,13 @@ scene:
   include_robots: false
 
 robots:
-  - type: Tiago
+  - type: R1
     obs_modalities: [rgb]
     scale: 1.0
     self_collisions: true
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    reset_joint_pos: [
-      0.0000,
-      0.0000,
-      -0.0000,
-      -0.0000,
-      -0.0000,
-      -0.0000,
-      0.3500,
-      0.9052,
-      0.9052,
-      0.0000,
-      -0.4281,
-      -0.4281,
-      -0.4500,
-      2.2350,
-      2.2350,
-      1.6463,
-      1.6463,
-      0.7687,
-      0.7687,
-      -0.7946,
-      -0.7946,
-      -1.0891,
-      -1.0891,
-      0.0450,
-      0.0450,
-      0.0450,
-      0.0450,
-    ]
     sensor_config:
       VisionSensor:
         sensor_kwargs:
@@ -79,16 +49,13 @@ robots:
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 200
-        pos_ki: 0.5
-        max_integral_error: 10.0
+        pos_kp: 50
       trunk:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 500
       arm_left:
         name: JointController
         # subsume_controllers: [trunk]
@@ -96,32 +63,24 @@ robots:
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 500
-        pos_ki: 0.5
-        max_integral_error: 10.0
       arm_right:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 500
-        pos_ki: 0.5
-        max_integral_error: 10.0
       gripper_left:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 200
       gripper_right:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
-        pos_kp: 200
       camera:
         name: JointController
 

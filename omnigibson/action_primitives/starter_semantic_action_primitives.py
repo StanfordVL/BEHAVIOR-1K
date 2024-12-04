@@ -67,7 +67,7 @@ m.KP_ANGLE_VEL = {
     R1: 0.2,
 }
 
-m.MAX_PLANNING_ATTEMPTS = 50
+m.MAX_PLANNING_ATTEMPTS = 20
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -559,7 +559,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Grasp completed, but no object detected in hand after executing grasp",
                 {"target object": obj.name},
             )
-        # TODO: reset density back when releasing
+
+        # TODO: ag force seems to not be enough to keep the object in hand. need to investigate
         obj_in_hand.root_link.density = 1.0
 
         indented_print("Moving hand back")
@@ -670,6 +671,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 pose_candidates.append(hand_pose)
 
+        valid_navigation_pose = None
         if directly_move_hand_pose is not None:
             yield from self._move_hand(directly_move_hand_pose)
         else:
@@ -937,8 +939,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 collision_detected = False
                 articulation_control_idx = th.cat(
                     (
-                        self.robot.arm_control_idx["left"],
-                        self.robot.arm_control_idx["right"],
+                        self.robot.arm_control_idx[self.arm],
                         self.robot.trunk_control_idx,
                     )
                 )
@@ -1255,10 +1256,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         q = self.robot.get_joint_positions()
         joint_names = list(self.robot.joints.keys())
-        for finger_joints in self.robot.finger_joints[self.arm]:
-            for finger_joint in finger_joints:
-                idx = joint_names.index(finger_joint.joint_name)
-                q[idx] = getattr(finger_joint, f"{limit_type}_limit")
+        for finger_joint in self.robot.finger_joints[self.arm]:
+            idx = joint_names.index(finger_joint.joint_name)
+            q[idx] = getattr(finger_joint, f"{limit_type}_limit")
         action = self._q_to_action(q)
         finger_joint_limits = getattr(self.robot, f"joint_{limit_type}_limits")[
             self.robot.gripper_control_idx[self.arm]
@@ -1655,6 +1655,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
         pose = self._sample_pose_near_object(obj, pose_on_obj=pose_on_obj, **kwargs)
+        if pose is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "Could not find a valid pose near the object",
+                {"object": obj.name},
+            )
         yield from self._navigate_to_pose(pose)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
