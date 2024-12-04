@@ -65,6 +65,9 @@ class _ControllerBackend:
     copy = None
     eye = None
     view = None
+    arange = None
+    where = None
+    squeeze = None
     T = None
 
     @classmethod
@@ -79,7 +82,7 @@ class _ControllerBackend:
 
 class _ControllerTorchBackend(_ControllerBackend):
     array = lambda *args: th.tensor(*args, dtype=th.float32)
-    int_array = lambda *args: th.tensor(*args, dtype=th.int)
+    int_array = lambda *args: th.tensor(*args, dtype=th.int32)
     prod = th.prod
     cat = th.cat
     zeros = lambda *args: th.zeros(*args, dtype=th.float32)
@@ -104,12 +107,15 @@ class _ControllerTorchBackend(_ControllerBackend):
     copy = lambda arr: arr.clone()
     eye = th.eye
     view = lambda arr, shape: arr.view(shape)
+    arange = th.arange
+    where = th.where
+    squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
     T = TT
 
 
 class _ControllerNumpyBackend(_ControllerBackend):
     array = lambda *args: np.array(*args, dtype=np.float32)
-    int_array = lambda *args: np.array(*args, dtype=int)
+    int_array = lambda *args: np.array(*args, dtype=np.int32)
     prod = np.prod
     cat = np.concatenate
     zeros = lambda *args: np.zeros(*args, dtype=np.float32)
@@ -134,6 +140,9 @@ class _ControllerNumpyBackend(_ControllerBackend):
     copy = lambda arr: np.array(arr)
     eye = np.eye
     view = lambda arr, shape: arr.reshape(shape)
+    arange = np.arange
+    where = np.where
+    squeeze = lambda arr, dim=None: arr.squeeze(axis=dim)
     T = NT
 
 
