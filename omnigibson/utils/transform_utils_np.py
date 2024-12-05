@@ -7,7 +7,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 import math
 
 import numpy as np
-from numba import jit
+from numba import jit, prange
 from scipy.spatial.transform import Rotation as R
 
 PI = np.pi
@@ -394,6 +394,78 @@ def mat2quat(rmat):
     return R.from_matrix(rmat).as_quat()
 
 
+@jit(nopython=True, fastmath=True)
+def _norm_2d_final_dim(mat):
+    n_elements = mat.shape[0]
+    out = np.zeros(n_elements, dtype=np.float32)
+    for i in prange(n_elements):
+        vec = mat[i]
+        out[i] = np.sqrt(np.sum(vec * vec))
+    return out
+
+
+@jit(nopython=True)
+def mat2quat_batch(rmat):
+    """
+    Converts given rotation matrix to quaternion.
+    Args:
+        rmat (torch.Tensor): (3, 3) or (..., 3, 3) rotation matrix
+    Returns:
+        torch.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
+    """
+    batch_shape = rmat.shape[:-2]
+    mat_flat = rmat.reshape(-1, 3, 3)
+
+    m00, m01, m02 = mat_flat[:, 0, 0], mat_flat[:, 0, 1], mat_flat[:, 0, 2]
+    m10, m11, m12 = mat_flat[:, 1, 0], mat_flat[:, 1, 1], mat_flat[:, 1, 2]
+    m20, m21, m22 = mat_flat[:, 2, 0], mat_flat[:, 2, 1], mat_flat[:, 2, 2]
+
+    trace = m00 + m11 + m22
+
+    trace_positive = trace > 0
+    cond1 = (m00 > m11) & (m00 > m22) & ~trace_positive
+    cond2 = (m11 > m22) & ~(trace_positive | cond1)
+    cond3 = ~(trace_positive | cond1 | cond2)
+
+    # Trace positive condition
+    sq = np.where(trace_positive, np.sqrt(trace + 1.0) * 2.0, np.zeros_like(trace))
+    qw = np.where(trace_positive, 0.25 * sq, np.zeros_like(trace))
+    qx = np.where(trace_positive, (m21 - m12) / sq, np.zeros_like(trace))
+    qy = np.where(trace_positive, (m02 - m20) / sq, np.zeros_like(trace))
+    qz = np.where(trace_positive, (m10 - m01) / sq, np.zeros_like(trace))
+
+    # Condition 1
+    sq = np.where(cond1, np.sqrt(1.0 + m00 - m11 - m22) * 2.0, sq)
+    qw = np.where(cond1, (m21 - m12) / sq, qw)
+    qx = np.where(cond1, 0.25 * sq, qx)
+    qy = np.where(cond1, (m01 + m10) / sq, qy)
+    qz = np.where(cond1, (m02 + m20) / sq, qz)
+
+    # Condition 2
+    sq = np.where(cond2, np.sqrt(1.0 + m11 - m00 - m22) * 2.0, sq)
+    qw = np.where(cond2, (m02 - m20) / sq, qw)
+    qx = np.where(cond2, (m01 + m10) / sq, qx)
+    qy = np.where(cond2, 0.25 * sq, qy)
+    qz = np.where(cond2, (m12 + m21) / sq, qz)
+
+    # Condition 3
+    sq = np.where(cond3, np.sqrt(1.0 + m22 - m00 - m11) * 2.0, sq)
+    qw = np.where(cond3, (m10 - m01) / sq, qw)
+    qx = np.where(cond3, (m02 + m20) / sq, qx)
+    qy = np.where(cond3, (m12 + m21) / sq, qy)
+    qz = np.where(cond3, 0.25 * sq, qz)
+
+    quat = np.stack((qx, qy, qz, qw), axis=-1)
+
+    # Normalize the quaternion
+    quat = quat / _norm_2d_final_dim(quat)[..., np.newaxis]
+
+    # Reshape to match input batch shape
+    quat = quat.reshape(batch_shape + (4,))
+
+    return quat
+
+
 def vec2quat(vec, up=(0, 0, 1.0)):
     """
     Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
@@ -446,6 +518,62 @@ def mat2euler(rmat):
     return R.from_matrix(M).as_euler("xyz")
 
 
+def quat2mat(quaternion):
+    if quaternion.dtype != np.float32:
+        quaternion = quaternion.astype(np.float32)
+    return _quat2mat(quaternion)
+
+
+@jit(nopython=True)
+def _quat2mat(quaternion):
+    """
+    Convert quaternions into rotation matrices.
+
+    Args:
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
+
+    Returns:
+        torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
+    """
+    # broadcast array is necessary to use numba parallel mode
+    q1, q2 = np.broadcast_arrays(quaternion[..., np.newaxis], quaternion[..., np.newaxis, :])
+    outer = q1 * q2
+
+    # Extract the necessary components
+    xx = outer[..., 0, 0]
+    yy = outer[..., 1, 1]
+    zz = outer[..., 2, 2]
+    xy = outer[..., 0, 1]
+    xz = outer[..., 0, 2]
+    yz = outer[..., 1, 2]
+    xw = outer[..., 0, 3]
+    yw = outer[..., 1, 3]
+    zw = outer[..., 2, 3]
+
+    rotation_matrix = np.empty(quaternion.shape[:-1] + (3, 3), dtype=np.float32)
+
+    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
+    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
+    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
+
+    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
+    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
+    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
+
+    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
+    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
+    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
+
+    return rotation_matrix
+
+
+# def pose2mat(pose):
+#     if pose.dtype != np.float32:
+#         pose = pose.astype(np.float32)
+#     return _pose2mat(pose)
+
+
+@jit(nopython=True)
 def pose2mat(pose):
     """
     Converts pose to homogeneous matrix.
@@ -458,23 +586,10 @@ def pose2mat(pose):
         np.array: 4x4 homogeneous matrix
     """
     homo_pose_mat = np.zeros((4, 4), dtype=np.float32)
-    homo_pose_mat[:3, :3] = quat2mat(pose[1])
-    homo_pose_mat[:3, 3] = np.array(pose[0], dtype=np.float32)
+    homo_pose_mat[:3, :3] = _quat2mat(pose[1])
+    homo_pose_mat[:3, 3] = pose[0]
     homo_pose_mat[3, 3] = 1.0
     return homo_pose_mat
-
-
-def quat2mat(quaternion):
-    """
-    Converts given quaternion to matrix.
-
-    Args:
-        quaternion (np.array): (..., 4) (x,y,z,w) float quaternion angles
-
-    Returns:
-        np.array: (..., 3, 3) rotation matrix
-    """
-    return R.from_quat(quaternion).as_matrix()
 
 
 def quat2axisangle(quat):
@@ -558,6 +673,13 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
 
 
 def pose_inv(pose_mat):
+    if pose_mat.dtype != np.float32:
+        pose_mat = pose_mat.astype(np.float32)
+    return _pose_inv(pose_mat)
+
+
+@jit(nopython=True)
+def _pose_inv(pose_mat):
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
     frame B in frame A. The inverse is the pose of frame A in frame B.
@@ -579,7 +701,7 @@ def pose_inv(pose_mat):
     # -t in the original frame, which is -R-1*t in the new frame, and then rotate back by
     # R-1 to align the axis again.
 
-    pose_inv = np.zeros((4, 4))
+    pose_inv = np.zeros((4, 4), dtype=np.float32)
     pose_inv[:3, :3] = pose_mat[:3, :3].T
     pose_inv[:3, 3] = -pose_inv[:3, :3].dot(pose_mat[:3, 3])
     pose_inv[3, 3] = 1.0
