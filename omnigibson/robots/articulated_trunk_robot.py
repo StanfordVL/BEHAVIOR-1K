@@ -1,4 +1,5 @@
 import torch as th
+from functools import cached_property
 
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
@@ -45,7 +46,7 @@ class ArticulatedTrunkRobot(ManipulationRobot):
     def trunk_joint_names(self):
         raise NotImplementedError("trunk_joint_names must be implemented in subclass")
 
-    @property
+    @cached_property
     def trunk_control_idx(self):
         """
         Returns:

@@ -175,7 +175,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Reload the controllers to update their command_output_limits and control_limits
         self.reload_controllers(self._controller_config)
 
-    @property
+    @cached_property
     def base_idx(self):
         """
         Returns:

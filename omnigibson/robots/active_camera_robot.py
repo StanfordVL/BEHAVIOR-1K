@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from functools import cached_property
 
 import torch as th
 
@@ -126,7 +127,7 @@ class ActiveCameraRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     def camera_control_idx(self):
         """
         Returns:

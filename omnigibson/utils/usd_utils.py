@@ -850,21 +850,54 @@ class BatchControlViewAPIImpl:
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
 
+    def _set_dof_position_targets(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_position_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF positions in backend")
+
+    def _set_dof_velocity_targets(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_velocity_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF velocities in backend")
+
+    def _set_dof_actuation_forces(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_actuation_forces(data_desc, indices_desc):
+            raise Exception("Failed to set DOF actuation forces in backend")
+
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
             pos_indices = cb.int_array(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
-            self._view.set_dof_position_targets(cb.to_torch(pos_targets), cb.to_torch(pos_indices))
+            self._set_dof_position_targets(cb.to_torch(pos_targets), cb.to_torch(pos_indices), cast=False)
 
         if "dof_velocity_targets" in self._write_idx_cache:
             vel_indices = cb.int_array(sorted(self._write_idx_cache["dof_velocity_targets"]))
             vel_targets = self._read_cache["dof_velocity_targets"]
-            self._view.set_dof_velocity_targets(cb.to_torch(vel_targets), cb.to_torch(vel_indices))
+            self._set_dof_velocity_targets(cb.to_torch(vel_targets), cb.to_torch(vel_indices), cast=False)
 
         if "dof_actuation_forces" in self._write_idx_cache:
             eff_indices = cb.int_array(sorted(self._write_idx_cache["dof_actuation_forces"]))
             eff_targets = self._read_cache["dof_actuation_forces"]
-            self._view.set_dof_actuation_forces(cb.to_torch(eff_targets), cb.to_torch(eff_indices))
+            self._set_dof_actuation_forces(cb.to_torch(eff_targets), cb.to_torch(eff_indices), cast=False)
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -967,45 +1000,58 @@ class BatchControlViewAPIImpl:
         else:
             return self.get_root_transform(prim_path)
 
-    def get_linear_velocity(self, prim_path):
+    def _get_velocities(self, prim_path):
         if self._base_footprint_link_names[prim_path] is not None:
             link_name = self._base_footprint_link_names[prim_path]
-            return self.get_link_linear_velocity(prim_path, link_name)
+            return self._get_link_velocities(prim_path, link_name)
         else:
-            return self.get_root_linear_velocity(prim_path)
+            return self._get_root_velocities(prim_path)
+
+    def _get_relative_velocities(self, prim_path):
+        if "relative_velocities" not in self._read_cache:
+            self._read_cache["relative_velocities"] = {}
+
+        if prim_path not in self._read_cache["relative_velocities"]:
+            # Compute all tfs at once, including base as well as all links
+            if "link_velocities" not in self._read_cache:
+                self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
+
+            idx = self._idx[prim_path]
+            vels = cb.zeros((len(self._link_idx[idx]) + 1, 6, 1))
+            # base vel is the final -1 index
+            vels[:-1, :, 0] = self._read_cache["link_velocities"][idx, :]
+            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path)
+
+            tf = cb.zeros((1, 6, 6))
+            orn_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
+            tf[0, :3, :3] = orn_t
+            tf[0, 3:, 3:] = orn_t
+            # x.T --> transpose (inverse) orientation
+            # (1, 6, 6) @ (n_links, 6, 1) -> (n_links, 6, 1) -> (n_links, 6)
+            self._read_cache["relative_velocities"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
+
+        return self._read_cache["relative_velocities"][prim_path]
+
+    def get_linear_velocity(self, prim_path):
+        return self._get_velocities(prim_path)[:3]
 
     def get_angular_velocity(self, prim_path):
-        if self._base_footprint_link_names[prim_path] is not None:
-            link_name = self._base_footprint_link_names[prim_path]
-            return self.get_link_angular_velocity(prim_path, link_name)
-        else:
-            return self.get_root_angular_velocity(prim_path)
+        return self._get_velocities(prim_path)[3:]
 
-    def get_root_linear_velocity(self, prim_path):
+    def _get_root_velocities(self, prim_path):
         if "root_velocities" not in self._read_cache:
             self._read_cache["root_velocities"] = cb.from_torch(self._view.get_root_velocities())
 
         idx = self._idx[prim_path]
-        return self._read_cache["root_velocities"][idx, :3]
-
-    def get_root_angular_velocity(self, prim_path):
-        if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = cb.from_torch(self._view.get_root_velocities())
-
-        idx = self._idx[prim_path]
-        return self._read_cache["root_velocities"][idx, 3:]
+        return self._read_cache["root_velocities"][idx]
 
     def get_relative_linear_velocity(self, prim_path):
-        orn = self.get_position_orientation(prim_path)[1]
-        linvel = self.get_linear_velocity(prim_path)
-        # x.T --> transpose (inverse) orientation
-        return cb.T.quat2mat(orn).T @ linvel
+        # base corresponds to final index
+        return self._get_relative_velocities(prim_path)[-1, :3]
 
     def get_relative_angular_velocity(self, prim_path):
-        orn = self.get_position_orientation(prim_path)[1]
-        angvel = self.get_angular_velocity(prim_path)
-        # x.T --> transpose (inverse) orientation
-        return cb.T.quat2mat(orn).T @ angvel
+        # base corresponds to final index
+        return self._get_relative_velocities(prim_path)[-1, 3:]
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
@@ -1058,54 +1104,67 @@ class BatchControlViewAPIImpl:
         pose = self._read_cache["link_transforms"][idx, link_idx]
         return pose[:3], pose[3:]
 
+    def _get_relative_poses(self, prim_path):
+        if "relative_poses" not in self._read_cache:
+            self._read_cache["relative_poses"] = {}
+
+        if prim_path not in self._read_cache["relative_poses"]:
+            # Compute all tfs at once, including base as well as all links
+            if "link_transforms" not in self._read_cache:
+                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+
+            idx = self._idx[prim_path]
+            tfs = cb.zeros((len(self._link_idx[idx]), 4, 4))
+            # base vel is the final -1 index
+            link_tfs = self._read_cache["link_transforms"][idx, :]
+            tfs[:, 3, 3] = 1.0
+            tfs[:, :3, 3] = link_tfs[:, :3]
+            tfs[:, :3, :3] = cb.T.quat2mat(link_tfs[:, 3:])
+            base_tf_inv = cb.zeros((1, 4, 4))
+            base_tf_inv[0, :, :] = cb.T.pose_inv(cb.T.pose2mat(self.get_position_orientation(prim_path=prim_path)))
+
+            # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
+            rel_tfs = base_tf_inv @ tfs
+
+            # Re-convert to quat form
+            rel_poses = cb.zeros((len(self._link_idx[idx]), 7))
+            rel_poses[:, :3] = rel_tfs[:, :3, 3]
+            rel_poses[:, 3:] = cb.T.mat2quat(rel_tfs[:, :3, :3])
+            self._read_cache["relative_poses"][prim_path] = rel_poses
+
+        return self._read_cache["relative_poses"][prim_path]
+
     def get_link_relative_position_orientation(self, prim_path, link_name):
-        pos, orn = self.get_link_transform(prim_path, link_name)
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        rel_pose = self._get_relative_poses(prim_path)[link_idx]
+        return rel_pose[:3], rel_pose[3:]
 
-        # Get the root world transform too
-        world_pos, world_orn = self.get_position_orientation(prim_path)
+    def _get_link_velocities(self, prim_path, link_name):
+        if "link_velocities" not in self._read_cache:
+            self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
 
-        # Compute the relative position and orientation
-        return cb.T.relative_pose_transform(pos, orn, world_pos, world_orn)
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        vel = self._read_cache["link_velocities"][idx, link_idx]
+
+        return vel
 
     def get_link_linear_velocity(self, prim_path, link_name):
-        if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
-
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache["link_velocities"][idx, link_idx]
-        linvel = vel[:3]
-
-        return linvel
+        return self._get_link_velocities(prim_path, link_name)[:3]
 
     def get_link_relative_linear_velocity(self, prim_path, link_name):
-        linvel = self.get_link_linear_velocity(prim_path, link_name)
-
-        # Get the root world transform too
-        _, world_orn = self.get_position_orientation(prim_path)
-
-        # Compute the relative position and orientation
-        return cb.T.quat2mat(world_orn).T @ linvel
-
-    def get_link_angular_velocity(self, prim_path, link_name):
-        if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
-
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache["link_velocities"][idx, link_idx]
-        angvel = vel[3:]
+        return self._get_relative_velocities(prim_path)[link_idx, :3]
 
-        return angvel
+    def get_link_angular_velocity(self, prim_path, link_name):
+        return self._get_link_velocities(prim_path, link_name)[3:]
 
     def get_link_relative_angular_velocity(self, prim_path, link_name):
-        angvel = self.get_link_angular_velocity(prim_path, link_name)
-
-        # Get the root world transform too
-        _, world_orn = self.get_position_orientation(prim_path)
-
-        # Compute the relative position and orientation
-        return cb.T.quat2mat(world_orn).T @ angvel
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        return self._get_relative_velocities(prim_path)[link_idx, 3:]
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
@@ -1115,14 +1174,21 @@ class BatchControlViewAPIImpl:
         return self._read_cache["jacobians"][idx]
 
     def get_relative_jacobian(self, prim_path):
-        jacobian = self.get_jacobian(prim_path)
-        ori_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-        tf = cb.zeros((1, 6, 6))
-        tf[:, :3, :3] = ori_t
-        tf[:, 3:, 3:] = ori_t
-        # Run this explicitly in pytorch since it's order of magnitude faster than numpy!
-        # e.g.: 2e-4 vs. 3e-5 on R1
-        return cb.from_torch(cb.to_torch(tf) @ cb.to_torch(jacobian))
+        if "relative_jacobians" not in self._read_cache:
+            self._read_cache["relative_jacobians"] = {}
+
+        if prim_path not in self._read_cache["relative_jacobians"]:
+            jacobian = self.get_jacobian(prim_path)
+            ori_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
+            tf = cb.zeros((1, 6, 6))
+            tf[:, :3, :3] = ori_t
+            tf[:, 3:, 3:] = ori_t
+            # Run this explicitly in pytorch since it's order of magnitude faster than numpy!
+            # e.g.: 2e-4 vs. 3e-5 on R1
+            rel_jac = cb.from_torch(cb.to_torch(tf) @ cb.to_torch(jacobian))
+            self._read_cache["relative_jacobians"][prim_path] = rel_jac
+
+        return self._read_cache["relative_jacobians"][prim_path]
 
 
 class ControllableObjectViewAPI:

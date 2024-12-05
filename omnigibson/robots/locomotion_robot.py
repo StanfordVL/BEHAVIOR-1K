@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from functools import cached_property
 
 import torch as th
 
@@ -218,7 +219,7 @@ class LocomotionRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     def base_control_idx(self):
         """
         Returns:
