@@ -9,6 +9,7 @@
 
 import math
 from collections.abc import Iterable
+from functools import cached_property
 
 import torch as th
 
@@ -160,7 +161,7 @@ class ClothPrim(GeomPrim):
         """
         return self._n_particles
 
-    @property
+    @cached_property
     def kinematic_only(self):
         """
         Returns:

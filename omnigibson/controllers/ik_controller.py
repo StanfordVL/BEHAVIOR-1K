@@ -1,5 +1,6 @@
 import math
 from collections.abc import Iterable
+from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerTorchBackend, _ControllerNumpyBackend
 from omnigibson.controllers.controller_base import _controller_backend as cb
 
 from omnigibson.controllers import ControlType, ManipulationController
@@ -270,8 +271,8 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
 
         goal_dict = dict(
-            target_pos=target_pos,
-            target_quat=target_quat,
+            target_pos=cb.as_float32(target_pos),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
         return goal_dict
@@ -285,7 +286,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 goals necessary for controller computation. Must include the following keys:
                     target_pos: robot-frame (x,y,z) desired end effector position
-                    target_quat: robot-frame (x,y,z,w) desired end effector quaternion orientation
+                    target_ori_mat: robot-frame desired end effector quaternion orientation matrix
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -299,37 +300,23 @@ class InverseKinematicsController(JointController, ManipulationController):
         Returns:
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
-        # Grab important info from control dict
-        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
-        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
-        target_pos = goal_dict["target_pos"]
-        target_quat = goal_dict["target_quat"]
-
         # Calculate and return IK-backed out joint angles
-        current_joint_pos = control_dict["joint_position"][self.dof_idx]
+        q = control_dict["joint_position"][self.dof_idx]
+        j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
+        ee_pos = control_dict[f"{self.task_name}_pos_relative"]
+        ee_quat = control_dict[f"{self.task_name}_quat_relative"]
 
-        # If the delta is really small, we just keep the current joint position. This avoids joint
-        # drift caused by IK solver inaccuracy even when zero delta actions are provided.
-        if cb.allclose(pos_relative, target_pos, atol=1e-4) and cb.allclose(quat_relative, target_quat, atol=1e-4):
-            target_joint_pos = current_joint_pos
-        else:
-            # Compute the pose error. Note that this is computed NOT in the EEF frame but still
-            # in the base frame.
-            pos_err = target_pos - pos_relative
-            ori_err = cb.T.orientation_error(cb.T.quat2mat(target_quat), cb.T.quat2mat(quat_relative))
-            err = cb.cat([pos_err, ori_err])
-
-            # Use the jacobian to compute a local approximation
-            j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
-            j_eef_pinv = cb.pinv(j_eef)
-            delta_j = j_eef_pinv @ err
-            target_joint_pos = current_joint_pos + delta_j
-
-            # Clip values to be within the joint limits
-            target_joint_pos = target_joint_pos.clip(
-                min=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
-                max=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
-            )
+        # Calculate desired joint positions
+        target_joint_pos = cb.compute_ik_qpos(
+            q=q,
+            j_eef=j_eef,
+            ee_pos=cb.as_float32(ee_pos),
+            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
+            goal_pos=goal_dict["target_pos"],
+            goal_ori_mat=goal_dict["target_ori_mat"],
+            q_lower_limit=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
+            q_upper_limit=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
+        )
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:
@@ -340,9 +327,13 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
+        target_pos = cb.copy(control_dict[f"{self.task_name}_pos_relative"])
+        target_quat = cb.copy(control_dict[f"{self.task_name}_quat_relative"])
+
+        # Convert quat into eef ori mat
         return dict(
-            target_pos=control_dict[f"{self.task_name}_pos_relative"],
-            target_quat=control_dict[f"{self.task_name}_quat_relative"],
+            target_pos=cb.as_float32(target_pos),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
     def _compute_no_op_action(self, control_dict):
@@ -370,9 +361,77 @@ class InverseKinematicsController(JointController, ManipulationController):
     def _get_goal_shapes(self):
         return dict(
             target_pos=(3,),
-            target_quat=(4,),
+            target_ori_mat=(3, 3),
         )
 
     @property
     def command_dim(self):
         return IK_MODE_COMMAND_DIMS[self.mode]
+
+
+import torch as th
+import omnigibson.utils.transform_utils as TT
+@th.jit.script
+def _compute_ik_qpos_torch(
+    q: th.Tensor,
+    j_eef: th.Tensor,
+    ee_pos: th.Tensor,
+    ee_mat: th.Tensor,
+    goal_pos: th.Tensor,
+    goal_ori_mat: th.Tensor,
+    q_lower_limit: th.Tensor,
+    q_upper_limit: th.Tensor,
+):
+    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
+    # in the base frame.
+    pos_err = goal_pos - ee_pos
+    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
+    err = th.cat([pos_err, ori_err])
+
+    # Use the jacobian to compute a local approximation
+    j_eef_pinv = th.linalg.pinv(j_eef)
+    delta_j = j_eef_pinv @ err
+    target_joint_pos = q + delta_j
+
+    # Clip values to be within the joint limits
+    return target_joint_pos.clip(
+        min=q_lower_limit,
+        max=q_upper_limit,
+    )
+
+
+import numpy as np
+from numba import jit
+import omnigibson.utils.transform_utils_np as NT
+# Use numba since faster
+@jit(nopython=True)
+def _compute_ik_qpos_numpy(
+    q,
+    j_eef,
+    ee_pos,
+    ee_mat,
+    goal_pos,
+    goal_ori_mat,
+    q_lower_limit,
+    q_upper_limit,
+):
+    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
+    # in the base frame.
+    pos_err = goal_pos - ee_pos
+    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
+    err = np.concatenate((pos_err, ori_err))
+
+    # Use the jacobian to compute a local approximation
+    j_eef_pinv = np.linalg.pinv(j_eef)
+    delta_j = j_eef_pinv @ err
+    target_joint_pos = q + delta_j
+
+    # Clip values to be within the joint limits
+    return target_joint_pos.clip(q_lower_limit, q_upper_limit)
+
+
+# Set these as part of the backend values
+setattr(_ControllerBackend, "compute_ik_qpos", None)
+setattr(_ControllerTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
+setattr(_ControllerNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)
+

@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -193,15 +194,15 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             for arm in self.arm_names
         }
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         return ["wheel_link1", "wheel_link2", "wheel_link3"]
 
-    @property
+    @cached_property
     def trunk_link_names(self):
         return ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
@@ -213,23 +214,23 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def arm_names(cls):
         return ["left", "right"]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {arm: [f"{arm}_arm_link{i}" for i in range(1, 7)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {arm: [f"{arm}_arm_joint{i}" for i in range(1, 7)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {arm: [f"{arm}_gripper_link{i}" for i in range(1, 3)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {arm: [f"{arm}_gripper_axis{i}" for i in range(1, 3)] for arm in self.arm_names}
 

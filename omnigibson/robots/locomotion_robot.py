@@ -185,19 +185,19 @@ class LocomotionRobot(BaseRobot):
         quat = quat_multiply((euler2quat(delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
 
-    @property
+    @cached_property
     def non_floor_touching_base_links(self):
         return [self.links[name] for name in self.non_floor_touching_base_link_names]
 
-    @property
+    @cached_property
     def non_floor_touching_base_link_names(self):
         return [self.base_footprint_link_name]
 
-    @property
+    @cached_property
     def floor_touching_base_links(self):
         return [self.links[name] for name in self.floor_touching_base_link_names]
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         raise NotImplementedError
 

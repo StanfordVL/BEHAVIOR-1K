@@ -1,6 +1,7 @@
 import math
 import os
 from typing import Literal
+from functools import cached_property
 
 import torch as th
 
@@ -139,7 +140,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             **kwargs,
         )
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         names = dict()
         for arm in self.arm_names:
@@ -208,7 +209,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
     def base_footprint_link_name(self):
         return "base_footprint"
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         return [
             "wheel_front_left_link",
@@ -363,15 +364,15 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             ["arm_right_tool_link", "wrist_right_ft_tool_link"],
         ]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return ["head_1_joint", "head_2_joint"]
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         return ["torso_lift_joint"]
 
-    @property
+    @cached_property
     def manipulation_link_names(self):
         return [
             "torso_fixed_link",
@@ -411,19 +412,19 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             "xtion_link",
         ]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {arm: [f"arm_{arm}_{i}_link" for i in range(1, 8)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {
             arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"] for arm in self.arm_names
@@ -447,7 +448,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             for emb_sel in CuroboEmbodimentSelection
         }
 
-    @property
+    @cached_property
     def curobo_attached_object_link_names(self):
         return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
 

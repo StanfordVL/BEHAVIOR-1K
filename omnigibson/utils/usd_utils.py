@@ -8,11 +8,13 @@ from collections.abc import Iterable
 import numpy as np
 import torch as th
 import trimesh
+from numba import jit, prange
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.controllers.controller_base import _controller_backend as cb
 import omnigibson.utils.transform_utils as T
+from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerNumpyBackend, _ControllerTorchBackend
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
@@ -1090,7 +1092,9 @@ class BatchControlViewAPIImpl:
 
     def get_coriolis_and_centrifugal_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
-            self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(self._view.get_coriolis_and_centrifugal_forces())
+            self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
+                self._view.get_coriolis_and_centrifugal_forces()
+            )
 
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
@@ -1114,23 +1118,12 @@ class BatchControlViewAPIImpl:
                 self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
             idx = self._idx[prim_path]
-            tfs = cb.zeros((len(self._link_idx[idx]), 4, 4))
-            # base vel is the final -1 index
-            link_tfs = self._read_cache["link_transforms"][idx, :]
-            tfs[:, 3, 3] = 1.0
-            tfs[:, :3, 3] = link_tfs[:, :3]
-            tfs[:, :3, :3] = cb.T.quat2mat(link_tfs[:, 3:])
-            base_tf_inv = cb.zeros((1, 4, 4))
-            base_tf_inv[0, :, :] = cb.T.pose_inv(cb.T.pose2mat(self.get_position_orientation(prim_path=prim_path)))
-
-            # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
-            rel_tfs = base_tf_inv @ tfs
-
-            # Re-convert to quat form
-            rel_poses = cb.zeros((len(self._link_idx[idx]), 7))
-            rel_poses[:, :3] = rel_tfs[:, :3, 3]
-            rel_poses[:, 3:] = cb.T.mat2quat(rel_tfs[:, :3, :3])
-            self._read_cache["relative_poses"][prim_path] = rel_poses
+            self._read_cache["relative_poses"][prim_path] = cb.compute_relative_poses(
+                idx,
+                len(self._link_idx[idx]),
+                self._read_cache["link_transforms"],
+                self.get_position_orientation(prim_path=prim_path),
+            )
 
         return self._read_cache["relative_poses"][prim_path]
 
@@ -1909,3 +1902,68 @@ def get_sdf_value_type_name(val):
         if isinstance(val, type_):
             return usd_type
     raise ValueError(f"Unsupported input type: {type(val)}")
+
+
+import omnigibson.utils.transform_utils as TT
+
+
+@th.compile
+def _compute_relative_poses_torch(
+    idx: int,
+    n_links: int,
+    all_tfs: th.Tensor,
+    base_pose: th.Tensor,
+):
+    tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
+    # base vel is the final -1 index
+    link_tfs = all_tfs[idx, :]
+    tfs[:, 3, 3] = 1.0
+    tfs[:, :3, 3] = link_tfs[:, :3]
+    tfs[:, :3, :3] = TT.quat2mat(link_tfs[:, 3:])
+    base_tf_inv = th.zeros((1, 4, 4), dtype=th.float32)
+    base_tf_inv[0, :, :] = TT.pose_inv(TT.pose2mat(base_pose))
+
+    # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
+    rel_tfs = base_tf_inv @ tfs
+
+    # Re-convert to quat form
+    rel_poses = th.zeros((n_links, 7), dtype=th.float32)
+    rel_poses[:, :3] = rel_tfs[:, :3, 3]
+    rel_poses[:, 3:] = TT.mat2quat(rel_tfs[:, :3, :3])
+
+    return rel_poses
+
+
+import omnigibson.utils.transform_utils_np as NT
+
+
+@jit(nopython=True)
+def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
+    tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
+    # base vel is the final -1 index
+    link_tfs = all_tfs[idx, :]
+    tfs[:, 3, 3] = 1.0
+    tfs[:, :3, 3] = link_tfs[:, :3]
+    tfs[:, :3, :3] = NT._quat2mat(link_tfs[:, 3:])
+    # base_tf_inv = np.zeros((1, 4, 4), dtype=np.float32)
+    # base_tf_inv[0, :, :] = NT._pose_inv(NT.pose2mat(base_pose))
+    base_tf_inv = NT._pose_inv(NT.pose2mat(base_pose))
+
+    # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
+    rel_tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
+    for i in prange(n_links):
+        rel_tfs[i, :, :] = base_tf_inv @ tfs[i, :, :]
+    # rel_tfs = base_tf_inv @ tfs
+
+    # Re-convert to quat form
+    rel_poses = np.zeros((n_links, 7), dtype=np.float32)
+    rel_poses[:, :3] = rel_tfs[:, :3, 3]
+    rel_poses[:, 3:] = NT.mat2quat_batch(rel_tfs[:, :3, :3].copy())
+
+    return rel_poses
+
+
+# Set these as part of the backend values
+setattr(_ControllerBackend, "compute_relative_poses", None)
+setattr(_ControllerTorchBackend, "compute_relative_poses", _compute_relative_poses_torch)
+setattr(_ControllerNumpyBackend, "compute_relative_poses", _compute_relative_poses_numpy)
