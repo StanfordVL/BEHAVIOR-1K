@@ -1399,7 +1399,7 @@ class EntityPrim(XFormPrim):
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )
 
-    @property
+    @cached_property
     def kinematic_only(self):
         """
         Returns:

@@ -234,7 +234,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 "emissive_intensity": material.emissive_intensity,
             }
 
-    @property
+    @cached_property
     def articulation_root_path(self):
         has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
         if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):

@@ -531,7 +531,7 @@ class ManipulationRobot(BaseRobot):
             )
         return gripper_action_idx
 
-    @property
+    @cached_property
     @abstractmethod
     def arm_link_names(self):
         """
@@ -544,7 +544,7 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     @abstractmethod
     def arm_joint_names(self):
         """
@@ -557,7 +557,7 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     @abstractmethod
     def eef_link_names(self):
         """
@@ -567,7 +567,7 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     @abstractmethod
     def finger_link_names(self):
         """
@@ -580,7 +580,7 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     @abstractmethod
     def finger_joint_names(self):
         """
@@ -617,7 +617,7 @@ class ManipulationRobot(BaseRobot):
             for arm in self.arm_names
         }
 
-    @property
+    @cached_property
     def arm_links(self):
         """
         Returns:
@@ -626,7 +626,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: [self._links[link] for link in self.arm_link_names[arm]] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def eef_links(self):
         """
         Returns:
@@ -635,7 +635,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_links(self):
         """
         Returns:
@@ -644,7 +644,7 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: [self._links[link] for link in self.finger_link_names[arm]] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_joints(self):
         """
         Returns:

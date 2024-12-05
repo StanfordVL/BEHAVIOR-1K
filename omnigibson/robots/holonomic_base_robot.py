@@ -186,7 +186,7 @@ class HolonomicBaseRobot(LocomotionRobot):
             [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
         )
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
 
@@ -330,7 +330,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
         return action
 
-    @property
+    @cached_property
     def base_footprint_link_name(self):
         raise NotImplementedError("base_footprint_link_name is not implemented for HolonomicBaseRobot")
 

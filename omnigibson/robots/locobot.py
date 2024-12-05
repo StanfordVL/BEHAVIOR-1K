@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -20,7 +21,7 @@ class Locobot(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.230
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["wheel_right_joint", "wheel_left_joint"]
 

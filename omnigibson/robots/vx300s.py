@@ -1,5 +1,6 @@
 import math
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -141,7 +142,7 @@ class VX300S(ManipulationRobot):
             ["gripper_bar_link", "gripper_link"],
         ]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
@@ -156,7 +157,7 @@ class VX300S(ManipulationRobot):
             ]
         }
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {
             self.default_arm: [
@@ -169,15 +170,15 @@ class VX300S(ManipulationRobot):
             ]
         }
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: "ee_gripper_link"}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: ["left_finger_link", "right_finger_link"]}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["left_finger", "right_finger"]}
 
@@ -197,7 +198,7 @@ class VX300S(ManipulationRobot):
     def curobo_path(self):
         return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")
 
-    @property
+    @cached_property
     def curobo_attached_object_link_names(self):
         return {"ee_gripper_link": "attached_object"}
 

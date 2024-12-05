@@ -34,15 +34,15 @@ class ArticulatedTrunkRobot(ManipulationRobot):
 
         return fcns
 
-    @property
+    @cached_property
     def trunk_links(self):
         return [self.links[name] for name in self.trunk_link_names]
 
-    @property
+    @cached_property
     def trunk_link_names(self):
         raise NotImplementedError
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         raise NotImplementedError("trunk_joint_names must be implemented in subclass")
 

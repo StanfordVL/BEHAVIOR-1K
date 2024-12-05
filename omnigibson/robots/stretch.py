@@ -1,5 +1,6 @@
 import math
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -150,15 +151,15 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["respeaker_base", "link_mast"],
         ]
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["joint_left_wheel", "joint_right_wheel"]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return ["joint_head_pan", "joint_head_tilt"]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
@@ -178,7 +179,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {
             self.default_arm: [
@@ -193,11 +194,11 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: "link_grasp_center"}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {
             self.default_arm: [
@@ -208,7 +209,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
 

@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -37,7 +38,7 @@ class Freight(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.372
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["r_wheel_joint", "l_wheel_joint"]
 
