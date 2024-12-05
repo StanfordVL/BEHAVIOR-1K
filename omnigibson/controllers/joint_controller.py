@@ -1,5 +1,6 @@
 import math
 
+from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerTorchBackend, _ControllerNumpyBackend
 from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers import (
     ControlType,
@@ -210,9 +211,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = cb.meshgrid(self.dof_idx, self.dof_idx)
-            mm = control_dict["mass_matrix"][dof_idxs_mat]
-            u = mm @ u
+            u = cb.compute_joint_torques(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:
@@ -284,3 +283,57 @@ class JointController(LocomotionController, ManipulationController, GripperContr
     @property
     def command_dim(self):
         return len(self.dof_idx)
+
+
+import torch as th
+@th.compile
+def _compute_joint_torques_torch(
+    u: th.Tensor,
+    mm: th.Tensor,
+    dof_idx: th.Tensor,
+):
+    dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
+    return mm[dof_idxs_mat] @ u
+
+
+
+import numpy as np
+from numba import jit
+# Use numba since faster
+@jit(nopython=True)
+def numba_ix(arr, rows, cols):
+    """
+    Numba compatible implementation of arr[np.ix_(rows, cols)] for 2D arrays.
+
+    Implementation from:
+    https://github.com/numba/numba/issues/5894#issuecomment-974701551
+
+    :param arr: 2D array to be indexed
+    :param rows: Row indices
+    :param cols: Column indices
+    :return: 2D array with the given rows and columns of the input array
+    """
+    one_d_index = np.zeros(len(rows) * len(cols), dtype=np.int32)
+    for i, r in enumerate(rows):
+        start = i * len(cols)
+        one_d_index[start: start + len(cols)] = cols + arr.shape[1] * r
+
+    arr_1d = arr.reshape((arr.shape[0] * arr.shape[1], 1))
+    slice_1d = np.take(arr_1d, one_d_index)
+    return slice_1d.reshape((len(rows), len(cols)))
+
+
+@jit(nopython=True)
+def _compute_joint_torques_numpy(
+    u,
+    mm,
+    dof_idx,
+):
+    return numba_ix(mm, dof_idx, dof_idx) @ u
+
+
+# Set these as part of the backend values
+setattr(_ControllerBackend, "compute_joint_torques", None)
+setattr(_ControllerTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
+setattr(_ControllerNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+

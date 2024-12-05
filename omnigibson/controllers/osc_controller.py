@@ -362,7 +362,7 @@ class OperationalSpaceController(ManipulationController):
             goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 goals necessary for controller computation. Must include the following keys:
                     target_pos: robot-frame (x,y,z) desired end effector position
-                    target_quat: robot-frame (x,y,z,w) desired end effector quaternion orientation
+                    target_ori_mat: robot-frame desired end effector quaternion orientation matrix
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
