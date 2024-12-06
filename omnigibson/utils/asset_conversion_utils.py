@@ -13,9 +13,9 @@ from os.path import exists
 from pathlib import Path
 from xml.dom import minidom
 
+import pymeshlab
 import torch as th
 import trimesh
-import pymeshlab
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -1167,8 +1167,8 @@ def _recursively_replace_list_of_dict(dic):
 
 
 def _create_urdf_import_config(
-        use_convex_decomposition=False,
-        merge_fixed_joints=False,
+    use_convex_decomposition=False,
+    merge_fixed_joints=False,
 ):
     """
     Creates and configures a URDF import configuration.
