@@ -1829,22 +1829,45 @@ def make_asset_positive(urdf_fpath, output_suffix="mirror"):
     return out_file
 
 
-def simplify_convex_hull(tm, max_faces=64):
+def find_all_prim_children_with_type(prim_type, root_prim):
+    """
+    Recursively searches children of @root_prim to find all instances of prim that satisfy type @prim_type
+
+    Args:
+        prim_type (str): Type of the prim to search
+        root_prim (Usd.Prim): Root prim to search
+
+    Returns:
+        list of Usd.Prim: All found prims whose prim type includes @prim_type
+    """
+    found_prims = []
+    for child in root_prim.GetChildren():
+        if prim_type in child.GetTypeName():
+            found_prims.append(child)
+        found_prims += find_all_prim_children_with_type(prim_type=prim_type, root_prim=child)
+
+    return found_prims
+
+
+def simplify_convex_hull(tm, max_vertices=60):
     """
     Simplifies a convex hull mesh by using quadric edge collapse to reduce the number of faces
 
     Args:
         tm (Trimesh): Trimesh mesh to simply. Should be convex hull
-        max_faces (int): Maximum number of faces to generate
+        max_vertices (int): Maximum number of vertices to generate
     """
     # If number of faces is less than or equal to @max_faces, simply return directly
-    if len(tm.faces) <= max_faces:
+    if len(tm.vertices) <= max_vertices:
         return tm
 
     # Use pymeshlab to reduce
+    max_faces = 64
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
-    ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+    while len(ms.current_mesh().vertex_matrix()) > max_vertices:
+        ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+        max_faces -= 2
     vertices_reduced = ms.current_mesh().vertex_matrix()
     faces_reduced = ms.current_mesh().face_matrix()
     vertex_normals_reduced = ms.current_mesh().vertex_normal_matrix()
@@ -1924,7 +1947,7 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
     # See https://github.com/mikedh/trimesh/issues/535
     hulls = [hull.convex_hull if not hull.is_volume else hull for hull in hulls]
 
-    # For each hull, simplify so that the complexity is more likely to be Omniverse-GPU compatible
+    # For each hull, simplify so that the complexity is guaranteed to be Omniverse-GPU compatible
     # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/rigid-bodies.html#collision-settings
     simplified_hulls = [simplify_convex_hull(hull) for hull in hulls]
 
