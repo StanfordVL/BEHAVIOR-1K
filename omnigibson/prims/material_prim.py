@@ -184,12 +184,14 @@ class MaterialPrim(BasePrim):
         assert self._shader is not None
         asyncio.run(self._load_mdl_parameters(render=render))
 
-    def shader_update_asset_paths_with_root_path(self, root_path):
+    def shader_update_asset_paths_with_root_path(self, root_path, relative=False):
         """
         Similar to @shader_update_asset_paths, except in this case, root_path is explicitly provided by the caller.
 
         Args:
-            root_path (str): root to be pre-appended to the original asset paths
+            root_path (str): root directory from which to update shader paths
+            relative (bool): If set, all paths will be updated as relative paths with respect to @root_path.
+                Otherwise, @root_path will be pre-appended to the original asset paths
         """
 
         for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
@@ -203,7 +205,7 @@ class MaterialPrim(BasePrim):
             if original_path == "":
                 continue
 
-            new_path = os.path.join(root_path, original_path)
+            new_path = f"./{os.path.relpath(original_path, root_path)}" if relative else os.path.join(root_path, original_path)
             self.set_input(inp_name, new_path)
 
     def get_input(self, inp):

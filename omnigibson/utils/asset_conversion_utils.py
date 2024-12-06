@@ -22,6 +22,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
@@ -1073,12 +1074,23 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
         if "glass" in link_tags:
             _process_glass_link(prim.GetChild(link))
 
-    # Rename model to be named <model>
+    # Rename model to be named <model> if not already named that
     old_prim_path = prim.GetPrimPath().pathString
-    new_prim_path = "/".join(old_prim_path.split("/")[:-1]) + f"/{obj_model}"
-    lazy.omni.kit.commands.execute("MovePrim", path_from=old_prim_path, path_to=new_prim_path)
+    if old_prim_path.split("/")[-1] != obj_model:
+        new_prim_path = "/".join(old_prim_path.split("/")[:-1]) + f"/{obj_model}"
+        lazy.omni.kit.commands.execute("MovePrim", path_from=old_prim_path, path_to=new_prim_path)
+        prim = stage.GetDefaultPrim()
 
-    prim = stage.GetDefaultPrim()
+    # Hacky way to avoid new prim being created at /World
+    class DummyScene:
+        prim_path = ""
+
+    og.sim.render()
+    mat_prims = find_all_prim_children_with_type(prim_type="Material", root_prim=prim)
+    for i, mat_prim in enumerate(mat_prims):
+        mat = MaterialPrim(mat_prim.GetPrimPath().pathString, f"mat{i}")
+        mat.load(DummyScene)
+        mat.shader_update_asset_paths_with_root_path(root_path=os.path.dirname(usd_path), relative=True)
 
     # Save stage
     stage.Save()
@@ -1220,7 +1232,9 @@ def import_obj_urdf(
         merge_fixed_joints (bool): whether to merge fixed joints or not
 
     Returns:
-        str: Absolute path to the imported USD file
+        2-tuple:
+            - str: Absolute path to post-processed URDF file used to generate USD
+            - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for metalinks
     urdf_path = _add_metalinks_to_urdf(
@@ -1246,7 +1260,7 @@ def import_obj_urdf(
     )
     log.debug(f"Imported {obj_category}, {obj_model}")
 
-    return usd_path
+    return urdf_path, usd_path
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
@@ -1567,7 +1581,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     return _save_xmltree_as_urdf(
         root_element=root,
         name=f"{obj_model}_with_metalinks",
-        dirpath=model_root_path,
+        dirpath=f"{model_root_path}/urdf",
         unique_urdf=False,
     )
 
@@ -2088,9 +2102,9 @@ def get_collision_approximation_for_urdf(
     )
 
 
-def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False):
+def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, suffix="original", overwrite=False):
     # Create a directory for the object
-    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
+    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
     if not overwrite:
         assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
     obj_dir.mkdir(parents=True, exist_ok=True)
@@ -2114,7 +2128,7 @@ def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATA
     # Export this URDF
     return _save_xmltree_as_urdf(
         root_element=root,
-        name=mdl,
+        name=f"{mdl}_{suffix}",
         dirpath=obj_dir,
         unique_urdf=False,
     )
@@ -2398,15 +2412,17 @@ def import_og_asset_from_urdf(
             category=category,
             mdl=model,
             dataset_root=dataset_root,
+            suffix="original",
             overwrite=overwrite,
         )
     else:
         # Verify that the object exists at the expected location
-        # This is <dataset_root>/objects/<category>/<model>/<model>.urdf
-        urdf_path = os.path.join(dataset_root, "objects", category, model, f"{model}.urdf")
+        # This is <dataset_root>/objects/<category>/<model>/urdf/<model>_original.urdf
+        urdf_path = os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}_original.urdf")
         assert os.path.exists(urdf_path), f"Expected urdf at dataset location {urdf_path}, but none was found!"
 
     # Make sure all scaling is positive
+    model_dir = os.path.join(dataset_root, "objects", category, model)
     urdf_path = make_asset_positive(urdf_fpath=urdf_path)
 
     # Update collisions if requested
@@ -2426,7 +2442,7 @@ def import_og_asset_from_urdf(
     print("Recording object metadata from URDF...")
     record_obj_metadata_from_urdf(
         urdf_path=urdf_path,
-        obj_dir=os.path.dirname(urdf_path),
+        obj_dir=model_dir,
         joint_setting="zero",
         overwrite=overwrite,
     )
@@ -2435,7 +2451,7 @@ def import_og_asset_from_urdf(
     print("Converting obj URDF to USD...")
     og.launch()
     assert len(og.sim.scenes) == 0
-    usd_path = import_obj_urdf(
+    urdf_path, usd_path = import_obj_urdf(
         urdf_path=urdf_path,
         obj_category=category,
         obj_model=model,
@@ -2444,6 +2460,9 @@ def import_og_asset_from_urdf(
         use_usda=use_usda,
         merge_fixed_joints=merge_fixed_joints,
     )
+
+    # Copy metalinks URDF to original name of object model
+    shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
 
     prim = import_obj_metadata(
         usd_path=usd_path,
