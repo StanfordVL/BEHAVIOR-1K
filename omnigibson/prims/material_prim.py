@@ -205,7 +205,9 @@ class MaterialPrim(BasePrim):
             if original_path == "":
                 continue
 
-            new_path = f"./{os.path.relpath(original_path, root_path)}" if relative else os.path.join(root_path, original_path)
+            new_path = (
+                f"./{os.path.relpath(original_path, root_path)}" if relative else os.path.join(root_path, original_path)
+            )
             self.set_input(inp_name, new_path)
 
     def get_input(self, inp):

@@ -1880,7 +1880,7 @@ def simplify_convex_hull(tm, max_vertices=60):
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
     while len(ms.current_mesh().vertex_matrix()) > max_vertices:
-        ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+        ms.apply_filter("meshing_decimation_quadric_edge_collapse", targetfacenum=max_faces)
         max_faces -= 2
     vertices_reduced = ms.current_mesh().vertex_matrix()
     faces_reduced = ms.current_mesh().face_matrix()
@@ -2102,7 +2102,9 @@ def get_collision_approximation_for_urdf(
     )
 
 
-def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, suffix="original", overwrite=False):
+def copy_urdf_to_dataset(
+    urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, suffix="original", overwrite=False
+):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
     if not overwrite:
