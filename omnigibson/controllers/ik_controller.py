@@ -1,9 +1,11 @@
 import math
 from collections.abc import Iterable
-from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerTorchBackend, _ControllerNumpyBackend
-from omnigibson.controllers.controller_base import _controller_backend as cb
+
+import torch as th
 
 from omnigibson.controllers import ControlType, ManipulationController
+from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerNumpyBackend, _ControllerTorchBackend
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.processing_utils import MovingAverageFilter
@@ -43,8 +45,8 @@ class InverseKinematicsController(JointController, ManipulationController):
         dof_idx,
         command_input_limits="default",
         command_output_limits=(
-                (-0.2, -0.2, -0.2, -0.5, -0.5, -0.5),
-                (0.2, 0.2, 0.2, 0.5, 0.5, 0.5),
+            (-0.2, -0.2, -0.2, -0.5, -0.5, -0.5),
+            (0.2, 0.2, 0.2, 0.5, 0.5, 0.5),
         ),
         pos_kp=None,
         pos_damping_ratio=None,
@@ -117,7 +119,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         """
         # Store arguments
         control_dim = len(dof_idx)
-        self.control_filter = None #(
+        self.control_filter = None  # (
         #     None
         #     if smoothing_filter_size in {None, 0}
         #     else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
@@ -219,10 +221,14 @@ class InverseKinematicsController(JointController, ManipulationController):
         state_flat = super().serialize(state=state)
 
         # Serialize state for this controller
-        return cb.cat(
+        return th.cat(
             [
                 state_flat,
-                cb.array([]) if self.control_filter is None else self.control_filter.serialize(state=state["control_filter"]),
+                (
+                    th.tensor([])
+                    if self.control_filter is None
+                    else cb.to_torch(self.control_filter.serialize(state=state["control_filter"]))
+                ),
             ]
         )
 
@@ -370,7 +376,10 @@ class InverseKinematicsController(JointController, ManipulationController):
 
 
 import torch as th
+
 import omnigibson.utils.transform_utils as TT
+
+
 @th.jit.script
 def _compute_ik_qpos_torch(
     q: th.Tensor,
@@ -402,7 +411,10 @@ def _compute_ik_qpos_torch(
 
 import numpy as np
 from numba import jit
+
 import omnigibson.utils.transform_utils_np as NT
+
+
 # Use numba since faster
 @jit(nopython=True)
 def _compute_ik_qpos_numpy(
@@ -434,4 +446,3 @@ def _compute_ik_qpos_numpy(
 setattr(_ControllerBackend, "compute_ik_qpos", None)
 setattr(_ControllerTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
 setattr(_ControllerNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)
-

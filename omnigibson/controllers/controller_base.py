@@ -2,13 +2,19 @@ import math
 from collections.abc import Iterable
 from enum import IntEnum
 
-import torch as th
 import numpy as np
+import torch as th
 
-from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty, \
-    recursively_convert_from_torch
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
+from omnigibson.utils.python_utils import (
+    Recreatable,
+    Registerable,
+    Serializable,
+    assert_valid_key,
+    classproperty,
+    recursively_convert_from_torch,
+)
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -231,7 +237,9 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(sum(_controller_backend.prod(_controller_backend.array(shape)) for shape in self._goal_shapes.values()))
+        self._goal_dim = int(
+            sum(_controller_backend.prod(_controller_backend.array(shape)) for shape in self._goal_shapes.values())
+        )
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -242,15 +250,12 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Standardize command input / output limits to be (min_array, max_array)
         command_input_limits = (
-            (-1.0, 1.0)
+            self._generate_default_command_input_limits()
             if type(command_input_limits) == str and command_input_limits == "default"
             else command_input_limits
         )
         command_output_limits = (
-            (
-                self._control_limits[self.control_type][0][self.dof_idx],
-                self._control_limits[self.control_type][1][self.dof_idx],
-            )
+            self._generate_default_command_output_limits()
             if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
         )
@@ -269,6 +274,21 @@ class BaseController(Serializable, Registerable, Recreatable):
                 self.nums2array(command_output_limits[0], self.command_dim),
                 self.nums2array(command_output_limits[1], self.command_dim),
             )
+        )
+
+    def _generate_default_command_input_limits(self):
+        """
+        Generates default command input limits based on the control limits
+        """
+        return (-1.0, 1.0)
+
+    def _generate_default_command_output_limits(self):
+        """
+        Generates default command output limits based on the control limits
+        """
+        return (
+            self._control_limits[self.control_type][0][self.dof_idx],
+            self._control_limits[self.control_type][1][self.dof_idx],
         )
 
     def _preprocess_command(self, command):
@@ -469,23 +489,31 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Default is just the command
         return dict(
             goal_is_valid=self._goal is not None,
-            goal=self._goal,
+            goal=None if self._goal is None else {k: _controller_backend.to_torch(v) for k, v in self._goal.items()},
         )
 
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = None if state["goal"] is None else {name: goal_state for name, goal_state in state["goal"].items()}
+        if state["goal"] is None:
+            self._goal = None
+        else:
+            self._goal = dict()
+            for name, goal_state in state["goal"].items():
+                if isinstance(goal_state, th.Tensor):
+                    self._goal[name] = _controller_backend.from_torch(goal_state)
+                else:
+                    self._goal[name] = goal_state
 
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            _controller_backend.cat([goal_state.flatten() for goal_state in self._goal.values()])
+            th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
             if (state)["goal_is_valid"]
-            else _controller_backend.zeros(self.goal_dim)
+            else th.zeros(self.goal_dim)
         )
 
-        return _controller_backend.cat([_controller_backend.array([state["goal_is_valid"]]), goal_state_flattened])
+        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])
@@ -536,9 +564,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             nums
             if isinstance(nums, _controller_backend.arr_type)
             else (
-                _controller_backend.array(nums)
-                if isinstance(nums, Iterable)
-                else _controller_backend.ones(dim) * nums
+                _controller_backend.array(nums) if isinstance(nums, Iterable) else _controller_backend.ones(dim) * nums
             )
         )
 

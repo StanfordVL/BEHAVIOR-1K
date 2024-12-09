@@ -221,6 +221,7 @@ def _launch_app():
                 "Content",
                 "Flow",
                 "Semantics Schema Editor",
+                "VR",
             ]
         )
 
@@ -241,7 +242,10 @@ def _launch_app():
 
     # Set controller backend
     import omnigibson.controllers.controller_base as CB
-    CB._controller_backend.set_methods(CB._ControllerNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else CB._ControllerTorchBackend)
+
+    CB._controller_backend.set_methods(
+        CB._ControllerNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else CB._ControllerTorchBackend
+    )
 
     return app
 
