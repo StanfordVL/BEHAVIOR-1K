@@ -60,6 +60,8 @@ class DataWrapper(EnvironmentWrapper):
         self.add_metadata(group=data_grp, name="config", data=config)
         self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
+        self.is_recording = False
+
         # Run super
         super().__init__(env=env)
 
@@ -86,12 +88,13 @@ class DataWrapper(EnvironmentWrapper):
         next_obs, reward, terminated, truncated, info = self.env.step(action)
         self.step_count += 1
 
-        # Aggregate step data
-        step_data = self._parse_step_data(action, next_obs, reward, terminated, truncated, info)
+        if self.is_recording:
+            # Aggregate step data
+            step_data = self._parse_step_data(action, next_obs, reward, terminated, truncated, info)
 
-        # Update obs and traj history
-        self.current_traj_history.append(step_data)
-        self.current_obs = next_obs
+            # Update obs and traj history
+            self.current_traj_history.append(step_data)
+            self.current_obs = next_obs
 
         return next_obs, reward, terminated, truncated, info
 
@@ -290,6 +293,18 @@ class DataCollectionWrapper(DataWrapper):
         # Configure the simulator to optimize for data collection
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
 
+    def start_recording(self):
+        """
+        Start recording data
+        """
+        self.is_recording = True
+
+    def stop_recording(self):
+        """
+        Stop recording data
+        """
+        self.is_recording = False
+
     def _optimize_sim_for_data_collection(self, viewport_camera_path):
         """
         Configures the simulator to optimize for data collection
@@ -305,9 +320,9 @@ class DataCollectionWrapper(DataWrapper):
         # Set the main viewport camera path
         og.sim.viewer_camera.active_camera_path = viewport_camera_path
 
-        # Use asynchronous rendering for faster performance
-        lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-        lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+        # # Use asynchronous rendering for faster performance
+        # lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+        # lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
         # Disable mouse grabbing since we're only using the UI passively
         lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)

@@ -14,6 +14,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
 
 try:
     from telemoma.configs.base_config import teleop_config
@@ -23,6 +24,9 @@ try:
     from telemoma.utils.general_utils import AttrDict
 except ImportError as e:
     raise e from ValueError("For teleoperation, install telemoma by running 'pip install telemoma'")
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 m = create_module_macros(module_path=__file__)
 m.movement_speed = 0.2  # the speed of the robot base movement
@@ -234,6 +238,61 @@ class OVXRSystem(TeleopSystem):
         #         reset_joint_pos=self.robot.get_joint_positions()[control_idx],
         #         eef_name=self.robot.eef_link_names[arm],
         #     )
+        self.head_canonical_transformation = None
+        KeyboardEventHandler.add_keyboard_callback(
+            key=lazy.carb.input.KeyboardInput.ENTER,
+            callback_fn=self.register_head_canonical_transformation,
+        )
+        KeyboardEventHandler.add_keyboard_callback(
+            key=lazy.carb.input.KeyboardInput.ESCAPE,
+            callback_fn=self.stop,
+        )
+        self._update_camera_callback = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
+            lazy.omni.kit.xr.core.XRCoreEventType.pre_render_update, self._update_camera_pose, name="update camera"
+        )
+
+    def _update_camera_pose(self, e) -> None:
+        if self.align_anchor_to == "touchpad":
+            # we use x, y from right controller for 2d movement and y from left controller for z movement
+            self._move_anchor(
+                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
+            )
+        else:
+            if self.anchor_prim is not None:
+                reference_frame = self.anchor_prim
+            elif self.align_anchor_to == "camera":
+                reference_frame = self.robot_cameras[self.active_camera_id]
+            elif self.align_anchor_to == "base":
+                reference_frame = self.robot
+            else:
+                raise ValueError(f"Invalid anchor: {self.align_anchor_to}")
+
+            anchor_pos, anchor_orn = reference_frame.get_position_orientation()
+
+            if self.head_canonical_transformation is not None:
+                current_head_physical_world_pose = self.xr2og(self.hmd.get_physical_world_pose())
+                # Find the orientation change from canonical to current physical orientation
+                _, relative_orientation = T.relative_pose_transform(
+                    *current_head_physical_world_pose, *self.head_canonical_transformation
+                )
+                anchor_orn = T.quat_multiply(anchor_orn, relative_orientation)
+
+            anchor_pose = self.og2xr(anchor_pos, anchor_orn)
+            self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
+                anchor_pose.numpy(), self.hmd
+            )
+
+    def register_head_canonical_transformation(self):
+        """
+        Here's what we need to do:
+        1) Let the user press a button to record head canonical orientation (GELLO and head facing forward)
+        2) when the user turn their head, get orientation change from canonical to current physical orientation as R
+        3) set the head in virtual world to robot head orientation + R, same position
+        """
+        if self.hmd is None:
+            log.warning("No HMD found, cannot register head canonical orientation")
+            return
+        self.head_canonical_transformation = self.xr2og(self.hmd.get_physical_world_pose())
 
     def set_anchor_with_prim(self, prim) -> None:
         """
@@ -305,6 +364,7 @@ class OVXRSystem(TeleopSystem):
                     og.sim.step()
                 self.reset_head_transform()
                 print("[VRSys] VR system is ready")
+                self.register_head_canonical_transformation()
                 break
             time.sleep(1)
             og.sim.step()
@@ -323,10 +383,10 @@ class OVXRSystem(TeleopSystem):
         """
         # update raw data
         self._update_devices()
+        self._update_device_transforms()
+        self._update_button_data()
         # Update teleop data based on controller input
         if self.eef_tracking_mode == "controller":
-            self._update_device_transforms()
-            self._update_button_data()
             # update eef related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
@@ -374,31 +434,6 @@ class OVXRSystem(TeleopSystem):
                 (self.raw_data["transforms"]["head"][0], T.quat2euler(self.raw_data["transforms"]["head"][1]))
             )
             self.teleop_action.is_valid["head"] = self._is_valid_transform(self.raw_data["transforms"]["head"])
-
-        # align anchor
-        if self.align_anchor_to == "touchpad":
-            # we use x, y from right controller for 2d movement and y from left controller for z movement
-            self._move_anchor(
-                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
-            )
-        else:
-            # Only align anchor when there's base movement
-            # if th.any(self.teleop_action.base != 0):
-            if self.anchor_prim is not None:
-                reference_frame = self.anchor_prim
-            elif self.align_anchor_to == "camera":
-                reference_frame = self.robot_cameras[self.active_camera_id]
-            elif self.align_anchor_to == "base":
-                reference_frame = self.robot
-            else:
-                raise ValueError(f"Invalid anchor: {self.align_anchor_to}")
-
-            anchor_pos, anchor_orn = reference_frame.get_position_orientation()
-
-            anchor_pose = self.og2xr(anchor_pos, anchor_orn)
-            self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-                anchor_pose.numpy(), self.hmd
-            )
 
     def get_robot_teleop_action(self) -> th.Tensor:
         """

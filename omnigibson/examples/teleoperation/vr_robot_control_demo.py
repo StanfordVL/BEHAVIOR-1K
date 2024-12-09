@@ -11,6 +11,7 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
 gm.ENABLE_FLATCACHE = True
+gm.GUI_VIEWPORT_ONLY = True
 
 # import torch._dynamo
 # torch._dynamo.config.suppress_errors = True
