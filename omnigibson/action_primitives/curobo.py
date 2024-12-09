@@ -720,7 +720,9 @@ class CuRoboMotionGenerator:
 
     def path_to_eef_trajectory(self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         """
-        Converts raw path from motion generator into end-effector trajectory sequence
+        Converts raw path from motion generator into end-effector trajectory sequence in the robot frame.
+        This trajectory sequence can be executed by an IKController, although there is no guaranteee that
+        the controller will output the same joint trajectory as the one computed by cuRobo.
 
         Args:
             path (JointState): Joint state path to convert into joint trajectory
