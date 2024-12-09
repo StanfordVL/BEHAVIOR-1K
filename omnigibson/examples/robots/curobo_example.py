@@ -5,14 +5,14 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection, CuRoboMotionGenerator
+from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.macros import gm, macros
 from omnigibson.object_states import Touching
 from omnigibson.utils.ui_utils import choose_from_options
 
 
 def plan_trajectory(
-    cmg, target_pos, target_quat, emb_sel=CuroboEmbodimentSelection.DEFAULT, attached_obj=None, attached_obj_scale=None
+    cmg, target_pos, target_quat, emb_sel=CuRoboEmbodimentSelection.DEFAULT, attached_obj=None, attached_obj_scale=None
 ):
     # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
     successes, traj_paths = cmg.compute_trajectories(
@@ -229,21 +229,6 @@ def test_curobo():
     robot = env.robots[0]
     eef_markers = [env.scene.object_registry("name", f"eef_marker_{i}") for i in range(2)]
 
-    # Stablize the robot and update the initial state
-    robot.reset()
-
-    # Open the gripper(s) to match cuRobo's default state
-    for arm_name in robot.gripper_control_idx.keys():
-        gripper_control_idx = robot.gripper_control_idx[arm_name]
-        robot.set_joint_positions(th.ones_like(gripper_control_idx), indices=gripper_control_idx, normalized=True)
-    robot.keep_still()
-
-    for _ in range(5):
-        og.sim.step()
-
-    env.scene.update_initial_state()
-    env.scene.reset()
-
     # Create CuRobo instance
     cmg = CuRoboMotionGenerator(
         robot=robot,
@@ -292,7 +277,7 @@ def test_curobo():
     table_nav_pos, table_nav_quat = T.pose_transform(*table.get_position_orientation(), *table_local_pose)
     target_pos = {robot.base_footprint_link_name: table_nav_pos}
     target_quat = {robot.base_footprint_link_name: table_nav_quat}
-    emb_sel = CuroboEmbodimentSelection.BASE
+    emb_sel = CuRoboEmbodimentSelection.BASE
     attached_obj = None
     attached_obj_scale = None
     plan_and_execute_trajectory(
@@ -308,7 +293,7 @@ def test_curobo():
     right_hand_pos, right_hand_quat = robot.get_eef_pose(arm="right")
     target_pos = {robot.eef_link_names["left"]: left_hand_pos}
     target_quat = {robot.eef_link_names["left"]: left_hand_quat}
-    emb_sel = CuroboEmbodimentSelection.ARM
+    emb_sel = CuRoboEmbodimentSelection.ARM
     attached_obj = None
     attached_obj_scale = None
     plan_and_execute_trajectory(
@@ -327,7 +312,7 @@ def test_curobo():
         robot.eef_link_names["left"]: left_hand_reset_quat,
         robot.eef_link_names["right"]: right_hand_reset_quat,
     }
-    emb_sel = CuroboEmbodimentSelection.ARM
+    emb_sel = CuRoboEmbodimentSelection.ARM
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     attached_obj_scale = {robot.eef_link_names["left"]: cologne_scale}
     plan_and_execute_trajectory(
@@ -338,7 +323,7 @@ def test_curobo():
     fridge_nav_pos, fridge_nav_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_local_pose)
     target_pos = {robot.base_footprint_link_name: fridge_nav_pos}
     target_quat = {robot.base_footprint_link_name: fridge_nav_quat}
-    emb_sel = CuroboEmbodimentSelection.BASE
+    emb_sel = CuRoboEmbodimentSelection.BASE
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     attached_obj_scale = {robot.eef_link_names["left"]: cologne_scale}
     plan_and_execute_trajectory(
@@ -349,7 +334,7 @@ def test_curobo():
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_local_pose)
     target_pos = {robot.eef_link_names["right"]: right_hand_pos}
     target_quat = {robot.eef_link_names["right"]: right_hand_quat}
-    emb_sel = CuroboEmbodimentSelection.ARM
+    emb_sel = CuRoboEmbodimentSelection.ARM
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     attached_obj_scale = {robot.eef_link_names["left"]: cologne_scale}
     plan_and_execute_trajectory(
@@ -366,7 +351,7 @@ def test_curobo():
     right_hand_pos, right_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_door_open_local_pose)
     target_pos = {robot.eef_link_names["right"]: right_hand_pos}
     target_quat = {robot.eef_link_names["right"]: right_hand_quat}
-    emb_sel = CuroboEmbodimentSelection.DEFAULT
+    emb_sel = CuRoboEmbodimentSelection.DEFAULT
     attached_obj = {
         robot.eef_link_names["left"]: cologne.root_link,
         robot.eef_link_names["right"]: fridge.links["link_0"],
@@ -383,7 +368,7 @@ def test_curobo():
     left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
     target_pos = {robot.eef_link_names["left"]: left_hand_pos}
     target_quat = {robot.eef_link_names["left"]: left_hand_quat}
-    emb_sel = CuroboEmbodimentSelection.DEFAULT
+    emb_sel = CuRoboEmbodimentSelection.DEFAULT
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     attached_obj_scale = {robot.eef_link_names["left"]: cologne_scale}
     plan_and_execute_trajectory(

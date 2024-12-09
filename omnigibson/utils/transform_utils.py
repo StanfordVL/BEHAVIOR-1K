@@ -457,9 +457,12 @@ def mat2pose(hmat):
             - (torch.tensor) (x,y,z) position array in cartesian coordinates
             - (torch.tensor) (x,y,z,w) orientation array in quaternion form
     """
-    assert torch.allclose(hmat[:3, :3].det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
-    pos = hmat[:3, 3]
-    orn = mat2quat(hmat[:3, :3])
+    hmat = hmat.reshape(-1, 4, 4)
+    assert torch.allclose(hmat[:, :3, :3].det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
+    pos = hmat[:, :3, 3]
+    orn = mat2quat(hmat[:, :3, :3])
+    pos = pos.squeeze(0)
+    orn = orn.squeeze(0)
     return pos, orn
 
 
@@ -614,12 +617,16 @@ def pose2mat(pose: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
     pos, orn = pose
 
     # Ensure pos and orn are the expected shape and dtype
-    pos = pos.to(dtype=torch.float32).reshape(3)
-    orn = orn.to(dtype=torch.float32).reshape(4)
+    pos = pos.to(dtype=torch.float32).reshape(-1, 3)
+    orn = orn.to(dtype=torch.float32).reshape(-1, 4)
 
-    homo_pose_mat = torch.eye(4, dtype=torch.float32)
-    homo_pose_mat[:3, :3] = quat2mat(orn)
-    homo_pose_mat[:3, 3] = pos
+    batch_size = pos.shape[0]
+    homo_pose_mat = torch.eye(4, dtype=torch.float32).unsqueeze(0).repeat(batch_size, 1, 1)
+
+    homo_pose_mat[:, :3, :3] = quat2mat(orn)
+    homo_pose_mat[:, :3, 3] = pos
+
+    homo_pose_mat = homo_pose_mat.squeeze(0)
 
     return homo_pose_mat
 
@@ -742,10 +749,13 @@ def pose_inv(pose_mat):
     # -t in the original frame, which is -R-1*t in the new frame, and then rotate back by
     # R-1 to align the axis again.
 
-    pose_inv = torch.zeros((4, 4))
-    pose_inv[:3, :3] = pose_mat[:3, :3].T
-    pose_inv[:3, 3] = -pose_inv[:3, :3] @ pose_mat[:3, 3]
-    pose_inv[3, 3] = 1.0
+    pose_mat = pose_mat.reshape(-1, 4, 4)
+    batch_size = pose_mat.shape[0]
+    pose_inv = torch.zeros((batch_size, 4, 4))
+    pose_inv[:, :3, :3] = pose_mat[:, :3, :3].transpose(1, 2)
+    pose_inv[:, :3, 3] = (-pose_inv[:, :3, :3] @ pose_mat[:, :3, 3].unsqueeze(-1)).squeeze(-1)
+    pose_inv[:, 3, 3] = 1.0
+    pose_inv = pose_inv.squeeze(0)
     return pose_inv
 
 
