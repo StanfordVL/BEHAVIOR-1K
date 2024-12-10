@@ -693,11 +693,5 @@ def import_custom_robot(config):
             og.sim.render()
 
 
-
-# TODO: Create configs and import all robots
-# TODO: Make manual updates to the new robots so that they match the original robots
-# TODO: Add function to merge specified fixed links and / or remove extraneous ones
-# TODO: Import textures properly
-
 if __name__ == "__main__":
     import_custom_robot()
