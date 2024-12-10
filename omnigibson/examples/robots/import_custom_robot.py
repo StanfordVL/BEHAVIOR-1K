@@ -14,7 +14,11 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.utils.asset_conversion_utils import _add_xform_properties, import_og_asset_from_urdf, find_all_prim_children_with_type
+from omnigibson.utils.asset_conversion_utils import (
+    _add_xform_properties,
+    find_all_prim_children_with_type,
+    import_og_asset_from_urdf,
+)
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
 
