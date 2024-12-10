@@ -343,7 +343,7 @@ def test_curobo():
         ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
         assert (
             false_negative / n_samples == 0.0
-        ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
+        ), f"Collision checking false negative rate: {false_negative / n_samples}, should be == 0.0."
 
         env.scene.reset()
 

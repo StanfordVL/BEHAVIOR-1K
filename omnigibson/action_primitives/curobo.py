@@ -176,7 +176,6 @@ class CuRoboMotionGenerator:
         self.debug = debug
         self.robot = robot
         self.robot_joint_names = list(robot.joints.keys())
-        self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self.batch_size = batch_size
 
         # Load robot config and usd paths and make sure paths point correctly
@@ -736,15 +735,10 @@ class CuRoboMotionGenerator:
         n = len(traj)
 
         # Use forward kinematic solver to compute the EEF link positions
-        positions = self._tensor_args.to_device(th.zeros((n, 3)))
-        orientations = self._tensor_args.to_device(
-            th.zeros((n, 4))
-        )  # This will be quat initially but we may convert to aa representation
-
-        for i, qpos in enumerate(traj):
-            pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link[emb_sel]])
-            positions[i] = pose[self.ee_link[emb_sel]][0]
-            orientations[i] = pose[self.ee_link[emb_sel]][1]
+        # poses in shape (T, 1, D), where 1 is because only one link is passed to link_names
+        poses = self.mg[emb_sel].kinematics.get_link_poses(traj, link_names=[self.ee_link[emb_sel]])
+        positions = poses.position.squeeze(dim=-1)
+        orientations = poses.quaternion.squeeze(dim=-1)
 
         # Possibly convert orientations to aa-representation
         if return_axisangle:
