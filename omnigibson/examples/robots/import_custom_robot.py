@@ -14,7 +14,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
-from omnigibson.utils.asset_conversion_utils import _add_xform_properties, import_og_asset_from_urdf
+from omnigibson.utils.asset_conversion_utils import _add_xform_properties, import_og_asset_from_urdf, find_all_prim_children_with_type
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
 
@@ -314,26 +314,6 @@ def find_articulation_root_prim(root_prim):
     )
 
 
-def find_all_prim_children_with_type(prim_type, root_prim):
-    """
-    Recursively searches children of @root_prim to find all instances of prim that satisfy type @prim_type
-
-    Args:
-        prim_type (str): Type of the prim to search
-        root_prim (Usd.Prim): Root prim to search
-
-    Returns:
-        list of Usd.Prim: All found prims whose prim type includes @prim_type
-    """
-    found_prims = []
-    for child in root_prim.GetChildren():
-        if prim_type in child.GetTypeName():
-            found_prims.append(child)
-        found_prims += find_all_prim_children_with_type(prim_type=prim_type, root_prim=child)
-
-    return found_prims
-
-
 def make_joint_fixed(stage, root_prim, joint_name):
     """
     Converts a revolute / prismatic joint @joint_name into a fixed joint
@@ -471,7 +451,7 @@ def create_curobo_cfgs(robot_prim, curobo_cfg, root_link, save_dir, is_holonomic
     joint_prims = find_all_articulated_joints(robot_prim)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
     retract_cfg = curobo_cfg.default_qpos
-    lock_joints = curobo_cfg.lock_joints.to_dict()
+    lock_joints = curobo_cfg.lock_joints.to_dict() if curobo_cfg.lock_joints else {}
     if is_holonomic:
         # Move the final six joints to the beginning, since the holonomic joints are added at the end
         all_joint_names = list(reversed(all_joint_names[-6:])) + all_joint_names[:-6]
@@ -591,36 +571,39 @@ def import_custom_robot(config):
     stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
 
     # Add cameras, lidars, and visual spheres
-    for eef_vis_info in cfg.eef_vis_links:
-        add_sensor(
-            stage=stage,
-            root_prim=prim,
-            sensor_type="VisualSphere",
-            link_name=eef_vis_info.link,
-            parent_link_name=eef_vis_info.parent_link,
-            pos_offset=eef_vis_info.offset.position,
-            ori_offset=eef_vis_info.offset.orientation,
-        )
-    for camera_info in cfg.camera_links:
-        add_sensor(
-            stage=stage,
-            root_prim=prim,
-            sensor_type="Camera",
-            link_name=camera_info.link,
-            parent_link_name=camera_info.parent_link,
-            pos_offset=camera_info.offset.position,
-            ori_offset=camera_info.offset.orientation,
-        )
-    for lidar_info in cfg.lidar_links:
-        add_sensor(
-            stage=stage,
-            root_prim=prim,
-            sensor_type="Lidar",
-            link_name=lidar_info.link,
-            parent_link_name=lidar_info.parent_link,
-            pos_offset=lidar_info.offset.position,
-            ori_offset=lidar_info.offset.orientation,
-        )
+    if cfg.eef_vis_links:
+        for eef_vis_info in cfg.eef_vis_links:
+            add_sensor(
+                stage=stage,
+                root_prim=prim,
+                sensor_type="VisualSphere",
+                link_name=eef_vis_info.link,
+                parent_link_name=eef_vis_info.parent_link,
+                pos_offset=eef_vis_info.offset.position,
+                ori_offset=eef_vis_info.offset.orientation,
+            )
+    if cfg.camera_links:
+        for camera_info in cfg.camera_links:
+            add_sensor(
+                stage=stage,
+                root_prim=prim,
+                sensor_type="Camera",
+                link_name=camera_info.link,
+                parent_link_name=camera_info.parent_link,
+                pos_offset=camera_info.offset.position,
+                ori_offset=camera_info.offset.orientation,
+            )
+    if cfg.lidar_links:
+        for lidar_info in cfg.lidar_links:
+            add_sensor(
+                stage=stage,
+                root_prim=prim,
+                sensor_type="Lidar",
+                link_name=lidar_info.link,
+                parent_link_name=lidar_info.parent_link,
+                pos_offset=lidar_info.offset.position,
+                ori_offset=lidar_info.offset.orientation,
+            )
 
     # Make wheels sphere approximations if requested
     if cfg.base_motion.use_sphere_wheels:
@@ -699,7 +682,7 @@ def import_custom_robot(config):
             robot_prim=prim,
             root_link=root_prim_name,
             curobo_cfg=cfg.curobo,
-            save_dir="/".join(usd_path.split("/")[:-2]),
+            save_dir="/".join(usd_path.split("/")[:-2]) + "/curobo",
             is_holonomic=cfg.base_motion.use_holonomic_joints,
         )
 
@@ -708,6 +691,7 @@ def import_custom_robot(config):
         click.echo("The asset has been successfully imported. You can view it and make changes and save if you'd like.")
         while True:
             og.sim.render()
+
 
 
 # TODO: Create configs and import all robots
