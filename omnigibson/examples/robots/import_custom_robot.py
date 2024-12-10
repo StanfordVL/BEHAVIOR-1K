@@ -26,47 +26,309 @@ _DOCSTRING = """
 Imports an externally-defined robot URDF asset into an OmniGibson-compatible USD format and saves the imported asset
 files to the external dataset directory (gm.EXTERNAL_DATASET_PATH)
 
-Note that @config is expected to follow the following format (fetch config shown as an example):
+Note that @config is expected to follow the following format (R1 config shown as an example):
 
 \b
-urdf_path: XXX                      # (str) Absolute path to robot URDF to import
-name: XXX                           # (str) Name to assign to robot
-collision_method:                   # (str) [coacd, convex, or null] collision decomposition method
-hull_count:                         # (int) max hull count to use during decomposition, only relevant for coacd
-headless:                           # (bool) if set, run without GUI
-overwrite:                          # (bool) if set, overwrite any existing files
-visual_only_links:                  # (list of str) links that will have any associated collision meshes removed
-  - laser_link
-  - estop_link
-sphere_links:                       # (list of str) links that should have sphere collision approximation (eg: wheels)
-  - l_wheel_link
-  - r_wheel_link
-camera_links:                       # (list of dict) information for adding cameras to robot
-  - link: eyes                      # (str) link name to add camera. Must exist if @parent_link is null, else will be 
-                                    #       added as a child of the parent
-    parent_link: null               # (str) optional parent link to use if adding new link
-    offset:                         # (dict) local pos,ori offset values. if @parent_link is specified, defines offset 
-                                    #       between @parent_link and @link specified in @parent_link's frame. 
-                                    #       Otherwise, specifies offset of generated prim relative to @link's frame
-      position: [0, 0, 0]           # (3-tuple) (x,y,z) offset
-      orientation: [0, 0, 0, 1.0]   # (4-tuple) (x,y,z,w) offset
-  - link: wrist
-    parent_link: null
-    offset:
-      position: [0, 0, 0]
-      orientation: [0, 0, 0, 1.0]
-lidar_links:                        # (list of dict) information for adding cameras to robot
-  - link: laser_link                # same format as @camera_links
-    parent_link: null
-    offset:
-      position: [0, 0, 0]
-      orientation: [0, 0, 0, 1.0]
+urdf_path: r1_pro_source.urdf       # (str) Absolute path to robot URDF to import
+name: r1                            # (str) Name to assign to robot
+headless: false                     # (bool) if set, run without GUI
+overwrite: true                     # (bool) if set, overwrite any existing files
+merge_fixed_joints: false           # (bool) whether to merge fixed joints in the robot hierarchy or not
+base_motion:
+  wheel_links:                      # (list of str): links corresponding to wheels
+    - wheel_link1
+    - wheel_link2
+    - wheel_link3
+  wheel_joints:                     # (list of str): joints corresponding to wheel motion
+    - servo_joint1
+    - servo_joint2
+    - servo_joint3
+    - wheel_joint1
+    - wheel_joint2
+    - wheel_joint3
+  use_sphere_wheels: true           # (bool) whether to use sphere approximation for wheels (better stability)
+  use_holonomic_joints: true        # (bool) whether to use joints to approximate a holonomic base. In this case, all
+                                    #       wheel-related joints will be made into fixed joints, and 6 additional
+                                    #       "virtual" joints will be added to the robot's base capturing 6DOF movement,
+                                    #       with the (x,y,rz) joints being controllable by motors
+collision:
+  decompose_method: coacd           # (str) [coacd, convex, or null] collision decomposition method
+  hull_count: 8                     # (int) per-mesh max hull count to use during decomposition, only relevant for coacd
+  coacd_links: []                   # (list of str): links that should use CoACD to decompose collision meshes
+  convex_links:                     # (list of str): links that should use convex hull to decompose collision meshes
+    - base_link
+    - wheel_link1
+    - wheel_link2
+    - wheel_link3
+    - torso_link1
+    - torso_link2
+    - torso_link3
+    - torso_link4
+    - left_arm_link1
+    - left_arm_link4
+    - left_arm_link5
+    - right_arm_link1
+    - right_arm_link4
+    - right_arm_link5
+  no_decompose_links: []            # (list of str): links that should not have any post-processing done to them
+  no_collision_links:               # (list of str) links that will have any associated collision meshes removed
+    - servo_link1
+    - servo_link2
+    - servo_link3
 eef_vis_links:                      # (list of dict) information for adding cameras to robot
-  - link: gripper_vis_link          # same format as @camera_links
-    parent_link: gripper_link
+  - link: left_eef_link             # same format as @camera_links
+    parent_link: left_arm_link6
     offset:
-      position: [0, 0, 0.1]
-      orientation: [0, 0, 0, 1.0]
+      position: [0, 0, 0.06]
+      orientation: [0, 0, 0, 1]
+  - link: right_eef_link            # same format as @camera_links
+    parent_link: right_arm_link6
+    offset:
+      position: [0, 0, 0.06]
+      orientation: [0, 0, 0, 1]
+camera_links:                       # (list of dict) information for adding cameras to robot
+  - link: eyes                      # (str) link name to add camera. Must exist if @parent_link is null, else will be
+                                    #       added as a child of the parent
+    parent_link: torso_link4        # (str) optional parent link to use if adding new link
+    offset:                         # (dict) local pos,ori offset values. if @parent_link is specified, defines offset
+                                    #       between @parent_link and @link specified in @parent_link's frame.
+                                    #       Otherwise, specifies offset of generated prim relative to @link's frame
+      position: [0.0732, 0, 0.4525]                     # (3-tuple) (x,y,z) offset -- this is done BEFORE the rotation
+      orientation: [0.4056, -0.4056, -0.5792, 0.5792]   # (4-tuple) (x,y,z,w) offset
+  - link: left_eef_link
+    parent_link: null
+    offset:
+      position: [0.05, 0, -0.05]
+      orientation: [-0.7011, -0.7011, -0.0923, -0.0923]
+  - link: right_eef_link
+    parent_link: null
+    offset:
+      position: [0.05, 0, -0.05]
+      orientation: [-0.7011, -0.7011, -0.0923, -0.0923]
+lidar_links: []                     # (list of dict) information for adding cameras to robot
+curobo:
+  eef_to_gripper_info:              # (dict) Maps EEF link name to corresponding gripper links / joints
+    right_eef_link:
+      links: ["right_gripper_link1", "right_gripper_link2"]
+      joints: ["right_gripper_axis1", "right_gripper_axis2"]
+    left_eef_link:
+      links: ["left_gripper_link1", "left_gripper_link2"]
+      joints: ["left_gripper_axis1", "left_gripper_axis2"]
+  flip_joint_limits: []             # (list of str) any joints that have a negative axis specified in the
+                                    #       source URDF
+  lock_joints: {}                   # (dict) Maps joint name to "locked" joint configuration. Any joints
+                                    #       specified here will not be considered active when motion planning
+                                    #       NOTE: All gripper joints and non-controllable holonomic joints
+                                    #       will automatically be added here
+  self_collision_ignore:            # (dict) Maps link name to list of other ignore links to ignore collisions
+                                    #       with. Note that bi-directional specification is not necessary,
+                                    #       e.g.: "torso_link1" does not need to be specified in
+                                    #       "torso_link2"'s list if "torso_link2" is already specified in
+                                    #       "torso_link1"'s list
+    base_link: ["torso_link1", "wheel_link1", "wheel_link2", "wheel_link3"]
+    torso_link1: ["torso_link2"]
+    torso_link2: ["torso_link3", "torso_link4"]
+    torso_link3: ["torso_link4"]
+    torso_link4: ["left_arm_link1", "right_arm_link1", "left_arm_link2", "right_arm_link2"]
+    left_arm_link1: ["left_arm_link2"]
+    left_arm_link2: ["left_arm_link3"]
+    left_arm_link3: ["left_arm_link4"]
+    left_arm_link4: ["left_arm_link5"]
+    left_arm_link5: ["left_arm_link6"]
+    left_arm_link6: ["left_gripper_link1", "left_gripper_link2"]
+    right_arm_link1: ["right_arm_link2"]
+    right_arm_link2: ["right_arm_link3"]
+    right_arm_link3: ["right_arm_link4"]
+    right_arm_link4: ["right_arm_link5"]
+    right_arm_link5: ["right_arm_link6"]
+    right_arm_link6: ["right_gripper_link1", "right_gripper_link2"]
+    left_gripper_link1: ["left_gripper_link2"]
+    right_gripper_link1: ["right_gripper_link2"]
+  collision_spheres:                # (dict) Maps link name to list of collision sphere representations,
+                                    #       where each sphere is defined by its (x,y,z) "center" and "radius"
+                                    #       values. This defines the collision geometry during motion planning
+    base_link:
+      - "center": [-0.009, -0.094, 0.131]
+        "radius": 0.09128
+      - "center": [-0.021, 0.087, 0.121]
+        "radius": 0.0906
+      - "center": [0.019, 0.137, 0.198]
+        "radius": 0.07971
+      - "center": [0.019, -0.14, 0.209]
+        "radius": 0.07563
+      - "center": [0.007, -0.018, 0.115]
+        "radius": 0.08448
+      - "center": [0.119, -0.176, 0.209]
+        "radius": 0.05998
+      - "center": [0.137, 0.118, 0.208]
+        "radius": 0.05862
+      - "center": [-0.152, -0.049, 0.204]
+        "radius": 0.05454
+    torso_link1:
+      - "center": [-0.001, -0.014, -0.057]
+        "radius": 0.1
+      - "center": [-0.001, -0.127, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.219, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.29, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.375, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.419, -0.064]
+        "radius": 0.07
+    torso_link2:
+      - "center": [-0.001, -0.086, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.194, -0.064]
+        "radius": 0.07
+      - "center": [-0.001, -0.31, -0.064]
+        "radius": 0.07
+    torso_link4:
+      - "center": [0.005, -0.001, 0.062]
+        "radius": 0.1
+      - "center": [0.005, -0.001, 0.245]
+        "radius": 0.15
+      - "center": [0.005, -0.001, 0.458]
+        "radius": 0.1
+      - "center": [0.002, 0.126, 0.305]
+        "radius": 0.08
+      - "center": [0.002, -0.126, 0.305]
+        "radius": 0.08
+    left_arm_link1:
+      - "center": [0.001, 0.0, 0.069]
+        "radius": 0.06
+    left_arm_link2:
+      - "center": [-0.062, -0.016, -0.03]
+        "radius": 0.06
+      - "center": [-0.135, -0.019, -0.03]
+        "radius": 0.06
+      - "center": [-0.224, -0.019, -0.03]
+        "radius": 0.06
+      - "center": [-0.31, -0.022, -0.03]
+        "radius": 0.06
+      - "center": [-0.34, -0.027, -0.03]
+        "radius": 0.06
+    left_arm_link3:
+      - "center": [0.037, -0.058, -0.044]
+        "radius": 0.05
+      - "center": [0.095, -0.08, -0.044]
+        "radius": 0.03
+      - "center": [0.135, -0.08, -0.043]
+        "radius": 0.03
+      - "center": [0.176, -0.08, -0.043]
+        "radius": 0.03
+      - "center": [0.22, -0.077, -0.043]
+        "radius": 0.03
+    left_arm_link4:
+      - "center": [-0.002, 0.0, 0.276]
+        "radius": 0.04
+    left_arm_link5:
+      - "center": [0.059, -0.001, -0.021]
+        "radius": 0.035
+    left_arm_link6:
+      - "center": [0.0, 0.0, 0.04]
+        "radius": 0.04
+    right_arm_link1:
+      - "center": [0.001, 0.0, 0.069]
+        "radius": 0.06
+    right_arm_link2:
+      - "center": [-0.062, -0.016, -0.03]
+        "radius": 0.06
+      - "center": [-0.135, -0.019, -0.03]
+        "radius": 0.06
+      - "center": [-0.224, -0.019, -0.03]
+        "radius": 0.06
+      - "center": [-0.31, -0.022, -0.03]
+        "radius": 0.06
+      - "center": [-0.34, -0.027, -0.03]
+        "radius": 0.06
+    right_arm_link3:
+      - "center": [0.037, -0.058, -0.044]
+        "radius": 0.05
+      - "center": [0.095, -0.08, -0.044]
+        "radius": 0.03
+      - "center": [0.135, -0.08, -0.043]
+        "radius": 0.03
+      - "center": [0.176, -0.08, -0.043]
+        "radius": 0.03
+      - "center": [0.22, -0.077, -0.043]
+        "radius": 0.03
+    right_arm_link4:
+      - "center": [-0.002, 0.0, 0.276]
+        "radius": 0.04
+    right_arm_link5:
+      - "center": [0.059, -0.001, -0.021]
+        "radius": 0.035
+    right_arm_link6:
+      - "center": [-0.0, 0.0, 0.04]
+        "radius": 0.035
+    wheel_link1:
+      - "center": [-0.0, 0.0, -0.03]
+        "radius": 0.06
+    wheel_link2:
+      - "center": [0.0, 0.0, 0.03]
+        "radius": 0.06
+    wheel_link3:
+      - "center": [0.0, 0.0, -0.03]
+        "radius": 0.06
+    left_gripper_link1:
+      - "center": [-0.03, 0.0, -0.002]
+        "radius": 0.008
+      - "center": [-0.01, 0.0, -0.003]
+        "radius": 0.007
+      - "center": [0.005, 0.0, -0.005]
+        "radius": 0.005
+      - "center": [0.02, 0.0, -0.007]
+        "radius": 0.003
+    left_gripper_link2:
+      - "center": [-0.03, 0.0, -0.002]
+        "radius": 0.008
+      - "center": [-0.01, 0.0, -0.003]
+        "radius": 0.007
+      - "center": [0.005, 0.0, -0.005]
+        "radius": 0.005
+      - "center": [0.02, 0.0, -0.007]
+        "radius": 0.003
+    right_gripper_link1:
+      - "center": [-0.03, 0.0, -0.002]
+        "radius": 0.008
+      - "center": [-0.01, -0.0, -0.003]
+        "radius": 0.007
+      - "center": [0.005, -0.0, -0.005]
+        "radius": 0.005
+      - "center": [0.02, -0.0, -0.007]
+        "radius": 0.003
+    right_gripper_link2:
+      - "center": [-0.03, 0.0, -0.002]
+        "radius": 0.008
+      - "center": [-0.01, 0.0, -0.003]
+        "radius": 0.007
+      - "center": [0.005, 0.0, -0.005]
+        "radius": 0.005
+      - "center": [0.02, 0.0, -0.007]
+        "radius": 0.003
+  default_qpos:                     # (list of float): Default joint configuration
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 0.0
+    - 1.906
+    - 1.906
+    - -0.991
+    - -0.991
+    - 1.571
+    - 1.571
+    - 0.915
+    - 0.915
+    - -1.571
+    - -1.571
+    - 0.03
+    - 0.03
+    - 0.03
+    - 0.03
 
 """
 
@@ -570,7 +832,7 @@ def import_custom_robot(config):
     # Get current stage
     stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
 
-    # Add cameras, lidars, and visual spheres
+    # Add visual spheres, cameras, and lidars
     if cfg.eef_vis_links:
         for eef_vis_info in cfg.eef_vis_links:
             add_sensor(
