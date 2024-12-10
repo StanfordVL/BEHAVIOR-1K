@@ -1,11 +1,11 @@
 import math
+import os
 from abc import abstractmethod
 from collections import namedtuple
 from typing import Literal
 
 import networkx as nx
 import torch as th
-import os
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -987,7 +987,9 @@ class ManipulationRobot(BaseRobot):
         # By default, sets the standardized path
         model = self.model_name.lower()
         return {
-            emb_sel: os.path.join(gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml")
+            emb_sel: os.path.join(
+                gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml"
+            )
             for emb_sel in CuroboEmbodimentSelection
         }
 

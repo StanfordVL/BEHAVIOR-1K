@@ -18,10 +18,7 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
-from omnigibson.utils.usd_utils import (
-    ControllableObjectViewAPI,
-    absolute_prim_path_to_scene_relative,
-)
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, absolute_prim_path_to_scene_relative
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 
 # Global dicts that will contain mappings
