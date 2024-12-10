@@ -7,7 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
+from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
@@ -446,7 +446,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
     def curobo_path(self):
         return {
             emb_sel: os.path.join(gm.ASSET_PATH, f"models/tiago/tiago_description_curobo_{emb_sel.value}.yaml")
-            for emb_sel in CuroboEmbodimentSelection
+            for emb_sel in CuRoboEmbodimentSelection
         }
 
     @property
