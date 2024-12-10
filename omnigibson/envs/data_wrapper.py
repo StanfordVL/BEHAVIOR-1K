@@ -306,6 +306,13 @@ class DataCollectionWrapper(DataWrapper):
         og.sim.viewer_camera.active_camera_path = viewport_camera_path
 
         # Use asynchronous rendering for faster performance
+        # We have to do a super hacky workaround to avoid the GUI freezing, which is
+        # toggling these settings to be True -> False -> True
+        # Only setting it to True once will actually freeze the GUI for some reason!
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
+        lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
         lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
         lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
