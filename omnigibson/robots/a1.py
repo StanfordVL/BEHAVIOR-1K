@@ -192,10 +192,6 @@ class A1(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.usd")
 
     @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_description.yaml")}
-
-    @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.urdf")
 

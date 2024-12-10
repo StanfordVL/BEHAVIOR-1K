@@ -5,6 +5,7 @@ from typing import Literal
 
 import networkx as nx
 import torch as th
+import os
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -974,13 +975,30 @@ class ManipulationRobot(BaseRobot):
             joint.set_vel(vel=0.0)
 
     @property
-    def robot_arm_descriptor_yamls(self):
+    def curobo_path(self):
         """
         Returns:
-            dict: Dictionary mapping arm appendage name to files path to the descriptor
-                of the robot for IK Controller.
+            str or Dict[CuroboEmbodimentSelection, str]: file path to the robot curobo file or a mapping from
+                CuroboEmbodimentSelection to the file path
         """
-        raise NotImplementedError
+        # Import here to avoid circular imports
+        from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
+
+        # By default, sets the standardized path
+        model = self.model_name.lower()
+        return {
+            emb_sel: os.path.join(gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml")
+            for emb_sel in CuroboEmbodimentSelection
+        }
+
+    @property
+    def curobo_attached_object_link_names(self):
+        """
+        Returns:
+            Dict[str, str]: mapping from robot eef link names to the link names of the attached objects
+        """
+        # By default, sets the standardized path
+        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
 
     @property
     def _default_arm_joint_controller_configs(self):

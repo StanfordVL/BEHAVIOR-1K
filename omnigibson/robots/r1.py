@@ -234,39 +234,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return {arm: [f"{arm}_gripper_axis{i}" for i in range(1, 3)] for arm in self.arm_names}
 
     @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/r1/r1_pro.usda")
-
-    @property
-    def curobo_path(self):
-        return {
-            emb_sel: os.path.join(gm.ASSET_PATH, f"models/r1/r1_description_curobo_{emb_sel.value}.yaml")
-            for emb_sel in CuroboEmbodimentSelection
-        }
-
-    @property
-    def curobo_attached_object_link_names(self):
-        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        descriptor_yamls = {
-            arm: os.path.join(gm.ASSET_PATH, f"models/r1/r1_{arm}_descriptor.yaml") for arm in self.arm_names
-        }
-        descriptor_yamls["combined"]: os.path.join(gm.ASSET_PATH, "models/r1/r1_combined_descriptor.yaml")
-        return descriptor_yamls
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/r1/r1.urdf")
-
-    @property
     def arm_workspace_range(self):
         return {arm: [th.deg2rad(-45), th.deg2rad(45)] for arm in self.arm_names}
-
-    @property
-    def eef_usd_path(self):
-        return {arm: os.path.join(gm.ASSET_PATH, "models/r1/r1_eef.usd") for arm in self.arm_names}
 
     @property
     def disabled_collision_pairs(self):
