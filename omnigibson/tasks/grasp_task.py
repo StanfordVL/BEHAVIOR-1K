@@ -109,7 +109,7 @@ class GraspTask(BaseTask):
                 joint_pos, joint_control_idx = self._get_random_joint_position(robot)
                 initial_joint_pos[control_idx_in_joint_pos] = joint_pos
                 collision_detected = self._primitive_controller._motion_generator.check_collisions(
-                    [initial_joint_pos], check_self_collision=False
+                    [initial_joint_pos], self_collision_check=False
                 ).cpu()[0]
                 if not collision_detected:
                     robot.set_joint_positions(joint_pos, joint_control_idx)

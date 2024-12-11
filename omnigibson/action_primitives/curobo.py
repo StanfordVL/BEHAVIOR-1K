@@ -332,7 +332,7 @@ class CuRoboMotionGenerator:
     def check_collisions(
         self,
         q,
-        check_self_collision=True,
+        self_collision_check=True,
         skip_obstacle_update=False,
     ):
         """
@@ -341,7 +341,7 @@ class CuRoboMotionGenerator:
         Args:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
-            check_self_collision (bool): Whether to check self-collisions or not
+            self_collision_check (bool): Whether to check self-collisions or not
             emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for checking collisions
 
         Returns:
@@ -378,7 +378,7 @@ class CuRoboMotionGenerator:
                 self.mg[emb_sel].rollout_fn.primitive_collision_constraint.forward(robot_spheres).squeeze(1)
             )
             collision_results = collision_dist > 0.0
-            if check_self_collision:
+            if self_collision_check:
                 self_collision_dist = (
                     self.mg[emb_sel].rollout_fn.robot_self_collision_constraint.forward(robot_spheres).squeeze(1)
                 )
@@ -500,6 +500,7 @@ class CuRoboMotionGenerator:
         attached_obj_scale=None,
         skip_obstacle_update=False,
         ik_only=False,
+        ik_world_collision_check=True,
         emb_sel=CuRoboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -535,6 +536,7 @@ class CuRoboMotionGenerator:
                 link names and the values are the corresponding scale to apply to the attached object
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
             ik_only (bool): Whether to only run the IK solver and not the trajectory optimization
+            ik_world_collision_check (bool): Whether to check for collisions in the world when running the IK solver for ik_only mode
             emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for computing trajectories
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
@@ -690,14 +692,27 @@ class CuRoboMotionGenerator:
             )
             for additional_link in self.additional_links[emb_sel]:
                 (
+                    rollout_fn._link_pose_costs[additional_link].enable_cost()
+                    if additional_link in target_pos
+                    else rollout_fn._link_pose_costs[additional_link].disable_cost()
+                )
+                (
                     rollout_fn._link_pose_convergence[additional_link].enable_cost()
                     if additional_link in target_pos
                     else rollout_fn._link_pose_convergence[additional_link].disable_cost()
                 )
+
+        if ik_only:
+            for rollout_fn in self.mg[emb_sel].ik_solver.get_all_rollout_instances():
                 (
-                    rollout_fn._link_pose_costs[additional_link].enable_cost()
-                    if additional_link in target_pos
-                    else rollout_fn._link_pose_costs[additional_link].disable_cost()
+                    rollout_fn.primitive_collision_cost.enable_cost()
+                    if ik_world_collision_check
+                    else rollout_fn.primitive_collision_cost.disable_cost()
+                )
+                (
+                    rollout_fn.primitive_collision_constraint.enable_cost()
+                    if ik_world_collision_check
+                    else rollout_fn.primitive_collision_constraint.disable_cost()
                 )
 
         # Determine how many internal batches we need to run based on submitted size

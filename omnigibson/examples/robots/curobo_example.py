@@ -58,7 +58,7 @@ def plan_and_execute_trajectory(
     if success:
         print("Successfully planned trajectory")
         if not dry_run:
-            q_traj = cmg.path_to_joint_trajectory(traj_path, emb_sel)
+            q_traj = cmg.path_to_joint_trajectory(traj_path, get_full_js=True, emb_sel=emb_sel)
             execute_trajectory(q_traj, env, robot, attached_obj)
     else:
         print("Failed to plan trajectory")

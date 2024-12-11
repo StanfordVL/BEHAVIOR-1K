@@ -25,7 +25,7 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection, CuRoboMotionGenerator
+from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.controllers import DifferentialDriveController, InverseKinematicsController, JointController
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
@@ -660,12 +660,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Sample location to place object
         pose_candidates = []
         directly_move_hand_pose = None
+        self._motion_generator.update_obstacles()
         while len(pose_candidates) < m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE:
             obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
             # TODO: why do we sample this orientation?
             obj_pose = (obj_pose[0], obj_in_hand.get_position_orientation()[1])
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-            if self._target_in_reach_of_robot(hand_pose)[self.arm]:
+            if self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)[self.arm]:
                 directly_move_hand_pose = hand_pose
                 break
             else:
@@ -730,25 +731,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
         return joint_pos
 
-    def _target_in_reach_of_robot(self, target_pose):
+    def _target_in_reach_of_robot(self, target_pose, skip_obstacle_update=False):
         """
         Determines whether the eef for the robot can reach the target pose in the world frame
 
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for the pose for the eef
+            skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
             dict: Whether each eef can reach the target pose
         """
         relative_target_pose = self._world_pose_to_robot_pose(target_pose)
-        return self._target_in_reach_of_robot_relative(relative_target_pose)
+        return self._target_in_reach_of_robot_relative(relative_target_pose, skip_obstacle_update=skip_obstacle_update)
 
-    def _target_in_reach_of_robot_relative(self, relative_target_pose):
+    def _target_in_reach_of_robot_relative(self, relative_target_pose, skip_obstacle_update=False):
         """
         Determines whether eef for the robot can reach the target pose where the target pose is in the robot frame
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef
+            relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef in the robot frame
+            skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
             dict: Whether each eef can reach the target pose
@@ -756,7 +759,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # TODO: output may need to be a dictionary of arms and whether they can reach the target pose
         target_in_reach = dict()
         for arm in self.robot.arm_names:
-            target_in_reach[arm] = self._ik_solver_cartesian_to_joint_space(relative_target_pose, arm=arm) is not None
+            target_in_reach[arm] = (
+                self._ik_solver_cartesian_to_joint_space(
+                    relative_target_pose, arm=arm, skip_obstacle_update=skip_obstacle_update
+                )
+                is not None
+            )
         return target_in_reach
 
     def _manipulation_control_idx(self, arm=None):
@@ -764,19 +772,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if arm is None:
             arm = self.arm
 
-        if m.TORSO_FIXED or arm == "right":
-            return self.robot.arm_control_idx[arm]
-        else:
-            # Only append trunk control idx if it is not fixed and the arm is left
-            if hasattr(self.robot, "trunk_control_idx"):
-                return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[arm]])
+        return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[arm]])
 
-    def _ik_solver_cartesian_to_joint_space(self, relative_target_pose, arm=None):
+    def _ik_solver_cartesian_to_joint_space(self, relative_target_pose, arm=None, skip_obstacle_update=False):
         """
         Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
 
         Args:
             relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose in the robot frame
+            arm (str): Arm to use for the target pose
+            skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
             2-tuple
@@ -785,23 +790,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if arm is None:
             arm = self.arm
-        # TODO: make sure descriptor file match torso & arm setting
-        ik_solver = IKSolver(
-            robot_description_path=self.robot.robot_arm_descriptor_yamls[arm],
-            robot_urdf_path=self.robot.urdf_path,
-            reset_joint_pos=self.robot.reset_joint_pos[self._manipulation_control_idx(arm)],
-            eef_name=self.robot.eef_link_names[self.arm],
+        world_pose = self._robot_pose_to_world_pose(relative_target_pose)
+        target_pos = {self.robot.eef_link_names[arm]: world_pose[0]}
+        target_quat = {self.robot.eef_link_names[arm]: world_pose[1]}
+        successes, joint_states = self._motion_generator.compute_trajectories(
+            target_pos=target_pos,
+            target_quat=target_quat,
+            is_local=False,
+            return_full_result=False,
+            ik_only=True,
+            ik_world_collision_check=False,
+            skip_obstacle_update=skip_obstacle_update,
+            emb_sel=CuRoboEmbodimentSelection.ARM,
         )
-        # Grab the joint positions in order to reach the desired pose target
-        joint_pos = ik_solver.solve(
-            target_pos=relative_target_pose[0],
-            target_quat=relative_target_pose[1],
-            max_iterations=200,
-            initial_joint_pos=self.robot.get_joint_positions()[self._manipulation_control_idx(arm)],
-            tolerance_pos=0.005,
-        )
+        if not successes[0]:
+            return None
 
-        return joint_pos
+        joint_state = joint_states[0]
+        joint_pos = self._motion_generator.path_to_joint_trajectory(
+            joint_state, get_full_js=False, emb_sel=CuRoboEmbodimentSelection.ARM
+        )
+        return joint_pos[self._manipulation_control_idx(arm)].cpu()
 
     def _move_hand(
         self,
@@ -852,9 +861,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             q_traj = self._plan_joint_motion(
                 target_pos=target_pos,
                 target_quat=target_quat,
-                embodiment_selection=CuroboEmbodimentSelection.ARM,
+                embodiment_selection=CuRoboEmbodimentSelection.ARM,
                 motion_constraint=motion_constraint,
-            ).cpu()
+            )
         else:
             # Move EEF directly without collsion checking
             goal_arm_joint_pos = self._convert_cartesian_to_joint_space(target_pose, arm=arm)
@@ -862,6 +871,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             goal_joint_pos = curr_joint_pos.clone()
             goal_joint_pos[self._manipulation_control_idx(arm)] = goal_arm_joint_pos
             q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=[curr_joint_pos, goal_joint_pos]))
+
         indented_print(f"Plan has {len(q_traj)} steps")
         yield from self._execute_motion_plan(q_traj, stop_on_contact=not avoid_collision, low_precision=low_precision)
 
@@ -869,7 +879,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self,
         target_pos,
         target_quat,
-        embodiment_selection=CuroboEmbodimentSelection.DEFAULT,
+        embodiment_selection=CuRoboEmbodimentSelection.DEFAULT,
         attached_obj=None,
         motion_constraint=None,
     ):
@@ -919,7 +929,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "There is no accessible path from where you are to the desired pose. Try again",
             )
 
-        return self._motion_generator.path_to_joint_trajectory(traj_path, embodiment_selection)
+        q_traj = self._motion_generator.path_to_joint_trajectory(
+            traj_path, get_full_js=True, emb_sel=embodiment_selection
+        )
+        return q_traj.cpu()
 
     def _execute_motion_plan(
         self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False, ignore_physics=False
@@ -1439,9 +1452,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         q_traj = self._plan_joint_motion(
             target_pos=target_pos,
             target_quat=target_quat,
-            embodiment_selection=CuroboEmbodimentSelection.ARM,
+            embodiment_selection=CuRoboEmbodimentSelection.ARM,
             attached_obj=attached_obj,
-        ).cpu()
+        )
         indented_print(f"Plan has {len(q_traj)} steps")
         yield from self._execute_motion_plan(q_traj, low_precision=True)
 
@@ -1596,7 +1609,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = {self.robot.base_footprint_link_name: pose_3d[0]}
         target_quat = {self.robot.base_footprint_link_name: pose_3d[1]}
 
-        q_traj = self._plan_joint_motion(target_pos, target_quat, CuroboEmbodimentSelection.BASE).cpu()
+        q_traj = self._plan_joint_motion(target_pos, target_quat, CuRoboEmbodimentSelection.BASE)
         yield from self._execute_motion_plan(q_traj, stop_on_contact=True)
 
     def _draw_plan(self, plan):
@@ -1931,6 +1944,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
             pose_on_obj (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
                 Can be a single pose or list of poses.
+            arm (str): Name of the arm to check reachability for
+            skip_obstacle_update (bool): Whether to skip updating the obstacles in the motion generator
 
         Returns:
             list of bool: Whether any robot arm can reach all poses on the objects and is not in collision
@@ -1950,7 +1965,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         candidate_joint_positions = th.stack(candidate_joint_positions)
         invalid_results = self._motion_generator.check_collisions(
-            candidate_joint_positions, check_self_collision=False, skip_obstacle_update=skip_obstacle_update
+            candidate_joint_positions, self_collision_check=False, skip_obstacle_update=skip_obstacle_update
         ).cpu()
 
         # For each candidate that passed collision check, verify reachability
@@ -1961,7 +1976,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if pose_on_obj is not None:
                 pose = self._get_robot_pose_from_2d_pose(candidate_poses[i])
                 relative_pose = T.relative_pose_transform(*pose_on_obj, *pose)
-                if not self._target_in_reach_of_robot_relative(relative_pose)[arm]:
+                if not self._target_in_reach_of_robot_relative(
+                    relative_pose, skip_obstacle_update=skip_obstacle_update
+                )[arm]:
                     invalid_results[i] = True
 
         return ~invalid_results
