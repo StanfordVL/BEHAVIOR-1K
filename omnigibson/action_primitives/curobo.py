@@ -1,5 +1,4 @@
 import math
-import os
 from collections.abc import Iterable
 from enum import Enum
 
@@ -11,7 +10,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.prims.rigid_prim import RigidPrim
-from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import GROUND_CATEGORIES, JointType
 from omnigibson.utils.control_utils import FKSolver
@@ -417,6 +415,75 @@ class CuRoboMotionGenerator:
             link_idx = kc.link_name_to_idx_map[child_link_name]
             kc.fixed_transforms[link_idx] = relative_pose
 
+    def solve_ik_batch(
+        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuroboEmbodimentSelection.DEFAULT
+    ):
+        """Find IK solutions to reach a batch of goal poses from a batch of start joint states.
+
+        Args:
+            start_state: Start joint states of the robot. When planning from a non-static state,
+                i.e, when velocity or acceleration is non-zero, set :attr:`MotionGen.optimize_dt`
+                to False.
+            goal_pose: Goal poses for the end-effector.ik_
+            plan_config: Planning parameters for motion generation.
+            link_poses: Goal poses for each link in the robot when planning for multiple links.
+
+        Returns:
+            IKResult: Result of IK solution. Check :attr:`IKResult.success`
+                attribute to check which indices of the batch were successful.
+            bool: Whether the IK solution was successful for the batch.
+            JointState: Joint state of the robot at the goal pose.
+        """
+        solve_state = self.mg[emb_sel]._get_solve_state(
+            lazy.curobo.wrap.reacher.types.ReacherSolveType.BATCH, plan_config, goal_pose, start_state
+        )
+        result = self.mg[emb_sel]._solve_ik_from_solve_state(
+            goal_pose,
+            solve_state,
+            start_state,
+            plan_config.use_nn_ik_seed,
+            plan_config.partial_ik_opt,
+            link_poses,
+        )
+        # If any of the IK seeds is successful
+        success = result.success.any(dim=1)
+        # Set non-successful error to infinity
+        result.error[~result.success].fill_(float("inf"))
+        # Get the index of the minimum error
+        min_error_idx = result.error.argmin(dim=1)
+        # Get the joint state with the minimum error
+        joint_state = result.js_solution[range(result.js_solution.shape[0]), min_error_idx]
+        joint_state = [joint_state[i] for i in range(joint_state.shape[0])]
+        return result, success, joint_state
+
+    def plan_batch(
+        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuroboEmbodimentSelection.DEFAULT
+    ):
+        """Plan a batch of trajectories from a batch of start joint states to a batch of goal poses.
+
+        Args:
+            start_state: Start joint states of the robot. When planning from a non-static state,
+                i.e, when velocity or acceleration is non-zero, set :attr:`MotionGen.optimize_dt`
+                to False.
+            goal_pose: Goal poses for the end-effector.
+            plan_config: Planning parameters for motion generation.
+            link_poses: Goal poses for each link in the robot when planning for multiple links.
+
+        Returns:
+            MotionGenResult: Result of IK solution. Check :attr:`MotionGenResult.success`
+                attribute to check which indices of the batch were successful.
+            bool: Whether the IK solution was successful for the batch.
+            JointState: Joint state of the robot at the goal pose.
+        """
+        result = self.mg[emb_sel].plan_batch(start_state, goal_pose, plan_config, link_poses=link_poses)
+        success = result.success
+        if result.interpolated_plan is None:
+            joint_state = [None] * goal_pose.batch
+        else:
+            joint_state = result.get_paths()
+
+        return result, success, joint_state
+
     def compute_trajectories(
         self,
         target_pos,
@@ -433,6 +500,7 @@ class CuRoboMotionGenerator:
         motion_constraint=None,
         attached_obj_scale=None,
         skip_obstacle_update=False,
+        ik_only=False,
         emb_sel=CuroboEmbodimentSelection.DEFAULT,
     ):
         """
@@ -466,6 +534,8 @@ class CuRoboMotionGenerator:
                 link names and the values are the corresponding BaseObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
+            skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
+            ik_only (bool): Whether to only run the IK solver and not the trajectory optimization
             emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for computing trajectories
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
@@ -489,6 +559,9 @@ class CuRoboMotionGenerator:
         #     print("Robot is near joint limits! No trajectory will be computed")
         #     return None, None if not return_full_result else None
 
+        if not skip_obstacle_update:
+            self.update_obstacles()
+
         # If target_pos and target_quat are torch tensors, it's assumed that they correspond to the default ee_link
         if isinstance(target_pos, th.Tensor):
             target_pos = {self.ee_link[emb_sel]: target_pos}
@@ -500,29 +573,6 @@ class CuRoboMotionGenerator:
         # Make sure tensor shapes are (N, 3) and (N, 4)
         target_pos = {k: v if len(v.shape) == 2 else v.unsqueeze(0) for k, v in target_pos.items()}
         target_quat = {k: v if len(v.shape) == 2 else v.unsqueeze(0) for k, v in target_quat.items()}
-
-        # Define the plan config
-        plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
-            enable_graph=False,
-            max_attempts=max_attempts,
-            timeout=timeout,
-            enable_graph_attempt=None,
-            ik_fail_return=ik_fail_return,
-            enable_finetune_trajopt=enable_finetune_trajopt,
-            finetune_attempts=finetune_attempts,
-            success_ratio=1.0 / self.batch_size if success_ratio is None else success_ratio,
-        )
-
-        # Add the pose cost metric
-        if motion_constraint is None:
-            motion_constraint = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
-            hold_partial_pose=False, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
-        )
-        plan_cfg.pose_cost_metric = pose_cost_metric
-
-        if not skip_obstacle_update:
-            self.update_obstacles()
 
         for link_name in target_pos.keys():
             target_pos_link = target_pos[link_name]
@@ -551,6 +601,26 @@ class CuRoboMotionGenerator:
 
             target_pos[link_name] = target_pos_link
             target_quat[link_name] = target_quat_link
+
+        # Define the plan config
+        plan_cfg = lazy.curobo.wrap.reacher.motion_gen.MotionGenPlanConfig(
+            enable_graph=False,
+            max_attempts=max_attempts,
+            timeout=timeout,
+            enable_graph_attempt=None,
+            ik_fail_return=ik_fail_return,
+            enable_finetune_trajopt=enable_finetune_trajopt,
+            finetune_attempts=finetune_attempts,
+            success_ratio=1.0 / self.batch_size if success_ratio is None else success_ratio,
+        )
+
+        # Add the pose cost metric
+        if motion_constraint is None:
+            motion_constraint = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
+            hold_partial_pose=False, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
+        )
+        plan_cfg.pose_cost_metric = pose_cost_metric
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -688,21 +758,17 @@ class CuRoboMotionGenerator:
             if len(ik_goal_batch_by_link) == 0:
                 ik_goal_batch_by_link = None
 
-            result = self.mg[emb_sel].plan_batch(
-                cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link
+            plan_fn = self.plan_batch if not ik_only else self.solve_ik_batch
+            result, success, joint_state = plan_fn(
+                cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link, emb_sel=emb_sel
             )
             if self.debug:
                 breakpoint()
 
             # Append results
             results.append(result)
-            successes = th.concatenate([successes, result.success[:end_idx]])
-
-            # If result.interpolated_plan is be None (e.g. IK failure), return Nones
-            if result.interpolated_plan is None:
-                paths += [None] * end_idx
-            else:
-                paths += result.get_paths()[:end_idx]
+            successes = th.concatenate([successes, success[:end_idx]])
+            paths += joint_state[:end_idx]
 
         # Detach attached object if it was attached
         if attached_obj is not None:
@@ -717,12 +783,13 @@ class CuRoboMotionGenerator:
         else:
             return successes, paths
 
-    def path_to_joint_trajectory(self, path, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+    def path_to_joint_trajectory(self, path, get_full_js=True, emb_sel=CuroboEmbodimentSelection.DEFAULT):
         """
         Converts raw path from motion generator into joint trajectory sequence
 
         Args:
             path (JointState): Joint state path to convert into joint trajectory
+            get_full_js (bool): Whether to get the full joint state
             emb_sel (CuroboEmbodimentSelection): Which embodiment to use for the robot
 
         Returns:
@@ -730,7 +797,7 @@ class CuRoboMotionGenerator:
                 to reach the desired @target_pos, @target_quat configuration, where T is the number of interpolated
                 steps and D is the number of robot joints.
         """
-        cmd_plan = self.mg[emb_sel].get_full_js(path)
+        cmd_plan = self.mg[emb_sel].get_full_js(path) if get_full_js else path
         return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
 
     def convert_q_to_eef_traj(self, traj, return_axisangle=False, emb_sel=CuroboEmbodimentSelection.DEFAULT):
