@@ -26,7 +26,7 @@ m.HOLONOMIC_BASE_PRISMATIC_JOINT_LIMIT = 5.0  # meters
 m.HOLONOMIC_BASE_REVOLUTE_JOINT_LIMIT = math.pi * 2  # radians
 
 
-class CuroboEmbodimentSelection(str, Enum):
+class CuRoboEmbodimentSelection(str, Enum):
     BASE = "base"
     ARM = "arm"
     DEFAULT = "default"
@@ -174,16 +174,15 @@ class CuRoboMotionGenerator:
         self.debug = debug
         self.robot = robot
         self.robot_joint_names = list(robot.joints.keys())
-        self._fk = FKSolver(self.robot.robot_arm_descriptor_yamls[robot.default_arm], self.robot.urdf_path)
         self.batch_size = batch_size
 
         # Load robot config and usd paths and make sure paths point correctly
         robot_cfg_path_dict = robot.curobo_path if robot_cfg_path is None else robot_cfg_path
         if not isinstance(robot_cfg_path_dict, dict):
-            robot_cfg_path_dict = {CuroboEmbodimentSelection.DEFAULT: robot_cfg_path_dict}
+            robot_cfg_path_dict = {CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict}
         if use_default_embodiment_only:
             robot_cfg_path_dict = {
-                CuroboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuroboEmbodimentSelection.DEFAULT]
+                CuRoboEmbodimentSelection.DEFAULT: robot_cfg_path_dict[CuRoboEmbodimentSelection.DEFAULT]
             }
         robot_usd_path = robot.usd_path if robot_usd_path is None else robot_usd_path
 
@@ -263,7 +262,7 @@ class CuRoboMotionGenerator:
 
                 joint_limits.position[1][joint_idx] = -joint_limits.position[0][joint_idx]
 
-    def save_visualization(self, q, file_path, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+    def save_visualization(self, q, file_path, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         # Update obstacles
         self.update_obstacles()
 
@@ -309,12 +308,12 @@ class CuRoboMotionGenerator:
             ],
         )
         # All embodiment selections share the same world collision checker
-        self.mg[CuroboEmbodimentSelection.DEFAULT].update_world(obstacles)
+        self.mg[CuRoboEmbodimentSelection.DEFAULT].update_world(obstacles)
         print("Synced CuRobo world from stage.")
 
     def update_obstacles_fast(self):
         # All embodiment selections share the same world collision checker
-        world_coll_checker = self.mg[CuroboEmbodimentSelection.DEFAULT].world_coll_checker
+        world_coll_checker = self.mg[CuRoboEmbodimentSelection.DEFAULT].world_coll_checker
         for i, prim_path in enumerate(world_coll_checker._env_mesh_names[0]):
             if prim_path is None:
                 continue
@@ -343,13 +342,13 @@ class CuRoboMotionGenerator:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
             check_self_collision (bool): Whether to check self-collisions or not
-            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for checking collisions
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for checking collisions
 
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
         """
         # check_collisions only makes sense for the default embodiment where all the joints are actuated
-        emb_sel = CuroboEmbodimentSelection.DEFAULT
+        emb_sel = CuRoboEmbodimentSelection.DEFAULT
 
         # Update obstacles
         if not skip_obstacle_update:
@@ -396,7 +395,7 @@ class CuRoboMotionGenerator:
 
         Args:
             cu_joint_state (JointState): JointState object representing the current joint positions
-            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for updating locked joints
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for updating locked joints
         """
         kc = self.mg[emb_sel].kinematics.kinematics_config
         # Update the lock joint state position
@@ -501,7 +500,7 @@ class CuRoboMotionGenerator:
         attached_obj_scale=None,
         skip_obstacle_update=False,
         ik_only=False,
-        emb_sel=CuroboEmbodimentSelection.DEFAULT,
+        emb_sel=CuRoboEmbodimentSelection.DEFAULT,
     ):
         """
         Computes the robot joint trajectory to reach the desired @target_pos and @target_quat
@@ -536,7 +535,7 @@ class CuRoboMotionGenerator:
                 link names and the values are the corresponding scale to apply to the attached object
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
             ik_only (bool): Whether to only run the IK solver and not the trajectory optimization
-            emb_sel (CuroboEmbodimentSelection): Which embodiment selection to use for computing trajectories
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for computing trajectories
         Returns:
             2-tuple or list of MotionGenResult: If @return_full_result is True, will return a list of raw MotionGenResult
                 object(s) computed from internal batch trajectory computations. If it is False, will return 2-tuple
@@ -743,6 +742,7 @@ class CuRoboMotionGenerator:
                 ik_goal_batch = lazy.curobo.types.math.Pose(
                     position=batch_target_pos,
                     quaternion=batch_target_quat,
+                    name=link_name,
                 )
 
                 ik_goal_batch_by_link[link_name] = ik_goal_batch
@@ -783,14 +783,14 @@ class CuRoboMotionGenerator:
         else:
             return successes, paths
 
-    def path_to_joint_trajectory(self, path, get_full_js=True, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+    def path_to_joint_trajectory(self, path, get_full_js=True, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         """
         Converts raw path from motion generator into joint trajectory sequence
 
         Args:
             path (JointState): Joint state path to convert into joint trajectory
             get_full_js (bool): Whether to get the full joint state
-            emb_sel (CuroboEmbodimentSelection): Which embodiment to use for the robot
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment to use for the robot
 
         Returns:
             torch.tensor: (T, D) tensor representing the interpolated joint trajectory
@@ -800,39 +800,59 @@ class CuRoboMotionGenerator:
         cmd_plan = self.mg[emb_sel].get_full_js(path) if get_full_js else path
         return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
 
-    def convert_q_to_eef_traj(self, traj, return_axisangle=False, emb_sel=CuroboEmbodimentSelection.DEFAULT):
+    def path_to_eef_trajectory(self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         """
-        Converts a joint trajectory @traj into an equivalent trajectory defined by end effector poses
+        Converts raw path from motion generator into end-effector trajectory sequence in the robot frame.
+        This trajectory sequence can be executed by an IKController, although there is no guaranteee that
+        the controller will output the same joint trajectory as the one computed by cuRobo.
 
         Args:
-            traj (torch.Tensor): (T, D)-shaped joint trajectory
+            path (JointState): Joint state path to convert into joint trajectory
             return_axisangle (bool): Whether to return the interpolated orientations in quaternion or axis-angle representation
-            emb_sel (CuroboEmbodimentSelection): Which embodiment to use for the robot
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment to use for the robot
 
         Returns:
-            torch.Tensor: (T, [6, 7])-shaped array where each entry is is the (x,y,z) position and (x,y,z,w) quaternion
-                (if @return_axisangle is False) or (ax, ay, az) axis-angle orientation, specified in the robot frame.
+            Dict[str, torch.Tensor]: Mapping eef link names to (T, [6, 7])-shaped array where each entry is is the (x,y,z) position
+            and (x,y,z,w) quaternion (if @return_axisangle is False) or (ax, ay, az) axis-angle orientation, specified in the robot frame.
         """
-        # Prune the relevant joints from the trajectory
-        traj = traj[:, self.robot.arm_control_idx[self.robot.default_arm]]
-        n = len(traj)
+        # If the base-only embodiment is selected, the eef links stay the same, return the current eef poses in the robot frame
+        if emb_sel == CuRoboEmbodimentSelection.BASE:
+            link_poses = dict()
+            for arm_name in self.robot.arm_names:
+                link_name = self.robot.eef_link_names[arm_name]
+                position, orientation = self.robot.get_relative_eef_pose(arm_name)
+                if return_axisangle:
+                    orientation = T.quat2axisangle(orientation)
+                link_poses[link_name] = th.cat([position, orientation], dim=-1)
+            return link_poses
 
-        # Use forward kinematic solver to compute the EEF link positions
-        positions = self._tensor_args.to_device(th.zeros((n, 3)))
-        orientations = self._tensor_args.to_device(
-            th.zeros((n, 4))
-        )  # This will be quat initially but we may convert to aa representation
+        cmd_plan = self.mg[emb_sel].get_full_js(path)
+        robot_state = self.mg[emb_sel].kinematics.compute_kinematics(path)
 
-        for i, qpos in enumerate(traj):
-            pose = self._fk.get_link_poses(joint_positions=qpos, link_names=[self.ee_link[emb_sel]])
-            positions[i] = pose[self.ee_link[emb_sel]][0]
-            orientations[i] = pose[self.ee_link[emb_sel]][1]
+        link_poses = dict()
 
-        # Possibly convert orientations to aa-representation
-        if return_axisangle:
-            orientations = T.quat2axisangle(orientations)
+        for link_name, poses in robot_state.link_poses.items():
+            position = poses.position
+            # wxyz -> xyzw
+            orientation = poses.quaternion[:, [1, 2, 3, 0]]
 
-        return th.concatenate([positions, orientations], dim=-1)
+            # If the robot is holonomic, we need to transform the poses to the base link frame
+            if isinstance(self.robot, HolonomicBaseRobot):
+                base_link_position = th.zeros_like(position)
+                base_link_position[:, 0] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_x_joint")]
+                base_link_position[:, 1] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_y_joint")]
+                base_link_euler = th.zeros_like(position)
+                base_link_euler[:, 2] = cmd_plan.position[:, cmd_plan.joint_names.index("base_footprint_rz_joint")]
+                base_link_orientation = T.euler2quat(base_link_euler)
+                position, orientation = T.relative_pose_transform(
+                    position, orientation, base_link_position, base_link_orientation
+                )
+
+            if return_axisangle:
+                orientation = T.quat2axisangle(orientation)
+            link_poses[link_name] = th.cat([position, orientation], dim=-1)
+
+        return link_poses
 
     @property
     def tensor_args(self):
