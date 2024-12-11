@@ -2402,7 +2402,8 @@ def import_og_asset_from_urdf(
             (bigger memory footprint, but human-readable)
 
     Returns:
-        2-tuple:
+        3-tuple:
+            - str: Absolute path to post-processed URDF file
             - str: Absolute path to generated USD file
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
@@ -2477,4 +2478,4 @@ def import_og_asset_from_urdf(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
     )
 
-    return usd_path, prim
+    return urdf_path, usd_path, prim
