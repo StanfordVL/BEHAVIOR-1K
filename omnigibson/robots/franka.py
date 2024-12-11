@@ -272,6 +272,10 @@ class FrankaPanda(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
 
     @property
+    def curobo_attached_object_link_names(self):
+        return {self._eef_link_names: "attached_object"}
+
+    @property
     def eef_usd_path(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_eef.usd")}
 
@@ -289,10 +293,15 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def disabled_collision_pairs(self):
-        # some dexhand has self collisions that needs to be filtered out
+        # panda_link5 has a very bad collision mesh (overapproximation) and should be fixed in the future.
+        collision_pairs = [
+            ["panda_link5", "panda_link7"],
+            ["panda_link5", "panda_hand"],
+        ]
+
         if self.end_effector == "allegro":
-            return [["link_12_0", "part_studio_link"]]
+            collision_pairs.append(["link_12_0", "part_studio_link"])
         elif self.end_effector == "inspire":
-            return [["base_link", "link12"]]
-        else:
-            return []
+            collision_pairs.append(["base_link", "link12"])
+
+        return collision_pairs

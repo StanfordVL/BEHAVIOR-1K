@@ -19,8 +19,9 @@ class NullJointController(JointController):
         command_input_limits="default",
         command_output_limits="default",
         default_command=None,
-        kp=None,
-        damping_ratio=None,
+        pos_kp=None,
+        pos_damping_ratio=None,
+        vel_kp=None,
         use_impedances=False,
     ):
         """
@@ -47,10 +48,12 @@ class NullJointController(JointController):
                 to the @control_limits entry corresponding to self.control_type
             default_command (None or n-array): if specified, should be the same length as @dof_idx, specifying
                 the default control for this controller to output
-            kp (None or float): If @motor_type is "position" or "velocity" and @use_impedances=True, this is the
+            pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
-            damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+            pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 damping ratio applied to the joint controller. If None, a default value will be used.
+            vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
         """
@@ -65,8 +68,9 @@ class NullJointController(JointController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
-            kp=kp,
-            damping_ratio=damping_ratio,
+            pos_kp=pos_kp,
+            pos_damping_ratio=pos_damping_ratio,
+            vel_kp=vel_kp,
             use_impedances=use_impedances,
             use_delta_commands=False,
         )

@@ -8,8 +8,6 @@ from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 class ArticulatedTrunkRobot(ManipulationRobot):
     """
     ManipulationRobot that is is equipped with an articulated trunk.
-    If rigid_trunk is True, the trunk will be rigid and not articulated.
-    Otherwise, it will belong to the kinematic chain of the default arm.
 
     NOTE: If using IK Control for both the right and left arms, note that the left arm dictates control of the trunk,
     and the right arm passively must follow. That is, sending desired delta position commands to the right end effector

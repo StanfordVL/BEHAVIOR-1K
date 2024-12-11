@@ -21,6 +21,7 @@ jobs:
       matrix:
         test_file:
           - test_controllers
+          - test_curobo
           - test_data_collection
           - test_dump_load_states
           - test_envs
@@ -49,7 +50,7 @@ jobs:
           submodules: true
 
       - name: Install
-        run: pip install -e .[dev,primitives]
+        run: pip install -e .[dev,primitives] --no-build-isolation
 
       - name: Print env
         run: printenv

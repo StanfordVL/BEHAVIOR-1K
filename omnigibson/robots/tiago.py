@@ -7,6 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
@@ -208,6 +209,15 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return "base_footprint"
 
     @property
+    def floor_touching_base_link_names(self):
+        return [
+            "wheel_front_left_link",
+            "wheel_front_right_link",
+            "wheel_rear_left_link",
+            "wheel_rear_right_link",
+        ]
+
+    @property
     def _raw_controller_order(self):
         controllers = ["base", "trunk", "camera"]
         for arm in self.arm_names:
@@ -234,10 +244,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return {
             arm: [
                 GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.2])
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.2])
                 ),
                 GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([0.002, 0.0, -0.13])
+                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.13])
                 ),
             ]
             for arm in self.arm_names
@@ -248,10 +258,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return {
             arm: [
                 GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.2])
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.2])
                 ),
                 GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([-0.002, 0.0, -0.13])
+                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.13])
                 ),
             ]
             for arm in self.arm_names
@@ -431,6 +441,17 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return os.path.join(
             gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd"
         )
+
+    @property
+    def curobo_path(self):
+        return {
+            emb_sel: os.path.join(gm.ASSET_PATH, f"models/tiago/tiago_description_curobo_{emb_sel.value}.yaml")
+            for emb_sel in CuRoboEmbodimentSelection
+        }
+
+    @property
+    def curobo_attached_object_link_names(self):
+        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
 
     @property
     def simplified_mesh_usd_path(self):
