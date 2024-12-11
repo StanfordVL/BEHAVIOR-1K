@@ -722,8 +722,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach target pose
                 - th.tensor: Indices for joints in the robot
         """
-        relative_target_pose = self._world_pose_to_robot_pose(target_pose)
-        joint_pos = self._ik_solver_cartesian_to_joint_space(relative_target_pose, arm=arm)
+        joint_pos = self._ik_solver_cartesian_to_joint_space(target_pose, arm=arm, frame="world")
         if joint_pos is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -742,8 +741,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             dict: Whether each eef can reach the target pose
         """
-        relative_target_pose = self._world_pose_to_robot_pose(target_pose)
-        return self._target_in_reach_of_robot_relative(relative_target_pose, skip_obstacle_update=skip_obstacle_update)
+        target_in_reach = dict()
+        for arm in self.robot.arm_names:
+            target_in_reach[arm] = (
+                self._ik_solver_cartesian_to_joint_space(
+                    target_pose,
+                    arm=arm,
+                    skip_obstacle_update=skip_obstacle_update,
+                    frame="world",
+                )
+                is not None
+            )
+        return target_in_reach
 
     def _target_in_reach_of_robot_relative(self, relative_target_pose, skip_obstacle_update=False):
         """
@@ -756,12 +765,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             dict: Whether each eef can reach the target pose
         """
-        # TODO: output may need to be a dictionary of arms and whether they can reach the target pose
         target_in_reach = dict()
         for arm in self.robot.arm_names:
             target_in_reach[arm] = (
                 self._ik_solver_cartesian_to_joint_space(
-                    relative_target_pose, arm=arm, skip_obstacle_update=skip_obstacle_update
+                    relative_target_pose,
+                    arm=arm,
+                    skip_obstacle_update=skip_obstacle_update,
+                    frame="robot",
                 )
                 is not None
             )
@@ -774,7 +785,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[arm]])
 
-    def _ik_solver_cartesian_to_joint_space(self, relative_target_pose, arm=None, skip_obstacle_update=False):
+    def _ik_solver_cartesian_to_joint_space(self, target_pose, arm=None, skip_obstacle_update=False, frame="robot"):
         """
         Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
 
@@ -782,6 +793,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose in the robot frame
             arm (str): Arm to use for the target pose
             skip_obstacle_update (bool): Whether to skip updating obstacles
+            frame (str): Frame to use for the target pose
 
         Returns:
             2-tuple
@@ -790,9 +802,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if arm is None:
             arm = self.arm
-        world_pose = self._robot_pose_to_world_pose(relative_target_pose)
-        target_pos = {self.robot.eef_link_names[arm]: world_pose[0]}
-        target_quat = {self.robot.eef_link_names[arm]: world_pose[1]}
+
+        if frame == "robot":
+            target_pose = self._robot_pose_to_world_pose(target_pose)
+        elif frame == "world":
+            pass
+        else:
+            raise ValueError(f"Unsupported frame: {frame}")
+
+        target_pos = {self.robot.eef_link_names[arm]: target_pose[0]}
+        target_quat = {self.robot.eef_link_names[arm]: target_pose[1]}
         successes, joint_states = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
