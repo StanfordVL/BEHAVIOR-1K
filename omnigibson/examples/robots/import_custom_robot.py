@@ -2,6 +2,7 @@
 Helper script to download OmniGibson dataset and assets.
 """
 
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 from pathlib import Path
 
@@ -9,7 +10,6 @@ import click
 import torch as th
 import yaml
 from addict import Dict
-import xml.etree.ElementTree as ET
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -17,9 +17,9 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.asset_conversion_utils import (
     _add_xform_properties,
+    _space_string_to_tensor,
     find_all_prim_children_with_type,
     import_og_asset_from_urdf,
-    _space_string_to_tensor,
 )
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import create_joint, create_primitive_mesh
