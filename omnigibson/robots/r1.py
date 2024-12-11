@@ -206,33 +206,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
-    @property
-    def manipulation_link_names(self):
-        return [
-            "torso_link1",
-            "torso_link2",
-            "torso_link3",
-            "torso_link4",
-            "left_arm_link1",
-            "left_arm_link2",
-            "left_arm_link3",
-            "left_arm_link4",
-            "left_arm_link5",
-            "left_arm_link6",
-            "left_gripper_link1",
-            "left_gripper_link2",
-            "left_hand",
-            "right_arm_link1",
-            "right_arm_link2",
-            "right_arm_link3",
-            "right_arm_link4",
-            "right_arm_link5",
-            "right_arm_link6",
-            "right_gripper_link1",
-            "right_gripper_link2",
-            "right_hand",
-        ]
-
     @classproperty
     def n_arms(cls):
         return 2

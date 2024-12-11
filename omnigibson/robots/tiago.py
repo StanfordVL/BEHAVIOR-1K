@@ -372,46 +372,6 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return ["torso_lift_joint"]
 
     @property
-    def manipulation_link_names(self):
-        return [
-            "torso_fixed_link",
-            "torso_lift_link",
-            "arm_left_1_link",
-            "arm_left_2_link",
-            "arm_left_3_link",
-            "arm_left_4_link",
-            "arm_left_5_link",
-            "arm_left_6_link",
-            "arm_left_7_link",
-            "arm_left_tool_link",
-            "wrist_left_ft_link",
-            "wrist_left_ft_tool_link",
-            "gripper_left_link",
-            # "gripper_left_grasping_frame",
-            "gripper_left_left_finger_link",
-            "gripper_left_right_finger_link",
-            "gripper_left_tool_link",
-            "arm_right_1_link",
-            "arm_right_2_link",
-            "arm_right_3_link",
-            "arm_right_4_link",
-            "arm_right_5_link",
-            "arm_right_6_link",
-            "arm_right_7_link",
-            "arm_right_tool_link",
-            "wrist_right_ft_link",
-            "wrist_right_ft_tool_link",
-            "gripper_right_link",
-            # "gripper_right_grasping_frame",
-            "gripper_right_left_finger_link",
-            "gripper_right_right_finger_link",
-            "gripper_right_tool_link",
-            "head_1_link",
-            "head_2_link",
-            "xtion_link",
-        ]
-
-    @property
     def arm_link_names(self):
         return {arm: [f"arm_{arm}_{i}_link" for i in range(1, 8)] for arm in self.arm_names}
 
