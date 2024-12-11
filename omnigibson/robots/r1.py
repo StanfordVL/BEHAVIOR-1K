@@ -5,7 +5,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
+from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
@@ -158,6 +158,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         pos = th.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        for arm in self.arm_names:
+            pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
         return pos
 
     @property
@@ -166,6 +168,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         for arm in self.arm_names:
+            pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
             pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
         return pos
 
