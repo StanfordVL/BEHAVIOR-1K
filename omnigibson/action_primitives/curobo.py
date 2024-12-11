@@ -415,7 +415,7 @@ class CuRoboMotionGenerator:
             kc.fixed_transforms[link_idx] = relative_pose
 
     def solve_ik_batch(
-        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuroboEmbodimentSelection.DEFAULT
+        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuRoboEmbodimentSelection.DEFAULT
     ):
         """Find IK solutions to reach a batch of goal poses from a batch of start joint states.
 
@@ -456,7 +456,7 @@ class CuRoboMotionGenerator:
         return result, success, joint_state
 
     def plan_batch(
-        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuroboEmbodimentSelection.DEFAULT
+        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuRoboEmbodimentSelection.DEFAULT
     ):
         """Plan a batch of trajectories from a batch of start joint states to a batch of goal poses.
 
