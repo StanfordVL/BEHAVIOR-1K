@@ -23,7 +23,7 @@ def test_scene_graph():
         return {
             "name": name,
             "type": "Fetch",
-            "obs_modalities": "all",
+            "obs_modalities": ["rgb", "seg_instance"],
             "position": position,
             "orientation": T.euler2quat(th.tensor([0, 0, -math.pi / 2], dtype=th.float32)),
             "controller_config": {

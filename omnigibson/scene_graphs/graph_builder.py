@@ -283,7 +283,7 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     # Prepare pyplot figure that's sized to match the robot video.
     robot = all_robots[0]  # If there are multiple robots, we only include the first one
     (robot_camera_sensor,) = [
-        s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities
+        s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "eyes" in s.name and "rgb" in s.modalities
     ]
     robot_view = (robot_camera_sensor.get_obs()[0]["rgb"][..., :3]).to(th.uint8)
     imgheight, imgwidth, _ = robot_view.shape
