@@ -2308,7 +2308,7 @@ def import_og_asset_from_urdf(
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
         merge_fixed_joints (bool): Whether to merge fixed joints or not
-        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is external dataset
+        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is custom dataset
             path set from the global macros
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
             Only relevant if @collision_method is "coacd"
