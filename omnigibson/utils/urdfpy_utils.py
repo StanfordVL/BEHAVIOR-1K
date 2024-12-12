@@ -1,3 +1,7 @@
+"""
+Code directly adapted from https://github.com/mmatl/urdfpy
+"""
+
 import copy
 import os
 import time
