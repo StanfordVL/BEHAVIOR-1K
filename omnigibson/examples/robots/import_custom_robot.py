@@ -903,10 +903,6 @@ def import_custom_robot(config):
     assert articulation_root_prim is not None, "Could not find any valid articulation root prim!"
     root_prim_name = articulation_root_prim.GetName()
 
-    # Zero out all friction on joints
-    for joint_prim in find_all_articulated_joints(root_prim=prim):
-        joint_prim.GetAttribute("physxJoint:jointFriction").Set(0.0)
-
     # Add holonomic base if requested
     if cfg.base_motion.use_holonomic_joints:
         # Convert all wheel joints into fixed joints
