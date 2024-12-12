@@ -62,7 +62,7 @@ def import_custom_object(
 ):
     """
     Imports an externally-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
-    files to the external dataset directory (gm.EXTERNAL_DATASET_PATH)
+    files to the external dataset directory (gm.CUSTOM_DATASET_PATH)
     """
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."
     collision_method = None if collision_method == "none" else collision_method

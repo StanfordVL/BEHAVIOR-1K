@@ -29,8 +29,8 @@ gm.ENABLE_FLATCACHE = False
 
 
 _DOCSTRING = """
-Imports an externally-defined robot URDF asset into an OmniGibson-compatible USD format and saves the imported asset
-files to the external dataset directory (gm.EXTERNAL_DATASET_PATH)
+Imports an custom-defined robot URDF asset into an OmniGibson-compatible USD format and saves the imported asset
+files to the custom dataset directory (gm.CUSTOM_DATASET_PATH)
 
 Note that @config is expected to follow the following format (R1 config shown as an example):
 
@@ -351,7 +351,7 @@ def create_rigid_prim(stage, link_prim_path):
         Usd.Prim: Newly created rigid prim
     """
     # Make sure link prim does NOT already exist (this should be a new link)
-    link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
+    link_prim_exists = stage.GetPrimAtPath(link_prim_path).IsValid()
     assert (
         not link_prim_exists
     ), f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"

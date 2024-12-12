@@ -1128,7 +1128,7 @@ def import_obj_urdf(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    dataset_root=gm.CUSTOM_DATASET_PATH,
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -2018,7 +2018,7 @@ def get_collision_approximation_for_urdf(
 
 
 def copy_urdf_to_dataset(
-    urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, suffix="original", overwrite=False
+    urdf_path, category, mdl, dataset_root=gm.CUSTOM_DATASET_PATH, suffix="original", overwrite=False
 ):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
@@ -2052,7 +2052,7 @@ def copy_urdf_to_dataset(
 
 
 def generate_urdf_for_obj(
-    visual_mesh, collision_meshes, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False
+    visual_mesh, collision_meshes, category, mdl, dataset_root=gm.CUSTOM_DATASET_PATH, overwrite=False
 ):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
@@ -2286,7 +2286,7 @@ def import_og_asset_from_urdf(
     no_decompose_links=None,
     visual_only_links=None,
     merge_fixed_joints=False,
-    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    dataset_root=gm.CUSTOM_DATASET_PATH,
     hull_count=32,
     overwrite=False,
     use_usda=False,
