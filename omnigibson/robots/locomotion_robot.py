@@ -40,8 +40,8 @@ class LocomotionRobot(BaseRobot):
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
 
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
 
         # Add base info
         dic["base_qpos"] = joint_positions[self.base_control_idx]

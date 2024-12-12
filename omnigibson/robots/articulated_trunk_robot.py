@@ -165,8 +165,8 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
