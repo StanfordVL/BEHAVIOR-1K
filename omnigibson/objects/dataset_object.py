@@ -27,7 +27,7 @@ m.MIN_OBJ_MASS = 0.4
 
 class DatasetType(IntEnum):
     BEHAVIOR = 0
-    EXTERNAL = 1
+    CUSTOM = 1
 
 
 class DatasetObject(USDObject):
@@ -70,8 +70,8 @@ class DatasetObject(USDObject):
 
                 Otherwise, will randomly sample a model given @category
             dataset_type (DatasetType): Dataset to search for this object. Default is BEHAVIOR, corresponding to the
-                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, EXTERNAL}.
-                If EXTERNAL, assumes asset is found at gm.EXTERNAL_DATASET_PATH and additionally not encrypted.
+                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, CUSTOM}.
+                If CUSTOM, assumes asset is found at gm.CUSTOM_DATASET_PATH and additionally not encrypted.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -167,7 +167,7 @@ class DatasetObject(USDObject):
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.EXTERNAL_DATASET_PATH
+        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.CUSTOM_DATASET_PATH
         return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
