@@ -2,6 +2,7 @@ import collections.abc
 import json
 import os
 
+import numpy as np
 import torch as th
 import yaml
 

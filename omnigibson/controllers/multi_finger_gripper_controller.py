@@ -112,6 +112,11 @@ class MultiFingerGripperController(GripperController):
             command_output_limits=command_output_limits,
         )
 
+    def _generate_default_command_output_limits(self):
+        command_output_limits = super()._generate_default_command_output_limits()
+
+        return cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+
     def reset(self):
         # Call super first
         super().reset()
@@ -249,9 +254,7 @@ class MultiFingerGripperController(GripperController):
                 dist_from_upper_limit = max_pos - finger_pos
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
-                valid_grasp_pos = (
-                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
-                )
+                valid_grasp_pos = dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
                 valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)

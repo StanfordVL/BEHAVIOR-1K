@@ -221,6 +221,7 @@ def _launch_app():
                 "Content",
                 "Flow",
                 "Semantics Schema Editor",
+                "VR",
             ]
         )
 
@@ -239,9 +240,13 @@ def _launch_app():
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
     signal.signal(signal.SIGINT, og.shutdown_handler)
 
-    # Set controller backend
-    import omnigibson.controllers.controller_base as CB
-    CB._controller_backend.set_methods(CB._ControllerNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else CB._ControllerTorchBackend)
+    # Set compute backend
+    import omnigibson.utils.backend_utils as _backend_utils
+    _backend_utils._compute_backend.set_methods(
+        _backend_utils._ComputeNumpyBackend
+        if gm.USE_NUMPY_CONTROLLER_BACKEND
+        else _backend_utils._ComputeTorchBackend
+    )
 
     return app
 
