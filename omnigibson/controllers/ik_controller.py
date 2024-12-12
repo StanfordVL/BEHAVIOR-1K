@@ -152,7 +152,10 @@ class InverseKinematicsController(JointController, ManipulationController):
                     command_input_limits[1][3:] = cb.array([math.pi] * len(command_input_limits[1][3:]))
             if command_output_limits is not None:
                 if not isinstance(command_output_limits, str) and isinstance(command_output_limits, Iterable):
-                    command_output_limits = cb.array(command_output_limits)
+                    command_output_limits = [
+                        cb.array(command_output_limits[0]),
+                        cb.array(command_output_limits[1]),
+                    ]
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
