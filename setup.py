@@ -48,6 +48,7 @@ setup(
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
         "lxml>=5.3.0",
+        "pillow~=10.2.0",
     ],
     extras_require={
         "dev": [
