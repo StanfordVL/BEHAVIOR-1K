@@ -1,4 +1,4 @@
-from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import JointController
 
 

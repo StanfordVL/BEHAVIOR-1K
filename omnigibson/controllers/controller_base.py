@@ -3,12 +3,8 @@ from collections.abc import Iterable
 from enum import IntEnum
 
 import torch as th
-import numpy as np
-
-from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty, \
-    recursively_convert_from_torch
-import omnigibson.utils.transform_utils as TT
-import omnigibson.utils.transform_utils_np as NT
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -38,115 +34,7 @@ class IsGraspingState(IntEnum):
     FALSE = -1
 
 
-class _ControllerBackend:
-    array = None
-    int_array = None
-    prod = None
-    cat = None
-    zeros = None
-    ones = None
-    to_numpy = None
-    from_numpy = None
-    to_torch = None
-    from_torch = None
-    from_torch_recursive = None
-    allclose = None
-    arr_type = None
-    as_int = None
-    as_float32 = None
-    pinv = None
-    meshgrid = None
-    full = None
-    logical_or = None
-    all = None
-    abs = None
-    sqrt = None
-    mean = None
-    copy = None
-    eye = None
-    view = None
-    arange = None
-    where = None
-    squeeze = None
-    T = None
 
-    @classmethod
-    def set_methods(cls, backend):
-        for attr, fcn in backend.__dict__.items():
-            # Do not override reserved functions
-            if attr.startswith("__"):
-                continue
-            # Set function to this backend
-            setattr(cls, attr, fcn)
-
-
-class _ControllerTorchBackend(_ControllerBackend):
-    array = lambda *args: th.tensor(*args, dtype=th.float32)
-    int_array = lambda *args: th.tensor(*args, dtype=th.int32)
-    prod = th.prod
-    cat = th.cat
-    zeros = lambda *args: th.zeros(*args, dtype=th.float32)
-    ones = lambda *args: th.ones(*args, dtype=th.float32)
-    to_numpy = lambda x: x.numpy()
-    from_numpy = lambda x: th.from_numpy()
-    to_torch = lambda x: x
-    from_torch = lambda x: x
-    from_torch_recursive = lambda dic: dic
-    allclose = th.allclose
-    arr_type = th.Tensor
-    as_int = lambda arr: arr.int()
-    as_float32 = lambda arr: arr.float()
-    pinv = th.linalg.pinv
-    meshgrid = lambda idx_a, idx_b: th.meshgrid(idx_a, idx_b, indexing="xy")
-    full = lambda shape, fill_value: th.full(shape, fill_value, dtype=th.float32)
-    logical_or = th.logical_or
-    all = th.all
-    abs = th.abs
-    sqrt = th.sqrt
-    mean = lambda val, dim=None, keepdim=False: th.mean(val, dim=dim, keepdim=keepdim)
-    copy = lambda arr: arr.clone()
-    eye = th.eye
-    view = lambda arr, shape: arr.view(shape)
-    arange = th.arange
-    where = th.where
-    squeeze = lambda arr, dim=None: arr.squeeze(dim=dim)
-    T = TT
-
-
-class _ControllerNumpyBackend(_ControllerBackend):
-    array = lambda *args: np.array(*args, dtype=np.float32)
-    int_array = lambda *args: np.array(*args, dtype=np.int32)
-    prod = np.prod
-    cat = np.concatenate
-    zeros = lambda *args: np.zeros(*args, dtype=np.float32)
-    ones = lambda *args: np.ones(*args, dtype=np.float32)
-    to_numpy = lambda x: x
-    from_numpy = lambda x: x
-    to_torch = lambda x: th.from_numpy(x)
-    from_torch = lambda x: x.numpy()
-    from_torch_recursive = recursively_convert_from_torch
-    allclose = np.allclose
-    arr_type = np.ndarray
-    as_int = lambda arr: arr.astype(int)
-    as_float32 = lambda arr: arr.astype(np.float32)
-    pinv = np.linalg.pinv
-    meshgrid = lambda idx_a, idx_b: np.ix_(idx_a, idx_b)
-    full = lambda shape, fill_value: np.full(shape, fill_value, dtype=np.float32)
-    logical_or = np.logical_or
-    all = np.all
-    abs = np.abs
-    sqrt = np.sqrt
-    mean = lambda val, dim=None, keepdim=False: np.mean(val, axis=dim, keepdims=keepdim)
-    copy = lambda arr: np.array(arr)
-    eye = np.eye
-    view = lambda arr, shape: arr.reshape(shape)
-    arange = np.arange
-    where = np.where
-    squeeze = lambda arr, dim=None: arr.squeeze(axis=dim)
-    T = NT
-
-
-_controller_backend = _ControllerBackend
 
 
 # Define macros
@@ -227,11 +115,11 @@ class BaseController(Serializable, Registerable, Recreatable):
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = _controller_backend.as_int(dof_idx)
+        self._dof_idx = cb.as_int(dof_idx)
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(sum(_controller_backend.prod(_controller_backend.array(shape)) for shape in self._goal_shapes.values()))
+        self._goal_dim = int(sum(cb.prod(cb.array(shape)) for shape in self._goal_shapes.values()))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -242,15 +130,12 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Standardize command input / output limits to be (min_array, max_array)
         command_input_limits = (
-            (-1.0, 1.0)
+            self._generate_default_command_input_limits()
             if type(command_input_limits) == str and command_input_limits == "default"
             else command_input_limits
         )
         command_output_limits = (
-            (
-                self._control_limits[self.control_type][0][self.dof_idx],
-                self._control_limits[self.control_type][1][self.dof_idx],
-            )
+            self._generate_default_command_output_limits()
             if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
         )
@@ -271,6 +156,31 @@ class BaseController(Serializable, Registerable, Recreatable):
             )
         )
 
+    def _generate_default_command_input_limits(self):
+        """
+        Generates default command input limits based on the control limits
+
+        Returns:
+            2-tuple:
+                - int or array: min command input limits
+                - int or array: max command input limits
+        """
+        return (-1.0, 1.0)
+
+    def _generate_default_command_output_limits(self):
+        """
+        Generates default command output limits based on the control limits
+
+        Returns:
+            2-tuple:
+                - int or array: min command output limits
+                - int or array: max command output limits
+        """
+        return (
+            self._control_limits[self.control_type][0][self.dof_idx],
+            self._control_limits[self.control_type][1][self.dof_idx],
+        )
+
     def _preprocess_command(self, command):
         """
         Clips + scales inputted @command according to self.command_input_limits and self.command_output_limits.
@@ -284,7 +194,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             Array[float]: Processed command vector
         """
         # Make sure command is a th.tensor
-        command = _controller_backend.array([command]) if type(command) in {int, float} else command
+        command = cb.array([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -469,23 +379,31 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Default is just the command
         return dict(
             goal_is_valid=self._goal is not None,
-            goal=self._goal,
+            goal=None if self._goal is None else {k: cb.to_torch(v) for k, v in self._goal.items()},
         )
 
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = None if state["goal"] is None else {name: goal_state for name, goal_state in state["goal"].items()}
+        if state["goal"] is None:
+            self._goal = None
+        else:
+            self._goal = dict()
+            for name, goal_state in state["goal"].items():
+                if isinstance(goal_state, th.Tensor):
+                    self._goal[name] = cb.from_torch(goal_state)
+                else:
+                    self._goal[name] = goal_state
 
     def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            _controller_backend.cat([goal_state.flatten() for goal_state in self._goal.values()])
+            th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
             if (state)["goal_is_valid"]
-            else _controller_backend.zeros(self.goal_dim)
+            else th.zeros(self.goal_dim)
         )
 
-        return _controller_backend.cat([_controller_backend.array([state["goal_is_valid"]]), goal_state_flattened])
+        return cb.cat([cb.array([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])
@@ -534,12 +452,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Else, input is a single value, so we map to a numpy array of correct size and return
         return (
             nums
-            if isinstance(nums, _controller_backend.arr_type)
-            else (
-                _controller_backend.array(nums)
-                if isinstance(nums, Iterable)
-                else _controller_backend.ones(dim) * nums
-            )
+            if isinstance(nums, cb.arr_type)
+            else cb.array(nums)if isinstance(nums, Iterable) else cb.ones(dim) * nums
         )
 
     @property

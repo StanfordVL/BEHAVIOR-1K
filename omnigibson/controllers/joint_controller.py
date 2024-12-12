@@ -1,7 +1,7 @@
 import math
 
-from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerTorchBackend, _ControllerNumpyBackend
-from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -333,7 +333,7 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ControllerBackend, "compute_joint_torques", None)
-setattr(_ControllerTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
-setattr(_ControllerNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+setattr(_ComputeBackend, "compute_joint_torques", None)
+setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
+setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
 

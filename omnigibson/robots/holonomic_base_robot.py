@@ -6,7 +6,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot

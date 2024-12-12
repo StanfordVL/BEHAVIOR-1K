@@ -12,8 +12,8 @@ import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerTorchBackend, _ControllerNumpyBackend
-from omnigibson.controllers.controller_base import _controller_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
+from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
@@ -1930,7 +1930,7 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 
 
 # Set these as part of the backend values
-setattr(_ControllerBackend, "compute_relative_poses", None)
-setattr(_ControllerTorchBackend, "compute_relative_poses", _compute_relative_poses_torch)
-setattr(_ControllerNumpyBackend, "compute_relative_poses", _compute_relative_poses_numpy)
+setattr(_ComputeBackend, "compute_relative_poses", None)
+setattr(_ComputeTorchBackend, "compute_relative_poses", _compute_relative_poses_torch)
+setattr(_ComputeNumpyBackend, "compute_relative_poses", _compute_relative_poses_numpy)
 
