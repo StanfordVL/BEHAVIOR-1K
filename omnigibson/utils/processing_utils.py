@@ -109,7 +109,7 @@ class MovingAverageFilter(Filter):
     @property
     def state_size(self):
         # This is the size of the internal buffer plus the current index and fully filled single values
-        return th.prod(self.past_samples.shape) + 2
+        return cb.prod(self.past_samples.shape) + 2
 
     def _dump_state(self):
         # Run super init first
