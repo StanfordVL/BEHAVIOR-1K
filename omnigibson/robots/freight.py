@@ -26,7 +26,7 @@ class Freight(TwoWheelRobot):
 
     @property
     def base_joint_names(self):
-        return ["r_wheel_joint", "l_wheel_joint"]
+        return ["l_wheel_joint", "r_wheel_joint"]
 
     @property
     def _default_joint_pos(self):
