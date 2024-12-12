@@ -179,7 +179,7 @@ class SceneGraphBuilder(object):
             # If we're not in full observability mode, only pick the objects in FOV of robots.
             for robot in self._robots:
                 objs_in_fov = robot.states[object_states.ObjectsInFOVOfRobot].get_value()
-                objs_to_add &= set(objs_in_fov)
+                objs_to_add &= objs_in_fov
 
         # Remove all BaseRobot objects from the set of objects to add.
         base_robots = [obj for obj in objs_to_add if isinstance(obj, BaseRobot)]
@@ -243,9 +243,9 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
         node_labels = {obj: obj.category for obj in nodes}
 
         # get all objects in fov of robots
-        objects_in_fov = []
+        objects_in_fov = set()
         for robot in all_robots:
-            objects_in_fov += robot.states[object_states.ObjectsInFOVOfRobot].get_value()
+            objects_in_fov.update(robot.states[object_states.ObjectsInFOVOfRobot].get_value())
         colors = [
             ("yellow" if obj.category == "agent" else ("green" if obj in objects_in_fov else "red")) for obj in nodes
         ]

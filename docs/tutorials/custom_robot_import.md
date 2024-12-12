@@ -13,7 +13,340 @@ In order to import a custom robot, You will need to first prepare your robot mod
 Below, we will walk through each step for importing a new custom robot into **OmniGibson**. We use [Hello Robotic](https://hello-robot.com/)'s [Stretch](https://hello-robot.com/stretch-3-product) robot as an example, taken directly from their [official repo](https://github.com/hello-robot/stretch_urdf).
 
 ## Convert from URDF to USD
+There are two ways to convert our raw robot URDF into an OmniGibson-compatible USD file. The first is by using our integrated script, while the other method is using IsaacSim's native URDF-to-USD converter via the GUI. We highly recommend our script version, as it both wraps the same functionality from the underlying IsaacSim converter as well as providing useful features such as automatic convex decomposition of collision meshes, programmatic adding of sensors, etc.
 
+### Option 1: Using Our 1-Liner Script (Recommended)
+Our custom robot importer [`import_custom_robot.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/examples/robots/import_custom_robot.py) wraps the native URDF Importer from Isaac Sim to convert our robot URDF model into USD format. Please see the following steps for running this script:
+
+1. All that is required is a single source config yaml file that dictates how the URDF should be post-processed when being converted into a USD. You can run `import_custom_robot.py --help` to see a detailed example configuration used, which is also shown below (`r1_pro_source_config.yaml`) for your convenience.
+2. All output files are written to `<gm.EXTERNAL_DATASET_PATH>/objects/robot/<name>`. Please move this directory to `<gm.ASSET_PATH>/objects/<name>` so it can be imported into **OmniGibson**.
+
+Some notes about the importing script:
+
+- The importing procedure can be summarized as follows:
+
+  1. Copy the raw URDF file + any dependencies into the `gm.EXTERNAL_DATASET_PATH` directory
+  2. Updates the URDF + meshes to ensure all scaling is positive
+  3. Generates collision meshes for each robot link (as specified by the source config)
+  4. Generates metadata necessary for **OmniGibson**
+  5. Converts the post-processed URDF into USD (technically, USDA) format
+  6. Generates relevant semantic metadata for the given object, given its category
+  7. Generates visual spheres, cameras, and lidars (in that order, as specified by the source config)
+  8. Updates wheel approximations (as specified by the source config)
+  9. Generates holonomic base joints (as specified by the source config)
+  10. Generates configuration files needed for CuRobo motion planning (as specified by the source config)
+
+- If `merge_fixed_joints=true`, all robot links that are connected to a parent link via a fixed joint will be merged directly into the parent joint. This means that the USD will _not_ contain these links! However, this collapsing occurs during the final URDF to USD conversion, meaning that these links _can_ be referenced beforehand (e.g.: when specifying desired per-link collision decomposition behavior)
+- [CuRobo](https://curobo.org/index.html) is a highly performant motion planner that is used in **OmniGibson** for specific use-cases, such as skills. However, CuRobo requires a manually-specified sphere representation of the robot to be defined. These values can be generated using [IsaacSim's interactive GUI](https://curobo.org/tutorials/1_robot_configuration.html#robot-collision-representation), and should be exported and copied into the robot source config yaml file used for importing into **OmniGibson**. You can see the set of values used for the R1 robot below. For more information regarding specific keys specified, please see CuRobo's [Configuring a New Robot](https://curobo.org/tutorials/1_robot_configuration.html) tutorial!
+
+??? code "r1_pro_source_config.yaml"
+    ``` yaml linenums="1"
+
+    urdf_path: r1_pro_source.urdf       # (str) Absolute path to robot URDF to import
+    name: r1                            # (str) Name to assign to robot
+    headless: false                     # (bool) if set, run without GUI
+    overwrite: true                     # (bool) if set, overwrite any existing files
+    merge_fixed_joints: false           # (bool) whether to merge fixed joints in the robot hierarchy or not
+    base_motion:
+      wheel_links:                      # (list of str): links corresponding to wheels
+        - wheel_link1
+        - wheel_link2
+        - wheel_link3
+      wheel_joints:                     # (list of str): joints corresponding to wheel motion
+        - servo_joint1
+        - servo_joint2
+        - servo_joint3
+        - wheel_joint1
+        - wheel_joint2
+        - wheel_joint3
+      use_sphere_wheels: true           # (bool) whether to use sphere approximation for wheels (better stability)
+      use_holonomic_joints: true        # (bool) whether to use joints to approximate a holonomic base. In this case, all
+                                        #       wheel-related joints will be made into fixed joints, and 6 additional
+                                        #       "virtual" joints will be added to the robot's base capturing 6DOF movement,
+                                        #       with the (x,y,rz) joints being controllable by motors
+    collision:
+      decompose_method: coacd           # (str) [coacd, convex, or null] collision decomposition method
+      hull_count: 8                     # (int) per-mesh max hull count to use during decomposition, only relevant for coacd
+      coacd_links: []                   # (list of str): links that should use CoACD to decompose collision meshes
+      convex_links:                     # (list of str): links that should use convex hull to decompose collision meshes
+        - base_link
+        - wheel_link1
+        - wheel_link2
+        - wheel_link3
+        - torso_link1
+        - torso_link2
+        - torso_link3
+        - torso_link4
+        - left_arm_link1
+        - left_arm_link4
+        - left_arm_link5
+        - right_arm_link1
+        - right_arm_link4
+        - right_arm_link5
+      no_decompose_links: []            # (list of str): links that should not have any post-processing done to them
+      no_collision_links:               # (list of str) links that will have any associated collision meshes removed
+        - servo_link1
+        - servo_link2
+        - servo_link3
+    eef_vis_links:                      # (list of dict) information for adding cameras to robot
+      - link: left_eef_link             # same format as @camera_links
+        parent_link: left_arm_link6
+        offset:
+          position: [0, 0, 0.06]
+          orientation: [0, 0, 0, 1]
+      - link: right_eef_link            # same format as @camera_links
+        parent_link: right_arm_link6
+        offset:
+          position: [0, 0, 0.06]
+          orientation: [0, 0, 0, 1]
+    camera_links:                       # (list of dict) information for adding cameras to robot
+      - link: eyes                      # (str) link name to add camera. Must exist if @parent_link is null, else will be
+                                        #       added as a child of the parent
+        parent_link: torso_link4        # (str) optional parent link to use if adding new link
+        offset:                         # (dict) local pos,ori offset values. if @parent_link is specified, defines offset
+                                        #       between @parent_link and @link specified in @parent_link's frame.
+                                        #       Otherwise, specifies offset of generated prim relative to @link's frame
+          position: [0.0732, 0, 0.4525]                     # (3-tuple) (x,y,z) offset -- this is done BEFORE the rotation
+          orientation: [0.4056, -0.4056, -0.5792, 0.5792]   # (4-tuple) (x,y,z,w) offset
+      - link: left_eef_link
+        parent_link: null
+        offset:
+          position: [0.05, 0, -0.05]
+          orientation: [-0.7011, -0.7011, -0.0923, -0.0923]
+      - link: right_eef_link
+        parent_link: null
+        offset:
+          position: [0.05, 0, -0.05]
+          orientation: [-0.7011, -0.7011, -0.0923, -0.0923]
+    lidar_links: []                     # (list of dict) information for adding cameras to robot
+    curobo:
+      eef_to_gripper_info:              # (dict) Maps EEF link name to corresponding gripper links / joints
+        right_eef_link:
+          links: ["right_gripper_link1", "right_gripper_link2"]
+          joints: ["right_gripper_axis1", "right_gripper_axis2"]
+        left_eef_link:
+          links: ["left_gripper_link1", "left_gripper_link2"]
+          joints: ["left_gripper_axis1", "left_gripper_axis2"]
+      flip_joint_limits: []             # (list of str) any joints that have a negative axis specified in the
+                                        #       source URDF
+      lock_joints: {}                   # (dict) Maps joint name to "locked" joint configuration. Any joints
+                                        #       specified here will not be considered active when motion planning
+                                        #       NOTE: All gripper joints and non-controllable holonomic joints
+                                        #       will automatically be added here
+      self_collision_ignore:            # (dict) Maps link name to list of other ignore links to ignore collisions
+                                        #       with. Note that bi-directional specification is not necessary,
+                                        #       e.g.: "torso_link1" does not need to be specified in
+                                        #       "torso_link2"'s list if "torso_link2" is already specified in
+                                        #       "torso_link1"'s list
+        base_link: ["torso_link1", "wheel_link1", "wheel_link2", "wheel_link3"]
+        torso_link1: ["torso_link2"]
+        torso_link2: ["torso_link3", "torso_link4"]
+        torso_link3: ["torso_link4"]
+        torso_link4: ["left_arm_link1", "right_arm_link1", "left_arm_link2", "right_arm_link2"]
+        left_arm_link1: ["left_arm_link2"]
+        left_arm_link2: ["left_arm_link3"]
+        left_arm_link3: ["left_arm_link4"]
+        left_arm_link4: ["left_arm_link5"]
+        left_arm_link5: ["left_arm_link6"]
+        left_arm_link6: ["left_gripper_link1", "left_gripper_link2"]
+        right_arm_link1: ["right_arm_link2"]
+        right_arm_link2: ["right_arm_link3"]
+        right_arm_link3: ["right_arm_link4"]
+        right_arm_link4: ["right_arm_link5"]
+        right_arm_link5: ["right_arm_link6"]
+        right_arm_link6: ["right_gripper_link1", "right_gripper_link2"]
+        left_gripper_link1: ["left_gripper_link2"]
+        right_gripper_link1: ["right_gripper_link2"]
+      collision_spheres:                # (dict) Maps link name to list of collision sphere representations,
+                                        #       where each sphere is defined by its (x,y,z) "center" and "radius"
+                                        #       values. This defines the collision geometry during motion planning
+        base_link:
+          - "center": [-0.009, -0.094, 0.131]
+            "radius": 0.09128
+          - "center": [-0.021, 0.087, 0.121]
+            "radius": 0.0906
+          - "center": [0.019, 0.137, 0.198]
+            "radius": 0.07971
+          - "center": [0.019, -0.14, 0.209]
+            "radius": 0.07563
+          - "center": [0.007, -0.018, 0.115]
+            "radius": 0.08448
+          - "center": [0.119, -0.176, 0.209]
+            "radius": 0.05998
+          - "center": [0.137, 0.118, 0.208]
+            "radius": 0.05862
+          - "center": [-0.152, -0.049, 0.204]
+            "radius": 0.05454
+        torso_link1:
+          - "center": [-0.001, -0.014, -0.057]
+            "radius": 0.1
+          - "center": [-0.001, -0.127, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.219, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.29, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.375, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.419, -0.064]
+            "radius": 0.07
+        torso_link2:
+          - "center": [-0.001, -0.086, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.194, -0.064]
+            "radius": 0.07
+          - "center": [-0.001, -0.31, -0.064]
+            "radius": 0.07
+        torso_link4:
+          - "center": [0.005, -0.001, 0.062]
+            "radius": 0.1
+          - "center": [0.005, -0.001, 0.245]
+            "radius": 0.15
+          - "center": [0.005, -0.001, 0.458]
+            "radius": 0.1
+          - "center": [0.002, 0.126, 0.305]
+            "radius": 0.08
+          - "center": [0.002, -0.126, 0.305]
+            "radius": 0.08
+        left_arm_link1:
+          - "center": [0.001, 0.0, 0.069]
+            "radius": 0.06
+        left_arm_link2:
+          - "center": [-0.062, -0.016, -0.03]
+            "radius": 0.06
+          - "center": [-0.135, -0.019, -0.03]
+            "radius": 0.06
+          - "center": [-0.224, -0.019, -0.03]
+            "radius": 0.06
+          - "center": [-0.31, -0.022, -0.03]
+            "radius": 0.06
+          - "center": [-0.34, -0.027, -0.03]
+            "radius": 0.06
+        left_arm_link3:
+          - "center": [0.037, -0.058, -0.044]
+            "radius": 0.05
+          - "center": [0.095, -0.08, -0.044]
+            "radius": 0.03
+          - "center": [0.135, -0.08, -0.043]
+            "radius": 0.03
+          - "center": [0.176, -0.08, -0.043]
+            "radius": 0.03
+          - "center": [0.22, -0.077, -0.043]
+            "radius": 0.03
+        left_arm_link4:
+          - "center": [-0.002, 0.0, 0.276]
+            "radius": 0.04
+        left_arm_link5:
+          - "center": [0.059, -0.001, -0.021]
+            "radius": 0.035
+        left_arm_link6:
+          - "center": [0.0, 0.0, 0.04]
+            "radius": 0.04
+        right_arm_link1:
+          - "center": [0.001, 0.0, 0.069]
+            "radius": 0.06
+        right_arm_link2:
+          - "center": [-0.062, -0.016, -0.03]
+            "radius": 0.06
+          - "center": [-0.135, -0.019, -0.03]
+            "radius": 0.06
+          - "center": [-0.224, -0.019, -0.03]
+            "radius": 0.06
+          - "center": [-0.31, -0.022, -0.03]
+            "radius": 0.06
+          - "center": [-0.34, -0.027, -0.03]
+            "radius": 0.06
+        right_arm_link3:
+          - "center": [0.037, -0.058, -0.044]
+            "radius": 0.05
+          - "center": [0.095, -0.08, -0.044]
+            "radius": 0.03
+          - "center": [0.135, -0.08, -0.043]
+            "radius": 0.03
+          - "center": [0.176, -0.08, -0.043]
+            "radius": 0.03
+          - "center": [0.22, -0.077, -0.043]
+            "radius": 0.03
+        right_arm_link4:
+          - "center": [-0.002, 0.0, 0.276]
+            "radius": 0.04
+        right_arm_link5:
+          - "center": [0.059, -0.001, -0.021]
+            "radius": 0.035
+        right_arm_link6:
+          - "center": [-0.0, 0.0, 0.04]
+            "radius": 0.035
+        wheel_link1:
+          - "center": [-0.0, 0.0, -0.03]
+            "radius": 0.06
+        wheel_link2:
+          - "center": [0.0, 0.0, 0.03]
+            "radius": 0.06
+        wheel_link3:
+          - "center": [0.0, 0.0, -0.03]
+            "radius": 0.06
+        left_gripper_link1:
+          - "center": [-0.03, 0.0, -0.002]
+            "radius": 0.008
+          - "center": [-0.01, 0.0, -0.003]
+            "radius": 0.007
+          - "center": [0.005, 0.0, -0.005]
+            "radius": 0.005
+          - "center": [0.02, 0.0, -0.007]
+            "radius": 0.003
+        left_gripper_link2:
+          - "center": [-0.03, 0.0, -0.002]
+            "radius": 0.008
+          - "center": [-0.01, 0.0, -0.003]
+            "radius": 0.007
+          - "center": [0.005, 0.0, -0.005]
+            "radius": 0.005
+          - "center": [0.02, 0.0, -0.007]
+            "radius": 0.003
+        right_gripper_link1:
+          - "center": [-0.03, 0.0, -0.002]
+            "radius": 0.008
+          - "center": [-0.01, -0.0, -0.003]
+            "radius": 0.007
+          - "center": [0.005, -0.0, -0.005]
+            "radius": 0.005
+          - "center": [0.02, -0.0, -0.007]
+            "radius": 0.003
+        right_gripper_link2:
+          - "center": [-0.03, 0.0, -0.002]
+            "radius": 0.008
+          - "center": [-0.01, 0.0, -0.003]
+            "radius": 0.007
+          - "center": [0.005, 0.0, -0.005]
+            "radius": 0.005
+          - "center": [0.02, 0.0, -0.007]
+            "radius": 0.003
+      default_qpos:                               # (list of float): Default joint configuration
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 0.0
+        - 1.906
+        - 1.906
+        - -0.991
+        - -0.991
+        - 1.571
+        - 1.571
+        - 0.915
+        - 0.915
+        - -1.571
+        - -1.571
+        - 0.03
+        - 0.03
+        - 0.03
+        - 0.03
+
+        ```
+
+
+### Option 2: Using IsaacSim's Native URDF-to-USD Converter
 In this section, we will be using the URDF Importer in native Isaac Sim to convert our robot URDF model into USD format. Before we get started, it is strongly recommended that you read through the official [URDF Importer Tutorial](https://docs.omniverse.nvidia.com/isaacsim/latest/features/environment_setup/ext_omni_isaac_urdf.html). 
 
 1. Create a directory with the name of the new robot under `<PATH_TO_OG_ASSET_DIR>/models`. This is where all of our robot models live. In our case, we created a directory named `stretch`.
@@ -75,7 +408,7 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
     ![Stretch Robot Import 5b](../assets/tutorials/stretch-import-5b.png)
     ![Stretch Robot Import 5c](../assets/tutorials/stretch-import-5c.png)
 
-6. Finally, save your USD! Note that you need to remove the fixed link created at step 4 before saving.
+6. Finally, save your USD (as a USDA file)! Note that you need to remove the fixed link created at step 4 before saving. Please save the file to `<gm.ASSET_PATH>/models/<name>/usd/<name>.usda`.
 
 ## Create the Robot Class
 Now that we have the USD file for the robot, let's write our own robot class. For more information please refer to the [Robot module](../modules/robots.md).
@@ -84,7 +417,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 
 2. Determine which robot interfaces it should inherit. We currently support three modular interfaces that can be used together: [`LocomotionRobot`](../reference/robots/locomotion_robot.md) for robots whose bases can move (and a more specific [`TwoWheelRobot`](../reference/robots/two_wheel_robot.md) for locomotive robots that only have two wheels), [`ManipulationRobot`](../reference/robots/manipulation_robot.md) for robots equipped with one or more arms and grippers, and [`ActiveCameraRobot`](../reference/robots/active_camera_robot.md) for robots with a controllable head or camera mount. In our case, our robot is a mobile manipulator with a moveable camera mount, so our Python class inherits all three interfaces.
 
-3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify.
+3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify. Note that **OmniGibson** automatically looks for your robot file at `<gm.ASSET_PATH>/models/<name>/usd/<name>.usda`, so if it exists elsewhere please specify the path via the `usd_path` property in the robot class.
 
     ??? note "Optional properties"
      
@@ -102,7 +435,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     
             Best practise of setting these points is to load the robot into Isaac Sim, and create a small sphere under the target link of the end effector. Then drag the sphere to the desired location (which should be just right outside the mesh of the link) or by setting the position in the `Property` tab. After you get a desired relative pose to the link, write down the link name and position in the robot class. 
 
-4. If your robot is a manipulation robot, you must additionally define a description .yaml file in order to use our inverse kinematics solver for end-effector control. Our example description file is shown below for our Stretch robot, which you can modify as needed. Place the descriptor file under `<PATH_TO_OG_ASSET_DIR>/models/<YOUR_MODEL>`.
+4. If your robot is a manipulation robot, you must additionally define a description .yaml file in order to use our CuRobo solver for end-effector motion planning. Our example description file is shown below for our R1 robot, which you can modify as needed. (Note that if you import your robot URDF using our import script, these files are automatically generated for you!). Place the curobo file under `<PATH_TO_OG_ASSET_DIR>/models/<YOUR_MODEL>/curobo`.
 
 5. In order for **OmniGibson** to register your new robot class internally, you must import the robot class before running the simulation. If your python module exists under `omnigibson/robots`, you can simply add an additional import line in `omnigibson/robots/__init__.py`. Otherwise, in any end use-case script, you can simply import your robot class from your python module at the top of the file.
 
@@ -120,29 +453,24 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     
     class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         """
-        Stretch Robot from Hello Robotics
+        Strech Robot from Hello Robotics
         Reference: https://hello-robot.com/stretch-3-product
         """
     
         @property
         def discrete_action_list(self):
-            # Only need to define if supporting a discrete set of high-level actions
             raise NotImplementedError()
     
         def _create_discrete_action_space(self):
-            # Only need to define if @discrete_action_list is defined
             raise ValueError("Stretch does not support discrete actions!")
     
         @property
         def _raw_controller_order(self):
-            # Raw controller ordering. Usually determined by general robot kinematics chain
-            # You can usually simply take a subset of these based on the type of robot interfaces inherited for your robot class
+            # Ordered by general robot kinematics chain
             return ["base", "camera", f"arm_{self.default_arm}", f"gripper_{self.default_arm}"]
     
         @property
         def _default_controllers(self):
-            # Define the default controllers that should be used if no explicit configuration is specified when your robot class is created
-    
             # Always call super first
             controllers = super()._default_controllers
     
@@ -156,126 +484,69 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     
         @property
         def _default_joint_pos(self):
-            # Define the default joint positions for your robot
-    
-            return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8]. dtype=th.float32)
+            return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
     
         @property
         def wheel_radius(self):
-            # Only relevant for TwoWheelRobots. Radius of each wheel
             return 0.050
     
         @property
         def wheel_axle_length(self):
-            # Only relevant for TwoWheelRobots. Distance between the two wheels
             return 0.330
     
         @property
         def finger_lengths(self):
-            # Only relevant for ManipulationRobots. Length of fingers
             return {self.default_arm: 0.04}
     
         @property
         def assisted_grasp_start_points(self):
-            # Only relevant for ManipulationRobots. The start points for grasping if using assisted grasping
             return {
                 self.default_arm: [
-                    GraspingPoint(link_name="r_gripper_finger_link", position=[0.025, -0.012, 0.0]),
-                    GraspingPoint(link_name="r_gripper_finger_link", position=[-0.025, -0.012, 0.0]),
+                    GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([0.013, 0.0, 0.01])),
+                    GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.01, 0.0, 0.009])),
                 ]
             }
     
         @property
         def assisted_grasp_end_points(self):
-            # Only relevant for ManipulationRobots. The end points for grasping if using assisted grasping
             return {
                 self.default_arm: [
-                    GraspingPoint(link_name="l_gripper_finger_link", position=[0.025, 0.012, 0.0]),
-                    GraspingPoint(link_name="l_gripper_finger_link", position=[-0.025, 0.012, 0.0]),
+                    GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.013, 0.0, 0.01])),
+                    GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([-0.01, 0.0, 0.009])),
                 ]
             }
     
         @property
         def disabled_collision_pairs(self):
-            # Pairs of robot links whose pairwise collisions should be ignored.
-            # Useful for filtering out bad collision modeling in the native robot meshes
             return [
-                ["base_link", "caster_link"],
-                ["base_link", "link_aruco_left_base"],
-                ["base_link", "link_aruco_right_base"],
-                ["base_link", "base_imu"],
-                ["base_link", "laser"],
-                ["base_link", "link_left_wheel"],
-                ["base_link", "link_right_wheel"],
-                ["base_link", "link_mast"],
-                ["link_mast", "link_head"],
-                ["link_head", "link_head_pan"],
-                ["link_head_pan", "link_head_tilt"],
-                ["camera_link", "link_head_tilt"],
-                ["camera_link", "link_head_pan"],
-                ["link_head_nav_cam", "link_head_tilt"],
-                ["link_head_nav_cam", "link_head_pan"],
-                ["link_mast", "link_lift"],
-                ["link_lift", "link_aruco_shoulder"],
-                ["link_lift", "link_arm_l4"],
                 ["link_lift", "link_arm_l3"],
                 ["link_lift", "link_arm_l2"],
                 ["link_lift", "link_arm_l1"],
-                ["link_arm_l4", "link_arm_l3"],
-                ["link_arm_l4", "link_arm_l2"],
-                ["link_arm_l4", "link_arm_l1"],
-                ["link_arm_l3", "link_arm_l2"],
+                ["link_lift", "link_arm_l0"],
                 ["link_arm_l3", "link_arm_l1"],
-                ["link_arm_l2", "link_arm_l1"],
                 ["link_arm_l0", "link_arm_l1"],
                 ["link_arm_l0", "link_arm_l2"],
                 ["link_arm_l0", "link_arm_l3"],
-                ["link_arm_l0", "link_arm_l4"],
-                ["link_arm_l0", "link_arm_l1"],
-                ["link_arm_l0", "link_aruco_inner_wrist"],
-                ["link_arm_l0", "link_aruco_top_wrist"],
-                ["link_arm_l0", "link_wrist_yaw"],
-                ["link_arm_l0", "link_wrist_yaw_bottom"],
-                ["link_arm_l0", "link_wrist_pitch"],
-                ["link_wrist_yaw_bottom", "link_wrist_pitch"],
-                ["gripper_camera_link", "link_gripper_s3_body"],
-                ["link_gripper_s3_body", "link_aruco_d405"],
-                ["link_gripper_s3_body", "link_gripper_finger_left"],
-                ["link_gripper_finger_left", "link_aruco_fingertip_left"],
-                ["link_gripper_finger_left", "link_gripper_fingertip_left"],
-                ["link_gripper_s3_body", "link_gripper_finger_right"],
-                ["link_gripper_finger_right", "link_aruco_fingertip_right"],
-                ["link_gripper_finger_right", "link_gripper_fingertip_right"],
-                ["respeaker_base", "link_head"],
-                ["respeaker_base", "link_mast"],
             ]
     
         @property
         def base_joint_names(self):
-            # Names of the joints that control the robot's base
             return ["joint_left_wheel", "joint_right_wheel"]
     
         @property
         def camera_joint_names(self):
-            # Names of the joints that control the robot's camera / head
             return ["joint_head_pan", "joint_head_tilt"]
     
         @property
         def arm_link_names(self):
-            # Names of the links that compose the robot's arm(s) (not including gripper(s))
             return {
                 self.default_arm: [
-                    "link_mast",
                     "link_lift",
-                    "link_arm_l4",
                     "link_arm_l3",
                     "link_arm_l2",
                     "link_arm_l1",
                     "link_arm_l0",
-                    "link_aruco_inner_wrist",
-                    "link_aruco_top_wrist",
                     "link_wrist_yaw",
-                    "link_wrist_yaw_bottom",
                     "link_wrist_pitch",
                     "link_wrist_roll",
                 ]
@@ -283,7 +554,6 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     
         @property
         def arm_joint_names(self):
-            # Names of the joints that control the robot's arm(s) (not including gripper(s))
             return {
                 self.default_arm: [
                     "joint_lift",
@@ -299,100 +569,662 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
     
         @property
         def eef_link_names(self):
-            # Name of the link that defines the per-arm end-effector frame
-            return {self.default_arm: "link_grasp_center"}
+            return {self.default_arm: "eef_link"}
     
         @property
         def finger_link_names(self):
-            # Names of the links that compose the robot's gripper(s)
-            return {self.default_arm: ["link_gripper_finger_left", "link_gripper_finger_right", "link_gripper_fingertip_left", "link_gripper_fingertip_right"]}
+            return {
+                self.default_arm: [
+                    "link_gripper_finger_left",
+                    "link_gripper_finger_right",
+                ]
+            }
     
         @property
         def finger_joint_names(self):
-            # Names of the joints that control the robot's gripper(s)
             return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
-    
-        @property
-        def usd_path(self):
-            # Absolute path to the native robot USD file
-            return os.path.join(gm.ASSET_PATH, "models/stretch/stretch/stretch.usd")
-    
-        @property
-        def urdf_path(self):
-            # Absolute path to the native robot URDF file
-            return os.path.join(gm.ASSET_PATH, "models/stretch/stretch.urdf")
-    
-        @property
-        def robot_arm_descriptor_yamls(self):
-            # Only relevant for ManipulationRobots. Absolute path(s) to the per-arm descriptor files (see Step 4 below)
-            return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/stretch/stretch_descriptor.yaml")}
+
     ```
 
-??? code "stretch_descriptor.yaml"
+??? code "r1_description_curobo_default.yaml"
     ``` yaml linenums="1"
 
-    # The robot descriptor defines the generalized coordinates and how to map those
-    # to the underlying URDF dofs.
-
-    api_version: 1.0
-    
-    # Defines the generalized coordinates. Each generalized coordinate is assumed
-    # to have an entry in the URDF, except when otherwise specified below under
-    # cspace_urdf_bridge
-    cspace:
-        - joint_lift
-        - joint_arm_l3
-        - joint_arm_l2
-        - joint_arm_l1
-        - joint_arm_l0
-        - joint_wrist_yaw
-        - joint_wrist_pitch
-        - joint_wrist_roll
-    
-    root_link: base_link
-    subtree_root_link: base_link
-    
-    default_q: [
-        # Original version
-        # 0.00, 0.00, 0.00, -1.57, 0.00, 1.50, 0.75
-    
-        # New config
-        0, 0, 0, 0, 0, 0, 0, 0
-    ]
-    
-    # Most dimensions of the cspace have a direct corresponding element
-    # in the URDF. This list of rules defines how unspecified coordinates
-    # should be extracted.
-    cspace_to_urdf_rules: []
-    
-    active_task_spaces:
-        - base_link
-        - lift_link
-        - link_mast
-        - link_lift
-        - link_arm_l4
-        - link_arm_l3
-        - link_arm_l2
-        - link_arm_l1
-        - link_arm_l0
-        - link_aruco_inner_wrist
-        - link_aruco_top_wrist
-        - link_wrist_yaw
-        - link_wrist_yaw_bottom
-        - link_wrist_pitch
-        - link_wrist_roll
-        - link_gripper_s3_body
-        - gripper_camera_link
-        - link_aruco_d405
-        - link_gripper_finger_left
-        - link_aruco_fingertip_left
-        - link_gripper_fingertip_left
-        - link_gripper_finger_right
-        - link_aruco_fingertip_right
-        - link_gripper_fingertip_right
-        - link_grasp_center
-    
-    composite_task_spaces: []
+    robot_cfg:
+      base_link: base_footprint_x
+      collision_link_names:
+      - base_link
+      - torso_link1
+      - torso_link2
+      - torso_link4
+      - left_arm_link1
+      - left_arm_link2
+      - left_arm_link3
+      - left_arm_link4
+      - left_arm_link5
+      - left_arm_link6
+      - right_arm_link1
+      - right_arm_link2
+      - right_arm_link3
+      - right_arm_link4
+      - right_arm_link5
+      - right_arm_link6
+      - wheel_link1
+      - wheel_link2
+      - wheel_link3
+      - left_gripper_link1
+      - left_gripper_link2
+      - right_gripper_link1
+      - right_gripper_link2
+      - attached_object_right_eef_link
+      - attached_object_left_eef_link
+      collision_sphere_buffer: 0.002
+      collision_spheres:
+        base_link:
+        - center:
+          - -0.009
+          - -0.094
+          - 0.131
+          radius: 0.09128
+        - center:
+          - -0.021
+          - 0.087
+          - 0.121
+          radius: 0.0906
+        - center:
+          - 0.019
+          - 0.137
+          - 0.198
+          radius: 0.07971
+        - center:
+          - 0.019
+          - -0.14
+          - 0.209
+          radius: 0.07563
+        - center:
+          - 0.007
+          - -0.018
+          - 0.115
+          radius: 0.08448
+        - center:
+          - 0.119
+          - -0.176
+          - 0.209
+          radius: 0.05998
+        - center:
+          - 0.137
+          - 0.118
+          - 0.208
+          radius: 0.05862
+        - center:
+          - -0.152
+          - -0.049
+          - 0.204
+          radius: 0.05454
+        left_arm_link1:
+        - center:
+          - 0.001
+          - 0.0
+          - 0.069
+          radius: 0.06
+        left_arm_link2:
+        - center:
+          - -0.062
+          - -0.016
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.135
+          - -0.019
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.224
+          - -0.019
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.31
+          - -0.022
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.34
+          - -0.027
+          - -0.03
+          radius: 0.06
+        left_arm_link3:
+        - center:
+          - 0.037
+          - -0.058
+          - -0.044
+          radius: 0.05
+        - center:
+          - 0.095
+          - -0.08
+          - -0.044
+          radius: 0.03
+        - center:
+          - 0.135
+          - -0.08
+          - -0.043
+          radius: 0.03
+        - center:
+          - 0.176
+          - -0.08
+          - -0.043
+          radius: 0.03
+        - center:
+          - 0.22
+          - -0.077
+          - -0.043
+          radius: 0.03
+        left_arm_link4:
+        - center:
+          - -0.002
+          - 0.0
+          - 0.276
+          radius: 0.04
+        left_arm_link5:
+        - center:
+          - 0.059
+          - -0.001
+          - -0.021
+          radius: 0.035
+        left_arm_link6:
+        - center:
+          - 0.0
+          - 0.0
+          - 0.04
+          radius: 0.04
+        left_gripper_link1:
+        - center:
+          - -0.03
+          - 0.0
+          - -0.002
+          radius: 0.008
+        - center:
+          - -0.01
+          - 0.0
+          - -0.003
+          radius: 0.007
+        - center:
+          - 0.005
+          - 0.0
+          - -0.005
+          radius: 0.005
+        - center:
+          - 0.02
+          - 0.0
+          - -0.007
+          radius: 0.003
+        left_gripper_link2:
+        - center:
+          - -0.03
+          - 0.0
+          - -0.002
+          radius: 0.008
+        - center:
+          - -0.01
+          - 0.0
+          - -0.003
+          radius: 0.007
+        - center:
+          - 0.005
+          - 0.0
+          - -0.005
+          radius: 0.005
+        - center:
+          - 0.02
+          - 0.0
+          - -0.007
+          radius: 0.003
+        right_arm_link1:
+        - center:
+          - 0.001
+          - 0.0
+          - 0.069
+          radius: 0.06
+        right_arm_link2:
+        - center:
+          - -0.062
+          - -0.016
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.135
+          - -0.019
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.224
+          - -0.019
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.31
+          - -0.022
+          - -0.03
+          radius: 0.06
+        - center:
+          - -0.34
+          - -0.027
+          - -0.03
+          radius: 0.06
+        right_arm_link3:
+        - center:
+          - 0.037
+          - -0.058
+          - -0.044
+          radius: 0.05
+        - center:
+          - 0.095
+          - -0.08
+          - -0.044
+          radius: 0.03
+        - center:
+          - 0.135
+          - -0.08
+          - -0.043
+          radius: 0.03
+        - center:
+          - 0.176
+          - -0.08
+          - -0.043
+          radius: 0.03
+        - center:
+          - 0.22
+          - -0.077
+          - -0.043
+          radius: 0.03
+        right_arm_link4:
+        - center:
+          - -0.002
+          - 0.0
+          - 0.276
+          radius: 0.04
+        right_arm_link5:
+        - center:
+          - 0.059
+          - -0.001
+          - -0.021
+          radius: 0.035
+        right_arm_link6:
+        - center:
+          - -0.0
+          - 0.0
+          - 0.04
+          radius: 0.035
+        right_gripper_link1:
+        - center:
+          - -0.03
+          - 0.0
+          - -0.002
+          radius: 0.008
+        - center:
+          - -0.01
+          - -0.0
+          - -0.003
+          radius: 0.007
+        - center:
+          - 0.005
+          - -0.0
+          - -0.005
+          radius: 0.005
+        - center:
+          - 0.02
+          - -0.0
+          - -0.007
+          radius: 0.003
+        right_gripper_link2:
+        - center:
+          - -0.03
+          - 0.0
+          - -0.002
+          radius: 0.008
+        - center:
+          - -0.01
+          - 0.0
+          - -0.003
+          radius: 0.007
+        - center:
+          - 0.005
+          - 0.0
+          - -0.005
+          radius: 0.005
+        - center:
+          - 0.02
+          - 0.0
+          - -0.007
+          radius: 0.003
+        torso_link1:
+        - center:
+          - -0.001
+          - -0.014
+          - -0.057
+          radius: 0.1
+        - center:
+          - -0.001
+          - -0.127
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.219
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.29
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.375
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.419
+          - -0.064
+          radius: 0.07
+        torso_link2:
+        - center:
+          - -0.001
+          - -0.086
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.194
+          - -0.064
+          radius: 0.07
+        - center:
+          - -0.001
+          - -0.31
+          - -0.064
+          radius: 0.07
+        torso_link4:
+        - center:
+          - 0.005
+          - -0.001
+          - 0.062
+          radius: 0.1
+        - center:
+          - 0.005
+          - -0.001
+          - 0.245
+          radius: 0.15
+        - center:
+          - 0.005
+          - -0.001
+          - 0.458
+          radius: 0.1
+        - center:
+          - 0.002
+          - 0.126
+          - 0.305
+          radius: 0.08
+        - center:
+          - 0.002
+          - -0.126
+          - 0.305
+          radius: 0.08
+        wheel_link1:
+        - center:
+          - -0.0
+          - 0.0
+          - -0.03
+          radius: 0.06
+        wheel_link2:
+        - center:
+          - 0.0
+          - 0.0
+          - 0.03
+          radius: 0.06
+        wheel_link3:
+        - center:
+          - 0.0
+          - 0.0
+          - -0.03
+          radius: 0.06
+      cspace:
+      - base_footprint_x_joint
+      - base_footprint_y_joint
+      - base_footprint_z_joint
+      - base_footprint_rx_joint
+      - base_footprint_ry_joint
+      - base_footprint_rz_joint
+      - torso_joint1
+      - torso_joint2
+      - torso_joint3
+      - torso_joint4
+      - left_arm_joint1
+      - right_arm_joint1
+      - left_arm_joint2
+      - left_arm_joint3
+      - left_arm_joint4
+      - left_arm_joint5
+      - left_arm_joint6
+      - left_gripper_axis1
+      - left_gripper_axis2
+      - right_arm_joint2
+      - right_arm_joint3
+      - right_arm_joint4
+      - right_arm_joint5
+      - right_arm_joint6
+      - right_gripper_axis1
+      - right_gripper_axis2
+      cspace_distance_weight:
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      ee_link: right_eef_link
+      external_asset_path: null
+      extra_collision_spheres:
+        attached_object_left_eef_link: 32
+        attached_object_right_eef_link: 32
+      extra_links:
+        attached_object_left_eef_link:
+          fixed_transform:
+          - 0
+          - 0
+          - 0
+          - 1
+          - 0
+          - 0
+          - 0
+          joint_name: attached_object_left_eef_link_joint
+          joint_type: FIXED
+          link_name: attached_object_left_eef_link
+          parent_link_name: left_eef_link
+        attached_object_right_eef_link:
+          fixed_transform:
+          - 0
+          - 0
+          - 0
+          - 1
+          - 0
+          - 0
+          - 0
+          joint_name: attached_object_right_eef_link_joint
+          joint_type: FIXED
+          link_name: attached_object_right_eef_link
+          parent_link_name: right_eef_link
+      link_names:
+      - left_eef_link
+      lock_joints:
+        base_footprint_rx_joint: 0.0
+        base_footprint_ry_joint: 0.0
+        base_footprint_z_joint: 0.0
+        left_gripper_axis1: 0.05000000074505806
+        left_gripper_axis2: 0.05000000074505806
+        right_gripper_axis1: 0.05000000074505806
+        right_gripper_axis2: 0.05000000074505806
+      max_acceleration: 15.0
+      max_jerk: 500.0
+      mesh_link_names:
+      - base_link
+      - torso_link1
+      - torso_link2
+      - torso_link4
+      - left_arm_link1
+      - left_arm_link2
+      - left_arm_link3
+      - left_arm_link4
+      - left_arm_link5
+      - left_arm_link6
+      - right_arm_link1
+      - right_arm_link2
+      - right_arm_link3
+      - right_arm_link4
+      - right_arm_link5
+      - right_arm_link6
+      - wheel_link1
+      - wheel_link2
+      - wheel_link3
+      - left_gripper_link1
+      - left_gripper_link2
+      - right_gripper_link1
+      - right_gripper_link2
+      - attached_object_right_eef_link
+      - attached_object_left_eef_link
+      null_space_weight:
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      - 1
+      retract_config:
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 0.0
+      - 1.906
+      - 1.906
+      - -0.991
+      - -0.991
+      - 1.571
+      - 1.571
+      - 0.915
+      - 0.915
+      - -1.571
+      - -1.571
+      - 0.03
+      - 0.03
+      - 0.03
+      - 0.03
+      self_collision_buffer:
+        base_link: 0.02
+      self_collision_ignore:
+        base_link:
+        - torso_link1
+        - wheel_link1
+        - wheel_link2
+        - wheel_link3
+        left_arm_link1:
+        - left_arm_link2
+        left_arm_link2:
+        - left_arm_link3
+        left_arm_link3:
+        - left_arm_link4
+        left_arm_link4:
+        - left_arm_link5
+        left_arm_link5:
+        - left_arm_link6
+        left_arm_link6:
+        - left_gripper_link1
+        - left_gripper_link2
+        left_gripper_link1:
+        - left_gripper_link2
+        - attached_object_left_eef_link
+        left_gripper_link2:
+        - attached_object_left_eef_link
+        right_arm_link1:
+        - right_arm_link2
+        right_arm_link2:
+        - right_arm_link3
+        right_arm_link3:
+        - right_arm_link4
+        right_arm_link4:
+        - right_arm_link5
+        right_arm_link5:
+        - right_arm_link6
+        right_arm_link6:
+        - right_gripper_link1
+        - right_gripper_link2
+        right_gripper_link1:
+        - right_gripper_link2
+        - attached_object_right_eef_link
+        right_gripper_link2:
+        - attached_object_right_eef_link
+        torso_link1:
+        - torso_link2
+        torso_link2:
+        - torso_link3
+        - torso_link4
+        torso_link3:
+        - torso_link4
+        torso_link4:
+        - left_arm_link1
+        - right_arm_link1
+        - left_arm_link2
+        - right_arm_link2
+      usd_flip_joint_limits: []
+      usd_flip_joints: {}
+      usd_robot_root: /r1
+      use_global_cumul: true
     ```
 
 

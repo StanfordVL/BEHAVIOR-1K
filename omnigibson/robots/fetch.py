@@ -175,24 +175,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             "horizontal": th.tensor([-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]),
         }
 
-    def _post_load(self):
-        super()._post_load()
-
-        # Set the wheels back to using sphere approximations
-        for wheel_name in ["l_wheel_link", "r_wheel_link"]:
-            log.warning(
-                "Fetch wheel links are post-processed to use sphere approximation collision meshes. "
-                "Please ignore any previous errors about these collision meshes."
-            )
-            wheel_link = self.links[wheel_name]
-            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
-
-        # Also apply a convex decomposition to the torso lift link
-        torso_lift_link = self.links["torso_lift_link"]
-        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "torso link should only have 1 collision!"
-        torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
-
     @property
     def discrete_action_list(self):
         raise NotImplementedError()
@@ -249,29 +231,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             ]
         }
 
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["torso_lift_link", "shoulder_lift_link"],
-            ["torso_lift_link", "torso_fixed_link"],
-            ["torso_lift_link", "estop_link"],
-            ["base_link", "laser_link"],
-            ["base_link", "torso_fixed_link"],
-            ["base_link", "l_wheel_link"],
-            ["base_link", "r_wheel_link"],
-            ["base_link", "estop_link"],
-            ["torso_lift_link", "shoulder_pan_link"],
-            ["torso_lift_link", "head_pan_link"],
-            ["head_pan_link", "head_tilt_link"],
-            ["shoulder_pan_link", "shoulder_lift_link"],
-            ["shoulder_lift_link", "upperarm_roll_link"],
-            ["upperarm_roll_link", "elbow_flex_link"],
-            ["elbow_flex_link", "forearm_roll_link"],
-            ["forearm_roll_link", "wrist_flex_link"],
-            ["wrist_flex_link", "wrist_roll_link"],
-            ["wrist_roll_link", "gripper_link"],
-        ]
-
     @cached_property
     def base_joint_names(self):
         return ["l_wheel_joint", "r_wheel_joint"]
@@ -297,7 +256,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             "forearm_roll_link",
             "wrist_flex_link",
             "wrist_roll_link",
-            "gripper_link",
+            "eef_link",
             "l_gripper_finger_link",
             "r_gripper_finger_link",
         ]
@@ -332,7 +291,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
 
     @cached_property
     def eef_link_names(self):
-        return {self.default_arm: "gripper_link"}
+        return {self.default_arm: "eef_link"}
 
     @cached_property
     def finger_link_names(self):
@@ -343,24 +302,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
         return {self.default_arm: ["r_gripper_finger_joint", "l_gripper_finger_joint"]}
 
     @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch.usda")
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch_descriptor.yaml")}
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/fetch/fetch.urdf")
-
-    @property
     def arm_workspace_range(self):
         return {self.default_arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32))}
-
-    @property
-    def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch_eef.usd")}
 
     @property
     def teleop_rotation_offset(self):

@@ -61,8 +61,8 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = th.tensor([150.1628, 149.9993, 101.3773])
-    sensor_world_ori_gt = th.tensor([-0.2952, 0.2959, 0.6427, -0.6421])
+    sensor_world_pos_gt = th.tensor([150.5187, 149.8295, 101.0960])
+    sensor_world_ori_gt = th.tensor([0.0198, -0.1313, 0.9895, -0.0576])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)

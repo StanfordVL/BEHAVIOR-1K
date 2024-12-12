@@ -55,14 +55,21 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
         Gets all objects in the robot's field of view.
 
         Returns:
-            list: List of objects in the robot's field of view
+            set: Set of objects in the robot's field of view
         """
         if not any(isinstance(sensor, VisionSensor) for sensor in self.robot.sensors.values()):
             raise ValueError("No vision sensors found on robot.")
-        obj_names = []
+        objs = set()
         names_to_exclude = set(["background", "unlabelled"])
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
-                obj_names.extend([name for name in info["seg_instance"].values() if name not in names_to_exclude])
-        return [x for x in [self.obj.scene.object_registry("name", x) for x in obj_names] if x is not None]
+                objs.update(
+                    set(
+                        self.obj.scene.object_registry("name", name)
+                        for name in info["seg_instance"].values()
+                        if name not in names_to_exclude
+                    )
+                )
+        # Return all objects, minus any that were mapped to None because they were not found in our object registry
+        return objs - {None}

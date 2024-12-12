@@ -134,14 +134,6 @@ class VX300S(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["gripper_bar_link", "left_finger_link"],
-            ["gripper_bar_link", "right_finger_link"],
-            ["gripper_bar_link", "gripper_link"],
-        ]
-
     @cached_property
     def arm_link_names(self):
         return {
@@ -153,7 +145,6 @@ class VX300S(ManipulationRobot):
                 "lower_forearm_link",
                 "wrist_link",
                 "gripper_link",
-                "gripper_bar_link",
             ]
         }
 
@@ -172,7 +163,7 @@ class VX300S(ManipulationRobot):
 
     @cached_property
     def eef_link_names(self):
-        return {self.default_arm: "ee_gripper_link"}
+        return {self.default_arm: "eef_link"}
 
     @cached_property
     def finger_link_names(self):
@@ -181,31 +172,6 @@ class VX300S(ManipulationRobot):
     @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["left_finger", "right_finger"]}
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s/vx300s.usd")
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description.yaml")}
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s.urdf")
-
-    @property
-    def curobo_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_description_curobo.yaml")
-
-    @cached_property
-    def curobo_attached_object_link_names(self):
-        return {"ee_gripper_link": "attached_object"}
-
-    @property
-    def eef_usd_path(self):
-        # return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/vx300s/vx300s_eef.usd")}
-        raise NotImplementedError
 
     @property
     def teleop_rotation_offset(self):
