@@ -64,6 +64,12 @@ class ObjectsInFOVOfRobot(AbsoluteObjectState, RobotStateMixin):
         for sensor in self.robot.sensors.values():
             if isinstance(sensor, VisionSensor):
                 _, info = sensor.get_obs()
-                objs.update(set(self.obj.scene.object_registry("name", name) for name in info["seg_instance"].values() if name not in names_to_exclude))
+                objs.update(
+                    set(
+                        self.obj.scene.object_registry("name", name)
+                        for name in info["seg_instance"].values()
+                        if name not in names_to_exclude
+                    )
+                )
         # Return all objects, minus any that were mapped to None because they were not found in our object registry
         return objs - {None}
