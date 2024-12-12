@@ -36,6 +36,7 @@ from omnigibson.robots import *
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.control_utils import FKSolver, IKSolver
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import (
@@ -336,13 +337,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 arm = f"arm_{arm_name}"
                 arm_ctrl = self.robot.controllers[arm]
                 if isinstance(arm_ctrl, InverseKinematicsController):
-                    pos_relative = control_dict[f"{eef}_pos_relative"]
-                    quat_relative = control_dict[f"{eef}_quat_relative"]
+                    pos_relative = cb.to_torch(control_dict[f"{eef}_pos_relative"])
+                    quat_relative = cb.to_torch(control_dict[f"{eef}_quat_relative"])
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
 
-                    arm_target = control_dict["joint_position"][arm_ctrl.dof_idx]
+                    arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
 
         self.robot_copy = self._load_robot_copy()
