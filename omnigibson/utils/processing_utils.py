@@ -43,6 +43,13 @@ class Filter(Serializable):
         # Default is no state, so do nothing
         return dict(), 0
 
+    @property
+    def state_size(self):
+        """
+        Size of the serialized state of this filter
+        """
+        raise NotImplementedError
+
 
 class MovingAverageFilter(Filter):
     """
@@ -98,6 +105,11 @@ class MovingAverageFilter(Filter):
         self.past_samples *= 0.0
         self.current_idx = 0
         self.fully_filled = False
+
+    @property
+    def state_size(self):
+        # This is the size of the internal buffer plus the current index and fully filled single values
+        return th.prod(self.past_samples.shape) + 2
 
     def _dump_state(self):
         # Run super init first
@@ -185,6 +197,11 @@ class ExponentialAverageFilter(Filter):
         # Clear internal state
         self.avg *= 0.0
         self.num_samples = 0
+
+    @property
+    def state_size(self):
+        # This is the size of the internal value as well as a num samples
+        return len(self.avg) + 1
 
     def _dump_state(self):
         # Run super init first
