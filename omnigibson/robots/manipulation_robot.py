@@ -978,11 +978,11 @@ class ManipulationRobot(BaseRobot):
     def curobo_path(self):
         """
         Returns:
-            str or Dict[CuroboEmbodimentSelection, str]: file path to the robot curobo file or a mapping from
-                CuroboEmbodimentSelection to the file path
+            str or Dict[CuRoboEmbodimentSelection, str]: file path to the robot curobo file or a mapping from
+                CuRoboEmbodimentSelection to the file path
         """
         # Import here to avoid circular imports
-        from omnigibson.action_primitives.curobo import CuroboEmbodimentSelection
+        from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 
         # By default, sets the standardized path
         model = self.model_name.lower()
@@ -990,7 +990,7 @@ class ManipulationRobot(BaseRobot):
             emb_sel: os.path.join(
                 gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml"
             )
-            for emb_sel in CuroboEmbodimentSelection
+            for emb_sel in CuRoboEmbodimentSelection
         }
 
     @property
