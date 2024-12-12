@@ -351,7 +351,7 @@ def create_rigid_prim(stage, link_prim_path):
         Usd.Prim: Newly created rigid prim
     """
     # Make sure link prim does NOT already exist (this should be a new link)
-    link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
+    link_prim_exists = stage.GetPrimAtPath(link_prim_path).IsValid()
     assert (
         not link_prim_exists
     ), f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"
