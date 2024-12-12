@@ -403,7 +403,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             else th.zeros(self.goal_dim)
         )
 
-        return cb.cat([cb.array([state["goal_is_valid"]]), goal_state_flattened])
+        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
 
     def deserialize(self, state):
         goal_is_valid = bool(state[0])

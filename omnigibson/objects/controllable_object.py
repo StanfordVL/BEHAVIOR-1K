@@ -704,9 +704,9 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = cb.to_torch(cb.cat(
+        controller_states_flat = th.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
-        ))
+        )
 
         # Concatenate and return
         return th.cat([state_flat, controller_states_flat])
@@ -718,7 +718,7 @@ class ControllableObject(BaseObject):
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c.deserialize(state=cb.from_torch(state[idx:]))
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 

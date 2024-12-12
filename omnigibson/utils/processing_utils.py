@@ -81,12 +81,12 @@ class MovingAverageFilter(Filter):
 
         # Compute value based on whether we're fully filled or not
         if not self.fully_filled:
-            val = self.past_samples[: self.current_idx + 1, :].mean(dim=0)
+            val = cb.mean(self.past_samples[: self.current_idx + 1, :], dim=0)
             # Denote that we're fully filled if we're at the end of the buffer
             if self.current_idx == self.filter_width - 1:
                 self.fully_filled = True
         else:
-            val = self.past_samples.mean(dim=0)
+            val = cb.mean(self.past_samples, dim=0)
 
         # Increment the index to write the next sample to
         self.current_idx = (self.current_idx + 1) % self.filter_width
