@@ -361,6 +361,10 @@ def test_curobo():
 
         print(f"Planning for {len(target_pos[robot.eef_link_names[robot.default_arm]])} eef targets...")
 
+        # Make sure robot is kept still for better determinism before planning
+        robot.keep_still()
+        og.sim.step_physics()
+
         # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
         successes, traj_paths = cmg.compute_trajectories(
             target_pos=target_pos,
