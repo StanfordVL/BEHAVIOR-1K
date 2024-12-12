@@ -19,8 +19,7 @@ There are two ways to convert our raw robot URDF into an OmniGibson-compatible U
 Our custom robot importer [`import_custom_robot.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/examples/robots/import_custom_robot.py) wraps the native URDF Importer from Isaac Sim to convert our robot URDF model into USD format. Please see the following steps for running this script:
 
 1. All that is required is a single source config yaml file that dictates how the URDF should be post-processed when being converted into a USD. You can run `import_custom_robot.py --help` to see a detailed example configuration used, which is also shown below (`r1_pro_source_config.yaml`) for your convenience.
-2. All output files are written to `<gm.EXTERNAL_DATASET_PATH>/objects/robot/<name>`. Please copy / move this directory to `<gm.ASSET_PATH>/objects/<name>` so it can be imported into **OmniGibson**.
-3. That's it!
+2. All output files are written to `<gm.EXTERNAL_DATASET_PATH>/objects/robot/<name>`. Please move this directory to `<gm.ASSET_PATH>/objects/<name>` so it can be imported into **OmniGibson**.
 
 Some notes about the importing script:
 
