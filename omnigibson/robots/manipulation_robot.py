@@ -1315,23 +1315,24 @@ class ManipulationRobot(BaseRobot):
             # a zero action will actually keep the AG setting where it already is.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
+            control = cb.to_torch(controller.control)
             threshold = th.mean(
                 th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
                 dim=0,
             )
-            if controller.control is None:
+            if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
-                    th.any(controller.control < threshold)
+                    th.any(control < threshold)
                     if controller.control_type == ControlType.POSITION
-                    else th.any(controller.control < 0)
+                    else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
-                    th.any(controller.control > threshold)
+                    th.any(control > threshold)
                     if controller.control_type == ControlType.POSITION
-                    else th.any(controller.control > 0)
+                    else th.any(control > 0)
                 )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
