@@ -252,7 +252,9 @@ class MultiFingerGripperController(GripperController):
                 dist_from_upper_limit = max_pos - finger_pos
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
-                valid_grasp_pos = th.mean(dist_from_lower_limit) > m.POS_TOLERANCE or th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                valid_grasp_pos = (
+                    th.mean(dist_from_lower_limit) > m.POS_TOLERANCE or th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
                 valid_grasp_vel = th.all(th.abs(finger_vel) < m.VEL_TOLERANCE)
