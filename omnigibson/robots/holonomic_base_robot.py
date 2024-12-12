@@ -6,10 +6,10 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
@@ -254,7 +254,9 @@ class HolonomicBaseRobot(LocomotionRobot):
             joint_pos, joint_orn = cb.from_torch(joint_pos), cb.from_torch(joint_orn)
             inv_joint_pos, inv_joint_orn = cb.T.mat2pose(cb.T.pose_inv(cb.T.pose2mat((joint_pos, joint_orn))))
 
-            relative_pos, relative_orn = cb.T.pose_transform(inv_joint_pos, inv_joint_orn, cb.from_torch(position), cb.from_torch(orientation))
+            relative_pos, relative_orn = cb.T.pose_transform(
+                inv_joint_pos, inv_joint_orn, cb.from_torch(position), cb.from_torch(orientation)
+            )
             relative_rpy = cb.T.quat2euler(relative_orn)
             self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
             self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
@@ -321,7 +323,9 @@ class HolonomicBaseRobot(LocomotionRobot):
         global_pose = cur_pose @ local_pose
         lin_vel_global, ang_vel_global = global_pose[0, :3, 3], global_pose[1, :3, 3]
 
-        u_vec[cb.from_torch(self.base_control_idx)] = cb.array([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
+        u_vec[cb.from_torch(self.base_control_idx)] = cb.array(
+            [lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]]
+        )
 
         return u_vec, u_type_vec
 

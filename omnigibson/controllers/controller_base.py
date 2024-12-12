@@ -3,8 +3,9 @@ from collections.abc import Iterable
 from enum import IntEnum
 
 import torch as th
-from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -32,9 +33,6 @@ class IsGraspingState(IntEnum):
     TRUE = 1
     UNKNOWN = 0
     FALSE = -1
-
-
-
 
 
 # Define macros
@@ -453,7 +451,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         return (
             nums
             if isinstance(nums, cb.arr_type)
-            else cb.array(nums)if isinstance(nums, Iterable) else cb.ones(dim) * nums
+            else cb.array(nums) if isinstance(nums, Iterable) else cb.ones(dim) * nums
         )
 
     @property

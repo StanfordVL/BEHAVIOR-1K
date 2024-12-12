@@ -1,5 +1,6 @@
-import torch as th
 import numpy as np
+import torch as th
+
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.python_utils import recursively_convert_from_torch

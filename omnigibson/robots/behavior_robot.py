@@ -1,9 +1,9 @@
 import itertools
-from functools import cached_property
 import math
 import os
 from abc import ABC
 from collections import OrderedDict
+from functools import cached_property
 from typing import Iterable, List, Literal, Tuple
 
 import torch as th

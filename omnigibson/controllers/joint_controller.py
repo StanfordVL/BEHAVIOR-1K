@@ -1,7 +1,5 @@
 import math
 
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -10,6 +8,8 @@ from omnigibson.controllers import (
     ManipulationController,
 )
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -286,6 +286,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
 
 import torch as th
+
+
 @th.compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
@@ -296,9 +298,10 @@ def _compute_joint_torques_torch(
     return mm[dof_idxs_mat] @ u
 
 
-
 import numpy as np
 from numba import jit
+
+
 # Use numba since faster
 @jit(nopython=True)
 def numba_ix(arr, rows, cols):
@@ -316,7 +319,7 @@ def numba_ix(arr, rows, cols):
     one_d_index = np.zeros(len(rows) * len(cols), dtype=np.int32)
     for i, r in enumerate(rows):
         start = i * len(cols)
-        one_d_index[start: start + len(cols)] = cols + arr.shape[1] * r
+        one_d_index[start : start + len(cols)] = cols + arr.shape[1] * r
 
     arr_1d = arr.reshape((arr.shape[0] * arr.shape[1], 1))
     slice_1d = np.take(arr_1d, one_d_index)
@@ -336,4 +339,3 @@ def _compute_joint_torques_numpy(
 setattr(_ComputeBackend, "compute_joint_torques", None)
 setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
 setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
-

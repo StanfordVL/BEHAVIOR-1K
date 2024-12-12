@@ -10,8 +10,8 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
