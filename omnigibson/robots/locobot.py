@@ -23,7 +23,7 @@ class Locobot(TwoWheelRobot):
 
     @cached_property
     def base_joint_names(self):
-        return ["wheel_right_joint", "wheel_left_joint"]
+        return ["wheel_left_joint", "wheel_right_joint"]
 
     @property
     def _default_joint_pos(self):
