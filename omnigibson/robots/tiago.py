@@ -1,7 +1,7 @@
 import math
 import os
-from typing import Literal
 from functools import cached_property
+from typing import Literal
 
 import torch as th
 

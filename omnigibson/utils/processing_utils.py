@@ -1,7 +1,7 @@
 import torch as th
 
-from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.python_utils import Serializable
 
 
 class Filter(Serializable):

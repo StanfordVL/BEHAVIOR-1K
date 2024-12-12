@@ -1,5 +1,5 @@
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import JointController
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 class NullJointController(JointController):

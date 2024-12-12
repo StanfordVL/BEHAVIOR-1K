@@ -1,6 +1,6 @@
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import assert_valid_key
 
 VALID_MODES = {
@@ -254,7 +254,9 @@ class MultiFingerGripperController(GripperController):
                 dist_from_upper_limit = max_pos - finger_pos
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
-                valid_grasp_pos = dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
+                valid_grasp_pos = (
+                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
+                )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
                 valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)

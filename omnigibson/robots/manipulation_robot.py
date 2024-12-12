@@ -1,8 +1,8 @@
 import math
 import os
 from abc import abstractmethod
-from functools import cached_property
 from collections import namedtuple
+from functools import cached_property
 from typing import Literal
 
 import networkx as nx
@@ -10,7 +10,6 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
     ControlType,
@@ -24,6 +23,7 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty

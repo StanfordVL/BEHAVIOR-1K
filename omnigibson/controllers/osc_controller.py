@@ -1,8 +1,8 @@
 import math
 
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers import ControlType, ManipulationController
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
@@ -412,7 +412,11 @@ class OperationalSpaceController(ManipulationController):
             ee_pos=cb.as_float32(ee_pos),
             ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
             ee_lin_vel=cb.as_float32(ee_vel[:3]),
-            ee_ang_vel_err=cb.as_float32(cb.T.quat2axisangle(cb.T.quat_multiply(cb.T.axisangle2quat(-ee_vel[3:]), cb.T.axisangle2quat(base_ang_vel)))),
+            ee_ang_vel_err=cb.as_float32(
+                cb.T.quat2axisangle(
+                    cb.T.quat_multiply(cb.T.axisangle2quat(-ee_vel[3:]), cb.T.axisangle2quat(base_ang_vel))
+                )
+            ),
             goal_pos=goal_dict["target_pos"],
             goal_ori_mat=goal_dict["target_ori_mat"],
             kp=kp,
@@ -486,7 +490,10 @@ class OperationalSpaceController(ManipulationController):
 
 
 import torch as th
+
 import omnigibson.utils.transform_utils as TT
+
+
 @th.jit.script
 def _compute_osc_torques_torch(
     q: th.Tensor,
@@ -564,7 +571,10 @@ def _compute_osc_torques_torch(
 
 import numpy as np
 from numba import jit
+
 import omnigibson.utils.transform_utils_np as NT
+
+
 # Use numba since faster
 @jit(nopython=True)
 def _compute_osc_torques_numpy(

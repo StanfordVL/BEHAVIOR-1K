@@ -1402,4 +1402,3 @@ def orientation_error(desired, current):
     error = 0.5 * (torch.linalg.cross(rc1, rd1) + torch.linalg.cross(rc2, rd2) + torch.linalg.cross(rc3, rd3))
 
     return error.reshape(desired.shape[:-2] + (3,))
-

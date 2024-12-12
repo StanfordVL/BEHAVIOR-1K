@@ -4,8 +4,8 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.robots import LocomotionRobot
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 def test_arm_control():

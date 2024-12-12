@@ -1,10 +1,10 @@
 import math
 from collections.abc import Iterable
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
-from omnigibson.utils.backend_utils import _compute_backend as cb
 
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -220,7 +220,11 @@ class InverseKinematicsController(JointController, ManipulationController):
         return th.cat(
             [
                 state_flat,
-                th.tensor([]) if self.control_filter is None else self.control_filter.serialize(state=state["control_filter"]),
+                (
+                    th.tensor([])
+                    if self.control_filter is None
+                    else self.control_filter.serialize(state=state["control_filter"])
+                ),
             ]
         )
 
@@ -368,7 +372,10 @@ class InverseKinematicsController(JointController, ManipulationController):
 
 
 import torch as th
+
 import omnigibson.utils.transform_utils as TT
+
+
 @th.jit.script
 def _compute_ik_qpos_torch(
     q: th.Tensor,
@@ -400,7 +407,10 @@ def _compute_ik_qpos_torch(
 
 import numpy as np
 from numba import jit
+
 import omnigibson.utils.transform_utils_np as NT
+
+
 # Use numba since faster
 @jit(nopython=True)
 def _compute_ik_qpos_numpy(
@@ -432,4 +442,3 @@ def _compute_ik_qpos_numpy(
 setattr(_ComputeBackend, "compute_ik_qpos", None)
 setattr(_ComputeTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
 setattr(_ComputeNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)
-

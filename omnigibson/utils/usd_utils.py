@@ -6,16 +6,16 @@ import re
 from collections.abc import Iterable
 
 import numpy as np
-from numba import jit, prange
 import torch as th
 import trimesh
+from numba import jit, prange
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeTorchBackend, _ComputeNumpyBackend
-from omnigibson.utils.backend_utils import _compute_backend as cb
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
@@ -1092,7 +1092,9 @@ class BatchControlViewAPIImpl:
 
     def get_coriolis_and_centrifugal_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
-            self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(self._view.get_coriolis_and_centrifugal_forces())
+            self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
+                self._view.get_coriolis_and_centrifugal_forces()
+            )
 
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
@@ -1875,12 +1877,14 @@ def delete_or_deactivate_prim(prim_path):
 
 
 import omnigibson.utils.transform_utils as TT
+
+
 @th.compile
 def _compute_relative_poses_torch(
-        idx: int,
-        n_links: int,
-        all_tfs: th.Tensor,
-        base_pose: th.Tensor,
+    idx: int,
+    n_links: int,
+    all_tfs: th.Tensor,
+    base_pose: th.Tensor,
 ):
     tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
     # base vel is the final -1 index
@@ -1903,6 +1907,8 @@ def _compute_relative_poses_torch(
 
 
 import omnigibson.utils.transform_utils_np as NT
+
+
 @jit(nopython=True)
 def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
     tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
@@ -1933,4 +1939,3 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 setattr(_ComputeBackend, "compute_relative_poses", None)
 setattr(_ComputeTorchBackend, "compute_relative_poses", _compute_relative_poses_torch)
 setattr(_ComputeNumpyBackend, "compute_relative_poses", _compute_relative_poses_numpy)
-
