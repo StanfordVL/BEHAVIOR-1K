@@ -256,10 +256,6 @@ class FrankaPanda(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
 
     @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description.yaml")}
-
-    @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
 
@@ -274,10 +270,6 @@ class FrankaPanda(ManipulationRobot):
     @property
     def curobo_attached_object_link_names(self):
         return {self._eef_link_names: "attached_object"}
-
-    @property
-    def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_eef.usd")}
 
     @property
     def teleop_rotation_offset(self):
