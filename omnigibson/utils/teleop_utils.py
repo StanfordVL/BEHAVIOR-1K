@@ -10,11 +10,13 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.objects import USDObject
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
+from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 
 try:
     from telemoma.configs.base_config import teleop_config
@@ -148,7 +150,9 @@ class OVXRSystem(TeleopSystem):
         system: str = "SteamVR",
         disable_display_output: bool = False,
         eef_tracking_mode: Literal["controller", "hand", "disabled"] = "controller",
+        # TODO: fix this to only take something like a prim path
         align_anchor_to: Literal["camera", "base", "touchpad"] = "camera",
+        view_angle_limits: Optional[Iterable[float]] = None,
     ) -> None:
         """
         Initializes the VR system
@@ -160,6 +164,7 @@ class OVXRSystem(TeleopSystem):
             eef_tracking_mode (Literal): whether to use controller tracking or hand tracking, one of ["controller", "hand", "disabled"], default is controller.
             align_anchor_to (Literal): specify where the VR view aligns to, one of ["camera", "base", "touchpad"], defaults to robot camera.
                 The "touchpad" option enables free movement of the VR view (i.e. the user), while the other two constrain the VR view to the either the robot base or camera pose.
+            view_angle_limits (Iterable): the view angle limits for the VR system (roll, pitch, and yaw) in degrees, default is None.
         """
         align_to_prim = isinstance(align_anchor_to, XFormPrim)
         assert (
@@ -178,7 +183,6 @@ class OVXRSystem(TeleopSystem):
         self.raw_data = {}
         # enable xr extension
         lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
-        self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
         # run super method
         super().__init__(teleop_config, robot, show_control_marker)
         # get xr core and profile
@@ -250,6 +254,24 @@ class OVXRSystem(TeleopSystem):
         self._update_camera_callback = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
             lazy.omni.kit.xr.core.XRCoreEventType.pre_render_update, self._update_camera_pose, name="update camera"
         )
+        self._view_blackout_prim = None
+        self._view_angle_limits = (
+            [T.deg2rad(limit) for limit in view_angle_limits] if view_angle_limits is not None else None
+        )
+        if self._view_angle_limits is not None:
+            scene = self.robot.scene
+            blackout_relative_path = "/view_blackout"
+            blackout_prim_path = scene_relative_prim_path_to_absolute(scene, blackout_relative_path)
+            blackout_sphere = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, blackout_prim_path)
+            blackout_sphere.CreateRadiusAttr().Set(0.1)
+            blackout_sphere.CreateDisplayColorAttr().Set(lazy.pxr.Vt.Vec3fArray([255, 255, 255]))
+            self._view_blackout_prim = VisualGeomPrim(
+                relative_prim_path=blackout_relative_path,
+                name="view_blackout",
+            )
+            self._view_blackout_prim.load(scene)
+            self._view_blackout_prim.initialize()
+            self._view_blackout_prim.visible = False
 
     def _update_camera_pose(self, e) -> None:
         if self.align_anchor_to == "touchpad":
@@ -277,6 +299,19 @@ class OVXRSystem(TeleopSystem):
                 )
                 anchor_orn = T.quat_multiply(anchor_orn, relative_orientation)
 
+                if self._view_blackout_prim is not None:
+                    relative_ori_in_euler = T.quat2euler(relative_orientation)
+                    roll_limit, pitch_limit, yaw_limit = self._view_angle_limits
+                    # OVXR has a different coordinate system than OmniGibson
+                    if (
+                        abs(relative_ori_in_euler[0]) > pitch_limit
+                        or abs(relative_ori_in_euler[1]) > yaw_limit
+                        or abs(relative_ori_in_euler[2]) > roll_limit
+                    ):
+                        self._view_blackout_prim.set_position_orientation(anchor_pos, anchor_orn)
+                        self._view_blackout_prim.visible = True
+                    else:
+                        self._view_blackout_prim.visible = False
             anchor_pose = self.og2xr(anchor_pos, anchor_orn)
             self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
                 anchor_pose.numpy(), self.hmd
@@ -548,14 +583,14 @@ class OVXRSystem(TeleopSystem):
         """
         for device in self.vr_profile.get_device_list():
             device_class = device.get_class()
-            if device_class == self.xr_device_class.xrdisplaydevice:
+            if device_class == lazy.omni.kit.xr.core.XRDeviceClass.xrdisplaydevice:
                 self.hmd = device
-            elif device_class == self.xr_device_class.xrcontroller:
+            elif device_class == lazy.omni.kit.xr.core.XRDeviceClass.xrcontroller:
                 # we want the first 2 controllers to be corresponding to the left and right hand
                 d_idx = device.get_index()
                 controller_name = ["left", "right"][d_idx] if d_idx < 2 else f"controller_{d_idx+1}"
                 self.controllers[controller_name] = device
-            elif device_class == self.xr_device_class.xrtracker:
+            elif device_class == lazy.omni.kit.xr.core.XRDeviceClass.xrtracker:
                 self.trackers[device.get_index()] = device
 
     def _update_device_transforms(self) -> None:

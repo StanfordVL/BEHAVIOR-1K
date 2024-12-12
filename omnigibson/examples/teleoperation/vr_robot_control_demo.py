@@ -30,16 +30,12 @@ def main():
             "arm_left": {
                 "name": "InverseKinematicsController",
                 "mode": "absolute_pose",
-                "pos_kp": 5.0,
-                "vel_kp": 0.0,
                 "command_input_limits": None,
                 "command_output_limits": None,
             },
             "arm_right": {
                 "name": "InverseKinematicsController",
                 "mode": "absolute_pose",
-                "pos_kp": 5.0,
-                "vel_kp": 0.0,
                 "command_input_limits": None,
                 "command_output_limits": None,
             },
@@ -88,6 +84,8 @@ def main():
         system="SteamVR",
         eef_tracking_mode="controller",
         align_anchor_to="camera",
+        # roll, pitch, yaw
+        view_angle_limits=[180, 30, 30],
     )
     vrsys.start()
 
