@@ -575,16 +575,28 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to remove from the Replicator backend
         """
         if self._annotators.get(modality, None) is not None:
-            self._annotators[modality].detach([self._render_product])
+            # Passing an explicit list is bugged -- see omni source code
+            # So we only pass in the product directly, which gets post-processed correctly
+            self._annotators[modality].detach(self._render_product)
             self._annotators[modality] = None
 
     def remove(self):
         # Remove from global sensors dictionary
         self.SENSORS.pop(self.prim_path)
 
+        # Remove all modalities
+        for modality in tuple(self.modalities):
+            self.remove_modality(modality)
+
+        # Destroy the render product
+        self._render_product.destroy()
+
         # Remove the viewport if it's not the main viewport
         if self._viewport.name != "Viewport":
             self._viewport.destroy()
+        else:
+            # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
+            self.active_camera_path = "/OmniverseKit_Persp"
 
         # Run super
         super().remove()
@@ -882,10 +894,9 @@ class VisionSensor(BaseSensor):
         """
         Clear all the class-wide variables.
         """
-        for sensor in cls.SENSORS.values():
-            # Destroy any sensor that is not attached to the main viewport window
-            if sensor._viewport.name != "Viewport":
-                sensor._viewport.destroy()
+        # Remove all sensors
+        for sensor in tuple(cls.SENSORS.values()):
+            sensor.remove()
 
         # Render to update
         render()
