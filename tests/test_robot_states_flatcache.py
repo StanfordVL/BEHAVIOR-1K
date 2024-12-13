@@ -185,7 +185,7 @@ def test_robot_load_drive():
             robot.reload_controllers(controller_config=controller_config)
             env.scene.update_initial_state()
 
-            action_primitives = StarterSemanticActionPrimitives(robot)
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 
             eef_pos = env.robots[0].get_eef_position()
             eef_orn = env.robots[0].get_eef_orientation()
@@ -200,7 +200,7 @@ def test_robot_load_drive():
 
         # If this is a locomotion robot, we want to test driving
         if isinstance(robot, LocomotionRobot):
-            action_primitives = StarterSemanticActionPrimitives(robot)
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)

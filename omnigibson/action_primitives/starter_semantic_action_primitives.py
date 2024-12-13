@@ -136,6 +136,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         planning_batch_size=3,
         collision_check_batch_size=5,
         debug_visual_marker=None,
+        skip_curobo_initilization=False,
     ):
         """
         Initializes a StarterSemanticActionPrimitives generator.
@@ -151,13 +152,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             planning_batch_size (int): The batch size for curobo motion planning. Defaults to 3.
             collision_check_batch_size (int): The batch size for curobo collision checking. Defaults to 5.
             debug_visual_marker (PrimitiveObject): The object to use for debug visual markers. Defaults to None.
+            skip_curobo_initilization (bool): Whether to skip curobo initialization. Defaults to False.
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with Tiago and R1 with their JointControllers set to absolute position mode with impedance."
         )
         super().__init__(env, robot)
-        self._motion_generator = CuRoboMotionGenerator(robot=self.robot, batch_size=planning_batch_size)
         self.controller_functions = {
             StarterSemanticActionPrimitiveSet.GRASP: self._grasp,
             StarterSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
@@ -169,19 +170,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.TOGGLE_ON: self._toggle_on,
             StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
-        # Validate the robot
-        if isinstance(self.robot, LocomotionRobot):
-            base_controller = self.robot.controllers["base"]
-            assert (
-                isinstance(base_controller, (JointController)) and not base_controller.use_delta_commands
-            ), "StarterSemanticActionPrimitives only works with a JointController with absolute mode at the robot base."
+        self._motion_generator = (
+            None
+            if skip_curobo_initilization
+            else CuRoboMotionGenerator(robot=self.robot, batch_size=planning_batch_size)
+        )
 
         self._task_relevant_objects_only = task_relevant_objects_only
 
         self._enable_head_tracking = enable_head_tracking
         self._always_track_eef = always_track_eef
         self._tracking_object = None
-        self._arm = self.robot.default_arm
+        self._arm = self.robot.default_arm if isinstance(self.robot, ManipulationRobot) else None
 
         # Store the current position of the arm as the arm target
         control_dict = self.robot.get_control_dict()
@@ -1728,15 +1728,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action = self._empty_action()
 
-                base_action_size = self.robot.controller_action_idx["base"].numel()
-                assert (
-                    base_action_size == 3
-                ), "Currently, the action primitives only support [x, y, theta] joint controller"
-
-                base_action = th.tensor(
-                    [body_target_pose[0][0], body_target_pose[0][1], body_target_pose[1]], dtype=th.float32
-                )
-                action[self.robot.controller_action_idx["base"]] = base_action
+                if isinstance(self.robot.controllers["base"], JointController):
+                    base_action_size = self.robot.controller_action_idx["base"].numel()
+                    assert (
+                        base_action_size == 3
+                    ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                    direction_vec = (
+                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[type(self.robot)]
+                    )
+                    base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
+                    action[self.robot.controller_action_idx["base"]] = base_action
+                else:
+                    # Diff drive controller
+                    base_action = th.tensor([m.KP_LIN_VEL[type(self.robot)], 0.0], dtype=th.float32)
+                    action[self.robot.controller_action_idx["base"]] = base_action
 
                 yield self._postprocess_action(action)
 
@@ -1771,14 +1776,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             action = self._empty_action()
 
+            direction = -1.0 if diff_yaw < 0.0 else 1.0
+            ang_vel = m.KP_ANGLE_VEL[type(self.robot)] * direction
+
+            if isinstance(self.robot, Locobot) or isinstance(self.robot, Freight):
+                # Locobot and Freight wheel joints are reversed
+                ang_vel = -ang_vel
+
             base_action = action[self.robot.controller_action_idx["base"]]
 
-            assert (
-                base_action.numel() == 3
-            ), "Currently, the action primitives only support [x, y, theta] joint controller"
-            base_action[0] = 0.0
-            base_action[1] = 0.0
-            base_action[2] = T.quat2euler(body_target_pose[1])[2].item()
+            if not isinstance(self.robot.controllers["base"], JointController):
+                base_action[0] = 0.0
+                base_action[1] = ang_vel
+            else:
+                assert (
+                    base_action.numel() == 3
+                ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                base_action[0] = 0.0
+                base_action[1] = 0.0
+                base_action[2] = ang_vel
 
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)

@@ -18,7 +18,7 @@ from omnigibson.utils.python_utils import create_class_from_registry_and_config
 
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = True
-current_robot_type = "Fetch"
+current_robot_type = "R1"
 
 
 def load_robot_config(robot_name):
@@ -38,7 +38,7 @@ def start_env(robot_type):
             current_robot_type = robot_type
             og.clear()
 
-    if robot_type not in ["Fetch", "Tiago"]:
+    if robot_type not in ["R1", "Tiago"]:
         raise ValueError("Invalid robot configuration")
     robots = load_robot_config(robot_type)
     config = {
@@ -72,7 +72,7 @@ def start_env(robot_type):
                 "category": "apple",
                 "model": "agveuv",
                 "position": [4.75, 10.75, 1.0],
-                "bounding_box": [0.098, 0.098, 0.115],
+                "bounding_box": [0.05, 0.05, 0.05],
             },
             {
                 "type": "DatasetObject",
@@ -103,7 +103,7 @@ def retrieve_obj_cfg(obj):
 
 def pytest_generate_tests(metafunc):
     if "robot_type" in metafunc.fixturenames:
-        metafunc.parametrize("robot_type", ["Fetch", "Tiago"], scope="session")
+        metafunc.parametrize("robot_type", ["R1", "Tiago"], scope="session")
 
 
 @pytest.fixture(scope="module")
@@ -127,7 +127,7 @@ def robot(env):
 
 @pytest.fixture
 def prim_gen(env):
-    return SymbolicSemanticActionPrimitives(env)
+    return SymbolicSemanticActionPrimitives(env, env.robots[0])
 
 
 @pytest.fixture

@@ -40,8 +40,8 @@ class SymbolicSemanticActionPrimitiveSet(IntEnum):
 
 
 class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env, robot):
+        super().__init__(env, robot)
         self.controller_functions = {
             SymbolicSemanticActionPrimitiveSet.GRASP: self._grasp,
             SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
