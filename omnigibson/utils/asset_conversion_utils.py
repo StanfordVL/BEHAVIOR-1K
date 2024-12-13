@@ -1914,6 +1914,7 @@ def get_collision_approximation_for_urdf(
             during collision generation process
     """
     # Load URDF
+    urdf_dir = os.path.dirname(urdf_path)
     tree = ET.parse(urdf_path)
     root = tree.getroot()
 
@@ -1923,7 +1924,8 @@ def get_collision_approximation_for_urdf(
     no_decompose_links = set() if no_decompose_links is None else set(no_decompose_links)
     visual_only_links = set() if visual_only_links is None else set(visual_only_links)
     ignore_links = set() if ignore_links is None else set(ignore_links)
-    col_mesh_folder = pathlib.Path(os.path.dirname(urdf_path)) / "meshes" / "collision"
+    col_mesh_rel_folder = "meshes/collision"
+    col_mesh_folder = pathlib.Path(urdf_dir) / col_mesh_rel_folder
     col_mesh_folder.mkdir(exist_ok=True, parents=True)
     for link in root.findall("link"):
         link_name = link.attrib["name"]
@@ -1996,7 +1998,7 @@ def get_collision_approximation_for_urdf(
                     collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
                     collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
                     collision_mesh_xml.attrib = {
-                        "filename": str(col_mesh_folder / collision_filename),
+                        "filename": os.path.join(col_mesh_rel_folder, collision_filename),
                         "scale": " ".join([str(item) for item in collision_scale]),
                     }
 
