@@ -139,6 +139,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             command_output_limits=command_output_limits,
         )
 
+    def _generate_default_command_output_limits(self):
+        # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
+        # but controls low-level efforts
+        return (
+            self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx],
+            self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx],
+        )
+
     def _update_goal(self, command, control_dict):
         # If we're using delta commands, add this value
         if self._use_delta_commands:
