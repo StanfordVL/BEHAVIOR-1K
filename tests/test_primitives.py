@@ -26,8 +26,8 @@ def load_robot_config(robot_name):
         return full_config.get("robots", {})[0]
 
 
-def setup_environment(load_object_categories, robot="Fetch"):
-    if robot not in ["Fetch", "Tiago"]:
+def setup_environment(load_object_categories, robot="R1"):
+    if robot not in ["R1", "Tiago"]:
         raise ValueError("Invalid robot configuration")
 
     robots = load_robot_config(robot)
@@ -85,7 +85,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
         og.clear()
 
 
-@pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
+@pytest.mark.parametrize("robot", ["Tiago", "R1"])
 class TestPrimitives:
     def test_navigate(self, robot):
         categories = ["floors", "ceilings", "walls"]

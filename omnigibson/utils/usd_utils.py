@@ -1650,8 +1650,8 @@ def add_asset_to_stage(asset_path, prim_path):
         Usd.Prim: Loaded prim as a USD prim
     """
     # Make sure this is actually a supported asset type
-    assert asset_path[-4:].lower() in {".usd", ".obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
-    asset_type = asset_path[-3:]
+    asset_type = asset_path.split(".")[-1]
+    assert asset_type in {"usd", "usda", "obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"

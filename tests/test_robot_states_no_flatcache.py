@@ -33,14 +33,15 @@ def test_object_in_FOV_of_robot():
     env = setup_environment(False)
     robot = env.robots[0]
     env.reset()
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == [robot]
+    objs_in_fov = robot.states[ObjectsInFOVOfRobot].get_value()
+    assert len(objs_in_fov) == 1 and next(iter(objs_in_fov)) == robot
     sensors = [s for s in robot.sensors.values() if isinstance(s, VisionSensor)]
     assert len(sensors) > 0
-    vision_sensor = sensors[0]
-    vision_sensor.set_position_orientation(position=[100, 150, 100])
+    for vision_sensor in sensors:
+        vision_sensor.set_position_orientation(position=[100, 150, 100])
     og.sim.step()
     for _ in range(5):
         og.sim.render()
     # Since the sensor is moved away from the robot, the robot should not see itself
-    assert robot.states[ObjectsInFOVOfRobot].get_value() == []
+    assert len(robot.states[ObjectsInFOVOfRobot].get_value()) == 0
     og.clear()

@@ -1,6 +1,7 @@
 import math
 import os
 import random
+from enum import IntEnum
 
 import torch as th
 
@@ -24,6 +25,11 @@ m = create_module_macros(module_path=__file__)
 m.MIN_OBJ_MASS = 0.4
 
 
+class DatasetType(IntEnum):
+    BEHAVIOR = 0
+    CUSTOM = 1
+
+
 class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
@@ -37,6 +43,7 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
+        dataset_type=DatasetType.BEHAVIOR,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -62,6 +69,9 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
+            dataset_type (DatasetType): Dataset to search for this object. Default is BEHAVIOR, corresponding to the
+                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, CUSTOM}.
+                If CUSTOM, assumes asset is found at gm.CUSTOM_DATASET_PATH and additionally not encrypted.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -99,6 +109,7 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
+        load_config["dataset_type"] = dataset_type
         # All DatasetObjects should have xform properties pre-loaded
         load_config["xform_props_pre_loaded"] = True
 
@@ -119,13 +130,13 @@ class DatasetObject(USDObject):
             )
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model)
+        usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
 
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=True,
+            encrypted=dataset_type == DatasetType.BEHAVIOR,
             name=name,
             category=category,
             scale=scale,
@@ -142,7 +153,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model):
+    def get_usd_path(cls, category, model, dataset_type=DatasetType.BEHAVIOR):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -151,11 +162,13 @@ class DatasetObject(USDObject):
         Args:
             category (str): Category for the object
             model (str): Specific model ID of the object
+            dataset_type (DatasetType): Dataset type, used to infer dataset directory to search for @category and @model
 
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
+        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.CUSTOM_DATASET_PATH
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
         """

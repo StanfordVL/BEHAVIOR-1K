@@ -89,7 +89,7 @@ def test_curobo():
         {
             "type": "R1",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.55, 0.0],
+            "position": [0.7, -0.7, 0.056],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -343,7 +343,7 @@ def test_curobo():
         ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
         assert (
             false_negative / n_samples == 0.0
-        ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
+        ), f"Collision checking false negative rate: {false_negative / n_samples}, should be == 0.0."
 
         env.scene.reset()
 

@@ -372,12 +372,50 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return ["torso_lift_joint"]
 
     @property
+    def manipulation_link_names(self):
+        return [
+            "torso_fixed_link",
+            "torso_lift_link",
+            "arm_left_1_link",
+            "arm_left_2_link",
+            "arm_left_3_link",
+            "arm_left_4_link",
+            "arm_left_5_link",
+            "arm_left_6_link",
+            "arm_left_7_link",
+            "arm_left_tool_link",
+            "wrist_left_ft_link",
+            "wrist_left_ft_tool_link",
+            "gripper_left_link",
+            "gripper_left_left_finger_link",
+            "gripper_left_right_finger_link",
+            "gripper_left_tool_link",
+            "arm_right_1_link",
+            "arm_right_2_link",
+            "arm_right_3_link",
+            "arm_right_4_link",
+            "arm_right_5_link",
+            "arm_right_6_link",
+            "arm_right_7_link",
+            "arm_right_tool_link",
+            "wrist_right_ft_link",
+            "wrist_right_ft_tool_link",
+            "gripper_right_link",
+            "gripper_right_left_finger_link",
+            "gripper_right_right_finger_link",
+            "gripper_right_tool_link",
+            "head_1_link",
+            "head_2_link",
+            "xtion_link",
+        ]
+
+    @property
     def arm_link_names(self):
         return {arm: [f"arm_{arm}_{i}_link" for i in range(1, 8)] for arm in self.arm_names}
 
     @property
     def eef_link_names(self):
-        return {arm: "gripper_{}_grasping_frame".format(arm) for arm in self.arm_names}
+        return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
     @property
     def finger_link_names(self):
@@ -390,67 +428,8 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         }
 
     @property
-    def usd_path(self):
-        if self._variant == "wrist_cam":
-            return os.path.join(
-                gm.ASSET_PATH,
-                "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd",
-            )
-
-        # Default variant
-        return os.path.join(
-            gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd"
-        )
-
-    @property
-    def curobo_path(self):
-        return {
-            emb_sel: os.path.join(gm.ASSET_PATH, f"models/tiago/tiago_description_curobo_{emb_sel.value}.yaml")
-            for emb_sel in CuRoboEmbodimentSelection
-        }
-
-    @property
-    def curobo_attached_object_link_names(self):
-        return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
-
-    @property
-    def simplified_mesh_usd_path(self):
-        # TODO: How can we make this more general - maybe some automatic way to generate these?
-        return os.path.join(
-            gm.ASSET_PATH,
-            "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd",
-        )
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        # TODO: Remove the need to do this by making the arm descriptor yaml files generated automatically
-        return {
-            "left": os.path.join(
-                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"
-            ),
-            "left_fixed": os.path.join(
-                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_fixed_trunk_descriptor.yaml"
-            ),
-            "right": os.path.join(
-                gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"
-            ),
-            "combined": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.yaml"),
-        }
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
-
-    @property
     def arm_workspace_range(self):
         return {
             "left": th.deg2rad(th.tensor([15, 75], dtype=th.float32)),
             "right": th.deg2rad(th.tensor([-75, -15], dtype=th.float32)),
-        }
-
-    @property
-    def eef_usd_path(self):
-        return {
-            arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd")
-            for arm in self.arm_names
         }

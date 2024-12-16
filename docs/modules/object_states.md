@@ -210,9 +210,9 @@ These are object states that are agnostic to other objects in a given scene.
         <tr>
         <td valign="top" width="60%">
             [**`ObjectsInFOVOfRobot`**](../reference/object_states/robot_related_states.md)<br><br>  
-            A robot-specific state. Comptues the list of objects that are currently in the robot's field of view.<br><br>
+            A robot-specific state. Comptues the set of objects that are currently in the robot's field of view.<br><br>
             <ul>
-                <li>`get_value()`: returns `obj_list`, the list of `BaseObject`s</li>
+                <li>`get_value()`: returns `obj_set`, the set of `BaseObject`s</li>
                 <li>`set_value(new_value)`: Not supported</li>
             </ul>
         </td>

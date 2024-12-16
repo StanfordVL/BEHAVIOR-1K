@@ -50,7 +50,7 @@ m.KP_LIN_VEL = {
     Stretch: 0.5,
     Turtlebot: 0.3,
     Husky: 0.05,
-    Freight: 0.05,
+    Freight: 0.2,
     Locobot: 1.5,
     BehaviorRobot: 0.3,
     R1: 0.3,
@@ -61,7 +61,7 @@ m.KP_ANGLE_VEL = {
     Stretch: 0.7,
     Turtlebot: 0.2,
     Husky: 0.05,
-    Freight: 0.05,
+    Freight: 0.1,
     Locobot: 1.5,
     BehaviorRobot: 0.2,
     R1: 0.2,
@@ -1778,10 +1778,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
             ang_vel = m.KP_ANGLE_VEL[type(self.robot)] * direction
-
-            if isinstance(self.robot, Locobot) or isinstance(self.robot, Freight):
-                # Locobot and Freight wheel joints are reversed
-                ang_vel = -ang_vel
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
