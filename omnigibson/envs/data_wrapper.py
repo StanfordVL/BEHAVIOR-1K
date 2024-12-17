@@ -320,15 +320,24 @@ class DataCollectionWrapper(DataWrapper):
         # Set the main viewport camera path
         og.sim.viewer_camera.active_camera_path = viewport_camera_path
 
-        # # Use asynchronous rendering for faster performance
-        # lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-        # lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+        # Use asynchronous rendering for faster performance
+        # We have to do a super hacky workaround to avoid the GUI freezing, which is
+        # toggling these settings to be True -> False -> True
+        # Only setting it to True once will actually freeze the GUI for some reason!
+        if not gm.HEADLESS:
+            # TODO: VR doesn't work with async rendering
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+            # lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
-        # Disable mouse grabbing since we're only using the UI passively
-        lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
-        lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
-        lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
-        lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
+            # Disable mouse grabbing since we're only using the UI passively
+            lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient

@@ -31,11 +31,3 @@ class Husky(LocomotionRobot):
     @property
     def _default_joint_pos(self):
         return th.zeros(self.n_joints)
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/husky/husky/husky.usd")
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/husky/husky.urdf")

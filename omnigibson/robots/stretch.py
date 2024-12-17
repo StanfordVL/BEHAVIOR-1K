@@ -19,19 +19,6 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     Reference: https://hello-robot.com/stretch-3-product
     """
 
-    def _post_load(self):
-        super()._post_load()
-
-        # Set the wheels back to using sphere approximations
-        for wheel_name in ["link_left_wheel", "link_right_wheel"]:
-            log.warning(
-                "Stretch wheel links are post-processed to use sphere approximation collision meshes. "
-                "Please ignore any previous errors about these collision meshes."
-            )
-            wheel_link = self.links[wheel_name]
-            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
-
     @property
     def discrete_action_list(self):
         raise NotImplementedError()
@@ -77,8 +64,8 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_fingertip_right", position=th.tensor([-0.01, 0.0, 0.009])),
+                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 
@@ -86,69 +73,22 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_fingertip_left", position=th.tensor([-0.01, 0.0, 0.009])),
+                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.013, 0.0, 0.01])),
+                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([-0.01, 0.0, 0.009])),
             ]
         }
 
     @property
     def disabled_collision_pairs(self):
         return [
-            ["base_link", "caster_link"],
-            ["base_link", "link_aruco_left_base"],
-            ["base_link", "link_aruco_right_base"],
-            ["base_link", "base_imu"],
-            ["base_link", "laser"],
-            ["base_link", "link_left_wheel"],
-            ["base_link", "link_right_wheel"],
-            ["base_link", "link_mast"],
-            ["link_mast", "link_head"],
-            ["link_head", "link_head_pan"],
-            ["link_head_pan", "link_head_tilt"],
-            ["camera_link", "link_head_tilt"],
-            ["camera_link", "link_head_pan"],
-            ["link_head_nav_cam", "link_head_tilt"],
-            ["link_head_nav_cam", "link_head_pan"],
-            ["link_mast", "link_lift"],
-            ["link_lift", "link_aruco_shoulder"],
-            ["link_lift", "link_arm_l4"],
             ["link_lift", "link_arm_l3"],
             ["link_lift", "link_arm_l2"],
             ["link_lift", "link_arm_l1"],
-            ["link_arm_l4", "link_arm_l3"],
-            ["link_arm_l4", "link_arm_l2"],
-            ["link_arm_l4", "link_arm_l1"],
-            ["link_arm_l4", "link_aruco_inner_wrist"],
-            ["link_arm_l3", "link_arm_l2"],
+            ["link_lift", "link_arm_l0"],
             ["link_arm_l3", "link_arm_l1"],
-            ["link_arm_l3", "link_aruco_top_wrist"],
-            ["link_arm_l3", "link_aruco_inner_wrist"],
-            ["link_arm_l2", "link_arm_l1"],
-            ["link_arm_l2", "link_aruco_top_wrist"],
-            ["link_arm_l2", "link_aruco_inner_wrist"],
             ["link_arm_l0", "link_arm_l1"],
             ["link_arm_l0", "link_arm_l2"],
             ["link_arm_l0", "link_arm_l3"],
-            ["link_arm_l0", "link_arm_l4"],
-            ["link_arm_l0", "link_arm_l1"],
-            ["link_arm_l0", "link_aruco_inner_wrist"],
-            ["link_arm_l0", "link_aruco_top_wrist"],
-            ["link_arm_l0", "link_wrist_yaw"],
-            ["link_arm_l0", "link_wrist_yaw_bottom"],
-            ["link_arm_l0", "link_wrist_pitch"],
-            ["link_wrist_yaw_bottom", "link_wrist_pitch"],
-            ["link_wrist_yaw_bottom", "link_arm_l4"],
-            ["link_wrist_yaw_bottom", "link_arm_l3"],
-            ["gripper_camera_link", "link_gripper_s3_body"],
-            ["link_gripper_s3_body", "link_aruco_d405"],
-            ["link_gripper_s3_body", "link_gripper_finger_left"],
-            ["link_gripper_finger_left", "link_aruco_fingertip_left"],
-            ["link_gripper_finger_left", "link_gripper_fingertip_left"],
-            ["link_gripper_s3_body", "link_gripper_finger_right"],
-            ["link_gripper_finger_right", "link_aruco_fingertip_right"],
-            ["link_gripper_finger_right", "link_gripper_fingertip_right"],
-            ["respeaker_base", "link_head"],
-            ["respeaker_base", "link_mast"],
         ]
 
     @cached_property
@@ -163,17 +103,12 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def arm_link_names(self):
         return {
             self.default_arm: [
-                "link_mast",
                 "link_lift",
-                "link_arm_l4",
                 "link_arm_l3",
                 "link_arm_l2",
                 "link_arm_l1",
                 "link_arm_l0",
-                "link_aruco_inner_wrist",
-                "link_aruco_top_wrist",
                 "link_wrist_yaw",
-                "link_wrist_yaw_bottom",
                 "link_wrist_pitch",
                 "link_wrist_roll",
             ]
@@ -196,7 +131,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @cached_property
     def eef_link_names(self):
-        return {self.default_arm: "link_grasp_center"}
+        return {self.default_arm: "eef_link"}
 
     @cached_property
     def finger_link_names(self):
@@ -204,23 +139,9 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             self.default_arm: [
                 "link_gripper_finger_left",
                 "link_gripper_finger_right",
-                "link_gripper_fingertip_left",
-                "link_gripper_fingertip_right",
             ]
         }
 
     @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/stretch/stretch/stretch.usd")
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/stretch/stretch.urdf")
-
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/stretch/stretch_descriptor.yaml")}

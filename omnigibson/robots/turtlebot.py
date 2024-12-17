@@ -29,37 +29,3 @@ class Turtlebot(TwoWheelRobot):
     @property
     def _default_joint_pos(self):
         return th.zeros(self.n_joints)
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot/turtlebot.usd")
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot.urdf")
-
-    @property
-    def disabled_collision_pairs(self):
-        # badly modeled gripper collision meshes
-        return [
-            ["plate_bottom_link", "pole_middle_0_link"],
-            ["plate_bottom_link", "pole_middle_2_link"],
-            ["plate_middle_link", "pole_top_3_link"],
-            ["plate_middle_link", "pole_kinect_0_link"],
-            ["plate_middle_link", "pole_kinect_1_link"],
-            ["plate_middle_link", "pole_top_1_link"],
-            ["plate_middle_link", "pole_middle_0_link"],
-            ["plate_middle_link", "pole_middle_1_link"],
-            ["plate_middle_link", "pole_middle_2_link"],
-            ["plate_middle_link", "pole_middle_3_link"],
-            ["plate_top_link", "pole_top_0_link"],
-            ["plate_top_link", "pole_top_1_link"],
-            ["plate_top_link", "pole_top_2_link"],
-            ["plate_top_link", "pole_top_3_link"],
-            ["pole_top_0_link", "pole_middle_0_link"],
-            ["pole_top_0_link", "plate_middle_link"],
-            ["pole_top_1_link", "pole_middle_1_link"],
-            ["pole_top_2_link", "pole_middle_2_link"],
-            ["pole_top_2_link", "plate_middle_link"],
-            ["pole_top_3_link", "pole_middle_3_link"],
-        ]

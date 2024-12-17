@@ -1,6 +1,9 @@
+import torch as th
+
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 
 VALID_MODES = {
@@ -15,7 +18,7 @@ m = create_module_macros(module_path=__file__)
 
 # is_grasping heuristics parameters
 m.POS_TOLERANCE = 0.002  # arbitrary heuristic
-m.VEL_TOLERANCE = 0.01  # arbitrary heuristic
+m.VEL_TOLERANCE = 0.02  # arbitrary heuristic
 
 
 class MultiFingerGripperController(GripperController):
@@ -99,6 +102,9 @@ class MultiFingerGripperController(GripperController):
         # Create other args to be filled in at runtime
         self._is_grasping = IsGraspingState.FALSE
 
+        # Create ring buffer for velocity history to avoid high frequency nosie during grasp state inference
+        self._vel_filter = MovingAverageFilter(obs_dim=len(dof_idx), filter_width=5)
+
         # If we're using binary signal, we override the command output limits
         if mode == "binary":
             command_output_limits = (-1.0, 1.0)
@@ -121,8 +127,16 @@ class MultiFingerGripperController(GripperController):
         # Call super first
         super().reset()
 
+        # Reset the filter
+        self._vel_filter.reset()
+
         # reset grasping state
         self._is_grasping = IsGraspingState.FALSE
+
+    @property
+    def state_size(self):
+        # Add state size from the control filter
+        return super().state_size + self._vel_filter.state_size
 
     def _preprocess_command(self, command):
         # We extend this method to make sure command is always n-dimensional
@@ -211,6 +225,9 @@ class MultiFingerGripperController(GripperController):
                     joint_position: Array of current joint positions
                     joint_velocity: Array of current joint velocities
         """
+        # Update velocity history
+        finger_vel = self._vel_filter.estimate(control_dict["joint_velocity"][self.dof_idx])
+
         # Calculate grasping state based on mode of this controller
         # Independent mode of MultiFingerGripperController does not have any good heuristics to determine is_grasping
         if self._mode == "independent":
@@ -242,7 +259,6 @@ class MultiFingerGripperController(GripperController):
 
             # Otherwise, the last control signal intends to "move" the gripper
             else:
-                finger_vel = control_dict["joint_velocity"][self.dof_idx]
                 min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
@@ -253,9 +269,9 @@ class MultiFingerGripperController(GripperController):
                 dist_from_lower_limit = finger_pos - min_pos
                 dist_from_upper_limit = max_pos - finger_pos
 
-                # If the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
+                # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                    dist_from_lower_limit.mean() > m.POS_TOLERANCE and dist_from_upper_limit.mean() > m.POS_TOLERANCE
+                    th.mean(dist_from_lower_limit) > m.POS_TOLERANCE or th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
@@ -298,6 +314,39 @@ class MultiFingerGripperController(GripperController):
     def is_grasping(self):
         # Return cached value
         return self._is_grasping
+
+    def _dump_state(self):
+        # Run super first
+        state = super()._dump_state()
+
+        # Add filter state
+        state["vel_filter"] = self._vel_filter.dump_state(serialized=False)
+
+        return state
+
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
+
+        # Also load velocity filter state
+        self._vel_filter.load_state(state["vel_filter"], serialized=False)
+
+    def serialize(self, state):
+        # Run super first
+        state_flat = super().serialize(state=state)
+
+        # Serialize state for this controller
+        return th.cat([state_flat, self._vel_filter.serialize(state=state["vel_filter"])])
+
+    def deserialize(self, state):
+        # Run super first
+        state_dict, idx = super().deserialize(state=state)
+
+        # Deserialize state for the velocity filter
+        state_dict["vel_filter"], deserialized_items = self._vel_filter.deserialize(state=state[idx:])
+        idx += deserialized_items
+
+        return state_dict, idx
 
     @property
     def control_type(self):

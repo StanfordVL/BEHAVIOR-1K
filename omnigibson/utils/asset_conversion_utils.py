@@ -13,15 +13,16 @@ from os.path import exists
 from pathlib import Path
 from xml.dom import minidom
 
+import pymeshlab
 import torch as th
 import trimesh
-import pymeshlab
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
+from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
@@ -559,91 +560,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
     _copy_object_state_textures(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
 
-    # ###################################
-    #
-    # # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
-    # # know <link_name> is a valid link, and we check explicitly for these material files in our set
-    # # Note: we assume that the link name is included as a string within the mat_file!
-    # for prim in obj_prim.GetChildren():
-    #     if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-    #         # This could be a link, check if it owns a visual subprim
-    #         link_name = prim.GetName()
-    #         visual_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{prim.GetPrimPath().pathString}/visuals")
-    #         log.debug(f"path: {prim.GetPrimPath().pathString}/visuals")
-    #         log.debug(f"visual prim: {visual_prim}")
-    #
-    #         if visual_prim:
-    #             # Aggregate all material files for this prim
-    #             link_mat_files = []
-    #             for mat_file in deepcopy(mat_files):
-    #                 if link_name in mat_file:
-    #                     # Add this mat file and remove it from the set
-    #                     link_mat_files.append(mat_file)
-    #                     mat_files.remove(mat_file)
-    #             # Potentially write material files for this prim if we have any valid materials
-    #             log.debug("link_mat_files:", link_mat_files)
-    #             if not link_mat_files:
-    #                 # Bind default material to the visual prim
-    #                 shade = lazy.pxr.UsdShade.Material(default_mat)
-    #                 lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, lazy.pxr.UsdShade.Tokens.strongerThanDescendants)
-    #                 default_mat_is_used = True
-    #             else:
-    #                 # Create new material for this link
-    #                 mtl_created_list = []
-    #                 lazy.omni.kit.commands.execute(
-    #                     "CreateAndBindMdlMaterialFromLibrary",
-    #                     mdl_name="OmniPBR.mdl",
-    #                     mtl_name="OmniPBR",
-    #                     mtl_created_list=mtl_created_list,
-    #                 )
-    #                 log.debug(f"Created material for link {link_name}:", mtl_created_list[0])
-    #                 mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-    #
-    #                 shade = lazy.pxr.UsdShade.Material(mat)
-    #                 # Bind the created link material to the visual prim
-    #                 lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, lazy.pxr.UsdShade.Tokens.strongerThanDescendants)
-    #
-    #                 # Iterate over all material channels and write them to the material
-    #                 for link_mat_file in link_mat_files:
-    #                     # Copy this file into the materials folder
-    #                     mat_fpath = os.path.join(usd_dir, "materials")
-    #                     shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
-    #                     # Check if any valid rendering channel
-    #                     mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
-    #                     # Apply the material if it exists
-    #                     render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
-    #                     if render_channel_fcn is not None:
-    #                         render_channel_fcn(mat, os.path.join("materials", link_mat_file))
-    #                     else:
-    #                         # Warn user that we didn't find the correct rendering channel
-    #                         log.warning(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
-    #
-    #                 # Rename material
-    #                 mat = rename_prim(prim=mat, name=f"material_{link_name}")
-    #
-    # # For any remaining materials, we write them to the default material
-    # # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
-    # # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_default")
-    # log.debug(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
-    # for mat_file in mat_files:
-    #     # Copy this file into the materials folder
-    #     mat_fpath = os.path.join(usd_dir, "materials")
-    #     shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
-    #     # Check if any valid rendering channel
-    #     mat_type = mat_file.split("_")[-1].split(".")[0].lower()
-    #     # Apply the material if it exists
-    #     render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
-    #     if render_channel_fcn is not None:
-    #         render_channel_fcn(default_mat, os.path.join("materials", mat_file))
-    #         default_mat_is_used = True
-    #     else:
-    #         # Warn user that we didn't find the correct rendering channel
-    #         log.warning(f"Could not find rendering channel function for material: {mat_type}")
-    #
-    # # Possibly delete the default material prim if it was never used
-    # if not default_mat_is_used:
-    #     stage.RemovePrim(default_mat.GetPrimPath())
-
 
 def _add_xform_properties(prim):
     """
@@ -1073,12 +989,23 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
         if "glass" in link_tags:
             _process_glass_link(prim.GetChild(link))
 
-    # Rename model to be named <model>
+    # Rename model to be named <model> if not already named that
     old_prim_path = prim.GetPrimPath().pathString
-    new_prim_path = "/".join(old_prim_path.split("/")[:-1]) + f"/{obj_model}"
-    lazy.omni.kit.commands.execute("MovePrim", path_from=old_prim_path, path_to=new_prim_path)
+    if old_prim_path.split("/")[-1] != obj_model:
+        new_prim_path = "/".join(old_prim_path.split("/")[:-1]) + f"/{obj_model}"
+        lazy.omni.kit.commands.execute("MovePrim", path_from=old_prim_path, path_to=new_prim_path)
+        prim = stage.GetDefaultPrim()
 
-    prim = stage.GetDefaultPrim()
+    # Hacky way to avoid new prim being created at /World
+    class DummyScene:
+        prim_path = ""
+
+    og.sim.render()
+    mat_prims = find_all_prim_children_with_type(prim_type="Material", root_prim=prim)
+    for i, mat_prim in enumerate(mat_prims):
+        mat = MaterialPrim(mat_prim.GetPrimPath().pathString, f"mat{i}")
+        mat.load(DummyScene)
+        mat.shader_update_asset_paths_with_root_path(root_path=os.path.dirname(usd_path), relative=True)
 
     # Save stage
     stage.Save()
@@ -1155,8 +1082,8 @@ def _recursively_replace_list_of_dict(dic):
 
 
 def _create_urdf_import_config(
-        use_convex_decomposition=False,
-        merge_fixed_joints=False,
+    use_convex_decomposition=False,
+    merge_fixed_joints=False,
 ):
     """
     Creates and configures a URDF import configuration.
@@ -1201,7 +1128,7 @@ def import_obj_urdf(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    dataset_root=gm.CUSTOM_DATASET_PATH,
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -1220,7 +1147,9 @@ def import_obj_urdf(
         merge_fixed_joints (bool): whether to merge fixed joints or not
 
     Returns:
-        str: Absolute path to the imported USD file
+        2-tuple:
+            - str: Absolute path to post-processed URDF file used to generate USD
+            - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for metalinks
     urdf_path = _add_metalinks_to_urdf(
@@ -1246,7 +1175,7 @@ def import_obj_urdf(
     )
     log.debug(f"Imported {obj_category}, {obj_model}")
 
-    return usd_path
+    return urdf_path, usd_path
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
@@ -1567,7 +1496,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     return _save_xmltree_as_urdf(
         root_element=root,
         name=f"{obj_model}_with_metalinks",
-        dirpath=model_root_path,
+        dirpath=f"{model_root_path}/urdf",
         unique_urdf=False,
     )
 
@@ -1829,22 +1758,45 @@ def make_asset_positive(urdf_fpath, output_suffix="mirror"):
     return out_file
 
 
-def simplify_convex_hull(tm, max_faces=64):
+def find_all_prim_children_with_type(prim_type, root_prim):
+    """
+    Recursively searches children of @root_prim to find all instances of prim that satisfy type @prim_type
+
+    Args:
+        prim_type (str): Type of the prim to search
+        root_prim (Usd.Prim): Root prim to search
+
+    Returns:
+        list of Usd.Prim: All found prims whose prim type includes @prim_type
+    """
+    found_prims = []
+    for child in root_prim.GetChildren():
+        if prim_type in child.GetTypeName():
+            found_prims.append(child)
+        found_prims += find_all_prim_children_with_type(prim_type=prim_type, root_prim=child)
+
+    return found_prims
+
+
+def simplify_convex_hull(tm, max_vertices=60):
     """
     Simplifies a convex hull mesh by using quadric edge collapse to reduce the number of faces
 
     Args:
         tm (Trimesh): Trimesh mesh to simply. Should be convex hull
-        max_faces (int): Maximum number of faces to generate
+        max_vertices (int): Maximum number of vertices to generate
     """
     # If number of faces is less than or equal to @max_faces, simply return directly
-    if len(tm.faces) <= max_faces:
+    if len(tm.vertices) <= max_vertices:
         return tm
 
     # Use pymeshlab to reduce
+    max_faces = 64
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
-    ms.apply_filter('meshing_decimation_quadric_edge_collapse', targetfacenum=max_faces)
+    while len(ms.current_mesh().vertex_matrix()) > max_vertices:
+        ms.apply_filter("meshing_decimation_quadric_edge_collapse", targetfacenum=max_faces)
+        max_faces -= 2
     vertices_reduced = ms.current_mesh().vertex_matrix()
     faces_reduced = ms.current_mesh().face_matrix()
     vertex_normals_reduced = ms.current_mesh().vertex_normal_matrix()
@@ -1924,7 +1876,7 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
     # See https://github.com/mikedh/trimesh/issues/535
     hulls = [hull.convex_hull if not hull.is_volume else hull for hull in hulls]
 
-    # For each hull, simplify so that the complexity is more likely to be Omniverse-GPU compatible
+    # For each hull, simplify so that the complexity is guaranteed to be Omniverse-GPU compatible
     # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/rigid-bodies.html#collision-settings
     simplified_hulls = [simplify_convex_hull(hull) for hull in hulls]
 
@@ -2065,9 +2017,11 @@ def get_collision_approximation_for_urdf(
     )
 
 
-def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False):
+def copy_urdf_to_dataset(
+    urdf_path, category, mdl, dataset_root=gm.CUSTOM_DATASET_PATH, suffix="original", overwrite=False
+):
     # Create a directory for the object
-    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
+    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
     if not overwrite:
         assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
     obj_dir.mkdir(parents=True, exist_ok=True)
@@ -2091,14 +2045,14 @@ def copy_urdf_to_dataset(urdf_path, category, mdl, dataset_root=gm.EXTERNAL_DATA
     # Export this URDF
     return _save_xmltree_as_urdf(
         root_element=root,
-        name=mdl,
+        name=f"{mdl}_{suffix}",
         dirpath=obj_dir,
         unique_urdf=False,
     )
 
 
 def generate_urdf_for_obj(
-    visual_mesh, collision_meshes, category, mdl, dataset_root=gm.EXTERNAL_DATASET_PATH, overwrite=False
+    visual_mesh, collision_meshes, category, mdl, dataset_root=gm.CUSTOM_DATASET_PATH, overwrite=False
 ):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
@@ -2332,7 +2286,7 @@ def import_og_asset_from_urdf(
     no_decompose_links=None,
     visual_only_links=None,
     merge_fixed_joints=False,
-    dataset_root=gm.EXTERNAL_DATASET_PATH,
+    dataset_root=gm.CUSTOM_DATASET_PATH,
     hull_count=32,
     overwrite=False,
     use_usda=False,
@@ -2363,7 +2317,8 @@ def import_og_asset_from_urdf(
             (bigger memory footprint, but human-readable)
 
     Returns:
-        2-tuple:
+        3-tuple:
+            - str: Absolute path to post-processed URDF file
             - str: Absolute path to generated USD file
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
@@ -2375,15 +2330,17 @@ def import_og_asset_from_urdf(
             category=category,
             mdl=model,
             dataset_root=dataset_root,
+            suffix="original",
             overwrite=overwrite,
         )
     else:
         # Verify that the object exists at the expected location
-        # This is <dataset_root>/objects/<category>/<model>/<model>.urdf
-        urdf_path = os.path.join(dataset_root, "objects", category, model, f"{model}.urdf")
+        # This is <dataset_root>/objects/<category>/<model>/urdf/<model>_original.urdf
+        urdf_path = os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}_original.urdf")
         assert os.path.exists(urdf_path), f"Expected urdf at dataset location {urdf_path}, but none was found!"
 
     # Make sure all scaling is positive
+    model_dir = os.path.join(dataset_root, "objects", category, model)
     urdf_path = make_asset_positive(urdf_fpath=urdf_path)
 
     # Update collisions if requested
@@ -2403,7 +2360,7 @@ def import_og_asset_from_urdf(
     print("Recording object metadata from URDF...")
     record_obj_metadata_from_urdf(
         urdf_path=urdf_path,
-        obj_dir=os.path.dirname(urdf_path),
+        obj_dir=model_dir,
         joint_setting="zero",
         overwrite=overwrite,
     )
@@ -2412,7 +2369,7 @@ def import_og_asset_from_urdf(
     print("Converting obj URDF to USD...")
     og.launch()
     assert len(og.sim.scenes) == 0
-    usd_path = import_obj_urdf(
+    urdf_path, usd_path = import_obj_urdf(
         urdf_path=urdf_path,
         obj_category=category,
         obj_model=model,
@@ -2421,6 +2378,9 @@ def import_og_asset_from_urdf(
         use_usda=use_usda,
         merge_fixed_joints=merge_fixed_joints,
     )
+
+    # Copy metalinks URDF to original name of object model
+    shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
 
     prim = import_obj_metadata(
         usd_path=usd_path,
@@ -2433,4 +2393,4 @@ def import_og_asset_from_urdf(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
     )
 
-    return usd_path, prim
+    return urdf_path, usd_path, prim
