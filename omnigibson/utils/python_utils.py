@@ -786,6 +786,7 @@ def recursively_convert_to_torch(state):
 def recursively_convert_from_torch(state):
     # For all the lists in state dict, convert from torch tensor -> numpy array
     import numpy as np
+
     for key, value in state.items():
         if isinstance(value, dict):
             state[key] = recursively_convert_from_torch(value)

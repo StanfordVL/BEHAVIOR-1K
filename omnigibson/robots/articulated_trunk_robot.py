@@ -1,5 +1,6 @@
-import torch as th
 from functools import cached_property
+
+import torch as th
 
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
