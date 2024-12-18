@@ -567,12 +567,6 @@ def _quat2mat(quaternion):
     return rotation_matrix
 
 
-# def pose2mat(pose):
-#     if pose.dtype != np.float32:
-#         pose = pose.astype(np.float32)
-#     return _pose2mat(pose)
-
-
 @jit(nopython=True)
 def pose2mat(pose):
     """

@@ -3,6 +3,7 @@ import torch as th
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 
@@ -121,7 +122,7 @@ class MultiFingerGripperController(GripperController):
     def _generate_default_command_output_limits(self):
         command_output_limits = super()._generate_default_command_output_limits()
 
-        return (cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1]))
+        return cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
 
     def reset(self):
         # Call super first
@@ -271,7 +272,7 @@ class MultiFingerGripperController(GripperController):
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                    th.mean(dist_from_lower_limit) > m.POS_TOLERANCE or th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)

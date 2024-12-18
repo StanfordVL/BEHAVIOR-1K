@@ -10,6 +10,8 @@ from omnigibson.controllers import (
 from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerNumpyBackend, _ControllerTorchBackend
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -137,6 +139,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+        )
+
+    def _generate_default_command_output_limits(self):
+        # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
+        # but controls low-level efforts
+        return (
+            self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx],
+            self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx],
         )
 
     def _update_goal(self, command, control_dict):
@@ -336,6 +346,6 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ControllerBackend, "compute_joint_torques", None)
-setattr(_ControllerTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
-setattr(_ControllerNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+setattr(_ComputeBackend, "compute_joint_torques", None)
+setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
+setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)

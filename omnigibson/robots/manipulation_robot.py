@@ -23,6 +23,7 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -414,8 +415,8 @@ class ManipulationRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Loop over all arms to grab proprio info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
         for arm in self.arm_names:
             # Add arm info
             dic["arm_{}_qpos".format(arm)] = joint_positions[self.arm_control_idx[arm]]
@@ -424,11 +425,10 @@ class ManipulationRobot(BaseRobot):
             dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
             # Add eef and grasping info
-            dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = (
-                ControllableObjectViewAPI.get_link_relative_position_orientation(
-                    self.articulation_root_path, self.eef_link_names[arm]
-                )
+            eef_pos, eef_quat = ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, self.eef_link_names[arm]
             )
+            dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = cb.to_torch(eef_pos), cb.to_torch(eef_quat)
             dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
             dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
@@ -1315,23 +1315,24 @@ class ManipulationRobot(BaseRobot):
             # a zero action will actually keep the AG setting where it already is.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
+            control = cb.to_torch(controller.control)
             threshold = th.mean(
                 th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
                 dim=0,
             )
-            if controller.control is None:
+            if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
-                    th.any(controller.control < threshold)
+                    th.any(control < threshold)
                     if controller.control_type == ControlType.POSITION
-                    else th.any(controller.control < 0)
+                    else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
-                    th.any(controller.control > threshold)
+                    th.any(control > threshold)
                     if controller.control_type == ControlType.POSITION
-                    else th.any(controller.control > 0)
+                    else th.any(control > 0)
                 )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:

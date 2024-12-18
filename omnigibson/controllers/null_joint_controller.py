@@ -1,5 +1,5 @@
-from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers import JointController
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 class NullJointController(JointController):
@@ -95,3 +95,12 @@ class NullJointController(JointController):
         ), f"Default control must be length: {self.control_dim}, got length: {len(target)}"
 
         self._default_command = cb.array(target)
+
+    def _compute_no_op_action(self, control_dict):
+        # Empty tensor since no action should be received
+        return cb.array([])
+
+    @property
+    def command_dim(self):
+        # Auto-generates control, so no command should be received
+        return 0

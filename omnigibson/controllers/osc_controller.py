@@ -1,8 +1,8 @@
 import math
 
 from omnigibson.controllers import ControlType, ManipulationController
-from omnigibson.controllers.controller_base import _controller_backend as cb
-from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerNumpyBackend, _ControllerTorchBackend
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
@@ -652,6 +652,6 @@ def _compute_osc_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ControllerBackend, "compute_osc_torques", None)
-setattr(_ControllerTorchBackend, "compute_osc_torques", _compute_osc_torques_torch)
-setattr(_ControllerNumpyBackend, "compute_osc_torques", _compute_osc_torques_numpy)
+setattr(_ComputeBackend, "compute_osc_torques", None)
+setattr(_ComputeTorchBackend, "compute_osc_torques", _compute_osc_torques_torch)
+setattr(_ComputeNumpyBackend, "compute_osc_torques", _compute_osc_torques_numpy)

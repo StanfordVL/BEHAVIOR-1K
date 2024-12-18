@@ -1,15 +1,13 @@
 import math
 from collections.abc import Iterable
 
-import torch as th
-
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.controllers.controller_base import _ControllerBackend, _ControllerNumpyBackend, _ControllerTorchBackend
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.processing_utils import MovingAverageFilter
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -119,11 +117,11 @@ class InverseKinematicsController(JointController, ManipulationController):
         """
         # Store arguments
         control_dim = len(dof_idx)
-        self.control_filter = None  # (
-        #     None
-        #     if smoothing_filter_size in {None, 0}
-        #     else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
-        # )
+        self.control_filter = (
+            None
+            if smoothing_filter_size in {None, 0}
+            else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
+        )
         assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
 
         # If mode is absolute pose, make sure command input limits / output limits are None
@@ -156,7 +154,10 @@ class InverseKinematicsController(JointController, ManipulationController):
                     command_input_limits[1][3:] = cb.array([math.pi] * len(command_input_limits[1][3:]))
             if command_output_limits is not None:
                 if not isinstance(command_output_limits, str) and isinstance(command_output_limits, Iterable):
-                    command_output_limits = cb.array(command_output_limits)
+                    command_output_limits = [
+                        cb.array(command_output_limits[0]),
+                        cb.array(command_output_limits[1]),
+                    ]
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
@@ -227,7 +228,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                 (
                     th.tensor([])
                     if self.control_filter is None
-                    else cb.to_torch(self.control_filter.serialize(state=state["control_filter"]))
+                    else self.control_filter.serialize(state=state["control_filter"])
                 ),
             ]
         )
@@ -443,6 +444,6 @@ def _compute_ik_qpos_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ControllerBackend, "compute_ik_qpos", None)
-setattr(_ControllerTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
-setattr(_ControllerNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)
+setattr(_ComputeBackend, "compute_ik_qpos", None)
+setattr(_ComputeTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
+setattr(_ComputeNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)

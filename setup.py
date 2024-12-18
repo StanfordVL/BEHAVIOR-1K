@@ -48,8 +48,8 @@ setup(
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
         "lxml>=5.3.0",
-        "numba",
-        "cffi==1.16.0",
+        "numba>=0.60.0",
+        "cffi>=1.16.0",
         "pillow~=10.2.0",
     ],
     extras_require={

@@ -38,8 +38,8 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
         dic["camera_qpos_sin"] = th.sin(joint_positions[self.camera_control_idx])
         dic["camera_qpos_cos"] = th.cos(joint_positions[self.camera_control_idx])

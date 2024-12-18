@@ -10,8 +10,8 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.controllers.controller_base import _controller_backend as cb
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
@@ -704,8 +704,8 @@ class ControllableObject(BaseObject):
         state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = cb.to_torch(
-            cb.cat([c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()])
+        controller_states_flat = th.cat(
+            [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
         )
 
         # Concatenate and return
@@ -718,7 +718,7 @@ class ControllableObject(BaseObject):
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            controller_states[c_name], deserialized_items = c.deserialize(state=cb.from_torch(state[idx:]))
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
             idx += deserialized_items
         state_dict["controllers"] = controller_states
 

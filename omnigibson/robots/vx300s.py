@@ -134,7 +134,7 @@ class VX300S(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [

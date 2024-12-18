@@ -231,7 +231,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             ]
         }
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["l_wheel_joint", "r_wheel_joint"]
 
