@@ -888,6 +888,28 @@ def rotation_matrix(angle, direction, point=None):
     return M
 
 
+def transformation_matrix(angle, direction, point=None):
+    """
+    Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
+    Args:
+        angle (float): Magnitude of rotation in radians
+        direction (np.array): (ax,ay,az) axis about which to rotate
+        point (bool): If specified, is the (x,y,z) point about which the rotation will occur
+
+    Returns:
+        np.array: 4x4 homogeneous transformation matrix
+    """
+    R = rotation_matrix(angle, direction)
+
+    M = np.eye(4)
+    M[:3, :3] = R
+
+    if point is not None:
+        # Rotation not about origin
+        M[:3, 3] = point - R @ point
+    return M
+
+
 def clip_translation(dpos, limit):
     """
     Limits a translation (delta position) to a specified limit

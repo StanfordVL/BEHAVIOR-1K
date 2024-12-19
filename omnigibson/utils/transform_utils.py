@@ -982,6 +982,29 @@ def rotation_matrix(angle: float, direction: torch.Tensor) -> torch.Tensor:
 
 
 @torch.compile
+def transformation_matrix(angle: float, direction: torch.Tensor, point: Optional[torch.Tensor] = None) -> torch.Tensor:
+    """
+    Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
+    Args:
+        angle (float): Magnitude of rotation in radians
+        direction (torch.Tensor): (ax,ay,az) axis about which to rotate
+        point (Optional[torch.Tensor]): If specified, is the (x,y,z) point about which the rotation will occur
+    Returns:
+        torch.Tensor: 4x4 homogeneous transformation matrix
+    """
+    R = rotation_matrix(angle, direction)
+
+    M = torch.eye(4, dtype=torch.float32, device=direction.device)
+    M[:3, :3] = R
+
+    if point is not None:
+        # Rotation not about origin
+        point = point.to(dtype=torch.float32)
+        M[:3, 3] = point - R @ point
+    return M
+
+
+@torch.compile
 def clip_translation(dpos, limit):
     """
     Limits a translation (delta position) to a specified limit
