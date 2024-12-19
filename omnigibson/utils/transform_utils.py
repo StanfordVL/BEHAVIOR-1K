@@ -335,7 +335,6 @@ def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
     return quaternions
 
 
-
 @torch.compile
 def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     """

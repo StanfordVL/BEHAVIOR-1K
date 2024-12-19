@@ -652,4 +652,6 @@ def _compute_osc_torques_numpy(
 
 
 # Set these as part of the backend values
-add_compute_function(name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch)
+add_compute_function(
+    name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
+)

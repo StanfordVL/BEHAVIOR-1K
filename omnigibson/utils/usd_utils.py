@@ -1936,4 +1936,6 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 
 
 # Set these as part of the backend values
-add_compute_function(name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch)
+add_compute_function(
+    name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch
+)
