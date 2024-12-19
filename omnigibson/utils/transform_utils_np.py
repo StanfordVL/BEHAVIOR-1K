@@ -1220,6 +1220,22 @@ def transform_points(points, matrix, translate=True):
         return (matrix[:dim, :dim] @ points.T).T
 
 
+def quaternions_close(q1, q2, atol=1e-3):
+    """
+    Whether two quaternions represent the same rotation,
+    allowing for the possibility that one is the negative of the other.
+
+    Arguments:
+        q1 (np.array): First quaternion
+        q2 (np.array): Second quaternion
+        atol (float): Absolute tolerance for comparison
+
+    Returns:
+        bool: Whether the quaternions are close
+    """
+    return np.allclose(q1, q2, atol=atol) or np.allclose(q1, -q2, atol=atol)
+
+
 @jit(nopython=True)
 def orientation_error(desired, current):
     """

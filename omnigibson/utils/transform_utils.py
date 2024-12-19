@@ -1346,6 +1346,27 @@ def transform_points(points: torch.Tensor, matrix: torch.Tensor, translate: bool
 
 
 @torch.compile
+def quaternions_close(q1: torch.Tensor, q2: torch.Tensor, atol: float = 1e-3) -> bool:
+    """
+    Whether two quaternions represent the same rotation,
+    allowing for the possibility that one is the negative of the other.
+
+    Arguments:
+        q1: torch.Tensor
+            First quaternion
+        q2: torch.Tensor
+            Second quaternion
+        atol: float
+            Absolute tolerance for comparison
+
+    Returns:
+        bool
+            Whether the quaternions are close
+    """
+    return torch.allclose(q1, q2, atol=atol) or torch.allclose(q1, -q2, atol=atol)
+
+
+@torch.compile
 def orientation_error(desired, current):
     """
     This function calculates a 3-dimensional orientation error vector for use in the
