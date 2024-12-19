@@ -6,7 +6,25 @@ import omnigibson.utils.transform_utils_np as NT
 from omnigibson.utils.python_utils import recursively_convert_from_torch
 
 
+# Global function for adding custom compute functions
+def add_compute_function(name, np_function, th_function):
+    """
+    Adds a custom compute function defined by @name
+
+    Args:
+        name (str): name of the function to add
+        np_function (callable): numpy version of the function
+        th_function (callable): torch version of the function
+    """
+    _ComputeNumpyBackend.set_custom_method(name, np_function)
+    _ComputeTorchBackend.set_custom_method(name, th_function)
+
+
 class _ComputeBackend:
+
+    # Dictionary mapping custom externally-defined function name to function
+    _custom_fcns = None
+
     array = None
     int_array = None
     prod = None
@@ -39,7 +57,30 @@ class _ComputeBackend:
     T = None
 
     @classmethod
-    def set_methods(cls, backend):
+    def get_custom_method(cls, method_name):
+        """
+        Gets a custom method from the internal backend
+
+        Args:
+            method_name (str): Name of the method to get
+        """
+        return cls._custom_fcns[method_name]
+
+    @classmethod
+    def set_custom_method(cls, method_name, method):
+        """
+        Sets a custom method to the internal backend
+
+        Args:
+            method_name (str): Name of the method
+            method (callable): Custom method to add
+        """
+        if cls._custom_fcns is None:
+            cls._custom_fcns = dict()
+        cls._custom_fcns[method_name] = method
+
+    @classmethod
+    def set_methods_from_backend(cls, backend):
         for attr, fcn in backend.__dict__.items():
             # Do not override reserved functions
             if attr.startswith("__"):
