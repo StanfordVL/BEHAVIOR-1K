@@ -44,7 +44,7 @@ _AXES2TUPLE = {
 
 
 @torch.compile
-def _copysign(a, b):
+def copysign(a, b):
     # type: (float, torch.Tensor) -> torch.Tensor
     a = torch.tensor(a, device=b.device, dtype=torch.float).repeat(b.shape[0])
     return torch.abs(a) * torch.sign(b)
@@ -588,7 +588,7 @@ def quat2euler(q):
     roll = torch.atan2(sinr_cosp, cosr_cosp)
     # pitch (y-axis rotation)
     sinp = 2.0 * (q[:, qw] * q[:, qy] - q[:, qz] * q[:, qx])
-    pitch = torch.where(torch.abs(sinp) >= 1, _copysign(math.pi / 2.0, sinp), torch.asin(sinp))
+    pitch = torch.where(torch.abs(sinp) >= 1, copysign(math.pi / 2.0, sinp), torch.asin(sinp))
     # yaw (z-axis rotation)
     siny_cosp = 2.0 * (q[:, qw] * q[:, qz] + q[:, qx] * q[:, qy])
     cosy_cosp = q[:, qw] * q[:, qw] + q[:, qx] * q[:, qx] - q[:, qy] * q[:, qy] - q[:, qz] * q[:, qz]

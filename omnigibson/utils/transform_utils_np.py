@@ -50,6 +50,11 @@ _AXES2TUPLE = {
 _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
 
+def copysign(a, b):
+    a = np.array(a).repeat(b.shape[0])
+    return np.abs(a) * np.sign(b)
+
+
 def anorm(x, axis=None, keepdims=False):
     """Compute L2 norms alogn specified axes."""
     return np.linalg.norm(x, axis=axis, keepdims=keepdims)
