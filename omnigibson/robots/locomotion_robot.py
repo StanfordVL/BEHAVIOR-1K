@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from functools import cached_property
 
 import torch as th
 
@@ -39,8 +40,8 @@ class LocomotionRobot(BaseRobot):
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
 
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
 
         # Add base info
         dic["base_qpos"] = joint_positions[self.base_control_idx]
@@ -99,7 +100,7 @@ class LocomotionRobot(BaseRobot):
             "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.base_control_idx,
-            "default_command": th.zeros(len(self.base_control_idx)),
+            "default_goal": th.zeros(len(self.base_control_idx)),
             "use_impedances": False,
         }
 
@@ -184,19 +185,19 @@ class LocomotionRobot(BaseRobot):
         quat = quat_multiply((euler2quat(delta, 0, 0)), quat)
         self.set_position_orientation(orientation=quat)
 
-    @property
+    @cached_property
     def non_floor_touching_base_links(self):
         return [self.links[name] for name in self.non_floor_touching_base_link_names]
 
-    @property
+    @cached_property
     def non_floor_touching_base_link_names(self):
         return [self.base_footprint_link_name]
 
-    @property
+    @cached_property
     def floor_touching_base_links(self):
         return [self.links[name] for name in self.floor_touching_base_link_names]
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         raise NotImplementedError
 
@@ -218,7 +219,7 @@ class LocomotionRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     def base_control_idx(self):
         """
         Returns:

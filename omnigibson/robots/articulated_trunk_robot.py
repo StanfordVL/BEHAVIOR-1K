@@ -1,3 +1,5 @@
+from functools import cached_property
+
 import torch as th
 
 from omnigibson.robots.manipulation_robot import ManipulationRobot
@@ -33,19 +35,19 @@ class ArticulatedTrunkRobot(ManipulationRobot):
 
         return fcns
 
-    @property
+    @cached_property
     def trunk_links(self):
         return [self.links[name] for name in self.trunk_link_names]
 
-    @property
+    @cached_property
     def trunk_link_names(self):
         raise NotImplementedError
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         raise NotImplementedError("trunk_joint_names must be implemented in subclass")
 
-    @property
+    @cached_property
     def trunk_control_idx(self):
         """
         Returns:
@@ -141,7 +143,7 @@ class ArticulatedTrunkRobot(ManipulationRobot):
             "motor_type": "position",
             "control_limits": self.control_limits,
             "dof_idx": self.trunk_control_idx,
-            "default_command": self.reset_joint_pos[self.trunk_control_idx],
+            "default_goal": self.reset_joint_pos[self.trunk_control_idx],
             "use_impedances": False,
         }
 
@@ -164,8 +166,8 @@ class ArticulatedTrunkRobot(ManipulationRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
         dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
         dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 

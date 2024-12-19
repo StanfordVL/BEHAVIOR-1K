@@ -11,6 +11,7 @@ import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
@@ -277,7 +278,7 @@ class ControllableObject(BaseObject):
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
 
             # Create the controller
-            controller = create_controller(**cfg)
+            controller = create_controller(**cb.from_torch_recursive(cfg))
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
                 assert self._joints[
@@ -409,8 +410,8 @@ class ControllableObject(BaseObject):
 
         return gym.spaces.Box(
             shape=(self.action_dim,),
-            low=th.cat(low).cpu().numpy(),
-            high=th.cat(high).cpu().numpy(),
+            low=cb.to_numpy(cb.cat(low)),
+            high=cb.to_numpy(cb.cat(high)),
             dtype=NumpyTypes.FLOAT32,
         )
 
@@ -440,6 +441,9 @@ class ControllableObject(BaseObject):
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
             self.action_dim, len(action)
         )
+
+        # Convert action from torch if necessary
+        action = cb.from_torch(action)
 
         # First, loop over all controllers, and update the desired command
         idx = 0
@@ -488,9 +492,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = th.zeros(self.n_dof)
-        # By default, the control type is None and the control value is 0 (th.zeros) - i.e. no control applied
-        u_type_vec = th.tensor([ControlType.NONE] * self.n_dof)
+        u_vec = cb.zeros(self.n_dof)
+        # By default, the control type is Effort and the control value is 0 (th.zeros) - i.e. no control applied
+        u_type_vec = cb.array([ControlType.EFFORT] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -549,87 +553,31 @@ class ControllableObject(BaseObject):
         """
         # Run sanity check
         assert len(control) == len(control_type) == self.n_dof, (
-            "Control signals, control types, and number of DOF should all be the same!"
-            "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
+            f"Control signals, control types, and number of DOF should all be the same!"
+            f"Got {len(control)}, {len(control_type)}, and {self.n_dof} respectively."
         )
-        # Set indices manually so that we're standardized
-        indices = range(self.n_dof)
-
-        # Standardize normalized input
-        n_indices = len(indices)
-
-        # Loop through controls and deploy
-        # We have to use delicate logic to account for the edge cases where a single joint may contain > 1 DOF
-        # (e.g.: spherical joint)
-        pos_vec, pos_idxs, using_pos = [], [], False
-        vel_vec, vel_idxs, using_vel = [], [], False
-        eff_vec, eff_idxs, using_eff = [], [], False
-        cur_indices_idx = 0
-        while cur_indices_idx != n_indices:
-            # Grab the current DOF index we're controlling and find the corresponding joint
-            joint = self._dof_to_joints[indices[cur_indices_idx]]
-            cur_ctrl_idx = indices[cur_indices_idx]
-            joint_dof = joint.n_dof
-            if joint_dof > 1:
-                # Run additional sanity checks since the joint has more than one DOF to make sure our controls,
-                # control types, and indices all match as expected
-
-                # Make sure the indices are mapped correctly
-                assert (
-                    indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof
-                ), "Got mismatched control indices for a single joint!"
-                # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
-                for group_name, group in zip(
-                    ("joints", "control_types"),
-                    (self._dof_to_joints, control_type),
-                ):
-                    assert (
-                        len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
-                    ), f"Not all {group_name} were the same when trying to deploy control for a single joint!"
-                # Assuming this all passes, we grab the control subvector, type, and normalized value accordingly
-                ctrl = control[cur_ctrl_idx : cur_ctrl_idx + joint_dof]
-            else:
-                # Grab specific control. No need to do checks since this is a single value
-                ctrl = control[cur_ctrl_idx]
-
-            # Deploy control based on type
-            ctrl_type = control_type[
-                cur_ctrl_idx
-            ]  # In multi-DOF joint case all values were already checked to be the same
-            if ctrl_type == ControlType.EFFORT:
-                eff_vec.append(ctrl)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            elif ctrl_type == ControlType.VELOCITY:
-                vel_vec.append(ctrl)
-                vel_idxs.append(cur_ctrl_idx)
-                using_vel = True
-            elif ctrl_type == ControlType.POSITION:
-                pos_vec.append(ctrl)
-                pos_idxs.append(cur_ctrl_idx)
-                using_pos = True
-            elif ctrl_type == ControlType.NONE:
-                # Set zero efforts
-                eff_vec.append(0)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            else:
-                raise ValueError("Invalid control type specified: {}".format(ctrl_type))
-            # Finally, increment the current index based on how many DOFs were just controlled
-            cur_indices_idx += joint_dof
 
         # set the targets for joints
-        if using_pos:
+        pos_idxs = cb.where(control_type == ControlType.POSITION)[0]
+        if len(pos_idxs) > 0:
             ControllableObjectViewAPI.set_joint_position_targets(
-                self.articulation_root_path, positions=th.tensor(pos_vec, dtype=th.float), indices=th.tensor(pos_idxs)
+                self.articulation_root_path,
+                positions=control[pos_idxs],
+                indices=pos_idxs,
             )
-        if using_vel:
+        vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
+        if len(vel_idxs) > 0:
             ControllableObjectViewAPI.set_joint_velocity_targets(
-                self.articulation_root_path, velocities=th.tensor(vel_vec, dtype=th.float), indices=th.tensor(vel_idxs)
+                self.articulation_root_path,
+                velocities=control[vel_idxs],
+                indices=vel_idxs,
             )
-        if using_eff:
+        eff_idxs = cb.where(control_type == ControlType.EFFORT)[0]
+        if len(eff_idxs) > 0:
             ControllableObjectViewAPI.set_joint_efforts(
-                self.articulation_root_path, efforts=th.tensor(eff_vec, dtype=th.float), indices=th.tensor(eff_idxs)
+                self.articulation_root_path,
+                efforts=control[eff_idxs],
+                indices=eff_idxs,
             )
 
     def get_control_dict(self):

@@ -1,14 +1,11 @@
 import math
+from collections.abc import Iterable
 
-import torch as th
-
-import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.control_utils import orientation_error
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.processing_utils import MovingAverageFilter
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -44,8 +41,8 @@ class InverseKinematicsController(JointController, ManipulationController):
         dof_idx,
         command_input_limits="default",
         command_output_limits=(
-            th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5], dtype=th.float32),
-            th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5], dtype=th.float32),
+            (-0.2, -0.2, -0.2, -0.5, -0.5, -0.5),
+            (0.2, 0.2, 0.2, 0.5, 0.5, 0.5),
         ),
         pos_kp=None,
         pos_damping_ratio=None,
@@ -147,29 +144,26 @@ class InverseKinematicsController(JointController, ManipulationController):
             if command_input_limits is not None:
                 if type(command_input_limits) == str and command_input_limits == "default":
                     command_input_limits = [
-                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
-                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
+                        cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
+                        cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_input_limits[0][3:] = th.tensor(
-                        [-math.pi] * len(command_input_limits[0][3:]), dtype=th.float32
-                    )
-                    command_input_limits[1][3:] = th.tensor(
-                        [math.pi] * len(command_input_limits[1][3:]), dtype=th.float32
-                    )
+                    command_input_limits[0][3:] = cb.array([-math.pi] * len(command_input_limits[0][3:]))
+                    command_input_limits[1][3:] = cb.array([math.pi] * len(command_input_limits[1][3:]))
             if command_output_limits is not None:
+                if not isinstance(command_output_limits, str) and isinstance(command_output_limits, Iterable):
+                    command_output_limits = [
+                        cb.array(command_output_limits[0]),
+                        cb.array(command_output_limits[1]),
+                    ]
                 if type(command_output_limits) == str and command_output_limits == "default":
                     command_output_limits = [
-                        th.tensor([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi], dtype=th.float32),
-                        th.tensor([1.0, 1.0, 1.0, math.pi, math.pi, math.pi], dtype=th.float32),
+                        cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
+                        cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
                     ]
                 else:
-                    command_output_limits[0][3:] = th.tensor(
-                        [-math.pi] * len(command_output_limits[0][3:]), dtype=th.float32
-                    )
-                    command_output_limits[1][3:] = th.tensor(
-                        [math.pi] * len(command_output_limits[1][3:]), dtype=th.float32
-                    )
+                    command_output_limits[0][3:] = cb.array([-math.pi] * len(command_output_limits[0][3:]))
+                    command_output_limits[1][3:] = cb.array([math.pi] * len(command_output_limits[1][3:]))
         # Run super init
         super().__init__(
             control_freq=control_freq,
@@ -197,14 +191,15 @@ class InverseKinematicsController(JointController, ManipulationController):
     @property
     def state_size(self):
         # Add state size from the control filter
-        return super().state_size + self.control_filter.state_size
+        return super().state_size + (0 if self.control_filter is None else self.control_filter.state_size)
 
     def _dump_state(self):
         # Run super first
         state = super()._dump_state()
 
         # Add internal quaternion target and filter state
-        state["control_filter"] = self.control_filter.dump_state(serialized=False)
+        if self.control_filter is not None:
+            state["control_filter"] = self.control_filter.dump_state(serialized=False)
 
         return state
 
@@ -217,7 +212,8 @@ class InverseKinematicsController(JointController, ManipulationController):
             self._fixed_quat_target = self._goal["target_quat"]
 
         # Load relevant info for this controller
-        self.control_filter.load_state(state["control_filter"], serialized=False)
+        if self.control_filter is not None:
+            self.control_filter.load_state(state["control_filter"], serialized=False)
 
     def serialize(self, state):
         # Run super first
@@ -227,7 +223,11 @@ class InverseKinematicsController(JointController, ManipulationController):
         return th.cat(
             [
                 state_flat,
-                self.control_filter.serialize(state=state["control_filter"]),
+                (
+                    th.tensor([])
+                    if self.control_filter is None
+                    else self.control_filter.serialize(state=state["control_filter"])
+                ),
             ]
         )
 
@@ -236,9 +236,11 @@ class InverseKinematicsController(JointController, ManipulationController):
         state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["control_filter"], deserialized_items = self.control_filter.deserialize(state=state[idx:])
+        if self.control_filter is not None:
+            state_dict["control_filter"], deserialized_items = self.control_filter.deserialize(state=state[idx:])
+            idx += deserialized_items
 
-        return state_dict, idx + deserialized_items
+        return state_dict, idx
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
@@ -263,19 +265,19 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_quat = quat_relative
         elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = T.axisangle2quat(command[3:6])
+            target_quat = cb.T.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
-            dori = T.quat2mat(T.axisangle2quat(command[3:6]))
-            target_quat = T.mat2quat(dori @ T.quat2mat(quat_relative))
+            dori = cb.T.quat2mat(cb.T.axisangle2quat(command[3:6]))
+            target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
 
         goal_dict = dict(
-            target_pos=target_pos,
-            target_quat=target_quat,
+            target_pos=cb.as_float32(target_pos),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
         return goal_dict
@@ -289,7 +291,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 goals necessary for controller computation. Must include the following keys:
                     target_pos: robot-frame (x,y,z) desired end effector position
-                    target_quat: robot-frame (x,y,z,w) desired end effector quaternion orientation
+                    target_ori_mat: robot-frame desired end effector quaternion orientation matrix
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -303,37 +305,23 @@ class InverseKinematicsController(JointController, ManipulationController):
         Returns:
             Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
-        # Grab important info from control dict
-        pos_relative = control_dict[f"{self.task_name}_pos_relative"]
-        quat_relative = control_dict[f"{self.task_name}_quat_relative"]
-        target_pos = goal_dict["target_pos"]
-        target_quat = goal_dict["target_quat"]
-
         # Calculate and return IK-backed out joint angles
-        current_joint_pos = control_dict["joint_position"][self.dof_idx]
+        q = control_dict["joint_position"][self.dof_idx]
+        j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
+        ee_pos = control_dict[f"{self.task_name}_pos_relative"]
+        ee_quat = control_dict[f"{self.task_name}_quat_relative"]
 
-        # If the delta is really small, we just keep the current joint position. This avoids joint
-        # drift caused by IK solver inaccuracy even when zero delta actions are provided.
-        if th.allclose(pos_relative, target_pos, atol=1e-4) and th.allclose(quat_relative, target_quat, atol=1e-4):
-            target_joint_pos = current_joint_pos
-        else:
-            # Compute the pose error. Note that this is computed NOT in the EEF frame but still
-            # in the base frame.
-            pos_err = target_pos - pos_relative
-            ori_err = orientation_error(T.quat2mat(target_quat), T.quat2mat(quat_relative))
-            err = th.cat([pos_err, ori_err])
-
-            # Use the jacobian to compute a local approximation
-            j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
-            j_eef_pinv = th.linalg.pinv(j_eef)
-            delta_j = j_eef_pinv @ err
-            target_joint_pos = current_joint_pos + delta_j
-
-            # Clip values to be within the joint limits
-            target_joint_pos = target_joint_pos.clamp(
-                min=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
-                max=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
-            )
+        # Calculate desired joint positions
+        target_joint_pos = cb.get_custom_method("compute_ik_qpos")(
+            q=q,
+            j_eef=j_eef,
+            ee_pos=cb.as_float32(ee_pos),
+            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
+            goal_pos=goal_dict["target_pos"],
+            goal_ori_mat=goal_dict["target_ori_mat"],
+            q_lower_limit=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
+            q_upper_limit=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
+        )
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:
@@ -344,16 +332,17 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
+        # Convert quat into eef ori mat
         return dict(
-            target_pos=control_dict[f"{self.task_name}_pos_relative"],
-            target_quat=control_dict[f"{self.task_name}_quat_relative"],
+            target_pos=cb.as_float32(control_dict[f"{self.task_name}_pos_relative"]),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(control_dict[f"{self.task_name}_quat_relative"])),
         )
 
     def _compute_no_op_action(self, control_dict):
         pos_relative = control_dict[f"{self.task_name}_pos_relative"]
         quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
-        command = th.zeros(6, dtype=th.float32, device=pos_relative.device)
+        command = cb.zeros(6)
 
         # Handle position
         if self.mode == "absolute_pose":
@@ -364,7 +353,7 @@ class InverseKinematicsController(JointController, ManipulationController):
 
         # Handle orientation
         if self.mode in ("pose_absolute_ori", "absolute_pose"):
-            command[3:] = T.quat2axisangle(quat_relative)
+            command[3:] = cb.T.quat2axisangle(quat_relative)
         else:
             # For these modes, we don't need to add orientation to the command
             pass
@@ -374,9 +363,80 @@ class InverseKinematicsController(JointController, ManipulationController):
     def _get_goal_shapes(self):
         return dict(
             target_pos=(3,),
-            target_quat=(4,),
+            target_ori_mat=(3, 3),
         )
 
     @property
     def command_dim(self):
         return IK_MODE_COMMAND_DIMS[self.mode]
+
+
+import torch as th
+
+import omnigibson.utils.transform_utils as TT
+
+
+@th.jit.script
+def _compute_ik_qpos_torch(
+    q: th.Tensor,
+    j_eef: th.Tensor,
+    ee_pos: th.Tensor,
+    ee_mat: th.Tensor,
+    goal_pos: th.Tensor,
+    goal_ori_mat: th.Tensor,
+    q_lower_limit: th.Tensor,
+    q_upper_limit: th.Tensor,
+):
+    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
+    # in the base frame.
+    pos_err = goal_pos - ee_pos
+    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
+    err = th.cat([pos_err, ori_err])
+
+    # Use the jacobian to compute a local approximation
+    j_eef_pinv = th.linalg.pinv(j_eef)
+    delta_j = j_eef_pinv @ err
+    target_joint_pos = q + delta_j
+
+    # Clip values to be within the joint limits
+    return target_joint_pos.clip(
+        min=q_lower_limit,
+        max=q_upper_limit,
+    )
+
+
+import numpy as np
+from numba import jit
+
+import omnigibson.utils.transform_utils_np as NT
+
+
+# Use numba since faster
+@jit(nopython=True)
+def _compute_ik_qpos_numpy(
+    q,
+    j_eef,
+    ee_pos,
+    ee_mat,
+    goal_pos,
+    goal_ori_mat,
+    q_lower_limit,
+    q_upper_limit,
+):
+    # Compute the pose error. Note that this is computed NOT in the EEF frame but still
+    # in the base frame.
+    pos_err = goal_pos - ee_pos
+    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
+    err = np.concatenate((pos_err, ori_err))
+
+    # Use the jacobian to compute a local approximation
+    j_eef_pinv = np.linalg.pinv(j_eef)
+    delta_j = j_eef_pinv @ err
+    target_joint_pos = q + delta_j
+
+    # Clip values to be within the joint limits
+    return target_joint_pos.clip(q_lower_limit, q_upper_limit)
+
+
+# Set these as part of the backend values
+add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)

@@ -150,6 +150,7 @@ class CuRoboMotionGenerator:
         motion_cfg_kwargs=None,
         batch_size=2,
         use_cuda_graph=True,
+        collision_activation_distance=0.005,
         debug=False,
         use_default_embodiment_only=False,
     ):
@@ -165,6 +166,9 @@ class CuRoboMotionGenerator:
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
+            collision_activation_distance (float): Distance threshold at which a collision is detected.
+                Increasing this value will make the motion planner more conservative in its planning with respect
+                to the underlying sphere representation of the robot
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
             use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
         """
@@ -227,7 +231,7 @@ class CuRoboMotionGenerator:
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
                 interpolation_dt=0.03,
-                collision_activation_distance=0.005,
+                collision_activation_distance=collision_activation_distance,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
                 fixed_iters_trajopt=True,

@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -231,23 +232,23 @@ class FrankaPanda(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"panda_link{i}" for i in range(8)]}
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {self.default_arm: [f"panda_joint{i+1}" for i in range(7)]}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: self._eef_link_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: self._finger_link_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: self._finger_joint_names}
 
@@ -267,7 +268,7 @@ class FrankaPanda(ManipulationRobot):
         ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
         return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
 
-    @property
+    @cached_property
     def curobo_attached_object_link_names(self):
         return {self._eef_link_names: "attached_object"}
 

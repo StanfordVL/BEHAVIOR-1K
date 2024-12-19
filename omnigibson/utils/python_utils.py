@@ -783,6 +783,25 @@ def recursively_convert_to_torch(state):
     return state
 
 
+def recursively_convert_from_torch(state):
+    # For all the lists in state dict, convert from torch tensor -> numpy array
+    import numpy as np
+
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_from_torch(value)
+        elif isinstance(value, th.Tensor):
+            state[key] = value.cpu().numpy()
+        elif (isinstance(value, list) or isinstance(value, tuple)) and len(value) > 0:
+            if isinstance(value[0], dict):
+                state[key] = [recursively_convert_from_torch(val) for val in value]
+            elif isinstance(value[0], th.Tensor):
+                state[key] = [tensor.numpy() for tensor in value]
+            elif isinstance(value[0], int) or isinstance(value[0], float):
+                state[key] = np.array(value)
+    return state
+
+
 def h5py_group_to_torch(group):
     state = {}
     for key, value in group.items():

@@ -1,5 +1,6 @@
 import math
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -133,7 +134,7 @@ class VX300S(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
@@ -147,7 +148,7 @@ class VX300S(ManipulationRobot):
             ]
         }
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {
             self.default_arm: [
@@ -160,15 +161,15 @@ class VX300S(ManipulationRobot):
             ]
         }
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: "eef_link"}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: ["left_finger_link", "right_finger_link"]}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["left_finger", "right_finger"]}
 

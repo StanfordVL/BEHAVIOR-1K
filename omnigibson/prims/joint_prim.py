@@ -75,6 +75,8 @@ class JointPrim(BasePrim):
         self._joint_type = None
         self._control_type = None
         self._driven = None
+        self._body0 = None
+        self._body1 = None
 
         # The following values will only be valid if this joint is part of an articulation
         self._n_dof = None  # The number of degrees of freedom this joint provides
@@ -232,8 +234,10 @@ class JointPrim(BasePrim):
             None or str: Absolute prim path to the body prim to set as this joint's parent link, or None if there is
                 no body0 specified.
         """
-        targets = self._prim.GetRelationship("physics:body0").GetTargets()
-        return targets[0].__str__() if len(targets) > 0 else None
+        if self._body0 is None:
+            targets = self._prim.GetRelationship("physics:body0").GetTargets()
+            self._body0 = targets[0].__str__()
+        return self._body0
 
     @body0.setter
     def body0(self, body0):
@@ -246,6 +250,7 @@ class JointPrim(BasePrim):
         # Make sure prim path is valid
         assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
         self._prim.GetRelationship("physics:body0").SetTargets([lazy.pxr.Sdf.Path(body0)])
+        self._body0 = None
 
     @property
     def body1(self):
@@ -256,8 +261,10 @@ class JointPrim(BasePrim):
             None or str: Absolute prim path to the body prim to set as this joint's child link, or None if there is
                 no body1 specified.
         """
-        targets = self._prim.GetRelationship("physics:body1").GetTargets()
-        return targets[0].__str__()
+        if self._body1 is None:
+            targets = self._prim.GetRelationship("physics:body1").GetTargets()
+            self._body1 = targets[0].__str__()
+        return self._body1
 
     @body1.setter
     def body1(self, body1):
@@ -270,6 +277,7 @@ class JointPrim(BasePrim):
         # Make sure prim path is valid
         assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         self._prim.GetRelationship("physics:body1").SetTargets([lazy.pxr.Sdf.Path(body1)])
+        self._body1 = None
 
     @property
     def local_orientation(self):

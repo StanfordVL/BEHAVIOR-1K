@@ -1,12 +1,10 @@
 import math
 
-import torch as th
-
-import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
-from omnigibson.utils.control_utils import orientation_error
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.processing_utils import MovingAverageFilter
-from omnigibson.utils.python_utils import assert_valid_key, nums2array
+from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -144,13 +142,13 @@ class OperationalSpaceController(ManipulationController):
             )
 
         # Store gains
-        self.kp = nums2array(nums=kp, dim=6, dtype=th.float32) if kp is not None else None
+        self.kp = self.nums2array(nums=kp, dim=6) if kp is not None else None
         self.damping_ratio = damping_ratio
-        self.kp_null = nums2array(nums=kp_null, dim=control_dim, dtype=th.float32) if kp_null is not None else None
-        self.kd_null = 2 * th.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
-        self.kp_limits = th.tensor(kp_limits, dtype=th.float32)
-        self.damping_ratio_limits = th.tensor(damping_ratio_limits, dtype=th.float32)
-        self.kp_null_limits = th.tensor(kp_null_limits, dtype=th.float32)
+        self.kp_null = self.nums2array(nums=kp_null, dim=control_dim) if kp_null is not None else None
+        self.kd_null = 2 * cb.sqrt(self.kp_null) if kp_null is not None else None  # critically damped
+        self.kp_limits = cb.array(kp_limits)
+        self.damping_ratio_limits = cb.array(damping_ratio_limits)
+        self.kp_null_limits = cb.array(kp_null_limits)
 
         # Store settings for whether we're learning gains or not
         self.variable_kp = self.kp is None
@@ -199,12 +197,12 @@ class OperationalSpaceController(ManipulationController):
         is_input_limits_numeric = not (command_input_limits is None or isinstance(command_input_limits, str))
         is_output_limits_numeric = not (command_output_limits is None or isinstance(command_output_limits, str))
         command_input_limits = (
-            [nums2array(lim, dim=6, dtype=th.float32) for lim in command_input_limits]
+            [self.nums2array(lim, dim=6) for lim in command_input_limits]
             if is_input_limits_numeric
             else command_input_limits
         )
         command_output_limits = (
-            [nums2array(lim, dim=6, dtype=th.float32) for lim in command_output_limits]
+            [self.nums2array(lim, dim=6) for lim in command_output_limits]
             if is_output_limits_numeric
             else command_output_limits
         )
@@ -220,12 +218,12 @@ class OperationalSpaceController(ManipulationController):
                 # Add this to input / output limits
                 if is_input_limits_numeric:
                     command_input_limits = [
-                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=th.float32)])
+                        cb.cat([lim, self.nums2array(nums=val, dim=dim)])
                         for lim, val in zip(command_input_limits, (-1, 1))
                     ]
                 if is_output_limits_numeric:
                     command_output_limits = [
-                        th.cat([lim, nums2array(nums=val, dim=dim, dtype=th.float32)])
+                        cb.cat([lim, self.nums2array(nums=val, dim=dim)])
                         for lim, val in zip(command_output_limits, gain_limits)
                     ]
                 # Update command dim
@@ -293,7 +291,7 @@ class OperationalSpaceController(ManipulationController):
             idx += 6
         if self.variable_kp_null:
             self.kp_null = gains[:, idx : idx + self.control_dim]
-            self.kd_null = 2 * th.sqrt(self.kp_null)  # critically damped
+            self.kd_null = 2 * cb.sqrt(self.kp_null)  # critically damped
             idx += self.control_dim
 
     def _update_goal(self, command, control_dict):
@@ -315,8 +313,8 @@ class OperationalSpaceController(ManipulationController):
                         frame to control, computed in its local frame (e.g.: robot base frame)
         """
         # Grab important info from control dict
-        pos_relative = control_dict[f"{self.task_name}_pos_relative"].clone()
-        quat_relative = control_dict[f"{self.task_name}_quat_relative"].clone()
+        pos_relative = cb.copy(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = cb.copy(control_dict[f"{self.task_name}_quat_relative"])
 
         # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
@@ -336,11 +334,11 @@ class OperationalSpaceController(ManipulationController):
             target_quat = quat_relative
         elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = T.axisangle2quat(command[3:6])
+            target_quat = cb.T.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
-            dori = T.quat2mat(T.axisangle2quat(command[3:6]))
-            target_quat = T.mat2quat(dori @ T.quat2mat(quat_relative))
+            dori = cb.T.quat2mat(cb.T.axisangle2quat(command[3:6]))
+            target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:
@@ -352,8 +350,8 @@ class OperationalSpaceController(ManipulationController):
 
         # Set goals and return
         return dict(
-            target_pos=target_pos,
-            target_ori_mat=T.quat2mat(target_quat),
+            target_pos=cb.as_float32(target_pos),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
     def compute_control(self, goal_dict, control_dict):
@@ -364,7 +362,7 @@ class OperationalSpaceController(ManipulationController):
             goal_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 goals necessary for controller computation. Must include the following keys:
                     target_pos: robot-frame (x,y,z) desired end effector position
-                    target_quat: robot-frame (x,y,z,w) desired end effector quaternion orientation
+                    target_ori_mat: robot-frame desired end effector quaternion orientation matrix
             control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
                 states necessary for controller computation. Must include the following keys:
                     joint_position: Array of current joint positions
@@ -389,31 +387,36 @@ class OperationalSpaceController(ManipulationController):
         # For now, always use internal values
         kp = self.kp
         damping_ratio = self.damping_ratio
-        kd = 2 * th.sqrt(kp) * damping_ratio
+        kd = 2 * cb.sqrt(kp) * damping_ratio
 
         # Extract relevant values from the control dict
-        dof_idxs_mat = tuple(th.meshgrid(self.dof_idx, self.dof_idx))
+        dof_idxs_mat = tuple(cb.meshgrid(self.dof_idx, self.dof_idx))
         q = control_dict["joint_position"][self.dof_idx]
         qd = control_dict["joint_velocity"][self.dof_idx]
         mm = control_dict["mass_matrix"][dof_idxs_mat]
         j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
-        ee_vel = th.cat(
+        ee_vel = cb.cat(
             [control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]]
         )
         base_lin_vel = control_dict["root_rel_lin_vel"]
         base_ang_vel = control_dict["root_rel_ang_vel"]
 
         # Calculate torques
-        u = _compute_osc_torques(
+        u = cb.get_custom_method("compute_osc_torques")(
             q=q,
             qd=qd,
             mm=mm,
             j_eef=j_eef,
-            ee_pos=ee_pos,
-            ee_mat=T.quat2mat(ee_quat),
-            ee_vel=ee_vel,
+            ee_pos=cb.as_float32(ee_pos),
+            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
+            ee_lin_vel=cb.as_float32(ee_vel[:3]),
+            ee_ang_vel_err=cb.as_float32(
+                cb.T.quat2axisangle(
+                    cb.T.quat_multiply(cb.T.axisangle2quat(-ee_vel[3:]), cb.T.axisangle2quat(base_ang_vel))
+                )
+            ),
             goal_pos=goal_dict["target_pos"],
             goal_ori_mat=goal_dict["target_ori_mat"],
             kp=kp,
@@ -423,8 +426,8 @@ class OperationalSpaceController(ManipulationController):
             rest_qpos=self.reset_joint_pos,
             control_dim=self.control_dim,
             decouple_pos_ori=self.decouple_pos_ori,
-            base_lin_vel=base_lin_vel,
-            base_ang_vel=base_ang_vel,
+            base_lin_vel=cb.as_float32(base_lin_vel),
+            base_ang_vel=cb.as_float32(base_ang_vel),
         ).flatten()
 
         # Add gravity compensation
@@ -440,20 +443,20 @@ class OperationalSpaceController(ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
-        target_pos = control_dict[f"{self.task_name}_pos_relative"].clone()
-        target_quat = control_dict[f"{self.task_name}_quat_relative"].clone()
+        target_pos = cb.copy(control_dict[f"{self.task_name}_pos_relative"])
+        target_quat = cb.copy(control_dict[f"{self.task_name}_quat_relative"])
 
         # Convert quat into eef ori mat
         return dict(
-            target_pos=target_pos,
-            target_ori_mat=T.quat2mat(target_quat),
+            target_pos=cb.as_float32(target_pos),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
     def _compute_no_op_action(self, control_dict):
         pos_relative = control_dict[f"{self.task_name}_pos_relative"]
         quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
-        command = th.zeros(6, dtype=th.float32, device=pos_relative.device)
+        command = cb.zeros(6)
 
         # Handle position
         if self.mode == "absolute_pose":
@@ -464,7 +467,7 @@ class OperationalSpaceController(ManipulationController):
 
         # Handle orientation
         if self.mode in ("pose_absolute_ori", "absolute_pose"):
-            command[3:] = T.quat2axisangle(quat_relative)
+            command[3:] = cb.T.quat2axisangle(quat_relative)
         else:
             # For these modes, we don't need to add orientation to the command
             pass
@@ -486,15 +489,21 @@ class OperationalSpaceController(ManipulationController):
         return self._command_dim
 
 
+import torch as th
+
+import omnigibson.utils.transform_utils as TT
+
+
 @th.jit.script
-def _compute_osc_torques(
+def _compute_osc_torques_torch(
     q: th.Tensor,
     qd: th.Tensor,
     mm: th.Tensor,
     j_eef: th.Tensor,
     ee_pos: th.Tensor,
     ee_mat: th.Tensor,
-    ee_vel: th.Tensor,
+    ee_lin_vel: th.Tensor,
+    ee_ang_vel_err: th.Tensor,
     goal_pos: th.Tensor,
     goal_ori_mat: th.Tensor,
     kp: th.Tensor,
@@ -512,7 +521,7 @@ def _compute_osc_torques(
 
     # Calculate error
     pos_err = goal_pos - ee_pos
-    ori_err = orientation_error(goal_ori_mat, ee_mat)
+    ori_err = TT.orientation_error(goal_ori_mat, ee_mat)
     err = th.cat((pos_err, ori_err))
 
     # Vel target is the base velocity as experienced by the end effector
@@ -521,9 +530,8 @@ def _compute_osc_torques(
     #   due to the base linear velocity
     # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
     # properly, not simply "subtraction" as in the linear case
-    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_vel[:3]
-    ang_vel_err = T.quat2axisangle(T.quat_multiply(T.axisangle2quat(-ee_vel[3:]), T.axisangle2quat(base_ang_vel)))
-    vel_err = th.cat((lin_vel_err, ang_vel_err))
+    lin_vel_err = base_lin_vel + th.linalg.cross(base_ang_vel, ee_pos) - ee_lin_vel
+    vel_err = th.cat((lin_vel_err, ee_ang_vel_err))
 
     # Determine desired wrench
     err = th.unsqueeze(kp * err + kd * vel_err, dim=-1)
@@ -559,3 +567,91 @@ def _compute_osc_torques(
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u
+
+
+import numpy as np
+from numba import jit
+
+import omnigibson.utils.transform_utils_np as NT
+
+
+# Use numba since faster
+@jit(nopython=True)
+def _compute_osc_torques_numpy(
+    q,
+    qd,
+    mm,
+    j_eef,
+    ee_pos,
+    ee_mat,
+    ee_lin_vel,
+    ee_ang_vel_err,
+    goal_pos,
+    goal_ori_mat,
+    kp,
+    kd,
+    kp_null,
+    kd_null,
+    rest_qpos,
+    control_dim,
+    decouple_pos_ori,
+    base_lin_vel,
+    base_ang_vel,
+):
+    # Compute the inverse
+    mm_inv = np.linalg.inv(mm)
+
+    # Calculate error
+    pos_err = goal_pos - ee_pos
+    ori_err = NT.orientation_error(goal_ori_mat, ee_mat).astype(np.float32)
+    err = np.concatenate((pos_err, ori_err))
+
+    # Vel target is the base velocity as experienced by the end effector
+    # For angular velocity, this is just the base angular velocity
+    # For linear velocity, this is the base linear velocity PLUS the net linear velocity experienced
+    #   due to the base linear velocity
+    # For angular velocity, we need to make sure we compute the difference between the base and eef velocity
+    # properly, not simply "subtraction" as in the linear case
+    lin_vel_err = base_lin_vel + np.cross(base_ang_vel, ee_pos) - ee_lin_vel
+    vel_err = np.concatenate((lin_vel_err, ee_ang_vel_err))
+
+    # Determine desired wrench
+    err = np.expand_dims(kp * err + kd * vel_err, axis=-1)
+    m_eef_inv = j_eef @ mm_inv @ j_eef.T
+    m_eef = np.linalg.inv(m_eef_inv)
+
+    if decouple_pos_ori:
+        # # More efficient, but numba doesn't support 3D tensor operations yet
+        # j_eef_batch = j_eef.reshape(2, 3, -1)
+        # m_eef_pose_inv = np.matmul(np.matmul(j_eef_batch, np.expand_dims(mm_inv, axis=0)), np.transpose(j_eef_batch, (0, 2, 1)))
+        # m_eef_pose = np.linalg.inv(m_eef_pose_inv)  # Shape (2, 3, 3)
+        # wrench = np.matmul(m_eef_pose, err.reshape(2, 3, 1)).flatten()
+        m_eef_pos_inv = j_eef[:3, :] @ mm_inv @ j_eef[:3, :].T
+        m_eef_ori_inv = j_eef[3:, :] @ mm_inv @ j_eef[3:, :].T
+        m_eef_pos = np.linalg.inv(m_eef_pos_inv)
+        m_eef_ori = np.linalg.inv(m_eef_ori_inv)
+        wrench_pos = m_eef_pos @ err[:3, :]
+        wrench_ori = m_eef_ori @ err[3:, :]
+        wrench = np.concatenate((wrench_pos, wrench_ori))
+    else:
+        wrench = m_eef @ err
+
+    # Compute OSC torques
+    u = j_eef.T @ wrench
+
+    # Nullspace control torques `u_null` prevents large changes in joint configuration
+    # They are added into the nullspace of OSC so that the end effector orientation remains constant
+    # roboticsproceedings.org/rss07/p31.pdf
+    if rest_qpos is not None:
+        j_eef_inv = m_eef @ j_eef @ mm_inv
+        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + np.pi) % (2 * np.pi) - np.pi)
+        u_null = mm @ np.expand_dims(u_null, axis=-1).astype(np.float32)
+        u += (np.eye(control_dim, dtype=np.float32) - j_eef.T @ j_eef_inv) @ u_null
+
+    return u
+
+
+# Set these as part of the backend values
+add_compute_function(
+    name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
+)

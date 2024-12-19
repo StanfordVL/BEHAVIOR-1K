@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -167,23 +168,23 @@ class A1(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.087}
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {self.default_arm: [f"arm_joint{i+1}" for i in range(6)]}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: self._eef_link_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: self._finger_link_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: self._finger_joint_names}
 

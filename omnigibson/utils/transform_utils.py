@@ -1,6 +1,8 @@
 """
 Utility functions of matrix and vector transformations.
 
+NOTE: This file has a 1-to-1 correspondence to transform_utils_np.py
+
 NOTE: convention for quaternions is (x, y, z, w)
 """
 
@@ -309,6 +311,31 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
 
 @torch.compile
+def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
+    """
+    Generate random rotation quaternions, uniformly distributed over SO(3).
+
+    Arguments:
+        num_quaternions (int): number of quaternions to generate (default: 1)
+
+    Returns:
+        torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
+    """
+    # Generate four random numbers between 0 and 1
+    rand = torch.rand(num_quaternions, 4)
+
+    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
+    r1 = torch.sqrt(1.0 - rand[:, 0])
+    r2 = torch.sqrt(rand[:, 0])
+    t1 = 2 * torch.pi * rand[:, 1]
+    t2 = 2 * torch.pi * rand[:, 2]
+
+    quaternions = torch.stack([r1 * torch.sin(t1), r1 * torch.cos(t1), r2 * torch.sin(t2), r2 * torch.cos(t2)], dim=1)
+
+    return quaternions
+
+
+@torch.compile
 def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     """
     Samples an axis-angle rotation by first sampling a random axis
@@ -442,6 +469,20 @@ def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
         quat = quat.squeeze(0)
 
     return quat
+
+
+def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
+    """
+    Converts given rotation matrix to quaternion. Version optimized for batch operations
+
+    Args:
+        rmat (torch.Tensor): (3, 3) or (..., 3, 3) rotation matrix
+
+    Returns:
+        torch.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
+    """
+    # For torch, no different than basic version
+    return mat2quat(rmat)
 
 
 @torch.compile
@@ -944,12 +985,10 @@ def rotation_matrix(angle: float, direction: torch.Tensor) -> torch.Tensor:
 def transformation_matrix(angle: float, direction: torch.Tensor, point: Optional[torch.Tensor] = None) -> torch.Tensor:
     """
     Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
-
     Args:
         angle (float): Magnitude of rotation in radians
         direction (torch.Tensor): (ax,ay,az) axis about which to rotate
         point (Optional[torch.Tensor]): If specified, is the (x,y,z) point about which the rotation will occur
-
     Returns:
         torch.Tensor: 4x4 homogeneous transformation matrix
     """
@@ -1293,31 +1332,6 @@ def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
 
 
 @torch.compile
-def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
-    """
-    Generate random rotation quaternions, uniformly distributed over SO(3).
-
-    Arguments:
-        num_quaternions: int, number of quaternions to generate (default: 1)
-
-    Returns:
-        torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
-    """
-    # Generate four random numbers between 0 and 1
-    rand = torch.rand(num_quaternions, 4)
-
-    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
-    r1 = torch.sqrt(1.0 - rand[:, 0])
-    r2 = torch.sqrt(rand[:, 0])
-    t1 = 2 * torch.pi * rand[:, 1]
-    t2 = 2 * torch.pi * rand[:, 2]
-
-    quaternions = torch.stack([r1 * torch.sin(t1), r1 * torch.cos(t1), r2 * torch.sin(t2), r2 * torch.cos(t2)], dim=1)
-
-    return quaternions
-
-
-@torch.compile
 def transform_points(points: torch.Tensor, matrix: torch.Tensor, translate: bool = True) -> torch.Tensor:
     """
     Returns points rotated by a homogeneous
@@ -1372,3 +1386,33 @@ def quaternions_close(q1: torch.Tensor, q2: torch.Tensor, atol: float = 1e-3) ->
             Whether the quaternions are close
     """
     return torch.allclose(q1, q2, atol=atol) or torch.allclose(q1, -q2, atol=atol)
+
+
+@torch.compile
+def orientation_error(desired, current):
+    """
+    This function calculates a 3-dimensional orientation error vector for use in the
+    impedance controller. It does this by computing the delta rotation between the
+    inputs and converting that rotation to exponential coordinates (axis-angle
+    representation, where the 3d vector is axis * angle).
+    See https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation for more information.
+    Optimized function to determine orientation error from matrices
+
+    Args:
+        desired (tensor): (..., 3, 3) where final two dims are 2d array representing target orientation matrix
+        current (tensor): (..., 3, 3) where final two dims are 2d array representing current orientation matrix
+    Returns:
+        tensor: (..., 3) where final dim is (ax, ay, az) axis-angle representing orientation error
+    """
+    # Compute batch size
+    batch_size = desired.numel() // 9  # Each 3x3 matrix has 9 elements
+
+    desired_flat = desired.reshape(batch_size, 3, 3)
+    current_flat = current.reshape(batch_size, 3, 3)
+
+    rc1, rc2, rc3 = current_flat[:, :, 0], current_flat[:, :, 1], current_flat[:, :, 2]
+    rd1, rd2, rd3 = desired_flat[:, :, 0], desired_flat[:, :, 1], desired_flat[:, :, 2]
+
+    error = 0.5 * (torch.linalg.cross(rc1, rd1) + torch.linalg.cross(rc2, rd2) + torch.linalg.cross(rc3, rd3))
+
+    return error.reshape(desired.shape[:-2] + (3,))

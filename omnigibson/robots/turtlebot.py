@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -21,7 +22,7 @@ class Turtlebot(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.23
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["wheel_left_joint", "wheel_right_joint"]
 

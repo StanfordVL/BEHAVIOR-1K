@@ -3,6 +3,7 @@ import math
 import os
 from abc import ABC
 from collections import OrderedDict
+from functools import cached_property
 from typing import Iterable, List, Literal, Tuple
 
 import torch as th
@@ -153,18 +154,18 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_names(cls):
         return ["left", "right"]
 
-    @property
+    @cached_property
     def eef_link_names(self):
         dic = {arm: f"{arm}_{m.PALM_LINK_NAME}" for arm in self.arm_names}
         dic["head"] = "head"
         return dic
 
-    @property
+    @cached_property
     def arm_link_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
         return {arm: [f"{arm}_{component}" for component in m.COMPONENT_SUFFIXES] for arm in self.arm_names + ["head"]}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {
             arm: [
@@ -173,22 +174,22 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             for arm in self.arm_names
         }
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return [f"base_{component}_joint" for component in m.COMPONENT_SUFFIXES]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return [f"head_{component}_joint" for component in m.COMPONENT_SUFFIXES]
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
         return {
             eef: [f"{eef}_{component}_joint" for component in m.COMPONENT_SUFFIXES] for eef in self.arm_names + ["head"]
         }
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {
             arm: (
@@ -352,7 +353,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 self.joints[joint_name].max_effort = m.FINGER_JOINT_MAX_EFFORT
                 self.joints[joint_name].max_velocity = m.FINGER_JOINT_MAX_VELOCITY
 
-    @property
+    @cached_property
     def base_footprint_link_name(self):
         """
         Name of the actual root link that we are interested in.
