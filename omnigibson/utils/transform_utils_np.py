@@ -1,6 +1,9 @@
 """
 Utility functions of matrix and vector transformations.
 
+NOTE: This file has a 1-to-1 correspondence to transform_utils.py. By default, we use scipy for most transform-related
+    operations, but we optionally implement numba versions for functions that are often called in "batch" mode
+
 NOTE: convention for quaternions is (x, y, z, w)
 """
 
@@ -47,72 +50,90 @@ _AXES2TUPLE = {
 _TUPLE2AXES = dict((v, k) for k, v in _AXES2TUPLE.items())
 
 
-def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
+def anorm(x, axis=None, keepdims=False):
+    """Compute L2 norms alogn specified axes."""
+    return np.linalg.norm(x, axis=axis, keepdims=keepdims)
+
+
+def normalize(v, axis=None, eps=1e-10):
+    """L2 Normalize along specified axes."""
+    norm = anorm(v, axis=axis, keepdims=True)
+    return v / np.where(norm < eps, eps, norm)
+
+
+def dot(v1, v2, dim=-1, keepdim=False):
+    return np.sum(v1 * v2, axis=dim, keepdims=keepdim)
+
+
+def unit_vector(data, axis=None, out=None):
     """
-    Calculates the exponential moving average over a vector.
-    Will fail for large inputs.
+    Returns ndarray normalized by length, i.e. eucledian norm, along axis.
+
+    E.g.:
+        >>> v0 = numpy.random.random(3)
+        >>> v1 = unit_vector(v0)
+        >>> numpy.allclose(v1, v0 / numpy.linalg.norm(v0))
+        True
+
+        >>> v0 = numpy.random.rand(5, 4, 3)
+        >>> v1 = unit_vector(v0, axis=-1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
+        >>> numpy.allclose(v1, v2)
+        True
+
+        >>> v1 = unit_vector(v0, axis=1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
+        >>> numpy.allclose(v1, v2)
+        True
+
+        >>> v1 = numpy.empty((5, 4, 3), dtype=numpy.float32)
+        >>> unit_vector(v0, axis=1, out=v1)
+        >>> numpy.allclose(v1, v2)
+        True
+
+        >>> list(unit_vector([]))
+        []
+
+        >>> list(unit_vector([1.0]))
+        [1.0]
 
     Args:
-        data (Iterable): Input data
-        alpha (float): scalar in range (0,1)
-            The alpha parameter for the moving average.
-        offset (None or float): If specified, the offset for the moving average. None defaults to data[0].
-        dtype (None or type): Data type used for calculations. If None, defaults to float64 unless
-            data.dtype is float32, then it will use float32.
-        order (None or str): Order to use when flattening the data. Valid options are {'C', 'F', 'A'}.
-            None defaults to 'C'.
-        out (None or np.array): If specified, the location into which the result is stored. If provided, it must have
-            the same shape as the input. If not provided or `None`,
-            a freshly-allocated array is returned.
+        data (np.array): data to normalize
+        axis (None or int): If specified, determines specific axis along data to normalize
+        out (None or np.array): If specified, will store computation in this variable
 
     Returns:
-        np.array: Exponential moving average from @data
+        None or np.array: If @out is not specified, will return normalized vector. Otherwise, stores the output in @out
     """
-    data = np.array(data, copy=False)
-
-    if dtype is None:
-        if data.dtype == np.float32:
-            dtype = np.float32
-        else:
-            dtype = np.float64
-    else:
-        dtype = np.dtype(dtype)
-
-    if data.ndim > 1:
-        # flatten input
-        data = data.reshape(-1, order)
-
     if out is None:
-        out = np.empty_like(data, dtype=dtype)
+        data = np.array(data, dtype=np.float32, copy=True)
+        if data.ndim == 1:
+            data /= math.sqrt(np.dot(data, data))
+            return data
     else:
-        assert out.shape == data.shape
-        assert out.dtype == dtype
+        if out is not data:
+            out[:] = np.array(data, copy=False)
+        data = out
+    length = np.atleast_1d(np.sum(data * data, axis))
+    np.sqrt(length, length)
+    if axis is not None:
+        length = np.expand_dims(length, axis)
+    data /= length
+    if out is None:
+        return data
 
-    if data.size < 1:
-        # empty input, return empty array
-        return out
 
-    if offset is None:
-        offset = data[0]
+def quat_apply(quat, vec):
+    """
+    Apply a quaternion rotation to a vector (equivalent to R.from_quat(x).apply(y))
+    Args:
+        quat (np.array): (4,) or (N, 4) or (N, 1, 4) quaternion in (x, y, z, w) format
+        vec (np.array): (3,) or (M, 3) or (1, M, 3) vector to rotate
 
-    alpha = np.array(alpha, copy=False).astype(dtype, copy=False)
-
-    # scaling_factors -> 0 as len(data) gets large
-    # this leads to divide-by-zeros below
-    scaling_factors = np.power(1.0 - alpha, np.arange(data.size + 1, dtype=dtype), dtype=dtype)
-    # create cumulative sum array
-    np.multiply(data, (alpha * scaling_factors[-2]) / scaling_factors[:-1], dtype=dtype, out=out)
-    np.cumsum(out, dtype=dtype, out=out)
-
-    # cumsums / scaling
-    out /= scaling_factors[-2::-1]
-
-    if offset != 0:
-        offset = np.array(offset, copy=False).astype(dtype, copy=False)
-        # add offsets
-        out += offset * scaling_factors[1:]
-
-    return out
+    Returns:
+        np.array: (M, 3) or (N, M, 3) rotated vector
+    """
+    return R.from_quat(quat).apply(vec)
 
 
 def convert_quat(q, to="xyzw"):
@@ -270,38 +291,29 @@ def quat_slerp(quat0, quat1, fraction, shortestpath=True):
     return q0
 
 
-def random_quat(rand=None):
+@jit(nopython=True)
+def random_quaternion(num_quaternions=1):
     """
-    Return uniform random unit quaternion.
+    Generate random rotation quaternions, uniformly distributed over SO(3).
 
-    E.g.:
-    >>> q = random_quat()
-    >>> np.allclose(1.0, vector_norm(q))
-    True
-    >>> q = random_quat(np.random.random(3))
-    >>> q.shape
-    (4,)
-
-    Args:
-        rand (3-array or None): If specified, must be three independent random variables that are uniformly distributed
-            between 0 and 1.
+    Arguments:
+        num_quaternions (int): number of quaternions to generate (default: 1)
 
     Returns:
-        np.array: (x,y,z,w) random quaternion
+        np.array: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
     """
-    if rand is None:
-        rand = np.random.rand(3)
-    else:
-        assert len(rand) == 3
-    r1 = np.sqrt(1.0 - rand[0])
-    r2 = np.sqrt(rand[0])
-    pi2 = math.pi * 2.0
-    t1 = pi2 * rand[1]
-    t2 = pi2 * rand[2]
-    return np.array(
-        (np.sin(t1) * r1, np.cos(t1) * r1, np.sin(t2) * r2, np.cos(t2) * r2),
-        dtype=np.float32,
-    )
+    # Generate four random numbers between 0 and 1
+    rand = np.random.rand(num_quaternions, 4)
+
+    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
+    r1 = np.sqrt(1.0 - rand[:, 0])
+    r2 = np.sqrt(rand[:, 0])
+    t1 = 2 * np.pi * rand[:, 1]
+    t2 = 2 * np.pi * rand[:, 2]
+
+    quaternions = np.stack((r1 * np.sin(t1), r1 * np.cos(t1), r2 * np.sin(t2), r2 * np.cos(t2)), axis=1)
+
+    return quaternions
 
 
 def random_axis_angle(angle_limit=None, random_state=None):
@@ -338,47 +350,53 @@ def random_axis_angle(angle_limit=None, random_state=None):
     return random_axis, random_angle
 
 
-def vec(values):
+def quat2mat(quaternion):
+    if quaternion.dtype != np.float32:
+        quaternion = quaternion.astype(np.float32)
+    return _quat2mat(quaternion)
+
+
+@jit(nopython=True)
+def _quat2mat(quaternion):
     """
-    Converts value tuple into a numpy vector.
+    Convert quaternions into rotation matrices.
 
     Args:
-        values (n-array): a tuple of numbers
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
 
     Returns:
-        np.array: vector of given values
+        torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
     """
-    return np.array(values, dtype=np.float32)
+    # broadcast array is necessary to use numba parallel mode
+    q1, q2 = np.broadcast_arrays(quaternion[..., np.newaxis], quaternion[..., np.newaxis, :])
+    outer = q1 * q2
 
+    # Extract the necessary components
+    xx = outer[..., 0, 0]
+    yy = outer[..., 1, 1]
+    zz = outer[..., 2, 2]
+    xy = outer[..., 0, 1]
+    xz = outer[..., 0, 2]
+    yz = outer[..., 1, 2]
+    xw = outer[..., 0, 3]
+    yw = outer[..., 1, 3]
+    zw = outer[..., 2, 3]
 
-def mat4(array):
-    """
-    Converts an array to 4x4 matrix.
+    rotation_matrix = np.empty(quaternion.shape[:-1] + (3, 3), dtype=np.float32)
 
-    Args:
-        array (n-array): the array in form of vec, list, or tuple
+    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
+    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
+    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
 
-    Returns:
-        np.array: a 4x4 numpy matrix
-    """
-    return np.array(array, dtype=np.float32).reshape((4, 4))
+    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
+    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
+    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
 
+    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
+    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
+    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
 
-def mat2pose(hmat):
-    """
-    Converts a homogeneous 4x4 matrix into pose.
-
-    Args:
-        hmat (np.array): a 4x4 homogeneous matrix
-
-    Returns:
-        2-tuple:
-            - (np.array) (x,y,z) position array in cartesian coordinates
-            - (np.array) (x,y,z,w) orientation array in quaternion form
-    """
-    pos = hmat[:3, 3]
-    orn = mat2quat(hmat[:3, :3])
-    return pos, orn
+    return rotation_matrix
 
 
 def mat2quat(rmat):
@@ -466,6 +484,23 @@ def mat2quat_batch(rmat):
     return quat
 
 
+def mat2pose(hmat):
+    """
+    Converts a homogeneous 4x4 matrix into pose.
+
+    Args:
+        hmat (np.array): a 4x4 homogeneous matrix
+
+    Returns:
+        2-tuple:
+            - (np.array) (x,y,z) position array in cartesian coordinates
+            - (np.array) (x,y,z,w) orientation array in quaternion form
+    """
+    pos = hmat[:3, 3]
+    orn = mat2quat(hmat[:3, :3])
+    return pos, orn
+
+
 def vec2quat(vec, up=(0, 0, 1.0)):
     """
     Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
@@ -482,6 +517,38 @@ def vec2quat(vec, up=(0, 0, 1.0)):
     s_n = np.cross(up_n, vec_n)  # y
     u_n = np.cross(vec_n, s_n)  # z
     return mat2quat(np.array([vec_n, s_n, u_n]).T)
+
+
+def euler2quat(euler):
+    """
+    Converts euler angles into quaternion form
+
+    Args:
+        euler (np.array): (r,p,y) angles
+
+    Returns:
+        np.array: (x,y,z,w) float quaternion angles
+
+    Raises:
+        AssertionError: [Invalid input shape]
+    """
+    return R.from_euler("xyz", euler).as_quat()
+
+
+def quat2euler(quat):
+    """
+    Converts euler angles into quaternion form
+
+    Args:
+        quat (np.array): (x,y,z,w) float quaternion angles
+
+    Returns:
+        np.array: (r,p,y) angles
+
+    Raises:
+        AssertionError: [Invalid input shape]
+    """
+    return R.from_quat(quat).as_euler("xyz")
 
 
 def euler2mat(euler):
@@ -516,55 +583,6 @@ def mat2euler(rmat):
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
-
-
-def quat2mat(quaternion):
-    if quaternion.dtype != np.float32:
-        quaternion = quaternion.astype(np.float32)
-    return _quat2mat(quaternion)
-
-
-@jit(nopython=True)
-def _quat2mat(quaternion):
-    """
-    Convert quaternions into rotation matrices.
-
-    Args:
-        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
-
-    Returns:
-        torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
-    """
-    # broadcast array is necessary to use numba parallel mode
-    q1, q2 = np.broadcast_arrays(quaternion[..., np.newaxis], quaternion[..., np.newaxis, :])
-    outer = q1 * q2
-
-    # Extract the necessary components
-    xx = outer[..., 0, 0]
-    yy = outer[..., 1, 1]
-    zz = outer[..., 2, 2]
-    xy = outer[..., 0, 1]
-    xz = outer[..., 0, 2]
-    yz = outer[..., 1, 2]
-    xw = outer[..., 0, 3]
-    yw = outer[..., 1, 3]
-    zw = outer[..., 2, 3]
-
-    rotation_matrix = np.empty(quaternion.shape[:-1] + (3, 3), dtype=np.float32)
-
-    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
-    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
-    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
-
-    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
-    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
-    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
-
-    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
-    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
-    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
-
-    return rotation_matrix
 
 
 @jit(nopython=True)
@@ -611,38 +629,6 @@ def axisangle2quat(vec):
         np.array: (x,y,z,w) vec4 float angles
     """
     return R.from_rotvec(vec).as_quat()
-
-
-def euler2quat(euler):
-    """
-    Converts euler angles into quaternion form
-
-    Args:
-        euler (np.array): (r,p,y) angles
-
-    Returns:
-        np.array: (x,y,z,w) float quaternion angles
-
-    Raises:
-        AssertionError: [Invalid input shape]
-    """
-    return R.from_euler("xyz", euler).as_quat()
-
-
-def quat2euler(quat):
-    """
-    Converts euler angles into quaternion form
-
-    Args:
-        quat (np.array): (x,y,z,w) float quaternion angles
-
-    Returns:
-        np.array: (r,p,y) angles
-
-    Raises:
-        AssertionError: [Invalid input shape]
-    """
-    return R.from_quat(quat).as_euler("xyz")
 
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
@@ -983,64 +969,6 @@ def make_pose(translation, rotation):
     return pose
 
 
-def unit_vector(data, axis=None, out=None):
-    """
-    Returns ndarray normalized by length, i.e. eucledian norm, along axis.
-
-    E.g.:
-        >>> v0 = numpy.random.random(3)
-        >>> v1 = unit_vector(v0)
-        >>> numpy.allclose(v1, v0 / numpy.linalg.norm(v0))
-        True
-
-        >>> v0 = numpy.random.rand(5, 4, 3)
-        >>> v1 = unit_vector(v0, axis=-1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> v1 = unit_vector(v0, axis=1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> v1 = numpy.empty((5, 4, 3), dtype=numpy.float32)
-        >>> unit_vector(v0, axis=1, out=v1)
-        >>> numpy.allclose(v1, v2)
-        True
-
-        >>> list(unit_vector([]))
-        []
-
-        >>> list(unit_vector([1.0]))
-        [1.0]
-
-    Args:
-        data (np.array): data to normalize
-        axis (None or int): If specified, determines specific axis along data to normalize
-        out (None or np.array): If specified, will store computation in this variable
-
-    Returns:
-        None or np.array: If @out is not specified, will return normalized vector. Otherwise, stores the output in @out
-    """
-    if out is None:
-        data = np.array(data, dtype=np.float32, copy=True)
-        if data.ndim == 1:
-            data /= math.sqrt(np.dot(data, data))
-            return data
-    else:
-        if out is not data:
-            out[:] = np.array(data, copy=False)
-        data = out
-    length = np.atleast_1d(np.sum(data * data, axis))
-    np.sqrt(length, length)
-    if axis is not None:
-        length = np.expand_dims(length, axis)
-    data /= length
-    if out is None:
-        return data
-
-
 def get_orientation_error(target_orn, current_orn):
     """
     Returns the difference between two quaternion orientations as a 3 DOF numpy array.
@@ -1169,65 +1097,45 @@ def vecs2quat(vec0, vec1, normalized=False):
     return quat_unnormalized / np.linalg.norm(quat_unnormalized, axis=-1, keepdims=True)
 
 
+def align_vector_sets(vec_set1, vec_set2):
+    """
+    Computes a single quaternion representing the rotation that best aligns vec_set1 to vec_set2.
+
+    Args:
+        vec_set1 (np.array): (N, 3) tensor of N 3D vectors
+        vec_set2 (np.array): (N, 3) tensor of N 3D vectors
+
+    Returns:
+        np.array: (4,) Normalized quaternion representing the overall rotation
+    """
+    # Compute the cross-covariance matrix
+    H = vec_set2.T @ vec_set1
+
+    # Compute the elements for the quaternion
+    trace = H.trace()
+    w = trace + 1
+    x = H[1, 2] - H[2, 1]
+    y = H[2, 0] - H[0, 2]
+    z = H[0, 1] - H[1, 0]
+
+    # Construct the quaternion
+    quat = np.stack([x, y, z, w])
+
+    # Handle the case where w is close to zero
+    if quat[3] < 1e-4:
+        quat[3] = 0
+        max_idx = np.argmax(quat[:3].abs()) + 1
+        quat[max_idx] = 1
+
+    # Normalize the quaternion
+    quat = quat / (np.linalg.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
+
+    return quat
+
+
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return np.linalg.norm(np.array(v1) - np.array(v2))
-
-
-def frustum(left, right, bottom, top, znear, zfar):
-    """Create view frustum matrix."""
-    assert right != left
-    assert bottom != top
-    assert znear != zfar
-
-    M = np.zeros((4, 4), dtype=np.float32)
-    M[0, 0] = +2.0 * znear / (right - left)
-    M[2, 0] = (right + left) / (right - left)
-    M[1, 1] = +2.0 * znear / (top - bottom)
-    # TODO: Put this back to 3,1
-    # M[3, 1] = (top + bottom) / (top - bottom)
-    M[2, 1] = (top + bottom) / (top - bottom)
-    M[2, 2] = -(zfar + znear) / (zfar - znear)
-    M[3, 2] = -2.0 * znear * zfar / (zfar - znear)
-    M[2, 3] = -1.0
-    return M
-
-
-def ortho(left, right, bottom, top, znear, zfar):
-    """Create orthonormal projection matrix."""
-    assert right != left
-    assert bottom != top
-    assert znear != zfar
-
-    M = np.zeros((4, 4), dtype=np.float32)
-    M[0, 0] = 2.0 / (right - left)
-    M[1, 1] = 2.0 / (top - bottom)
-    M[2, 2] = -2.0 / (zfar - znear)
-    M[3, 0] = -(right + left) / (right - left)
-    M[3, 1] = -(top + bottom) / (top - bottom)
-    M[3, 2] = -(zfar + znear) / (zfar - znear)
-    M[3, 3] = 1.0
-    return M
-
-
-def perspective(fovy, aspect, znear, zfar):
-    """Create perspective projection matrix."""
-    # fovy is in degree
-    assert znear != zfar
-    h = np.tan(fovy / 360.0 * np.pi) * znear
-    w = h * aspect
-    return frustum(-w, w, -h, h, znear, zfar)
-
-
-def anorm(x, axis=None, keepdims=False):
-    """Compute L2 norms alogn specified axes."""
-    return np.linalg.norm(x, axis=axis, keepdims=keepdims)
-
-
-def normalize(v, axis=None, eps=1e-10):
-    """L2 Normalize along specified axes."""
-    norm = anorm(v, axis=axis, keepdims=True)
-    return v / np.where(norm < eps, eps, norm)
 
 
 def cartesian_to_polar(x, y):
@@ -1268,11 +1176,6 @@ def z_angle_from_quat(quat):
     return np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
 
 
-def z_rotation_from_quat(quat):
-    """Get the quaternion for the rotation around the Z axis produced by the quaternion."""
-    return R.from_euler("z", z_angle_from_quat(quat)).as_quat()
-
-
 def integer_spiral_coordinates(n):
     """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
@@ -1285,27 +1188,36 @@ def integer_spiral_coordinates(n):
     return int(x), int(y)
 
 
-def calculate_xy_plane_angle(quaternion):
+@jit(nopython=True)
+def transform_points(points, matrix, translate=True):
     """
-    Compute the 2D orientation angle from a quaternion assuming the initial forward vector is along the x-axis.
+    Returns points rotated by a homogeneous
+    transformation matrix.
+    If points are (n, 2) matrix must be (3, 3)
+    If points are (n, 3) matrix must be (4, 4)
 
-    Parameters:
-    quaternion : array_like
-        The quaternion (w, x, y, z) representing the rotation.
+    Arguments:
+        points (np.array): (n, dim) where `dim` is 2 or 3.
+        matrix (np.array): (3, 3) or (4, 4) homogeneous rotation matrix.
+        translate (bool): whether to apply translation from matrix or not.
 
     Returns:
-    float
-        The angle (in radians) of the projection of the forward vector onto the XY plane.
-        Returns 0.0 if the projected vector's magnitude is negligibly small.
+        np.array: (n, dim) transformed points.
     """
-    fwd = R.from_quat(quaternion).apply([1, 0, 0])
-    fwd[2] = 0.0
+    if len(points) == 0 or matrix is None:
+        return points.copy()
 
-    if np.linalg.norm(fwd) < 1e-4:
-        return 0.0
+    count, dim = points.shape
+    # Check if the matrix is close to an identity matrix
+    identity = np.eye(dim + 1)
+    if np.abs(matrix - identity[: dim + 1, : dim + 1]).max() < 1e-8:
+        return points.copy()
 
-    fwd /= np.linalg.norm(fwd)
-    return np.arctan2(fwd[1], fwd[0])
+    if translate:
+        stack = np.ascontiguousarray(np.concatenate((points, np.ones((count, 1))), axis=1))
+        return (matrix @ stack.T).T[:, :dim]
+    else:
+        return (matrix[:dim, :dim] @ points.T).T
 
 
 @jit(nopython=True)
