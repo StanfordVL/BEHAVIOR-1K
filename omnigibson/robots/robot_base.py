@@ -64,6 +64,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         **kwargs,
@@ -99,6 +101,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -122,6 +130,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         abilities = robot_abilities if abilities is None else robot_abilities.update(abilities)
 
         # Initialize internal attributes that will be loaded later
+        self._include_sensor_names = None if include_sensor_names is None else set(include_sensor_names)
+        self._exclude_sensor_names = None if exclude_sensor_names is None else set(exclude_sensor_names)
         self._sensors = None  # e.g.: scan sensor, vision sensor
 
         # All BaseRobots should have xform properties pre-loaded
@@ -208,11 +218,19 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # If the modalities list is empty, don't import the sensor.
                     if not sensor_kwargs["modalities"]:
                         continue
+
+                    # Possibly filter out the sensor based on name
+                    prim_path = str(prim.GetPrimPath())
+                    not_blacklisted = self._exclude_sensor_names is None or not any(name in prim_path for name in self._exclude_sensor_names)
+                    whitelisted = self._include_sensor_names is None or any(name in prim_path for name in self._include_sensor_names)
+                    if not (not_blacklisted and whitelisted):
+                        continue
+
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim_path),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )

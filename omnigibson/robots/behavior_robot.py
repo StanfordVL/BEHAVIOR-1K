@@ -80,6 +80,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities="rgb",
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         # Unique to ManipulationRobot
         grasping_mode="assisted",
@@ -109,6 +111,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             grasping_mode=grasping_mode,
             grasping_direction="upper",

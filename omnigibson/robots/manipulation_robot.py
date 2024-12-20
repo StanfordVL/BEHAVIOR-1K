@@ -85,6 +85,8 @@ class ManipulationRobot(BaseRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -123,6 +125,12 @@ class ManipulationRobot(BaseRobot):
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -178,6 +186,8 @@ class ManipulationRobot(BaseRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             **kwargs,
@@ -186,25 +196,17 @@ class ManipulationRobot(BaseRobot):
     def _validate_configuration(self):
         # Iterate over all arms
         for arm in self.arm_names:
-            # We make sure that our arm controller exists and is a manipulation controller
-            assert (
-                "arm_{}".format(arm) in self._controllers
-            ), "Controller 'arm_{}' must exist in controllers! Current controllers: {}".format(
-                arm, list(self._controllers.keys())
-            )
-            assert isinstance(
-                self._controllers["arm_{}".format(arm)], ManipulationController
-            ), "Arm {} controller must be a ManipulationController!".format(arm)
+            # If we have an arm controller, make sure it is a manipulation controller
+            if f"arm_{arm}" in self._controllers:
+                assert isinstance(
+                    self._controllers["arm_{}".format(arm)], ManipulationController
+                ), "Arm {} controller must be a ManipulationController!".format(arm)
 
-            # We make sure that our gripper controller exists and is a gripper controller
-            assert (
-                "gripper_{}".format(arm) in self._controllers
-            ), "Controller 'gripper_{}' must exist in controllers! Current controllers: {}".format(
-                arm, list(self._controllers.keys())
-            )
-            assert isinstance(
-                self._controllers["gripper_{}".format(arm)], GripperController
-            ), "Gripper {} controller must be a GripperController!".format(arm)
+            # If we have a gripper controller, make sure it is a manipulation controller
+            if f"gripper_{arm}" in self._controllers:
+                assert isinstance(
+                    self._controllers["gripper_{}".format(arm)], GripperController
+                ), "Gripper {} controller must be a GripperController!".format(arm)
 
         # run super
         super()._validate_configuration()
