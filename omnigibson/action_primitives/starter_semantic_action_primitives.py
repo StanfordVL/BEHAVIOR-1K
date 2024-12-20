@@ -1065,6 +1065,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 (target_pos, target_quat), ignore_failure=True, in_world_frame=False, stop_if_stuck=stop_if_stuck
             )
 
+    def _q_to_action(self, q):
+        action = []
+        for controller in self.robot.controllers.values():
+            command = q[controller.dof_idx]
+            action.append(controller._reverse_preprocess_command(command))
+        action = th.cat(action, dim=0)
+        assert action.shape[0] == self.robot.action_dim
+        return action
+
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
         """
         Adds waypoints to the plan so the distance between values in the plan never exceeds the max_inter_dist.
