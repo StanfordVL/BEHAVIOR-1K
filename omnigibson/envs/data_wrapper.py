@@ -5,6 +5,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import h5py
+import imageio
 import torch as th
 
 import omnigibson as og
@@ -188,13 +189,22 @@ class DataWrapper(EnvironmentWrapper):
 
         return traj_grp
 
+    @property
+    def should_save_current_episode(self):
+        """
+        Returns:
+            bool: Whether the current episode should be saved or discarded
+        """
+        # Only save successful demos and if actually recording
+        success = self.env.task.success or not self.only_successes
+        return success and self.hdf5_file is not None
+
     def flush_current_traj(self):
         """
         Flush current trajectory data
         """
         # Only save successful demos and if actually recording
-        success = self.env.task.success or not self.only_successes
-        if success and self.hdf5_file is not None:
+        if self.should_save_current_episode:
             traj_grp_name = f"demo_{self.traj_count}"
             traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
@@ -384,6 +394,11 @@ class DataCollectionWrapper(DataWrapper):
         self.max_state_size = 0
         self.current_transitions = dict()
 
+    @property
+    def should_save_current_episode(self):
+        # In addition to default conditions, we only save the current episode if we are actually recording
+        return super().should_save_current_episode and self.is_recording
+
     def add_transition_info(self, obj, add=True):
         """
         Adds transition info to the current sim step for specific object @obj.
@@ -470,6 +485,10 @@ class DataPlaybackWrapper(DataWrapper):
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
 
+        # Because we're loading directly from the cached scene file, we need to disable any additional objects that are being added since
+        # they will already be cached in the original scene file
+        config["objects"] = []
+
         # Set observation modalities and update sensor config
         for robot_cfg in config["robots"]:
             robot_cfg["obs_modalities"] = robot_obs_modalities
@@ -523,7 +542,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record=True):
+    def playback_episode(self, episode_id, record=True, video_path=None, video_writer=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -531,7 +550,13 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record (bool): Whether to record data during playback or not
+            video_path (None or str): If specified, path to write the playback video to
+            video_writer (None or str): If specified, an imageio video writer to use for writing the video (can be specified in place of @video_path)
         """
+        using_external_writer = video_writer is not None
+        if video_writer is None and video_path is not None:
+            video_writer = imageio.get_writer(video_path, fps=30)
+
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
@@ -597,17 +622,33 @@ class DataPlaybackWrapper(DataWrapper):
                 )
                 self.current_traj_history.append(step_data)
 
+            # If writing video, save the current frame
+            if video_writer is not None:
+                video_writer.append_data(og.sim.viewer_camera.get_obs()[0]["rgb"][:, :, :3].numpy())
+
             self.step_count += 1
 
         if record:
             self.flush_current_traj()
 
-    def playback_dataset(self, record=True):
+        # If we weren't using an external writer but we're still writing a video, close the writer
+        if video_writer is not None and not using_external_writer:
+            video_writer.close()
+
+    def playback_dataset(self, record=True, video_path=None, video_writer=None):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record (bool): Whether to record data during playback or not
+            video_path (None or str): If specified, path to write the playback video to
+            video_writer (None or str): If specified, an imageio video writer to use for writing the video (can be specified in place of @video_path)
         """
+        if video_writer is None and video_path is not None:
+            video_writer = imageio.get_writer(video_path, fps=30)
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
-            self.playback_episode(episode_id=episode_id, record=record)
+            self.playback_episode(episode_id=episode_id, record=record, video_path=None, video_writer=video_writer)
+
+        # Close the video writer at the end if created
+        if video_writer is not None:
+            video_writer.close()
