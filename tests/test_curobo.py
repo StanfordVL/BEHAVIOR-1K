@@ -425,16 +425,17 @@ def test_curobo():
                     else:
                         # Convert target joint positions to command
                         q = q.cpu()
-                        command = []
+                        action = []
                         for controller in robot.controllers.values():
-                            command.append(q[controller.dof_idx])
-                        command = th.cat(command, dim=0)
-                        assert command.shape[0] == robot.action_dim
+                            command = q[controller.dof_idx]
+                            action.append(controller._reverse_preprocess_command(command))
+                        action = th.cat(action, dim=0)
+                        assert action.shape[0] == robot.action_dim
 
                         num_repeat = 3
                         for j in range(num_repeat):
                             print(f"Executing waypoint {i}/{len(q_traj)}, step {j}")
-                            env.step(command)
+                            env.step(action)
 
                             for contact in robot.contact_list():
                                 assert contact.body0 in robot.link_prim_paths

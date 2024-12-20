@@ -1010,7 +1010,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def _q_to_action(self, q):
         action = []
         for controller in self.robot.controllers.values():
-            action.append(q[controller.dof_idx])
+            command = q[controller.dof_idx]
+            action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
         assert action.shape[0] == self.robot.action_dim
         return action
