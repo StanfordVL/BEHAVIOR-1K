@@ -252,8 +252,8 @@ class ManipulationRobot(BaseRobot):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
-
+                if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
+                    is_grasping = IsGraspingState.FALSE
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
