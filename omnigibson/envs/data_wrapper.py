@@ -87,14 +87,28 @@ class DataWrapper(EnvironmentWrapper):
         next_obs, reward, terminated, truncated, info = self.env.step(action)
         self.step_count += 1
 
+        self._record_step_trajectory(action, next_obs, reward, terminated, truncated, info)
+
+        return next_obs, reward, terminated, truncated, info
+
+    def _record_step_trajectory(self, action, obs, reward, terminated, truncated, info):
+        """
+        Record the current step data to the trajectory history
+
+        Args:
+            action (th.Tensor): action deployed resulting in @obs
+            obs (dict): state, i.e. observation
+            reward (float): reward, i.e. reward at this current timestep
+            terminated (bool): terminated, i.e. whether this episode ended due to a failure or success
+            truncated (bool): truncated, i.e. whether this episode ended due to a time limit etc.
+            info (dict): info, i.e. dictionary with any useful information
+        """
         # Aggregate step data
-        step_data = self._parse_step_data(action, next_obs, reward, terminated, truncated, info)
+        step_data = self._parse_step_data(action, obs, reward, terminated, truncated, info)
 
         # Update obs and traj history
         self.current_traj_history.append(step_data)
-        self.current_obs = next_obs
-
-        return next_obs, reward, terminated, truncated, info
+        self.current_obs = obs
 
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         """
@@ -262,7 +276,9 @@ class DataCollectionWrapper(DataWrapper):
     dataset!
     """
 
-    def __init__(self, env, output_path, viewport_camera_path="/World/viewer_camera", only_successes=True):
+    def __init__(
+        self, env, output_path, viewport_camera_path="/World/viewer_camera", only_successes=True, use_vr=False
+    ):
         """
         Args:
             env (Environment): The environment to wrap
@@ -270,6 +286,7 @@ class DataCollectionWrapper(DataWrapper):
             viewport_camera_path (str): prim path to the camera to use when rendering the main viewport during
                 data collection
             only_successes (bool): Whether to only save successful episodes
+            use_vr (bool): Whether to use VR headset for data collection
         """
         # Store additional variables needed for optimized data collection
 
@@ -279,6 +296,9 @@ class DataCollectionWrapper(DataWrapper):
         # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
         # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
+
+        self._is_recording = True
+        self.use_vr = use_vr
 
         # Add callbacks on import / remove objects and systems
         og.sim.add_callback_on_system_init(
@@ -300,6 +320,18 @@ class DataCollectionWrapper(DataWrapper):
         # Configure the simulator to optimize for data collection
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
 
+    @property
+    def is_recording(self):
+        return self._is_recording
+
+    @is_recording.setter
+    def is_recording(self, value: bool):
+        self._is_recording = value
+
+    def _record_step_trajectory(self, action, obs, reward, terminated, truncated, info):
+        if self.is_recording:
+            super()._record_step_trajectory(action, obs, reward, terminated, truncated, info)
+
     def _optimize_sim_for_data_collection(self, viewport_camera_path):
         """
         Configures the simulator to optimize for data collection
@@ -320,12 +352,14 @@ class DataCollectionWrapper(DataWrapper):
         # toggling these settings to be True -> False -> True
         # Only setting it to True once will actually freeze the GUI for some reason!
         if not gm.HEADLESS:
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
-            lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+            # Async rendering does not work in VR mode
+            if not self.use_vr:
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", False)
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", False)
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRendering", True)
+                lazy.carb.settings.get_settings().set_bool("/app/asyncRenderingLowLatency", True)
 
             # Disable mouse grabbing since we're only using the UI passively
             lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
