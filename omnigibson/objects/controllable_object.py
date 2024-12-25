@@ -1,14 +1,22 @@
+import math
 from abc import abstractmethod
 from copy import deepcopy
-import numpy as np
-import gym
+from functools import cached_property
+
+import gymnasium as gym
+import networkx as nx
+import torch as th
+
 import omnigibson as og
-from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, CachedFunctions
-from omnigibson.utils.constants import PrimType
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.numpy_utils import NumpyTypes
+from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -24,9 +32,8 @@ class ControllableObject(BaseObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -44,11 +51,8 @@ class ControllableObject(BaseObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -60,7 +64,7 @@ class ControllableObject(BaseObject):
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -76,7 +80,7 @@ class ControllableObject(BaseObject):
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = None if reset_joint_pos is None else np.array(reset_joint_pos)
+        self._reset_joint_pos = None if reset_joint_pos is None else th.tensor(reset_joint_pos, dtype=th.float)
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")
@@ -90,12 +94,29 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = None
         self._control_enabled = True
 
+        class_name = self.__class__.__name__.lower()
+        if relative_prim_path:
+            # If prim path is specified, assert that the last element starts with the right prefix to ensure that
+            # the object will be included in the ControllableObjectViewAPI.
+            assert relative_prim_path.split("/")[-1].startswith(f"controllable__{class_name}__"), (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+            assert relative_prim_path.split("/")[-1].count("__") == 2, (
+                "If relative_prim_path is specified, the last element of the path must look like "
+                f"'controllable__{class_name}__robotname' where robotname can be an arbitrary "
+                "string containing no double underscores."
+            )
+        else:
+            # If prim path is not specified, set it to the default path, but prepend controllable.
+            relative_prim_path = f"/controllable__{class_name}__{name}"
+
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -107,6 +128,22 @@ class ControllableObject(BaseObject):
         )
 
     def _initialize(self):
+        # Assert that the prim path matches ControllableObjectViewAPI's expected format
+        scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
+        assert scene_id.startswith(
+            "scene_"
+        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
+        robot_name_components = robot_name.split("__")
+        assert (
+            len(robot_name_components) == 3
+        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
+        assert (
+            robot_name_components[0] == "controllable"
+        ), "Third component of articulation root path (robot name) must start with 'controllable'"
+        assert (
+            robot_name_components[1] == self.__class__.__name__.lower()
+        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
+
         # Run super first
         super()._initialize()
         # Fill in the DOF to joint mapping
@@ -135,31 +172,51 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-        # If we haven't already created a physics callback, do so now so control gets updated every sim step
-        callback_name = f"{self.name}_controller_callback"
-        if not og.sim.physics_callback_exists(callback_name=callback_name):
-            og.sim.add_physics_callback(
-                callback_name=callback_name,
-                callback_fn=lambda x: self.step(),
-            )
-
-    def load(self):
+    def load(self, scene):
         # Run super first
-        prim = super().load()
+        prim = super().load(scene)
 
         # Set the control frequency if one was not provided.
-        expected_control_freq = 1.0 / og.sim.get_rendering_dt()
+        expected_control_freq = 1.0 / og.sim.get_sim_step_dt()
         if self._control_freq is None:
             log.info(
                 "Control frequency is None - being set to default of render_frequency: %.4f", expected_control_freq
             )
             self._control_freq = expected_control_freq
         else:
-            assert np.isclose(
+            assert math.isclose(
                 expected_control_freq, self._control_freq
             ), "Stored control frequency does not match environment's render timestep."
 
         return prim
+
+    def _post_load(self):
+        # Call super first
+        super()._post_load()
+
+        # For controllable objects, we disable gravity of all links that are not fixed to the base link.
+        # This is because we cannot accurately apply gravity compensation in the absence of a working
+        # generalized gravity force computation. This may have some side effects on the measured
+        # torque on each of these links, but it provides a greatly improved joint control behavior.
+        # Note that we do NOT disable gravity for links that are fixed to the base link, as these links
+        # are typically where most of the downward force on the robot is applied. Disabling gravity
+        # for these links would result in the robot floating in the air easily. Also note that here
+        # we use the base link footprint which takes into account the presence of virtual joints.
+
+        # Find all the links that are accessible from the base link footprint via a chain of fixed
+        # joints. We will disable gravity for all links that are not in this set.
+        articulation_tree = self.articulation_tree
+        base_footprint = self.base_footprint_link_name
+        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
+        only_fixed_joints = nx.subgraph_view(articulation_tree, filter_edge=is_edge_fixed)
+        fixed_link_names = nx.descendants(only_fixed_joints, base_footprint) | {base_footprint}
+
+        # Find the links that are NOT fixed.
+        other_link_names = set(self.links.keys()) - fixed_link_names
+
+        # Disable gravity for those links.
+        for link_name in other_link_names:
+            self.links[link_name].disable_gravity()
 
     def _load_controllers(self):
         """
@@ -170,21 +227,58 @@ class ControllableObject(BaseObject):
         # Generate the controller config
         self._controller_config = self._generate_controller_config(custom_config=self._controller_config)
 
+        # We copy the controller config here because we add/remove some keys in-place that shouldn't persist
+        _controller_config = deepcopy(self._controller_config)
+
         # Store dof idx mapping to dof name
         self.dof_names_ordered = list(self._joints.keys())
 
         # Initialize controllers to create
         self._controllers = dict()
+        # Keep track of any controllers that are subsumed by other controllers
+        # We will not instantiate subsumed controllers
+        controller_subsumes = dict()  # Maps independent controller name to list of subsumed controllers
+        subsume_names = set()
+        for name in self._raw_controller_order:
+            # Make sure we have the valid controller name specified
+            assert_valid_key(key=name, valid_keys=_controller_config, name="controller name")
+            cfg = _controller_config[name]
+            subsume_controllers = cfg.pop("subsume_controllers", [])
+            # If this controller subsumes other controllers, it cannot be subsumed by another controller
+            # (i.e.: we don't allow nested / cyclical subsuming)
+            if len(subsume_controllers) > 0:
+                assert (
+                    name not in subsume_names
+                ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                controller_subsumes[name] = subsume_controllers
+                for subsume_name in subsume_controllers:
+                    # Make sure it doesn't already exist -- a controller should only be subsumed by up to one other
+                    assert (
+                        subsume_name not in subsume_names
+                    ), f"Controller {subsume_name} cannot be subsumed by more than one other controller!"
+                    assert (
+                        subsume_name not in controller_subsumes
+                    ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                    subsume_names.add(subsume_name)
+
         # Loop over all controllers, in the order corresponding to @action dim
-        for name in self.controller_order:
-            assert_valid_key(key=name, valid_keys=self._controller_config, name="controller name")
-            cfg = self._controller_config[name]
+        for name in self._raw_controller_order:
+            # If this controller is subsumed by another controller, simply skip it
+            if name in subsume_names:
+                continue
+            cfg = _controller_config[name]
+            # If we subsume other controllers, prepend the subsumed' dof idxs to this controller's idxs
+            if name in controller_subsumes:
+                for subsumed_name in controller_subsumes[name]:
+                    subsumed_cfg = _controller_config[subsumed_name]
+                    cfg["dof_idx"] = th.concatenate([subsumed_cfg["dof_idx"], cfg["dof_idx"]])
+
             # If we're using normalized action space, override the inputs for all controllers
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
 
             # Create the controller
-            controller = create_controller(**cfg)
+            controller = create_controller(**cb.from_torch_recursive(cfg))
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
                 assert self._joints[
@@ -198,14 +292,37 @@ class ControllableObject(BaseObject):
         Helper function to force the joints to use the internal specified control mode and gains
         """
         # Update the control modes of each joint based on the outputted control from the controllers
+        unused_dofs = {i for i in range(self.n_dof)}
         for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
+                # Make sure the DOF has not already been set yet, and remove it afterwards
+                assert dof.item() in unused_dofs
+                unused_dofs.remove(dof.item())
                 control_type = self._controllers[name].control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
+                    kd=(
+                        self.default_kd
+                        if control_type == ControlType.POSITION or control_type == ControlType.VELOCITY
+                        else None
+                    ),
                 )
+
+        # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
+        # motion wrt a specific axis), so explicitly set kp / kd to 0 to avoid silent bugs when
+        # joint positions / velocities are set
+        for unused_dof in unused_dofs:
+            unused_joint = self._joints[self.dof_names_ordered[unused_dof]]
+            assert not unused_joint.driven, (
+                f"All unused joints not mapped to any controller should not have DriveAPI attached to it! "
+                f"However, joint {unused_joint.name} is driven!"
+            )
+            unused_joint.set_control_type(
+                control_type=ControlType.NONE,
+                kp=None,
+                kd=None,
+            )
 
     def _generate_controller_config(self, custom_config=None):
         """
@@ -223,7 +340,7 @@ class ControllableObject(BaseObject):
         controller_config = {} if custom_config is None else deepcopy(custom_config)
 
         # Update the configs
-        for group in self.controller_order:
+        for group in self._raw_controller_order:
             group_controller_name = (
                 controller_config[group]["name"]
                 if group in controller_config and "name" in controller_config[group]
@@ -288,10 +405,15 @@ class ControllableObject(BaseObject):
         low, high = [], []
         for controller in self._controllers.values():
             limits = controller.command_input_limits
-            low.append(np.array([-np.inf] * controller.command_dim) if limits is None else limits[0])
-            high.append(np.array([np.inf] * controller.command_dim) if limits is None else limits[1])
+            low.append(th.tensor([-float("inf")] * controller.command_dim) if limits is None else limits[0])
+            high.append(th.tensor([float("inf")] * controller.command_dim) if limits is None else limits[1])
 
-        return gym.spaces.Box(shape=(self.action_dim,), low=np.concatenate(low), high=np.concatenate(high), dtype=float)
+        return gym.spaces.Box(
+            shape=(self.action_dim,),
+            low=cb.to_numpy(cb.cat(low)),
+            high=cb.to_numpy(cb.cat(high)),
+            dtype=NumpyTypes.FLOAT32,
+        )
 
     def apply_action(self, action):
         """
@@ -307,12 +429,21 @@ class ControllableObject(BaseObject):
 
         # If we're using discrete action space, we grab the specific action and use that to convert to control
         if self._action_type == "discrete":
-            action = np.array(self.discrete_action_list[action])
+            action = th.tensor(self.discrete_action_list[action], dtype=th.float32)
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
+
+        # Sanity check that action is 1D array
+        assert len(action.shape) == 1, f"Action must be 1D array, got {len(action.shape)}D array!"
 
         # Check if the input action's length matches the action dimension
         assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
             self.action_dim, len(action)
         )
+
+        # Convert action from torch if necessary
+        action = cb.from_torch(action)
 
         # First, loop over all controllers, and update the desired command
         idx = 0
@@ -361,9 +492,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self.n_dof)
-        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
-        u_type_vec = np.array([ControlType.NONE] * self.n_dof)
+        u_vec = cb.zeros(self.n_dof)
+        # By default, the control type is Effort and the control value is 0 (th.zeros) - i.e. no control applied
+        u_type_vec = cb.array([ControlType.EFFORT] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -372,7 +503,7 @@ class ControllableObject(BaseObject):
         u_vec, u_type_vec = self._postprocess_control(control=u_vec, control_type=u_type_vec)
 
         # Deploy control signals
-        self.deploy_control(control=u_vec, control_type=u_type_vec, indices=None, normalized=False)
+        self.deploy_control(control=u_vec, control_type=u_type_vec)
 
     def _postprocess_control(self, control, control_type):
         """
@@ -394,7 +525,7 @@ class ControllableObject(BaseObject):
         """
         return control, control_type
 
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
+    def deploy_control(self, control, control_type):
         """
         Deploys control signals @control with corresponding @control_type on this entity.
 
@@ -421,93 +552,33 @@ class ControllableObject(BaseObject):
                 values. Expects a single bool for the entire @control. Default is False.
         """
         # Run sanity check
-        if indices is None:
-            assert len(control) == len(control_type) == self.n_dof, (
-                "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
-            )
-            # Set indices manually so that we're standardized
-            indices = np.arange(self.n_dof)
-        else:
-            assert len(control) == len(control_type) == len(indices), (
-                "Control signals, control types, and indices should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), len(indices))
-            )
-
-        # Standardize normalized input
-        n_indices = len(indices)
-
-        # Loop through controls and deploy
-        # We have to use delicate logic to account for the edge cases where a single joint may contain > 1 DOF
-        # (e.g.: spherical joint)
-        pos_vec, pos_idxs, using_pos = [], [], False
-        vel_vec, vel_idxs, using_vel = [], [], False
-        eff_vec, eff_idxs, using_eff = [], [], False
-        cur_indices_idx = 0
-        while cur_indices_idx != n_indices:
-            # Grab the current DOF index we're controlling and find the corresponding joint
-            joint = self._dof_to_joints[indices[cur_indices_idx]]
-            cur_ctrl_idx = indices[cur_indices_idx]
-            joint_dof = joint.n_dof
-            if joint_dof > 1:
-                # Run additional sanity checks since the joint has more than one DOF to make sure our controls,
-                # control types, and indices all match as expected
-
-                # Make sure the indices are mapped correctly
-                assert (
-                    indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof
-                ), "Got mismatched control indices for a single joint!"
-                # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
-                for group_name, group in zip(
-                    ("joints", "control_types", "normalized"),
-                    (self._dof_to_joints, control_type, normalized),
-                ):
-                    assert (
-                        len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1
-                    ), f"Not all {group_name} were the same when trying to deploy control for a single joint!"
-                # Assuming this all passes, we grab the control subvector, type, and normalized value accordingly
-                ctrl = control[cur_ctrl_idx : cur_ctrl_idx + joint_dof]
-            else:
-                # Grab specific control. No need to do checks since this is a single value
-                ctrl = control[cur_ctrl_idx]
-
-            # Deploy control based on type
-            ctrl_type = control_type[
-                cur_ctrl_idx
-            ]  # In multi-DOF joint case all values were already checked to be the same
-            if ctrl_type == ControlType.EFFORT:
-                eff_vec.append(ctrl)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            elif ctrl_type == ControlType.VELOCITY:
-                vel_vec.append(ctrl)
-                vel_idxs.append(cur_ctrl_idx)
-                using_vel = True
-            elif ctrl_type == ControlType.POSITION:
-                pos_vec.append(ctrl)
-                pos_idxs.append(cur_ctrl_idx)
-                using_pos = True
-            elif ctrl_type == ControlType.NONE:
-                # Set zero efforts
-                eff_vec.append(0)
-                eff_idxs.append(cur_ctrl_idx)
-                using_eff = True
-            else:
-                raise ValueError("Invalid control type specified: {}".format(ctrl_type))
-            # Finally, increment the current index based on how many DOFs were just controlled
-            cur_indices_idx += joint_dof
+        assert len(control) == len(control_type) == self.n_dof, (
+            f"Control signals, control types, and number of DOF should all be the same!"
+            f"Got {len(control)}, {len(control_type)}, and {self.n_dof} respectively."
+        )
 
         # set the targets for joints
-        if using_pos:
-            self.set_joint_positions(
-                positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized
+        pos_idxs = cb.where(control_type == ControlType.POSITION)[0]
+        if len(pos_idxs) > 0:
+            ControllableObjectViewAPI.set_joint_position_targets(
+                self.articulation_root_path,
+                positions=control[pos_idxs],
+                indices=pos_idxs,
             )
-        if using_vel:
-            self.set_joint_velocities(
-                velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized
+        vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
+        if len(vel_idxs) > 0:
+            ControllableObjectViewAPI.set_joint_velocity_targets(
+                self.articulation_root_path,
+                velocities=control[vel_idxs],
+                indices=vel_idxs,
             )
-        if using_eff:
-            self.set_joint_efforts(efforts=np.array(eff_vec), indices=np.array(eff_idxs), normalized=normalized)
+        eff_idxs = cb.where(control_type == ControlType.EFFORT)[0]
+        if len(eff_idxs) > 0:
+            ControllableObjectViewAPI.set_joint_efforts(
+                self.articulation_root_path,
+                efforts=control[eff_idxs],
+                indices=eff_idxs,
+            )
 
     def get_control_dict(self):
         """
@@ -527,22 +598,69 @@ class ControllableObject(BaseObject):
                 - gravity_force: (n_dof,) per-joint generalized gravity forces
                 - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
+        # Note that everything here uses the ControllableObjectViewAPI because these are faster implementations of
+        # the functions that this class also implements. The API centralizes access for all of the robots in the scene
+        # removing the need for multiple reads and writes.
+        # TODO(cgokmen): CachedFunctions can now be entirely removed since the ControllableObjectViewAPI already implements caching.
         fcns = CachedFunctions()
-        fcns["_root_pos_quat"] = self.get_position_orientation
+        fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = self.get_linear_velocity
-        fcns["root_ang_vel"] = self.get_angular_velocity
-        fcns["root_rel_lin_vel"] = self.get_relative_linear_velocity
-        fcns["root_rel_ang_vel"] = self.get_relative_angular_velocity
-        fcns["joint_position"] = lambda: self.get_joint_positions(normalized=False)
-        fcns["joint_velocity"] = lambda: self.get_joint_velocities(normalized=False)
-        fcns["joint_effort"] = lambda: self.get_joint_efforts(normalized=False)
-        fcns["mass_matrix"] = lambda: self.get_mass_matrix(clone=False)
-        fcns["gravity_force"] = lambda: self.get_generalized_gravity_forces(clone=False)
-        fcns["cc_force"] = lambda: self.get_coriolis_and_centrifugal_forces(clone=False)
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)
+        fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
+            self.articulation_root_path
+        )
+        fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
+            self.articulation_root_path
+        )
+        fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
+        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+            self.articulation_root_path
+        )
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+            self.articulation_root_path
+        )
 
         return fcns
+
+    def _add_task_frame_control_dict(self, fcns, task_name, link_name):
+        """
+        Internally helper function to generate per-link control dictionary entries. Useful for generating relevant
+        control values needed for IK / OSC for a given @task_name. Should be called within @get_control_dict()
+
+        Args:
+            fcns (CachedFunctions): Keyword-mapped control values for this object, mapping names to n-arrays.
+            task_name (str): name to assign for this task_frame. It will be prepended to all fcns generated
+            link_name (str): the corresponding link name from this controllable object that @task_name is referencing
+        """
+        fcns[f"_{task_name}_pos_quat_relative"] = (
+            lambda: ControllableObjectViewAPI.get_link_relative_position_orientation(
+                self.articulation_root_path, link_name
+            )
+        )
+        fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
+        fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
+        fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
+            self.articulation_root_path, link_name
+        )
+        fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
+            self.articulation_root_path, link_name
+        )
+        # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        # see self.get_relative_jacobian() for more info
+        # We also count backwards for the link frame because if the robot is fixed base, the jacobian returned has one
+        # less index than the number of links. This is presumably because the 1st link of a fixed base robot will
+        # always have a zero jacobian since it can't move. Counting backwards resolves this issue.
+        start_idx = 0 if self.fixed_base else 6
+        link_idx = self._articulation_view.get_body_index(link_name)
+        fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
+            self.articulation_root_path
+        )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
 
     def dump_action(self):
         """
@@ -581,31 +699,60 @@ class ControllableObject(BaseObject):
         for controller_name, controller in self._controllers.items():
             controller.load_state(state=controller_states[controller_name])
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize the controller states sequentially
-        controller_states_flat = np.concatenate(
+        controller_states_flat = th.cat(
             [c.serialize(state=state["controllers"][c_name]) for c_name, c in self._controllers.items()]
         )
 
         # Concatenate and return
-        return np.concatenate([state_flat, controller_states_flat]).astype(float)
+        return th.cat([state_flat, controller_states_flat])
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize the controller states sequentially
         controller_states = dict()
         for c_name, c in self._controllers.items():
-            state_size = c.state_size
-            controller_states[c_name] = c.deserialize(state=state[idx : idx + state_size])
-            idx += state_size
+            controller_states[c_name], deserialized_items = c.deserialize(state=state[idx:])
+            idx += deserialized_items
         state_dict["controllers"] = controller_states
 
         return state_dict, idx
+
+    @property
+    def base_footprint_link_name(self):
+        """
+        Get the base footprint link name for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            str: Name of the base footprint link for this object
+        """
+        return self.root_link_name
+
+    @property
+    def base_footprint_link(self):
+        """
+        Get the base footprint link for the controllable object.
+
+        The base footprint link is the link that should be considered the base link for the object
+        even in the presence of virtual joints that may be present in the object's articulation. For
+        robots without virtual joints, this is the same as the root link. For robots with virtual joints,
+        this is the link that is the child of the last virtual joint in the robot's articulation.
+
+        Returns:
+            RigidPrim: Base footprint link for this object
+        """
+        return self.links[self.base_footprint_link_name]
 
     @property
     def action_dim(self):
@@ -647,13 +794,27 @@ class ControllableObject(BaseObject):
         return self._controllers
 
     @property
-    @abstractmethod
     def controller_order(self):
         """
         Returns:
             list: Ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
                 to denote that the action vector should be interpreted as first the base action, then arm command, then
-                gripper command
+                gripper command. Note that this may be a subset of all possible controllers due to some controllers
+                subsuming others (e.g.: arm controller subsuming the trunk controller if using IK)
+        """
+        assert self._controllers is not None, "Can only view controller_order after controllers are loaded!"
+        return list(self._controllers.keys())
+
+    @property
+    @abstractmethod
+    def _raw_controller_order(self):
+        """
+        Returns:
+            list: Raw ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
+                to denote that the action vector should be interpreted as first the base action, then arm command, then
+                gripper command. Note that external users should query @controller_order, which is the post-processed
+                ordering of actions, which may be a subset of the controllers due to some controllers subsuming others
+                (e.g.: arm controller subsuming the trunk controller if using IK)
         """
         raise NotImplementedError
 
@@ -668,7 +829,7 @@ class ControllableObject(BaseObject):
         idx = 0
         for controller in self.controller_order:
             cmd_dim = self._controllers[controller].command_dim
-            dic[controller] = np.arange(idx, idx + cmd_dim)
+            dic[controller] = th.arange(idx, idx + cmd_dim)
             idx += cmd_dim
 
         return dic
@@ -686,7 +847,8 @@ class ControllableObject(BaseObject):
 
         return dic
 
-    @property
+    # TODO: These are cached, but they are not updated when the joint limit is changed
+    @cached_property
     def control_limits(self):
         """
         Returns:

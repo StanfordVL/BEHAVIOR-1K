@@ -1,6 +1,4 @@
 env:
-  action_frequency: 60                  # (int): environment executes action at the action_frequency rate
-  physics_frequency: 60                 # (int): physics frequency (1 / physics_timestep for physx)
   device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
   automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
@@ -9,12 +7,15 @@ env:
   initial_pos_z_offset: 0.1
   external_sensors:                     # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
     - sensor_type: VisionSensor
+      name: external_sensor0
+      relative_prim_path: /external_sensor0
       modalities: [rgb, depth]
       sensor_kwargs:
         image_height: 128
         image_width: 128
-      local_position: [0, 0, 1.0]
-      local_orientation: [0.707, 0.0, 0.0, 0.707]
+      position: [0, 0, 1.0]
+      orientation: [0.707, 0.0, 0.0, 0.707]
+      pose_frame: parent
 
 
 render:
@@ -44,8 +45,6 @@ robots:
     action_normalize: true
     action_type: continuous
     grasping_mode: physical
-    rigid_trunk: false
-    default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     default_reset_mode: tuck
     sensor_config:
@@ -60,8 +59,11 @@ robots:
     controller_config:
       base:
         name: DifferentialDriveController
+      trunk:
+        name: JointController
       arm_0:
         name: InverseKinematicsController
+        subsume_controllers: [trunk]
       gripper_0:
         name: MultiFingerGripperController
         mode: binary

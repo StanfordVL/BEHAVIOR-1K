@@ -1,16 +1,16 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin, GlobalUpdateStateMixin
-from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import create_primitive_mesh, RigidContactAPI
+from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import PrimType
-
+from omnigibson.utils.numpy_utils import vtarray_to_torch
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -22,7 +22,7 @@ m.CAN_TOGGLE_STEPS = 5
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin, GlobalUpdateStateMixin):
 
-    # Set of prim paths defining robot finger links belonging to any manipulation robots
+    # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
     # Set of objects that are contacting any manipulation robots
@@ -48,30 +48,35 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         cls._finger_contact_objs = set()
 
         # detect marker and hand interaction
-        robot_finger_links = set(
-            link
-            for robot in og.sim.scene.robots
-            if isinstance(robot, ManipulationRobot)
-            for finger_links in robot.finger_links.values()
-            for link in finger_links
-        )
-        cls._robot_finger_paths = set(link.prim_path for link in robot_finger_links)
+        cls._robot_finger_paths = [
+            {
+                link.prim_path
+                for robot in scene.robots
+                if isinstance(robot, ManipulationRobot)
+                for finger_links in robot.finger_links.values()
+                for link in finger_links
+            }
+            for scene in og.sim.scenes
+        ]
 
         # If there aren't any valid robot link paths, immediately return
-        if len(cls._robot_finger_paths) == 0:
+        if not any(len(robot_finger_paths) > 0 for robot_finger_paths in cls._robot_finger_paths):
             return
 
-        finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path) for prim_path in cls._robot_finger_paths]
-        finger_impulses = RigidContactAPI.get_all_impulses()[:, finger_idxs, :]
-        n_bodies = len(finger_impulses)
-        touching_bodies = np.any(finger_impulses.reshape(n_bodies, -1), axis=-1)
-        touching_bodies_idxs = np.where(touching_bodies)[0]
-        if len(touching_bodies_idxs) > 0:
-            for idx in touching_bodies_idxs:
-                body_prim_path = RigidContactAPI.get_row_idx_prim_path(idx=idx)
-                obj = og.sim.scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
-                if obj is not None:
-                    cls._finger_contact_objs.add(obj)
+        for scene_idx, (scene, scene_robot_finger_paths) in enumerate(zip(og.sim.scenes, cls._robot_finger_paths)):
+            if len(scene_robot_finger_paths) == 0:
+                continue
+            finger_idxs = [RigidContactAPI.get_body_col_idx(prim_path)[1] for prim_path in scene_robot_finger_paths]
+            finger_impulses = RigidContactAPI.get_all_impulses(scene_idx)[:, finger_idxs, :]
+            n_bodies = len(finger_impulses)
+            touching_bodies = th.any(finger_impulses.reshape(n_bodies, -1), dim=-1)
+            touching_bodies_idxs = th.where(touching_bodies)[0]
+            if len(touching_bodies_idxs) > 0:
+                for idx in touching_bodies_idxs:
+                    body_prim_path = RigidContactAPI.get_row_idx_prim_path(scene_idx, idx=idx)
+                    obj = scene.object_registry("prim_path", "/".join(body_prim_path.split("/")[:-1]))
+                    if obj is not None:
+                        cls._finger_contact_objs.add(obj)
 
     @classproperty
     def metalink_prefix(cls):
@@ -84,7 +89,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.value = new_value
 
         # Choose which color to apply to the toggle marker
-        self.visual_marker.color = np.array([0, 1.0, 0]) if self.value else np.array([1.0, 0, 0])
+        self.visual_marker.color = th.tensor([0, 1.0, 0]) if self.value else th.tensor([1.0, 0, 0])
 
         return True
 
@@ -110,10 +115,14 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         else:
             # Infer radius from mesh if not specified as an input
             lazy.omni.isaac.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
-            self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
+            self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
-        self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
+        relative_prim_path = absolute_prim_path_to_scene_relative(self.obj.scene, mesh_prim_path)
+        self.visual_marker = VisualGeomPrim(
+            relative_prim_path=relative_prim_path, name=f"{self.obj.name}_visual_marker"
+        )
+        self.visual_marker.load(self.obj.scene)
         self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
         self.visual_marker.visible = True
@@ -126,7 +135,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         def overlap_callback(hit):
             nonlocal valid_hit
-            valid_hit = hit.rigid_body in self._robot_finger_paths
+            all_finger_paths = {path for path_set in self._robot_finger_paths for path in path_set}
+            valid_hit = hit.rigid_body in all_finger_paths
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
@@ -152,10 +162,15 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             # Check to make sure fingers are actually overlapping the toggle button mesh
             robot_can_toggle = self._check_overlap()
 
+        previous_step = self.robot_can_toggle_steps
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1
         else:
             self.robot_can_toggle_steps = 0
+
+        # If step size is different, add this object to the current state update set in its scene
+        if previous_step != self.robot_can_toggle_steps:
+            self.obj.state_updated()
 
         if self.robot_can_toggle_steps == m.CAN_TOGGLE_STEPS:
             self.set_value(not self.value)
@@ -164,7 +179,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     def get_texture_change_params():
         # By default, it keeps the original albedo unchanged.
         albedo_add = 0.0
-        diffuse_tint = (1.0, 1.0, 1.0)
+        diffuse_tint = th.tensor([1.0, 1.0, 1.0])
         return albedo_add, diffuse_tint
 
     @property
@@ -180,8 +195,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self._set_value(state["value"])
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
-    def _serialize(self, state):
-        return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
+    def serialize(self, state):
+        return th.tensor([state["value"], state["hand_in_marker_steps"]], dtype=th.float32)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

@@ -1,5 +1,5 @@
-from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
 class CollisionReward(BaseRewardFunction):

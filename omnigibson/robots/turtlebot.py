@@ -1,5 +1,7 @@
 import os
-import numpy as np
+from functools import cached_property
+
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
@@ -20,22 +22,10 @@ class Turtlebot(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.23
 
-    @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([0, 1])
+    @cached_property
+    def base_joint_names(self):
+        return ["wheel_left_joint", "wheel_right_joint"]
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot/turtlebot.usd")
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot.urdf")
+        return th.zeros(self.n_joints)

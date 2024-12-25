@@ -6,7 +6,7 @@ force-exclude = 'omnigibson/(data|external)'
 [tool.isort]
 profile = "black"
 line_length = 120
-py_version = 'all'
+py_version = '310'
 filter_files = true
 extend_skip_glob = [
     'omnigibson/data/*',

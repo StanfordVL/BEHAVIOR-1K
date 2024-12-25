@@ -1,9 +1,37 @@
-import gym
-import omnigibson as og
 import os
-import psutil
-from pynvml.smi import nvidia_smi
 from time import time
+
+import gymnasium as gym
+import psutil
+
+import omnigibson as og
+import omnigibson.utils.pynvml_utils as pynvml
+
+
+# Method copied from: https://github.com/wandb/wandb/blob/main/wandb/sdk/internal/system/assets/gpu.py
+def gpu_in_use_by_this_process(gpu_handle: "GPUHandle", pid: int) -> bool:
+    if psutil is None:
+        return False
+
+    try:
+        base_process = psutil.Process(pid=pid)
+    except psutil.NoSuchProcess:
+        # do not report any gpu metrics if the base process cant be found
+        return False
+
+    our_processes = base_process.children(recursive=True)
+    our_processes.append(base_process)
+
+    our_pids = {process.pid for process in our_processes}
+
+    compute_pids = {process.pid for process in pynvml.nvmlDeviceGetComputeRunningProcesses(gpu_handle)}  # type: ignore
+    graphics_pids = {
+        process.pid for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
+    }
+
+    pids_using_device = compute_pids | graphics_pids
+
+    return len(pids_using_device & our_pids) > 0
 
 
 class ProfilingEnv(og.Environment):
@@ -62,15 +90,18 @@ class ProfilingEnv(og.Environment):
             # memory usage in GB
             memory_usage = psutil.Process(os.getpid()).memory_info().rss / 1024**3
             # VRAM usage in GB
-            for gpu in nvidia_smi.getInstance().DeviceQuery()["gpu"]:
+            pynvml.nvmlInit()
+            device_count = pynvml.nvmlDeviceGetCount()
+            for i in range(device_count):
                 found = False
-                for process in gpu["processes"]:
-                    if process["pid"] == os.getpid():
-                        vram_usage = process["used_memory"] / 1024
-                        found = True
-                        break
+                handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+                if gpu_in_use_by_this_process(handle, os.getpid()):
+                    vram_usage = pynvml.nvmlDeviceGetMemoryInfo(handle).used / 1024**3
+                    found = True
+                    break
                 if found:
                     break
+            pynvml.nvmlShutdown()
 
             ret = [total_frame_time, omni_time, og_time, memory_usage, vram_usage]
             if self._current_step % 100 == 0:

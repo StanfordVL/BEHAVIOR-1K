@@ -1,17 +1,16 @@
+import itertools
+
+import torch as th
+from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.constants import PrimType
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
-from omnigibson.macros import create_module_macros
-
-import omnigibson as og
-
-from scipy.spatial import ConvexHull, HalfspaceIntersection, QhullError
-import numpy as np
-import trimesh
-import itertools
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -62,15 +61,15 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
         # Compute the base aligned bounding box of the rigid object.
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
-        vertices_local = np.array(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
-        vertices = trimesh.transformations.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn)))
+        vertices_local = th.tensor(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
+        vertices = T.transform_points(vertices_local, T.pose2mat((bbox_center, bbox_orn)))
         rigid_hull = ConvexHull(vertices[:, :2])
 
         # The goal is to find the intersection of the convex hull and the bounding box.
         # We can do so with HalfspaceIntersection, which takes as input a list of equations that define the half spaces,
         # and an interior point. We assume the center of the bounding box is an interior point.
-        interior_pt = vertices.mean(axis=0)[:2]
-        half_spaces = np.vstack((cloth_hull.equations, rigid_hull.equations))
+        interior_pt = th.mean(vertices, dim=0)[:2]
+        half_spaces = th.vstack((th.tensor(cloth_hull.equations), th.tensor(rigid_hull.equations)))
         try:
             half_space_intersection = HalfspaceIntersection(half_spaces, interior_pt)
         except QhullError:

@@ -1,15 +1,23 @@
 import os
 
-import numpy as np
+import torch as th
 
-from omnigibson.scenes.traversable_scene import TraversableScene
+import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
+from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_scene_path
-from omnigibson.utils.usd_utils import add_asset_to_stage
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import add_asset_to_stage, scene_relative_prim_path_to_absolute
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create macros
+m = create_module_macros(module_path=__file__)
+
+# Additional elevation for the floor plane
+m.FLOOR_Z_OFFSET = 0.02
 
 
 class StaticTraversableScene(TraversableScene):
@@ -26,8 +34,6 @@ class StaticTraversableScene(TraversableScene):
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
-        floor_plane_visible=False,
-        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
         Args:
@@ -39,15 +45,13 @@ class StaticTraversableScene(TraversableScene):
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
-            floor_plane_visible (bool): whether to render the additionally added floor plane
-            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
-                to the generated floor plane
         """
         # Store and initialize additional variables
         self._floor_heights = None
         self._scene_mesh = None
 
         # Run super init
+        assert og.sim.floor_plane, "Floor plane must be enabled for StaticTraversableScene"
         super().__init__(
             scene_model=scene_model,
             scene_file=scene_file,
@@ -57,8 +61,6 @@ class StaticTraversableScene(TraversableScene):
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=True,
-            floor_plane_visible=floor_plane_visible,
-            floor_plane_color=floor_plane_color,
         )
 
     def _load(self):
@@ -70,16 +72,19 @@ class StaticTraversableScene(TraversableScene):
         if not os.path.isfile(filename):
             filename = os.path.join(get_scene_path(self.scene_model), "mesh_z_up.obj")
 
-        scene_prim = add_asset_to_stage(
+        scene_mesh_relative_path = "/scene"
+        scene_mesh_absolute_path = scene_relative_prim_path_to_absolute(self, scene_mesh_relative_path)
+        scene_mesh_prim = add_asset_to_stage(
             asset_path=filename,
-            prim_path=f"/World/scene_{self.scene_model}",
+            prim_path=scene_mesh_absolute_path,
         )
 
         # Grab the actual mesh prim
         self._scene_mesh = CollisionVisualGeomPrim(
-            prim_path=f"/World/scene_{self.scene_model}/mesh_z_up/{self.scene_model}_mesh_texture",
+            relative_prim_path=f"/scene/mesh_z_up/{self.scene_model}_mesh_texture",
             name=f"{self.scene_model}_mesh",
         )
+        self._scene_mesh.load(self)
 
         # Load floor metadata
         floor_height_path = os.path.join(get_scene_path(self.scene_model), "floors.txt")
@@ -88,11 +93,15 @@ class StaticTraversableScene(TraversableScene):
             self.floor_heights = sorted(list(map(float, f.readlines())))
             log.debug("Floors {}".format(self.floor_heights))
 
-        # Move the floor plane to the first floor by default
-        self.move_floor_plane(floor=0)
+        # Move the first floor to be at the floor level by default.
+        default_floor = 0
+        floor_height = self.floor_heights[default_floor] + m.FLOOR_Z_OFFSET
+        scene_position = self._scene_prim.get_position_orientation()[0]
+        scene_position[2] = floor_height
+        self._scene_prim.set_position_orientation(position=scene_position)
 
         # Filter the collision between the scene mesh and the floor plane
-        self._scene_mesh.add_filtered_collision_pair(prim=self._floor_plane)
+        self._scene_mesh.add_filtered_collision_pair(prim=og.sim.floor_plane)
 
         # Load the traversability map
         self._trav_map.load_map(get_scene_path(self.scene_model))
@@ -107,8 +116,13 @@ class StaticTraversableScene(TraversableScene):
             height (None or float): If specified, alternative parameter to directly control the height of the ground
                 plane. Note that this will override @additional_elevation and @floor!
         """
-        height = height if height is not None else self.floor_heights[floor] + additional_elevation
-        self._floor_plane.set_position(np.array([0, 0, height]))
+        if height is not None:
+            height_adjustment = height - self.floor_heights[floor]
+        else:
+            height_adjustment = (
+                self.floor_heights[floor] - self._scene_prim.get_position_orientation()[0][2] + additional_elevation
+            )
+        self._scene_prim.set_position_orientation(position=th.tensor([0, 0, height_adjustment]))
 
     def get_floor_height(self, floor=0):
         """

@@ -1,9 +1,10 @@
-from omnigibson.utils.constants import PrimType
-from omnigibson.object_states import Folded, Unfolded
-from omnigibson.macros import gm
-import numpy as np
+import torch as th
 
 import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson.object_states import Folded, Unfolded
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import multi_dim_linspace
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
@@ -67,8 +68,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set viewer camera
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.46382895, -2.66703958, 1.22616824]),
-        orientation=np.array([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
+        position=th.tensor([0.46382895, -2.66703958, 1.22616824]),
+        orientation=th.tensor([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
     )
 
     def print_state():
@@ -96,22 +97,24 @@ def main(random_selection=False, headless=False, short_exec=False):
         for i in range(3):
             obj = objs[i]
             pos = obj.root_link.compute_particle_positions()
-            x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+            x_min, x_max = th.min(pos, dim=0).values[0], th.max(pos, dim=0).values[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
-            indices = np.argsort(pos, axis=0)[:, 0][: (pos.shape[0] // 10)]
-            start = np.copy(pos[indices])
+            indices = th.argsort(pos, dim=0)[:, 0][: (pos.shape[0] // 10)]
+            start = th.clone(pos[indices])
 
             # lift up a bit
-            mid = np.copy(start)
+            mid = th.clone(start)
             mid[:, 2] += x_extent * 0.2
 
             # move towards x_max
-            end = np.copy(mid)
+            end = th.clone(mid)
             end[:, 0] += x_extent * 0.9
 
             increments = 25
-            for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+            for ctrl_pts in th.cat(
+                [multi_dim_linspace(start, mid, increments), multi_dim_linspace(mid, end, increments)]
+            ):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
                 og.sim.step()
                 print_state()
@@ -120,35 +123,37 @@ def main(random_selection=False, headless=False, short_exec=False):
         for direction in [-1, 1]:
             obj = shirt
             pos = obj.root_link.compute_particle_positions()
-            y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
+            y_min, y_max = th.min(pos, dim=0).values[1], th.max(pos, dim=0).values[1]
             y_extent = y_max - y_min
             if direction == 1:
-                indices = np.argsort(pos, axis=0)[:, 1][: (pos.shape[0] // 20)]
+                indices = th.argsort(pos, dim=0)[:, 1][: (pos.shape[0] // 20)]
             else:
-                indices = np.argsort(pos, axis=0)[:, 1][-(pos.shape[0] // 20) :]
-            start = np.copy(pos[indices])
+                indices = th.argsort(pos, dim=0)[:, 1][-(pos.shape[0] // 20) :]
+            start = th.clone(pos[indices])
 
             # lift up a bit
-            mid = np.copy(start)
+            mid = th.clone(start)
             mid[:, 2] += y_extent * 0.2
 
             # move towards y_max
-            end = np.copy(mid)
+            end = th.clone(mid)
             end[:, 1] += direction * y_extent * 0.4
 
             increments = 25
-            for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+            for ctrl_pts in th.cat(
+                [multi_dim_linspace(start, mid, increments), multi_dim_linspace(mid, end, increments)]
+            ):
                 obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
-                env.step(np.array([]))
+                env.step(th.empty(0))
                 print_state()
 
         while True:
-            env.step(np.array([]))
+            env.step(th.empty(0))
             print_state()
 
     # Shut down env at the end
     print()
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

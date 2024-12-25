@@ -1,7 +1,6 @@
 from abc import ABCMeta, abstractmethod
 
-from omnigibson.utils.python_utils import classproperty, Registerable
-
+from omnigibson.utils.python_utils import Registerable, classproperty
 
 # Registered sensor noises
 REGISTERED_SENSOR_NOISES = dict()
@@ -26,10 +25,10 @@ class BaseSensorNoise(Registerable, metaclass=ABCMeta):
         identical call to self.corrupt(...)
 
         Args:
-            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+            obs (th.tensor): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
 
         Returns:
-            np.array: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
+            th.tensor: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
         """
         return self.corrupt(obs=obs)
 
@@ -38,10 +37,10 @@ class BaseSensorNoise(Registerable, metaclass=ABCMeta):
         If this noise is enabled, corrupts observation @obs by adding sensor noise to sensor reading.
 
         Args:
-            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+            obs (th.tensor): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
 
         Returns:
-            np.array: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
+            th.tensor: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
         """
         # Run sanity check to make sure obs is in acceptable range
         assert len(obs[(obs < 0.0) | (obs > 1.0)]) == 0, "sensor reading has to be between [0.0, 1.0]"
@@ -54,10 +53,10 @@ class BaseSensorNoise(Registerable, metaclass=ABCMeta):
         Corrupts observation @obs by adding sensor noise to sensor reading
 
         Args:
-            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+            obs (th.tensor): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
 
         Returns:
-            np.array: Corrupted observation numpy array
+            th.tensor: Corrupted observation numpy array
         """
         raise NotImplementedError()
 

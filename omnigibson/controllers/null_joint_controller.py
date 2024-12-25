@@ -1,6 +1,5 @@
-import numpy as np
-
 from omnigibson.controllers import JointController
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 class NullJointController(JointController):
@@ -18,9 +17,10 @@ class NullJointController(JointController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
-        default_command=None,
-        kp=None,
-        damping_ratio=None,
+        default_goal=None,
+        pos_kp=None,
+        pos_damping_ratio=None,
+        vel_kp=None,
         use_impedances=False,
     ):
         """
@@ -45,17 +45,19 @@ class NullJointController(JointController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
-            default_command (None or n-array): if specified, should be the same length as @dof_idx, specifying
-                the default control for this controller to output
-            kp (None or float): If @motor_type is "position" or "velocity" and @use_impedances=True, this is the
+            default_goal (None or n-array): if specified, should be the same length as @dof_idx, specifying
+                the default joint goal for this controller to converge to
+            pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
-            damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
+            pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 damping ratio applied to the joint controller. If None, a default value will be used.
+            vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
+                proportional gain applied to the joint controller. If None, a default value will be used.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
         """
         # Store values
-        self._default_command = np.zeros(len(dof_idx)) if default_command is None else np.array(default_command)
+        self.default_goal = cb.zeros(len(dof_idx)) if default_goal is None else default_goal
 
         # Run super init
         super().__init__(
@@ -65,19 +67,20 @@ class NullJointController(JointController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
-            kp=kp,
-            damping_ratio=damping_ratio,
+            pos_kp=pos_kp,
+            pos_damping_ratio=pos_damping_ratio,
+            vel_kp=vel_kp,
             use_impedances=use_impedances,
             use_delta_commands=False,
         )
 
     def compute_no_op_goal(self, control_dict):
         # Set the goal to be internal stored default value
-        return dict(target=self._default_command)
+        return dict(target=self.default_goal)
 
     def _preprocess_command(self, command):
-        # Override super and force the processed command to be internal stored default value
-        return np.array(self._default_command)
+        # Override super and force the processed goal to be internal stored default value
+        return cb.array(self.default_goal)
 
     def update_default_goal(self, target):
         """
@@ -89,6 +92,15 @@ class NullJointController(JointController):
         """
         assert (
             len(target) == self.control_dim
-        ), f"Default control must be length: {self.control_dim}, got length: {len(target)}"
+        ), f"Default goal must be length: {self.control_dim}, got length: {len(target)}"
 
-        self._default_command = np.array(target)
+        self.default_goal = cb.array(target)
+
+    def _compute_no_op_action(self, control_dict):
+        # Empty tensor since no action should be received
+        return cb.array([])
+
+    @property
+    def command_dim(self):
+        # Auto-generates control, so no command should be received
+        return 0

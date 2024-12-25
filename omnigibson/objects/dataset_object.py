@@ -1,21 +1,17 @@
 import math
 import os
-import numpy as np
+import random
+from enum import IntEnum
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import gm
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.constants import (
-    AVERAGE_CATEGORY_SPECS,
-    DEFAULT_JOINT_FRICTION,
-    SPECIAL_JOINT_FRICTIONS,
-    JointType,
-)
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.asset_utils import get_all_object_category_models
-from omnigibson.utils.constants import PrimType
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.objects.usd_object import USDObject
+from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
+from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -29,6 +25,11 @@ m = create_module_macros(module_path=__file__)
 m.MIN_OBJ_MASS = 0.4
 
 
+class DatasetType(IntEnum):
+    BEHAVIOR = 0
+    CUSTOM = 1
+
+
 class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
@@ -39,10 +40,10 @@ class DatasetObject(USDObject):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
         model=None,
-        uuid=None,
+        dataset_type=DatasetType.BEHAVIOR,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -60,8 +61,7 @@ class DatasetObject(USDObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
@@ -69,8 +69,9 @@ class DatasetObject(USDObject):
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
+            dataset_type (DatasetType): Dataset to search for this object. Default is BEHAVIOR, corresponding to the
+                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, CUSTOM}.
+                If CUSTOM, assumes asset is found at gm.CUSTOM_DATASET_PATH and additionally not encrypted.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -108,12 +109,15 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
+        load_config["dataset_type"] = dataset_type
+        # All DatasetObjects should have xform properties pre-loaded
+        load_config["xform_props_pre_loaded"] = True
 
         # Infer the correct usd path to use
         if model is None:
             available_models = get_all_object_category_models(category=category)
             assert len(available_models) > 0, f"No available models found for category {category}!"
-            model = np.random.choice(available_models)
+            model = random.choice(available_models)
 
         # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
         # TODO: Remove this once the asset is fixed!
@@ -126,16 +130,15 @@ class DatasetObject(USDObject):
             )
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model)
+        usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=True,
+            encrypted=dataset_type == DatasetType.BEHAVIOR,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -150,7 +153,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model):
+    def get_usd_path(cls, category, model, dataset_type=DatasetType.BEHAVIOR):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -159,11 +162,13 @@ class DatasetObject(USDObject):
         Args:
             category (str): Category for the object
             model (str): Specific model ID of the object
+            dataset_type (DatasetType): Dataset type, used to infer dataset directory to search for @category and @model
 
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
+        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.CUSTOM_DATASET_PATH
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
         """
@@ -176,17 +181,17 @@ class DatasetObject(USDObject):
             raise ValueError("No orientation probabilities set")
         if len(self.orientations) == 0:
             # Set default value
-            chosen_orientation = np.array([0, 0, 0, 1.0])
+            chosen_orientation = th.tensor([0, 0, 0, 1.0])
         else:
             probabilities = [o["prob"] for o in self.orientations.values()]
-            probabilities = np.array(probabilities) / np.sum(probabilities)
-            chosen_orientation = np.array(
-                np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"]
-            )
+            probabilities = th.tensor(probabilities, dtype=th.float32) / th.sum(probabilities)
+            option = th.multinomial(probabilities, 1).item()
+            chosen_orientation = th.tensor(list(self.orientations.values())[option]["rotation"])
 
         # Randomize yaw from -pi to pi
-        rot_num = np.random.uniform(-1, 1)
-        rot_matrix = np.array(
+        rot_lo, rot_hi = -1, 1
+        rot_num = (th.rand(1) * (rot_hi - rot_lo) + rot_lo).item()
+        rot_matrix = th.tensor(
             [
                 [math.cos(math.pi * rot_num), -math.sin(math.pi * rot_num), 0.0],
                 [math.sin(math.pi * rot_num), math.cos(math.pi * rot_num), 0.0],
@@ -230,16 +235,16 @@ class DatasetObject(USDObject):
     def _post_load(self):
         # If manual bounding box is specified, scale based on ratio between that and the native bbox
         if self._load_config["bounding_box"] is not None:
-            scale = np.ones(3)
+            scale = th.ones(3)
             valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = (
-                np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
+                th.tensor(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
             )
         else:
-            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
         # Assert that the scale does not have too small dimensions
-        assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
+        assert th.all(th.tensor(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
@@ -320,13 +325,16 @@ class DatasetObject(USDObject):
                 None means it will not be changed
         """
         if orientation is None:
-            orientation = self.get_orientation()
+            orientation = self.get_position_orientation()[1]
         if position is not None:
             rotated_offset = T.pose_transform(
-                [0, 0, 0], orientation, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1]
+                th.tensor([0, 0, 0], dtype=th.float32),
+                orientation,
+                self.scaled_bbox_center_in_base_frame,
+                th.tensor([0, 0, 0, 1], dtype=th.float32),
             )[0]
             position = position + rotated_offset
-        self.set_position_orientation(position, orientation)
+        self.set_position_orientation(position=position, orientation=orientation)
 
     @property
     def model(self):
@@ -367,7 +375,7 @@ class DatasetObject(USDObject):
         assert (
             "ig:nativeBB" in self.property_names
         ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
-        return np.array(self.get_attribute(attr="ig:nativeBB"))
+        return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property
     def base_link_offset(self):
@@ -377,7 +385,7 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) base link offset if it exists
         """
-        return np.array(self.get_attribute(attr="ig:offsetBaseLink"))
+        return th.tensor(self.get_attribute(attr="ig:offsetBaseLink"))
 
     @property
     def metadata(self):
@@ -452,9 +460,11 @@ class DatasetObject(USDObject):
                             prim.GetAttribute("physics:localRot1").Get()
                         )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-                        local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+                        local_ori = T.quat_multiply(
+                            quaternion1=T.quat_inverse(th.from_numpy(quat1)), quaternion0=th.from_numpy(quat0)
+                        )
                         jnt_frame_rot = T.quat2mat(local_ori)
-                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
+                        scale_in_child_lf = th.abs(jnt_frame_rot.T @ th.tensor(scale_in_parent_lf))
                         scales[child_name] = scale_in_child_lf
 
         return scales
@@ -467,12 +477,13 @@ class DatasetObject(USDObject):
         Returns:
             None or dict: Average object information based on its category
         """
-        return AVERAGE_CATEGORY_SPECS.get(self.category, None)
+        avg_specs = get_og_avg_category_specs()
+        return avg_specs.get(self.category, None)
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=self.category,
             scale=self.scale,

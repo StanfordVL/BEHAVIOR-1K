@@ -1,19 +1,20 @@
+import math
 from abc import ABCMeta
-import numpy as np
 from collections.abc import Iterable
+from functools import cached_property
+
+import torch as th
 import trimesh
-from scipy.spatial.transform import Rotation
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.usd_utils import create_joint, CollisionAPI
-from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
-from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 import omnigibson.utils.transform_utils as T
-
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
+from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.usd_utils import CollisionAPI, create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -39,9 +40,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     def __init__(
         self,
         name,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -55,11 +55,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -79,11 +76,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         # Generate default prim path if none is specified
-        prim_path = f"/World/{name}" if prim_path is None else prim_path
+        relative_prim_path = f"/{name}" if relative_prim_path is None else relative_prim_path
 
         # Store values
-        self.uuid = get_uuid(name) if uuid is None else uuid
-        assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
+        self._uuid = get_uuid(name, deterministic=True)
         self.category = category
         self.fixed_base = fixed_base
 
@@ -93,7 +89,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = np.array(scale) if isinstance(scale, Iterable) else scale
+        load_config["scale"] = (
+            scale
+            if isinstance(scale, th.Tensor)
+            else th.tensor(scale, dtype=th.float32) if isinstance(scale, Iterable) else scale
+        )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["kinematic_only"] = kinematic_only
@@ -102,7 +102,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -110,15 +110,18 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # TODO: Super hacky, think of a better way to preserve this info
         # Update init info for this
         self._init_info["args"]["name"] = self.name
-        self._init_info["args"]["uuid"] = self.uuid
 
-    def load(self):
-        # Run super method ONLY if we're not loaded yet
-        if self.loaded:
-            prim = self._prim
-        else:
-            prim = super().load()
-            log.info(f"Loaded {self.name} at {self.prim_path}")
+    def prebuild(self, stage):
+        """
+        Implement this function to provide pre-building functionality on an USD stage
+        that is not loaded into Isaac Sim. This is useful for pre-compiling scene USDs,
+        speeding up load times especially for parallel envs.
+        """
+        pass
+
+    def load(self, scene):
+        prim = super().load(scene)
+        log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
 
     def remove(self):
@@ -137,10 +140,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # merely set this to be a static collider, i.e.: kinematic-only
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+            scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
             if (
                 self.n_joints == 0
-                and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0)
+                and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
                 and (self._load_config["kinematic_only"] != False)
                 and not self.has_attachment_points
             ):
@@ -164,9 +167,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # the error explicitly here
             with suppress_omni_log(channels=["omni.hydra"]):
                 create_joint(
-                    prim_path=f"{self._prim_path}/rootJoint",
+                    prim_path=f"{self.prim_path}/rootJoint",
                     joint_type="FixedJoint",
-                    body1=f"{self._prim_path}/{self._root_link_name}",
+                    body1=f"{self.prim_path}/{self._root_link_name}",
                 )
 
             # Delete n_fixed_joints cached property if it exists since the number of fixed joints has now changed
@@ -187,6 +190,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.root_prim.HasAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI):
             self.root_prim.RemoveAPI(lazy.pxr.UsdPhysics.ArticulationRootAPI)
             self.root_prim.RemoveAPI(lazy.pxr.PhysxSchema.PhysxArticulationAPI)
+
+        if og.sim.is_playing():
+            log.warning(
+                "An object's articulation root API was changed while simulation is playing. This may cause issues."
+            )
 
         # Potentially add articulation root APIs and also set self collisions
         root_prim = (
@@ -226,7 +234,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 "emissive_intensity": material.emissive_intensity,
             }
 
-    @property
+    @cached_property
     def articulation_root_path(self):
         has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
         if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
@@ -239,11 +247,28 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
             # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
             # for more info
-            return f"{self._prim_path}/{self.root_link_name}"
+            return f"{self.prim_path}/{self.root_link_name}"
         else:
             # Fixed objects that are not kinematic only, or non-fixed objects that have no articulated joints but do
             # have fixed joints
-            return self._prim_path
+            return self.prim_path
+
+    @property
+    def is_active(self):
+        """
+        Returns:
+            bool: True if this object is currently considered active -- e.g.: if this object is currently awake
+        """
+        return not self.kinematic_only and not self.is_asleep
+
+    @property
+    def uuid(self):
+        """
+        Returns:
+            int: 8-digit unique identifier for this object. It is randomly generated from this object's name
+                but deterministic
+        """
+        return self._uuid
 
     @property
     def mass(self):
@@ -288,10 +313,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["scale"] = scale
 
     @property
-    def link_prim_paths(self):
-        return [link.prim_path for link in self._links.values()]
-
-    @property
     def highlighted(self):
         """
         Returns:
@@ -322,7 +343,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
             material.emissive_color = (
-                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"]
+                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
             )
             material.emissive_intensity = (
                 m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
@@ -356,14 +377,16 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
             # The desired frame is same as the base_com frame with its X/Y rotations removed.
-            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
+            translate = base_frame_to_world[:3, 3]
 
             # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
             # and then take the arctangent of its projection onto the XY plane.
             rotated_X_axis = base_frame_to_world[:3, 0]
-            rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
-            xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
-                translate=translate, angles=[0, 0, rotation_around_Z_axis]
+            rotation_around_Z_axis = th.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+            xy_aligned_base_com_to_world = th.eye(4, dtype=th.float32)
+            xy_aligned_base_com_to_world[:3, 3] = translate
+            xy_aligned_base_com_to_world[:3, :3] = T.euler2mat(
+                th.tensor([0, 0, rotation_around_Z_axis], dtype=th.float32)
             )
 
             # Finally update our desired frame.
@@ -373,17 +396,17 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             desired_frame_to_world = base_frame_to_world
 
         # Compute the world-to-base frame transform.
-        world_to_desired_frame = np.linalg.inv(desired_frame_to_world)
+        world_to_desired_frame = th.linalg.inv_ex(desired_frame_to_world).inverse
 
         # Grab all the world-frame points corresponding to the object's visual or collision hulls.
         points_in_world = []
         if self.prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            particles_in_world_frame = np.concatenate(
-                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], axis=0
+            particles_in_world_frame = th.cat(
+                [particle_positions - particle_contact_offset, particle_positions + particle_contact_offset], dim=0
             )
-            points_in_world.extend(particles_in_world_frame)
+            points_in_world.extend(particles_in_world_frame.tolist())
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
             for link_name, link in links.items():
@@ -393,25 +416,41 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     hull_points = link.collision_boundary_points_world
 
                 if hull_points is not None:
-                    points_in_world.extend(hull_points)
+                    points_in_world.extend(hull_points.tolist())
 
         # Move the points to the desired frame
-        points = trimesh.transformations.transform_points(points_in_world, world_to_desired_frame)
+        points = T.transform_points(th.tensor(points_in_world, dtype=th.float32), world_to_desired_frame)
 
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
         # Now fit a bounding box to all the points by taking the minimum/maximum in the desired frame.
-        aabb_min_in_desired_frame = np.amin(points, axis=0)
-        aabb_max_in_desired_frame = np.amax(points, axis=0)
+        aabb_min_in_desired_frame = th.amin(points, dim=0)
+        aabb_max_in_desired_frame = th.amax(points, dim=0)
         bbox_center_in_desired_frame = (aabb_min_in_desired_frame + aabb_max_in_desired_frame) / 2
         bbox_extent_in_desired_frame = aabb_max_in_desired_frame - aabb_min_in_desired_frame
 
         # Transform the center to the world frame.
-        bbox_center_in_world = trimesh.transformations.transform_points(
-            [bbox_center_in_desired_frame], desired_frame_to_world
-        )[0]
-        bbox_orn_in_world = Rotation.from_matrix(desired_frame_to_world[:3, :3]).as_quat()
+        bbox_center_in_world = T.transform_points(
+            bbox_center_in_desired_frame.unsqueeze(0), desired_frame_to_world
+        ).squeeze(0)
+        bbox_orn_in_world = T.mat2quat(desired_frame_to_world[:3, :3])
 
         return bbox_center_in_world, bbox_orn_in_world, bbox_extent_in_desired_frame, bbox_center_in_desired_frame
+
+    def dump_state(self, serialized=False):
+        """
+        Dumps the state of this object in either dictionary of flattened numerical form.
+
+        Args:
+            serialized (bool): If True, will return the state of this object as a 1D numpy array. Otherewise, will return
+                a (potentially nested) dictionary of states for this object
+
+        Returns:
+            dict or n-array: Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical th.Tensor capturing this object's state
+        """
+        assert self._initialized, "Object must be initialized before dumping state!"
+        return super().dump_state(serialized=serialized)
 
     @classproperty
     def _do_not_register_classes(cls):

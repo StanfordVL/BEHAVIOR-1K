@@ -1,35 +1,30 @@
-import numpy as np
 import os
+
+import torch as th
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
-    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
+    get_natural_initial_conditions,
     get_object_scope,
 )
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import (
-    get_system,
-    add_callback_on_system_init,
-    add_callback_on_system_clear,
-    REGISTERED_SYSTEMS,
-)
 from omnigibson.scenes.scene_base import Scene
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
+from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.bddl_utils import BEHAVIOR_ACTIVITIES, BDDLEntity, BDDLSampler, OmniGibsonBDDLBackend
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -50,7 +45,6 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
-        debug_object_sampling (bool): whether to debug placement functionality
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -69,7 +63,6 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        debug_object_sampling=False,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -103,8 +96,10 @@ class BehaviorTask(BaseTask):
         self.feedback = None  # None or str
         self.sampler = None  # BDDLSampler
 
+        # Scene info
+        self.scene_name = None
+
         # Object info
-        self.debug_object_sampling = debug_object_sampling  # bool
         self.online_object_sampling = online_object_sampling  # bool
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to BDDLEntity
@@ -112,7 +107,7 @@ class BehaviorTask(BaseTask):
         self.future_obj_instances = None  # set of str
 
         # Info for demonstration collection
-        self.instruction_order = None  # np.array of int
+        self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
         self.activity_natural_language_goal_conditions = None  # str
@@ -167,18 +162,12 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    def write_task_metadata(self):
+    @property
+    def task_metadata(self):
         # Store mapping from entity name to its corresponding BDDL instance name
-        metadata = dict(
+        return dict(
             inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
         )
-
-        # Write to sim
-        og.sim.write_metadata(key="task", data=metadata)
-
-    def load_task_metadata(self):
-        # Load from sim
-        return og.sim.get_metadata(key="task")
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
@@ -205,6 +194,9 @@ class BehaviorTask(BaseTask):
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
+        # Store the scene name
+        self.scene_name = env.scene.scene_model if isinstance(env.scene, TraversableScene) else None
+
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
             for entity in self.object_scope.values():
@@ -215,10 +207,11 @@ class BehaviorTask(BaseTask):
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
         callback_name = f"{self.activity_name}_refresh"
-        og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
+        og.sim.add_callback_on_add_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
         og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
-        add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
-        add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
+
+        og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
+        og.sim.add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -269,8 +262,9 @@ class BehaviorTask(BaseTask):
         )
 
         # Demo attributes
-        self.instruction_order = np.arange(len(self.activity_conditions.parsed_goal_conditions))
-        np.random.shuffle(self.instruction_order)
+        self.instruction_order = th.arange(len(self.activity_conditions.parsed_goal_conditions))
+        self.instruction_order = self.instruction_order[th.randperm(self.instruction_order.size(0))]
+
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
         self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
@@ -314,7 +308,6 @@ class BehaviorTask(BaseTask):
             activity_conditions=self.activity_conditions,
             object_scope=self.object_scope,
             backend=self.backend,
-            debug=self.debug_object_sampling,
         )
 
         # Compose future objects
@@ -371,8 +364,8 @@ class BehaviorTask(BaseTask):
                     f"from loaded scene, but could not be found!"
                 )
                 name = inst_to_name[obj_inst]
-                is_system = name in REGISTERED_SYSTEMS
-                entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
+                is_system = name in env.scene.available_systems.keys()
+                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,
@@ -384,15 +377,15 @@ class BehaviorTask(BaseTask):
         # Batch rpy calculations for much better efficiency
         objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(
-            np.array(
+            th.stack(
                 [
-                    obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
+                    obj.states[Pose].get_value()[1] if obj_exist else th.tensor([0, 0, 0, 1.0])
                     for obj, obj_exist in objs_exist.items()
                 ]
             )
         )
-        objs_rpy_cos = np.cos(objs_rpy)
-        objs_rpy_sin = np.sin(objs_rpy)
+        objs_rpy_cos = th.cos(objs_rpy)
+        objs_rpy_sin = th.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)
@@ -404,21 +397,21 @@ class BehaviorTask(BaseTask):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.array([1.0])
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.tensor([1.0])
                 low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
                 low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
                 low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
                 if obj.name != agent.name:
                     for arm in agent.arm_names:
                         grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.tensor([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.bddl_inst}_real"] = np.zeros(1)
-                low_dim_obs[f"{obj.bddl_inst}_pos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = np.zeros(3)
-                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_real"] = th.zeros(1)
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = th.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = th.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.zeros(1)
+                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = th.zeros(1)
 
         return low_dim_obs, dict()
 
@@ -433,7 +426,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_added_obj(self, obj):
         """
-        Internal callback function to be called when sim.import_object() is called to potentially update internal
+        Internal callback function to be called when new objects are added to the simulator to potentially update internal
         bddl object scope
 
         Args:
@@ -448,7 +441,7 @@ class BehaviorTask(BaseTask):
 
     def _update_bddl_scope_from_removed_obj(self, obj):
         """
-        Internal callback function to be called when sim.remove_object() is called to potentially update internal
+        Internal callback function to be called when sim._pre_remove_object() is called to potentially update internal
         bddl object scope
 
         Args:
@@ -525,24 +518,25 @@ class BehaviorTask(BaseTask):
 
         Args:
             path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
-                <gm.DATASET_PATH/scenes/<SCENE_MODEL>/json/...>
+                <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
         """
         if path is None:
+            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
             fname = self.get_cached_activity_scene_filename(
-                scene_model=og.sim.scene.scene_model,
+                scene_model=self.scene_name,
                 activity_name=self.activity_name,
                 activity_definition_id=self.activity_definition_id,
                 activity_instance_id=self.activity_instance_id,
             )
-            path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
+            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
 
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
         # Write metadata and then save
         self.write_task_metadata()
-        og.sim.save(json_path=path)
+        og.sim.save(json_paths=[path])
 
     @property
     def name(self):

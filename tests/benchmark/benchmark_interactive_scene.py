@@ -2,18 +2,17 @@
 
 import os
 import time
+
 import matplotlib.pyplot as plt
-import numpy as np
+import torch as th
 
 import omnigibson as og
-from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.simulator import launch_simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
 from omnigibson.utils.constants import PrimType
-from omnigibson.systems import get_system
 
 # Params to be set as needed.
 SCENES = ["Rs_int"]  # house_single_floor
@@ -32,7 +31,7 @@ gm.DEFAULT_VIEWER_HEIGHT = 128
 
 
 # Launch the simulator
-launch_simulator(physics_dt=1 / 60.0, rendering_dt=1 / 60.0)
+og.launch(physics_dt=1 / 60.0, rendering_dt=1 / 60.0)
 
 
 def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
@@ -43,44 +42,44 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     og.sim.import_scene(scene)
 
     if gm.RENDER_VIEWER_CAMERA:
-        og.sim.viewer_camera.set_position_orientation([0, 0, 0.2], [0.5, -0.5, -0.5, 0.5])
+        og.sim.viewer_camera.set_position_orientation(position=[0, 0, 0.2], orientation=[0.5, -0.5, -0.5, 0.5])
     print(time.time() - start)
 
     if import_robot:
-        turtlebot = Turtlebot(prim_path="/World/robot", name="agent", obs_modalities=["rgb"])
-        og.sim.import_object(turtlebot)
+        turtlebot = Turtlebot(relative_prim_path="/robot", name="agent", obs_modalities=["rgb"])
+        scene.add_object(turtlebot)
         og.sim.step()
 
     if non_rigid_simulation:
         cloth = DatasetObject(
             name="cloth",
-            prim_path="/World/cloth",
+            relative_prim_path="/cloth",
             category="t_shirt",
             model="kvidcx",
             prim_type=PrimType.CLOTH,
             abilities={"cloth": {}},
             bounding_box=[0.3, 0.5, 0.7],
         )
-        og.sim.import_object(cloth)
+        scene.add_object(cloth)
         og.sim.step()
-        water_system = get_system("water")
+        water_system = scene.get_system("water")
         for i in range(100):
-            water_system.generate_particles(positions=[np.array([0.5, 0, 0.5]) + np.random.randn(3) * 0.1])
+            water_system.generate_particles(positions=[th.tensor([0.5, 0, 0.5]) + th.randn(3) * 0.1])
         og.sim.step()
 
     og.sim.play()
     if non_rigid_simulation:
-        cloth.set_position([1, 0, 1])
+        cloth.set_position_orientation(position=[1, 0, 1])
     og.sim.step()
     fps = []
     physics_fps = []
     render_fps = []
-    print(len(og.sim.scene.objects))
+    print(len(scene.objects))
     for i in range(NUM_STEPS):
         start = time.time()
         if import_robot:
             # Apply random actions.
-            turtlebot.apply_action(np.zeros(2))
+            turtlebot.apply_action(th.zeros(2))
         og.sim.step(render=False)
         physics_end = time.time()
 
@@ -113,15 +112,15 @@ def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
     ax.set_xlabel("Step fps")
     ax = plt.subplot(6, 1, 4)
     plt.plot(render_fps)
-    ax.set_xlabel("Render fps with time, converge to {}".format(np.mean(render_fps[-100:])))
+    ax.set_xlabel("Render fps with time, converge to {}".format(th.mean(render_fps[-100:])))
     ax.set_ylabel("fps")
     ax = plt.subplot(6, 1, 5)
     plt.plot(physics_fps)
-    ax.set_xlabel("Physics fps with time, converge to {}".format(np.mean(physics_fps[-100:])))
+    ax.set_xlabel("Physics fps with time, converge to {}".format(th.mean(physics_fps[-100:])))
     ax.set_ylabel("fps")
     ax = plt.subplot(6, 1, 6)
     plt.plot(fps)
-    ax.set_xlabel("Overall fps with time, converge to {}".format(np.mean(fps[-100:])))
+    ax.set_xlabel("Overall fps with time, converge to {}".format(th.mean(fps[-100:])))
     ax.set_ylabel("fps")
     plt.tight_layout()
     plt.savefig(

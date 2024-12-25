@@ -23,9 +23,10 @@ def main():
     Spawn a robot in an empty scene with a breakfast table and some toys.
     Users can try pick and place the toy into the basket using selected external devices and robot of their choice.
     """
-    from omnigibson.utils.teleop_utils import TeleopSystem
-    from telemoma.utils.camera_utils import RealSenseCamera
     from telemoma.configs.base_config import teleop_config
+    from telemoma.utils.camera_utils import RealSenseCamera
+
+    from omnigibson.utils.teleop_utils import TeleopSystem
 
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     arm_teleop_method = choose_from_options(options=TELEOP_METHOD, name="robot arm teleop method")
@@ -117,7 +118,7 @@ def main():
     env = og.Environment(configs=cfg)
     env.reset()
     # update viewer camera pose
-    og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
+    og.sim.viewer_camera.set_position_orientation(position=[-0.22, 0.99, 1.09], orientation=[-0.14, 0.47, 0.84, -0.23])
     # Start teleoperation system
     robot = env.robots[0]
 
@@ -132,7 +133,7 @@ def main():
 
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

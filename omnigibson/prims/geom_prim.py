@@ -1,14 +1,15 @@
 from functools import cached_property
-import numpy as np
-import trimesh
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
-import omnigibson.utils.transform_utils as T
 
 
 class GeomPrim(XFormPrim):
@@ -18,7 +19,7 @@ class GeomPrim(XFormPrim):
     created from scratch.at
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this mesh prim, the below values can be specified:
@@ -26,14 +27,14 @@ class GeomPrim(XFormPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -48,10 +49,6 @@ class GeomPrim(XFormPrim):
 
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
-
-    def duplicate(self, prim_path):
-        # Cannot directly duplicate a mesh prim
-        raise NotImplementedError("Cannot directly duplicate a geom prim!")
 
     @property
     def purpose(self):
@@ -81,7 +78,7 @@ class GeomPrim(XFormPrim):
             return self.material.diffuse_color_constant
         else:
             color = self.get_attribute("primvars:displayColor")
-            return None if color is None else np.array(color)[0]
+            return None if color is None else th.tensor(color)[0]
 
     @color.setter
     def color(self, rgb):
@@ -91,10 +88,11 @@ class GeomPrim(XFormPrim):
         Args:
             3-array: The default RGB color used for this visual geom
         """
+        rgb = th.as_tensor(rgb)
         if self.has_material():
             self.material.diffuse_color_constant = rgb
         else:
-            self.set_attribute("primvars:displayColor", np.array(rgb))
+            self.set_attribute("primvars:displayColor", rgb.cpu().numpy())
 
     @property
     def opacity(self):
@@ -106,7 +104,7 @@ class GeomPrim(XFormPrim):
             return self.material.opacity_constant
         else:
             opacity = self.get_attribute("primvars:displayOpacity")
-            return None if opacity is None else np.array(opacity)[0]
+            return None if opacity is None else th.tensor(opacity)[0]
 
     @opacity.setter
     def opacity(self, opacity):
@@ -125,27 +123,27 @@ class GeomPrim(XFormPrim):
     def points(self):
         """
         Returns:
-            np.ndarray: Local poses of all points
+            th.tensor: Local poses of all points
         """
         # If the geom is a mesh we can directly return its points.
         mesh = self.prim
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return np.array(self.prim.GetAttribute("points").Get())
+            return vtarray_to_torch(self.prim.GetAttribute("points").Get(), dtype=th.float32)
         else:
             # Return the vertices of the trimesh
-            return np.array(mesh_prim_shape_to_trimesh_mesh(mesh).vertices)
+            return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)
 
     @property
     def points_in_parent_frame(self):
         points = self.points
         if points is None:
             return None
-        position, orientation = self.get_local_pose()
+        position, orientation = self.get_position_orientation(frame="parent")
         scale = self.scale
         points_scaled = points * scale
-        points_rotated = np.dot(T.quat2mat(orientation), points_scaled.T).T
+        points_rotated = (T.quat2mat(orientation) @ points_scaled.T).T
         points_transformed = points_rotated + position
         return points_transformed
 
@@ -155,11 +153,11 @@ class GeomPrim(XFormPrim):
 
         # transform self.points into world frame
         points = self.points
-        points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
+        points_homogeneous = th.cat((points, th.ones((points.shape[0], 1))), dim=1)
         points_transformed = (points_homogeneous @ world_pose_w_scale.T)[:, :3]
 
-        aabb_lo = np.min(points_transformed, axis=0)
-        aabb_hi = np.max(points_transformed, axis=0)
+        aabb_lo = th.min(points_transformed, dim=0).values
+        aabb_hi = th.max(points_transformed, dim=0).values
         return aabb_lo, aabb_hi
 
     @property
@@ -188,17 +186,17 @@ class GeomPrim(XFormPrim):
     def extent(self):
         """
         Returns:
-            np.ndarray: The unscaled 3d extent of the mesh in its local frame.
+            th.tensor: The unscaled 3d extent of the mesh in its local frame.
         """
         points = self.points
-        return np.max(points, axis=0) - np.min(points, axis=0)
+        return th.max(points, dim=0).values - th.min(points, dim=0).values
 
 
 class CollisionGeomPrim(GeomPrim):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         load_config=None,
     ):
@@ -210,7 +208,7 @@ class CollisionGeomPrim(GeomPrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -399,11 +397,6 @@ class CollisionGeomPrim(GeomPrim):
             weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
                                                       materials, otherwise False. Defaults to False.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if weaker_than_descendants:
             self._binding_api.Bind(
                 physics_material.material,
@@ -426,11 +419,6 @@ class CollisionGeomPrim(GeomPrim):
         Returns:
             PhysicsMaterial: the current applied physics material.
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(lazy.pxr.UsdShade.MaterialBindingAPI):
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = lazy.pxr.UsdShade.MaterialBindingAPI.Apply(self.prim)
         if self._applied_physics_material is not None:
             return self._applied_physics_material
         else:

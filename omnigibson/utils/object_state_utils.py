@@ -1,19 +1,15 @@
-import cv2
-import numpy as np
+import math
 
-from IPython import embed
-from scipy.spatial.transform import Rotation as R
-from scipy.spatial import ConvexHull, distance_matrix
+import torch as th
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, Dict, macros
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint
-import omnigibson.utils.transform_utils as T
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -96,7 +92,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    max_trials=m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS,
+    max_trials=None,
     z_offset=0.05,
     skip_falling=False,
 ):
@@ -116,6 +112,8 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
+    if max_trials is None:
+        max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (
         z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
     ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
@@ -136,13 +134,13 @@ def sample_kinematics(
         if hasattr(objA, "orientations") and objA.orientations is not None:
             orientation = objA.sample_orientation()
         else:
-            orientation = np.array([0, 0, 0, 1.0])
+            orientation = th.tensor([0, 0, 0, 1.0])
 
         # Orientation needs to be set for stable_z_on_aabb to work correctly
         # Position needs to be set to be very far away because the object's
         # original position might be blocking rays (use_ray_casting_method=True)
-        old_pos = np.array([100, 100, 10])
-        objA.set_position_orientation(old_pos, orientation)
+        old_pos = th.tensor([100, 100, 10])
+        objA.set_position_orientation(position=old_pos, orientation=orientation)
         objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
         og.sim.step_physics()
@@ -161,7 +159,7 @@ def sample_kinematics(
         else:
             aabb_lower, aabb_upper = objA.states[AABB].get_value()
             parallel_bbox_center = (aabb_lower + aabb_upper) / 2.0
-            parallel_bbox_orn = np.array([0.0, 0.0, 0.0, 1.0])
+            parallel_bbox_orn = th.tensor([0.0, 0.0, 0.0, 1.0])
             parallel_bbox_extents = aabb_upper - aabb_lower
 
         sampling_results = sample_cuboid_for_predicate(predicate, objB, parallel_bbox_extents)
@@ -172,27 +170,23 @@ def sample_kinematics(
 
         if sampling_success:
             # Move the object from the original parallel bbox to the sampled bbox
-            parallel_bbox_rotation = R.from_quat(parallel_bbox_orn)
-            sample_rotation = R.from_quat(sampled_quaternion)
-            original_rotation = R.from_quat(orientation)
-
             # The additional orientation to be applied should be the delta orientation
             # between the parallel bbox orientation and the sample orientation
-            additional_rotation = sample_rotation * parallel_bbox_rotation.inv()
-            combined_rotation = additional_rotation * original_rotation
-            orientation = combined_rotation.as_quat()
+            additional_quat = T.quat_multiply(sampled_quaternion, T.quat_inverse(parallel_bbox_orn))
+            combined_quat = T.quat_multiply(additional_quat, orientation)
+            orientation = combined_quat
 
             # The delta vector between the base CoM frame and the parallel bbox center needs to be rotated
             # by the same additional orientation
             diff = old_pos - parallel_bbox_center
-            rotated_diff = additional_rotation.apply(diff)
+            rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
         if pos is None:
             success = False
         else:
             pos[2] += z_offset
-            objA.set_position_orientation(pos, orientation)
+            objA.set_position_orientation(position=pos, orientation=orientation)
             objA.keep_still()
 
             og.sim.step_physics()
@@ -214,14 +208,14 @@ def sample_kinematics(
         # until it settles
         aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
         aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-        bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
+        bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
         desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
         desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
         pos = desired_bbox_pos + bbox_to_obj
         success = True
 
     if success and not skip_falling:
-        objA.set_position_orientation(pos, orientation)
+        objA.set_position_orientation(position=pos, orientation=orientation)
         objA.keep_still()
 
         # Step until either (a) max steps is reached (total of 0.5 second in sim time) or (b) contact is made, then
@@ -237,7 +231,7 @@ def sample_kinematics(
         for i in range(5):
             og.sim.step_physics()
         i = 0
-        while np.linalg.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
+        while th.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
             og.sim.step_physics()
             i += 1
 
@@ -284,22 +278,23 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
 
     if randomize_xy:
         # Sample a random position in the x-y plane within the other object's AABB
-        low = np.array([other_aabb_low[0], other_aabb_low[1], z_value])
-        high = np.array([other_aabb_high[0], other_aabb_high[1], z_value])
+        low = th.tensor([other_aabb_low[0], other_aabb_low[1], z_value])
+        high = th.tensor([other_aabb_high[0], other_aabb_high[1], z_value])
     else:
         # Always sample the center of the other object's AABB
-        low = np.array(
+        low = th.tensor(
             [(other_aabb_low[0] + other_aabb_high[0]) / 2.0, (other_aabb_low[1] + other_aabb_high[1]) / 2.0, z_value]
         )
         high = low
 
     for _ in range(max_trials):
         # Sample a random position
-        pos = np.random.uniform(low, high)
+        pos = th.rand(low.size()) * (high - low) + low
         # Sample a random orientation in the z-axis
-        orn = T.euler2quat(np.array([0.0, 0.0, np.random.uniform(0, np.pi * 2)]))
+        z_lo, z_hi = 0, math.pi * 2
+        orn = T.euler2quat(th.tensor([0.0, 0.0, (th.rand(1) * (z_hi - z_lo) + z_lo).item()]))
 
-        obj.set_position_orientation(pos, orn)
+        obj.set_position_orientation(position=pos, orientation=orn)
         obj.root_link.reset()
         obj.keep_still()
 

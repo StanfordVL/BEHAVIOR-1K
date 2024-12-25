@@ -1,36 +1,33 @@
 import json
-import bddl
 import os
 import random
-import numpy as np
-import networkx as nx
 from collections import defaultdict
-from bddl.activity import (
-    get_goal_conditions,
-    get_ground_goal_state_options,
-    get_initial_conditions,
-)
+from copy import deepcopy
+
+import bddl
+import networkx as nx
+import torch as th
+from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation
-from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormula
+from bddl.logic_base import AtomicFormula, BinaryAtomicFormula, UnaryAtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
+
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.asset_utils import (
-    get_attachment_metalinks,
-    get_all_object_categories,
-    get_all_object_category_models_with_abilities,
-)
-from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.python_utils import Wrapper
+from omnigibson import object_states
+from omnigibson.macros import create_module_macros, gm
+from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots import BaseRobot
-from omnigibson import object_states
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
-from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
-from omnigibson.systems.system_base import is_system_active, get_system
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.utils.asset_utils import (
+    get_all_object_categories,
+    get_all_object_category_models_with_abilities,
+    get_attachment_metalinks,
+)
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.python_utils import Wrapper
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -568,22 +565,14 @@ class BDDLEntity(Wrapper):
 
 
 class BDDLSampler:
-    def __init__(
-        self,
-        env,
-        activity_conditions,
-        object_scope,
-        backend,
-        debug=False,
-    ):
+    def __init__(self, env, activity_conditions, object_scope, backend):
+        # Avoid circular imports here
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = (
-            self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
-        )
+        self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, TraversableScene) else None
         self._agent = self._env.robots[0]
-        if debug:
-            gm.DEBUG = True
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
@@ -726,7 +715,7 @@ class BDDLSampler:
                         f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. "
                         f"Only non-sampleable (scene) objects can have room assignment."
                     )
-                if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in self._env.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
@@ -949,11 +938,13 @@ class BDDLSampler:
                     for cat, models in valid_models.items()
                 }
                 room_insts = (
-                    [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                    [None]
+                    if self._scene_model is None
+                    else self._env.scene.seg_map.room_sem_name_to_ins_name[room_type]
                 )
                 for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
-                    room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    room_objs = self._env.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [
                         obj
                         for obj in room_objs
@@ -1024,8 +1015,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                         # Sample!
                         for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1043,7 +1034,7 @@ class BDDLSampler:
                                     f"{condition_type} kinematic condition sampling",
                                     room_type,
                                     scene_obj,
-                                    room_inst,
+                                    str(room_inst),
                                     parent_obj_name,
                                     condition.STATE_NAME,
                                     str(condition.body),
@@ -1075,7 +1066,9 @@ class BDDLSampler:
         else:
             problematic_objs_by_proportion = defaultdict(list)
             for child_scope_name, parent_obj_names in problematic_objs.items():
-                problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+                problematic_objs_by_proportion[
+                    th.mean(th.tensor(list(parent_obj_names.values()), dtype=th.float32)).item()
+                ].append(child_scope_name)
             max_problematic_objs = problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
         return filtered_object_scope, max_problematic_objs
@@ -1195,7 +1188,9 @@ class BDDLSampler:
         assert og.sim.is_stopped(), "Simulator should be stopped when importing sampleable objects"
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
-        self._agent.set_position_orientation([300, 300, 300], [0, 0, 0, 1])
+        self._agent.set_position_orientation(
+            position=th.tensor([300, 300, 300], dtype=th.float32), orientation=th.tensor([0, 0, 0, 1], dtype=th.float32)
+        )
 
         self._sampled_objects = set()
         num_new_obj = 0
@@ -1221,7 +1216,9 @@ class BDDLSampler:
                 system_name = OBJECT_TAXONOMY.get_subtree_substances(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(system_name),
+                    entity=(
+                        None if obj_inst in self._future_obj_instances else self._env.scene.get_system(system_name)
+                    ),
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
@@ -1241,7 +1238,7 @@ class BDDLSampler:
                     continue
 
                 # Shuffle categories and sample to find a valid model
-                np.random.shuffle(categories)
+                random.shuffle(categories)
                 model_choices = set()
                 for category in categories:
                     # Get all available models that support all of its synset abilities
@@ -1266,7 +1263,7 @@ class BDDLSampler:
                     return f"Missing valid object models for all categories: {categories}"
 
                 # Randomly select an object model
-                model = np.random.choice(list(model_choices))
+                model = random.choice(list(model_choices))
 
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
@@ -1275,7 +1272,7 @@ class BDDLSampler:
 
                 # create the object
                 simulator_obj = DatasetObject(
-                    name=f"{category}_{len(og.sim.scene.objects)}",
+                    name=f"{category}_{len(self._env.scene.objects)}",
                     category=category,
                     model=model,
                     prim_type=(
@@ -1286,11 +1283,12 @@ class BDDLSampler:
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert og.sim.scene.loaded, "Scene is not loaded"
-                og.sim.import_object(simulator_obj)
+                self._env.scene.add_object(simulator_obj)
 
                 # Set these objects to be far-away locations
-                simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
+                simulator_obj.set_position_orientation(
+                    position=th.tensor([100.0, 100.0, -100.0]) + th.ones(3) * num_new_obj * 5.0
+                )
 
                 self._sampled_objects.add(simulator_obj)
                 self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
@@ -1321,7 +1319,8 @@ class BDDLSampler:
         ground_goal_state_options = get_ground_goal_state_options(
             self._activity_conditions, self._backend, self._object_scope, activity_goal_conditions
         )
-        np.random.shuffle(ground_goal_state_options)
+        num_options = ground_goal_state_options.size(0)
+        ground_goal_state_options = ground_goal_state_options[random.sample(range(num_options), num_options)]
         log.debug(("number of ground_goal_state_options", len(ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
@@ -1374,8 +1373,8 @@ class BDDLSampler:
                         rigid_conditions = [c for c in conditions_to_sample if c[2].prim_type != PrimType.CLOTH]
                         cloth_conditions = [c for c in conditions_to_sample if c[2].prim_type == PrimType.CLOTH]
                         conditions_to_sample = list(
-                            reversed(sorted(rigid_conditions, key=lambda x: np.product(x[2].aabb_extent)))
-                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: np.product(x[2].aabb_extent))))
+                            reversed(sorted(rigid_conditions, key=lambda x: th.prod(x[2].aabb_extent)))
+                        ) + list(reversed(sorted(cloth_conditions, key=lambda x: th.prod(x[2].aabb_extent))))
 
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
@@ -1402,7 +1401,7 @@ class BDDLSampler:
                                 # After the final round of kinematic sampling, we assign in_rooms to newly imported objects
                                 if group == "kinematic":
                                     parent = self._object_scope[condition.body[1]]
-                                    entity.in_rooms = parent.in_rooms.copy()
+                                    entity.in_rooms = deepcopy(parent.in_rooms)
 
                                 # Can terminate immediately
                                 break
@@ -1419,7 +1418,7 @@ class BDDLSampler:
 
                             # If any scales are equal or less than the lower threshold, terminate immediately
                             new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
-                            if np.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                            if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
                                 break
 
                             # Re-scale and re-attempt
@@ -1434,11 +1433,11 @@ class BDDLSampler:
                             og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
-                            og.sim.scene.object_registry.update(keys=["in_rooms"])
+                            self._env.scene.object_registry.update(keys=["in_rooms"])
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # Update object registry because we just assigned in_rooms to newly imported objects
-        og.sim.scene.object_registry.update(keys=["in_rooms"])
+        self._env.scene.object_registry.update(keys=["in_rooms"])
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
@@ -1459,8 +1458,8 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         error_msg, problematic_objs = "", []
-        while not np.any(
-            [np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]
+        while not any(
+            th.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE).item() for obj_inst in problematic_objs
         ):
             filtered_object_scope, problematic_objs = self._filter_object_scope(
                 input_object_scope, conditions, condition_type
@@ -1477,7 +1476,7 @@ class BDDLSampler:
                 if obj_inst in self._attached_objects or "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
                     og.sim.play()
                     return error_msg, None
-                assert np.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
+                assert th.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
                 obj.scale -= m.DYNAMIC_SCALE_INCREMENT
             og.sim.play()
 

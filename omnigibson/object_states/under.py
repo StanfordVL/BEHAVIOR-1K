@@ -2,9 +2,9 @@ import omnigibson as og
 from omnigibson.object_states.adjacency import VerticalAdjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.utils.object_state_utils import sample_kinematics
-from omnigibson.utils.object_state_utils import m as os_m
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.object_state_utils import m as os_m
+from omnigibson.utils.object_state_utils import sample_kinematics
 
 
 class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):

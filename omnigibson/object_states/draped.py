@@ -1,11 +1,12 @@
+import torch as th
+
+import omnigibson as og
+from omnigibson.object_states.cloth_mixin import ClothStateMixin
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.cloth_mixin import ClothStateMixin
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
-import omnigibson as og
-import numpy as np
 
 
 class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothStateMixin):
@@ -52,6 +53,6 @@ class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothState
                 contact_positions.append(contact.position)
 
         # The center of mass of the cloth needs to be below the average position of the contact points
-        mean_contact_position = np.mean(contact_positions, axis=0)
-        center_of_mass = np.mean(self.obj.root_link.keypoint_particle_positions, axis=0)
+        mean_contact_position = th.mean(th.stack(contact_positions), dim=0)
+        center_of_mass = th.mean(self.obj.root_link.keypoint_particle_positions, dim=0)
         return center_of_mass[2] < mean_contact_position[2]

@@ -1,8 +1,8 @@
-from abc import ABC
 import inspect
-import omnigibson as og
-from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
+from abc import ABC
 
+import omnigibson as og
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, classproperty
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECT_STATES = dict()
@@ -118,7 +118,7 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         return True, None
 
     @classmethod
-    def postprocess_ability_params(cls, params):
+    def postprocess_ability_params(cls, params, scene):
         """
         Post-processes ability parameters if needed. The default implementation is a simple passthrough.
         """
@@ -198,7 +198,7 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
     def cache_info(self, get_value_args):
         """
         Helper function to cache relevant information at the current timestep.
-        Stores it under @self._cache[<KEY>]["info"]
+        Stores it under @self._cache [<KEY>]["info"]
 
         Args:
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
@@ -344,6 +344,8 @@ class BaseObjectState(BaseObjectRequirement, Serializable, Registerable, Recreat
         self.clear_cache()
         # Set the value
         val = self._set_value(*args, **kwargs)
+        # Add this object to the current state update set in its scene
+        self.obj.state_updated()
         return val
 
     def _set_value(self, *args, **kwargs):

@@ -1,12 +1,13 @@
-import omnigibson as og
+import math
 
+import torch as th
+
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.object_states import *
-from omnigibson.utils.constants import PrimType, ParticleModifyCondition, ParticleModifyMethod
 from omnigibson.systems import *
-import omnigibson.utils.transform_utils as T
-import numpy as np
-
+from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
 
@@ -17,14 +18,16 @@ SYSTEM_EXAMPLES = {
     "stain": MacroVisualParticleSystem,
 }
 
+env = None
+
 
 def og_test(func):
     def wrapper():
-        assert_test_scene()
+        assert_test_env()
         try:
-            func()
+            func(env)
         finally:
-            og.sim.scene.reset()
+            env.scene.reset()
 
     return wrapper
 
@@ -38,7 +41,7 @@ def retrieve_obj_cfg(obj):
         "category": obj.category,
         "model": obj.model,
         "prim_type": obj.prim_type,
-        "position": obj.get_position(),
+        "position": obj.get_position_orientation()[0],
         "scale": obj.scale,
         "abilities": obj.abilities,
         "visual_only": obj.visual_only,
@@ -65,8 +68,9 @@ def get_obj_cfg(
     }
 
 
-def assert_test_scene():
-    if og.sim is None or og.sim.scene is None:
+def assert_test_env():
+    global env
+    if env is None:
         cfg = {
             "scene": {
                 "type": "Scene",
@@ -94,7 +98,7 @@ def assert_test_scene():
                 get_obj_cfg("shelf_baseboard", "shelf_baseboard", "hlhneo", abilities={"attachable": {}}),
                 get_obj_cfg("bracelet", "bracelet", "thqqmo"),
                 get_obj_cfg("oyster", "oyster", "enzocs"),
-                get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
+                get_obj_cfg("sink", "sink", "egwapq", scale=th.ones(3)),
                 get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}, "heatable": {}}),
                 get_obj_cfg(
                     "applier_dishtowel",
@@ -149,13 +153,13 @@ def assert_test_scene():
                 get_obj_cfg(
                     "baking_sheet", "baking_sheet", "yhurut", bounding_box=[0.41607812, 0.43617093, 0.02281223]
                 ),
-                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm", scale=np.ones(3) * 0.8),
+                get_obj_cfg("bagel_dough", "bagel_dough", "iuembm", scale=th.ones(3) * 0.8),
                 get_obj_cfg("raw_egg", "raw_egg", "ydgivr"),
                 get_obj_cfg("scoop_of_ice_cream", "scoop_of_ice_cream", "dodndj", bounding_box=[0.076, 0.077, 0.065]),
                 get_obj_cfg("food_processor", "food_processor", "gamkbo"),
                 get_obj_cfg("electric_mixer", "electric_mixer", "qornxa"),
                 get_obj_cfg("another_raw_egg", "raw_egg", "ydgivr"),
-                get_obj_cfg("chicken", "chicken", "nppsmz", scale=np.ones(3) * 0.7),
+                get_obj_cfg("chicken", "chicken", "nppsmz", scale=th.ones(3) * 0.7),
                 get_obj_cfg("tablespoon", "tablespoon", "huudhe"),
                 get_obj_cfg("swiss_cheese", "swiss_cheese", "hwxeto"),
                 get_obj_cfg("apple", "apple", "agveuv"),
@@ -168,21 +172,22 @@ def assert_test_scene():
             "robots": [
                 {
                     "type": "Fetch",
-                    "obs_modalities": ["seg_semantic", "seg_instance", "seg_instance_id"],
+                    "obs_modalities": "rgb",
                     "position": [150, 150, 100],
                     "orientation": [0, 0, 0, 1],
                 }
             ],
         }
 
-        # Make sure sim is stopped
-        if og.sim is not None:
+        if og.sim is None:
+            # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
+            gm.ENABLE_OBJECT_STATES = True
+            gm.USE_GPU_DYNAMICS = True
+            gm.ENABLE_FLATCACHE = False
+            gm.ENABLE_TRANSITION_RULES = True
+        else:
+            # Make sure sim is stopped
             og.sim.stop()
-
-        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth) and no flatcache
-        gm.ENABLE_OBJECT_STATES = True
-        gm.USE_GPU_DYNAMICS = True
-        gm.ENABLE_FLATCACHE = False
 
         # Create the environment
         env = og.Environment(configs=cfg)
@@ -191,15 +196,18 @@ def assert_test_scene():
         og.sim.stop()
         bounding_box_object_names = ["bagel_dough", "raw_egg"]
         for name in bounding_box_object_names:
-            obj = og.sim.scene.object_registry("name", name)
+            obj = env.scene.object_registry("name", name)
             for collision_mesh in obj.root_link.collision_meshes.values():
                 collision_mesh.set_collision_approximation("boundingCube")
         og.sim.play()
 
+    assert env is not None, "Environment not created"
+
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):
-    pos = np.random.uniform(pos_low, pos_hi, 3)
-    orn = T.euler2quat(np.random.uniform(-np.pi, np.pi, 3))
+    pos = th.rand(3) * (pos_hi - pos_low) + pos_low
+    ori_lo, ori_hi = -math.pi, math.pi
+    orn = T.euler2quat(th.rand(3) * (ori_hi - ori_lo) + ori_lo)
     return pos, orn
 
 
@@ -212,14 +220,14 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
     objA_aabb_center, objA_aabb_extent = objA.aabb_center, objA.aabb_extent
     objB_aabb_center, objB_aabb_extent = objB.aabb_center, objB.aabb_extent
-    objA_aabb_offset = objA.get_position() - objA_aabb_center
+    objA_aabb_offset = objA.get_position_orientation()[0] - objA_aabb_center
 
     target_objA_aabb_pos = (
         objB_aabb_center
-        + np.array([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
-        + np.array([x_offset, y_offset, z_offset])
+        + th.tensor([0, 0, (objB_aabb_extent[2] + objA_aabb_extent[2]) / 2.0])
+        + th.tensor([x_offset, y_offset, z_offset])
     )
-    objA.set_position(target_objA_aabb_pos + objA_aabb_offset)
+    objA.set_position_orientation(position=target_objA_aabb_pos + objA_aabb_offset)
 
 
 def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
@@ -229,13 +237,13 @@ def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
         obj.root_link.reset()
 
     obj_aabb_center, obj_aabb_extent = obj.aabb_center, obj.aabb_extent
-    obj_aabb_offset = obj.get_position() - obj_aabb_center
+    obj_aabb_offset = obj.get_position_orientation()[0] - obj_aabb_center
 
-    target_obj_aabb_pos = np.array([0, 0, obj_aabb_extent[2] / 2.0]) + np.array([x_offset, y_offset, z_offset])
-    obj.set_position(target_obj_aabb_pos + obj_aabb_offset)
+    target_obj_aabb_pos = th.tensor([0, 0, obj_aabb_extent[2] / 2.0]) + th.tensor([x_offset, y_offset, z_offset])
+    obj.set_position_orientation(position=target_obj_aabb_pos + obj_aabb_offset)
 
 
-def remove_all_systems():
-    for system in ParticleRemover.supported_active_systems.values():
+def remove_all_systems(scene):
+    for system in scene.active_systems.values():
         system.remove_all_particles()
     og.sim.step()

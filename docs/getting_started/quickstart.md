@@ -137,7 +137,7 @@ env = og.Environment(cfg)
 Once the environment loads, we can interface with our environment similar to OpenAI's Gym interface:
 
 ```{.python .annotate}
-obs, rew, done, info = env.step(env.action_space.sample())
+obs, rew, terminated, truncated, info = env.step(env.action_space.sample())
 ```
 
 ??? question "What happens if we have no robot loaded?"
@@ -221,7 +221,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
     
     # Step!
     for _ in range(10000):
-        obs, rew, done, info = env.step(env.action_space.sample())
+        obs, rew, terminated, truncated, info = env.step(env.action_space.sample())
 
     og.shutdown()
     ```
@@ -253,4 +253,4 @@ og.sim.viewer_camera.set_position_orientation(<POSITION>, <ORIENTATION>)
 
 ***
 
-**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Building Block](./building_blocks.md) examples!
+**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Modules](../modules/overview.md) pages!

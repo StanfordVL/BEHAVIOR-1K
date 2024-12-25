@@ -2,11 +2,13 @@
 A set of utility functions for registering and tracking objects
 """
 
-from inspect import isclass
-import numpy as np
 from collections.abc import Iterable
+from inspect import isclass
+
+import torch as th
+
 from omnigibson.macros import create_module_macros
-from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
+from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -19,7 +21,7 @@ m = create_module_macros(module_path=__file__)
 m.DOES_NOT_EXIST = "DOES_NOT_EXIST"
 
 
-class Registry(UniquelyNamed):
+class Registry:
     """
     Simple class for easily registering and tracking arbitrary objects of the same (or very similar) class types.
 
@@ -53,7 +55,7 @@ class Registry(UniquelyNamed):
         default_key="name",
         unique_keys=None,
         group_keys=None,
-        default_value=m.DOES_NOT_EXIST,
+        default_value=None,
     ):
         """
         Args:
@@ -66,7 +68,7 @@ class Registry(UniquelyNamed):
             default_key (str): default key by which to reference a given object. This key should be a
                 publically accessible attribute in a given object (e.g.: object.name) and uniquely identify
                 any entries
-            unique_keys (None or list of str): keys by which to reference a given object. Any key should be a
+            unique_keys (None or list of str or set of str): keys by which to reference a given object. Any key should be a
                 publically accessible attribute in a given object (e.g.: object.name)
                 i.e.: these keys should map to a single object
 
@@ -129,6 +131,7 @@ class Registry(UniquelyNamed):
                 None is default, which corresponds to all keys
         """
         keys = self.all_keys if keys is None else keys
+
         for k in keys:
             obj_attr = self._get_obj_attr(obj=obj, attr=k)
             # Standardize input as a list
@@ -257,7 +260,7 @@ class Registry(UniquelyNamed):
             val = getattr(obj, attr)
 
         except:
-            val = self.default_value
+            val = self.default_value if self.default_value is not None else m.DOES_NOT_EXIST
 
         return val
 
@@ -270,6 +273,16 @@ class Registry(UniquelyNamed):
             list of any: Instances owned by this registry
         """
         return list(self.get_dict(self.default_key).values())
+
+    @property
+    def object_names(self):
+        """
+        Get the names of the objects in this registry
+
+        Returns:
+            set of str: Names of the instances owned by this registry
+        """
+        return {obj.name for obj in self.objects}
 
     @property
     def all_keys(self):
@@ -311,6 +324,63 @@ class SerializableRegistry(Registry, Serializable):
     Note that this assumes that any objects added to this registry are themselves of @Serializable type!
     """
 
+    def __init__(
+        self,
+        name,
+        class_types=object,
+        default_key="name",
+        hash_key="uuid",
+        unique_keys=None,
+        group_keys=None,
+        default_value=None,
+    ):
+        """
+        Args:
+            name (str): name of this registry
+            class_types (class or list of class): class expected for all entries in this registry. Default is `object`,
+                meaning any object entered will be accepted. This is used to sanity check added entries using add()
+                to make sure their type is correct (either that the entry itself is a valid class, or that they are an
+                object of the valid class). Note that if a list of classes are passed, any one of the classes are
+                considered a valid type for added objects
+            default_key (str): default key by which to reference a given object. This key should be a
+                publically accessible attribute in a given object (e.g.: object.name) and uniquely identify
+                any entries
+            hash_key (str): key by which to reference a given object when serializing / deserializing its state.
+                This key should be a publically accessible attribute in a given object (e.g.: object.name) and
+                uniquely identify any entries via a hash value (i.e.: integer)
+            unique_keys (None or list of str or set of str): keys by which to reference a given object. Any key should be a
+                publically accessible attribute in a given object (e.g.: object.name)
+                i.e.: these keys should map to a single object
+
+            group_keys (None or list of str): keys by which to reference a group of objects, based on the key
+                (e.g.: object.room)
+                i.e.: these keys can map to multiple objects
+
+                e.g.: default is "name" key only, so we will store objects by their object.name attribute
+
+            default_value (any): Default value to use if the attribute @key does not exist in the object
+        """
+        # Store hash key
+        self.hash_key = hash_key
+
+        # We always add in the hash_key attribute as well
+        unique_keys = set() if unique_keys is None else set(unique_keys)
+        unique_keys.add(self.hash_key)
+
+        # Set the default dump and load filters, which is a pass-through
+        self._dump_filter = lambda obj: True
+        self._load_filter = lambda obj: True
+
+        # Run super
+        super().__init__(
+            name=name,
+            class_types=class_types,
+            default_key=default_key,
+            unique_keys=unique_keys,
+            group_keys=group_keys,
+            default_value=default_value,
+        )
+
     def add(self, obj):
         # In addition to any other class types, we make sure that the object is a serializable instance / class
         validate_class = issubclass if isclass(obj) else isinstance
@@ -320,15 +390,42 @@ class SerializableRegistry(Registry, Serializable):
         # Run super like normal
         super().add(obj=obj)
 
-    @property
-    def state_size(self):
-        return sum(obj.state_size for obj in self.objects)
+    def set_dump_filter(self, dump_filter):
+        """
+        Sets the internal filter that determines whether an object should be dumped or not.
+
+        Args:
+            dump_filter (function): Function that determines whether an object should be dumped or not.
+                Expected signature is:
+
+                def dump_filter(obj) -> bool
+
+                where it takes in a given registered object @obj and returns True if the object should have its state
+                dumped
+        """
+        self._dump_filter = dump_filter
+
+    def set_load_filter(self, load_filter):
+        """
+        Sets the internal filter that determines whether an object's state should be loaded or not.
+
+        Args:
+            load_filter (function): Function that determines whether an object should have its state loaded or not
+                Expected signature is:
+
+                def load_filter(obj) -> bool
+
+                where it takes in a given registered object @obj and returns True if the object should have its
+                state loaded or not
+        """
+        self._load_filter = load_filter
 
     def _dump_state(self):
         # Iterate over all objects and grab their states
         state = dict()
         for obj in self.objects:
-            state[obj.name] = obj.dump_state(serialized=False)
+            if self._dump_filter(obj):
+                state[obj.name] = obj.dump_state(serialized=False)
         return state
 
     def _load_state(self, state):
@@ -337,30 +434,64 @@ class SerializableRegistry(Registry, Serializable):
         # the state might contain additional information about objects that are NOT in the scene. For both cases, state
         # loading will be skipped.
         for obj in self.objects:
-            if obj.name not in state:
-                log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
-                continue
-            obj.load_state(state[obj.name], serialized=False)
+            if self._load_filter(obj):
+                if obj.name not in state:
+                    log.debug(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                    continue
+                obj.load_state(state[obj.name], serialized=False)
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Iterate over the entire dict and flatten
-        return (
-            np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects])
-            if len(self.objects) > 0
-            else np.array([])
-        )
+        # We keep track of how many objects are being saved, as well as the unique identifier for each object so that
+        # the saved flattened array is agnostic to object ordering
+        # self("name", name) grabs the corresponding object from this registry so that we can serialize its state
+        # Each object's state in the flattened array is composed of [hash_key, serialized_state]
+        n_objs = len(state)
 
-    def _deserialize(self, state):
+        if len(state) > 0:
+            state_flat = []
+            for name in state:
+                obj = self("name", name)
+                serialized = obj.serialize(state[name])
+
+                # Handle the case where serialize returns an empty tensor
+                if serialized.numel() == 0:
+                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=th.float32)
+                    state_flat.append(hash_key_tensor)
+                else:
+                    hash_key_tensor = th.tensor([getattr(obj, self.hash_key)], dtype=serialized.dtype)
+                    state_flat.append(th.cat([hash_key_tensor, serialized.flatten()]))
+
+            state_flat = th.cat(state_flat)
+        else:
+            state_flat = th.tensor([])
+
+        return th.cat([th.tensor([n_objs], dtype=th.float32), state_flat])
+
+    def deserialize(self, state):
         state_dict = dict()
         # Iterate over all the objects and deserialize their individual states, incrementing the index counter
         # along the way
-        idx = 0
-        for obj in self.objects:
-            log.debug(
-                f"obj: {obj.name}, state size: {obj.state_size}, idx: {idx}, passing in state length: {len(state[idx:])}"
-            )
+        n_objects = int(state[0])
+        idx = 1
+        for _ in range(n_objects):
+            # Infer obj based on UUID
+            obj = self(self.hash_key, int(state[idx]))
+            assert (
+                obj is not None
+            ), f"Could not find object while deserializing with hash_key {self.hash_key}: {int(state[idx])}"
+            idx += 1
+            log.debug(f"obj: {obj.name}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
-            state_dict[obj.name] = obj.deserialize(state[idx:])
-            idx += obj.state_size
+            state_dict[obj.name], deserialized_items = obj.deserialize(state[idx:])
+            idx += deserialized_items
         return state_dict, idx
+
+    @property
+    def uuid(self):
+        """
+        Returns:
+            int: Unique hashed ID for this registry
+        """
+        return get_uuid(self.name)

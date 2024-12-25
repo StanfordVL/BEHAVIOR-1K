@@ -1,20 +1,20 @@
-import numpy as np
 from collections import defaultdict
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import JointType
-from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import CollisionAPI
+from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import CollisionAPI, create_joint
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -26,7 +26,7 @@ m = create_module_macros(module_path=__file__)
 m.ATTACHMENT_LINK_PREFIX = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
-m.DEFAULT_ORIENTATION_THRESHOLD = np.deg2rad(5.0)  # 5 degrees
+m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([5.0])).item()  # 5 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 1000  # Newton
 m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
@@ -191,8 +191,8 @@ class AttachedTo(
         self,
         other,
         bypass_alignment_checking=False,
-        pos_thresh=m.DEFAULT_POSITION_THRESHOLD,
-        orn_thresh=m.DEFAULT_ORIENTATION_THRESHOLD,
+        pos_thresh=None,
+        orn_thresh=None,
     ):
         """
         Args:
@@ -209,6 +209,10 @@ class AttachedTo(
                 - RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
                 - RigidPrim or None: the corresponding link of @other
         """
+        if pos_thresh is None:
+            pos_thresh = m.DEFAULT_POSITION_THRESHOLD
+        if orn_thresh is None:
+            orn_thresh = m.DEFAULT_ORIENTATION_THRESHOLD
         parent_candidates = self._get_parent_candidates(other)
         if not parent_candidates:
             return None, None
@@ -220,10 +224,12 @@ class AttachedTo(
                 if other.states[AttachedTo].children[parent_link_name] is None:
                     if bypass_alignment_checking:
                         return child_link, parent_link
-                    pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
-                    orn_diff = T.get_orientation_diff_in_radian(
-                        child_link.get_orientation(), parent_link.get_orientation()
-                    )
+
+                    child_pos, child_orn = child_link.get_position_orientation()
+                    parent_pos, parent_orn = parent_link.get_position_orientation()
+                    pos_diff = th.norm(child_pos - parent_pos)
+                    orn_diff = T.get_orientation_diff_in_radian(child_orn, parent_orn)
+
                     if pos_diff < pos_thresh and orn_diff < orn_thresh:
                         return child_link, parent_link
 
@@ -261,7 +267,7 @@ class AttachedTo(
             f"{self.parent_link.prim_path}/{self.obj.name}_attachment_joint" if self.parent_link is not None else None
         )
 
-    def _attach(self, other, child_link, parent_link, joint_type=m.DEFAULT_JOINT_TYPE, can_joint_break=True):
+    def _attach(self, other, child_link, parent_link, joint_type=None, can_joint_break=True):
         """
         Creates a fixed or spherical joint between a male meta link of self.obj (@child_link) and a female meta link of
          @other (@parent_link) with a given @joint_type, @break_force and @break_torque
@@ -273,6 +279,8 @@ class AttachedTo(
             joint_type (JointType): joint type of the attachment, {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}
             can_joint_break (bool): whether the joint can break or not.
         """
+        if joint_type is None:
+            joint_type = m.DEFAULT_JOINT_TYPE
         assert joint_type in {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}, f"Unsupported joint type {joint_type}"
 
         # Set pose for self.obj so that child_link and parent_link align (6dof alignment for FixedJoint and 3dof alignment for SphericalJoint)
@@ -295,20 +303,20 @@ class AttachedTo(
             new_child_root_quat = child_root_quat
 
         # Actually move the object and also keep it still for stability purposes.
-        self.obj.set_position_orientation(new_child_root_pos, new_child_root_quat)
+        self.obj.set_position_orientation(position=new_child_root_pos, orientation=new_child_root_quat)
         self.obj.keep_still()
         other.keep_still()
 
         if joint_type == JointType.JOINT_FIXED:
             # FixedJoint: the parent link, the child link and the joint frame all align.
-            parent_local_quat = np.array([0.0, 0.0, 0.0, 1.0])
+            parent_local_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
         else:
             # SphericalJoint: the same except that the rotation of the parent link doesn't align with the joint frame.
             # The child link and the joint frame still align.
             _, parent_local_quat = T.relative_pose_transform([0, 0, 0], child_quat, [0, 0, 0], parent_quat)
 
         # Disable collision between the parent and child objects
-        self._disable_collision_between_child_and_parent(child=self.obj, parent=other)
+        # self._disable_collision_between_child_and_parent(child=self.obj, parent=other)
 
         # Set the parent references
         self.parent = other
@@ -329,10 +337,11 @@ class AttachedTo(
             joint_type=joint_type,
             body0=f"{parent_link.prim_path}",
             body1=f"{child_link.prim_path}",
-            joint_frame_in_parent_frame_pos=np.zeros(3),
+            joint_frame_in_parent_frame_pos=th.zeros(3),
             joint_frame_in_parent_frame_quat=parent_local_quat,
-            joint_frame_in_child_frame_pos=np.zeros(3),
-            joint_frame_in_child_frame_quat=np.array([0.0, 0.0, 0.0, 1.0]),
+            joint_frame_in_child_frame_pos=th.zeros(3),
+            joint_frame_in_child_frame_quat=th.tensor([0.0, 0.0, 0.0, 1.0]),
+            exclude_from_articulation=True,
             **kwargs,
         )
 
@@ -356,11 +365,11 @@ class AttachedTo(
         if parent.category == "wall_nail":
             # Temporary hack to disable collision between the attached child object and all walls/floors so that objects
             # attached to the wall_nails do not collide with the walls/floors.
-            for wall in og.sim.scene.object_registry("category", "walls", set()):
+            for wall in parent.scene.object_registry("category", "walls", set()):
                 for wall_link in wall.links.values():
                     for child_link in child.links.values():
                         child_link.add_filtered_collision_pair(wall_link)
-            for wall in og.sim.scene.object_registry("category", "floors", set()):
+            for wall in parent.scene.object_registry("category", "floors", set()):
                 for floor_link in wall.links.values():
                     for child_link in child.links.values():
                         child_link.add_filtered_collision_pair(floor_link)
@@ -405,7 +414,7 @@ class AttachedTo(
         if uuid == -1:
             attached_obj = None
         else:
-            attached_obj = og.sim.scene.object_registry("uuid", uuid)
+            attached_obj = self.obj.scene.object_registry("uuid", uuid)
             assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.parent != attached_obj:
@@ -429,8 +438,8 @@ class AttachedTo(
                 if self.parent != attached_obj:
                     log.warning(f"parent reference is not updated after attachment")
 
-    def _serialize(self, state):
-        return np.array([state["attached_obj_uuid"]], dtype=float)
+    def serialize(self, state):
+        return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         return dict(attached_obj_uuid=int(state[0])), 1

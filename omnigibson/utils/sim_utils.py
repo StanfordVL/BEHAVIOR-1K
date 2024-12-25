@@ -1,12 +1,14 @@
-import numpy as np
+import math
 from collections import namedtuple
 from collections.abc import Iterable
 
+import torch as th
+
 import omnigibson as og
+import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils import python_utils
-import omnigibson.utils.transform_utils as T
-import omnigibson.lazy as lazy
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -53,34 +55,6 @@ def set_carb_setting(carb_settings, setting, value):
         raise TypeError(f"Value of type {type(value)} is not supported.")
 
 
-def check_deletable_prim(prim_path):
-    """
-    Checks whether the prim defined at @prim_path can be deleted.
-
-    Args:
-        prim_path (str): Path defining which prim should be checked for deletion
-
-    Returns:
-        bool: Whether the prim can be deleted or not
-    """
-    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
-        return False
-    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
-        return False
-    if prim_path == "/World":
-        return False
-    if prim_path == "/":
-        return False
-    # Don't remove any /Render prims as that can cause crashes
-    if prim_path.startswith("/Render"):
-        return False
-    return True
-
-
 def prims_to_rigid_prim_set(inp_prims):
     """
     Converts prims @inp_prims into its corresponding set of rigid prims
@@ -109,6 +83,22 @@ def prims_to_rigid_prim_set(inp_prims):
     return out
 
 
+def prim_paths_to_rigid_prims(prim_paths, scene):
+    """
+    Given a set of rigid body prim paths @body_prim_paths, return a list of (BaseObject, RigidPrim) tuples.
+    """
+    rigid_prims = set()
+    for body in prim_paths:
+        tokens = body.split("/")
+        obj_prim_path = "/".join(tokens[:-1])
+        link_name = tokens[-1]
+        obj = scene.object_registry("prim_path", obj_prim_path)
+        if obj is not None:
+            rigid_prims.add((obj, obj.links[link_name]))
+
+    return rigid_prims
+
+
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
     Grab collisions that occurred during the most recent physics timestep associated with prims @prims
@@ -134,7 +124,10 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         og.sim.step_physics()
 
     # Standardize inputs
-    prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
+    if prims is not None:
+        prims = prims if isinstance(prims, Iterable) else [prims]
+    else:
+        prims = [x for scene in og.sim.scenes for x in scene.objects]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = (
         [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
@@ -285,9 +278,11 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     from omnigibson.object_states import AABB
 
     lower, _ = obj.states[AABB].get_value()
-    cur_pos = obj.get_position()
+    cur_pos = obj.get_position_orientation()[0]
     z_diff = cur_pos[2] - lower[2]
-    obj.set_position_orientation(pos + np.array([0, 0, z_diff if z_offset is None else z_diff + z_offset]), quat)
+    obj.set_position_orientation(
+        position=pos + th.tensor([0, 0, z_diff if z_offset is None else z_diff + z_offset]), orientation=quat
+    )
 
 
 def test_valid_pose(obj, pos, quat=None, z_offset=None):
@@ -308,7 +303,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = og.sim.scene.dump_state(serialized=False)
+    state = og.sim.dump_state()
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)
@@ -318,7 +313,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
-    og.sim.load_state(state, serialized=False)
+    og.sim.load_state(state)
 
     # Valid if there are no collisions
     return not in_collision
@@ -339,14 +334,15 @@ def land_object(obj, pos, quat=None, z_offset=None):
     assert og.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
-    quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
+    quat_lo, quat_hi = 0, math.pi * 2
+    quat = T.euler2quat([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]) if quat is None else quat
     place_base_pose(obj, pos, quat, z_offset)
     obj.keep_still()
 
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
     land_success = False
-    max_simulator_step = int(1.0 / og.sim.get_rendering_dt())
+    max_simulator_step = int(1.0 / og.sim.get_sim_step_dt())
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
         og.sim.step()
@@ -363,5 +359,17 @@ def land_object(obj, pos, quat=None, z_offset=None):
     obj.keep_still()
 
 
-def meets_minimum_isaac_version(minimum_version):
-    return python_utils.meets_minimum_version(lazy.omni.isaac.version.get_version()[0], minimum_version)
+def meets_minimum_isaac_version(minimum_version, current_version=None):
+    def _transform_isaac_version(str):
+        # In order to avoid issues with the version scheme change from 202X.X.X to X.X.X,
+        # transform Isaac Sim versions to all not be 202x-based e.g. 2021.2.3 -> 1.2.3
+        return str[3:] if str.startswith("202") else str
+
+    # If the user has not provided the current Isaac version, get it from the system.
+    if current_version is None:
+        current_version = lazy.omni.isaac.version.get_version()[0]
+
+    # Transform and compare.
+    return python_utils.meets_minimum_version(
+        _transform_isaac_version(current_version), _transform_isaac_version(minimum_version)
+    )

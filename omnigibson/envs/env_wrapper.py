@@ -1,7 +1,7 @@
-from omnigibson.utils.python_utils import Wrapper
-from omnigibson.utils.python_utils import Registerable, classproperty, create_class_from_registry_and_config
-from omnigibson.utils.ui_utils import create_module_logger
 from copy import deepcopy
+
+from omnigibson.utils.python_utils import Registerable, Wrapper, classproperty, create_class_from_registry_and_config
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Global dicts that will contain mappings
 REGISTERED_ENV_WRAPPERS = dict()
@@ -46,13 +46,14 @@ class EnvironmentWrapper(Wrapper, Registerable):
         By default, run the normal environment step() function
 
         Args:
-            action (np.array): action to take in environment
+            action (th.tensor): action to take in environment
 
         Returns:
             4-tuple:
                 - (dict) observations from the environment
                 - (float) reward from the environment
-                - (bool) whether the current episode is completed or not
+                - (bool) whether the current episode is terminated
+                - (bool) whether the current episode is truncated
                 - (dict) misc information
         """
         return self.env.step(action)

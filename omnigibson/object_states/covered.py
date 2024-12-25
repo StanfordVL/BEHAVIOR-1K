@@ -1,10 +1,9 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.object_states.contact_particles import ContactParticles
-from omnigibson.systems.system_base import VisualParticleSystem, is_visual_particle_system, is_physical_particle_system
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
+from omnigibson.systems.system_base import VisualParticleSystem
 from omnigibson.utils.constants import PrimType
-
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -44,8 +43,8 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         """
         Utility function to destroy all corresponding attachment groups for this object
         """
-        for system in VisualParticleSystem.get_active_systems().values():
-            if self._visual_particle_group in system.groups:
+        for system in self.obj.scene.active_systems.values():
+            if isinstance(system, VisualParticleSystem) and self._visual_particle_group in system.groups:
                 system.remove_attachment_group(self._visual_particle_group)
 
     def _initialize(self):
@@ -59,11 +58,11 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         # First, we check what type of system
         # Currently, we support VisualParticleSystems and PhysicalParticleSystems
         if system.n_particles > 0:
-            if is_visual_particle_system(system_name=system.name):
+            if self.obj.scene.is_visual_particle_system(system_name=system.name):
                 if self._visual_particle_group in system.groups:
                     # check whether the current number of particles assigned to the group is greater than the threshold
                     value = system.num_group_particles(group=self._visual_particle_group) >= m.VISUAL_PARTICLE_THRESHOLD
-            elif is_physical_particle_system(system_name=system.name):
+            elif self.obj.scene.is_physical_particle_system(system_name=system.name):
                 # Make sure we're not cloth -- not supported yet
                 assert (
                     self.obj.prim_type != PrimType.CLOTH
@@ -86,7 +85,7 @@ class Covered(RelativeObjectState, BooleanStateMixin):
         success = True
         # First, we check what type of system
         # Currently, we support VisualParticleSystems and PhysicalParticleSystems
-        if is_visual_particle_system(system_name=system.name):
+        if self.obj.scene.is_visual_particle_system(system_name=system.name):
             # Create the group if it doesn't exist already
             if self._visual_particle_group not in system.groups:
                 system.create_attachment_group(obj=self.obj)
@@ -104,7 +103,7 @@ class Covered(RelativeObjectState, BooleanStateMixin):
                     # We remove all of this group's particles
                     system.remove_all_group_particles(group=self._visual_particle_group)
 
-        elif is_physical_particle_system(system_name=system.name):
+        elif self.obj.scene.is_physical_particle_system(system_name=system.name):
             # Make sure we're not cloth -- not supported yet
             assert (
                 self.obj.prim_type != PrimType.CLOTH

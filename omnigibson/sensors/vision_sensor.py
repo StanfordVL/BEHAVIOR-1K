@@ -1,23 +1,28 @@
 import math
-import numpy as np
 import time
-import gym
+
+import gymnasium as gym
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.sensors.sensor_base import BaseSensor
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+from omnigibson.systems.system_base import get_all_system_names
 from omnigibson.utils.constants import (
     MAX_CLASS_COUNT,
     MAX_INSTANCE_COUNT,
     MAX_VIEWER_SIZE,
-    semantic_class_name_to_id,
     semantic_class_id_to_name,
+    semantic_class_name_to_id,
 )
+from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
-from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.ui_utils import create_module_logger, dock_window
 from omnigibson.utils.vision_utils import Remapper
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Duplicate of simulator's render method, used so that this can be done before simulator is created!
@@ -44,10 +49,10 @@ class VisionSensor(BaseSensor):
         - Camera state
 
     Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
-        modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
-            to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb".
+        Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
                 {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
                 bbox_2d_loose, bbox_3d, camera}
@@ -111,9 +116,9 @@ class VisionSensor(BaseSensor):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
-        modalities="all",
+        modalities=["rgb"],
         enabled=True,
         noise=None,
         load_config=None,
@@ -158,7 +163,7 @@ class VisionSensor(BaseSensor):
             self.all_modalities
         ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
-        modalities = set([modalities]) if isinstance(modalities, str) else modalities
+        modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
 
         # 1) seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
         # 2) bounding box observations require seg_semantic to be enabled (for remapping bounding box semantic IDs)
@@ -169,7 +174,7 @@ class VisionSensor(BaseSensor):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             modalities=modalities,
             enabled=enabled,
@@ -181,7 +186,7 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         # Note that we can't use og.sim.stage here because the vision sensors get loaded first
         return lazy.pxr.UsdGeom.Camera.Define(
-            lazy.omni.isaac.core.utils.stage.get_current_stage(), self._prim_path
+            lazy.omni.isaac.core.utils.stage.get_current_stage(), self.prim_path
         ).GetPrim()
 
     def _post_load(self):
@@ -189,10 +194,10 @@ class VisionSensor(BaseSensor):
         super()._post_load()
 
         # Add this sensor to the list of global sensors
-        self.SENSORS[self._prim_path] = self
+        self.SENSORS[self.prim_path] = self
 
         resolution = (self._load_config["image_width"], self._load_config["image_height"])
-        self._render_product = lazy.omni.replicator.core.create.render_product(self._prim_path, resolution)
+        self._render_product = lazy.omni.replicator.core.create.render_product(self.prim_path, resolution)
 
         # Create a new viewport to link to this camera or link to a pre-existing one
         viewport_name = self._load_config["viewport_name"]
@@ -232,7 +237,7 @@ class VisionSensor(BaseSensor):
         self._viewport = viewport
 
         # Link the camera and viewport together
-        self._viewport.viewport_api.set_active_camera(self._prim_path)
+        self._viewport.viewport_api.set_active_camera(self.prim_path)
 
         # Requires 3 render updates to propagate changes
         for i in range(3):
@@ -287,39 +292,59 @@ class VisionSensor(BaseSensor):
             reordered_modalities = self._modalities
 
         for modality in reordered_modalities:
-            raw_obs = self._annotators[modality].get_data()
+            raw_obs = self._annotators[modality].get_data(device=og.sim.device)
+
             # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
             obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
-            if modality == "seg_semantic":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
-            elif modality == "seg_instance":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_instance_segmentation(
-                    obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=False
-                )
-            elif modality == "seg_instance_id":
-                id_to_labels = raw_obs["info"]["idToLabels"]
-                obs[modality], info[modality] = self._remap_instance_segmentation(
-                    obs[modality], id_to_labels, obs["seg_semantic"], info["seg_semantic"], id=True
-                )
-            elif "bbox" in modality:
-                obs[modality] = self._remap_bounding_box_semantic_ids(obs[modality])
+
+            if og.sim.device == "cpu":
+                obs[modality] = self._preprocess_cpu_obs(obs[modality], modality)
+            elif "cuda" in og.sim.device:
+                obs[modality] = self._preprocess_gpu_obs(obs[modality], modality)
+            else:
+                raise ValueError(f"Unsupported device {og.sim.device}")
+
+            if "seg_" in modality or "bbox_" in modality:
+                self._remap_modality(modality, obs, info, raw_obs)
         return obs, info
 
-    def _remap_semantic_segmentation(self, img, id_to_labels):
+    def _preprocess_cpu_obs(self, obs, modality):
+        # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
+        if "seg_" in modality:
+            obs = obs.astype(NumpyTypes.INT32)
+        return th.from_numpy(obs) if not "bbox_" in modality else obs
+
+    def _preprocess_gpu_obs(self, obs, modality):
+        # All segmentation modalities return uint32 warp arrays on gpu, but PyTorch doesn't support it
+        if "seg_" in modality:
+            obs = obs.view(lazy.warp.int32)
+        return lazy.warp.to_torch(obs) if not "bbox_" in modality else obs
+
+    def _remap_modality(self, modality, obs, info, raw_obs):
+        id_to_labels = raw_obs["info"]["idToLabels"]
+
+        if modality == "seg_semantic":
+            obs[modality], info[modality] = self._remap_semantic_segmentation(obs[modality], id_to_labels)
+        elif modality in ["seg_instance", "seg_instance_id"]:
+            obs[modality], info[modality] = self._remap_instance_segmentation(
+                obs[modality],
+                id_to_labels,
+                id=(modality == "seg_instance_id"),
+            )
+        elif "bbox" in modality:
+            obs[modality], info[modality] = self._remap_bounding_box_semantic_ids(obs[modality], id_to_labels)
+        else:
+            raise ValueError(f"Unsupported modality {modality}")
+
+    def _preprocess_semantic_labels(self, id_to_labels):
         """
-        Remap the semantic segmentation image to the class IDs defined in semantic_class_name_to_id().
-        Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
+        Preprocess the semantic labels to feed into the remapper.
 
         Args:
-            img (np.ndarray): Semantic segmentation image to remap
             id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
-            np.ndarray: Remapped semantic segmentation image
-            dict: Corrected id_to_labels dictionary
+            dict: Preprocessed dictionary of semantic IDs to class labels
         """
-        # Preprocess id_to_labels to feed into the remapper
         replicator_mapping = {}
         for key, val in id_to_labels.items():
             key = int(key)
@@ -327,34 +352,50 @@ class VisionSensor(BaseSensor):
             if "," in replicator_mapping[key]:
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
-                categories = [cat for cat in replicator_mapping[key].split(",") if cat in REGISTERED_SYSTEMS]
-                assert len(categories) == 1, "There should be exactly one category that belongs to REGISTERED_SYSTEMS"
+                categories = [cat for cat in replicator_mapping[key].split(",") if cat in get_all_system_names()]
+                assert (
+                    len(categories) == 1
+                ), "There should be exactly one category that belongs to scene.system_registry"
                 replicator_mapping[key] = categories[0]
 
             assert (
                 replicator_mapping[key] in semantic_class_id_to_name().values()
             ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
+        return replicator_mapping
 
-        image_keys = np.unique(img)
-        assert set(image_keys).issubset(
-            set(replicator_mapping.keys())
-        ), "Semantic segmentation image does not match the original id_to_labels mapping."
+    def _remap_semantic_segmentation(self, img, id_to_labels):
+        """
+        Remap the semantic segmentation image to the class IDs defined in semantic_class_name_to_id().
+        Also, correct the id_to_labels input with the labels from semantic_class_name_to_id() and return it.
+
+        Args:
+            img (th.Tensor): Semantic segmentation image to remap
+            id_to_labels (dict): Dictionary of semantic IDs to class labels
+        Returns:
+            th.Tensor: Remapped semantic segmentation image
+            dict: Corrected id_to_labels dictionary
+        """
+        replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
+
+        image_keys = th.unique(img)
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.debug(
+                "Some semantic IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return VisionSensor.SEMANTIC_REMAPPER.remap(replicator_mapping, semantic_class_id_to_name(), img, image_keys)
 
-    def _remap_instance_segmentation(self, img, id_to_labels, semantic_img, semantic_labels, id=False):
+    def _remap_instance_segmentation(self, img, id_to_labels, id=False):
         """
         Remap the instance segmentation image to our own instance IDs.
         Also, correct the id_to_labels input with our new labels and return it.
 
         Args:
-            img (np.ndarray): Instance segmentation image to remap
+            img (th.tensor): Instance segmentation image to remap
             id_to_labels (dict): Dictionary of instance IDs to class labels
-            semantic_img (np.ndarray): Semantic segmentation image to use for instance registry
-            semantic_labels (dict): Dictionary of semantic IDs to class labels
             id (bool): Whether to remap for instance ID segmentation
         Returns:
-            np.ndarray: Remapped instance segmentation image
+            th.tensor: Remapped instance segmentation image
             dict: Corrected id_to_labels dictionary
         """
         # Sometimes 0 and 1 show up in the image, but they are not in the id_to_labels mapping
@@ -368,73 +409,103 @@ class VisionSensor(BaseSensor):
             key = int(key)
             if value in ["BACKGROUND", "UNLABELLED"]:
                 value = value.lower()
-            else:
-                assert "/" in value, f"Instance segmentation (ID) label {value} is not a valid prim path!"
-                prim_name = value.split("/")[-1]
-                # Hacky way to get the particles of MacroVisual/PhysicalParticleSystem
-                # Remap instance segmentation and instance segmentation ID labels to system name
-                if "Particle" in prim_name:
-                    category_name = prim_name.split("Particle")[0]
-                    assert (
-                        category_name in REGISTERED_SYSTEMS
-                    ), f"System name {category_name} is not in the registered systems!"
-                    value = category_name
-                else:
-                    # Remap instance segmentation labels to object name
-                    if not id:
-                        # value is the prim path of the object
-                        if value == "/World/groundPlane":
-                            value = "groundPlane"
-                        else:
-                            obj = og.sim.scene.object_registry("prim_path", value)
-                            # Remap instance segmentation labels from prim path to object name
-                            assert obj is not None, f"Object with prim path {value} cannot be found in objct registry!"
-                            value = obj.name
-
-                    # Keep the instance segmentation ID labels intact (prim paths of visual meshes)
+            elif "/" in value:
+                # Instance Segmentation
+                if not id:
+                    # Case 1: This is the ground plane
+                    if og.sim.floor_plane is not None and value == og.sim.floor_plane.prim_path:
+                        value = "groundPlane"
                     else:
-                        pass
+                        # Case 2: Check if this is an object, e.g. '/World/scene_0/breakfast_table', '/World/scene_0/dishtowel'
+                        obj = None
+                        if self.scene is not None:
+                            # If this is a camera within a scene, we check the object registry of the scene
+                            obj = self.scene.object_registry("prim_path", value)
+                        else:
+                            # If this is the viewer camera, we check each object registry
+                            for scene in og.sim.scenes:
+                                obj = scene.object_registry("prim_path", value)
+                                if obj:
+                                    break
+                        if obj is not None:
+                            # This is an object, so we remap the instance segmentation label to the object name
+                            value = obj.name
+                        # Case 3: Check if this is a particle system
+                        else:
+                            # This is a particle system
+                            path_split = value.split("/")
+                            prim_name = path_split[-1]
+                            system_matched = False
+                            # Case 3.1: Filter out macro particle systems
+                            # e.g. '/World/scene_0/diced__apple/particles/diced__appleParticle0', '/World/scene_0/breakfast_table/base_link/stainParticle0'
+                            if "Particle" in prim_name:
+                                macro_system_name = prim_name.split("Particle")[0]
+                                if macro_system_name in get_all_system_names():
+                                    system_matched = True
+                                    value = macro_system_name
+                            # Case 3.2: Filter out micro particle systems
+                            # e.g. '/World/scene_0/water/waterInstancer0/prototype0_1', '/World/scene_0/white_rice/white_riceInstancer0/prototype0'
+                            else:
+                                # If anything in path_split has "Instancer" in it, we know it's a micro particle system
+                                for path in path_split:
+                                    if "Instancer" in path:
+                                        # This is a micro particle system
+                                        system_matched = True
+                                        value = path.split("Instancer")[0]
+                                        break
+                            # Case 4: If nothing matched, we label it as unlabelled
+                            if not system_matched:
+                                value = "unlabelled"
+                # Instance ID Segmentation
+                else:
+                    # The only thing we do here is for micro particle system, we clean its name
+                    # e.g. a raw path looks like '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0'
+                    # we clean it to '/World/scene_0/water/waterInstancer0/prototype0'
+                    # Case 1: This is a micro particle system
+                    # e.g. '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0'
+                    if "Instancer" in value and "." in value:
+                        # This is a micro particle system
+                        value = value[: value.rfind(".")]
+                    # Case 2: For everything else, we keep the name as is
+                    """
+                    e.g. 
+                    {
+                        '54': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '60': '/World/scene_0/water/waterInstancer0/prototype0.proto0_prototype0_id0', 
+                        '30': '/World/scene_0/breakfast_table/base_link/stainParticle1', 
+                        '27': '/World/scene_0/diced__apple/particles/diced__appleParticle0', 
+                        '58': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '64': '/World/scene_0/white_rice/white_riceInstancer0/prototype0.proto0_prototype0_id0', 
+                        '40': '/World/scene_0/diced__apple/particles/diced__appleParticle1', 
+                        '48': '/World/scene_0/breakfast_table/base_link/stainParticle0', 
+                        '1': '/World/ground_plane/geom', 
+                        '19': '/World/scene_0/dishtowel/base_link_cloth', 
+                        '6': '/World/scene_0/breakfast_table/base_link/visuals'
+                    }
+                    """
+            else:
+                # TODO: This is a temporary fix unexpected labels e.g. INVALID introduced in new Isaac Sim versions
+                value = "unlabelled"
 
             self._register_instance(value, id=id)
             replicator_mapping[key] = value
 
-        # Handle the cases for MicroPhysicalParticleSystem (FluidSystem, GranularSystem).
-        # They show up in the image, but not in the info (id_to_labels).
-        # We identify these values, find the corresponding semantic label (system name), and add the mapping.
-        image_keys, key_indices = np.unique(img, return_index=True)
-        for key, img_idx in zip(image_keys, key_indices):
-            if str(key) not in id_to_labels:
-                semantic_label = semantic_img.flatten()[img_idx]
-                assert (
-                    semantic_label in semantic_labels
-                ), f"Semantic map value {semantic_label} is not in the semantic labels!"
-                category_name = semantic_labels[semantic_label]
-                if category_name in REGISTERED_SYSTEMS:
-                    value = category_name
-                    self._register_instance(value, id=id)
-                # If the category name is not in the registered systems,
-                # which happens because replicator sometimes returns segmentation map and id_to_labels that are not in sync,
-                # we will label this as "unlabelled" for now
-                # This only happens with a very small number of pixels, e.g. 0.1% of the image
-                else:
-                    num_of_pixels = len(np.where(img == key)[0])
-                    resolution = (self._load_config["image_width"], self._load_config["image_height"])
-                    percentage = (num_of_pixels / (resolution[0] * resolution[1])) * 100
-                    if percentage > 2:
-                        og.log.warning(
-                            f"Marking {category_name} as unlabelled due to image & id_to_labels mismatch!"
-                            f"Percentage of pixels: {percentage}%"
-                        )
-                    value = "unlabelled"
-                    self._register_instance(value, id=id)
-                replicator_mapping[key] = value
+        # This is a temporary fix for the problem where some small number of pixels show up in the image, but not in the info (id_to_labels).
+        # We identify these values and mark them as unlabelled.
+        image_keys = th.unique(img)
+        for key in image_keys:
+            if str(key.item()) not in id_to_labels:
+                value = "unlabelled"
+                self._register_instance(value, id=id)
+                replicator_mapping[key.item()] = value
 
         registry = VisionSensor.INSTANCE_ID_REGISTRY if id else VisionSensor.INSTANCE_REGISTRY
         remapper = VisionSensor.INSTANCE_ID_REMAPPER if id else VisionSensor.INSTANCE_REMAPPER
 
-        assert set(image_keys).issubset(
-            set(replicator_mapping.keys())
-        ), "Instance segmentation image does not match the original id_to_labels mapping."
+        if not set(image_keys.tolist()).issubset(set(replicator_mapping.keys())):
+            log.warning(
+                "Some instance IDs in the image are not in the id_to_labels mapping. This is a known issue with the replicator and should only affect a few pixels. These pixels will be marked as unlabelled."
+            )
 
         return remapper.remap(replicator_mapping, registry, img, image_keys)
 
@@ -443,18 +514,24 @@ class VisionSensor(BaseSensor):
         if instance_name not in registry.values():
             registry[len(registry)] = instance_name
 
-    def _remap_bounding_box_semantic_ids(self, bboxes):
+    def _remap_bounding_box_semantic_ids(self, bboxes, id_to_labels):
         """
         Remap the semantic IDs of the bounding boxes to our own semantic IDs.
 
         Args:
             bboxes (list of dict): List of bounding boxes to remap
+            id_to_labels (dict): Dictionary of semantic IDs to class labels
         Returns:
             list of dict: Remapped list of bounding boxes
+            dict: Remapped id_to_labels dictionary
         """
+        replicator_mapping = self._preprocess_semantic_labels(id_to_labels)
         for bbox in bboxes:
-            bbox["semanticId"] = VisionSensor.SEMANTIC_REMAPPER.remap_bbox(bbox["semanticId"])
-        return bboxes
+            bbox["semanticId"] = semantic_class_name_to_id()[replicator_mapping[bbox["semanticId"]]]
+        # Replicator returns each box as a numpy.void; we convert them to tuples here
+        bboxes = [box.tolist() for box in bboxes]
+        info = {semantic_class_name_to_id()[val]: val for val in replicator_mapping.values()}
+        return bboxes, info
 
     def add_modality(self, modality):
         # Check if we already have this modality (if so, no need to initialize it explicitly)
@@ -498,18 +575,39 @@ class VisionSensor(BaseSensor):
             modality (str): Name of the modality to remove from the Replicator backend
         """
         if self._annotators.get(modality, None) is not None:
-            self._annotators[modality].detach([self._render_product])
+            # Passing an explicit list is bugged -- see omni source code
+            # So we only pass in the product directly, which gets post-processed correctly
+            self._annotators[modality].detach(self._render_product)
             self._annotators[modality] = None
 
     def remove(self):
         # Remove from global sensors dictionary
-        self.SENSORS.pop(self._prim_path)
+        self.SENSORS.pop(self.prim_path)
 
-        # Remove viewport
-        self._viewport.destroy()
+        # Remove all modalities
+        for modality in tuple(self.modalities):
+            self.remove_modality(modality)
+
+        # Destroy the render product
+        self._render_product.destroy()
+
+        # Remove the viewport if it's not the main viewport
+        if self._viewport.name != "Viewport":
+            self._viewport.destroy()
+        else:
+            # We're deleting our camera, so set the normal viewport camera to the default /Perspective camera
+            self.active_camera_path = "/OmniverseKit_Persp"
 
         # Run super
         super().remove()
+
+    @property
+    def render_product(self):
+        """
+        Returns:
+            HydraTexture: Render product associated with this viewport and camera
+        """
+        return self._render_product
 
     @property
     def camera_parameters(self):
@@ -517,24 +615,24 @@ class VisionSensor(BaseSensor):
         Returns a dictionary of keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
         The returned dictionary includes the following keys and their corresponding data types:
 
-        - "cameraAperture": np.ndarray (float32) - Camera aperture dimensions.
-        - "cameraApertureOffset": np.ndarray (float32) - Offset of the camera aperture.
-        - "cameraFisheyeLensP": np.ndarray (float32) - Fisheye lens P parameter.
-        - "cameraFisheyeLensS": np.ndarray (float32) - Fisheye lens S parameter.
+        - "cameraAperture": th.tensor (float32) - Camera aperture dimensions.
+        - "cameraApertureOffset": th.tensor (float32) - Offset of the camera aperture.
+        - "cameraFisheyeLensP": th.tensor (float32) - Fisheye lens P parameter.
+        - "cameraFisheyeLensS": th.tensor (float32) - Fisheye lens S parameter.
         - "cameraFisheyeMaxFOV": float - Maximum field of view for fisheye lens.
         - "cameraFisheyeNominalHeight": int - Nominal height for fisheye lens.
         - "cameraFisheyeNominalWidth": int - Nominal width for fisheye lens.
-        - "cameraFisheyeOpticalCentre": np.ndarray (float32) - Optical center for fisheye lens.
-        - "cameraFisheyePolynomial": np.ndarray (float32) - Polynomial parameters for fisheye lens distortion.
+        - "cameraFisheyeOpticalCentre": th.tensor (float32) - Optical center for fisheye lens.
+        - "cameraFisheyePolynomial": th.tensor (float32) - Polynomial parameters for fisheye lens distortion.
         - "cameraFocalLength": float - Focal length of the camera.
         - "cameraFocusDistance": float - Focus distance of the camera.
         - "cameraFStop": float - F-stop value of the camera.
         - "cameraModel": str - Camera model identifier.
-        - "cameraNearFar": np.ndarray (float32) - Near and far plane distances.
-        - "cameraProjection": np.ndarray (float32) - Camera projection matrix.
-        - "cameraViewTransform": np.ndarray (float32) - Camera view transformation matrix.
+        - "cameraNearFar": th.tensor (float32) - Near and far plane distances.
+        - "cameraProjection": th.tensor (float32) - Camera projection matrix.
+        - "cameraViewTransform": th.tensor (float32) - Camera view transformation matrix.
         - "metersPerSceneUnit": float - Scale factor from scene units to meters.
-        - "renderProductResolution": np.ndarray (int32) - Resolution of the rendered product.
+        - "renderProductResolution": th.tensor (int32) - Resolution of the rendered product.
 
         Returns:
             dict: Keyword-mapped relevant intrinsic and extrinsic camera parameters for this vision sensor.
@@ -587,6 +685,19 @@ class VisionSensor(BaseSensor):
         """
         width, _ = self._viewport.viewport_api.get_texture_resolution()
         self._viewport.viewport_api.set_texture_resolution((width, height))
+
+        # Also update render product and update all annotators
+        for annotator in self._annotators.values():
+            annotator.detach([self._render_product.path])
+
+        self._render_product.destroy()
+        self._render_product = lazy.omni.replicator.core.create.render_product(
+            self.prim_path, (width, height), force_new=True
+        )
+
+        for annotator in self._annotators.values():
+            annotator.attach([self._render_product])
+
         # Requires 3 updates to propagate changes
         for i in range(3):
             render()
@@ -609,6 +720,19 @@ class VisionSensor(BaseSensor):
         """
         _, height = self._viewport.viewport_api.get_texture_resolution()
         self._viewport.viewport_api.set_texture_resolution((width, height))
+
+        # Also update render product and update all annotators
+        for annotator in self._annotators.values():
+            annotator.detach([self._render_product.path])
+
+        self._render_product.destroy()
+        self._render_product = lazy.omni.replicator.core.create.render_product(
+            self.prim_path, (width, height), force_new=True
+        )
+
+        for annotator in self._annotators.values():
+            annotator.attach([self._render_product])
+
         # Requires 3 updates to propagate changes
         for i in range(3):
             render()
@@ -619,7 +743,7 @@ class VisionSensor(BaseSensor):
         Returns:
             2-tuple: [min, max] value of the sensor's clipping range, in meters
         """
-        return np.array(self.get_attribute("clippingRange"))
+        return th.tensor(self.get_attribute("clippingRange"))
 
     @clipping_range.setter
     def clipping_range(self, limits):
@@ -673,6 +797,27 @@ class VisionSensor(BaseSensor):
         self.set_attribute("focalLength", length)
 
     @property
+    def active_camera_path(self):
+        """
+        Returns:
+            str: prim path of the active camera attached to this vision sensor
+        """
+        return self._viewport.viewport_api.get_active_camera().pathString
+
+    @active_camera_path.setter
+    def active_camera_path(self, path):
+        """
+        Sets the active camera prim path @path for this vision sensor. Note: Must be a valid Camera prim path
+
+        Args:
+            path (str): Prim path to the camera that will be attached to this vision sensor
+        """
+        self._viewport.viewport_api.set_active_camera(path)
+        # Requires 6 updates to propagate changes
+        for i in range(6):
+            render()
+
+    @property
     def intrinsic_matrix(self):
         """
         Returns:
@@ -685,12 +830,12 @@ class VisionSensor(BaseSensor):
         horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
         vertical_fov = horizontal_fov * height / width
 
-        fx = (width / 2.0) / np.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / np.tan(vertical_fov / 2.0)
+        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
+        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
         cx = width / 2
         cy = height / 2
 
-        intrinsic_matrix = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]])
+        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
         return intrinsic_matrix
 
     @property
@@ -700,15 +845,17 @@ class VisionSensor(BaseSensor):
         bbox_3d_space = gym.spaces.Sequence(
             space=gym.spaces.Tuple(
                 (
-                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # x_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # y_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # z_min
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # x_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # y_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.float32),  # z_max
-                    gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32),  # transform
-                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),  # occlusion ratio
+                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=NumpyTypes.UINT32),  # semanticId
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # x_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # y_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # z_min
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # x_max
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # y_max
+                    gym.spaces.Box(low=-float("inf"), high=float("inf"), shape=(), dtype=NumpyTypes.FLOAT32),  # z_max
+                    gym.spaces.Box(
+                        low=-float("inf"), high=float("inf"), shape=(4, 4), dtype=NumpyTypes.FLOAT32
+                    ),  # transform
+                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=NumpyTypes.FLOAT32),  # occlusion ratio
                 )
             )
         )
@@ -716,25 +863,25 @@ class VisionSensor(BaseSensor):
         bbox_2d_space = gym.spaces.Sequence(
             space=gym.spaces.Tuple(
                 (
-                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_min
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_min
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_max
-                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_max
-                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=np.float32),  # occlusion ratio
+                    gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=NumpyTypes.UINT32),  # semanticId
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=NumpyTypes.INT32),  # x_min
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=NumpyTypes.INT32),  # y_min
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=NumpyTypes.INT32),  # x_max
+                    gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=NumpyTypes.INT32),  # y_max
+                    gym.spaces.Box(low=-1.0, high=1.0, shape=(), dtype=NumpyTypes.FLOAT32),  # occlusion ratio
                 )
             )
         )
 
         obs_space_mapping = dict(
-            rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
-            depth=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
-            depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
-            normal=((self.image_height, self.image_width, 4), -1.0, 1.0, np.float32),
-            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint32),
-            seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
-            seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
-            flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, np.float32),
+            rgb=((self.image_height, self.image_width, 4), 0, 255, NumpyTypes.UINT8),
+            depth=((self.image_height, self.image_width), 0.0, float("inf"), NumpyTypes.FLOAT32),
+            depth_linear=((self.image_height, self.image_width), 0.0, float("inf"), NumpyTypes.FLOAT32),
+            normal=((self.image_height, self.image_width, 4), -1.0, 1.0, NumpyTypes.FLOAT32),
+            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, NumpyTypes.UINT32),
+            seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, NumpyTypes.UINT32),
+            seg_instance_id=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, NumpyTypes.UINT32),
+            flow=((self.image_height, self.image_width, 4), -float("inf"), float("inf"), NumpyTypes.FLOAT32),
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,
@@ -745,17 +892,18 @@ class VisionSensor(BaseSensor):
     @classmethod
     def clear(cls):
         """
-        Clears all cached sensors that have been generated. Should be used when the simulator is completely reset; i.e.:
-        all objects on the stage are destroyed
+        Clear all the class-wide variables.
         """
-        for sensor in cls.SENSORS.values():
-            # Destroy any sensor that is not attached to the main viewport window
-            if sensor._viewport.name != "Viewport":
-                sensor._viewport.destroy()
+        # Remove all sensors
+        for sensor in tuple(cls.SENSORS.values()):
+            sensor.remove()
 
         # Render to update
         render()
 
+        cls.SEMANTIC_REMAPPER = Remapper()
+        cls.INSTANCE_REMAPPER = Remapper()
+        cls.INSTANCE_ID_REMAPPER = Remapper()
         cls.SENSORS = dict()
         cls.KNOWN_SEMANTIC_IDS = set()
         cls.KEY_ARRAY = None

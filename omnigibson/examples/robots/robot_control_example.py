@@ -4,14 +4,13 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
-
+from omnigibson.utils.ui_utils import KeyboardRobotController, choose_from_options
 
 CONTROL_MODES = dict(
     random="Use autonomous random actions (default)",
@@ -45,15 +44,19 @@ def choose_controllers(robot, random_selection=False):
     default_config = robot._default_controller_config
 
     # Iterate over all components in robot
-    for component, controller_options in default_config.items():
+    controller_names = robot.controller_order
+    for controller_name in controller_names:
+        controller_options = default_config[controller_name]
         # Select controller
         options = list(sorted(controller_options.keys()))
         choice = choose_from_options(
-            options=options, name="{} controller".format(component), random_selection=random_selection
+            options=options,
+            name=f"{controller_name} controller",
+            random_selection=random_selection,
         )
 
         # Add to user responses
-        controller_choices[component] = choice
+        controller_choices[controller_name] = choice
 
     return controller_choices
 
@@ -126,8 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([1.46949, -3.97358, 2.21529]),
-        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
+        position=th.tensor([1.46949, -3.97358, 2.21529]),
+        orientation=th.tensor([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
 
     # Reset environment and robot
@@ -155,6 +158,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # Loop control until user quits
     max_steps = -1 if not short_exec else 100
     step = 0
+
     while step != max_steps:
         action = (
             action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
@@ -163,7 +167,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         step += 1
 
     # Always shut down the environment cleanly at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
+import torch as th
 import yaml
-import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -37,7 +37,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             category="shelf_back_panel",
             model="gjsnrt",
             position=[0, 0, 0.01],
-            fixed_base=True,
             abilities={"attachable": {}},
         )
     )
@@ -99,7 +98,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"shelf_baseboard",
             category="shelf_baseboard",
             model="hlhneo",
-            position=[0, -0.97884506, base_z + delta_z * idx],
+            position=[0, -10.97884506, base_z + delta_z * idx],
             abilities={"attachable": {}},
         )
     )
@@ -111,21 +110,18 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set viewer camera pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.689292, -2.11718198, 0.93332228]),
-        orientation=np.array([0.57687967, -0.22995655, -0.29022759, 0.72807814]),
+        position=th.tensor([-1.689292, -2.11718198, 0.93332228]),
+        orientation=th.tensor([0.57687967, -0.22995655, -0.29022759, 0.72807814]),
     )
 
     for _ in range(10):
         env.step([])
 
-    shelf_baseboard = og.sim.scene.object_registry("name", "shelf_baseboard")
-    shelf_baseboard.set_position_orientation([0, -0.979, 0.26], [0, 0, 0, 1])
+    shelf_baseboard = env.scene.object_registry("name", "shelf_baseboard")
+    shelf_baseboard.set_position_orientation(position=[0, -0.979, 0.21], orientation=[0, 0, 0, 1])
     shelf_baseboard.keep_still()
-    shelf_baseboard.set_linear_velocity(np.array([-0.2, 0, 0]))
-
-    shelf_side_left = og.sim.scene.object_registry("name", "shelf_side_left")
-    shelf_side_left.set_position_orientation([-0.4, 0.0, 0.2], [0, 0, 0, 1])
-    shelf_side_left.keep_still()
+    # Lower the mass of the baseboard - otherwise, the gravity will create enough torque to break the joint
+    shelf_baseboard.root_link.mass = 0.1
 
     input(
         "\n\nShelf parts fall to their correct poses and get automatically attached to the back panel.\n"

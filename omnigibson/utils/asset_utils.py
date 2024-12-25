@@ -1,17 +1,19 @@
 import argparse
+import contextlib
+import inspect
 import json
 import os
 import subprocess
 import tempfile
-import contextlib
-import inspect
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from cryptography.fernet import Fernet
-from collections import defaultdict
 from urllib.request import urlretrieve
-import yaml
+
 import progressbar
+import yaml
+from cryptography.fernet import Fernet
+
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -150,9 +152,12 @@ def get_og_model_path(category_name, model_name):
     return os.path.join(og_category_path, model_name)
 
 
-def get_all_system_categories():
+def get_all_system_categories(include_cloth=False):
     """
     Get OmniGibson all system categories
+
+    Args:
+        include_cloth (bool): whether to include cloth category; default to only include non-cloth particle systems
 
     Returns:
         list: all system categories
@@ -161,6 +166,8 @@ def get_all_system_categories():
     og_categories_path = os.path.join(og_dataset_path, "systems")
 
     categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    if include_cloth:
+        categories.append("cloth")
     return sorted(categories)
 
 
@@ -231,8 +238,8 @@ def get_all_object_category_models_with_abilities(category, abilities):
             to support the requested list of @abilities
     """
     # Avoid circular imports
-    from omnigibson.objects.dataset_object import DatasetObject
     from omnigibson.object_states.factory import get_requirements_for_ability, get_states_for_ability
+    from omnigibson.objects.dataset_object import DatasetObject
 
     # Get all valid models
     all_models = get_all_object_category_models(category=category)
@@ -303,8 +310,8 @@ def get_attachment_metalinks(category, model):
         list of str: all attachment metalinks for the object model
     """
     # Avoid circular imports
-    from omnigibson.objects.dataset_object import DatasetObject
     from omnigibson.object_states import AttachedTo
+    from omnigibson.objects.dataset_object import DatasetObject
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
     usd_path = usd_path.replace(".usd", ".encrypted.usd")
@@ -390,7 +397,7 @@ def download_assets():
         with tempfile.TemporaryDirectory() as td:
             tmp_file = os.path.join(td, "og_assets.tar.gz")
             os.makedirs(gm.ASSET_PATH, exist_ok=True)
-            path = "https://storage.googleapis.com/gibson_scenes/og_assets_1_0_0.tar.gz"
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets_1_1_0.tar.gz"
             log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
             assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
             assert (

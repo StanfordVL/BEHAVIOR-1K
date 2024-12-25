@@ -1,6 +1,9 @@
-import numpy as np
+import math
+
+import torch as th
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.object_states import Pose
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.reward_functions.collision_reward import CollisionReward
@@ -8,13 +11,12 @@ from omnigibson.reward_functions.point_goal_reward import PointGoalReward
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
-from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.max_collision import MaxCollision
 from omnigibson.termination_conditions.point_goal import PointGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -85,9 +87,9 @@ class PointNavigationTask(BaseTask):
         # Store inputs
         self._robot_idn = robot_idn
         self._floor = floor
-        self._initial_pos = initial_pos if initial_pos is None else np.array(initial_pos)
-        self._initial_quat = initial_quat if initial_quat is None else np.array(initial_quat)
-        self._goal_pos = goal_pos if goal_pos is None else np.array(goal_pos)
+        self._initial_pos = initial_pos if initial_pos is None else th.tensor(initial_pos)
+        self._initial_quat = initial_quat if initial_quat is None else th.tensor(initial_quat)
+        self._goal_pos = goal_pos if goal_pos is None else th.tensor(goal_pos)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
@@ -153,6 +155,7 @@ class PointNavigationTask(BaseTask):
         # Auto-initialize all markers
         og.sim.play()
         env.scene.reset()
+        self._reset_agent(env=env)
         env.scene.update_initial_state()
         og.sim.stop()
 
@@ -165,42 +168,42 @@ class PointNavigationTask(BaseTask):
         """
         if self._visualize_goal:
             self._initial_pos_marker = PrimitiveObject(
-                prim_path="/World/task_initial_pos_marker",
+                relative_prim_path="/task_initial_pos_marker",
                 primitive_type="Cylinder",
                 name="task_initial_pos_marker",
                 radius=self._goal_tolerance,
                 height=self._goal_height,
                 visual_only=True,
-                rgba=np.array([1, 0, 0, 0.3]),
+                rgba=th.tensor([1, 0, 0, 0.3]),
             )
             self._goal_pos_marker = PrimitiveObject(
-                prim_path="/World/task_goal_pos_marker",
+                relative_prim_path="/task_goal_pos_marker",
                 primitive_type="Cylinder",
                 name="task_goal_pos_marker",
                 radius=self._goal_tolerance,
                 height=self._goal_height,
                 visual_only=True,
-                rgba=np.array([0, 0, 1, 0.3]),
+                rgba=th.tensor([0, 0, 1, 0.3]),
             )
 
             # Load the objects into the simulator
-            og.sim.import_object(self._initial_pos_marker)
-            og.sim.import_object(self._goal_pos_marker)
+            env.scene.add_object(self._initial_pos_marker)
+            env.scene.add_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if self._visualize_path:
             waypoints = []
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
-                    prim_path=f"/World/task_waypoint_marker{i}",
+                    relative_prim_path=f"/task_waypoint_marker{i}",
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
                     radius=self._waypoint_width,
                     height=self._waypoint_height,
                     visual_only=True,
-                    rgba=np.array([0, 1, 0, 0.3]),
+                    rgba=th.tensor([0, 1, 0, 0.3]),
                 )
-                og.sim.import_object(waypoint)
+                env.scene.add_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
@@ -229,8 +232,9 @@ class PointNavigationTask(BaseTask):
             initial_pos = self._initial_pos
 
         # Possibly sample initial ori
+        quat_lo, quat_hi = 0, math.pi * 2
         initial_quat = (
-            T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
+            T.euler2quat(th.tensor([0, 0, (th.rand(1) * (quat_hi - quat_lo) + quat_lo).item()]))
             if self._randomize_initial_quat
             else self._initial_quat
         )
@@ -296,13 +300,16 @@ class PointNavigationTask(BaseTask):
             float: Computed potential
         """
         if self._reward_type == "l2":
-            reward = self._get_l2_potential(env)
+            potential = self._get_l2_potential(env)
         elif self._reward_type == "geodesic":
-            reward = self._get_geodesic_potential(env)
+            potential = self._get_geodesic_potential(env)
+            # If no path is found, fall back to L2 potential
+            if potential is None:
+                potential = self._get_l2_potential(env)
         else:
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
-        return reward
+        return potential
 
     def _reset_agent(self, env):
         # Reset agent
@@ -337,8 +344,8 @@ class PointNavigationTask(BaseTask):
 
         # Update visuals if requested
         if self._visualize_goal:
-            self._initial_pos_marker.set_position(self._initial_pos)
-            self._goal_pos_marker.set_position(self._goal_pos)
+            self._initial_pos_marker.set_position_orientation(position=self._initial_pos)
+            self._goal_pos_marker.set_position_orientation(position=self._goal_pos)
 
     def _reset_variables(self, env):
         # Run super first
@@ -369,19 +376,19 @@ class PointNavigationTask(BaseTask):
 
         Args:
             env (TraversableEnv): Environment instance
-            pos (3-array): global (x,y,z) position
+            pos (th.Tensor): global (x,y,z) position
 
         Returns:
-            3-array: (x,y,z) position in self._robot_idn agent's local frame
+            th.Tensor: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
+        delta_pos_global = pos - env.robots[self._robot_idn].states[Pose].get_value()[0]
         return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
 
     def _get_obs(self, env):
         # Get relative position of goal with respect to the current agent position
         xy_pos_to_goal = self._global_pos_to_robot_frame(env, self._goal_pos)[:2]
         if self._goal_in_polar:
-            xy_pos_to_goal = np.array(T.cartesian_to_polar(*xy_pos_to_goal))
+            xy_pos_to_goal = th.tensor(T.cartesian_to_polar(*xy_pos_to_goal))
 
         # linear velocity and angular velocity
         ori_t = T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T
@@ -451,11 +458,11 @@ class PointNavigationTask(BaseTask):
             floor_height = env.scene.get_floor_height(self._floor)
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
-                self._waypoint_markers[i].set_position(
-                    position=np.array([shortest_path[i][0], shortest_path[i][1], floor_height])
+                self._waypoint_markers[i].set_position_orientation(
+                    position=th.tensor([shortest_path[i][0], shortest_path[i][1], floor_height])
                 )
             for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position(position=np.array([0.0, 0.0, 100.0]))
+                self._waypoint_markers[i].set_position_orientation(position=th.tensor([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first

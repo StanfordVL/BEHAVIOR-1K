@@ -1,6 +1,5 @@
-import numpy as np
-
 from omnigibson.controllers import ControlType, LocomotionController
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
 class DifferentialDriveController(LocomotionController):
@@ -54,7 +53,7 @@ class DifferentialDriveController(LocomotionController):
         self._wheel_axle_halflength = wheel_axle_length / 2.0
 
         # If we're using default command output limits, map this to maximum linear / angular velocities
-        if command_output_limits == "default":
+        if type(command_output_limits) == str and command_output_limits == "default":
             min_vels = control_limits["velocity"][0][dof_idx]
             assert (
                 min_vels[0] == min_vels[1]
@@ -107,11 +106,14 @@ class DifferentialDriveController(LocomotionController):
         right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
         # Return desired velocities
-        return np.array([left_wheel_joint_vel, right_wheel_joint_vel])
+        return cb.array([left_wheel_joint_vel, right_wheel_joint_vel])
 
     def compute_no_op_goal(self, control_dict):
         # This is zero-vector, since we want zero linear / angular velocity
-        return dict(vel=np.zeros(2))
+        return dict(vel=cb.zeros(2))
+
+    def _compute_no_op_action(self, control_dict):
+        return cb.zeros(2)
 
     def _get_goal_shapes(self):
         # Add (2, )-array representing linear, angular velocity

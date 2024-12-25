@@ -1,0 +1,34 @@
+2,3c2,3
+< title = "OmniGibson"
+< description = "A platform for accelerating Embodied AI research"
+---
+> title = "Isaac Sim Python"
+> description = "A trimmed down app for use with python samples"
+13c13
+< ## "omni.isaac.core_archive" = {}
+---
+> "omni.isaac.core_archive" = {}
+18d17
+< ## "omni.isaac.dofbot" = {}
+25c24
+< ## "omni.isaac.ml_archive" = {}
+---
+> "omni.isaac.ml_archive" = {}
+38,40c37,39
+< ## "omni.kit.property.isaac" = {}
+< ## "omni.pip.cloud" = {}
+< ## "omni.pip.compute" = {}
+---
+> "omni.kit.property.isaac" = {}
+> "omni.pip.cloud" = {}
+> "omni.pip.compute" = {}
+79d77
+< 
+82d79
+< 
+158c155
+< title = "OmniGibson"
+---
+> title = "Isaac Sim Python"
+271d267
+< pathStatCacheEnabled = false

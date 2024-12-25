@@ -2,8 +2,12 @@
 A set of helper utility functions for dealing with 3D geometry
 """
 
-import numpy as np
+import math
+
+import torch as th
+
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh
 
 
@@ -25,7 +29,7 @@ def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose_inv(T.pose2mat((pos, quat)))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = th.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     particle_positions = (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
@@ -54,7 +58,7 @@ def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose2mat((pos, quat))
     # Batch the transforms to get all particle points in the local link frame
-    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    positions_tensor = th.tile(th.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
     return (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
@@ -83,7 +87,7 @@ def check_points_in_cube(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(axis=-1) == 3
+    return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(dim=-1) == 3
 
 
 def check_points_in_cone(size, pos, quat, scale, particle_positions):
@@ -111,7 +115,7 @@ def check_points_in_cone(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < (
+    in_radius = th.norm(particle_positions[:, :-1], dim=-1) < (
         radius * (1 - (particle_positions[:, -1] + height / 2.0) / height)
     )
     return in_height & in_radius
@@ -142,7 +146,7 @@ def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < radius
+    in_radius = th.norm(particle_positions[:, :-1], dim=-1) < radius
     return in_height & in_radius
 
 
@@ -168,7 +172,7 @@ def check_points_in_sphere(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    return np.linalg.norm(particle_positions, axis=-1) < size
+    return th.norm(particle_positions, dim=-1) < size
 
 
 def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos, quat, scale, particle_positions):
@@ -199,13 +203,13 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     # particle position with the normal, and validating that the value is < 0)
     D, _ = mesh_face_centroids.shape
     N, _ = particle_positions.shape
-    mesh_points = np.tile(mesh_face_centroids.reshape(1, D, 3), (N, 1, 1))
-    mesh_normals = np.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
-    particle_positions = np.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
+    mesh_points = th.tile(mesh_face_centroids.reshape(1, D, 3), (N, 1, 1))
+    mesh_normals = th.tile(mesh_face_normals.reshape(1, D, 3), (N, 1, 1))
+    particle_positions = th.tile(particle_positions.reshape(N, 1, 3), (1, D, 1))
     # All arrays are now (N, D, 3) shape -- efficient for batching
-    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(axis=-1) < 0  # shape (N, D)
+    in_range = ((particle_positions - mesh_points) * mesh_normals).sum(dim=-1) < 0  # shape (N, D)
     # All D normals must be satisfied for a single point to be considered inside the hull
-    in_range = in_range.sum(axis=-1) == D
+    in_range = in_range.sum(dim=-1) == D
     return in_range
 
 
@@ -246,8 +250,8 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
     assert (
         trimesh_mesh.is_convex
     ), f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
-    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
-    face_normals = trimesh_mesh.face_normals
+    face_centroids = th.tensor(trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1), dtype=th.float32)
+    face_normals = th.tensor(trimesh_mesh.face_normals, dtype=th.float32)
 
     # This function assumes that:
     # 1. @particle_positions are in the local container_link frame
@@ -255,11 +259,11 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
     in_volume = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
         mesh_face_centroids=face_centroids,
         mesh_face_normals=face_normals,
-        pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-        quat=np.array(
+        pos=vtarray_to_torch(mesh.GetAttribute("xformOp:translate").Get()),
+        quat=vtarray_to_torch(
             [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]
         ),
-        scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+        scale=vtarray_to_torch(mesh.GetAttribute("xformOp:scale").Get()),
         particle_positions=particle_positions,
     )
     calc_volume = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
@@ -318,53 +322,53 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=vtarray_to_torch(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=vtarray_to_torch(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=vtarray_to_torch(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cylinder":
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=vtarray_to_torch(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=vtarray_to_torch(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=vtarray_to_torch(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cone":
             fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=vtarray_to_torch(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=vtarray_to_torch(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=vtarray_to_torch(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array(
+                pos=vtarray_to_torch(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=vtarray_to_torch(
                     [
                         *(mesh.GetAttribute("xformOp:orient").Get().imaginary),
                         mesh.GetAttribute("xformOp:orient").Get().real,
                     ]
                 ),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                scale=vtarray_to_torch(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
         else:
@@ -391,7 +395,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             particle_positions=particle_positions,
         )
 
-        in_volumes = np.zeros(n_particles).astype(bool)
+        in_volumes = th.zeros(n_particles).bool()
         for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
             in_volumes |= checker_fcn(mesh.prim, particle_positions)
 
@@ -404,28 +408,28 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         # respect to the volume link's global AABB
 
         # Convert precision to minimum number of particles to sample
-        min_n_particles = int(np.ceil(1.0 / precision))
+        min_n_particles = int(math.ceil(1.0 / precision))
 
         # Make sure container meshes are visible so AABB computation is correct
         for mesh in container_meshes:
             mesh.visible = True
 
         # Determine equally-spaced sampling distance to achieve this minimum particle count
-        aabb_volume = np.product(volume_link.visual_aabb_extent)
-        sampling_distance = np.cbrt(aabb_volume / min_n_particles)
+        aabb_volume = th.prod(volume_link.visual_aabb_extent)
+        sampling_distance = th.pow(aabb_volume / min_n_particles, 1 / 3.0)
         low, high = volume_link.visual_aabb
-        n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
-        assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
+        n_particles_per_axis = ((high - low) / sampling_distance).int() + 1
+        assert th.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
         # 1e-10 is added because the extent might be an exact multiple of particle radius
-        arrs = [np.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
+        arrs = [th.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        points = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
 
         # Re-hide container meshes
         for mesh in container_meshes:
             mesh.visible = False
 
         # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
-        return aabb_volume * np.mean(check_points_in_volumes(points))
+        return aabb_volume * th.mean(check_points_in_volumes(points).float())
 
     return check_points_in_volumes, calculate_volume

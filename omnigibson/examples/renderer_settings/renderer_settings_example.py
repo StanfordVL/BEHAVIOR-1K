@@ -1,4 +1,5 @@
-import numpy as np
+import torch as th
+
 import omnigibson as og
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 
@@ -43,13 +44,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
     cam.set_position_orientation(
-        position=np.array([-4.62785, -0.418575, 0.933943]),
-        orientation=np.array([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
+        position=th.tensor([-4.62785, -0.418575, 0.933943]),
+        orientation=th.tensor([0.52196595, -0.4231939, -0.46640436, 0.5752612]),
     )
 
     def steps(n):
         for _ in range(n):
-            env.step(np.array([]))
+            env.step(th.empty(0))
 
     # Take a few steps to let objects settle
     steps(25)
@@ -62,12 +63,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     assert renderer_setting == renderer_setting2
 
     # Set current renderer.
-    input("Setting renderer to Real-Time. Press [ENTER] to continue.")
+    if not short_exec:
+        input("Setting renderer to Real-Time. Press [ENTER] to continue.")
     renderer_setting.set_current_renderer("Real-Time")
     assert renderer_setting.get_current_renderer() == "Real-Time"
     steps(5)
 
-    input("Setting renderer to Interactive (Path Tracing). Press [ENTER] to continue.")
+    if not short_exec:
+        input("Setting renderer to Interactive (Path Tracing). Press [ENTER] to continue.")
     renderer_setting.set_current_renderer("Interactive (Path Tracing)")
     assert renderer_setting.get_current_renderer() == "Interactive (Path Tracing)"
     steps(5)
@@ -75,10 +78,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Get all available settings.
     print(renderer_setting.settings.keys())
 
-    input(
-        "Showcasing how to use RendererSetting APIs. Please see example script for more information. "
-        "Press [ENTER] to continue."
-    )
+    if not short_exec:
+        input(
+            "Showcasing how to use RendererSetting APIs. Please see example script for more information. "
+            "Press [ENTER] to continue."
+        )
 
     # Set setting (2 lines below are equivalent).
     renderer_setting.set_setting(path="/app/renderer/skipMaterialLoading", value=True)
@@ -118,8 +122,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     renderer_setting.set_setting(path="/rtx/fog/fogColorIntensity", value=1.0)
 
     # Shutdown sim
-    input("Completed demo. Press [ENTER] to shutdown simulation.")
-    og.shutdown()
+    if not short_exec:
+        input("Completed demo. Press [ENTER] to shutdown simulation.")
+    og.clear()
 
 
 if __name__ == "__main__":

@@ -1,9 +1,10 @@
 from abc import ABCMeta
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, Registerable
-from omnigibson.utils.gym_utils import GymObservable
-from gym.spaces import Space
 
+import gymnasium as gym
+
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.python_utils import Registerable, assert_valid_key, classproperty
 
 # Registered sensors
 REGISTERED_SENSORS = dict()
@@ -18,7 +19,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
     Sensor-specific get_obs method is implemented in subclasses
 
     Args:
-        prim_path (str): prim path of the Sensor to encapsulate or create.
+        relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the sensor. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
@@ -30,7 +31,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
 
     def __init__(
         self,
-        prim_path,
+        relative_prim_path,
         name,
         modalities="all",
         enabled=True,
@@ -50,7 +51,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
         )
@@ -100,7 +101,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         obs_space = dict()
         for modality, space in self._obs_space_mapping.items():
             if modality in self._modalities:
-                if isinstance(space, Space):
+                if isinstance(space, gym.Space):
                     # Directly add this space
                     obs_space[modality] = space
                 else:

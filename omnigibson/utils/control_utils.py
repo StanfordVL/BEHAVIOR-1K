@@ -2,9 +2,9 @@
 Set of utilities for helping to execute robot control
 """
 
+import torch as th
+
 import omnigibson.lazy as lazy
-import numpy as np
-from numba import jit
 import omnigibson.utils.transform_utils as T
 
 
@@ -43,15 +43,12 @@ class FKSolver:
             pose3_lula = self.kinematics.pose(joint_positions, link_name)
 
             # get position
-            link_position = pose3_lula.translation
+            link_position = th.tensor(pose3_lula.translation, dtype=th.float32)
 
             # get orientation
             rotation_lula = pose3_lula.rotation
-            link_orientation = (
-                rotation_lula.x(),
-                rotation_lula.y(),
-                rotation_lula.z(),
-                rotation_lula.w(),
+            link_orientation = th.tensor(
+                [rotation_lula.x(), rotation_lula.y(), rotation_lula.z(), rotation_lula.w()], dtype=th.float32
             )
             link_poses[link_name] = (link_position, link_orientation)
         return link_poses
@@ -84,7 +81,8 @@ class IKSolver:
         tolerance_quat=0.01,
         weight_pos=1.0,
         weight_quat=0.05,
-        max_iterations=150,
+        bfgs_orientation_weight=100.0,
+        max_iterations=10,
         initial_joint_pos=None,
     ):
         """
@@ -99,6 +97,8 @@ class IKSolver:
             tolerance_quat (float): Maximum orientation error (per-axis L2-norm) for a successful IK solution
             weight_pos (float): Weight for the relative importance of position error during CCD
             weight_quat (float): Weight for the relative importance of position error during CCD
+            bfgs_orientation_weight (float): Weight when applying BFGS algorithm during optimization. Only used if
+                target_quat is specified
             max_iterations (int): Number of iterations used for each cyclic coordinate descent.
             initial_joint_pos (None or n-array): If specified, will set the initial cspace seed when solving for joint
                 positions. Otherwise, will use self.reset_joint_pos
@@ -107,60 +107,34 @@ class IKSolver:
             None or n-array: Joint positions for reaching desired target_pos and target_quat, otherwise None if no
                 solution was found
         """
-        pos = np.array(target_pos, dtype=np.float64).reshape(3, 1)
-        rot = np.array(T.quat2mat(np.array([0, 0, 0, 1.0]) if target_quat is None else target_quat), dtype=np.float64)
+        pos = (
+            target_pos.to(th.float64) if isinstance(target_pos, th.Tensor) else th.tensor(target_pos, dtype=th.float64)
+        ).reshape(3, 1)
+
+        if target_quat is None:
+            rot = T.quat2mat(th.tensor([0, 0, 0, 1.0], dtype=th.float64))
+        else:
+            rot = T.quat2mat(
+                target_quat.to(th.float64)
+                if isinstance(target_quat, th.Tensor)
+                else th.tensor(target_quat, dtype=th.float64)
+            )
         ik_target_pose = lazy.lula.Pose3(lazy.lula.Rotation3(rot), pos)
 
         # Set the cspace seed and tolerance
-        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else np.array(initial_joint_pos)
+        initial_joint_pos = self.reset_joint_pos if initial_joint_pos is None else initial_joint_pos
         self.config.cspace_seeds = [initial_joint_pos]
         self.config.position_tolerance = tolerance_pos
         self.config.orientation_tolerance = 100.0 if target_quat is None else tolerance_quat
 
         self.config.ccd_position_weight = weight_pos
         self.config.ccd_orientation_weight = 0.0 if target_quat is None else weight_quat
+        self.config.bfgs_orientation_weight = 0.0 if target_quat is None else bfgs_orientation_weight
         self.config.max_num_descents = max_iterations
 
         # Compute target joint positions
         ik_results = lazy.lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
         if ik_results.success:
-            return np.array(ik_results.cspace_position)
+            return th.tensor(ik_results.cspace_position, dtype=th.float32)
         else:
             return None
-
-
-@jit(nopython=True)
-def orientation_error(desired, current):
-    """
-    This function calculates a 3-dimensional orientation error vector for use in the
-    impedance controller. It does this by computing the delta rotation between the
-    inputs and converting that rotation to exponential coordinates (axis-angle
-    representation, where the 3d vector is axis * angle).
-    See https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation for more information.
-    Optimized function to determine orientation error from matrices
-
-    Args:
-        desired (tensor): (..., 3, 3) where final two dims are 2d array representing target orientation matrix
-        current (tensor): (..., 3, 3) where final two dims are 2d array representing current orientation matrix
-    Returns:
-        tensor: (..., 3) where final dim is (ax, ay, az) axis-angle representing orientation error
-    """
-    # convert input shapes
-    input_shape = desired.shape[:-2]
-    desired = desired.reshape(-1, 3, 3)
-    current = current.reshape(-1, 3, 3)
-
-    # grab relevant info
-    rc1 = current[:, :, 0]
-    rc2 = current[:, :, 1]
-    rc3 = current[:, :, 2]
-    rd1 = desired[:, :, 0]
-    rd2 = desired[:, :, 1]
-    rd3 = desired[:, :, 2]
-
-    error = 0.5 * (np.cross(rc1, rd1) + np.cross(rc2, rd2) + np.cross(rc3, rd3))
-
-    # Reshape
-    error = error.reshape(*input_shape, 3)
-
-    return error

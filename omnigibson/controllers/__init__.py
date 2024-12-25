@@ -2,18 +2,18 @@ from omnigibson.controllers.controller_base import (
     REGISTERED_CONTROLLERS,
     REGISTERED_LOCOMOTION_CONTROLLERS,
     REGISTERED_MANIPULATION_CONTROLLERS,
-    IsGraspingState,
     ControlType,
+    GripperController,
+    IsGraspingState,
     LocomotionController,
     ManipulationController,
-    GripperController,
 )
 from omnigibson.controllers.dd_controller import DifferentialDriveController
-from omnigibson.controllers.osc_controller import OperationalSpaceController
 from omnigibson.controllers.ik_controller import InverseKinematicsController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.controllers.multi_finger_gripper_controller import MultiFingerGripperController
 from omnigibson.controllers.null_joint_controller import NullJointController
+from omnigibson.controllers.osc_controller import OperationalSpaceController
 from omnigibson.utils.python_utils import assert_valid_key
 
 

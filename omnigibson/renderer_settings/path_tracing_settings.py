@@ -1,5 +1,4 @@
 import omnigibson.lazy as lazy
-
 from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
 

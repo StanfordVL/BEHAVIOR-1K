@@ -32,32 +32,30 @@ scene:
 
 robots:
   - type: Fetch
-    obs_modalities: [scan, rgb, depth]
+    obs_modalities: [rgb]
     scale: 1.0
     self_collisions: true
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    rigid_trunk: false
-    default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     controller_config:
       base:
         name: DifferentialDriveController
+      trunk:
+        name: JointController
       arm_0:
-        name: InverseKinematicsController
-        command_input_limits: default
-        command_output_limits:
-          - [-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]
-          - [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
-        mode: pose_absolute_ori
-        kp: 300.0
+        name: JointController
+        subsume_controllers: [trunk]
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
       gripper_0:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
-        use_delta_commands: true
+        use_delta_commands: false
       camera:
         name: JointController
         use_delta_commands: False
@@ -66,9 +64,3 @@ objects: []
 
 task:
   type: DummyTask
-
-scene_graph:
-  egocentric: true
-  full_obs: true
-  only_true: true
-  merge_parallel_edges: false

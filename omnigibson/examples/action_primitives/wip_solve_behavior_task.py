@@ -1,13 +1,14 @@
 import os
+
+import torch as th
 import yaml
-import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -23,7 +24,7 @@ def main():
     """
     Demonstrates how to use the action primitives to solve a simple BEHAVIOR-1K task.
 
-    It loads Benevolence_1_int with a Fetch robot, and the robot attempts to solve the
+    It loads Benevolence_1_int with a robot, and the robot attempts to solve the
     picking_up_trash task using a hardcoded sequence of primitives.
     """
     # Load the config
@@ -54,14 +55,14 @@ def main():
     controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
     # Grasp can of soda
-    grasp_obj = scene.object_registry("name", "can_of_soda_89")
+    grasp_obj = env.task.object_scope["can__of__soda.n.01_2"]
     print("Executing controller")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
     print("Finished executing grasp")
 
     # Place can in trash can
     print("Executing controller")
-    trash = scene.object_registry("name", "trash_can_85")
+    trash = env.task.object_scope["ashcan.n.01_1"]
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
     print("Finished executing place")
 

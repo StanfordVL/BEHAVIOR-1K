@@ -1,24 +1,26 @@
-from abc import abstractmethod
+import os
 from copy import deepcopy
-import numpy as np
-import matplotlib.pyplot as plt
 
-from omnigibson.macros import create_module_macros
-from omnigibson.sensors import (
-    create_sensor,
-    SENSOR_PRIMS_TO_SENSOR_CLS,
-    ALL_SENSOR_MODALITIES,
-    VisionSensor,
-    ScanSensor,
-)
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.objects.object_base import BaseObject
+import torch as th
+
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.objects.controllable_object import ControllableObject
-from omnigibson.utils.gym_utils import GymObservable
-from omnigibson.utils.usd_utils import add_asset_to_stage
-from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
-from omnigibson.utils.vision_utils import segmentation_to_rgb
+from omnigibson.objects.usd_object import USDObject
+from omnigibson.sensors import (
+    ALL_SENSOR_MODALITIES,
+    SENSOR_PRIMS_TO_SENSOR_CLS,
+    ScanSensor,
+    VisionSensor,
+    create_sensor,
+)
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.numpy_utils import NumpyTypes
+from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, absolute_prim_path_to_scene_relative
+from omnigibson.utils.vision_utils import segmentation_to_rgb
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()
@@ -45,13 +47,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self,
         # Shared kwargs in hierarchy
         name,
-        prim_path=None,
-        uuid=None,
+        relative_prim_path=None,
         scale=None,
         visible=True,
         fixed_base=False,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -61,8 +62,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-        # Unique to this class
-        obs_modalities="all",
+        # Unique to BaseRobot
+        obs_modalities=("rgb", "proprio"),
         proprio_obs="default",
         sensor_config=None,
         **kwargs,
@@ -70,10 +71,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -87,7 +85,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
                 the object state instance constructor.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                simulator.import_object will automatically set the control frequency to be at the render frequency by default.
+                we will automatically set the control frequency to be at the render frequency by default.
             controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
                 configurations for this object. This will override any default values specified by this class.
             action_type (str): one of {discrete, continuous} - what type of action space to use
@@ -97,9 +95,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
                 Set this value instead if you want to initialize the robot with a different rese joint position.
-            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
-                corresponds to all modalities being used.
-                Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
+            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
+                Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
@@ -126,21 +123,17 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Initialize internal attributes that will be loaded later
         self._sensors = None  # e.g.: scan sensor, vision sensor
-        self._dummy = None  # Dummy version of the robot w/ fixed base for computing generalized gravity forces
 
-        # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
-        # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
-        assert (
-            scale is None or isinstance(scale, int) or isinstance(scale, float) or np.all(scale == scale[0])
-        ), f"Robot scale must be uniform! Got: {scale}"
+        # All BaseRobots should have xform properties pre-loaded
+        load_config = {} if load_config is None else load_config
+        load_config["xform_props_pre_loaded"] = True
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             usd_path=self.usd_path,
             name=name,
             category=m.ROBOT_CATEGORY,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -158,24 +151,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             **kwargs,
         )
 
-    def _load(self):
-        # Run super first
-        prim = super()._load()
-
-        # Also import dummy object if this robot is not fixed base
-        if self._use_dummy:
-            dummy_path = f"{self._prim_path}_dummy"
-            dummy_prim = add_asset_to_stage(asset_path=self._dummy_usd_path, prim_path=dummy_path)
-            self._dummy = BaseObject(
-                name=f"{self.name}_dummy",
-                prim_path=dummy_path,
-                scale=self._load_config.get("scale", None),
-                visible=False,
-                fixed_base=True,
-                visual_only=True,
-            )
-
-        return prim
+        assert not isinstance(self._load_config["scale"], th.Tensor) or th.all(
+            self._load_config["scale"] == self._load_config["scale"][0]
+        ), f"Robot scale must be uniform! Got: {self._load_config['scale']}"
 
     def _post_load(self):
         # Run super post load first
@@ -185,10 +163,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self._load_sensors()
 
     def _initialize(self):
-        # Initialize the dummy first if it exists
-        if self._dummy is not None:
-            self._dummy.initialize()
-
         # Run super
         super()._initialize()
 
@@ -231,14 +205,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                             if self._obs_modalities == "all"
                             else sensor_cls.all_modalities.intersection(self._obs_modalities)
                         )
+                    # If the modalities list is empty, don't import the sensor.
+                    if not sensor_kwargs["modalities"]:
+                        continue
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-                        prim_path=str(prim.GetPrimPath()),
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )
+                    sensor.load(self.scene)
                     self._sensors[sensor.name] = sensor
                     sensor_counts[prim_type] += 1
 
@@ -278,22 +256,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         pass
 
-    def step(self):
-        # Skip this step if our articulation view is not valid
-        if self._articulation_view_direct is None or not self._articulation_view_direct.initialized:
-            return
-
-        # Before calling super, update the dummy robot's kinematic state based on this robot's kinematic state
-        # This is done prior to any state getter calls, since setting kinematic state results in physx backend
-        # having to re-fetch tensorized state.
-        # We do this so we have more optimal runtime performance
-        if self._use_dummy:
-            self._dummy.set_joint_positions(self.get_joint_positions())
-            self._dummy.set_joint_velocities(self.get_joint_velocities())
-            self._dummy.set_position_orientation(*self.get_position_orientation())
-
-        super().step()
-
     def get_obs(self):
         """
         Grabs all observations from the robot. This is keyword-mapped based on each observation modality
@@ -326,7 +288,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: empty dictionary, a placeholder for additional info
         """
         proprio_dict = self._get_proprioception_dict()
-        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs]), {}
+        return th.cat([proprio_dict[obs] for obs in self._proprio_obs]), {}
 
     def _get_proprioception_dict(self):
         """
@@ -334,25 +296,30 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: keyword-mapped proprioception observations available for this robot.
                 Can be extended by subclasses
         """
-        joint_positions = self.get_joint_positions(normalized=False)
-        joint_velocities = self.get_joint_velocities(normalized=False)
-        joint_efforts = self.get_joint_efforts(normalized=False)
-        pos, ori = self.get_position(), self.get_rpy()
-        ori_2d = self.get_2d_orientation()
+        joint_positions = cb.to_torch(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
+        joint_velocities = cb.to_torch(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
+        joint_efforts = cb.to_torch(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path))
+        pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
+        pos, quat = cb.to_torch(pos), cb.to_torch(quat)
+        ori = T.quat2euler(quat)
+
+        ori_2d = T.z_angle_from_quat(quat)
+
+        # Pack everything together
         return dict(
             joint_qpos=joint_positions,
-            joint_qpos_sin=np.sin(joint_positions),
-            joint_qpos_cos=np.cos(joint_positions),
+            joint_qpos_sin=th.sin(joint_positions),
+            joint_qpos_cos=th.cos(joint_positions),
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
-            robot_ori_cos=np.cos(ori),
-            robot_ori_sin=np.sin(ori),
+            robot_ori_cos=th.cos(ori),
+            robot_ori_sin=th.sin(ori),
             robot_2d_ori=ori_2d,
-            robot_2d_ori_cos=np.cos(ori_2d),
-            robot_2d_ori_sin=np.sin(ori_2d),
-            robot_lin_vel=self.get_linear_velocity(),
-            robot_ang_vel=self.get_angular_velocity(),
+            robot_2d_ori_cos=th.cos(ori_2d),
+            robot_2d_ori_sin=th.sin(ori_2d),
+            robot_lin_vel=cb.to_torch(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)),
+            robot_ang_vel=cb.to_torch(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)),
         )
 
     def _load_observation_space(self):
@@ -366,7 +333,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
             obs_space["proprio"] = self._build_obs_box_space(
-                shape=(self.proprioception_dim,), low=-np.inf, high=np.inf, dtype=np.float64
+                shape=(self.proprioception_dim,), low=-float("inf"), high=float("inf"), dtype=NumpyTypes.FLOAT32
             )
 
         return obs_space
@@ -445,6 +412,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             print(f"Modalities: {remaining_obs_modalities} cannot be visualized, skipping...")
 
         # Write all the frames to a plot
+        import matplotlib.pyplot as plt
+
         for sensor_name, sensor_frames in frames.items():
             n_sensor_frames = len(sensor_frames)
             if n_sensor_frames > 0:
@@ -467,10 +436,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Call super first
         super().update_handles()
 
-        # If we have a dummy robot, also update its handles too
-        if self._dummy is not None:
-            self._dummy.update_handles()
-
     def remove(self):
         """
         Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
@@ -491,23 +456,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         return self._reset_joint_pos_aabb_extent
 
-    def teleop_data_to_action(self, teleop_action) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         """
         Generate action data from teleoperation action data
         Args:
             teleop_action (TeleopAction): teleoperation action data
         Returns:
-            np.ndarray: array of action data filled with update value
+            th.tensor: array of action data filled with update value
         """
-        return np.zeros(self.action_dim)
-
-    def get_generalized_gravity_forces(self, clone=True):
-        # Override method based on whether we're using a dummy or not
-        return (
-            self._dummy.get_generalized_gravity_forces(clone=clone)
-            if self._use_dummy
-            else super().get_generalized_gravity_forces(clone=clone)
-        )
+        return th.zeros(self.action_dim)
 
     @property
     def sensors(self):
@@ -613,20 +570,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         return self.__class__.__name__
 
     @property
-    @abstractmethod
     def usd_path(self):
-        # For all robots, this must be specified a priori, before we actually initialize the USDObject constructor!
-        # So we override the parent implementation, and make this an abstract method
-        raise NotImplementedError
-
-    @property
-    def _dummy_usd_path(self):
-        """
-        Returns:
-            str: Absolute path to the dummy USD to load for, e.g., computing gravity compensation
-        """
-        # By default, this is just the normal usd path
-        return self.usd_path
+        # By default, sets the standardized path
+        model = self.model_name.lower()
+        return os.path.join(gm.ASSET_PATH, f"models/{model}/usd/{model}.usda")
 
     @property
     def urdf_path(self):
@@ -634,16 +581,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Returns:
             str: file path to the robot urdf file.
         """
-        raise NotImplementedError
-
-    @property
-    def _use_dummy(self):
-        """
-        Returns:
-            bool: Whether the robot dummy should be loaded and used for some computations, e.g., gravity compensation
-        """
-        # By default, only load if robot is not fixed base
-        return not self.fixed_base
+        # By default, sets the standardized path
+        model = self.model_name.lower()
+        return os.path.join(gm.ASSET_PATH, f"models/{model}/urdf/{model}.urdf")
 
     @classproperty
     def _do_not_register_classes(cls):

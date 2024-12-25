@@ -1,4 +1,4 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
@@ -31,9 +31,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the scene config to load -- empty scene
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
-        }
+        },
     }
 
     # Define objects to load into the environment
@@ -69,19 +72,19 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.37860532, -0.65396566, 1.4067066]),
-        orientation=np.array([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
+        position=th.tensor([0.37860532, -0.65396566, 1.4067066]),
+        orientation=th.tensor([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink
     for _ in range(10):
-        env.step(np.array([]))  # Empty action since no robots are in the scene
+        env.step(th.empty(0))  # Empty action since no robots are in the scene
 
     sink = env.scene.object_registry("name", "sink")
     assert sink.states[object_states.ToggledOn].set_value(True)
 
     # Take a step, and save the state
-    env.step(np.array([]))
+    env.step(th.empty(0))
     initial_state = og.sim.dump_state()
 
     # Main simulation loop.
@@ -95,7 +98,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             steps = 0
             while steps != max_steps:
                 steps += 1
-                env.step(np.array([]))
+                env.step(th.empty(0))
             og.log.info("Max steps reached; resetting.")
 
             # Reset to the initial state
@@ -105,7 +108,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     finally:
         # Always shut down environment at the end
-        env.close()
+        og.clear()
 
 
 if __name__ == "__main__":

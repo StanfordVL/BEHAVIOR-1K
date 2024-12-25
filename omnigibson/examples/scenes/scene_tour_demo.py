@@ -1,10 +1,10 @@
-import numpy as np
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
-from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
+from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -61,7 +61,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     def add_waypoint():
         nonlocal waypoints
-        pos = cam_mover.cam.get_position()
+        pos = cam_mover.cam.get_position_orientation()[0]
         print(f"Added waypoint at {pos}")
         waypoints.append(pos)
 
@@ -82,7 +82,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.J,
         callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
-            waypoints=np.array(waypoints),
+            waypoints=th.tensor(waypoints),
             per_step_distance=0.02,
             fps=30,
             steps_per_frame=1,
@@ -91,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.ESCAPE,
-        callback_fn=lambda: env.close(),
+        callback_fn=lambda: og.clear(),
     )
 
     # Print out additional keyboard commands
@@ -101,8 +101,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     print(f"\t ESC: Terminate the demo")
 
     # Loop indefinitely
-    while True:
+    steps = 0
+    max_steps = -1 if not short_exec else 100
+    while steps != max_steps:
         env.step([])
+        steps += 1
 
 
 if __name__ == "__main__":

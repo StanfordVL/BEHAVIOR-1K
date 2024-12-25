@@ -1,7 +1,8 @@
 import collections.abc
 import json
 import os
-import numpy as np
+
+import torch as th
 import yaml
 
 # File I/O related
@@ -71,8 +72,8 @@ def load_default_config():
     return parse_config(f"{example_config_path}/default_cfg.yaml")
 
 
-class NumpyEncoder(json.JSONEncoder):
+class TorchEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, np.ndarray):
+        if isinstance(obj, th.Tensor):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)

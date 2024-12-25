@@ -1,8 +1,10 @@
-import networkx as nx
 from collections import namedtuple
 
-from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+import networkx as nx
+
 from omnigibson.object_states import *
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 
 # states: list of ObjectBaseState
 # requirements: list of ObjectBaseRequirement
@@ -162,3 +164,13 @@ def get_states_by_dependency_order(states=None):
         list: all states in topological order of dependency
     """
     return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
+
+
+# Define all metalinks
+METALINK_PREFIXES = set()
+for state in get_states_by_dependency_order():
+    if issubclass(state, LinkBasedStateMixin):
+        try:
+            METALINK_PREFIXES.add(state.metalink_prefix)
+        except NotImplementedError:
+            pass

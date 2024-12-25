@@ -1,14 +1,14 @@
-import numpy as np
-from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.utils.python_utils import assert_valid_key
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
-from omnigibson.utils.usd_utils import create_primitive_mesh
-from omnigibson.utils.render_utils import create_pbr_material
+from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, PrimType
 from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import create_primitive_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -29,9 +29,8 @@ class PrimitiveObject(StatefulObject):
         self,
         name,
         primitive_type,
-        prim_path=None,
+        relative_prim_path=None,
         category="object",
-        uuid=None,
         scale=None,
         visible=True,
         fixed_base=False,
@@ -53,11 +52,8 @@ class PrimitiveObject(StatefulObject):
             name (str): Name for the object. Names need to be unique per scene
             primitive_type (str): type of primitive object to create. Should be one of:
                 {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
-            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
-                created at /World/<name>
+            relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
-            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-                If None is specified, then it will be auto-generated
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -86,7 +82,7 @@ class PrimitiveObject(StatefulObject):
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
-        load_config["color"] = np.array(rgba[:3])
+        load_config["color"] = rgba[:3]
         load_config["opacity"] = rgba[3]
         load_config["radius"] = radius
         load_config["height"] = height
@@ -95,17 +91,16 @@ class PrimitiveObject(StatefulObject):
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
-        self._extents = np.ones(3)  # (x,y,z extents)
+        self._extents = th.ones(3)  # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
         self._primitive_type = primitive_type
 
         super().__init__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             name=name,
             category=category,
-            uuid=uuid,
             scale=scale,
             visible=visible,
             fixed_base=fixed_base,
@@ -121,15 +116,15 @@ class PrimitiveObject(StatefulObject):
 
     def _load(self):
         # Define an Xform at the specified path
-        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
         # Define a nested mesh corresponding to the root link for this prim
-        base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        base_link = og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
         self._vis_geom = create_primitive_mesh(
-            prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type
+            prim_path=f"{self.prim_path}/base_link/visuals", primitive_type=self._primitive_type
         )
         self._col_geom = create_primitive_mesh(
-            prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type
+            prim_path=f"{self.prim_path}/base_link/collisions", primitive_type=self._primitive_type
         )
 
         # Add collision API to collision geom
@@ -138,8 +133,8 @@ class PrimitiveObject(StatefulObject):
         lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
 
         # Create a material for this object for the base link
-        og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
-        mat_path = f"{self._prim_path}/Looks/default"
+        og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
+        mat_path = f"{self.prim_path}/Looks/default"
         mat = create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
 
@@ -185,7 +180,11 @@ class PrimitiveObject(StatefulObject):
             raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
 
         visual_geom_prim.color = self._load_config["color"]
-        visual_geom_prim.opacity = self._load_config["opacity"]
+        visual_geom_prim.opacity = (
+            self._load_config["opacity"].item()
+            if isinstance(self._load_config["opacity"], th.Tensor)
+            else self._load_config["opacity"]
+        )
 
     @property
     def radius(self):
@@ -212,21 +211,24 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = self._extents.clone()
         self._extents = (
-            np.ones(3) * radius * 2.0
+            th.ones(3) * radius * 2.0
             if self._primitive_type == "Sphere"
-            else np.array([radius * 2.0, radius * 2.0, self._extents[2]])
+            else th.tensor([radius * 2.0, radius * 2.0, self._extents[2]])
         )
         attr_pairs = []
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.tensor(attr.Get()).double()
                     attr_pairs.append([attr, vals])
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -240,7 +242,7 @@ class PrimitiveObject(StatefulObject):
             else:
                 vals[:, :2] = vals[:, :2] * scaling_factor
             # Set the value
-            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+            attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
 
     @property
     def height(self):
@@ -267,7 +269,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         # Update the extents variable
-        original_extent = np.array(self._extents)
+        original_extent = self._extents.clone()
         self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -275,13 +277,16 @@ class PrimitiveObject(StatefulObject):
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
-                    vals = np.array(attr.Get()).astype(np.float64)
+                    vals = th.tensor(attr.Get()).double()
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals.tolist()]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
@@ -311,8 +316,8 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
         # Update the extents variable
-        original_extent = np.array(self._extents)
-        self._extents = np.ones(3) * size
+        original_extent = self._extents.clone()
+        self._extents = th.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = size / original_extent[0]
@@ -320,18 +325,21 @@ class PrimitiveObject(StatefulObject):
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     # Scale all three axes by the scaling factor
-                    vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
-                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v) for v in vals]))
+                    vals = th.tensor(attr.Get()).double() * scaling_factor
+                    attr.Set(lazy.pxr.Vt.Vec3fArray([lazy.pxr.Gf.Vec3f(*v.tolist()) for v in vals]))
                 geom.GetExtentAttr().Set(
                     lazy.pxr.Vt.Vec3fArray(
-                        [lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0)), lazy.pxr.Gf.Vec3f(*(self._extents / 2.0))]
+                        [
+                            lazy.pxr.Gf.Vec3f(*(-self._extents / 2.0).tolist()),
+                            lazy.pxr.Gf.Vec3f(*(self._extents / 2.0).tolist()),
+                        ]
                     )
                 )
 
-    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+    def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)
         return self.__class__(
-            prim_path=prim_path,
+            relative_prim_path=relative_prim_path,
             primitive_type=self._primitive_type,
             name=name,
             category=self.category,
@@ -354,7 +362,7 @@ class PrimitiveObject(StatefulObject):
 
     def _load_state(self, state):
         super()._load_state(state=state)
-        # self._extents = np.array(state["extents"])
+        # self._extents = th.tensor(state["extents"])
         if self._primitive_type in VALID_RADIUS_OBJECTS:
             self.radius = state["radius"]
         if self._primitive_type in VALID_HEIGHT_OBJECTS:
@@ -362,21 +370,21 @@ class PrimitiveObject(StatefulObject):
         if self._primitive_type in VALID_SIZE_OBJECTS:
             self.size = state["size"]
 
-    def _deserialize(self, state):
-        state_dict, idx = super()._deserialize(state=state)
+    def deserialize(self, state):
+        state_dict, idx = super().deserialize(state=state)
         # state_dict["extents"] = state[idx: idx + 3]
         state_dict["radius"] = state[idx]
         state_dict["height"] = state[idx + 1]
         state_dict["size"] = state[idx + 2]
         return state_dict, idx + 3
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
-                np.array([state["radius"], state["height"], state["size"]]),
+                th.tensor([state["radius"], state["height"], state["size"]]),
             ]
-        ).astype(float)
+        )

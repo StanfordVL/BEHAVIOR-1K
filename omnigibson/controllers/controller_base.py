@@ -1,9 +1,11 @@
+import math
 from collections.abc import Iterable
 from enum import IntEnum
 
-import numpy as np
+import torch as th
 
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable, Recreatable
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -106,16 +108,16 @@ class BaseController(Serializable, Registerable, Recreatable):
                 continue
 
             self._control_limits[ControlType.get_type(motor_type)] = [
-                np.array(control_limits[motor_type][0]),
-                np.array(control_limits[motor_type][1]),
+                control_limits[motor_type][0],
+                control_limits[motor_type][1],
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = np.array(dof_idx, dtype=int)
+        self._dof_idx = cb.as_int(dof_idx)
 
         # Generate goal information
         self._goal_shapes = self._get_goal_shapes()
-        self._goal_dim = int(np.sum([np.product(shape) for shape in self._goal_shapes.values()]))
+        self._goal_dim = int(sum(cb.prod(cb.array(shape)) for shape in self._goal_shapes.values()))
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None
@@ -125,13 +127,14 @@ class BaseController(Serializable, Registerable, Recreatable):
         self._command_input_transform = None
 
         # Standardize command input / output limits to be (min_array, max_array)
-        command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
+        command_input_limits = (
+            self._generate_default_command_input_limits()
+            if type(command_input_limits) == str and command_input_limits == "default"
+            else command_input_limits
+        )
         command_output_limits = (
-            (
-                np.array(self._control_limits[self.control_type][0])[self.dof_idx],
-                np.array(self._control_limits[self.control_type][1])[self.dof_idx],
-            )
-            if command_output_limits == "default"
+            self._generate_default_command_output_limits()
+            if type(command_output_limits) == str and command_output_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (
@@ -151,6 +154,31 @@ class BaseController(Serializable, Registerable, Recreatable):
             )
         )
 
+    def _generate_default_command_input_limits(self):
+        """
+        Generates default command input limits based on the control limits
+
+        Returns:
+            2-tuple:
+                - int or array: min command input limits
+                - int or array: max command input limits
+        """
+        return (-1.0, 1.0)
+
+    def _generate_default_command_output_limits(self):
+        """
+        Generates default command output limits based on the control limits
+
+        Returns:
+            2-tuple:
+                - int or array: min command output limits
+                - int or array: max command output limits
+        """
+        return (
+            self._control_limits[self.control_type][0][self.dof_idx],
+            self._control_limits[self.control_type][1][self.dof_idx],
+        )
+
     def _preprocess_command(self, command):
         """
         Clips + scales inputted @command according to self.command_input_limits and self.command_output_limits.
@@ -163,8 +191,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: Processed command vector
         """
-        # Make sure command is a np.array
-        command = np.array([command]) if type(command) in {int, float} else np.array(command)
+        # Make sure command is a th.tensor
+        command = cb.array([command]) if type(command) in {int, float} else command
         # We only clip and / or scale if self.command_input_limits exists
         if self._command_input_limits is not None:
             # Clip
@@ -189,6 +217,35 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Return processed command
         return command
 
+    def _reverse_preprocess_command(self, processed_command):
+        """
+        Reverses the scaling operation performed by _preprocess_command.
+        Note: This method does not reverse the clipping operation as it's not reversible.
+
+        Args:
+            processed_command (th.Tensor[float]): Processed command vector
+
+        Returns:
+            th.Tensor[float]: Original command vector (before scaling, clipping not reversed)
+        """
+        # We only reverse the scaling if both input and output limits exist
+        if self._command_input_limits is not None and self._command_output_limits is not None:
+            # If we haven't calculated how to scale the command, do that now (once)
+            if self._command_scale_factor is None:
+                self._command_scale_factor = abs(self._command_output_limits[1] - self._command_output_limits[0]) / abs(
+                    self._command_input_limits[1] - self._command_input_limits[0]
+                )
+                self._command_output_transform = (self._command_output_limits[1] + self._command_output_limits[0]) / 2.0
+                self._command_input_transform = (self._command_input_limits[1] + self._command_input_limits[0]) / 2.0
+
+            original_command = (
+                processed_command - self._command_output_transform
+            ) / self._command_scale_factor + self._command_input_transform
+        else:
+            original_command = processed_command
+
+        return original_command
+
     def update_goal(self, command, control_dict):
         """
         Updates inputted @command internally, writing any necessary internal variables as needed.
@@ -204,7 +261,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
 
         # Preprocess and run internal command
-        self._goal = self._update_goal(command=self._preprocess_command(np.array(command)), control_dict=control_dict)
+        self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
 
     def _update_goal(self, command, control_dict):
         """
@@ -275,6 +332,9 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Compute control, then clip and return
         control = self.compute_control(goal_dict=self._goal, control_dict=control_dict)
+        assert (
+            len(control) == self.control_dim
+        ), f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
         self._control = self.clip_control(control=control)
         return self._control
 
@@ -297,45 +357,60 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         raise NotImplementedError
 
+    def compute_no_op_action(self, control_dict):
+        """
+        Compute a no-op action that updates the goal to match the current position
+        Disclaimer: this no-op might cause drift under external load (e.g. when the controller cannot reach the goal position)
+        """
+        if self._goal is None:
+            self._goal = self.compute_no_op_goal(control_dict=control_dict)
+        command = self._compute_no_op_action(control_dict=control_dict)
+        return cb.to_torch(self._reverse_preprocess_command(command))
+
+    def _compute_no_op_action(self, control_dict):
+        """
+        Compute no-op action given the goal
+        """
+        raise NotImplementedError
+
     def _dump_state(self):
         # Default is just the command
         return dict(
             goal_is_valid=self._goal is not None,
-            goal=self._goal,
+            goal=None if self._goal is None else {k: cb.to_torch(v) for k, v in self._goal.items()},
         )
 
     def _load_state(self, state):
         # Make sure every entry in goal is a numpy array
         # Load goal
-        self._goal = (
-            None
-            if state["goal"] is None
-            else {name: np.array(goal_state) for name, goal_state in state["goal"].items()}
-        )
+        if state["goal"] is None:
+            self._goal = None
+        else:
+            self._goal = dict()
+            for name, goal_state in state["goal"].items():
+                if isinstance(goal_state, th.Tensor):
+                    self._goal[name] = cb.from_torch(goal_state)
+                else:
+                    self._goal[name] = goal_state
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Make sure size of the state is consistent, even if we have no goal
         goal_state_flattened = (
-            np.concatenate([goal_state.flatten() for goal_state in self._goal.values()])
+            th.cat([goal_state.flatten() for goal_state in state["goal"].values()])
             if (state)["goal_is_valid"]
-            else np.zeros(self.goal_dim)
+            else th.zeros(self.goal_dim)
         )
 
-        return np.concatenate(
-            [
-                [state["goal_is_valid"]],
-                goal_state_flattened,
-            ]
-        )
+        return th.cat([th.tensor([state["goal_is_valid"]]), goal_state_flattened])
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         goal_is_valid = bool(state[0])
         if goal_is_valid:
             # Un-flatten all the keys
             idx = 1
             goal = dict()
             for key, shape in self._goal_shapes.items():
-                length = np.product(shape)
+                length = math.prod(shape)
                 goal[key] = state[idx : idx + length].reshape(shape)
                 idx += length
         else:
@@ -365,15 +440,19 @@ class BaseController(Serializable, Registerable, Recreatable):
             dim (int): Size of array to broadcast input to
 
         Returns:
-            np.array: Array filled with values specified in @nums
+            th.tensor: Array filled with values specified in @nums
         """
         # First run sanity check to make sure no strings are being inputted
         if isinstance(nums, str):
             raise TypeError("Error: Only numeric inputs are supported for this function, nums2array!")
 
-        # Check if input is an Iterable, if so, we simply convert the input to np.array and return
+        # Check if input is an Iterable, if so, we simply convert the input to th.tensor and return
         # Else, input is a single value, so we map to a numpy array of correct size and return
-        return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
+        return (
+            nums
+            if isinstance(nums, cb.arr_type)
+            else cb.array(nums) if isinstance(nums, Iterable) else cb.ones(dim) * nums
+        )
 
     @property
     def state_size(self):
@@ -461,7 +540,7 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return np.array(self._dof_idx)
+        return self._dof_idx
 
     @classproperty
     def _do_not_register_classes(cls):

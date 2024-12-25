@@ -5,12 +5,14 @@ A set of utility functions for general python usage
 import inspect
 import re
 from abc import ABCMeta
-from copy import deepcopy
 from collections.abc import Iterable
-from functools import wraps, cache
+from copy import deepcopy
+from functools import cache, wraps
+from hashlib import md5
 from importlib import import_module
 
-import numpy as np
+import h5py
+import torch as th
 
 # Global dictionary storing all unique names
 NAMES = set()
@@ -147,6 +149,15 @@ def create_object_from_init_info(init_info):
     return cls(**init_info["args"], **init_info.get("kwargs", {}))
 
 
+def safe_equal(a, b):
+    if isinstance(a, th.Tensor) and isinstance(b, th.Tensor):
+        return a.shape == b.shape and (a == b).all().item()
+    elif isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(safe_equal(a_item, b_item) for a_item, b_item in zip(a, b))
+    else:
+        return a == b
+
+
 def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
     """
     Iteratively updates @base_dict with values from @extra_dict. Note: This generates a new dictionary!
@@ -169,12 +180,10 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
             if isinstance(v, dict) and isinstance(base_dict[k], dict):
                 base_dict[k] = merge_nested_dicts(base_dict[k], v)
             else:
-                not_equal = base_dict[k] != v
-                if isinstance(not_equal, np.ndarray):
-                    not_equal = not_equal.any()
-                if not_equal and verbose:
+                equal = safe_equal(base_dict[k], v)
+                if not equal and verbose:
                     print(f"Different values for key {k}: {base_dict[k]}, {v}\n")
-                base_dict[k] = np.array(v) if isinstance(v, list) else v
+                base_dict[k] = v
 
     # Return new dict
     return base_dict
@@ -277,44 +286,21 @@ def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_
     return cls(**cls_kwargs)
 
 
-def get_uuid(name, n_digits=8):
+def get_uuid(name, n_digits=8, deterministic=True):
     """
     Helper function to create a unique @n_digits uuid given a unique @name
 
     Args:
         name (str): Name of the object or class
         n_digits (int): Number of digits of the uuid, default is 8
+        deterministic (bool): Whether the outputted UUID should be deterministic or not
 
     Returns:
         int: uuid
     """
-    return abs(hash(name)) % (10**n_digits)
-
-
-def camel_case_to_snake_case(camel_case_text):
-    """
-    Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
-
-    Args:
-        camel_case_text (str): Text in camel case
-
-    Returns:
-        str: snake case text
-    """
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", camel_case_text).lower()
-
-
-def snake_case_to_camel_case(snake_case_text):
-    """
-    Helper function to convert a snake case text to camel case, e.g. "strawberry_smoothie" -> "StrawberrySmoothie"
-
-    Args:
-        snake_case_text (str): Text in snake case
-
-    Returns:
-        str: camel case text
-    """
-    return "".join(item.title() for item in snake_case_text.split("_"))
+    # Make sure the number is float32 compatible
+    val = int(md5(name.encode()).hexdigest(), 16) if deterministic else abs(hash(name))
+    return int(th.tensor(val % (10**n_digits), dtype=th.float32).item())
 
 
 def meets_minimum_version(test_version, minimum_version):
@@ -342,63 +328,6 @@ def meets_minimum_version(test_version, minimum_version):
 
     # If we get here, that means test_version == threshold_version, so this is a success
     return True
-
-
-class UniquelyNamed:
-    """
-    Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
-    entity must be UNIQUE!
-    """
-
-    def __init__(self, *args, **kwargs):
-        global NAMES
-        # Register this object, making sure it's name is unique
-        assert self.name not in NAMES, f"UniquelyNamed object with name {self.name} already exists!"
-        NAMES.add(self.name)
-
-    def remove_names(self):
-        """
-        Checks if self.name exists in the global NAMES registry, and deletes it if so. Possibly also iterates through
-        all owned member variables and checks for their corresponding names if @include_all_owned is True.
-
-        Args:
-            include_all_owned (bool): If True, will iterate through all owned members of this instance and remove their
-                names as well, if they are UniquelyNamed
-
-            skip_ids (None or set of int): If specified, will skip over any ids in the specified set that are matched
-                to any attributes found (this compares id(attr) to @skip_ids).
-        """
-        # Check for this name, possibly remove it if it exists
-        if self.name in NAMES:
-            NAMES.remove(self.name)
-
-    @property
-    def name(self):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
-
-
-class UniquelyNamedNonInstance:
-    """
-    Identical to UniquelyNamed, but intended for non-instanceable classes
-    """
-
-    def __init_subclass__(cls, **kwargs):
-        global CLASS_NAMES
-        # Register this object, making sure it's name is unique
-        assert cls.name not in CLASS_NAMES, f"UniquelyNamed class with name {cls.name} already exists!"
-        CLASS_NAMES.add(cls.name)
-
-    @classproperty
-    def name(cls):
-        """
-        Returns:
-            str: Name of this instance. Must be unique!
-        """
-        raise NotImplementedError
 
 
 class Registerable:
@@ -453,14 +382,6 @@ class Serializable:
     as well.
     """
 
-    @property
-    def state_size(self):
-        """
-        Returns:
-            int: Size of this object's serialized state
-        """
-        raise NotImplementedError()
-
     def _dump_state(self):
         """
         Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
@@ -481,7 +402,7 @@ class Serializable:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
         state = self._dump_state()
         return self.serialize(state=state) if serialized else state
@@ -502,26 +423,18 @@ class Serializable:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
-        state = self.deserialize(state=state) if serialized else state
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = self.deserialize(state=state)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
         self._load_state(state=state)
-
-    def _serialize(self, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
 
     def serialize(self, state):
         """
@@ -533,18 +446,17 @@ class Serializable:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return self._serialize(state=state)
+        raise NotImplementedError()
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         """
         De-serializes flattened 1D numpy array @state into nested dictionary state.
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -556,40 +468,11 @@ class Serializable:
         """
         raise NotImplementedError
 
-    def deserialize(self, state):
-        """
-        De-serializes flattened 1D numpy array @state into nested dictionary state.
-        Should be implemented by subclass.
-
-        Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
-
-        Returns:
-            dict: Keyword-mapped states of this object. Should match structure of output from
-                self._dump_state()
-        """
-        # Sanity check the idx with the expected state size
-        state_dict, idx = self._deserialize(state=state)
-        assert idx == self.state_size, (
-            f"Invalid state deserialization occurred! Expected {self.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
-
-        return state_dict
-
 
 class SerializableNonInstance:
     """
     Identical to Serializable, but intended for non-instanceable classes
     """
-
-    @classproperty
-    def state_size(cls):
-        """
-        Returns:
-            int: Size of this object's serialized state
-        """
-        raise NotImplementedError()
 
     @classmethod
     def _dump_state(cls):
@@ -613,7 +496,7 @@ class SerializableNonInstance:
         Returns:
             dict or n-array: Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
         """
         state = cls._dump_state()
         return cls.serialize(state=state) if serialized else state
@@ -636,27 +519,18 @@ class SerializableNonInstance:
         Args:
             state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
-                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+                - encoded + serialized, 1D numerical th.tensor capturing this object's state.
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
                 a (potentially nested) dictionary of states for this object
         """
-        state = cls.deserialize(state=state) if serialized else state
+        if serialized:
+            orig_state_len = len(state)
+            state, deserialized_items = cls.deserialize(state=state)
+            assert deserialized_items == orig_state_len, (
+                f"Invalid state deserialization occurred! Expected {orig_state_len} total "
+                f"values to be deserialized, only {deserialized_items} were."
+            )
         cls._load_state(state=state)
-
-    @classmethod
-    def _serialize(cls, state):
-        """
-        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
-        Should be implemented by subclass.
-
-        Args:
-            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
-                self._dump_state()
-
-        Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
-        """
-        raise NotImplementedError()
 
     @classmethod
     def serialize(cls, state):
@@ -669,19 +543,19 @@ class SerializableNonInstance:
                 self._dump_state()
 
         Returns:
-            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+            n-array: encoded + serialized, 1D numerical th.tensor capturing this object's state
         """
-        # Simply returns self._serialize() for now. this is for future proofing
-        return cls._serialize(state=state)
+        # Simply returns self.serialize() for now. this is for future proofing
+        return NotImplementedError()
 
     @classmethod
-    def _deserialize(cls, state):
+    def deserialize(cls, state):
         """
         De-serializes flattened 1D numpy array @state into nested dictionary state.
         Should be implemented by subclass.
 
         Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+            state (n-array): encoded + serialized, 1D numerical th.tensor capturing this object's state
 
         Returns:
             2-tuple:
@@ -692,28 +566,6 @@ class SerializableNonInstance:
                     deserialization left off before continuing.
         """
         raise NotImplementedError
-
-    @classmethod
-    def deserialize(cls, state):
-        """
-        De-serializes flattened 1D numpy array @state into nested dictionary state.
-        Should be implemented by subclass.
-
-        Args:
-            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
-
-        Returns:
-            dict: Keyword-mapped states of this object. Should match structure of output from
-                self._dump_state()
-        """
-        # Sanity check the idx with the expected state size
-        state_dict, idx = cls._deserialize(state=state)
-        assert idx == cls.state_size, (
-            f"Invalid state deserialization occurred! Expected {cls.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
-
-        return state_dict
 
 
 class CachedFunctions:
@@ -729,6 +581,7 @@ class CachedFunctions:
     def __init__(self, **kwargs):
         # Create internal dict to store functions
         self._fcns = dict()
+        self._cache = dict()
         for kwarg in kwargs:
             self._fcns[kwarg] = kwargs[kwarg]
 
@@ -738,21 +591,20 @@ class CachedFunctions:
     def __setitem__(self, key, value):
         self.add_fcn(name=key, fcn=value)
 
-    @cache
-    def get(self, name, *args, **kwargs):
+    def get(self, name):
         """
         Computes the function referenced by @name with the corresponding @args and @kwargs. Note that for a unique
         set of arguments, this value will be internally cached
 
         Args:
             name (str): The name of the function to call
-            *args (tuple): Positional arguments to pass into the function call
-            **kwargs (tuple): Keyword arguments to pass into the function call
 
         Returns:
             any: Output of the function referenced by @name
         """
-        return self._fcns[name](*args, **kwargs)
+        if name not in self._cache:
+            self._cache[name] = self._fcns[name]()
+        return self._cache[name]
 
     def get_fcn(self, name):
         """
@@ -861,7 +713,7 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
-def nums2array(nums, dim, dtype=float):
+def nums2array(nums, dim, dtype=th.float32):
     """
     Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
     corresponding dimension size @dim before converting into numpy array
@@ -876,7 +728,7 @@ def nums2array(nums, dim, dtype=float):
     # Make sure the inputted nums isn't a string
     assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
 
-    out = np.array(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+    out = th.tensor(nums, dtype=dtype) if isinstance(nums, Iterable) else th.ones(dim, dtype=dtype) * nums
 
     return out
 
@@ -887,3 +739,110 @@ def clear():
     """
     NAMES.clear()
     CLASS_NAMES.clear()
+
+
+def torch_delete(tensor: th.Tensor, indices: th.Tensor | int, dim: int | None = None) -> th.Tensor:
+    """
+    Delete elements from a tensor along a specified dimension.
+
+    Parameters:
+    tensor (torch.Tensor): Input tensor.
+    indices (int or torch.Tensor): Indices of elements to remove.
+    dim (int, optional): The dimension along which to delete the elements.
+                         If None, the tensor is flattened before deletion.
+
+    Returns:
+    torch.Tensor: Tensor with specified elements removed.
+    """
+    assert tensor.dim() > 0, "Input tensor must have at least one dimension"
+
+    if dim is None:
+        # Flatten the tensor if no dim is specified
+        tensor = tensor.flatten()
+        dim = 0
+
+    if not isinstance(indices, th.Tensor):
+        indices = th.tensor(indices, dtype=th.long, device=tensor.device)
+
+    assert th.all(indices >= 0) and th.all(indices < tensor.size(dim)), "Indices out of bounds"
+
+    # Create a mask for the indices to keep
+    keep_indices = th.ones(tensor.size(dim), dtype=th.bool, device=tensor.device)
+    keep_indices[indices] = False
+
+    return th.index_select(tensor, dim, th.nonzero(keep_indices).squeeze(1))
+
+
+def recursively_convert_to_torch(state):
+    # For all the lists in state dict, convert to torch tensor
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_to_torch(value)
+        elif isinstance(value, list):
+            state[key] = th.tensor(value, dtype=th.float32)
+    return state
+
+
+def recursively_convert_from_torch(state):
+    # For all the lists in state dict, convert from torch tensor -> numpy array
+    import numpy as np
+
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_from_torch(value)
+        elif isinstance(value, th.Tensor):
+            state[key] = value.cpu().numpy()
+        elif (isinstance(value, list) or isinstance(value, tuple)) and len(value) > 0:
+            if isinstance(value[0], dict):
+                state[key] = [recursively_convert_from_torch(val) for val in value]
+            elif isinstance(value[0], th.Tensor):
+                state[key] = [tensor.numpy() for tensor in value]
+            elif isinstance(value[0], int) or isinstance(value[0], float):
+                state[key] = np.array(value)
+    return state
+
+
+def h5py_group_to_torch(group):
+    state = {}
+    for key, value in group.items():
+        if isinstance(value, h5py.Group):
+            state[key] = h5py_group_to_torch(value)
+        else:
+            state[key] = th.tensor(value[()], dtype=th.float32)
+    return state
+
+
+@th.jit.script
+def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int) -> th.Tensor:
+    """
+    Generate a tensor with evenly spaced values along multiple dimensions.
+    This function creates a tensor where each slice along the first dimension
+    contains values linearly interpolated between the corresponding elements
+    of 'start' and 'stop'. It's similar to numpy.linspace but works with
+    multi-dimensional inputs in PyTorch.
+    Args:
+        start (th.Tensor): Starting values for each dimension.
+        stop (th.Tensor): Ending values for each dimension.
+        num (int): Number of samples to generate along the interpolated dimension.
+    Returns:
+        th.Tensor: A tensor of shape (num, *start.shape) containing the interpolated values.
+    Example:
+        >>> start = th.tensor([0, 10, 100])
+        >>> stop = th.tensor([1, 20, 200])
+        >>> result = multi_dim_linspace(start, stop, num=5)
+        >>> print(result.shape)
+        torch.Size([5, 3])
+        >>> print(result)
+        tensor([[  0.0000,  10.0000, 100.0000],
+                [  0.2500,  12.5000, 125.0000],
+                [  0.5000,  15.0000, 150.0000],
+                [  0.7500,  17.5000, 175.0000],
+                [  1.0000,  20.0000, 200.0000]])
+    """
+    steps = th.linspace(0, 1, num, dtype=start.dtype, device=start.device)
+
+    # Create a new shape for broadcasting
+    new_shape = [num] + [1] * start.dim()
+    steps = steps.reshape(new_shape)
+
+    return start + steps * (stop - start)

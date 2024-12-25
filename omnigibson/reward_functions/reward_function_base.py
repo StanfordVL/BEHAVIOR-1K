@@ -1,6 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
-from omnigibson.utils.python_utils import classproperty, Registerable
+
+from omnigibson.utils.python_utils import Registerable, classproperty
 
 REGISTERED_REWARD_FUNCTIONS = dict()
 

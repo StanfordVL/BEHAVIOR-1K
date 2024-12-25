@@ -1,7 +1,9 @@
-import numpy as np
+import random
+
+import torch as th
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -222,12 +224,12 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         sides = [1, -1] if both_sides else [1]
 
         for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
-            side = np.random.choice(sides)
+            side = random.choice(sides)
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.
             if new_value and not fully:
-                num_to_open = np.random.randint(1, len(relevant_joints) + 1)
-                random_indices = np.random.choice(range(len(relevant_joints)), size=num_to_open, replace=False)
+                num_to_open = th.randint(1, len(relevant_joints) + 1, (1,)).item()
+                random_indices = th.randperm(len(relevant_joints))[:num_to_open]
                 relevant_joints = [relevant_joints[i] for i in random_indices]
                 joint_directions = [joint_directions[i] for i in random_indices]
 
@@ -249,7 +251,7 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
                     high = max(joint_range)
 
                     # Sample a position.
-                    joint_pos = np.random.uniform(low, high)
+                    joint_pos = (th.rand(1) * (high - low) + low).item()
 
                 # Save sampled position.
                 joint.set_pos(joint_pos)

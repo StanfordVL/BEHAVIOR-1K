@@ -1,4 +1,5 @@
-import numpy as np
+import torch as th
+
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
@@ -7,7 +8,7 @@ from omnigibson.macros import gm
 gm.ENABLE_OBJECT_STATES = True
 
 
-def main():
+def main(random_selection=False, headless=False, short_exec=False):
     # Define object configurations for objects to load -- we want to load a light and three bowls
     obj_configs = []
 
@@ -29,7 +30,7 @@ def main():
                 name=f"bowl{i}",
                 category="bowl",
                 model="ajzltc",
-                bounding_box=np.array([0.329, 0.293, 0.168]) * scale,
+                bounding_box=th.tensor([0.329, 0.293, 0.168]) * scale,
                 abilities={"heatable": {}},
                 position=[x, 0, 0.2],
             )
@@ -48,12 +49,12 @@ def main():
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([0.182103, -2.07295, 0.14017]),
-        orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
+        position=th.tensor([0.182103, -2.07295, 0.14017]),
+        orientation=th.tensor([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
 
     # Dim the skybox so we can see the bowls' steam effectively
-    env.scene.skybox.intensity = 100.0
+    og.sim.skybox.intensity = 100.0
 
     # Grab reference to objects of relevance
     objs = list(env.scene.object_registry("category", "bowl"))
@@ -69,21 +70,23 @@ def main():
     print("==== Initial state ====")
     report_states(objs)
 
-    # Notify user that we're about to heat the object
-    input("Objects will be heated, and steam will slowly rise. Press ENTER to continue.")
+    if not short_exec:
+        # Notify user that we're about to heat the object
+        input("Objects will be heated, and steam will slowly rise. Press ENTER to continue.")
 
     # Heated.
     for obj in objs:
         obj.states[object_states.Temperature].set_value(50)
-    env.step(np.array([]))
+    env.step(th.empty(0))
     report_states(objs)
 
     # Take a look at the steam effect.
     # After a while, objects will be below the Steam temperature threshold.
     print("==== Objects are now heated... ====")
     print()
-    for _ in range(2000):
-        env.step(np.array([]))
+    max_iterations = 2000 if not short_exec else 100
+    for _ in range(max_iterations):
+        env.step(th.empty(0))
         # Also print temperatures
         temps = [f"{obj.states[object_states.Temperature].get_value():>7.2f}" for obj in objs]
         print(f"obj temps:", *temps, end="\r")
@@ -93,9 +96,11 @@ def main():
     print("==== Objects are no longer heated... ====")
     report_states(objs)
 
-    # Close environment at the end
-    input("Demo completed. Press ENTER to shutdown environment.")
-    env.close()
+    if not short_exec:
+        # Close environment at the end
+        input("Demo completed. Press ENTER to shutdown environment.")
+
+    og.clear()
 
 
 if __name__ == "__main__":

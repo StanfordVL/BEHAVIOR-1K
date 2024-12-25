@@ -1,8 +1,8 @@
 ---
-icon: octicons/rocket-16
+icon: material/controller
 ---
 
-# 🕹️ **Collecting Demonstrations**
+# 🎮 **Collecting Demonstrations**
 
 
 ## Devices
@@ -16,36 +16,93 @@ We assume that we already have the scene and task setup. To initialize a teleope
 
 After the config simply instantiate teh teleoperation system.
 
-```
+```{.python .annotate}
 teleop_sys = TeleopSystem(config=teleop_config, robot=robot, show_control_marker=True)
 ```
 
 `TeleopSystem` takes in the config dictionary, which we just created. It also takes in the robot instance we want to teleoperate, as well as `show_control_marker`, which if set to `True`, will also create a green visual marker indicates the desired pose of the robot end effector that the user wants to robot to go.
 
 After the `TeleopSystem` is created, start by calling
-```
+```{.python .annotate}
 teleop_sys.start()
 ```
 
 Then, within the simulation loop, simply call
 
-```
+```{.python .annotate}
 action = teleop_sys.get_action(teleop_sys.get_obs())
 ```
 
 to get the action based on the user teleoperation input, and pass the action to the `env.step` function.
 
-## (Optional) Saving and Loading Simulation State
-You can save the current state of the simulator to a json file by calling `save`:
+## Data Collection and Playback
 
-```
-og.sim.save(JSON_PATH)
+OmniGibson provides tools for collecting demonstration data and playing it back for further analysis, training, or evaluation. This is implemented via two environment wrapper classes: `DataCollectionWrapper` and `DataPlaybackWrapper`.
+
+### DataCollectionWrapper
+
+The `DataCollectionWrapper` is used to collect data during environment interactions. It wraps around an existing OmniGibson environment and records relevant information at each step.
+
+Key features:
+
+ - Records actions, states, rewards, and termination conditions
+ - Optimizes the simulator for data collection
+ - Tracks object and system transitions within the environment
+
+Example usage:
+
+```python
+import omnigibson as og
+from omnigibson.envs import DataCollectionWrapper
+
+# Create your OmniGibson environment
+env = og.Environment(configs=your_config)
+
+# Wrap it with DataCollectionWrapper
+wrapped_env = DataCollectionWrapper(
+    env=env,
+    output_path="path/to/save/data.hdf5",
+    only_successes=False,  # Set to True to only save successful episodes
+)
+
+# Use the wrapped environment as you would normally
+obs, info = wrapped_env.reset()
+for _ in range(num_steps):
+    action = your_policy(obs)
+    obs, reward, terminated, truncated, info = wrapped_env.step(action)
+
+# Save the collected data
+wrapped_env.save_data()
 ```
 
-To restore any saved state, simply call `restore`
+### DataPlaybackWrapper
 
-```
-og.sim.restore(JSON_PATH)
-```
+The `DataPlaybackWrapper` is used to replay collected data and optionally record additional observations. This is particularly useful for gathering visual data or other sensor information that wasn't collected during the initial demonstration.
 
-Alternatively, if you just want to save all the scene and objects info at the current tiemframe, you can also call `self.scene.dump_state(serialized=True)`, which will return a numpy array containing all the relavant information. You can then stack the array together to get the full trajectory of states.
+Key features:
+ - Replays episodes from collected data
+ - Can record additional observation modalities during playback
+ - Supports custom robot sensor configurations and external sensors
+
+Example usage:
+
+```python
+from omnigibson.envs import DataPlaybackWrapper
+
+# Create a playback environment
+playback_env = DataPlaybackWrapper.create_from_hdf5(
+    input_path="path/to/collected/data.hdf5",
+    output_path="path/to/save/playback/data.hdf5",
+    robot_obs_modalities=["proprio", "rgb", "depth_linear"],
+    robot_sensor_config=your_robot_sensor_config,
+    external_sensors_config=your_external_sensors_config,
+    n_render_iterations=5,
+    only_successes=False,
+)
+
+# Playback the entire dataset and record observations
+playback_env.playback_dataset(record=True)
+
+# Save the recorded playback data
+playback_env.save_data()
+```

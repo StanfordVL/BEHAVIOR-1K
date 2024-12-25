@@ -1,6 +1,7 @@
-import numpy as np
 import time
 from typing import Iterable, Optional, Tuple
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -10,10 +11,10 @@ from omnigibson.objects import USDObject
 from omnigibson.robots.robot_base import BaseRobot
 
 try:
+    from telemoma.configs.base_config import teleop_config
     from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
     from telemoma.human_interface.teleop_policy import TeleopPolicy
     from telemoma.utils.general_utils import AttrDict
-    from telemoma.configs.base_config import teleop_config
 except ImportError as e:
     raise e from ValueError("For teleoperation, install telemoma by running 'pip install telemoma'")
 
@@ -49,7 +50,7 @@ class TeleopSystem(TeleopPolicy):
                 self.control_markers[arm_name] = USDObject(
                     name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True
                 )
-                og.sim.import_object(self.control_markers[arm_name])
+                self.robot.scene.add_object(self.control_markers[arm_name])
 
     def get_obs(self) -> TeleopObservation:
         """
@@ -59,40 +60,42 @@ class TeleopSystem(TeleopPolicy):
         """
         robot_obs = TeleopObservation()
         base_pos, base_orn = self.robot.get_position_orientation()
-        robot_obs.base = np.r_[base_pos[:2], [T.quat2euler(base_orn)[2]]]
+        robot_obs.base = th.cat((base_pos[:2], th.tensor([T.quat2euler(base_orn)[2]])))
         for i, arm in enumerate(self.robot_arms):
             abs_cur_pos, abs_cur_orn = self.robot.eef_links[
                 self.robot.arm_names[self.robot_arms.index(arm)]
             ].get_position_orientation()
             rel_cur_pos, rel_cur_orn = T.relative_pose_transform(abs_cur_pos, abs_cur_orn, base_pos, base_orn)
-            gripper_pos = np.mean(
+            gripper_pos = th.mean(
                 self.robot.get_joint_positions(normalized=True)[self.robot.gripper_control_idx[self.robot.arm_names[i]]]
-            )
+            ).unsqueeze(0)
             # if we are grasping, we manually set the gripper position to be at most 0.5
             if self.robot.controllers[f"gripper_{self.robot.arm_names[i]}"].is_grasping():
-                gripper_pos = min(gripper_pos, 0.5)
-            robot_obs[arm] = np.r_[rel_cur_pos, rel_cur_orn, gripper_pos]
+                gripper_pos = th.min(gripper_pos, th.tensor([0.5]))
+            robot_obs[arm] = th.cat((rel_cur_pos, rel_cur_orn, gripper_pos))
         return robot_obs
 
-    def get_action(self, robot_obs: TeleopObservation) -> np.ndarray:
+    def get_action(self, robot_obs: TeleopObservation) -> th.Tensor:
         """
         Generate action data from VR input for robot teleoperation
         Args:
             robot_obs (TeleopObservation): dataclass containing robot observations
         Returns:
-            np.ndarray: array of action data
+            th.tensor: array of action data
         """
         # get teleop action
         self.teleop_action = super().get_action(robot_obs)
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(self.teleop_action[arm_name][3:6])
+                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(
+                    th.tensor(self.teleop_action[arm_name][3:6])
+                )
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
                 base_pos, base_orn = self.robot.get_position_orientation()
                 target_pos, target_orn = T.pose_transform(base_pos, base_orn, rel_target_pos, rel_target_orn)
-                self.control_markers[arm_name].set_position_orientation(target_pos, target_orn)
+                self.control_markers[arm_name].set_position_orientation(position=target_pos, orientation=target_orn)
         return self.robot.teleop_data_to_action(self.teleop_action)
 
     def reset(self) -> None:
@@ -177,8 +180,8 @@ class OVXRSystem(TeleopSystem):
         self.hmd = None
         self.controllers = {}
         self.trackers = {}
-        self.xr2og_orn_offset = np.array([0.5, -0.5, -0.5, -0.5])
-        self.og2xr_orn_offset = np.array([-0.5, 0.5, 0.5, -0.5])
+        self.xr2og_orn_offset = th.tensor([0.5, -0.5, -0.5, -0.5])
+        self.og2xr_orn_offset = th.tensor([-0.5, 0.5, 0.5, -0.5])
         # setup event subscriptions
         self.reset()
         self.use_hand_tracking = use_hand_tracking
@@ -189,31 +192,31 @@ class OVXRSystem(TeleopSystem):
                 lazy.omni.kit.xr.core.XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
 
-    def xr2og(self, transform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def xr2og(self, transform: th.tensor) -> Tuple[th.tensor, th.tensor]:
         """
         Apply the orientation offset from the Omniverse XR coordinate system to the OmniGibson coordinate system
         Note that we have to transpose the transform matrix because Omniverse uses row-major matrices
         while OmniGibson uses column-major matrices
         Args:
-            transform (np.ndarray): the transform matrix in the Omniverse XR coordinate system
+            transform (th.tensor): the transform matrix in the Omniverse XR coordinate system
         Returns:
-            tuple(np.ndarray, np.ndarray): the position and orientation in the OmniGibson coordinate system
+            tuple(th.tensor, th.Tensor): the position and orientation in the OmniGibson coordinate system
         """
-        pos, orn = T.mat2pose(np.array(transform).T)
+        pos, orn = T.mat2pose(th.tensor(transform).T)
         orn = T.quat_multiply(orn, self.xr2og_orn_offset)
         return pos, orn
 
-    def og2xr(self, pos: np.ndarray, orn: np.ndarray) -> np.ndarray:
+    def og2xr(self, pos: th.tensor, orn: th.tensor) -> th.Tensor:
         """
         Apply the orientation offset from the OmniGibson coordinate system to the Omniverse XR coordinate system
         Args:
-            pos (np.ndarray): the position in the OmniGibson coordinate system
-            orn (np.ndarray): the orientation in the OmniGibson coordinate system
+            pos (th.tensor): the position in the OmniGibson coordinate system
+            orn (th.tensor): the orientation in the OmniGibson coordinate system
         Returns:
-            np.ndarray: the transform matrix in the Omniverse XR coordinate system
+            th.tensor: the transform matrix in the Omniverse XR coordinate system
         """
         orn = T.quat_multiply(self.og2xr_orn_offset, orn)
-        return T.pose2mat((pos, orn)).T.astype(np.float64)
+        return T.pose2mat((pos, orn)).T.double()
 
     def reset(self) -> None:
         """
@@ -223,7 +226,7 @@ class OVXRSystem(TeleopSystem):
         self.raw_data = {}
         self.teleop_action.is_valid = {"left": False, "right": False, "head": False}
         self.teleop_action.reset = {"left": False, "right": False}
-        self.teleop_action.head = np.zeros(6)
+        self.teleop_action.head = th.zeros(6)
 
     @property
     def is_enabled(self) -> bool:
@@ -268,12 +271,12 @@ class OVXRSystem(TeleopSystem):
         self._update_button_data()
         # Update teleop data based on controller input if not using hand tracking
         if not self.use_hand_tracking:
-            self.teleop_action.base = np.zeros(3)
+            self.teleop_action.base = th.zeros(3)
             self.teleop_action.torso = 0.0
             # update right hand related info
             for arm_name, arm in zip(["left", "right"], self.robot_arms):
                 if arm in self.controllers:
-                    self.teleop_action[arm_name] = np.concatenate(
+                    self.teleop_action[arm_name] = th.cat(
                         (
                             self.raw_data["transforms"]["controllers"][arm][0],
                             T.quat2euler(
@@ -302,23 +305,25 @@ class OVXRSystem(TeleopSystem):
                 self.teleop_action.base[1] = -left_axis["touchpad_x"] * self.movement_speed
                 self.teleop_action.base[2] = left_axis["touchpad_y"] * self.movement_speed
         # update head related info
-        self.teleop_action.head = np.r_[
-            self.raw_data["transforms"]["head"][0], T.quat2euler(self.raw_data["transforms"]["head"][1])
-        ]
+        self.teleop_action.head = th.cat(
+            (self.raw_data["transforms"]["head"][0], th.tensor(T.quat2euler(self.raw_data["transforms"]["head"][1])))
+        )
         self.teleop_action.is_valid["head"] = self._is_valid_transform(self.raw_data["transforms"]["head"])
         # Optionally move anchor
         if self.enable_touchpad_movement:
             # we use x, y from right controller for 2d movement and y from left controller for z movement
-            self._move_anchor(pos_offset=np.r_[[self.teleop_action.torso], self.teleop_action.base[[0, 2]]])
+            self._move_anchor(
+                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
+            )
         if self.align_anchor_to_robot_base:
             robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
             self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
 
-    def teleop_data_to_action(self) -> np.ndarray:
+    def teleop_data_to_action(self) -> th.Tensor:
         """
         Generate action data from VR input for robot teleoperation
         Returns:
-            np.ndarray: array of action data
+            th.tensor: array of action data
         """
         # optionally update control marker
         if self.show_control_marker:
@@ -331,8 +336,10 @@ class OVXRSystem(TeleopSystem):
         Args:
             arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
-        robot_base_orn = self.robot.get_orientation()
-        robot_eef_pos = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position()
+        robot_base_orn = self.robot.get_position_orientation()[1]
+        robot_eef_pos = self.robot.eef_links[
+            self.robot.arm_names[self.robot_arms.index(arm)]
+        ].get_position_orientation()[0]
         target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
             target_transform, self.controllers[arm]
@@ -362,19 +369,17 @@ class OVXRSystem(TeleopSystem):
         """
         if pos_offset is not None:
             # note that x is forward, y is down, z is left for ovxr, but x is forward, y is left, z is up for og
-            pos_offset = np.array([-pos_offset[0], pos_offset[2], -pos_offset[1]]).astype(np.float64)
+            pos_offset = th.tensor([-pos_offset[0], pos_offset[2], -pos_offset[1]]).double()
             self.vr_profile.add_move_physical_world_relative_to_device(pos_offset)
         if rot_offset is not None:
-            rot_offset = np.array(rot_offset).astype(np.float64)
+            rot_offset = th.tensor(rot_offset).double()
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
-    def _is_valid_transform(self, transform: Tuple[np.ndarray, np.ndarray]) -> bool:
+    def _is_valid_transform(self, transform: Tuple[th.tensor, th.tensor]) -> bool:
         """
         Determine whether the transform is valid (ovxr plugin will return a zero position and rotation if not valid)
         """
-        return np.any(np.not_equal(transform[0], np.zeros(3))) and np.any(
-            np.not_equal(transform[1], self.og2xr_orn_offset)
-        )
+        return th.any(transform[0] != th.zeros(3)) and th.any(transform[1] != self.og2xr_orn_offset)
 
     def _update_devices(self) -> None:
         """
@@ -437,22 +442,28 @@ class OVXRSystem(TeleopSystem):
                 hand_joint_matrices = data_dict[f"joint_matrices_{hand}"]
                 for i in range(26):
                     # extract the pose from the flattened transform matrix
-                    pos, orn = self.xr2og(np.reshape(hand_joint_matrices[16 * i : 16 * (i + 1)], (4, 4)))
+                    pos, orn = self.xr2og(hand_joint_matrices[16 * i : 16 * (i + 1)].reshape(4, 4))
                     self.raw_data["hand_data"][hand]["pos"].append(pos)
                     self.raw_data["hand_data"][hand]["orn"].append(orn)
-                self.teleop_action[hand_name] = np.r_[
-                    self.raw_data["hand_data"][hand]["pos"][0],
-                    T.quat2euler(
-                        T.quat_multiply(
-                            self.raw_data["hand_data"][hand]["orn"][0],
-                            self.robot.teleop_rotation_offset[self.robot.arm_names[self.robot_arms.index(hand)]],
+                    self.teleop_action[hand_name] = th.cat(
+                        (
+                            self.raw_data["hand_data"][hand]["pos"][0],
+                            th.tensor(
+                                T.quat2euler(
+                                    T.quat_multiply(
+                                        self.raw_data["hand_data"][hand]["orn"][0],
+                                        self.robot.teleop_rotation_offset[
+                                            self.robot.arm_names[self.robot_arms.index(hand)]
+                                        ],
+                                    )
+                                )
+                            ),
+                            th.tensor([0]),
                         )
-                    ),
-                    [0],
-                ]
+                    )
                 # Get each finger joint's rotation angle from hand tracking data
                 # joint_angles is a 5 x 3 array of joint rotations (from thumb to pinky, from base to tip)
-                joint_angles = np.zeros((5, 3))
+                joint_angles = th.zeros((5, 3))
                 raw_hand_data = self.raw_data["hand_data"][hand]["pos"]
                 for i in range(5):
                     for j in range(3):
@@ -465,7 +476,7 @@ class OVXRSystem(TeleopSystem):
                         # calculate the angle formed by 3 points
                         v1 = cur_joint_pos - prev_joint_pos
                         v2 = next_joint_pos - cur_joint_pos
-                        v1 /= np.linalg.norm(v1)
-                        v2 /= np.linalg.norm(v2)
-                        joint_angles[i, j] = np.arccos(v1 @ v2)
+                        v1 /= th.norm(v1)
+                        v2 /= th.norm(v2)
+                        joint_angles[i, j] = th.arccos(v1 @ v2)
                 self.teleop_action.hand_data[hand_name] = joint_angles

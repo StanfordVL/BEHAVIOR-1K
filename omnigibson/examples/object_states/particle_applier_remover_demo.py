@@ -1,12 +1,10 @@
-import numpy as np
+import torch as th
+
 import omnigibson as og
-from omnigibson.object_states import Covered
-from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm, macros
-from omnigibson.systems import get_system
-from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.ui_utils import choose_from_options
+from omnigibson.object_states import Covered, ToggledOn
 from omnigibson.utils.constants import ParticleModifyMethod
+from omnigibson.utils.ui_utils import choose_from_options
 
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
@@ -48,57 +46,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="particle modifier type",
         random_selection=random_selection,
     )
-
-    modification_metalink = {
-        "particleApplier": "particleapplier_link",
-        "particleRemover": "particleremover_link",
-    }
-
-    particle_types = ["stain", "water"]
+    particle_types = ["salt", "water"]
     particle_type = choose_from_options(
         options={name: f"{name} particles will be applied or removed from the simulator" for name in particle_types},
         name="particle type",
         random_selection=random_selection,
     )
-
-    modification_method = {
-        "Adjacency": ParticleModifyMethod.ADJACENCY,
-        "Projection": ParticleModifyMethod.PROJECTION,
-    }
-
-    projection_mesh_params = {
-        "Adjacency": None,
-        "Projection": {
-            # Either Cone or Cylinder; shape of the projection where particles can be applied / removed
-            "type": "Cone",
-            # Size of the cone
-            "extents": np.array([0.1875, 0.1875, 0.375]),
-        },
-    }
-
-    method_type = choose_from_options(
-        options={
-            "Adjacency": "Close proximity to the object will be used to determine whether particles can be applied / removed",
-            "Projection": "A Cone or Cylinder shape protruding from the object will be used to determine whether particles can be applied / removed",
-        },
-        name="modifier method type",
-        random_selection=random_selection,
-    )
-
-    # Create the ability kwargs to pass to the object state
-    abilities = {
-        modifier_type: {
-            "method": modification_method[method_type],
-            "conditions": {
-                # For a specific particle system, this specifies what conditions are required in order for the
-                # particle applier / remover to apply / remover particles associated with that system
-                # The list should contain functions with signature condition() --> bool,
-                # where True means the condition is satisified
-                particle_type: [],
-            },
-            "projection_mesh_params": projection_mesh_params[method_type],
-        }
-    }
 
     table_cfg = dict(
         type="DatasetObject",
@@ -108,13 +61,58 @@ def main(random_selection=False, headless=False, short_exec=False):
         bounding_box=[3.402, 1.745, 1.175],
         position=[0, 0, 0.98],
     )
+    tool_cfg = dict(
+        type="DatasetObject",
+        name="tool",
+        visual_only=True,
+        position=[0, 0.3, 5.0],
+    )
+
+    if modifier_type == "particleRemover":
+        if particle_type == "salt":
+            # only ask this question if the modifier type is salt particleRemover
+            method_type = choose_from_options(
+                options={
+                    "Adjacency": "Close proximity to the object will be used to determine whether particles can be applied / removed",
+                    "Projection": "A Cone or Cylinder shape protruding from the object will be used to determine whether particles can be applied / removed",
+                },
+                name="modifier method type",
+                random_selection=random_selection,
+            )
+        else:
+            # If the particle type is water, the remover is always adjacency type
+            method_type = "Adjacency"
+        if method_type == "Adjacency":
+            # use dishtowel to remove adjacent particles
+            tool_cfg["category"] = "dishtowel"
+            tool_cfg["model"] = "dtfspn"
+            tool_cfg["bounding_box"] = [0.34245, 0.46798, 0.07]
+        elif method_type == "Projection":
+            # use vacuum to remove projections particles
+            tool_cfg["category"] = "vacuum"
+            tool_cfg["model"] = "wikhik"
+    else:
+        # If the modifier type is particleApplier, the applier is always projection type
+        method_type = "Projection"
+
+        if particle_type == "salt":
+            # use salt shaker to apply salt particles
+            tool_cfg["category"] = "salt_shaker"
+            tool_cfg["model"] = "iomwtn"
+        else:
+            # use water atomizer to apply water particles
+            tool_cfg["category"] = "water_atomizer"
+            tool_cfg["model"] = "lfarai"
 
     # Create the scene config to load -- empty scene with a light and table
     cfg = {
+        "env": {
+            "rendering_frequency": 60,  # for HQ rendering
+        },
         "scene": {
             "type": "Scene",
         },
-        "objects": [table_cfg],
+        "objects": [table_cfg, tool_cfg],
     }
 
     # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
@@ -124,88 +122,73 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = og.Environment(configs=cfg)
     og.sim.stop()
 
-    # Grab references to table
+    # Grab references to table and tool
     table = env.scene.object_registry("name", "table")
+    tool = env.scene.object_registry("name", "tool")
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.61340969, -1.79803028, 2.53167412]),
-        orientation=np.array([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
+        position=th.tensor([-1.61340969, -1.79803028, 2.53167412]),
+        orientation=th.tensor([0.46291845, -0.12381886, -0.22679218, 0.84790371]),
     )
-
-    # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
-    modifier = DatasetObject(
-        name="modifier",
-        category="dishtowel",
-        model="dtfspn",
-        bounding_box=[0.34245, 0.46798, 0.07],
-        visual_only=method_type
-        == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
-        abilities=abilities,
-    )
-    modifier_root_link_path = f"{modifier.prim_path}/base_link"
-    modifier._prim = modifier._load()
-    if method_type == "Projection":
-        metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
-        og.sim.stage.DefinePrim(metalink_path, "Xform")
-        create_joint(
-            prim_path=f"{modifier_root_link_path}/{modification_metalink[modifier_type]}_joint",
-            body0=modifier_root_link_path,
-            body1=metalink_path,
-            joint_type="FixedJoint",
-            enabled=True,
-        )
-    modifier._post_load()
-    modifier._loaded = True
-    og.sim.import_object(modifier)
-    modifier.set_position(np.array([0, 0, 5.0]))
 
     # Play the simulator and take some environment steps to let the objects settle
     og.sim.play()
     for _ in range(25):
-        env.step(np.array([]))
+        env.step(th.empty(0))
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
-        table.states[Covered].set_value(get_system(particle_type), True)
-
+        table.states[Covered].set_value(env.scene.get_system(particle_type), True)
         # Take a few steps to let particles settle
         for _ in range(25):
-            env.step(np.array([]))
+            env.step(th.empty(0))
+
+    # If the particle remover/applier is projection type, set the turn on shaker
+    if method_type == "Projection":
+        tool.states[ToggledOn].set_value(True)
 
     # Enable camera teleoperation for convenience
     og.sim.enable_viewer_camera_teleoperation()
 
+    tool.keep_still()
+
     # Set the modifier object to be in position to modify particles
-    if method_type == "Projection":
-        # Higher z to showcase projection volume at work
-        z = 1.85
-    elif particle_type == "stain":
-        # Lower z needed to allow for adjacency bounding box to overlap properly
-        z = 1.175
+    if modifier_type == "particleRemover" and method_type == "Projection":
+        tool.set_position_orientation(
+            position=[0, 0.3, 1.45],
+            orientation=[0, 0, 0, 1.0],
+        )
+    elif modifier_type == "particleRemover" and method_type == "Adjacency":
+        tool.set_position_orientation(
+            position=[0, 0.3, 1.175],
+            orientation=[0, 0, 0, 1.0],
+        )
+    elif modifier_type == "particleApplier" and particle_type == "water":
+        tool.set_position_orientation(
+            position=[0, 0.3, 1.4],
+            orientation=[0.3827, 0, 0, 0.9239],
+        )
     else:
-        # Higher z needed for actual physical interaction to accommodate non-negligible particle radius
-        z = 1.22
-    modifier.keep_still()
-    modifier.set_position_orientation(
-        position=np.array([0, 0.3, z]),
-        orientation=np.array([0, 0, 0, 1.0]),
-    )
+        tool.set_position_orientation(
+            position=[0, 0.3, 1.5],
+            orientation=[0.7071, 0, 0.7071, 0],
+        )
 
     # Move object in square around table
     deltas = [
-        [130, np.array([-0.01, 0, 0])],
-        [60, np.array([0, -0.01, 0])],
-        [130, np.array([0.01, 0, 0])],
-        [60, np.array([0, 0.01, 0])],
+        [130, th.tensor([-0.01, 0, 0])],
+        [60, th.tensor([0, -0.01, 0])],
+        [130, th.tensor([0.01, 0, 0])],
+        [60, th.tensor([0, 0.01, 0])],
     ]
     for t, delta in deltas:
-        for i in range(t):
-            modifier.set_position(modifier.get_position() + delta)
-            env.step(np.array([]))
+        for _ in range(t):
+            tool.set_position_orientation(position=tool.get_position_orientation()[0] + delta)
+            env.step(th.empty(0))
 
     # Always shut down environment at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

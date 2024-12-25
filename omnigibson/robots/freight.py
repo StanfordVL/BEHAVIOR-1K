@@ -1,8 +1,13 @@
 import os
-import numpy as np
+from functools import cached_property
+
+import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.utils.ui_utils import create_module_logger
+
+log = create_module_logger(module_name=__name__)
 
 
 class Freight(TwoWheelRobot):
@@ -13,10 +18,6 @@ class Freight(TwoWheelRobot):
     """
 
     @property
-    def model_name(self):
-        return "Freight"
-
-    @property
     def wheel_radius(self):
         return 0.0613
 
@@ -24,22 +25,10 @@ class Freight(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.372
 
-    @property
-    def base_control_idx(self):
-        """
-        Returns:
-            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
-        """
-        return np.array([0, 1])
+    @cached_property
+    def base_joint_names(self):
+        return ["l_wheel_joint", "r_wheel_joint"]
 
     @property
     def _default_joint_pos(self):
-        return np.zeros(self.n_joints)
-
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/fetch/freight/freight.usd")
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/fetch/freight.urdf")
+        return th.zeros(self.n_joints)

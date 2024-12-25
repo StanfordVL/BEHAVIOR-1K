@@ -1,4 +1,6 @@
-import numpy as np
+import torch as th
+
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import Serializable
 
 
@@ -25,11 +27,6 @@ class Filter(Serializable):
         """
         pass
 
-    @property
-    def state_size(self):
-        # No state by default
-        return 0
-
     def _dump_state(self):
         # Default is no state (empty dict)
         return dict()
@@ -38,13 +35,20 @@ class Filter(Serializable):
         # Default is no state (empty dict), so this is a no-op
         pass
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Default is no state, so do nothing
-        return np.array([])
+        return th.empty(0, dtype=th.float32)
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Default is no state, so do nothing
         return dict(), 0
+
+    @property
+    def state_size(self):
+        """
+        Size of the serialized state of this filter
+        """
+        raise NotImplementedError
 
 
 class MovingAverageFilter(Filter):
@@ -63,7 +67,7 @@ class MovingAverageFilter(Filter):
         self.obs_dim = obs_dim
         assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
         self.filter_width = filter_width
-        self.past_samples = np.zeros((filter_width, obs_dim))
+        self.past_samples = cb.zeros((filter_width, obs_dim))
         self.current_idx = 0
         self.fully_filled = False  # Whether the entire filter buffer is filled or not
 
@@ -80,16 +84,16 @@ class MovingAverageFilter(Filter):
             n-array: New estimate of state.
         """
         # Write the newest observation at the appropriate index
-        self.past_samples[self.current_idx, :] = np.array(observation)
+        self.past_samples[self.current_idx, :] = observation
 
         # Compute value based on whether we're fully filled or not
         if not self.fully_filled:
-            val = self.past_samples[: self.current_idx + 1, :].mean(axis=0)
+            val = cb.mean(self.past_samples[: self.current_idx + 1, :], dim=0)
             # Denote that we're fully filled if we're at the end of the buffer
             if self.current_idx == self.filter_width - 1:
                 self.fully_filled = True
         else:
-            val = self.past_samples.mean(axis=0)
+            val = cb.mean(self.past_samples, dim=0)
 
         # Increment the index to write the next sample to
         self.current_idx = (self.current_idx + 1) % self.filter_width
@@ -104,14 +108,15 @@ class MovingAverageFilter(Filter):
 
     @property
     def state_size(self):
-        return super().state_size + self.filter_width * self.obs_dim + 2
+        # This is the size of the internal buffer plus the current index and fully filled single values
+        return cb.prod(self.past_samples.shape) + 2
 
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
 
         # Add info from this filter
-        state["past_samples"] = np.array(self.past_samples)
+        state["past_samples"] = cb.to_torch(self.past_samples)
         state["current_idx"] = self.current_idx
         state["fully_filled"] = self.fully_filled
 
@@ -122,31 +127,31 @@ class MovingAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.past_samples = np.array(state["past_samples"])
+        self.past_samples = cb.from_torch(state["past_samples"])
         self.current_idx = state["current_idx"]
         self.fully_filled = state["fully_filled"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 state["past_samples"].flatten(),
-                [state["current_idx"]],
-                [state["fully_filled"]],
+                th.tensor([state["current_idx"]]),
+                th.tensor([state["fully_filled"]]),
             ]
-        ).astype(float)
+        )
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this filter
         samples_len = self.filter_width * self.obs_dim
-        state_dict["past_samples"] = state[idx : idx + samples_len]
+        state_dict["past_samples"] = state[idx : idx + samples_len].reshape(self.filter_width, self.obs_dim)
         state_dict["current_idx"] = int(state[idx + samples_len])
         state_dict["fully_filled"] = bool(state[idx + samples_len + 1])
 
@@ -167,7 +172,7 @@ class ExponentialAverageFilter(Filter):
             alpha (float): The relative weighting of new samples relative to older samples
         """
         self.obs_dim = obs_dim
-        self.avg = np.zeros(obs_dim)
+        self.avg = cb.zeros(obs_dim)
         self.num_samples = 0
         self.alpha = alpha
 
@@ -186,7 +191,7 @@ class ExponentialAverageFilter(Filter):
         self.avg = self.alpha * observation + (1.0 - self.alpha) * self.avg
         self.num_samples += 1
 
-        return np.array(self.avg)
+        return cb.copy(self.avg)
 
     def reset(self):
         # Clear internal state
@@ -195,14 +200,15 @@ class ExponentialAverageFilter(Filter):
 
     @property
     def state_size(self):
-        return super().state_size + self.obs_dim + 1
+        # This is the size of the internal value as well as a num samples
+        return len(self.avg) + 1
 
     def _dump_state(self):
         # Run super init first
         state = super()._dump_state()
 
         # Add info from this filter
-        state["avg"] = np.array(self.avg)
+        state["avg"] = cb.to_torch(self.avg)
         state["num_samples"] = self.num_samples
 
         return state
@@ -212,25 +218,25 @@ class ExponentialAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.avg = np.array(state["avg"])
+        self.avg = cb.from_torch(state["avg"])
         self.num_samples = state["num_samples"]
 
-    def _serialize(self, state):
+    def serialize(self, state):
         # Run super first
-        state_flat = super()._serialize(state=state)
+        state_flat = super().serialize(state=state)
 
         # Serialize state for this filter
-        return np.concatenate(
+        return th.cat(
             [
                 state_flat,
                 state["avg"],
                 [state["num_samples"]],
             ]
-        ).astype(float)
+        )
 
-    def _deserialize(self, state):
+    def deserialize(self, state):
         # Run super first
-        state_dict, idx = super()._deserialize(state=state)
+        state_dict, idx = super().deserialize(state=state)
 
         # Deserialize state for this filter
         state_dict["avg"] = state[idx : idx + self.obs_dim]
@@ -292,6 +298,6 @@ class UniformSubsampler(Subsampler):
 
 if __name__ == "__main__":
     f = MovingAverageFilter(3, 10)
-    a = np.array([1, 1, 1])
+    a = th.tensor([1, 1, 1])
     for i in range(500):
-        print(f.estimate(a + np.random.normal(scale=0.1)))
+        print(f.estimate(a + th.randn_like(a) * 0.1))

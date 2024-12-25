@@ -2,18 +2,19 @@
 Constant Definitions
 """
 
-from functools import cache
 import hashlib
 import os
-import numpy as np
 from enum import Enum, IntEnum
+from functools import cache
+
+import torch as th
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_all_object_categories
+from omnigibson.utils.asset_utils import get_all_object_categories, get_all_system_categories
 
-MAX_INSTANCE_COUNT = np.iinfo(np.uint32).max
-MAX_CLASS_COUNT = np.iinfo(np.uint32).max
+MAX_INSTANCE_COUNT = th.iinfo(th.int32).max
+MAX_CLASS_COUNT = th.iinfo(th.int32).max
 MAX_VIEWER_SIZE = 2048
 
 
@@ -55,6 +56,8 @@ class ParticleModifyCondition(str, Enum):
 # Structure categories that need to always be loaded for stability purposes
 STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence", "roof", "background"})
 
+# Ground categories / prim names used for filtering collisions, e.g.: during motion planning
+GROUND_CATEGORIES = frozenset({"floors", "lawn", "driveway", "carpet"})
 
 # Joint friction magic values to assign to objects based on their category
 DEFAULT_JOINT_FRICTION = 10.0
@@ -135,15 +138,6 @@ class JointType:
 
 # Object category specs
 AVERAGE_OBJ_DENSITY = 67.0
-AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
-
-
-def get_collision_group_mask(groups_to_exclude=[]):
-    """Get a collision group mask that has collisions enabled for every group except those in groups_to_exclude."""
-    collision_mask = ALL_COLLISION_GROUPS_MASK
-    for group in groups_to_exclude:
-        collision_mask &= ~(1 << group)
-    return collision_mask
 
 
 class OccupancyGridState:
@@ -186,13 +180,13 @@ def semantic_class_name_to_id():
         dict: class name to class id
     """
     categories = get_all_object_categories()
-    from omnigibson.systems.system_base import REGISTERED_SYSTEMS
+    systems = get_all_system_categories(include_cloth=True)
 
-    systems = sorted(REGISTERED_SYSTEMS)
     all_semantics = sorted(set(categories + systems + ["background", "unlabelled", "object", "light", "agent"]))
 
-    # Assign a unique class id to each class name with hashing
-    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % (2**32) for s in all_semantics}
+    # Assign a unique class id to each class name with hashing, the upper limit here is the max of int32
+    max_int32 = th.iinfo(th.int32).max + 1
+    class_name_to_class_id = {s: int(hashlib.md5(s.encode()).hexdigest(), 16) % max_int32 for s in all_semantics}
 
     return class_name_to_class_id
 

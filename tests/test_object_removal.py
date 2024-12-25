@@ -1,17 +1,13 @@
-from omnigibson.objects import DatasetObject
-import omnigibson as og
-from omnigibson.utils.python_utils import NAMES
-
+import pytest
 from utils import og_test
 
-import pytest
+import omnigibson as og
+from omnigibson.objects import DatasetObject
+from omnigibson.utils.python_utils import NAMES
 
 
 @og_test
-def test_removal_and_readdition():
-    # Make a copy of NAMES
-    initial_names = NAMES.copy()
-
+def test_removal_and_readdition(env):
     # Add an apple
     apple = DatasetObject(
         name="apple_unique",
@@ -20,21 +16,20 @@ def test_removal_and_readdition():
     )
 
     # Import it into the scene
-    og.sim.import_object(apple)
+    env.scene.add_object(apple)
 
-    # Check that NAMES has changed
-    assert NAMES != initial_names
+    # Check that apple exists
+    assert env.scene.object_registry("name", "apple_unique") is not None
 
     # Step a few times
     for _ in range(5):
         og.sim.step()
 
     # Remove the apple
-    og.sim.remove_object(obj=apple)
+    env.scene.remove_object(obj=apple)
 
     # Check that NAMES is the same as before
-    extra_names = NAMES - initial_names
-    assert len(extra_names) == 0, f"Extra names: {extra_names}"
+    assert env.scene.object_registry("name", "apple_unique") is None
 
     # Importing should work now
     apple2 = DatasetObject(
@@ -42,18 +37,15 @@ def test_removal_and_readdition():
         category="apple",
         model="agveuv",
     )
-    og.sim.import_object(apple2)
+    env.scene.add_object(apple2)
     og.sim.step()
 
     # Clear the stuff we added
-    og.sim.remove_object(apple2)
+    env.scene.remove_object(apple2)
 
 
 @og_test
-def test_readdition():
-    # Make a copy of NAMES
-    initial_names = NAMES.copy()
-
+def test_readdition(env):
     # Add an apple
     apple = DatasetObject(
         name="apple_unique",
@@ -62,11 +54,10 @@ def test_readdition():
     )
 
     # Import it into the scene
-    og.sim.import_object(apple)
+    env.scene.add_object(apple)
 
-    # Check that NAMES has changed
-    new_names = NAMES.copy()
-    assert new_names != initial_names
+    # Check that apple exists
+    assert env.scene.object_registry("name", "apple_unique") is not None
 
     # Step a few times
     for _ in range(5):
@@ -79,10 +70,10 @@ def test_readdition():
             category="apple",
             model="agveuv",
         )
-        og.sim.import_object(apple2)
+        env.scene.add_object(apple2)
 
-    # Check that NAMES has not changed
-    assert NAMES == new_names
+    # Check that apple exists
+    assert env.scene.object_registry("name", "apple_unique") is not None
 
     # Clear the stuff we added
-    og.sim.remove_object(apple)
+    env.scene.remove_object(apple)

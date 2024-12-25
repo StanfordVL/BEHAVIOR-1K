@@ -1,4 +1,5 @@
-import numpy as np
+import torch as th
+
 import omnigibson as og
 
 
@@ -21,14 +22,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = og.Environment(configs=cfg)
 
     # Grab all window objects
-    windows = og.sim.scene.object_registry("category", "window")
+    windows = env.scene.object_registry("category", "window")
 
     # Step environment while toggling window highlighting
     i = 0
     highlighted = False
     max_steps = -1 if not short_exec else 1000
     while i != max_steps:
-        env.step(np.array([]))
+        env.step(th.empty(0))
         if i % 50 == 0:
             highlighted = not highlighted
             og.log.info(f"Toggling window highlight to: {highlighted}")
@@ -38,7 +39,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         i += 1
 
     # Always close the environment at the end
-    env.close()
+    og.clear()
 
 
 if __name__ == "__main__":

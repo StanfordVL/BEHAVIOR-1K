@@ -4,17 +4,15 @@ A set of action primitives that work without executing low-level physics but ins
 objects directly into their post-condition states. Useful for learning high-level methods.
 """
 
+import torch as th
 from aenum import IntEnum, auto
-
-import numpy as np
-from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import REGISTERED_SYSTEMS
-from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects import DatasetObject
+from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.transition_rules import REGISTERED_RULES, SlicingRule, TransitionRuleAPI
 
 
 class SymbolicSemanticActionPrimitiveSet(IntEnum):
@@ -71,7 +69,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             attempts (int): Number of attempts to make before raising an error
 
         Returns:
-            np.array or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
+            th.tensor or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
 
         Raises:
             ActionPrimitiveError: If primitive fails to execute
@@ -151,7 +149,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             DatasetObject: Object for robot to grasp
 
         Returns:
-            np.array or None: Action array for one step for the robot to grasp or None if grasp completed
+            th.tensor or None: Action array for one step for the robot to grasp or None if grasp completed
         """
         # Don't do anything if the object is already grasped.
         obj_in_hand = self._get_obj_in_hand()
@@ -169,8 +167,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # yield from self._navigate_if_needed(obj)
 
         # Perform forced assisted grasp
-        obj.set_position(self.robot.get_eef_position(self.arm))
-        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position())
+        obj.set_position_orientation(position=self.robot.get_eef_position(self.arm))
+        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position_orientation()[0])
 
         # Execute for a moment
         yield from self._settle_robot()
@@ -244,7 +242,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             predicate (object_states.OnTop or object_states.Inside): Determines whether to place on top or inside
 
         Returns:
-            np.array or None: Action array for one step for the robot to place or None if place completed
+            th.tensor or None: Action array for one step for the robot to place or None if place completed
         """
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
@@ -292,8 +290,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # Check if the target object has any particles in it
         producing_systems = {
             ps
-            for ps in REGISTERED_SYSTEMS.values()
-            if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)
+            for ps in obj.scene.system_registry.objects
+            if obj.states[object_states.ParticleSource].check_conditions_for_system(ps.name)
         }
         if not producing_systems:
             raise ActionPrimitiveError(
@@ -311,8 +309,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
+
         if not supported_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -330,7 +329,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -347,6 +346,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # If so, remove the particles.
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Saturated].set_value(system, True)
+
+        # Yield some actions
+        yield from self._settle_robot()
 
     def _soak_inside(self, obj):
         # Check that our current object is a particle remover
@@ -366,7 +368,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Check if the target object has any particles in it
         contained_systems = {
-            ps for ps in REGISTERED_SYSTEMS.values() if obj.states[object_states.Contains].get_value(ps.states)
+            ps for ps in obj.scene.system_registry.objects if obj.states[object_states.Contains].get_value(ps.states)
         }
         if not contained_systems:
             raise ActionPrimitiveError(
@@ -384,7 +386,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
         if not supported_systems:
             raise ActionPrimitiveError(
@@ -403,7 +405,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -420,6 +422,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # If so, remove the particles.
         for system in currently_removable_systems:
             obj_in_hand.states[object_states.Saturated].set_value(system, True)
+
+        # Yield some actions
+        yield from self._settle_robot()
 
     def _wipe(self, obj):
         # Check that our current object is a particle remover
@@ -440,7 +445,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Check if the target object has any particles on it
         covering_systems = {
-            ps for ps in REGISTERED_SYSTEMS.values() if obj.states[object_states.Covered].get_value(ps.states)
+            ps for ps in obj.scene.system_registry.objects if obj.states[object_states.Covered].get_value(ps)
         }
         if not covering_systems:
             raise ActionPrimitiveError(
@@ -458,7 +463,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         supported_systems = {
-            x for x in covering_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+            x for x in covering_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x.name)
         }
         if not supported_systems:
             raise ActionPrimitiveError(
@@ -477,7 +482,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         currently_removable_systems = {
             x
             for x in supported_systems
-            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+            if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x.name)
         }
         if not currently_removable_systems:
             # TODO: This needs to be far more descriptive.
@@ -490,10 +495,12 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
                     "particles the target object is covered by": sorted(x.name for x in covering_systems),
                 },
             )
-
-        # If so, remove the particles.
+        # If so, remove the particles on the target object
         for system in currently_removable_systems:
-            obj_in_hand.states[object_states.Covered].set_value(system, False)
+            obj.states[object_states.Covered].set_value(system, False)
+
+        # Yield some actions
+        yield from self._settle_robot()
 
     def _cut(self, obj):
         # Check that our current object is a slicer
@@ -525,11 +532,12 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # TODO: Do some more validation
         added_obj_attrs = []
         removed_objs = []
-        output = REGISTERED_RULES["SlicingRule"].transition({"sliceable": [obj]})
+        (slicing_rule,) = [rule for rule in obj.scene.transition_rule_api.active_rules if isinstance(rule, SlicingRule)]
+        output = slicing_rule.transition({"sliceable": [obj]})
         added_obj_attrs += output.add
         removed_objs += output.remove
 
-        TransitionRuleAPI.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+        obj.scene.transition_rule_api.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
         yield from self._settle_robot()
 
     def _place_near_heating_element(self, heat_source_obj):
@@ -555,8 +563,11 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         # Get the position of the heat source on the thing we're placing near
-        heating_element_positions = np.array(
-            [link.get_position() for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()]
+        heating_element_positions = th.tensor(
+            [
+                link.get_position_orientation()[0]
+                for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()
+            ]
         )
         heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
 
@@ -601,7 +612,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             pose_2d (Iterable): (x, y, yaw) 2d pose
 
         Returns:
-            np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
+            th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         robot_pose = self._get_robot_pose_from_2d_pose(pose_2d)
         self.robot.set_position_orientation(*robot_pose)

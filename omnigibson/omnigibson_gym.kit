@@ -1,0 +1,288 @@
+[package]
+title = "Isaac Sim Python - Headless Gym"
+description = "A simplifed app for running Gym examples headlessly from Python"
+version = "2023.1.1"
+
+# That makes it browsable in UI with "experience" filter
+keywords = ["experience", "app", "usd"]
+
+[settings]
+app.name = "Isaac-Sim"
+app.version = "2023.1.1"
+
+[dependencies]
+"omni.kit.window.title" = {}
+"omni.physx" = {}
+"omni.physx.tensors" = {}
+"omni.physx.fabric" = {}
+"omni.warp.core" = {}
+"usdrt.scenegraph" = {}
+"omni.kit.mainwindow" = {}
+"omni.kit.telemetry" = {}
+"omni.kit.renderer.core" = {}
+
+
+[settings]
+renderer.active = "rtx"
+exts."omni.kit.viewport.menubar.camera".expand = true # Expand the extra-camera settings by default
+exts."omni.kit.window.file".useNewFilePicker = true
+exts."omni.kit.tool.asset_importer".useNewFilePicker = true
+exts."omni.kit.tool.collect".useNewFilePicker = true
+exts."omni.kit.widget.layers".useNewFilePicker = true
+exts."omni.kit.renderer.core".imgui.enableMips = true
+exts."omni.kit.browser.material".enabled = false
+exts."omni.kit.browser.asset".visible_after_startup = false
+exts."omni.kit.window.material".load_after_startup = true
+exts."omni.kit.widget.cloud_share".require_access_code = false
+exts."omni.kit.viewport.window".startup.windowName="Viewport" # Rename from Viewport Next
+exts."omni.kit.menu.utils".logDeprecated = false
+
+app.content.emptyStageOnStart = false
+
+# deprecate support for old kit.ui.menu
+app.menu.legacy_mode = false
+# use omni.ui.Menu for the MenuBar
+app.menu.compatibility_mode = false
+# Setting the port for the embedded http server
+exts."omni.services.transport.server.http".port = 8211
+
+# default viewport is fill
+app.runLoops.rendering_0.fillResolution = false
+exts."omni.kit.window.viewport".blockingGetViewportDrawable = false
+
+exts."omni.kit.test".includeTests.1 = "*isaac*"
+
+# Fix PlayButtonGroup error
+exts."omni.kit.widget.toolbar".PlayButton.enabled = false
+
+[settings.app.settings]
+persistent = true
+dev_build = false
+fabricDefaultStageFrameHistoryCount = 3 # needed for omni.syntheticdata TODO105 still true?
+
+[settings.app.window]
+title = "Isaac Sim"
+hideUi = false
+_iconSize = 256
+iconPath = "${app}/../exts/omni.isaac.app.setup/data/nvidia-omniverse-isaacsim.ico"
+
+# width = 1700
+# height = 900
+# x = -1
+# y = -1
+
+# Fonts
+[setting.app.font]
+file = "${fonts}/OpenSans-SemiBold.ttf"
+size = 16
+
+# [setting.app.runLoops]
+# main.rateLimitEnabled = false
+# main.rateLimitFrequency = 60
+# main.rateLimitUseBusyLoop = false
+# rendering_0.rateLimitEnabled = false
+
+[settings.exts.'omni.kit.window.extensions']
+# List extensions here we want to show as featured when extension manager is opened
+featuredExts = []
+
+
+[settings]
+# MGPU is always on, you can turn it from the settings, and force this off to save even more resource if you
+# only want to use a single GPU on your MGPU system
+# False for Isaac Sim
+renderer.multiGpu.enabled = true
+renderer.multiGpu.autoEnable = true
+'rtx-transient'.resourcemanager.enableTextureStreaming = true
+app.asyncRendering = false
+app.asyncRenderingLowLatency = false
+app.hydraEngine.waitIdle = false
+# app.hydra.aperture.conform = 4 # in 105.1 pixels are square by default
+omni.replicator.asyncRendering = false
+
+# Enable Iray and pxr by setting this to "rtx,iray,pxr"
+renderer.enabled = "rtx"
+
+# Disable IOMMU Enabled pop-up message on warmup (OM-100381)
+persistent.renderer.startupMessageDisplayed = true
+
+# Basic Kit App
+################################
+app.versionFile = "${app}/../VERSION"
+app.name = "Isaac-Sim"
+app.version = "2023.1.1"
+
+# hide NonToggleable Exts
+exts."omni.kit.window.extensions".hideNonToggleableExts = true
+exts."omni.kit.window.extensions".showFeatureOnly = false
+
+# Hang Detector
+################################
+# app.hangDetector.enabled = false
+# app.hangDetector.timeout = 120
+
+
+# Browsers
+exts."omni.kit.browser.material".folders = [
+        "Base::http://omniverse-content-production.s3-us-west-2.amazonaws.com/Materials/Base",
+        "vMaterials::http://omniverse-content-production.s3.us-west-2.amazonaws.com/Materials/vMaterials_2/",
+        "Twinbru Fabrics::https://twinbru.s3.eu-west-1.amazonaws.com/omniverse/Twinbru Fabrics/"
+]
+
+exts."omni.kit.window.environment".folders = [
+    "https://omniverse-content-production.s3.us-west-2.amazonaws.com/Assets/Skies/2022_1/Skies",
+    "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Scenes/Templates",
+]
+
+exts."omni.kit.browser.sample".folders = [ "http://omniverse-content-production.s3-us-west-2.amazonaws.com//Samples" ]
+
+exts."omni.kit.browser.asset".folders = [
+        "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Vegetation",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Commercial",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Industrial",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/ArchVis/Residential",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/DigitalTwin/Assets/Warehouse/Equipment",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/DigitalTwin/Assets/Warehouse/Safety",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/DigitalTwin/Assets/Warehouse/Shipping",
+		"http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/DigitalTwin/Assets/Warehouse/Storage",
+    ]
+
+exts."omni.kit.browser.texture".folders = [
+        "http://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Vegetation",
+ ]
+
+
+# set the default ros bridge to disable on startup
+isaac.startup.ros_bridge_extension = ""
+
+# Extensions
+###############################
+[settings.exts."omni.kit.registry.nucleus"]
+registries = [
+  { name = "kit/default", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/shared" },
+  { name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
+  { name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
+]
+
+[settings.app.extensions]
+skipPublishVerification = false
+registryEnabled = true
+
+[settings.exts."omni.kit.window.modifier.titlebar"]
+titleFormatString = "  Isaac Sim  {version:${app}/../SHORT_VERSION,font_color=0x909090,font_size=16} {separator} {file, board=true}"
+showFileFullPath = true
+icon.file = "${app}/../exts/omni.isaac.app.setup/data/nvidia-omniverse-isaacsim.ico"
+icon.size = 256
+defaultFont.name = "Arial"
+defaultFont.size = 16
+defaultFont.color = 0xD0D0D0
+separator.color = 0x00B976
+separator.width = 1
+windowBorder.color = 0x0F0F0F
+windowBorder.width = 2
+colors.caption = 0x0F0F0F
+colors.client = 0x0F0F0F
+respondOnMouseUp = true
+changeWindowRegion = true
+
+[settings.crashreporter.data]
+experience = "Isaac Sim"
+
+# Isaac Sim Settings
+###############################
+[settings.app.renderer]
+skipWhileMinimized = false
+sleepMsOnFocus = 0
+sleepMsOutOfFocus = 0
+resolution.width=1280
+resolution.height=720
+
+# default camera position in meters
+[settings.app.viewport]
+defaultCamPos.x = 5
+defaultCamPos.y = 5
+defaultCamPos.z = 5
+
+[settings.rtx]
+raytracing.fractionalCutoutOpacity = false
+hydra.enableSemanticSchema = true
+# descriptorSets=60000
+# reservedDescriptors=500000
+# sceneDb.maxInstances=1000000
+# Enable this for static scenes, improves visual quality
+# directLighting.sampledLighting.enabled = true
+
+[settings.persistent]
+app.file.recentFiles = []
+app.stage.upAxis = "Z"
+app.stage.movePrimInPlace = false
+app.stage.instanceableOnCreatingReference = false
+app.stage.materialStrength = "weakerThanDescendants"
+
+app.transform.gizmoUseSRT = true
+app.viewport.grid.scale = 1.0
+app.viewport.pickingMode = "kind:model.ALL"
+app.viewport.camMoveVelocity = 0.05 # 5 m/s
+app.viewport.gizmo.scale = 0.01 # scaled to meters
+app.viewport.previewOnPeek = false
+app.viewport.snapToSurface = false
+app.viewport.displayOptions = 31951 # Disable Frame Rate and Resolution by default
+app.window.uiStyle = "NvidiaDark"
+app.primCreation.DefaultXformOpType = "Scale, Orient, Translate"
+app.primCreation.DefaultXformOpOrder="xformOp:translate, xformOp:orient, xformOp:scale"
+app.primCreation.typedDefaults.camera.clippingRange = [0.01, 10000000.0]
+simulation.minFrameRate = 15
+simulation.defaultMetersPerUnit = 1.0
+omnigraph.updateToUsd = false
+omnigraph.useSchemaPrims = true
+omnigraph.disablePrimNodes = true
+physics.updateToUsd = false
+physics.updateVelocitiesToUsd = false
+physics.useFastCache = false
+physics.visualizationDisplayJoints = false
+omni.replicator.captureOnPlay = true
+omnihydra.useSceneGraphInstancing = true
+renderer.startupMessageDisplayed = true # hides the IOMMU popup window
+
+# Make Detail panel visible by default
+app.omniverse.content_browser.options_menu.show_details = true
+app.omniverse.filepicker.options_menu.show_details = true
+
+[settings.physics]
+updateToUsd = false
+updateVelocitiesToUsd = false
+updateForceSensorsToUsd = false
+outputVelocitiesLocalSpace = false
+
+# Register extension folder from this repo in kit
+[settings.app.exts]
+folders = ["${app}/../exts", "${app}/../extscache", "${app}/../extsPhysics", "${app}/../kit/exts"]
+
+[settings.ngx]
+enabled=true # Enable this for DLSS
+
+# Isaac Sim Extensions
+###############################
+[dependencies]
+"omni.isaac.core" = {}
+"omni.isaac.core_archive" = {}
+"omni.pip.compute" = {}
+"omni.pip.cloud" = {}
+"omni.isaac.cloner" = {}
+"omni.isaac.gym" = {}
+"omni.isaac.kit" = {}
+"omni.isaac.ml_archive" = {}
+"omni.kit.loop-isaac" = {}
+"omni.isaac.sensor" = {}
+
+# Non Isaac Sim Extensions
+######################
+[dependencies]
+"omni.syntheticdata" = {}
+"semantics.schema.editor" = {}
+"semantics.schema.property" = {}
+"omni.replicator.core" = {}
+"omni.replicator.replicator_yaml" = {}
+"omni.replicator.composer" = {}
+"omni.importer.mjcf" = {}
+"omni.importer.urdf" = {}

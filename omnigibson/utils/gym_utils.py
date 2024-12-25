@@ -1,6 +1,8 @@
-import gym
 from abc import ABCMeta, abstractmethod
-import numpy as np
+from collections.abc import Iterable
+
+import gymnasium as gym
+import torch as th
 
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -39,8 +41,8 @@ def recursively_generate_flat_dict(dic, prefix=None):
 
 def recursively_generate_compatible_dict(dic):
     """
-    Helper function to recursively iterate through dictionary and cast values to necessary types to be compatibel with
-    Gym spaces -- in particular, the Sequence and Tuple types for np.ndarray / np.void values in @dic
+    Helper function to recursively iterate through dictionary and cast values to necessary types to be compatible with
+    Gym spaces -- in particular, the Sequence and Tuple types for th.tensor values in @dic
 
     Args:
         dic (dict or gym.spaces.Dict): (Potentially nested) dictionary to convert into a flattened dictionary
@@ -52,9 +54,12 @@ def recursively_generate_compatible_dict(dic):
     for k, v in dic.items():
         if isinstance(v, dict):
             out[k] = recursively_generate_compatible_dict(dic=v)
-        elif isinstance(v, np.ndarray) and len(v.dtype) > 0:
+        elif isinstance(v, th.Tensor) and v.dim() > 1:
             # Map to list of tuples
-            out[k] = list(map(tuple, v))
+            out[k] = tuple(tuple(row.tolist()) for row in v)
+        elif isinstance(v, Iterable):
+            # bounding box modalities give a list of tuples
+            out[k] = tuple(v)
         else:
             # Preserve the key-value pair
             out[k] = v
@@ -95,7 +100,7 @@ class GymObservable(metaclass=ABCMeta):
         raise NotImplementedError()
 
     @staticmethod
-    def _build_obs_box_space(shape, low, high, dtype=np.float32):
+    def _build_obs_box_space(shape, low, high, dtype=th.float32):
         """
         Helper function that builds individual observation box spaces.
 
@@ -131,3 +136,23 @@ class GymObservable(metaclass=ABCMeta):
         log.debug(f"Loaded obs space dictionary for: {self.__class__.__name__}")
 
         return self.observation_space
+
+
+def maxdim(space):
+    """
+    Helper function to get the maximum dimension of a gym space
+
+    Args:
+        space (gym.spaces.Space): Gym space to get the maximum dimension of
+
+    Returns:
+        int: Maximum dimension of the gym space
+    """
+    if isinstance(space, (gym.spaces.Dict, gym.spaces.Tuple)):
+        return sum([maxdim(s) for s in space.spaces.values()])
+    elif isinstance(space, (gym.spaces.Box, gym.spaces.Discrete, gym.spaces.MultiDiscrete, gym.spaces.MultiBinary)):
+        return gym.spaces.utils.flatdim(space)
+    elif isinstance(space, (gym.spaces.Sequence, gym.spaces.Graph)):
+        return float("inf")
+    else:
+        raise ValueError(f"Unsupported gym space type: {type(space)}")

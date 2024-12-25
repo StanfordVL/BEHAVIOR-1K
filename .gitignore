@@ -72,6 +72,7 @@ gibson/assets
 notebook
 build
 dist
+omnigibson.egg-info
 
 # Directories used for QC pipeline
 omnigibson/utils/data_utils/mesh_decimation/collision
@@ -88,3 +89,6 @@ coverage.xml
 # Doc
 docs/reference
 site/
+
+# Tests of examples
+tests/tests_of_examples

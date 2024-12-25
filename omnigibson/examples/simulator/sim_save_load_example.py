@@ -1,5 +1,6 @@
 import os
-import numpy as np
+
+import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -35,8 +36,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set the camera to a good angle
     def set_camera_pose():
         og.sim.viewer_camera.set_position_orientation(
-            position=np.array([-0.229375, -3.40576, 7.26143]),
-            orientation=np.array([0.27619733, -0.00230233, -0.00801152, 0.9610648]),
+            position=th.tensor([-0.229375, -3.40576, 7.26143]),
+            orientation=th.tensor([0.27619733, -0.00230233, -0.00801152, 0.9610648]),
         )
 
     set_camera_pose()
@@ -55,14 +56,19 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
-        env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
+        action_lo, action_hi = -1, 1
+        env.step(th.rand(env.robots[0].action_dim) * (action_hi - action_lo) + action_lo)
 
     print("Completed scene modification, saving scene...")
     save_path = os.path.join(TEST_OUT_PATH, "saved_stage.json")
-    og.sim.save(json_path=save_path)
+    og.sim.save(json_paths=[save_path])
 
     print("Re-loading scene...")
-    og.sim.restore(json_path=save_path)
+    og.clear()
+    og.sim.restore(scene_files=[save_path])
+
+    # env is no longer valid after og.clear()
+    del env
 
     # Take a sim step and play
     og.sim.step()
@@ -78,10 +84,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Register callback so user knows to press space once they're done manipulating the scene
         KeyboardEventHandler.add_keyboard_callback(lazy.carb.input.KeyboardInput.Z, complete_loop)
     while not completed:
-        env.step(np.zeros(env.robots[0].action_dim))
-
-    # Shutdown omnigibson at the end
-    og.shutdown()
+        og.sim.step()
 
 
 if __name__ == "__main__":

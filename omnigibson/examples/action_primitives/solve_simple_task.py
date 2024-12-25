@@ -1,13 +1,13 @@
 import os
+
 import yaml
-import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
+from omnigibson.macros import gm
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -23,10 +23,10 @@ def main():
     """
     Demonstrates how to use the action primitives to pick and place an object in an empty scene.
 
-    It loads Rs_int with a Fetch robot, and the robot picks and places a bottle of cologne.
+    It loads Rs_int with a robot, and the robot picks and places a bottle of cologne.
     """
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "fetch_primitives.yaml")
+    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # Update it to create a custom environment and run some actions
