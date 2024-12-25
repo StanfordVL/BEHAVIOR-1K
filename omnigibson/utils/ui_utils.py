@@ -25,6 +25,7 @@ from termcolor import colored
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.macros import gm
 
 
 def print_icon():
@@ -1018,8 +1019,8 @@ def draw_text(
     font_size=12,
     line_size=1.0,
     anchor="center",
-    max_height=np.inf,
-    max_width=np.inf,
+    max_height=th.inf,
+    max_width=th.inf,
 ):
     """
     Draws text at a given position.
@@ -1052,35 +1053,35 @@ def draw_text(
                 current_point = end_point
             elif code == mpath.Path.CLOSEPOLY:
                 # This closes the path back to the starting point of the subpath
-                if np.allclose(current_point, subpath_start):
+                if th.allclose(current_point, subpath_start):
                     # Only add a closing line if we're not already at the start point
                     line_segments.append((current_point, subpath_start))
                 current_point = subpath_start  # Move back to start (though typically not needed)
             else:
                 raise ValueError(f"What is {code}?")
 
-        return np.array(line_segments)
+        return th.tensor(line_segments)
 
     # Convert the Path to line segments
     line_segments = _path_to_line_segments(path)
 
     # Transform the line segments to the desired position
     all_verts = line_segments.reshape(-1, 2)
-    orig_min = np.min(all_verts, axis=0)
-    orig_max = np.max(all_verts, axis=0)
+    orig_min = th.min(all_verts, axis=0)
+    orig_max = th.max(all_verts, axis=0)
     orig_ext = orig_max - orig_min
 
     # Figure out the necessary scaling
     scale = 1.0
-    max_dims = np.array([max_width, max_height])
-    if np.any(np.isfinite(max_dims)):
-        scale = np.min(max_dims / orig_ext)
+    max_dims = th.tensor([max_width, max_height])
+    if th.any(th.isfinite(max_dims)):
+        scale = th.min(max_dims / orig_ext)
     transformed_line_segments = line_segments * scale
 
     # Recompute the extents
     transformed_verts = transformed_line_segments.reshape(-1, 2)
-    min_pt = np.min(transformed_verts, axis=0)
-    max_pt = np.max(transformed_verts, axis=0)
+    min_pt = th.min(transformed_verts, axis=0)
+    max_pt = th.max(transformed_verts, axis=0)
     center = (min_pt + max_pt) / 2
 
     if anchor == "center":
@@ -1090,13 +1091,13 @@ def draw_text(
     elif anchor == "topright":
         anchor_pt = max_pt
     elif anchor == "topleft":
-        anchor_pt = np.array([min_pt[0], max_pt[1]])
+        anchor_pt = th.tensor([min_pt[0], max_pt[1]])
     elif anchor == "bottomright":
-        anchor_pt = np.array([max_pt[0], min_pt[1]])
+        anchor_pt = th.tensor([max_pt[0], min_pt[1]])
     elif anchor == "bottomcenter":
-        anchor_pt = np.array([center[0], min_pt[1]])
+        anchor_pt = th.tensor([center[0], min_pt[1]])
     elif anchor == "topcenter":
-        anchor_pt = np.array([center[0], max_pt[1]])
+        anchor_pt = th.tensor([center[0], max_pt[1]])
     else:
         raise ValueError(f"Unknown anchor point {anchor}")
 
@@ -1106,7 +1107,7 @@ def draw_text(
 
     def _transform_point(pt):
         centered_pt = pt - anchor_pt
-        return rotation.apply(np.array([centered_pt[0], centered_pt[1], 0])) + position
+        return rotation.apply([centered_pt[0], centered_pt[1], 0]) + position
 
     # Then, draw the line segments
     for f, t in transformed_line_segments:
