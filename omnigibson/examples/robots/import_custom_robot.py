@@ -410,9 +410,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
     link_prim_path = f"{root_prim_path}/{link_name}"
     link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
-        assert (
-            not link_prim_exists
-        ), f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
         create_rigid_prim(
             stage=stage,
@@ -443,9 +441,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     else:
         # Otherwise, link prim MUST exist
-        assert (
-            link_prim_exists
-        ), f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
+        assert link_prim_exists, f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
 
     # Define functions to generate the desired sensor prim
     if sensor_type == "Camera":

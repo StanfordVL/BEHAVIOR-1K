@@ -112,7 +112,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         self._obs_modalities = (
             obs_modalities
             if obs_modalities == "all"
-            else {obs_modalities} if isinstance(obs_modalities, str) else set(obs_modalities)
+            else {obs_modalities}
+            if isinstance(obs_modalities, str)
+            else set(obs_modalities)
         )  # this will get updated later when we fill in our sensors
         self._proprio_obs = self.default_proprio_obs if proprio_obs == "default" else list(proprio_obs)
         self._sensor_config = sensor_config

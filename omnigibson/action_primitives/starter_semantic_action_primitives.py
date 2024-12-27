@@ -309,11 +309,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 self.robot.controllers["base"], (JointController, DifferentialDriveController)
             ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
             if self._base_controller_is_joint:
-                assert not self.robot.controllers[
-                    "base"
-                ].use_delta_commands, (
-                    "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
-                )
+                assert (
+                    not self.robot.controllers["base"].use_delta_commands
+                ), "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
 
         self.robot_model = self.robot.model_name
         self.add_context = add_context

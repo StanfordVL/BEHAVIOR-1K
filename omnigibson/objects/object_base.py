@@ -90,7 +90,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config["scale"] = (
             scale
             if isinstance(scale, th.Tensor)
-            else th.tensor(scale, dtype=th.float32) if isinstance(scale, Iterable) else scale
+            else th.tensor(scale, dtype=th.float32)
+            if isinstance(scale, Iterable)
+            else scale
         )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only

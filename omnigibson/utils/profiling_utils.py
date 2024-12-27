@@ -26,7 +26,8 @@ def gpu_in_use_by_this_process(gpu_handle, pid: int) -> bool:
 
     compute_pids = {process.pid for process in pynvml.nvmlDeviceGetComputeRunningProcesses(gpu_handle)}  # type: ignore
     graphics_pids = {
-        process.pid for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
+        process.pid
+        for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
     }
 
     pids_using_device = compute_pids | graphics_pids

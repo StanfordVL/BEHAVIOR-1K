@@ -130,8 +130,9 @@ class URDFType(object):
                 vs = node.findall(t._TAG)
                 if len(vs) == 0 and r:
                     raise ValueError(
-                        "Missing required subelement(s) of type {} when "
-                        "parsing an object of type {}".format(t.__name__, cls.__name__)
+                        "Missing required subelement(s) of type {} when " "parsing an object of type {}".format(
+                            t.__name__, cls.__name__
+                        )
                     )
                 v = [t._from_xml(n, path) for n in vs]
             kwargs[a] = v
