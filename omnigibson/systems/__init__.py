@@ -1,3 +1,4 @@
+from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.systems.macro_particle_system import (
     MacroParticleSystem,
     MacroPhysicalParticleSystem,
@@ -12,6 +13,7 @@ from omnigibson.systems.micro_particle_system import (
 )
 
 __all__ = [
+    "BaseSystem",
     "Cloth",
     "FluidSystem",
     "GranularSystem",
@@ -20,4 +22,6 @@ __all__ = [
     "MacroVisualParticleSystem",
     "MicroParticleSystem",
     "MicroPhysicalParticleSystem",
+    "PhysicalParticleSystem",
+    "VisualParticleSystem",
 ]
