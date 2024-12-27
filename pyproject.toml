@@ -1,18 +1,3 @@
-[tool.black]
-line-length = 120
-target-version = ['py310']
-force-exclude = 'omnigibson/(data|external)'
-
-[tool.isort]
-profile = "black"
-line_length = 120
-py_version = '310'
-filter_files = true
-extend_skip_glob = [
-    'omnigibson/data/*',
-    'omnigibson/external/*'
-]
-
 [tool.pyright]
 exclude = [
   'omnigibson/data',
@@ -25,12 +10,9 @@ testpaths = [
     "tests",
 ]
 
-[tool.coverage.run]
-omit = ["omnigibson/external/*"]
-
 [tool.ruff]
 # Exclude a variety of commonly ignored directories.
-extend-exclude = ["omnigibson/utils/pynvml_utils.py"]
+extend-exclude = ["omnigibson/utils/pynvml_utils.py", "omnigibson/data"]
 
 # Same as Black.
 line-length = 120
