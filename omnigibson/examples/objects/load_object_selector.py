@@ -1,11 +1,7 @@
 import torch as th
 
 import omnigibson as og
-from omnigibson.utils.asset_utils import (
-    get_all_object_categories,
-    get_all_object_category_models,
-    get_og_avg_category_specs,
-)
+from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models
 from omnigibson.utils.ui_utils import choose_from_options
 
 

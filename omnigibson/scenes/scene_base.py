@@ -624,7 +624,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             ), f"Object with name {obj.name} already exists in scene!"
 
             # Load the object.
-            prim = obj.load(self)
+            obj.load(self)
 
             if register:
                 # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects

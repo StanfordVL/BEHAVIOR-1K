@@ -1259,7 +1259,7 @@ def _create_urdf_joint(
     # Create the initial joint
     jnt = ET.Element("joint", name=name, type=joint_type)
     # Create origin subtag
-    origin = ET.SubElement(
+    ET.SubElement(
         jnt,
         "origin",
         attrib={"rpy": _convert_to_xml_string(rpy), "xyz": _convert_to_xml_string(pos)},
@@ -1274,16 +1274,16 @@ def _create_urdf_joint(
     child = ET.SubElement(jnt, "child", link=child)
     # Add additional parameters if specified
     if axis is not None:
-        ax = ET.SubElement(jnt, "axis", xyz=_convert_to_xml_string(axis))
+        ET.SubElement(jnt, "axis", xyz=_convert_to_xml_string(axis))
     dynamic_params = {}
     if damping is not None:
         dynamic_params["damping"] = _convert_to_xml_string(damping)
     if friction is not None:
         dynamic_params["friction"] = _convert_to_xml_string(friction)
     if dynamic_params:
-        dp = ET.SubElement(jnt, "dynamics", **dynamic_params)
+        ET.SubElement(jnt, "dynamics", **dynamic_params)
     if limits is not None:
-        lim = ET.SubElement(jnt, "limit", lower=limits[0], upper=limits[1])
+        ET.SubElement(jnt, "limit", lower=limits[0], upper=limits[1])
 
     # Return this element
     return jnt

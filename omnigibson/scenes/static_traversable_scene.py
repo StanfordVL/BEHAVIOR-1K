@@ -74,7 +74,7 @@ class StaticTraversableScene(TraversableScene):
 
         scene_mesh_relative_path = "/scene"
         scene_mesh_absolute_path = scene_relative_prim_path_to_absolute(self, scene_mesh_relative_path)
-        scene_mesh_prim = add_asset_to_stage(
+        add_asset_to_stage(
             asset_path=filename,
             prim_path=scene_mesh_absolute_path,
         )
