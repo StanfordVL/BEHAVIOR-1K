@@ -175,7 +175,7 @@ class OperationalSpaceController(ManipulationController):
         self.mode = mode
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if type(command_input_limits) == str and command_input_limits == "default":
+                if type(command_input_limits) is str and command_input_limits == "default":
                     command_input_limits = [
                         [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
@@ -184,7 +184,7 @@ class OperationalSpaceController(ManipulationController):
                     command_input_limits[0][3:] = -math.pi
                     command_input_limits[1][3:] = math.pi
             if command_output_limits is not None:
-                if type(command_output_limits) == str and command_output_limits == "default":
+                if type(command_output_limits) is str and command_output_limits == "default":
                     command_output_limits = [
                         [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],

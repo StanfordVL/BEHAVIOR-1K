@@ -119,7 +119,7 @@ def compute_obj_kinematic_metadata(obj):
     """
     assert obj.scene is not None
     assert og.sim.floor_plane is not None
-    assert type(obj.scene) == Scene, "An empty scene must be used in order to compute kinematic metadata!"
+    assert type(obj.scene) is Scene, "An empty scene must be used in order to compute kinematic metadata!"
     assert th.all(obj.scale == 1.0), "Object must have scale [1, 1, 1] in order to compute kinematic metadata!"
     og.sim.stop()
 

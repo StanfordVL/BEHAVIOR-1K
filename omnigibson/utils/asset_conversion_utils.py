@@ -671,7 +671,7 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             continue
 
         # TODO: Remove this after this is fixed.
-        if type(mesh_info_list) == dict:
+        if type(mesh_info_list) is dict:
             keys = [str(x) for x in range(len(mesh_info_list))]
             assert set(mesh_info_list.keys()) == set(keys), "Unexpected keys"
             mesh_info_list = [mesh_info_list[k] for k in keys]
@@ -1465,7 +1465,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
 
                         # TODO: Remove this after this is fixed.
-                        if type(attrs_list) == dict:
+                        if type(attrs_list) is dict:
                             keys = [str(x) for x in range(len(attrs_list))]
                             assert set(attrs_list.keys()) == set(keys), "Unexpected keys"
                             attrs_list = [attrs_list[k] for k in keys]

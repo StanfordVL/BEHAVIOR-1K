@@ -564,7 +564,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Make sure conds isn't empty and is a list
             if conds is None:
                 continue
-            assert type(conds) == list, f"Expected list of conditions for system {system_name}, got {conds}"
+            assert type(conds) is list, f"Expected list of conditions for system {system_name}, got {conds}"
             system_conditions = []
             for cond_type, cond_val in conds:
                 cond = self._generate_condition(condition_type=cond_type, value=cond_val)
