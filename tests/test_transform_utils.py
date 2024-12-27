@@ -1,7 +1,6 @@
 import math
 
 import numpy as np
-import pytest
 import torch as th
 import trimesh
 from scipy.spatial.transform import Rotation as R

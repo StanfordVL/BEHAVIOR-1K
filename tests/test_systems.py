@@ -1,4 +1,3 @@
-import pytest
 from utils import SYSTEM_EXAMPLES, og_test
 
 import omnigibson as og

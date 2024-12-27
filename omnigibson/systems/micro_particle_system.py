@@ -9,7 +9,6 @@ import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -582,8 +581,8 @@ class MicroParticleSystem(BaseSystem):
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
-                "mdl_name": f"OmniPBR.mdl",
-                "mtl_name": f"OmniPBR",
+                "mdl_name": "OmniPBR.mdl",
+                "mtl_name": "OmniPBR",
             },
         )
 

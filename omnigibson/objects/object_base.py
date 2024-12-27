@@ -1,20 +1,18 @@
-import math
 from abc import ABCMeta
 from collections.abc import Iterable
 from functools import cached_property
 
 import torch as th
-import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
-from omnigibson.utils.usd_utils import CollisionAPI, create_joint
+from omnigibson.utils.usd_utils import create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()

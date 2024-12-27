@@ -1,4 +1,3 @@
-import json
 import os
 import random
 from collections import defaultdict
@@ -15,11 +14,10 @@ from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import _KINEMATIC_STATE_SET, get_system_states
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,

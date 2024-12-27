@@ -3,12 +3,12 @@ from functools import cached_property
 from typing import Literal
 
 import torch as th
-from scipy.spatial import ConvexHull, QhullError
+from scipy.spatial import ConvexHull
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES

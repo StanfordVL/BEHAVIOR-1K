@@ -14,7 +14,7 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin, Relati
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import CollisionAPI, create_joint
+from omnigibson.utils.usd_utils import create_joint
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -423,7 +423,7 @@ class AttachedTo(
                 self.set_value(self.parent, False)
                 # assert self.parent is None, "parent reference is not cleared after detachment"
                 if self.parent is not None:
-                    log.warning(f"parent reference is not cleared after detachment")
+                    log.warning("parent reference is not cleared after detachment")
 
             # If the loaded state requires attachment, attach.
             if attached_obj is not None:
@@ -436,7 +436,7 @@ class AttachedTo(
                 )
                 # assert self.parent == attached_obj, "parent reference is not updated after attachment"
                 if self.parent != attached_obj:
-                    log.warning(f"parent reference is not updated after attachment")
+                    log.warning("parent reference is not updated after attachment")
 
     def serialize(self, state):
         return th.tensor([state["attached_obj_uuid"]], dtype=th.float32)

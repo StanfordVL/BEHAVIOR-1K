@@ -8,7 +8,6 @@
 #
 
 import math
-from collections.abc import Iterable
 from functools import cached_property
 
 import torch as th
@@ -20,7 +19,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

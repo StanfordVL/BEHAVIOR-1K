@@ -1938,7 +1938,7 @@ def get_collision_approximation_for_urdf(
         generated_new_col = False
         idx = 0
         if link_name not in visual_only_links:
-            for vis in link.findall(f"visual"):
+            for vis in link.findall("visual"):
                 # Get origin
                 origin = vis.find("origin")
                 # Check all geometries

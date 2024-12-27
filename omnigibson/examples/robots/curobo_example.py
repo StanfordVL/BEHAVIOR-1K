@@ -3,11 +3,8 @@ import math
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
-from omnigibson.macros import gm, macros
-from omnigibson.object_states import Touching
 from omnigibson.utils.ui_utils import choose_from_options
 
 

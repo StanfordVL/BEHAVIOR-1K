@@ -4,18 +4,14 @@ import os
 import shutil
 import tempfile
 from abc import ABC
-from itertools import combinations
 
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
-from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.objects.light_object import LightObject
+from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.systems import Cloth
@@ -143,7 +139,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             SerializableRegistry: Object registry containing all active standalone objects in the scene
         """
-        return self._registry(key="name", value=f"object_registry")
+        return self._registry(key="name", value="object_registry")
 
     @property
     def system_registry(self):
@@ -547,7 +543,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Add registry for objects
         registry.add(
             obj=SerializableRegistry(
-                name=f"object_registry",
+                name="object_registry",
                 class_types=BaseObject,
                 default_key="name",
                 hash_key="uuid",

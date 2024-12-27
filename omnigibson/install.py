@@ -5,7 +5,6 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
-from importlib.util import find_spec
 from pathlib import Path
 from typing import List, Optional
 
@@ -363,12 +362,12 @@ def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_p
         dataset_exists, assets_exist = os.path.exists(gm.DATASET_PATH), os.path.exists(gm.ASSET_PATH)
         if not (dataset_exists and assets_exist):
             # Ask user which dataset to install
-            click.echo(f"OmniGibson will now install data under the following locations:")
+            click.echo("OmniGibson will now install data under the following locations:")
             click.echo(f"    dataset (~25GB): {gm.DATASET_PATH}")
             click.echo(f"    assets (~2.5GB): {gm.ASSET_PATH}")
             click.echo(
-                f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and "
-                f"rerun omnigibson/download_datasets.py."
+                "If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and "
+                "rerun omnigibson/download_datasets.py."
             )
             if click.confirm("Do you want to continue?", default=True):
                 # Only download if the dataset path doesn't exist

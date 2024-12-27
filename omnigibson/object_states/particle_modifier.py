@@ -19,7 +19,7 @@ from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
+from omnigibson.systems.system_base import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,

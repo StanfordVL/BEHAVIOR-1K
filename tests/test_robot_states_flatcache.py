@@ -227,7 +227,7 @@ def test_grasping_mode():
     objects_cfg.append(
         dict(
             type="DatasetObject",
-            name=f"table",
+            name="table",
             category="breakfast_table",
             model="lcsizg",
             bounding_box=[0.5, 0.5, 0.8],
@@ -238,7 +238,7 @@ def test_grasping_mode():
     objects_cfg.append(
         dict(
             type="PrimitiveObject",
-            name=f"box",
+            name="box",
             primitive_type="Cube",
             rgba=[1.0, 0, 0, 1.0],
             size=0.05,
@@ -269,7 +269,7 @@ def test_grasping_mode():
         robot = Fetch(
             name="Fetch",
             obs_modalities=[],
-            controller_config={f"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
+            controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,
         )
         env.scene.add_object(robot)

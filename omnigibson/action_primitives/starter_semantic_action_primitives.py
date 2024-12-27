@@ -7,10 +7,8 @@ runnable examples.
 """
 
 import inspect
-import logging
 import math
 import random
-from functools import cached_property
 
 import cv2
 import gymnasium as gym
@@ -28,10 +26,8 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     BaseActionPrimitiveSet,
 )
 from omnigibson.controllers import DifferentialDriveController, InverseKinematicsController, JointController
-from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots import *
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
@@ -1200,7 +1196,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pos_diff = th.norm(prev_pos - current_pos)
                 orn_diff = T.get_orientation_diff_in_radian(current_orn, prev_orn)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
-                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand is stuck")
+                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, "Hand is stuck")
 
             prev_pos = current_pos
             prev_orn = current_orn

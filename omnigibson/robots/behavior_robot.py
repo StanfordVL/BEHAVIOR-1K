@@ -8,7 +8,6 @@ from typing import Iterable, List, Literal, Tuple
 
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm

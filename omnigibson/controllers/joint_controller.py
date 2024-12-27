@@ -210,7 +210,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._motor_type == "position":
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
-                vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
+                vel_pos_error = -control_dict["joint_velocity"][self.dof_idx]
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
@@ -252,10 +252,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)
             else:
-                return control_dict[f"joint_position"][self.dof_idx]
+                return control_dict["joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -control_dict[f"joint_velocity"][self.dof_idx]
+                return -control_dict["joint_velocity"][self.dof_idx]
             else:
                 return cb.zeros(self.command_dim)
 

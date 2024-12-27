@@ -1,6 +1,5 @@
-import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims, prims_to_rigid_prim_set
+from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 
 
 class ContactBodies(AbsoluteObjectState):

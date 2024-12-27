@@ -355,13 +355,13 @@ class CameraMover:
         print("*" * 40)
         print("CameraMover! Commands:")
         print()
-        print(f"\t Right Click + Drag: Rotate camera")
-        print(f"\t W / S : Move camera forward / backward")
-        print(f"\t A / D : Move camera left / right")
-        print(f"\t T / G : Move camera up / down")
-        print(f"\t 9 / 0 : Increase / decrease the lights")
-        print(f"\t P : Print current camera pose")
-        print(f"\t O: Save the current camera view as an image")
+        print("\t Right Click + Drag: Rotate camera")
+        print("\t W / S : Move camera forward / backward")
+        print("\t A / D : Move camera left / right")
+        print("\t T / G : Move camera up / down")
+        print("\t 9 / 0 : Increase / decrease the lights")
+        print("\t P : Print current camera pose")
+        print("\t O: Save the current camera view as an image")
 
     def print_cam_pose(self):
         """

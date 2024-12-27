@@ -7,7 +7,6 @@ from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.transform_utils import euler2quat, quat2mat, quat_multiply
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class LocomotionRobot(BaseRobot):

@@ -1,4 +1,3 @@
-import itertools
 import json
 import math
 import operator
@@ -14,17 +13,14 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states import *
-from omnigibson.object_states.factory import get_system_states
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, RelativeObjectState
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory, torch_delete
+from omnigibson.utils.python_utils import Registerable, classproperty, torch_delete
 from omnigibson.utils.registry_utils import Registry
-from omnigibson.utils.ui_utils import create_module_logger, disclaimer
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create module logger

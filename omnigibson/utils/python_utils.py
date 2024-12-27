@@ -3,11 +3,10 @@ A set of utility functions for general python usage
 """
 
 import inspect
-import re
 from abc import ABCMeta
 from collections.abc import Iterable
 from copy import deepcopy
-from functools import cache, wraps
+from functools import wraps
 from hashlib import md5
 from importlib import import_module
 

@@ -1,11 +1,8 @@
-import atexit
 import contextlib
-import itertools
 import json
 import logging
 import math
 import os
-import re
 import shutil
 import signal
 import socket
@@ -96,7 +93,6 @@ def _launch_app():
 
     # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
     if not gm.DEBUG:
-        import sys
         import warnings
 
         try:
@@ -451,7 +447,7 @@ def _launch_simulator(*args, **kwargs):
             """
             Set the physics engine with specified settings
             """
-            assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
+            assert self.is_stopped(), "Cannot set simulator physics settings while simulation is playing!"
             self._physics_context.set_gravity(value=-self.gravity)
             # Also make sure we don't invert the collision group filter settings so that different collision groups by
             # default collide with each other, and modify settings for speed optimization

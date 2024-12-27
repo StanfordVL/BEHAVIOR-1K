@@ -11,7 +11,6 @@ from pathlib import Path
 from urllib.request import urlretrieve
 
 import progressbar
-import yaml
 from cryptography.fernet import Fernet
 
 import omnigibson as og

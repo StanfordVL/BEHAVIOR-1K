@@ -1,15 +1,7 @@
 import math
 
-import pytest
 import torch as th
-from utils import (
-    get_random_pose,
-    og_test,
-    place_obj_on_floor_plane,
-    place_objA_on_objB_bbox,
-    remove_all_systems,
-    retrieve_obj_cfg,
-)
+from utils import og_test, place_obj_on_floor_plane, remove_all_systems, retrieve_obj_cfg
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -17,8 +9,6 @@ from omnigibson.macros import macros as m
 from omnigibson.object_states import *
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 
 
 @og_test

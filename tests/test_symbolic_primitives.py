@@ -1,6 +1,4 @@
 import os
-import random
-import string
 
 import pytest
 import yaml
@@ -12,9 +10,6 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
     SymbolicSemanticActionPrimitiveSet,
 )
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.python_utils import create_class_from_registry_and_config
 
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = True
