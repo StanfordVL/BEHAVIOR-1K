@@ -2,7 +2,6 @@ import pytest
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.macros import gm

@@ -6,8 +6,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.objects import PrimitiveObject
-from omnigibson.robots import Fetch
-from omnigibson.scenes import Scene
 from omnigibson.utils.control_utils import IKSolver
 
 
@@ -117,7 +115,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         # Create a visual marker to be moved by the user, representing desired end-effector position
         marker = PrimitiveObject(
-            relative_prim_path=f"/marker",
+            relative_prim_path="/marker",
             name="marker",
             primitive_type="Sphere",
             radius=0.03,
@@ -164,7 +162,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, keyboard_event_handler)
+        input_interface.subscribe_to_keyboard_events(keyboard, keyboard_event_handler)
 
         # Print out helpful information to the user
         print_message()

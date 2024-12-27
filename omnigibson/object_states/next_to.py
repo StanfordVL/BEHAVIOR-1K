@@ -7,7 +7,6 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin, Relati
 
 
 class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
-
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()

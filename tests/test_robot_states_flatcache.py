@@ -4,7 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
-from omnigibson.robots import *
+from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
@@ -145,7 +145,6 @@ def test_robot_load_drive():
 
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
-
         if robot_name in ["FrankaMounted", "Stretch"]:
             # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
             continue
@@ -214,7 +213,6 @@ def test_robot_load_drive():
 
 
 def test_grasping_mode():
-
     if og.sim is None:
         # Set global flags
         gm.ENABLE_FLATCACHE = True
@@ -227,7 +225,7 @@ def test_grasping_mode():
     objects_cfg.append(
         dict(
             type="DatasetObject",
-            name=f"table",
+            name="table",
             category="breakfast_table",
             model="lcsizg",
             bounding_box=[0.5, 0.5, 0.8],
@@ -238,7 +236,7 @@ def test_grasping_mode():
     objects_cfg.append(
         dict(
             type="PrimitiveObject",
-            name=f"box",
+            name="box",
             primitive_type="Cube",
             rgba=[1.0, 0, 0, 1.0],
             size=0.05,
@@ -269,7 +267,7 @@ def test_grasping_mode():
         robot = Fetch(
             name="Fetch",
             obs_modalities=[],
-            controller_config={f"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
+            controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,
         )
         env.scene.add_object(robot)

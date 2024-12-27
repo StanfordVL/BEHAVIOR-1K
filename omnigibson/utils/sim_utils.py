@@ -163,7 +163,6 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
 
     # Only run the following (expensive) code if we are actively using filtering criteria
     if should_check_collisions or should_filter_collisions:
-
         # First filter out unnecessary collisions
         if should_filter_collisions:
             # First filter pass, remove the intersection of the main contacts and the contacts from the exclusion set minus

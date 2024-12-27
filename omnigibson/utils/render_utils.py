@@ -27,8 +27,8 @@ def make_glass(prim):
         visual_meshes = [prim]
     else:
         raise ValueError(
-            f"Inputted prim must an instance of EntityPrim, RigidPrim, or VisualGeomPrim "
-            f"in order to be converted into glass!"
+            "Inputted prim must an instance of EntityPrim, RigidPrim, or VisualGeomPrim "
+            "in order to be converted into glass!"
         )
 
     # Grab the glass material prim; if it doesn't exist, we create it on the fly

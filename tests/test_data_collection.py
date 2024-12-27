@@ -1,13 +1,11 @@
 import tempfile
 
-import pytest
 import torch as th
 
 import omnigibson as og
 from omnigibson.envs import DataCollectionWrapper, DataPlaybackWrapper
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
-from omnigibson.utils.ui_utils import create_module_logger
 
 
 def test_data_collect_and_playback():
@@ -117,7 +115,7 @@ def test_data_collect_and_playback():
         {
             "sensor_type": "VisionSensor",
             "name": "external_sensor0",
-            "relative_prim_path": f"/robot0/root_link/external_sensor0",
+            "relative_prim_path": "/robot0/root_link/external_sensor0",
             "modalities": ["rgb"],
             "sensor_kwargs": {
                 "image_height": 16,

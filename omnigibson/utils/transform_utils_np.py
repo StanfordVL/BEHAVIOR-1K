@@ -82,12 +82,12 @@ def unit_vector(data, axis=None, out=None):
 
         >>> v0 = numpy.random.rand(5, 4, 3)
         >>> v1 = unit_vector(v0, axis=-1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0 * v0, axis=2)), 2)
         >>> numpy.allclose(v1, v2)
         True
 
         >>> v1 = unit_vector(v0, axis=1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0 * v0, axis=1)), 1)
         >>> numpy.allclose(v1, v2)
         True
 
@@ -840,11 +840,11 @@ def rotation_matrix(angle, direction, point=None):
     Returns matrix to rotate about axis defined by point and direction.
 
     E.g.:
-        >>> angle = (random.random() - 0.5) * (2*math.pi)
+        >>> angle = (random.random() - 0.5) * (2 * math.pi)
         >>> direc = numpy.random.random(3) - 0.5
         >>> point = numpy.random.random(3) - 0.5
         >>> R0 = rotation_matrix(angle, direc, point)
-        >>> R1 = rotation_matrix(angle-2*math.pi, direc, point)
+        >>> R1 = rotation_matrix(angle - 2 * math.pi, direc, point)
         >>> is_same_transform(R0, R1)
         True
 
@@ -854,11 +854,10 @@ def rotation_matrix(angle, direction, point=None):
         True
 
         >>> I = numpy.identity(4, numpy.float32)
-        >>> numpy.allclose(I, rotation_matrix(math.pi*2, direc))
+        >>> numpy.allclose(I, rotation_matrix(math.pi * 2, direc))
         True
 
-        >>> numpy.allclose(2., numpy.trace(rotation_matrix(math.pi/2,
-        ...                                                direc, point)))
+        >>> numpy.allclose(2.0, numpy.trace(rotation_matrix(math.pi / 2, direc, point)))
         True
 
     Args:

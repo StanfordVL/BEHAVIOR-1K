@@ -7,7 +7,6 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states import ContactBodies
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.utils.ui_utils import create_module_logger
@@ -55,7 +54,6 @@ def plan_base_motion(
     from ompl import geometric as ompl_geo
 
     class CustomMotionValidator(ob.MotionValidator):
-
         def __init__(self, si, space):
             super(CustomMotionValidator, self).__init__(si)
             self.si = si

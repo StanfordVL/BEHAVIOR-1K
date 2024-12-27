@@ -106,15 +106,15 @@ def import_custom_object(
         if confirm_bbox:
             if any(size > 3.0 for size in bbox_size):
                 click.echo(
-                    f"Warning: The bounding box sounds a bit large. Are you sure you don't need to scale? "
-                    f"We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
+                    "Warning: The bounding box sounds a bit large. Are you sure you don't need to scale? "
+                    "We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
                 )
                 click.confirm("Do you want to continue?", abort=True)
 
             elif any(size < 0.01 for size in bbox_size):
                 click.echo(
-                    f"Warning: The bounding box sounds a bit small. Are you sure you don't need to scale? "
-                    f"We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
+                    "Warning: The bounding box sounds a bit small. Are you sure you don't need to scale? "
+                    "We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
                 )
                 click.confirm("Do you want to continue?", abort=True)
 

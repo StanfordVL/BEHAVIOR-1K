@@ -3,11 +3,8 @@ import math
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
-from omnigibson.macros import gm, macros
-from omnigibson.object_states import Touching
 from omnigibson.utils.ui_utils import choose_from_options
 
 
@@ -301,7 +298,7 @@ def test_curobo():
     )
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     control_gripper(env, robot, attached_obj)
-    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
+    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] is None
 
     # Reset to reset pose (both hands)
     target_pos = {
@@ -362,7 +359,7 @@ def test_curobo():
     )
     attached_obj = {robot.eef_link_names["left"]: cologne.root_link}
     control_gripper(env, robot, attached_obj)
-    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] == None
+    assert robot._ag_obj_in_hand["left"] == cologne and robot._ag_obj_in_hand["right"] is None
 
     # Place the cologne (left hand)
     left_hand_pos, left_hand_quat = T.pose_transform(*fridge.get_position_orientation(), *fridge_place_local_pose)
@@ -376,7 +373,7 @@ def test_curobo():
     )
     attached_obj = None
     control_gripper(env, robot, attached_obj)
-    assert robot._ag_obj_in_hand["left"] == None and robot._ag_obj_in_hand["right"] == None
+    assert robot._ag_obj_in_hand["left"] is None and robot._ag_obj_in_hand["right"] is None
 
     og.shutdown()
 

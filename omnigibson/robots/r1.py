@@ -1,19 +1,12 @@
-import os
 from functools import cached_property
 
 import torch as th
 
-import omnigibson as og
-import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
-from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
-from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.utils.python_utils import classproperty
 
 
 class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):

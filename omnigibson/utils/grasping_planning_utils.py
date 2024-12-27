@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.open_state import _get_relevant_joints
-from omnigibson.utils.constants import JointAxis, JointType
+from omnigibson.utils.constants import JointType
 
 m = create_module_macros(module_path=__file__)
 

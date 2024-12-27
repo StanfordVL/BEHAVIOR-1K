@@ -1,5 +1,4 @@
 import json
-import os
 import random
 
 import torch as th
@@ -10,18 +9,14 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     PlanningContext,
     StarterSemanticActionPrimitives,
 )
-from omnigibson.macros import gm
 from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
-from omnigibson.termination_conditions.falling import Falling
-from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
 from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 from omnigibson.utils.python_utils import classproperty, create_class_from_registry_and_config
-from omnigibson.utils.sim_utils import land_object
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 

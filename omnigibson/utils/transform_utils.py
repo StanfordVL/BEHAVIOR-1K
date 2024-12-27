@@ -7,7 +7,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 
@@ -575,7 +575,6 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
 
 @torch.compile
 def quat2euler(q):
-
     single_dim = q.dim() == 1
 
     if single_dim:

@@ -5,7 +5,6 @@ import torch as th
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ActiveCameraRobot(BaseRobot):

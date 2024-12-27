@@ -53,7 +53,7 @@ class DifferentialDriveController(LocomotionController):
         self._wheel_axle_halflength = wheel_axle_length / 2.0
 
         # If we're using default command output limits, map this to maximum linear / angular velocities
-        if type(command_output_limits) == str and command_output_limits == "default":
+        if type(command_output_limits) is str and command_output_limits == "default":
             min_vels = control_limits["velocity"][0][dof_idx]
             assert (
                 min_vels[0] == min_vels[1]

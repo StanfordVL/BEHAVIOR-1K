@@ -17,14 +17,14 @@ import warp as wp
 from omni.isaac.core.articulations import ArticulationView as _ArticulationView
 from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
 from omni.isaac.core.prims import XFormPrimView as _XFormPrimView
-from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
+from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
-from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
+from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0

@@ -3,7 +3,6 @@ import os
 import cv2
 import matplotlib.pyplot as plt
 import torch as th
-from PIL import Image
 
 import omnigibson as og
 from omnigibson.utils.asset_utils import get_available_og_scenes, get_og_scene_path
