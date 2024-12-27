@@ -74,3 +74,16 @@ def create_sensor(
     )
 
     return sensor
+
+
+__all__ = [
+    "ALL_SENSOR_MODALITIES",
+    "BaseSensor",
+    "BaseSensorNoise",
+    "create_sensor",
+    "DropoutSensorNoise",
+    "REGISTERED_SENSOR_NOISES",
+    "REGISTERED_SENSORS",
+    "ScanSensor",
+    "VisionSensor",
+]

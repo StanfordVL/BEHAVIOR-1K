@@ -33,6 +33,7 @@ __version__ = "1.1.1"
 root_path = os.path.dirname(os.path.realpath(__file__))
 
 # Store paths to example configs
+# TODO: Move this elsewhere.
 example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
 # Initialize global variables
@@ -142,3 +143,24 @@ def shutdown_handler(*args, **kwargs):
 
 # Something somewhere disables the default SIGINT handler, so we need to re-enable it
 signal.signal(signal.SIGINT, shutdown_handler)
+
+__all__ = [
+    "ALL_SENSOR_MODALITIES",
+    "app",
+    "cleanup",
+    "clear",
+    "Environment",
+    "example_config_path",
+    "gm",
+    "launch",
+    "log",
+    "REGISTERED_CONTROLLERS",
+    "REGISTERED_OBJECTS",
+    "REGISTERED_ROBOTS",
+    "REGISTERED_SCENES",
+    "REGISTERED_TASKS",
+    "shutdown",
+    "sim",
+    "tempdir",
+    "VectorEnvironment",
+]

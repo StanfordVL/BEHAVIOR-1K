@@ -10,3 +10,14 @@ from omnigibson.systems.micro_particle_system import (
     MicroParticleSystem,
     MicroPhysicalParticleSystem,
 )
+
+__all__ = [
+    "Cloth",
+    "FluidSystem",
+    "GranularSystem",
+    "MacroParticleSystem",
+    "MacroPhysicalParticleSystem",
+    "MacroVisualParticleSystem",
+    "MicroParticleSystem",
+    "MicroPhysicalParticleSystem",
+]
