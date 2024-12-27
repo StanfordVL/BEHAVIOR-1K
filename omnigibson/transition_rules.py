@@ -190,7 +190,6 @@ class TransitionRuleAPI:
 
         # Then add new objects
         if len(added_obj_attrs) > 0:
-            state = og.sim.dump_state()
             for added_obj_attr in added_obj_attrs:
                 new_obj = added_obj_attr.obj
                 self.scene.add_object(new_obj)
@@ -1007,7 +1006,6 @@ class DicingRule(BaseTransitionRule):
         objs_to_remove = []
 
         for diceable_obj in object_candidates["diceable"]:
-            obj_category = diceable_obj.category
             # We expect all diced particle systems to follow the naming convention (cooked__)diced__<category>
             system_name = "diced__" + diceable_obj.category.removeprefix("half_")
             if Cooked in diceable_obj.states and diceable_obj.states[Cooked].get_value():
@@ -1528,8 +1526,6 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if the recipe is active, else False
         """
-        in_volume = container_info["in_volume"]
-
         # Verify the container category is valid
         if not self._validate_recipe_container_is_valid(recipe=recipe, container=container):
             return False

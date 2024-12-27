@@ -1167,7 +1167,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = target_pose[0]
         target_orn = target_pose[1]
         target_orn_axisangle = T.quat2axisangle(target_pose[1])
-        control_idx = self.robot.controller_action_idx["arm_" + self.arm]
         prev_pos = prev_orn = None
 
         # All we need to do here is save the target IK position so that empty action takes us towards it

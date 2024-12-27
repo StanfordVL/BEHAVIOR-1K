@@ -35,9 +35,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         options=available_obj_models, name="object model", random_selection=random_selection
     )
 
-    # Load the specs of the object categories, e.g., common scaling factor
-    avg_category_spec = get_og_avg_category_specs()
-
     # Create and load this object into the simulator
     obj_cfg = dict(
         type="DatasetObject",

@@ -277,8 +277,8 @@ class TestSymbolicPrimitives:
     @pytest.mark.skip("Disabled until env reset can add/remove objects")
     def test_cut(self, env, prim_gen, apple, knife, countertop):
         # Store the apple object information for scene reset
-        deleted_objs = [apple]
-        deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+        # deleted_objs = [apple]
+        # deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
         # assert not apple.states[object_states.Cut].get_value(knife)
         # start a new environment to enable transition rules

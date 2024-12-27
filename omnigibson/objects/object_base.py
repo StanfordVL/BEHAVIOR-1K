@@ -142,7 +142,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             if (
                 self.n_joints == 0
                 and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                and (self._load_config["kinematic_only"] != False)
+                and (self._load_config["kinematic_only"] is not False)
                 and not self.has_attachment_points
             ):
                 kinematic_only = True

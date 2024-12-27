@@ -114,7 +114,7 @@ def _launch_app():
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim  # noqa: F401
     except ImportError:
-        isaacsim = None
+        pass
 
     # First obtain the Isaac Sim version
     isaac_path = os.environ["ISAAC_PATH"]
@@ -231,7 +231,7 @@ def _launch_app():
 
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
-    sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
+    shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
 
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
     signal.signal(signal.SIGINT, og.shutdown_handler)

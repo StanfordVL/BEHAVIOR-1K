@@ -162,7 +162,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, keyboard_event_handler)
+        input_interface.subscribe_to_keyboard_events(keyboard, keyboard_event_handler)
 
         # Print out helpful information to the user
         print_message()
