@@ -21,7 +21,6 @@ m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin, GlobalUpdateStateMixin):
-
     # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 

@@ -735,8 +735,9 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             xform_prim = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
-            mesh_in_parent_link_pos, mesh_in_parent_link_orn = th.tensor(mesh_info["position"]), th.tensor(
-                mesh_info["orientation"]
+            mesh_in_parent_link_pos, mesh_in_parent_link_orn = (
+                th.tensor(mesh_info["position"]),
+                th.tensor(mesh_info["orientation"]),
             )
 
             # Get the mesh/light pose in the meta link frame

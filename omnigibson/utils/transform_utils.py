@@ -575,7 +575,6 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
 
 @torch.compile
 def quat2euler(q):
-
     single_dim = q.dim() == 1
 
     if single_dim:

@@ -338,7 +338,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-
                     arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
 

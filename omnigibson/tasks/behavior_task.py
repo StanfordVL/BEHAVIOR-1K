@@ -392,7 +392,6 @@ class BehaviorTask(BaseTask):
         for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(
             objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin
         ):
-
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:

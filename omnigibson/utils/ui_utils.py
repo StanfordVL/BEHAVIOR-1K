@@ -550,7 +550,6 @@ class CameraMover:
             event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
             or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
         ):
-
             if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS and event.input in self.input_to_function:
                 self.input_to_function[event.input]()
 
@@ -763,7 +762,6 @@ class KeyboardRobotController:
             event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
             or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
         ):
-
             # Handle special cases
             if (
                 event.input in {lazy.carb.input.KeyboardInput.KEY_1, lazy.carb.input.KeyboardInput.KEY_2}
@@ -883,7 +881,6 @@ class KeyboardRobotController:
 
         # Possibly set the persistent gripper action
         if len(self.binary_grippers) > 0 and self.keypress_mapping[lazy.carb.input.KeyboardInput.T]["val"] is not None:
-
             for i, binary_gripper in enumerate(self.binary_grippers):
                 # Possibly update the stored value if the toggle gripper key has been pressed and
                 # it's the active gripper being controlled

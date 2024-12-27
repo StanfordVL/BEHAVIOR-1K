@@ -11,7 +11,6 @@ from omnigibson.utils.constants import PrimType
 
 
 def test_scene_graph():
-
     if og.sim is None:
         # Set global flags
         gm.ENABLE_OBJECT_STATES = True

@@ -232,7 +232,6 @@ class DataWrapper(EnvironmentWrapper):
             self.flush_current_traj()
 
         if self.hdf5_file is not None:
-
             log.info(
                 f"\nSaved:\n"
                 f"{self.traj_count} trajectories / {self.step_count} total steps\n"

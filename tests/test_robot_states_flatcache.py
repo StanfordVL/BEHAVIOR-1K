@@ -145,7 +145,6 @@ def test_robot_load_drive():
 
     # Iterate over all robots and test their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
-
         if robot_name in ["FrankaMounted", "Stretch"]:
             # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
             continue
@@ -214,7 +213,6 @@ def test_robot_load_drive():
 
 
 def test_grasping_mode():
-
     if og.sim is None:
         # Set global flags
         gm.ENABLE_FLATCACHE = True

@@ -13,7 +13,6 @@ m.N_MAX_MICRO_PARTICLE_SAMPLES = 100000
 
 
 class Filled(RelativeObjectState, BooleanStateMixin):
-
     def _get_value(self, system):
         # Sanity check to make sure system is valid
         assert self.obj.scene.is_physical_particle_system(

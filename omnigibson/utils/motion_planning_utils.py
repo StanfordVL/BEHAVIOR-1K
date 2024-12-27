@@ -54,7 +54,6 @@ def plan_base_motion(
     from ompl import geometric as ompl_geo
 
     class CustomMotionValidator(ob.MotionValidator):
-
         def __init__(self, si, space):
             super(CustomMotionValidator, self).__init__(si)
             self.si = si

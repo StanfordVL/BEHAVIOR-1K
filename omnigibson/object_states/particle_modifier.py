@@ -224,7 +224,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     """
 
     def __init__(self, obj, conditions, method=ParticleModifyMethod.ADJACENCY, projection_mesh_params=None):
-
         # Store internal variables
         self.method = method
         self.projection_source_sphere = None
