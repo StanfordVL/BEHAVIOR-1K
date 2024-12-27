@@ -4,7 +4,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
-from omnigibson.robots import *
+from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI

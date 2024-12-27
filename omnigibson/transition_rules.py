@@ -14,7 +14,22 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    ContactParticles,
+    ContainedParticles,
+    Contains,
+    Cooked,
+    Covered,
+    Filled,
+    Heated,
+    HeatSourceOrSink,
+    MaxTemperature,
+    OnTop,
+    Open,
+    Saturated,
+    SlicerActive,
+    ToggledOn,
+)
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.bddl_utils import translate_bddl_recipe_to_og_recipe, translate_bddl_washer_rule_to_og_washer_rule

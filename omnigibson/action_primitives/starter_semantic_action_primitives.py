@@ -28,7 +28,7 @@ from omnigibson.action_primitives.action_primitive_set_base import (
 from omnigibson.controllers import DifferentialDriveController, InverseKinematicsController, JointController
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.robots import *
+from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husky, Locobot, Stretch, Tiago, Turtlebot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask

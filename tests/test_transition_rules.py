@@ -6,7 +6,20 @@ from utils import og_test, place_obj_on_floor_plane, remove_all_systems, retriev
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    Contains,
+    Cooked,
+    Covered,
+    Heated,
+    HeatSourceOrSink,
+    Inside,
+    OnTop,
+    Open,
+    Saturated,
+    Temperature,
+    ToggledOn,
+    Touching,
+)
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
 

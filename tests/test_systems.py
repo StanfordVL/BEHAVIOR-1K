@@ -2,7 +2,7 @@ from utils import SYSTEM_EXAMPLES, og_test
 
 import omnigibson as og
 from omnigibson.object_states import Covered
-from omnigibson.systems import *
+from omnigibson.systems import VisualParticleSystem
 
 
 @og_test
