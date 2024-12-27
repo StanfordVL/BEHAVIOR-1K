@@ -1050,7 +1050,10 @@ def test_cooking_object_rule_failure_wrong_heat_source(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    heat_source_position = stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
+    # Check that the stove heat source link exists
+    stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
+
+    # Put the baking sheet on the stove
     baking_sheet.set_position_orientation(position=[-0.20, 0, 0.80], orientation=[0, 0, 0, 1])
     og.sim.step()
 

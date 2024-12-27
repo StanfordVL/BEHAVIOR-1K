@@ -631,7 +631,7 @@ class KeyboardRobotController:
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+        input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -1011,9 +1011,7 @@ def draw_line(start, end, color=(1.0, 0.0, 0.0, 1.0), size=1.0):
     """
     Draws a single line between two points.
     """
-    from omni.isaac.debug_draw import _debug_draw
-
-    draw = _debug_draw.acquire_debug_draw_interface()
+    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.draw_lines([start], [end], [color], [size])
 
 
@@ -1039,7 +1037,5 @@ def clear_debug_drawing():
     """
     Clears all debug drawings.
     """
-    from omni.isaac.debug_draw import _debug_draw
-
-    draw = _debug_draw.acquire_debug_draw_interface()
+    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.clear_lines()
