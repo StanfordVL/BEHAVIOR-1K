@@ -1,5 +1,9 @@
 import math
 
+import numpy as np
+import torch as th
+from numba import jit
+
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -293,9 +297,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return len(self.dof_idx)
 
 
-import torch as th
-
-
 @th.compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
@@ -304,10 +305,6 @@ def _compute_joint_torques_torch(
 ):
     dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
     return mm[dof_idxs_mat] @ u
-
-
-import numpy as np
-from numba import jit
 
 
 # Use numba since faster

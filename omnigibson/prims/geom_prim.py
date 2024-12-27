@@ -117,7 +117,7 @@ class GeomPrim(XFormPrim):
         if self.has_material():
             self.material.opacity_constant = opacity
         else:
-            self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+            self.set_attribute("primvars:displayOpacity", [opacity])
 
     @property
     def points(self):

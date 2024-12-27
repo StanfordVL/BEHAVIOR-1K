@@ -253,7 +253,7 @@ def _pip_based_install():
 
         # Check that it can now be imported
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim
+        import isaacsim  # noqa: F401
     except ImportError:
         return False
 
@@ -322,7 +322,10 @@ def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_p
     # Check if the isaacsim package is already installed
     try:
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim
+
+        # We import this, skip the unused import warning, because the import actually has side effects
+        # in terms of what's included in the Python path.
+        import isaacsim  # noqa: F401
 
         click.echo("Isaac Sim is already installed via pip in your current env.")
         click.echo("If you need to download the datasets, please run omnigibson/download_datasets.py.")

@@ -94,7 +94,7 @@ GOOD_BBOXES = {
 
 BAD_CLOTH_MODELS = {
     "bandana": {"wbhliu"},
-    "curtain": {"ohvomi"},
+    "curtain": {"ohvomi", "shbakk"},
     "cardigan": {"itrkhr"},
     "sweatshirt": {"nowqqh"},
     "jeans": {"nmvvil", "pvzxyp"},
@@ -113,7 +113,6 @@ BAD_CLOTH_MODELS = {
     "scarf": {"kclcrj"},
     "sock": {"vpafgj"},
     "tank_top": {"fzldgi"},
-    "curtain": {"shbakk"},
 }
 
 

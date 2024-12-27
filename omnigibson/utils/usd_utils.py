@@ -13,6 +13,8 @@ from numba import jit, prange
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.macros import gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
@@ -1876,9 +1878,6 @@ def delete_or_deactivate_prim(prim_path):
     return True
 
 
-import omnigibson.utils.transform_utils as TT
-
-
 @th.compile
 def _compute_relative_poses_torch(
     idx: int,
@@ -1904,9 +1903,6 @@ def _compute_relative_poses_torch(
     rel_poses[:, 3:] = TT.mat2quat(rel_tfs[:, :3, :3])
 
     return rel_poses
-
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 @jit(nopython=True)

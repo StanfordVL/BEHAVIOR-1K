@@ -17,13 +17,12 @@ from omnigibson.utils.python_utils import meets_minimum_version
 
 try:
     import gymnasium as gym
-    import tensorboard
+    import tensorboard  # noqa: F401
     import torch as th
     import torch.nn as nn
     from stable_baselines3 import PPO
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
     from stable_baselines3.common.evaluation import evaluate_policy
-    from stable_baselines3.common.preprocessing import maybe_transpose
     from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
     from stable_baselines3.common.utils import set_random_seed
 

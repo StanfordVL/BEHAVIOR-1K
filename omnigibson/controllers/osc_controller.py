@@ -1,5 +1,11 @@
 import math
 
+import numpy as np
+import torch as th
+from numba import jit
+
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
@@ -488,11 +494,6 @@ class OperationalSpaceController(ManipulationController):
         return self._command_dim
 
 
-import torch as th
-
-import omnigibson.utils.transform_utils as TT
-
-
 @th.jit.script
 def _compute_osc_torques_torch(
     q: th.Tensor,
@@ -566,12 +567,6 @@ def _compute_osc_torques_torch(
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u
-
-
-import numpy as np
-from numba import jit
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 # Use numba since faster
