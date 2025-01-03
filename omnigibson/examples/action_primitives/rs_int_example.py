@@ -10,6 +10,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
 )
 from omnigibson.macros import gm
 from omnigibson.robots.tiago import Tiago
+from omnigibson.utils.ui_utils import choose_from_options
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -27,8 +28,11 @@ def main():
 
     It loads Rs_int with a robot, and the robot picks and places an apple.
     """
+    robot_options = ["R1", "Tiago"]
+    robot_type = choose_from_options(options=robot_options, name="robot options", random_selection=False)
+
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
+    config_filename = os.path.join(og.example_config_path, f"{robot_type.lower()}_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     config["scene"]["scene_model"] = "Rs_int"
