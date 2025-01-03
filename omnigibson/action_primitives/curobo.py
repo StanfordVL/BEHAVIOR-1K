@@ -330,10 +330,7 @@ class CuRoboMotionGenerator:
             world_coll_checker._mesh_tensor_list[1][0, i, :7] = inv_pose
 
     def check_collisions(
-        self,
-        q,
-        self_collision_check=True,
-        skip_obstacle_update=False,
+        self, q, self_collision_check=True, skip_obstacle_update=False, attached_obj=None, attached_obj_scale=None
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -342,7 +339,11 @@ class CuRoboMotionGenerator:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
             self_collision_check (bool): Whether to check self-collisions or not
-            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use for checking collisions
+            skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
+            attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding BaseObject instances to attach to that link
+            attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
+                link names and the values are the corresponding scale to apply to the attached object
 
         Returns:
             th.tensor: (N,)-shaped tensor, where each value is True if in collision, else False
@@ -369,6 +370,14 @@ class CuRoboMotionGenerator:
             joint_names=self.robot_joint_names,
         ).get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
+        # Attach objects if specified
+        attached_info = self._attach_objects_to_robot(
+            attached_obj=attached_obj,
+            attached_obj_scale=attached_obj_scale,
+            cu_js_batch=cu_js,
+            emb_sel=emb_sel,
+        )
+
         robot_spheres = self.mg[emb_sel].compute_kinematics(cu_js).robot_spheres
         # (N_samples, n_spheres, 4) --> (N_samples, 1, n_spheres, 4)
         robot_spheres = robot_spheres.unsqueeze(dim=1)
@@ -384,6 +393,9 @@ class CuRoboMotionGenerator:
                 )
                 self_collision_results = self_collision_dist > 0.0
                 collision_results = collision_results | self_collision_results
+
+        # Detach objects before returning
+        self._detach_objects_from_robot(attached_info, emb_sel)
 
         # Return results
         return collision_results  # shape (B,)
@@ -649,28 +661,12 @@ class CuRoboMotionGenerator:
         cu_js_batch = cu_joint_state.get_ordered_joint_state(self.mg[emb_sel].kinematics.joint_names)
 
         # Attach object to robot if requested
-        if attached_obj is not None:
-            for ee_link_name, obj in attached_obj.items():
-                assert isinstance(obj, RigidPrim), "attached_object should be a RigidPrim object"
-                obj_paths = [geom.prim_path for geom in obj.collision_meshes.values()]
-                assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
-
-                position, quaternion = self.robot.links[ee_link_name].get_position_orientation()
-                # xyzw to wxyz
-                quaternion = quaternion[[3, 0, 1, 2]]
-                ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
-                self.mg[emb_sel].attach_objects_to_robot(
-                    joint_state=cu_js_batch,
-                    object_names=obj_paths,
-                    ee_pose=ee_pose,
-                    link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                    scale=1.0 if attached_obj_scale is None else attached_obj_scale[ee_link_name],
-                    pitch_scale=1.0,
-                    merge_meshes=True,
-                    world_objects_pose_offset=lazy.curobo.types.math.Pose.from_list(
-                        [0, 0, 0.01, 1, 0, 0, 0], self._tensor_args
-                    ),
-                )
+        attached_info = self._attach_objects_to_robot(
+            attached_obj=attached_obj,
+            attached_obj_scale=attached_obj_scale,
+            cu_js_batch=cu_js_batch,
+            emb_sel=emb_sel,
+        )
 
         all_rollout_fns = [
             fn
@@ -786,12 +782,7 @@ class CuRoboMotionGenerator:
             paths += joint_state[:end_idx]
 
         # Detach attached object if it was attached
-        if attached_obj is not None:
-            for ee_link_name, obj in attached_obj.items():
-                self.mg[emb_sel].detach_object_from_robot(
-                    object_names=[geom.prim_path for geom in obj.collision_meshes.values()],
-                    link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
-                )
+        self._detach_objects_from_robot(attached_info, emb_sel)
 
         if return_full_result:
             return results
@@ -876,3 +867,75 @@ class CuRoboMotionGenerator:
             TensorDeviceType: tensor arguments used by this CuRobo instance
         """
         return self._tensor_args
+
+    def _attach_objects_to_robot(
+        self,
+        attached_obj,
+        attached_obj_scale,
+        cu_js_batch,
+        emb_sel,
+    ):
+        """
+        Helper function to attach objects to the robot.
+
+        Args:
+            attached_obj (None or Dict[str, BaseObject]): Dictionary mapping end-effector
+                link names to corresponding BaseObject instances
+            attached_obj_scale (None or Dict[str, float]): Dictionary mapping end-effector
+                link names to corresponding scale values
+            cu_js_batch (JointState): CuRobo joint state object ordered according to kinematics
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use
+
+        Returns:
+            list: List of attached object information for detachment
+        """
+        if attached_obj is None:
+            return []
+
+        attached_info = []
+        for ee_link_name, obj in attached_obj.items():
+            assert isinstance(obj, RigidPrim), "attached_object should be a RigidPrim object"
+            obj_paths = [geom.prim_path for geom in obj.collision_meshes.values()]
+            assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
+
+            position, quaternion = self.robot.links[ee_link_name].get_position_orientation()
+            # xyzw to wxyz
+            quaternion = quaternion[[3, 0, 1, 2]]
+            ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
+
+            scale = 0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name]
+
+            self.mg[emb_sel].attach_objects_to_robot(
+                joint_state=cu_js_batch,
+                object_names=obj_paths,
+                ee_pose=ee_pose,
+                link_name=self.robot.curobo_attached_object_link_names[ee_link_name],
+                scale=scale,
+                pitch_scale=1.0,
+                merge_meshes=True,
+            )
+
+            attached_info.append(
+                {"obj_paths": obj_paths, "link_name": self.robot.curobo_attached_object_link_names[ee_link_name]}
+            )
+
+        return attached_info
+
+    def _detach_objects_from_robot(
+        self,
+        attached_info,
+        emb_sel,
+    ):
+        """
+        Helper function to detach previously attached objects from the robot.
+
+        Args:
+            attached_info (list): List of dictionaries containing object paths and link names
+                returned by _attach_objects_to_robot
+            emb_sel (CuRoboEmbodimentSelection): Which embodiment selection to use
+        """
+        for info in attached_info:
+            self.mg[emb_sel].detach_object_from_robot(
+                object_names=info["obj_paths"],
+                link_name=info["link_name"],
+            )

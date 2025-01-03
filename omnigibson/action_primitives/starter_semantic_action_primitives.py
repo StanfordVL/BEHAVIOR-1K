@@ -836,7 +836,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pose,
         avoid_collision=True,
         arm=None,
-        attached_obj=None,
         motion_constraint=None,
         low_precision=False,
         lock_auxiliary_arm=False,
@@ -899,15 +898,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos,
         target_quat,
         embodiment_selection=CuRoboEmbodimentSelection.DEFAULT,
-        attached_obj=None,
         motion_constraint=None,
     ):
-        if attached_obj is None:
-            # If an object is grasped, we need to pass it to the motion planner
-            obj_in_hand = self._get_obj_in_hand()
-            if obj_in_hand is not None:
-                # TODO: this root link logic is bad, fix it
-                attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link}
+        # If an object is grasped, we need to pass it to the motion planner
+        obj_in_hand = self._get_obj_in_hand()
+        attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link} if obj_in_hand is not None else None
+
         planning_attempts = 0
         success = False
         traj_path = None
@@ -1456,7 +1452,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[action_idx] = partial_action
         return action
 
-    def _reset_robot(self, attached_obj=None):
+    def _reset_robot(self):
         """
         Yields action to move both hands to the position optimal for executing subsequent action primitives
 
@@ -1473,12 +1469,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_pos=target_pos,
             target_quat=target_quat,
             embodiment_selection=CuRoboEmbodimentSelection.ARM,
-            attached_obj=attached_obj,
         )
         indented_print(f"Plan has {len(q_traj)} steps")
         yield from self._execute_motion_plan(q_traj, low_precision=True)
 
-    def _reset_hand(self, arm=None, attached_obj=None):
+    def _reset_hand(self, arm=None):
         """
         Yields action to move the hand to the position optimal for executing subsequent action primitives
 
@@ -1492,7 +1487,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         reset_eef_pose = self._get_reset_eef_pose("world")[arm]
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*reset_eef_pose)
-        yield from self._move_hand(reset_eef_pose, arm=arm, attached_obj=attached_obj, low_precision=True)
+        yield from self._move_hand(reset_eef_pose, arm=arm, low_precision=True)
 
     def _get_reset_eef_pose(self, frame="robot"):
         """
@@ -1996,8 +1991,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             candidate_joint_positions.append(joint_pos)
 
         candidate_joint_positions = th.stack(candidate_joint_positions)
+
+        # If an object is grasped, we need to pass it to the collision checker
+        obj_in_hand = self._get_obj_in_hand()
+        attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link} if obj_in_hand is not None else None
+
         invalid_results = self._motion_generator.check_collisions(
-            candidate_joint_positions, self_collision_check=False, skip_obstacle_update=skip_obstacle_update
+            candidate_joint_positions,
+            self_collision_check=False,
+            skip_obstacle_update=skip_obstacle_update,
+            attached_obj=attached_obj,
         ).cpu()
 
         # For each candidate that passed collision check, verify reachability
