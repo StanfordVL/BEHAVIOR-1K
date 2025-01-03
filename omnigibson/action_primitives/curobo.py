@@ -150,6 +150,7 @@ class CuRoboMotionGenerator:
         use_cuda_graph=True,
         debug=False,
         use_default_embodiment_only=False,
+        collision_activation_distance=0.01,
     ):
         """
         Args:
@@ -165,6 +166,9 @@ class CuRoboMotionGenerator:
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
             use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
+            collision_activation_distance (float): Activation distance for collision checking; this affects
+                1) how close the computed trajectories can get to obstacles and
+                2) how close the robot can get to obstacles during collision checks
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
@@ -225,7 +229,7 @@ class CuRoboMotionGenerator:
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
                 interpolation_dt=0.03,
-                collision_activation_distance=0.05,
+                collision_activation_distance=collision_activation_distance,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
                 fixed_iters_trajopt=True,
@@ -628,6 +632,12 @@ class CuRoboMotionGenerator:
         )
 
         # Add the pose cost metric
+        # Details can be found here: https://curobo.org/advanced_examples/3_constrained_planning.html
+        # The motion constraint vector is a 6D vector controlling end-effector movement:
+        # Angular constraints: [qx, qy, qz] - rotation around each axis
+        # Linear constraints: [x, y, z] - translation along each axis
+        # Setting any component to 1.0 locks that axis, forcing the planner to reach
+        # the target using only the remaining unlocked axes
         if motion_constraint is None:
             motion_constraint = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
