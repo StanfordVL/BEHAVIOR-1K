@@ -38,7 +38,6 @@ def get_grasp_poses_for_object_sticky(target_obj):
     towards_object_in_world_frame = bbox_center_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
-    # TODO: why was this pi/2 in the y-axis?
     grasp_quat = T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32))
 
     grasp_pose = (grasp_center_pos, grasp_quat)

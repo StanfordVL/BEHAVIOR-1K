@@ -80,7 +80,7 @@ robots:
         use_delta_commands: false
         use_impedances: true
         pos_kp: 200
-        pos_ki: 0.5
+        pos_ki: 5.0
         max_integral_error: 10.0
       trunk:
         name: JointController
@@ -91,13 +91,12 @@ robots:
         pos_kp: 500
       arm_left:
         name: JointController
-        # subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
         use_impedances: true
         pos_kp: 500
-        pos_ki: 0.5
+        pos_ki: 5.0
         max_integral_error: 10.0
       arm_right:
         name: JointController
@@ -106,22 +105,20 @@ robots:
         use_delta_commands: false
         use_impedances: true
         pos_kp: 500
-        pos_ki: 0.5
+        pos_ki: 5.0
         max_integral_error: 10.0
       gripper_left:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
-        use_impedances: true
-        pos_kp: 200
+        use_impedances: false
       gripper_right:
         name: JointController
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
-        use_impedances: true
-        pos_kp: 200
+        use_impedances: false
       camera:
         name: JointController
 

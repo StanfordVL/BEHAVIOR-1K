@@ -168,9 +168,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         pos = th.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+        pos[self.arm_control_idx["left"]] = th.tensor([-0.0464, 2.6172, -1.4584, -0.0433, 1.5899, -1.1587])
+        pos[self.arm_control_idx["right"]] = th.tensor([0.0464, 2.6168, -1.4570, 0.0418, -1.5896, 1.1593])
         for arm in self.arm_names:
             pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
-            pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
         return pos
 
     @property
@@ -247,33 +248,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         return [
             ["left_gripper_link1", "left_gripper_link2"],
             ["right_gripper_link1", "right_gripper_link2"],
-            ["base_link", "torso_link1"],
-            ["base_link", "servo_link1"],
-            ["base_link", "wheel_link3"],
-            ["base_link", "servo_link3"],
-            ["base_link", "servo_link2"],
             ["base_link", "wheel_link1"],
             ["base_link", "wheel_link2"],
-            ["servo_link1", "wheel_link1"],
-            ["servo_link2", "wheel_link2"],
-            ["servo_link3", "wheel_link3"],
-            ["torso_link1", "torso_link2"],
-            ["torso_link2", "torso_link3"],
-            ["torso_link3", "torso_link4"],
-            ["torso_link4", "left_arm_link1"],
-            ["left_arm_link1", "left_arm_link2"],
-            ["left_arm_link2", "left_arm_link3"],
-            ["left_arm_link3", "left_arm_link4"],
-            ["left_arm_link4", "left_arm_link5"],
-            ["left_arm_link5", "left_arm_link6"],
-            ["left_arm_link6", "left_gripper_link1"],
-            ["left_arm_link6", "left_gripper_link2"],
-            ["torso_link4", "right_arm_link1"],
-            ["right_arm_link1", "right_arm_link2"],
-            ["right_arm_link2", "right_arm_link3"],
-            ["right_arm_link3", "right_arm_link4"],
-            ["right_arm_link4", "right_arm_link5"],
-            ["right_arm_link5", "right_arm_link6"],
-            ["right_arm_link6", "right_gripper_link1"],
-            ["right_arm_link6", "right_gripper_link2"],
+            ["base_link", "wheel_link3"],
+            ["torso_link2", "torso_link4"],
         ]

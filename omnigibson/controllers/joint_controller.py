@@ -20,7 +20,7 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 m.DEFAULT_JOINT_POS_KP = 50.0
-m.DEFAULT_JOINT_POS_KI = 0.1
+m.DEFAULT_JOINT_POS_KI = 0.0  # do not use integral term by default
 m.DEFAULT_JOINT_MAX_INTEGRAL_ERROR = 1.0
 m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0  # critically damped
 m.DEFAULT_JOINT_VEL_KP = 2.0

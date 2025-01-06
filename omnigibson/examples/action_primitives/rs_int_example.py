@@ -13,8 +13,8 @@ from omnigibson.robots.tiago import Tiago
 from omnigibson.utils.ui_utils import choose_from_options
 
 # Don't use GPU dynamics and use flatcache for performance boost
-# gm.USE_GPU_DYNAMICS = True
-# gm.ENABLE_FLATCACHE = True
+gm.USE_GPU_DYNAMICS = False
+gm.ENABLE_FLATCACHE = True
 
 
 def execute_controller(ctrl_gen, env):

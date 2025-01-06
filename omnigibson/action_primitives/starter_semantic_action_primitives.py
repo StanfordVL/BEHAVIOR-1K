@@ -81,10 +81,12 @@ m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 500
 m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
-m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 100
+m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE = 20
 m.PREDICATE_SAMPLING_Z_OFFSET = 0.02
+m.BASE_POSE_SAMPLING_LOWER_BOUND = 0.0
+m.BASE_POSE_SAMPLING_UPPER_BOUND = 1.5
 
 m.GRASP_APPROACH_DISTANCE = 0.01
 m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
@@ -95,9 +97,8 @@ m.DEFAULT_ANGLE_THRESHOLD = 0.05
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
-m.TORSO_FIXED = False
 m.JOINT_POS_DIFF_THRESHOLD = 0.01
-m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.1
+m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.05
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
 m.TIME_BEFORE_JOINT_STUCK_CHECK = 1.0
@@ -532,7 +533,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
         indented_print("Moving hand to grasp pose")
-        yield from self._move_hand(grasp_pose, motion_constraint=[0, 0, 0, 0, 1, 0])
+        yield from self._move_hand(grasp_pose)
 
         if self.robot.grasping_mode == "sticky":
             # Pre-grasp in sticky grasping mode.
@@ -545,7 +546,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand(approach_pose, avoid_collision=False)
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
-            yield from self._move_hand(approach_pose, motion_constraint=[0, 0, 0, 0, 0, 1])
+            yield from self._move_hand(approach_pose)
             yield from self._execute_grasp()
 
         # Step a few times to update
@@ -677,7 +678,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand(directly_move_hand_pose)
         else:
             for candidate in pose_candidates:
-                valid_navigation_pose = self._sample_pose_near_object(obj, pose_on_obj=candidate)
+                valid_navigation_pose = self._sample_pose_near_object(obj, pose_on_obj=candidate, sampling_attempts=20)
                 if valid_navigation_pose is None:
                     continue
                 else:
@@ -904,7 +905,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         obj_in_hand = self._get_obj_in_hand()
         attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link} if obj_in_hand is not None else None
 
-        planning_attempts = 0
         success = False
         traj_path = None
         # aggregate target_pos and target_quat to match batch_size
@@ -914,30 +914,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         }
 
         self._motion_generator.update_obstacles()
-        while not success and planning_attempts < m.MAX_PLANNING_ATTEMPTS:
-            successes, traj_paths = self._motion_generator.compute_trajectories(
-                target_pos=target_pos,
-                target_quat=target_quat,
-                is_local=False,
-                max_attempts=5,
-                timeout=60.0,
-                ik_fail_return=5,
-                enable_finetune_trajopt=True,
-                finetune_attempts=1,
-                return_full_result=False,
-                success_ratio=1.0,
-                attached_obj=attached_obj,
-                motion_constraint=motion_constraint,
-                skip_obstacle_update=True,
-                emb_sel=embodiment_selection,
-            )
-            # Grab the first successful trajectory, if not found, then continue planning
-            success_idx = th.where(successes)[0].cpu()
-            if len(success_idx) > 0:
-                success = True
-                traj_path = traj_paths[success_idx[0]]
-            else:
-                planning_attempts += self._motion_generator.batch_size
+        successes, traj_paths = self._motion_generator.compute_trajectories(
+            target_pos=target_pos,
+            target_quat=target_quat,
+            is_local=False,
+            max_attempts=math.ceil(m.MAX_PLANNING_ATTEMPTS / self._motion_generator.batch_size),
+            timeout=60.0,
+            ik_fail_return=5,
+            enable_finetune_trajopt=True,
+            finetune_attempts=1,
+            return_full_result=False,
+            success_ratio=1.0,
+            attached_obj=attached_obj,
+            motion_constraint=motion_constraint,
+            skip_obstacle_update=True,
+            emb_sel=embodiment_selection,
+        )
+        # Grab the first successful trajectory, if not found, then continue planning
+        success_idx = th.where(successes)[0].cpu()
+        if len(success_idx) > 0:
+            success = True
+            traj_path = traj_paths[success_idx[0]]
         if not success:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -979,7 +976,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     articulation_threshold = (
                         m.JOINT_POS_DIFF_THRESHOLD if not low_precision else m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD
                     )
-                    if th.max(th.abs(articulation_joint_diff)).item() < m.JOINT_POS_DIFF_THRESHOLD:
+                    if th.max(th.abs(articulation_joint_diff)).item() < articulation_threshold:
                         articulation_target_reached = True
                     # TODO: genralize this to transaltion&rotation + high/low precision modes
                     if th.max(th.abs(base_joint_diff)).item() < m.DEFAULT_DIST_THRESHOLD:
@@ -1401,7 +1398,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # if not possible to look at object, return current head joint positions
         else:
-            default_head_pos = self._get_reset_joint_pos()[self.robot.controller_action_idx["camera"]]
+            default_head_pos = self.robot.reset_joint_pos[self.robot.controller_action_idx["camera"]]
             head1_joint_goal = default_head_pos[0]
             head2_joint_goal = default_head_pos[1]
 
@@ -1499,44 +1496,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             dict of th.tensor: The reset eef pose for each robot arm
         """
-        if isinstance(self.robot, Fetch):
-            pose = {
-                self.arm: (
-                    th.tensor([0.48688125, -0.12507881, 0.97888719]),
-                    th.tensor([0.61324748, 0.61305553, -0.35266518, 0.35173529]),
-                )
-            }
-        elif isinstance(self.robot, R1):
+        if isinstance(self.robot, R1):
             pose = {
                 self.robot.arm_names[0]: (
-                    th.tensor([0.43, 0.2, 1.2]),
+                    th.tensor([0.45, 0.183, 1.23]),
                     th.tensor([1.0, 0.0, 0.0, 0.0]),
                 ),
                 self.robot.arm_names[1]: (
-                    th.tensor([0.43, -0.2, 1.2]),
+                    th.tensor([0.45, -0.183, 1.23]),
                     th.tensor([-1.0, 0.0, 0.0, 0.0]),
                 ),
             }
         elif isinstance(self.robot, Tiago):
-            # TODO: default trunk position vs. raised trunk position
-            # pose = {
-            #     self.robot.arm_names[0]: (
-            #         th.tensor([0.4997, 0.2497, 0.6357]),
-            #         th.tensor([-0.5609, 0.5617, 0.4299, 0.4302]),
-            #     ),
-            #     self.robot.arm_names[1]: (
-            #         th.tensor([0.4978, -0.2521, 0.6357]),
-            #         th.tensor([-0.5609, -0.5617, 0.4299, -0.4302]),
-            #     ),
-            # }
             pose = {
                 self.robot.arm_names[0]: (
-                    th.tensor([0.5021, 0.2458, 0.7648]),
-                    th.tensor([-0.5599, 0.5649, 0.4303, 0.4269]),
+                    th.tensor([0.5, 0.23, 0.85]),
+                    th.tensor([0.7071, -0.7071, 0.0000, -0.0000]),
                 ),
                 self.robot.arm_names[1]: (
-                    th.tensor([0.4999, -0.2486, 0.7633]),
-                    th.tensor([-0.5592, -0.5646, 0.4311, -0.4274]),
+                    th.tensor([0.5, -0.23, 0.85]),
+                    th.tensor([-0.7071, -0.7071, -0.0000, -0.0000]),
                 ),
             }
         else:
@@ -1547,64 +1526,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return {arm: self._robot_pose_to_world_pose(pose[arm]) for arm in pose}
         else:
             raise ValueError(f"Unsupported frame: {frame}")
-
-    def _get_reset_joint_pos(self):
-        reset_pose_fetch = th.tensor(
-            [
-                0.0,
-                0.0,  # wheels
-                0.0,  # trunk
-                0.0,
-                -1.0,
-                0.0,  # head
-                -1.0,
-                1.53448,
-                2.2,
-                0.0,
-                1.36904,
-                1.90996,  # arm
-                0.05,
-                0.05,  # gripper
-            ]
-        )
-
-        reset_pose_tiago = th.tensor(
-            [
-                -1.78029833e-04,
-                3.20231302e-05,
-                -1.85759447e-07,
-                0.0,
-                -0.2,
-                0.0,
-                0.1,
-                -6.10000000e-01,
-                -1.10000000e00,
-                0.00000000e00,
-                -1.10000000e00,
-                1.47000000e00,
-                0.00000000e00,
-                8.70000000e-01,
-                2.71000000e00,
-                1.50000000e00,
-                1.71000000e00,
-                -1.50000000e00,
-                -1.57000000e00,
-                4.50000000e-01,
-                1.39000000e00,
-                0.00000000e00,
-                0.00000000e00,
-                4.50000000e-02,
-                4.50000000e-02,
-                4.50000000e-02,
-                4.50000000e-02,
-            ]
-        )
-        if isinstance(self.robot, Fetch):
-            return reset_pose_fetch
-        elif isinstance(self.robot, Tiago):
-            return reset_pose_tiago
-        else:
-            raise ValueError(f"Unsupported robot model: {type(self.robot)}")
 
     def _navigate_to_pose(self, pose_2d):
         """
@@ -1617,15 +1538,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         pose_3d = self._get_robot_pose_from_2d_pose(pose_2d)
-        # TODO: why was this 0.1?
-        pose_3d[0][2] = 0.0
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*pose_3d)
         target_pos = {self.robot.base_footprint_link_name: pose_3d[0]}
         target_quat = {self.robot.base_footprint_link_name: pose_3d[1]}
 
         q_traj = self._plan_joint_motion(target_pos, target_quat, CuRoboEmbodimentSelection.BASE)
-        yield from self._execute_motion_plan(q_traj, stop_on_contact=True)
+        yield from self._execute_motion_plan(q_traj, stop_on_contact=False)
 
     def _draw_plan(self, plan):
         SEARCHED = []
@@ -1803,7 +1722,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         empty_action = self._empty_action()
         yield self._postprocess_action(empty_action)
 
-    def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
+    def _sample_pose_near_object(
+        self, obj, pose_on_obj=None, sampling_attempts=m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT, **kwargs
+    ):
         """
         Returns a 2d pose for the robot within in the range of the object and where the robot is not in collision with anything
 
@@ -1817,8 +1738,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        # TODO: make this a macro
-        distance_lo, distance_hi = 0.0, 2.0
+        distance_lo, distance_hi = m.BASE_POSE_SAMPLING_LOWER_BOUND, m.BASE_POSE_SAMPLING_UPPER_BOUND
         yaw_lo, yaw_hi = -math.pi, math.pi
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 
@@ -1833,7 +1753,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         attempt = 0
         # Update obstacle once before sampling
         self._motion_generator.update_obstacles()
-        while attempt < m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT:
+        while attempt < sampling_attempts:
             candidate_poses = []
             for _ in range(self._collision_check_batch_size):
                 while True:
