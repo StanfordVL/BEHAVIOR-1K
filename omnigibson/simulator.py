@@ -329,6 +329,7 @@ def _launch_simulator(*args, **kwargs):
             self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
                 self._on_contact
             )
+            # The callback will be called right *before* the physics step
             self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
                 lambda _: self._on_physics_step(),
                 pre_step=True,
