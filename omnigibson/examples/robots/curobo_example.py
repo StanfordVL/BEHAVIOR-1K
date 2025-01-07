@@ -34,12 +34,12 @@ def execute_trajectory(q_traj, env, robot, attached_obj):
     for i, q in enumerate(q_traj):
         q = q.cpu()
         q = set_gripper_joint_positions(robot, q, attached_obj)
-        command = q_to_command(q, robot)
+        action = robot.q_to_action(q)
 
         num_repeat = 5
         print(f"Executing waypoint {i}/{len(q_traj)}")
         for _ in range(num_repeat):
-            env.step(command)
+            env.step(action)
 
 
 def plan_and_execute_trajectory(
@@ -76,21 +76,11 @@ def control_gripper(env, robot, attached_obj):
     # Control the gripper to open or close, while keeping the rest of the robot still
     q = robot.get_joint_positions()
     q = set_gripper_joint_positions(robot, q, attached_obj)
-    command = q_to_command(q, robot)
+    action = robot.q_to_action(q)
     num_repeat = 30
     print(f"Gripper (attached_obj={attached_obj})")
     for _ in range(num_repeat):
-        env.step(command)
-
-
-def q_to_command(q, robot):
-    # Convert target joint positions to command
-    command = []
-    for controller in robot.controllers.values():
-        command.append(q[controller.dof_idx])
-    command = th.cat(command, dim=0)
-    assert command.shape[0] == robot.action_dim
-    return command
+        env.step(action)
 
 
 def test_curobo():
