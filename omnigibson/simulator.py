@@ -329,8 +329,10 @@ def _launch_simulator(*args, **kwargs):
             self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
                 self._on_contact
             )
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
-                lambda _: self._on_physics_step()
+            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_physics_step(),
+                pre_step=True,
+                order=0,
             )
             self._simulation_event_callback = (
                 self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
