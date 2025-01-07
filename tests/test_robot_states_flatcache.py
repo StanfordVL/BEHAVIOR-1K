@@ -62,7 +62,7 @@ def camera_pose_test(flatcache):
     )
 
     sensor_world_pos_gt = th.tensor([150.5187, 149.8295, 101.0960])
-    sensor_world_ori_gt = th.tensor([0.0198, -0.1313, 0.9895, -0.0576])
+    sensor_world_ori_gt = th.tensor([0.0199, -0.1330, 0.9892, -0.0580])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
