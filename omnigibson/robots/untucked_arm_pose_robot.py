@@ -1,5 +1,3 @@
-from abc import abstractmethod
-
 import torch as th
 
 from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot

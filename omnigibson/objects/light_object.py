@@ -96,10 +96,10 @@ class LightObject(StatefulObject):
     def _load(self):
         # Define XForm and base link for this light
         prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
-        base_link = og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
+        og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
 
         # Define the actual light link
-        light_prim = (
+        (
             getattr(lazy.pxr.UsdLux, f"{self.light_type}Light")
             .Define(og.sim.stage, f"{self.prim_path}/base_link/light")
             .GetPrim()
@@ -118,7 +118,7 @@ class LightObject(StatefulObject):
         self._light_link.load(self.scene)
 
         # Apply Shaping API and set default cone angle attribute
-        shaping_api = lazy.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
+        lazy.pxr.UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
 
         # Optionally set the intensity
         if self._load_config.get("intensity", None) is not None:

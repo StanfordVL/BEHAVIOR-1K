@@ -1,6 +1,5 @@
 import os
 
-import torch as th
 import yaml
 
 import omnigibson as og
@@ -8,7 +7,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
-from omnigibson.macros import gm
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -46,8 +44,6 @@ def main():
 
     # Load the environment
     env = og.Environment(configs=config)
-    scene = env.scene
-    robot = env.robots[0]
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()

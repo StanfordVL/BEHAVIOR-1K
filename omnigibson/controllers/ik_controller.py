@@ -1,6 +1,12 @@
 import math
 from collections.abc import Iterable
 
+import numpy as np
+import torch as th
+from numba import jit
+
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -142,7 +148,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if type(command_input_limits) == str and command_input_limits == "default":
+                if type(command_input_limits) is str and command_input_limits == "default":
                     command_input_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
@@ -156,7 +162,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                         cb.array(command_output_limits[0]),
                         cb.array(command_output_limits[1]),
                     ]
-                if type(command_output_limits) == str and command_output_limits == "default":
+                if type(command_output_limits) is str and command_output_limits == "default":
                     command_output_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
@@ -371,11 +377,6 @@ class InverseKinematicsController(JointController, ManipulationController):
         return IK_MODE_COMMAND_DIMS[self.mode]
 
 
-import torch as th
-
-import omnigibson.utils.transform_utils as TT
-
-
 @th.jit.script
 def _compute_ik_qpos_torch(
     q: th.Tensor,
@@ -403,12 +404,6 @@ def _compute_ik_qpos_torch(
         min=q_lower_limit,
         max=q_upper_limit,
     )
-
-
-import numpy as np
-from numba import jit
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 # Use numba since faster

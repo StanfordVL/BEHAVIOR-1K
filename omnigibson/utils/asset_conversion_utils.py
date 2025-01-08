@@ -671,7 +671,7 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             continue
 
         # TODO: Remove this after this is fixed.
-        if type(mesh_info_list) == dict:
+        if type(mesh_info_list) is dict:
             keys = [str(x) for x in range(len(mesh_info_list))]
             assert set(mesh_info_list.keys()) == set(keys), "Unexpected keys"
             mesh_info_list = [mesh_info_list[k] for k in keys]
@@ -735,8 +735,9 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             xform_prim = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
-            mesh_in_parent_link_pos, mesh_in_parent_link_orn = th.tensor(mesh_info["position"]), th.tensor(
-                mesh_info["orientation"]
+            mesh_in_parent_link_pos, mesh_in_parent_link_orn = (
+                th.tensor(mesh_info["position"]),
+                th.tensor(mesh_info["orientation"]),
             )
 
             # Get the mesh/light pose in the meta link frame
@@ -1259,7 +1260,7 @@ def _create_urdf_joint(
     # Create the initial joint
     jnt = ET.Element("joint", name=name, type=joint_type)
     # Create origin subtag
-    origin = ET.SubElement(
+    ET.SubElement(
         jnt,
         "origin",
         attrib={"rpy": _convert_to_xml_string(rpy), "xyz": _convert_to_xml_string(pos)},
@@ -1274,16 +1275,16 @@ def _create_urdf_joint(
     child = ET.SubElement(jnt, "child", link=child)
     # Add additional parameters if specified
     if axis is not None:
-        ax = ET.SubElement(jnt, "axis", xyz=_convert_to_xml_string(axis))
+        ET.SubElement(jnt, "axis", xyz=_convert_to_xml_string(axis))
     dynamic_params = {}
     if damping is not None:
         dynamic_params["damping"] = _convert_to_xml_string(damping)
     if friction is not None:
         dynamic_params["friction"] = _convert_to_xml_string(friction)
     if dynamic_params:
-        dp = ET.SubElement(jnt, "dynamics", **dynamic_params)
+        ET.SubElement(jnt, "dynamics", **dynamic_params)
     if limits is not None:
-        lim = ET.SubElement(jnt, "limit", lower=limits[0], upper=limits[1])
+        ET.SubElement(jnt, "limit", lower=limits[0], upper=limits[1])
 
     # Return this element
     return jnt
@@ -1465,7 +1466,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
 
                         # TODO: Remove this after this is fixed.
-                        if type(attrs_list) == dict:
+                        if type(attrs_list) is dict:
                             keys = [str(x) for x in range(len(attrs_list))]
                             assert set(attrs_list.keys()) == set(keys), "Unexpected keys"
                             attrs_list = [attrs_list[k] for k in keys]
@@ -1938,7 +1939,7 @@ def get_collision_approximation_for_urdf(
         generated_new_col = False
         idx = 0
         if link_name not in visual_only_links:
-            for vis in link.findall(f"visual"):
+            for vis in link.findall("visual"):
                 # Get origin
                 origin = vis.find("origin")
                 # Check all geometries

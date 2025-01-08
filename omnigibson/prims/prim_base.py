@@ -1,7 +1,6 @@
 import string
-from abc import ABC, abstractmethod
+from abc import ABC
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable
 from omnigibson.utils.ui_utils import create_module_logger

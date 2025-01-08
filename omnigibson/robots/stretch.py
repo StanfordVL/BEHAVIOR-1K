@@ -1,10 +1,8 @@
 import math
-import os
 from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot

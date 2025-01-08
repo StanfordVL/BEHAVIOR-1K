@@ -7,10 +7,8 @@ runnable examples.
 """
 
 import inspect
-import logging
 import math
 import random
-from functools import cached_property
 
 import cv2
 import gymnasium as gym
@@ -28,11 +26,9 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     BaseActionPrimitiveSet,
 )
 from omnigibson.controllers import DifferentialDriveController, InverseKinematicsController, JointController
-from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.usd_object import USDObject
-from omnigibson.robots import *
+from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husky, Locobot, Stretch, Tiago, Turtlebot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
@@ -313,11 +309,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 self.robot.controllers["base"], (JointController, DifferentialDriveController)
             ), "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
             if self._base_controller_is_joint:
-                assert not self.robot.controllers[
-                    "base"
-                ].use_delta_commands, (
-                    "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
-                )
+                assert (
+                    not self.robot.controllers["base"].use_delta_commands
+                ), "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
 
         self.robot_model = self.robot.model_name
         self.add_context = add_context
@@ -342,7 +336,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-
                     arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
 
@@ -1180,7 +1173,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = target_pose[0]
         target_orn = target_pose[1]
         target_orn_axisangle = T.quat2axisangle(target_pose[1])
-        control_idx = self.robot.controller_action_idx["arm_" + self.arm]
         prev_pos = prev_orn = None
 
         # All we need to do here is save the target IK position so that empty action takes us towards it
@@ -1209,7 +1201,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pos_diff = th.norm(prev_pos - current_pos)
                 orn_diff = T.get_orientation_diff_in_radian(current_orn, prev_orn)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
-                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand is stuck")
+                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, "Hand is stuck")
 
             prev_pos = current_pos
             prev_orn = current_orn

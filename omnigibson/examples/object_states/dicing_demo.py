@@ -95,14 +95,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=T.euler2quat(th.tensor([-math.pi / 2, 0, 0])),
     )
 
-    if short_exec == False:
+    if not short_exec:
         input("The knife will fall on the apple and dice it. Press [ENTER] to continue.")
 
     # Step simulation for a bit so that apple is diced
     for _ in range(1000):
         env.step(th.empty(0))
 
-    if short_exec == False:
+    if not short_exec:
         input("Apple has been diced! Press [ENTER] to terminate the demo.")
 
     # Always close simulator at the end

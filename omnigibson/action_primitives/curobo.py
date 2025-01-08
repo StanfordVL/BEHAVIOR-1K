@@ -1,5 +1,4 @@
 import math
-import os
 from collections.abc import Iterable
 from enum import Enum
 
@@ -11,10 +10,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.prims.rigid_prim import RigidPrim
-from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.utils.constants import GROUND_CATEGORIES, JointType
-from omnigibson.utils.control_utils import FKSolver
+from omnigibson.utils.constants import JointType
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
 th.backends.cudnn.benchmark = True

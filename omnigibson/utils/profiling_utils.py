@@ -9,7 +9,7 @@ import omnigibson.utils.pynvml_utils as pynvml
 
 
 # Method copied from: https://github.com/wandb/wandb/blob/main/wandb/sdk/internal/system/assets/gpu.py
-def gpu_in_use_by_this_process(gpu_handle: "GPUHandle", pid: int) -> bool:
+def gpu_in_use_by_this_process(gpu_handle, pid: int) -> bool:
     if psutil is None:
         return False
 
@@ -26,7 +26,8 @@ def gpu_in_use_by_this_process(gpu_handle: "GPUHandle", pid: int) -> bool:
 
     compute_pids = {process.pid for process in pynvml.nvmlDeviceGetComputeRunningProcesses(gpu_handle)}  # type: ignore
     graphics_pids = {
-        process.pid for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
+        process.pid
+        for process in pynvml.nvmlDeviceGetGraphicsRunningProcesses(gpu_handle)  # type: ignore
     }
 
     pids_using_device = compute_pids | graphics_pids

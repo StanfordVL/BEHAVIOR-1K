@@ -100,7 +100,7 @@ class ScanSensor(BaseSensor):
 
         # Sanity check modalities -- if we're using occupancy_grid without scan modality, raise an error
         if isinstance(modalities, Iterable) and not isinstance(modalities, str) and "occupancy_grid" in modalities:
-            assert "scan" in modalities, f"'scan' modality must be included in order to get occupancy_grid modality!"
+            assert "scan" in modalities, "'scan' modality must be included in order to get occupancy_grid modality!"
 
         # Run super method
         super().__init__(

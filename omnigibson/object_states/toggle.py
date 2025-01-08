@@ -21,7 +21,6 @@ m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin, GlobalUpdateStateMixin):
-
     # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
@@ -107,7 +106,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             self.scale = m.DEFAULT_SCALE if self.scale is None else self.scale
             # Note: We have to create a mesh (instead of a sphere shape) because physx complains about non-uniform
             # scaling for non-meshes
-            mesh = create_primitive_mesh(
+            create_primitive_mesh(
                 prim_path=mesh_prim_path,
                 primitive_type="Sphere",
                 extents=1.0,

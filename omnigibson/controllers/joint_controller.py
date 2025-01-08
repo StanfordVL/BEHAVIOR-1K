@@ -1,5 +1,9 @@
 import math
 
+import numpy as np
+import torch as th
+from numba import jit
+
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -127,7 +131,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self._use_delta_commands and type(command_output_limits) == str and command_output_limits == "default"
+            self._use_delta_commands and type(command_output_limits) is str and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
@@ -210,7 +214,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._motor_type == "position":
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
-                vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
+                vel_pos_error = -control_dict["joint_velocity"][self.dof_idx]
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
@@ -252,10 +256,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)
             else:
-                return control_dict[f"joint_position"][self.dof_idx]
+                return control_dict["joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -control_dict[f"joint_velocity"][self.dof_idx]
+                return -control_dict["joint_velocity"][self.dof_idx]
             else:
                 return cb.zeros(self.command_dim)
 
@@ -293,9 +297,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return len(self.dof_idx)
 
 
-import torch as th
-
-
 @th.compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
@@ -304,10 +305,6 @@ def _compute_joint_torques_torch(
 ):
     dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
     return mm[dof_idxs_mat] @ u
-
-
-import numpy as np
-from numba import jit
 
 
 # Use numba since faster

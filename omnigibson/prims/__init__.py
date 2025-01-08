@@ -5,3 +5,16 @@ from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
+
+__all__ = [
+    "BasePrim",
+    "ClothPrim",
+    "CollisionGeomPrim",
+    "CollisionVisualGeomPrim",
+    "EntityPrim",
+    "GeomPrim",
+    "JointPrim",
+    "RigidPrim",
+    "VisualGeomPrim",
+    "XFormPrim",
+]

@@ -1,6 +1,4 @@
 import os
-import random
-import string
 
 import pytest
 import yaml
@@ -12,9 +10,6 @@ from omnigibson.action_primitives.symbolic_semantic_action_primitives import (
     SymbolicSemanticActionPrimitiveSet,
 )
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.python_utils import create_class_from_registry_and_config
 
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_TRANSITION_RULES = True
@@ -282,8 +277,8 @@ class TestSymbolicPrimitives:
     @pytest.mark.skip("Disabled until env reset can add/remove objects")
     def test_cut(self, env, prim_gen, apple, knife, countertop):
         # Store the apple object information for scene reset
-        deleted_objs = [apple]
-        deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
+        # deleted_objs = [apple]
+        # deleted_objs_cfg = [retrieve_obj_cfg(obj) for obj in deleted_objs]
 
         # assert not apple.states[object_states.Cut].get_value(knife)
         # start a new environment to enable transition rules

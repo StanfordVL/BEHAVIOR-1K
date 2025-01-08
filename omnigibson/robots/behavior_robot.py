@@ -8,7 +8,6 @@ from typing import Iterable, List, Literal, Tuple
 
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -473,8 +472,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Process local transform adjustments
             hand_data = 0
             if teleop_action.is_valid[part_name]:
-                des_world_part_pos, des_world_part_orn = teleop_action[part_name][:3], T.euler2quat(
-                    teleop_action[part_name][3:6]
+                des_world_part_pos, des_world_part_orn = (
+                    teleop_action[part_name][:3],
+                    T.euler2quat(teleop_action[part_name][3:6]),
                 )
                 if part_name in self.arm_names:
                     # compute gripper action

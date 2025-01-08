@@ -130,8 +130,9 @@ class URDFType(object):
                 vs = node.findall(t._TAG)
                 if len(vs) == 0 and r:
                     raise ValueError(
-                        "Missing required subelement(s) of type {} when "
-                        "parsing an object of type {}".format(t.__name__, cls.__name__)
+                        "Missing required subelement(s) of type {} when " "parsing an object of type {}".format(
+                            t.__name__, cls.__name__
+                        )
                     )
                 v = [t._from_xml(n, path) for n in vs]
             kwargs[a] = v
@@ -3323,20 +3324,20 @@ class URDF(URDFType):
         You can run this without specifying a ``cfg_trajectory`` to view
         the full articulation of the URDF
 
-        >>> robot = URDF.load('ur5.urdf')
+        >>> robot = URDF.load("ur5.urdf")
         >>> robot.animate()
 
         .. image:: /_static/ur5.gif
 
-        >>> ct = {'shoulder_pan_joint': [0.0, 2 * np.pi]}
+        >>> ct = {"shoulder_pan_joint": [0.0, 2 * np.pi]}
         >>> robot.animate(cfg_trajectory=ct)
 
         .. image:: /_static/ur5_shoulder.gif
 
         >>> ct = {
-        ...    'shoulder_pan_joint' : [-np.pi / 4, np.pi / 4],
-        ...    'shoulder_lift_joint' : [0.0, -np.pi / 2.0],
-        ...    'elbow_joint' : [0.0, np.pi / 2.0]
+        ...     "shoulder_pan_joint": [-np.pi / 4, np.pi / 4],
+        ...     "shoulder_lift_joint": [0.0, -np.pi / 2.0],
+        ...     "elbow_joint": [0.0, np.pi / 2.0],
         ... }
         >>> robot.animate(cfg_trajectory=ct)
 

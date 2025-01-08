@@ -304,7 +304,7 @@ class MultiFingerGripperController(GripperController):
             return cb.array([command_val])
 
         if self._motor_type == "position":
-            command = control_dict[f"joint_position"][self.dof_idx]
+            command = control_dict["joint_position"][self.dof_idx]
         elif self._motor_type == "velocity":
             command = cb.zeros(self.command_dim)
         else:

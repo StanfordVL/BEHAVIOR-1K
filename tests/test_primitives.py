@@ -7,7 +7,6 @@ import yaml
 from pytest_rerunfailures import pytest
 
 import omnigibson as og
-import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
