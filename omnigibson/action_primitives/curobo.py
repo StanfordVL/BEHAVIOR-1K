@@ -214,7 +214,7 @@ class CuRoboMotionGenerator:
         """
         Updates internal world collision cache representation based on sim state
         """
-        obstacles = {"cuboid": [], "sphere": None, "mesh": [], "cylinder": None, "capsule": None}
+        obstacles = {"cuboid": None, "sphere": None, "mesh": [], "cylinder": None, "capsule": None}
         robot_transform = T.pose_inv(T.pose2mat(self.robot.root_link.get_position_orientation()))
 
         if og.sim.floor_plane is not None:
