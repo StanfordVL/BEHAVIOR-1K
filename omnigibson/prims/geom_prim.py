@@ -9,7 +9,11 @@ from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class GeomPrim(XFormPrim):
@@ -118,7 +122,7 @@ class GeomPrim(XFormPrim):
         else:
             self.set_attribute("primvars:displayOpacity", [opacity])
 
-    @property
+    @cached_property
     def points(self):
         """
         Returns:
@@ -129,10 +133,39 @@ class GeomPrim(XFormPrim):
         mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
         if mesh_type == "Mesh":
             # If the geom is a mesh we can directly return its points.
-            return vtarray_to_torch(self.prim.GetAttribute("points").Get(), dtype=th.float32)
+            return vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
         else:
             # Return the vertices of the trimesh
             return th.tensor(mesh_prim_shape_to_trimesh_mesh(mesh).vertices, dtype=th.float32)
+
+    @cached_property
+    def faces(self):
+        mesh = self.prim
+        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+        if mesh_type != "Mesh":
+            log.warning(f"Geom {self.prim_path} is not a mesh, returning None for faces.")
+            return None
+
+        face_vertex_counts = vtarray_to_torch(mesh.GetAttribute("faceVertexCounts").Get(), dtype=th.int)
+        face_indices = vtarray_to_torch(mesh.GetAttribute("faceVertexIndices").Get(), dtype=th.int)
+
+        faces = []
+        i = 0
+        for count in face_vertex_counts:
+            for j in range(count - 2):
+                faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
+            i += count
+        faces = th.tensor(faces, dtype=th.float32)
+
+        return faces
+
+    @property
+    def geom_type(self):
+        """
+        Returns:
+            str: the type of the geom prim, one of {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
+        """
+        return self._prim.GetPrimTypeInfo().GetTypeName()
 
     @property
     def points_in_parent_frame(self):
