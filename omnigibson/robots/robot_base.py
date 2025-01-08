@@ -223,8 +223,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
                     # Possibly filter out the sensor based on name
                     prim_path = str(prim.GetPrimPath())
-                    not_blacklisted = self._exclude_sensor_names is None or not any(name in prim_path for name in self._exclude_sensor_names)
-                    whitelisted = self._include_sensor_names is None or any(name in prim_path for name in self._include_sensor_names)
+                    not_blacklisted = self._exclude_sensor_names is None or not any(
+                        name in prim_path for name in self._exclude_sensor_names
+                    )
+                    whitelisted = self._include_sensor_names is None or any(
+                        name in prim_path for name in self._include_sensor_names
+                    )
                     if not (not_blacklisted and whitelisted):
                         continue
 
