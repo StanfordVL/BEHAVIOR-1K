@@ -10,6 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 m = create_module_macros(module_path=__file__)
 m.MAX_LINEAR_VELOCITY = 1.5  # linear velocity in meters/second
@@ -100,6 +101,12 @@ class HolonomicBaseRobot(LocomotionRobot):
         """
         self._world_base_fixed_joint_prim = None
 
+        # Sanity check that the base controller is a HolonomicBaseJointController
+        if controller_config is not None and "base" in controller_config:
+            assert (
+                controller_config["base"]["name"] == "HolonomicBaseJointController"
+            ), "Base controller must be a HolonomicBaseJointController!"
+
         # Call super() method
         super().__init__(
             name=name,
@@ -123,15 +130,41 @@ class HolonomicBaseRobot(LocomotionRobot):
         )
 
     @property
-    def _default_base_joint_controller_config(self):
+    def _default_controllers(self):
+        # Always call super first
+        controllers = super()._default_controllers
+        controllers["base"] = "HolonomicBaseJointController"
+        return controllers
+
+    @property
+    def _default_holonomic_base_joint_controller_config(self):
         """
         Returns:
             dict: Default base joint controller config to control this robot's base. Uses velocity
                 control by default.
         """
-        cfg = super()._default_base_joint_controller_config
-        # The default value is too small for the base joints
-        cfg["pos_kp"] = m.BASE_JOINT_CONTROLLER_POSITION_KP
+        return {
+            "name": "HolonomicBaseJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.base_control_idx,
+            "command_output_limits": "default",
+        }
+
+    @property
+    def _default_controller_config(self):
+        # Always run super method first
+        cfg = super()._default_controller_config
+
+        # Add supported base controllers
+        cfg["base"] = {
+            self._default_holonomic_base_joint_controller_config[
+                "name"
+            ]: self._default_holonomic_base_joint_controller_config,
+            self._default_base_null_joint_controller_config["name"]: self._default_base_null_joint_controller_config,
+        }
+
         return cfg
 
     def _post_load(self):
@@ -297,30 +330,17 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
 
-    def _postprocess_control(self, control, control_type):
-        # Run super method first
-        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
+    def get_control_dict(self):
+        fcns = super().get_control_dict()
 
-        # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = self.base_footprint_link.get_position_orientation()[1]
-        root_link_orn = self.root_link.get_position_orientation()[1]
+        # Add canonical position and orientation
+        fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
+            self.articulation_root_path
+        )
+        fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
+        fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
 
-        cur_orn_mat = T.quat2mat(root_link_orn).T @ T.quat2mat(base_orn)
-        cur_pose = th.zeros((2, 4, 4))
-        cur_pose[:, :3, :3] = cur_orn_mat
-        cur_pose[:, 3, 3] = 1.0
-
-        local_pose = th.zeros((2, 4, 4))
-        local_pose[:] = th.eye(4)
-        local_pose[:, :3, 3] = u_vec[self.base_idx].view(2, 3)
-
-        # Rotate the linear and angular velocity to the desired frame
-        global_pose = cur_pose @ local_pose
-        lin_vel_global, ang_vel_global = global_pose[0, :3, 3], global_pose[1, :3, 3]
-
-        u_vec[self.base_control_idx] = th.tensor([lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]])
-
-        return u_vec, u_type_vec
+        return fcns
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)

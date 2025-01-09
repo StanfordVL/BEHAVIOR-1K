@@ -146,7 +146,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def _default_controllers(self):
         controllers = super()._default_controllers
         # We use joint controllers for base as default
-        controllers["base"] = "JointController"
+        controllers["base"] = "HolonomicBaseJointController"
         controllers["trunk"] = "JointController"
         # We use IK and multi finger gripper controllers as default
         for arm in self.arm_names:

@@ -1234,6 +1234,10 @@ class ControllableObjectViewAPI:
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
 
     @classmethod
+    def get_root_position_orientation(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_root_transform(prim_path)
+
+    @classmethod
     def get_linear_velocity(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
 
