@@ -44,30 +44,31 @@ robots:
           image_width: 128
     controller_config:
       base:
-        name: JointController
+        name: HolonomicBaseJointController
         motor_type: position
         command_input_limits: null
-        use_delta_commands: false
-        use_impedances: true
-        pos_kp: 50
+        use_impedances: false
       trunk:
         name: JointController
         motor_type: position
         command_input_limits: null
+        command_output_limits: null
         use_delta_commands: false
-        use_impedances: true
+        use_impedances: false
       arm_left:
         name: JointController
         motor_type: position
         command_input_limits: null
+        command_output_limits: null
         use_delta_commands: false
-        use_impedances: true
+        use_impedances: false
       arm_right:
         name: JointController
         motor_type: position
         command_input_limits: null
+        command_output_limits: null
         use_delta_commands: false
-        use_impedances: true
+        use_impedances: false
       gripper_left:
         name: JointController
         motor_type: position
