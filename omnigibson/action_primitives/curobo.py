@@ -7,7 +7,7 @@ import torch as th  # MUST come before importing omni!!!
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
@@ -150,7 +150,7 @@ class CuRoboMotionGenerator:
         use_cuda_graph=True,
         debug=False,
         use_default_embodiment_only=False,
-        collision_activation_distance=0.01,
+        collision_activation_distance=0.005,
     ):
         """
         Args:
@@ -172,6 +172,8 @@ class CuRoboMotionGenerator:
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
+
+        assert not gm.ENABLE_FLATCACHE, "CuRobo does not support flatcache for now"
 
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
