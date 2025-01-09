@@ -235,7 +235,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
-            collision_activation_distance=0.01,  # Use larger activation distance for better reproducibility
+            collision_activation_distance=0.02,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
