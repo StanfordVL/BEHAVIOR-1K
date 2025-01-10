@@ -706,6 +706,7 @@ def find_all_meshes(root_prim):
         root_prim=root_prim,
     )
 
+
 def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_dir, is_holonomic=False):
     """
     Creates a set of curobo configs based on @robot_prim and @curobo_cfg
@@ -926,7 +927,9 @@ def import_custom_robot(config):
 
     # Compute AABB
     bbox_cache = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
-    aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString)
+    aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(
+        bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString
+    )
     z_offset = aabb[2]
 
     # Update the root link's CoM
