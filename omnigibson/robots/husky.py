@@ -1,8 +1,7 @@
-import os
+from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 
@@ -23,7 +22,7 @@ class Husky(LocomotionRobot):
     def wheel_axle_length(self):
         return 0.670
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["front_left_wheel", "front_right_wheel", "rear_left_wheel", "rear_right_wheel"]
 

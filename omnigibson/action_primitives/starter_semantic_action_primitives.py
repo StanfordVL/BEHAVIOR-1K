@@ -17,7 +17,6 @@ from aenum import IntEnum, auto
 from matplotlib import pyplot as plt
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import (
@@ -27,18 +26,15 @@ from omnigibson.action_primitives.action_primitive_set_base import (
 )
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.controllers import (
-    DifferentialDriveController,
-    HolonomicBaseJointController,
     InverseKinematicsController,
     JointController,
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.robots import *
-from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husky, Locobot, Stretch, Tiago, Turtlebot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
-from omnigibson.utils.control_utils import FKSolver, IKSolver, orientation_error
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
@@ -197,13 +193,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 arm = f"arm_{arm_name}"
                 arm_ctrl = self.robot.controllers[arm]
                 if isinstance(arm_ctrl, InverseKinematicsController):
-                    pos_relative = control_dict[f"{eef}_pos_relative"]
-                    quat_relative = control_dict[f"{eef}_quat_relative"]
+                    pos_relative = cb.to_torch(control_dict[f"{eef}_pos_relative"])
+                    quat_relative = cb.to_torch(control_dict[f"{eef}_quat_relative"])
                     quat_relative_axis_angle = T.quat2axisangle(quat_relative)
                     self._arm_targets[arm] = (pos_relative, quat_relative_axis_angle)
                 else:
-
-                    arm_target = control_dict["joint_position"][arm_ctrl.dof_idx]
+                    arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
 
         self._collision_check_batch_size = collision_check_batch_size
@@ -1129,7 +1124,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = target_pose[0]
         target_orn = target_pose[1]
         target_orn_axisangle = T.quat2axisangle(target_pose[1])
-        control_idx = self.robot.controller_action_idx["arm_" + self.arm]
         prev_pos = prev_orn = None
 
         # All we need to do here is save the target IK position so that empty action takes us towards it
@@ -1158,7 +1152,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pos_diff = th.norm(prev_pos - current_pos)
                 orn_diff = T.get_orientation_diff_in_radian(current_orn, prev_orn)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
-                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, f"Hand is stuck")
+                    raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, "Hand is stuck")
 
             prev_pos = current_pos
             prev_orn = current_orn
@@ -1440,7 +1434,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
                     delta_pos = target_pos - current_pos
                     if controller.mode == "pose_delta_ori":
-                        delta_orn = orientation_error(
+                        delta_orn = T.orientation_error(
                             T.quat2mat(T.axisangle2quat(target_orn_axisangle)), T.quat2mat(current_orn)
                         )
                         partial_action = th.cat((delta_pos, delta_orn))

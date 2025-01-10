@@ -2,6 +2,7 @@ import torch as th
 
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 
@@ -95,8 +96,8 @@ class MultiFingerGripperController(GripperController):
         self._inverted = inverted
         self._mode = mode
         self._limit_tolerance = limit_tolerance
-        self._open_qpos = open_qpos if open_qpos is None else th.tensor(open_qpos)
-        self._closed_qpos = closed_qpos if closed_qpos is None else th.tensor(closed_qpos)
+        self._open_qpos = open_qpos if open_qpos is None else cb.array(open_qpos)
+        self._closed_qpos = closed_qpos if closed_qpos is None else cb.array(closed_qpos)
 
         # Create other args to be filled in at runtime
         self._is_grasping = IsGraspingState.FALSE
@@ -104,9 +105,9 @@ class MultiFingerGripperController(GripperController):
         # Create ring buffer for velocity history to avoid high frequency nosie during grasp state inference
         self._vel_filter = MovingAverageFilter(obs_dim=len(dof_idx), filter_width=5)
 
-        # If we're using binary signal, we override the command output limits
+        # If we're using binary signal, these values will be overridden manually, so set to default for now
         if mode == "binary":
-            command_output_limits = (-1.0, 1.0)
+            command_output_limits = "default"
 
         # Run super init
         super().__init__(
@@ -116,6 +117,19 @@ class MultiFingerGripperController(GripperController):
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
+
+    def _generate_default_command_output_limits(self):
+        # By default (independent mode), this is simply the super call
+        command_output_limits = super()._generate_default_command_output_limits()
+
+        # If we're in binary mode, output limits should just be (-1.0, 1.0)
+        if self._mode == "binary":
+            command_output_limits = (-1.0, 1.0)
+        # If we're in smoothing mode, output limits should be the average of the independent limits
+        elif self._mode == "smoothing":
+            command_output_limits = cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+
+        return command_output_limits
 
     def reset(self):
         # Call super first
@@ -136,9 +150,9 @@ class MultiFingerGripperController(GripperController):
         # We extend this method to make sure command is always n-dimensional
         if self._mode != "independent":
             command = (
-                th.tensor([command] * self.command_dim)
+                cb.array([command] * self.command_dim)
                 if type(command) in {int, float}
-                else th.tensor([command[0]] * self.command_dim)
+                else cb.array([command[0]] * self.command_dim)
             )
 
         # Flip the command if the direction is inverted.
@@ -189,7 +203,7 @@ class MultiFingerGripperController(GripperController):
                 )
         else:
             # Use continuous signal. Make sure to go from command to control dim.
-            u = th.full((self.control_dim,), target[0]) if len(target) == 1 else target
+            u = cb.full((self.control_dim,), target[0]) if len(target) == 1 else target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
         if self._motor_type in {"velocity", "torque"}:
@@ -199,7 +213,7 @@ class MultiFingerGripperController(GripperController):
             violate_lower_limit = (
                 joint_pos < self._control_limits[ControlType.POSITION][0][self.dof_idx] + self._limit_tolerance
             )
-            violation = th.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
+            violation = cb.logical_or(violate_upper_limit * (u > 0), violate_lower_limit * (u < 0))
             u *= ~violation
 
         # Update whether we're grasping or not
@@ -223,7 +237,6 @@ class MultiFingerGripperController(GripperController):
         finger_vel = self._vel_filter.estimate(control_dict["joint_velocity"][self.dof_idx])
 
         # Calculate grasping state based on mode of this controller
-
         # Independent mode of MultiFingerGripperController does not have any good heuristics to determine is_grasping
         if self._mode == "independent":
             is_grasping = IsGraspingState.UNKNOWN
@@ -233,7 +246,7 @@ class MultiFingerGripperController(GripperController):
             is_grasping = IsGraspingState.FALSE
 
         #  Different values in the command for non-independent mode - cannot use heuristics
-        elif not th.all(self._control == self._control[0]):
+        elif not cb.all(self._control == self._control[0]):
             is_grasping = IsGraspingState.UNKNOWN
 
         # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
@@ -245,11 +258,11 @@ class MultiFingerGripperController(GripperController):
             finger_pos = control_dict["joint_position"][self.dof_idx]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
-            if self._motor_type == "position" and th.mean(th.abs(finger_pos - self._control)) < m.POS_TOLERANCE:
+            if self._motor_type == "position" and cb.abs(finger_pos - self._control).mean() < m.POS_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
-            elif self._motor_type in {"velocity", "torque"} and th.mean(th.abs(self._control)) < m.VEL_TOLERANCE:
+            elif self._motor_type in {"velocity", "torque"} and cb.abs(self._control).mean() < m.VEL_TOLERANCE:
                 is_grasping = IsGraspingState.UNKNOWN
 
             # Otherwise, the last control signal intends to "move" the gripper
@@ -258,7 +271,7 @@ class MultiFingerGripperController(GripperController):
                 max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
-                finger_pos = th.clip(finger_pos, min_pos, max_pos)
+                finger_pos = finger_pos.clip(min_pos, max_pos)
 
                 # Check distance from both ends of the joint limits
                 dist_from_lower_limit = finger_pos - min_pos
@@ -266,11 +279,11 @@ class MultiFingerGripperController(GripperController):
 
                 # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                    th.mean(dist_from_lower_limit) > m.POS_TOLERANCE or th.mean(dist_from_upper_limit) > m.POS_TOLERANCE
+                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
-                valid_grasp_vel = th.all(th.abs(finger_vel) < m.VEL_TOLERANCE)
+                valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
                 is_grasping = IsGraspingState.TRUE if valid_grasp_pos and valid_grasp_vel else IsGraspingState.FALSE
@@ -280,7 +293,7 @@ class MultiFingerGripperController(GripperController):
 
     def compute_no_op_goal(self, control_dict):
         # Just use a zero vector
-        return dict(target=th.zeros(self.command_dim))
+        return dict(target=cb.zeros(self.command_dim))
 
     def _compute_no_op_action(self, control_dict):
         # Take care of the special case of binary control
@@ -288,18 +301,18 @@ class MultiFingerGripperController(GripperController):
             command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
             if self._inverted:
                 command_val = -1 * command_val
-            return th.tensor([command_val], dtype=th.float32)
+            return cb.array([command_val])
 
         if self._motor_type == "position":
-            command = control_dict[f"joint_position"][self.dof_idx]
+            command = control_dict["joint_position"][self.dof_idx]
         elif self._motor_type == "velocity":
-            command = th.zeros(self.command_dim)
+            command = cb.zeros(self.command_dim)
         else:
             raise ValueError("Cannot compute noop action for effort motor type.")
 
         # Convert to binary / smooth mode if necessary
         if self._mode == "smooth":
-            command = th.mean(command, dim=-1, keepdim=True)
+            command = cb.mean(command, dim=-1, keepdim=True)
 
         return command
 

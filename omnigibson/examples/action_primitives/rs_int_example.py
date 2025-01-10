@@ -8,7 +8,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
-from omnigibson.macros import gm
 from omnigibson.robots.tiago import Tiago
 from omnigibson.utils.ui_utils import choose_from_options
 

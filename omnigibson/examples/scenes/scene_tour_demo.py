@@ -67,7 +67,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     def clear_waypoints():
         nonlocal waypoints
-        print(f"Cleared all waypoints!")
+        print("Cleared all waypoints!")
         waypoints = []
 
     KeyboardEventHandler.initialize()
@@ -95,10 +95,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Print out additional keyboard commands
-    print(f"\t X: Save the current camera pose as a waypoint")
-    print(f"\t C: Clear all waypoints")
-    print(f"\t J: Record the camera trajectory from the current set of waypoints")
-    print(f"\t ESC: Terminate the demo")
+    print("\t X: Save the current camera pose as a waypoint")
+    print("\t C: Clear all waypoints")
+    print("\t J: Record the camera trajectory from the current set of waypoints")
+    print("\t ESC: Terminate the demo")
 
     # Loop indefinitely
     steps = 0

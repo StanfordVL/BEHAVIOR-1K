@@ -1,4 +1,5 @@
 import os
+from functools import cached_property
 
 import torch as th
 
@@ -97,15 +98,15 @@ class A1(ManipulationRobot):
             )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             self._ag_start_points = [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
-                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.025, -0.07, 0.012])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.015, -0.11, 0.012])),
+                GraspingPoint(link_name="link14", position=th.tensor([-0.01, 0.015, 0.004])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
-                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link22", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link32", position=th.tensor([0.006, 0.045, 0.003])),
+                GraspingPoint(link_name="link42", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link52", position=th.tensor([0.006, 0.04, 0.003])),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for A1")
@@ -167,23 +168,23 @@ class A1(ManipulationRobot):
     def finger_lengths(self):
         return {self.default_arm: 0.087}
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {self.default_arm: [f"arm_joint{i+1}" for i in range(6)]}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: self._eef_link_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: self._finger_link_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: self._finger_joint_names}
 

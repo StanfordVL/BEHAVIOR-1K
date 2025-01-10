@@ -47,7 +47,9 @@ setup(
         "rtree>=1.2.0",
         "graphviz>=0.20",
         "matplotlib>=3.0.0",
-        "lxml>=5.3.0",
+        "lxml>=5.2.2",
+        "numba>=0.59.1",
+        "cffi>=1.16.0",
         "pillow~=10.2.0",
     ],
     extras_require={

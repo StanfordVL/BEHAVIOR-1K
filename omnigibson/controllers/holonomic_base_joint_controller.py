@@ -2,7 +2,6 @@ import torch as th
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.macros import create_module_macros
 
 
 class HolonomicBaseJointController(JointController):
@@ -29,8 +28,6 @@ class HolonomicBaseJointController(JointController):
         command_output_limits=None,
         pos_kp=None,
         pos_damping_ratio=None,
-        pos_ki=None,
-        max_integral_error=None,
         vel_kp=None,
         use_impedances=False,
         use_gravity_compensation=False,
@@ -84,8 +81,6 @@ class HolonomicBaseJointController(JointController):
             command_output_limits=command_output_limits,
             pos_kp=pos_kp,
             pos_damping_ratio=pos_damping_ratio,
-            pos_ki=pos_ki,
-            max_integral_error=max_integral_error,
             vel_kp=vel_kp,
             use_impedances=use_impedances,
             use_gravity_compensation=use_gravity_compensation,

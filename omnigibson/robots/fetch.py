@@ -1,19 +1,15 @@
 import math
-import os
+from functools import cached_property
 
 import torch as th
 
-from omnigibson.controllers import ControlType
-from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.transform_utils import euler2quat
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 log = create_module_logger(module_name=__name__)
 
@@ -230,19 +226,19 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             ]
         }
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["l_wheel_joint", "r_wheel_joint"]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return ["head_pan_joint", "head_tilt_joint"]
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         return ["torso_lift_joint"]
 
-    @property
+    @cached_property
     def manipulation_link_names(self):
         return [
             "torso_lift_link",
@@ -260,7 +256,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             "r_gripper_finger_link",
         ]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
@@ -274,7 +270,7 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             ]
         }
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {
             self.default_arm: [
@@ -288,15 +284,15 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             ]
         }
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: "eef_link"}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {self.default_arm: ["r_gripper_finger_link", "l_gripper_finger_link"]}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["r_gripper_finger_joint", "l_gripper_finger_joint"]}
 

@@ -1,10 +1,10 @@
 from abc import abstractmethod
+from functools import cached_property
 
 import torch as th
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -37,8 +37,8 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        joint_positions = ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        joint_velocities = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        joint_positions = dic["joint_qpos"]
+        joint_velocities = dic["joint_qvel"]
         dic["camera_qpos"] = joint_positions[self.camera_control_idx]
         dic["camera_qpos_sin"] = th.sin(joint_positions[self.camera_control_idx])
         dic["camera_qpos_cos"] = th.cos(joint_positions[self.camera_control_idx])
@@ -95,7 +95,7 @@ class ActiveCameraRobot(BaseRobot):
             "motor_type": "position",
             "control_limits": self.control_limits,
             "dof_idx": self.camera_control_idx,
-            "default_command": self.reset_joint_pos[self.camera_control_idx],
+            "default_goal": self.reset_joint_pos[self.camera_control_idx],
             "use_impedances": False,
         }
 
@@ -114,7 +114,7 @@ class ActiveCameraRobot(BaseRobot):
 
         return cfg
 
-    @property
+    @cached_property
     @abstractmethod
     def camera_joint_names(self):
         """
@@ -126,7 +126,7 @@ class ActiveCameraRobot(BaseRobot):
         """
         raise NotImplementedError
 
-    @property
+    @cached_property
     def camera_control_idx(self):
         """
         Returns:

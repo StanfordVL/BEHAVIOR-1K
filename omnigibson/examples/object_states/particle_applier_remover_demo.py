@@ -3,7 +3,6 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import gm, macros
 from omnigibson.object_states import Covered, ToggledOn
-from omnigibson.utils.constants import ParticleModifyMethod
 from omnigibson.utils.ui_utils import choose_from_options
 
 # Set macros for this example

@@ -1,21 +1,13 @@
-import math
-import os
-from typing import Literal
+from functools import cached_property
 
 import torch as th
 
-import omnigibson as og
-import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
-from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
-from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.utils.python_utils import classproperty
 
 
 class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCameraRobot):
@@ -139,7 +131,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             **kwargs,
         )
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         names = dict()
         for arm in self.arm_names:
@@ -208,7 +200,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
     def base_footprint_link_name(self):
         return "base_footprint"
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         return [
             "wheel_front_left_link",
@@ -363,15 +355,15 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             ["arm_right_tool_link", "wrist_right_ft_tool_link"],
         ]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return ["head_1_joint", "head_2_joint"]
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         return ["torso_lift_joint"]
 
-    @property
+    @cached_property
     def manipulation_link_names(self):
         return [
             "torso_fixed_link",
@@ -409,19 +401,19 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             "xtion_link",
         ]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {arm: [f"arm_{arm}_{i}_link" for i in range(1, 8)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {arm: [f"gripper_{arm}_right_finger_link", f"gripper_{arm}_left_finger_link"] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {
             arm: [f"gripper_{arm}_right_finger_joint", f"gripper_{arm}_left_finger_joint"] for arm in self.arm_names

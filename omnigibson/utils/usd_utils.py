@@ -8,11 +8,16 @@ from collections.abc import Iterable
 import numpy as np
 import torch as th
 import trimesh
+from numba import jit, prange
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.macros import gm
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
@@ -125,7 +130,7 @@ def create_joint(
     # Make sure at least body0 or body1 is specified
     assert (
         body0 is not None or body1 is not None
-    ), f"At least either body0 or body1 must be specified when creating a joint!"
+    ), "At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
     joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
@@ -849,21 +854,54 @@ class BatchControlViewAPIImpl:
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
 
+    def _set_dof_position_targets(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_position_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF positions in backend")
+
+    def _set_dof_velocity_targets(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_velocity_targets(data_desc, indices_desc):
+            raise Exception("Failed to set DOF velocities in backend")
+
+    def _set_dof_actuation_forces(self, data, indices, cast=True):
+        # No casting results in better efficiency
+        if cast:
+            data = self._view._frontend.as_contiguous_float32(data)
+            indices = self._view._frontend.as_contiguous_uint32(indices)
+        data_desc = self._view._frontend.get_tensor_desc(data)
+        indices_desc = self._view._frontend.get_tensor_desc(indices)
+
+        if not self._view._backend.set_dof_actuation_forces(data_desc, indices_desc):
+            raise Exception("Failed to set DOF actuation forces in backend")
+
     def flush_control(self):
         if "dof_position_targets" in self._write_idx_cache:
-            pos_indices = th.tensor(sorted(self._write_idx_cache["dof_position_targets"]))
+            pos_indices = cb.int_array(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
-            self._view.set_dof_position_targets(pos_targets, pos_indices)
+            self._set_dof_position_targets(cb.to_torch(pos_targets), cb.to_torch(pos_indices), cast=False)
 
         if "dof_velocity_targets" in self._write_idx_cache:
-            vel_indices = th.tensor(sorted(self._write_idx_cache["dof_velocity_targets"]))
+            vel_indices = cb.int_array(sorted(self._write_idx_cache["dof_velocity_targets"]))
             vel_targets = self._read_cache["dof_velocity_targets"]
-            self._view.set_dof_velocity_targets(vel_targets, vel_indices)
+            self._set_dof_velocity_targets(cb.to_torch(vel_targets), cb.to_torch(vel_indices), cast=False)
 
         if "dof_actuation_forces" in self._write_idx_cache:
-            eff_indices = th.tensor(sorted(self._write_idx_cache["dof_actuation_forces"]))
+            eff_indices = cb.int_array(sorted(self._write_idx_cache["dof_actuation_forces"]))
             eff_targets = self._read_cache["dof_actuation_forces"]
-            self._view.set_dof_actuation_forces(eff_targets, eff_indices)
+            self._set_dof_actuation_forces(cb.to_torch(eff_targets), cb.to_torch(eff_indices), cast=False)
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -913,10 +951,10 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_position_targets" not in self._read_cache:
-            self._read_cache["dof_position_targets"] = self._view.get_dof_position_targets()
+            self._read_cache["dof_position_targets"] = cb.from_torch(self._view.get_dof_position_targets())
 
         # Update the target
-        self._read_cache["dof_position_targets"][idx][indices] = positions
+        self._read_cache["dof_position_targets"][idx, indices] = positions
 
         # Add this index to the write cache
         self._write_idx_cache["dof_position_targets"].add(idx)
@@ -927,10 +965,10 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_velocity_targets" not in self._read_cache:
-            self._read_cache["dof_velocity_targets"] = self._view.get_dof_velocity_targets()
+            self._read_cache["dof_velocity_targets"] = cb.from_torch(self._view.get_dof_velocity_targets())
 
         # Update the target
-        self._read_cache["dof_velocity_targets"][idx][indices] = velocities
+        self._read_cache["dof_velocity_targets"][idx, indices] = velocities
 
         # Add this index to the write cache
         self._write_idx_cache["dof_velocity_targets"].add(idx)
@@ -941,17 +979,17 @@ class BatchControlViewAPIImpl:
 
         # Load the current targets.
         if "dof_actuation_forces" not in self._read_cache:
-            self._read_cache["dof_actuation_forces"] = self._view.get_dof_actuation_forces()
+            self._read_cache["dof_actuation_forces"] = cb.from_torch(self._view.get_dof_actuation_forces())
 
         # Update the target
-        self._read_cache["dof_actuation_forces"][idx][indices] = efforts
+        self._read_cache["dof_actuation_forces"][idx, indices] = efforts
 
         # Add this index to the write cache
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
     def get_root_transform(self, prim_path):
         if "root_transforms" not in self._read_cache:
-            self._read_cache["root_transforms"] = self._view.get_root_transforms()
+            self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
 
         idx = self._idx[prim_path]
         pose = self._read_cache["root_transforms"][idx]
@@ -966,160 +1004,186 @@ class BatchControlViewAPIImpl:
         else:
             return self.get_root_transform(prim_path)
 
-    def get_linear_velocity(self, prim_path):
+    def _get_velocities(self, prim_path):
         if self._base_footprint_link_names[prim_path] is not None:
             link_name = self._base_footprint_link_names[prim_path]
-            return self.get_link_linear_velocity(prim_path, link_name)
+            return self._get_link_velocities(prim_path, link_name)
         else:
-            return self.get_root_linear_velocity(prim_path)
+            return self._get_root_velocities(prim_path)
+
+    def _get_relative_velocities(self, prim_path):
+        if "relative_velocities" not in self._read_cache:
+            self._read_cache["relative_velocities"] = {}
+
+        if prim_path not in self._read_cache["relative_velocities"]:
+            # Compute all tfs at once, including base as well as all links
+            if "link_velocities" not in self._read_cache:
+                self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
+
+            idx = self._idx[prim_path]
+            vels = cb.zeros((len(self._link_idx[idx]) + 1, 6, 1))
+            # base vel is the final -1 index
+            vels[:-1, :, 0] = self._read_cache["link_velocities"][idx, :]
+            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path)
+
+            tf = cb.zeros((1, 6, 6))
+            orn_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
+            tf[0, :3, :3] = orn_t
+            tf[0, 3:, 3:] = orn_t
+            # x.T --> transpose (inverse) orientation
+            # (1, 6, 6) @ (n_links, 6, 1) -> (n_links, 6, 1) -> (n_links, 6)
+            self._read_cache["relative_velocities"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
+
+        return self._read_cache["relative_velocities"][prim_path]
+
+    def get_linear_velocity(self, prim_path):
+        return self._get_velocities(prim_path)[:3]
 
     def get_angular_velocity(self, prim_path):
-        if self._base_footprint_link_names[prim_path] is not None:
-            link_name = self._base_footprint_link_names[prim_path]
-            return self.get_link_angular_velocity(prim_path, link_name)
-        else:
-            return self.get_root_angular_velocity(prim_path)
+        return self._get_velocities(prim_path)[3:]
 
-    def get_root_linear_velocity(self, prim_path):
+    def _get_root_velocities(self, prim_path):
         if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = self._view.get_root_velocities()
+            self._read_cache["root_velocities"] = cb.from_torch(self._view.get_root_velocities())
 
         idx = self._idx[prim_path]
-        return self._read_cache["root_velocities"][idx][:3]
-
-    def get_root_angular_velocity(self, prim_path):
-        if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = self._view.get_root_velocities()
-
-        idx = self._idx[prim_path]
-        return self._read_cache["root_velocities"][idx][3:]
+        return self._read_cache["root_velocities"][idx]
 
     def get_relative_linear_velocity(self, prim_path):
-        orn = self.get_position_orientation(prim_path)[1]
-        linvel = self.get_linear_velocity(prim_path)
-        # x.T --> transpose (inverse) orientation
-        return T.quat2mat(orn).T @ linvel
+        # base corresponds to final index
+        return self._get_relative_velocities(prim_path)[-1, :3]
 
     def get_relative_angular_velocity(self, prim_path):
-        orn = self.get_position_orientation(prim_path)[1]
-        angvel = self.get_angular_velocity(prim_path)
-        # x.T --> transpose (inverse) orientation
-        return T.quat2mat(orn).T @ angvel
+        # base corresponds to final index
+        return self._get_relative_velocities(prim_path)[-1, 3:]
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
-            self._read_cache["dof_positions"] = self._view.get_dof_positions()
+            self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_positions"][idx]
 
     def get_joint_velocities(self, prim_path):
         if "dof_velocities" not in self._read_cache:
-            self._read_cache["dof_velocities"] = self._view.get_dof_velocities()
+            self._read_cache["dof_velocities"] = cb.from_torch(self._view.get_dof_velocities())
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_velocities"][idx]
 
     def get_joint_efforts(self, prim_path):
         if "dof_projected_joint_forces" not in self._read_cache:
-            self._read_cache["dof_projected_joint_forces"] = self._view.get_dof_projected_joint_forces()
+            self._read_cache["dof_projected_joint_forces"] = cb.from_torch(self._view.get_dof_projected_joint_forces())
 
         idx = self._idx[prim_path]
         return self._read_cache["dof_projected_joint_forces"][idx]
 
     def get_mass_matrix(self, prim_path):
         if "mass_matrices" not in self._read_cache:
-            self._read_cache["mass_matrices"] = self._view.get_mass_matrices()
+            self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_mass_matrices())
 
         idx = self._idx[prim_path]
         return self._read_cache["mass_matrices"][idx]
 
     def get_generalized_gravity_forces(self, prim_path):
         if "generalized_gravity_forces" not in self._read_cache:
-            self._read_cache["generalized_gravity_forces"] = self._view.get_generalized_gravity_forces()
+            self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_generalized_gravity_forces())
 
         idx = self._idx[prim_path]
         return self._read_cache["generalized_gravity_forces"][idx]
 
     def get_coriolis_and_centrifugal_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
-            self._read_cache["coriolis_and_centrifugal_forces"] = self._view.get_coriolis_and_centrifugal_forces()
+            self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
+                self._view.get_coriolis_and_centrifugal_forces()
+            )
 
         idx = self._idx[prim_path]
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
     def get_link_transform(self, prim_path, link_name):
         if "link_transforms" not in self._read_cache:
-            self._read_cache["link_transforms"] = self._view.get_link_transforms()
+            self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        pose = self._read_cache["link_transforms"][idx][link_idx]
+        pose = self._read_cache["link_transforms"][idx, link_idx]
         return pose[:3], pose[3:]
 
+    def _get_relative_poses(self, prim_path):
+        if "relative_poses" not in self._read_cache:
+            self._read_cache["relative_poses"] = {}
+
+        if prim_path not in self._read_cache["relative_poses"]:
+            # Compute all tfs at once, including base as well as all links
+            if "link_transforms" not in self._read_cache:
+                self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+
+            idx = self._idx[prim_path]
+            self._read_cache["relative_poses"][prim_path] = cb.get_custom_method("compute_relative_poses")(
+                idx,
+                len(self._link_idx[idx]),
+                self._read_cache["link_transforms"],
+                self.get_position_orientation(prim_path=prim_path),
+            )
+
+        return self._read_cache["relative_poses"][prim_path]
+
     def get_link_relative_position_orientation(self, prim_path, link_name):
-        pos, orn = self.get_link_transform(prim_path, link_name)
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        rel_pose = self._get_relative_poses(prim_path)[link_idx]
+        return rel_pose[:3], rel_pose[3:]
 
-        # Get the root world transform too
-        world_pos, world_orn = self.get_position_orientation(prim_path)
+    def _get_link_velocities(self, prim_path, link_name):
+        if "link_velocities" not in self._read_cache:
+            self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
 
-        # Compute the relative position and orientation
-        return T.relative_pose_transform(pos, orn, world_pos, world_orn)
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        vel = self._read_cache["link_velocities"][idx, link_idx]
+
+        return vel
 
     def get_link_linear_velocity(self, prim_path, link_name):
-        if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = self._view.get_link_velocities()
-
-        idx = self._idx[prim_path]
-        link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache["link_velocities"][idx][link_idx]
-        linvel = vel[:3]
-
-        return linvel
+        return self._get_link_velocities(prim_path, link_name)[:3]
 
     def get_link_relative_linear_velocity(self, prim_path, link_name):
-        linvel = self.get_link_linear_velocity(prim_path, link_name)
-
-        # Get the root world transform too
-        _, world_orn = self.get_position_orientation(prim_path)
-
-        # Compute the relative position and orientation
-        return T.quat2mat(world_orn).T @ linvel
-
-    def get_link_angular_velocity(self, prim_path, link_name):
-        if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = self._view.get_link_velocities()
-
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache["link_velocities"][idx][link_idx]
-        angvel = vel[3:]
+        return self._get_relative_velocities(prim_path)[link_idx, :3]
 
-        return angvel
+    def get_link_angular_velocity(self, prim_path, link_name):
+        return self._get_link_velocities(prim_path, link_name)[3:]
 
     def get_link_relative_angular_velocity(self, prim_path, link_name):
-        angvel = self.get_link_angular_velocity(prim_path, link_name)
-
-        # Get the root world transform too
-        _, world_orn = self.get_position_orientation(prim_path)
-
-        # Compute the relative position and orientation
-        return T.quat2mat(world_orn).T @ angvel
+        idx = self._idx[prim_path]
+        link_idx = self._link_idx[idx][link_name]
+        return self._get_relative_velocities(prim_path)[link_idx, 3:]
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
-            self._read_cache["jacobians"] = self._view.get_jacobians()
+            self._read_cache["jacobians"] = cb.from_torch(self._view.get_jacobians())
 
         idx = self._idx[prim_path]
         return self._read_cache["jacobians"][idx]
 
     def get_relative_jacobian(self, prim_path):
-        jacobian = self.get_jacobian(prim_path)
-        ori_t = T.quat2mat(self.get_position_orientation(prim_path)[1]).T
-        tf = th.zeros((1, 6, 6), dtype=th.float32)
-        tf[:, :3, :3] = ori_t
-        tf[:, 3:, 3:] = ori_t
-        return tf @ jacobian
+        if "relative_jacobians" not in self._read_cache:
+            self._read_cache["relative_jacobians"] = {}
+
+        if prim_path not in self._read_cache["relative_jacobians"]:
+            jacobian = self.get_jacobian(prim_path)
+            ori_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
+            tf = cb.zeros((1, 6, 6))
+            tf[:, :3, :3] = ori_t
+            tf[:, 3:, 3:] = ori_t
+            # Run this explicitly in pytorch since it's order of magnitude faster than numpy!
+            # e.g.: 2e-4 vs. 3e-5 on R1
+            rel_jac = cb.from_torch(cb.to_torch(tf) @ cb.to_torch(jacobian))
+            self._read_cache["relative_jacobians"][prim_path] = rel_jac
+
+        return self._read_cache["relative_jacobians"][prim_path]
 
 
 class ControllableObjectViewAPI:
@@ -1281,6 +1345,12 @@ class ControllableObjectViewAPI:
     def get_coriolis_and_centrifugal_forces(cls, prim_path):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
             prim_path
+        )
+
+    @classmethod
+    def get_link_position_orientation(cls, prim_path, link_name):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_transform(
+            prim_path, link_name
         )
 
     @classmethod
@@ -1655,7 +1725,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
@@ -1806,3 +1876,62 @@ def delete_or_deactivate_prim(prim_path):
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True
+
+
+@th.compile
+def _compute_relative_poses_torch(
+    idx: int,
+    n_links: int,
+    all_tfs: th.Tensor,
+    base_pose: th.Tensor,
+):
+    tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
+    # base vel is the final -1 index
+    link_tfs = all_tfs[idx, :]
+    tfs[:, 3, 3] = 1.0
+    tfs[:, :3, 3] = link_tfs[:, :3]
+    tfs[:, :3, :3] = TT.quat2mat(link_tfs[:, 3:])
+    base_tf_inv = th.zeros((1, 4, 4), dtype=th.float32)
+    base_tf_inv[0, :, :] = TT.pose_inv(TT.pose2mat(base_pose))
+
+    # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
+    rel_tfs = base_tf_inv @ tfs
+
+    # Re-convert to quat form
+    rel_poses = th.zeros((n_links, 7), dtype=th.float32)
+    rel_poses[:, :3] = rel_tfs[:, :3, 3]
+    rel_poses[:, 3:] = TT.mat2quat(rel_tfs[:, :3, :3])
+
+    return rel_poses
+
+
+@jit(nopython=True)
+def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
+    tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
+    # base vel is the final -1 index
+    link_tfs = all_tfs[idx, :]
+    tfs[:, 3, 3] = 1.0
+    tfs[:, :3, 3] = link_tfs[:, :3]
+    tfs[:, :3, :3] = NT._quat2mat(link_tfs[:, 3:])
+    # base_tf_inv = np.zeros((1, 4, 4), dtype=np.float32)
+    # base_tf_inv[0, :, :] = NT._pose_inv(NT.pose2mat(base_pose))
+    base_tf_inv = NT._pose_inv(NT.pose2mat(base_pose))
+
+    # (1, 4, 4) @ (n_links, 4, 4) -> (n_links, 4, 4)
+    rel_tfs = np.zeros((n_links, 4, 4), dtype=np.float32)
+    for i in prange(n_links):
+        rel_tfs[i, :, :] = base_tf_inv @ tfs[i, :, :]
+    # rel_tfs = base_tf_inv @ tfs
+
+    # Re-convert to quat form
+    rel_poses = np.zeros((n_links, 7), dtype=np.float32)
+    rel_poses[:, :3] = rel_tfs[:, :3, 3]
+    rel_poses[:, 3:] = NT.mat2quat_batch(rel_tfs[:, :3, :3].copy())
+
+    return rel_poses
+
+
+# Set these as part of the backend values
+add_compute_function(
+    name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch
+)

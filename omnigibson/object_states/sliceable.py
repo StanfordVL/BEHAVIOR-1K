@@ -16,7 +16,7 @@ class SliceableRequirement(BaseObjectRequirement):
             return False, f"Only compatible with DatasetObject, but {obj} is of type {type(obj)}"
         # Check to make sure object parts are properly annotated in this object's metadata
         if not obj.metadata["object_parts"]:
-            return False, f"Missing required metadata 'object_parts'."
+            return False, "Missing required metadata 'object_parts'."
 
         return True, None
 
@@ -25,6 +25,6 @@ class SliceableRequirement(BaseObjectRequirement):
         # Check to make sure object parts are properly annotated in this object's metadata
         metadata = prim.GetCustomData().get("metadata", dict())
         if not metadata.get("object_parts", None):
-            return False, f"Missing required metadata 'object_parts'."
+            return False, "Missing required metadata 'object_parts'."
 
         return True, None

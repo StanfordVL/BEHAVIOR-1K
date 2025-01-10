@@ -1,4 +1,3 @@
-from abc import abstractmethod
 from functools import cached_property
 from typing import Literal
 
@@ -6,9 +5,10 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
@@ -206,7 +206,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Reload the controllers to update their command_output_limits and control_limits
         self.reload_controllers(self._controller_config)
 
-    @property
+    @cached_property
     def base_idx(self):
         """
         Returns:
@@ -217,7 +217,7 @@ class HolonomicBaseRobot(LocomotionRobot):
             [joints.index(f"base_footprint_{component}_joint") for component in ["x", "y", "z", "rx", "ry", "rz"]]
         )
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
 
@@ -282,10 +282,13 @@ class HolonomicBaseRobot(LocomotionRobot):
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
             joint_pos, joint_orn = self.root_link.get_position_orientation()
-            inv_joint_pos, inv_joint_orn = T.mat2pose(T.pose_inv(T.pose2mat((joint_pos, joint_orn))))
+            joint_pos, joint_orn = cb.from_torch(joint_pos), cb.from_torch(joint_orn)
+            inv_joint_pos, inv_joint_orn = cb.T.mat2pose(cb.T.pose_inv(cb.T.pose2mat((joint_pos, joint_orn))))
 
-            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
-            relative_rpy = T.quat2euler(relative_orn)
+            relative_pos, relative_orn = cb.T.pose_transform(
+                inv_joint_pos, inv_joint_orn, cb.from_torch(position), cb.from_torch(orientation)
+            )
+            relative_rpy = cb.T.quat2euler(relative_orn)
             self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
             self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
             self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
@@ -308,8 +311,8 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = self.root_link.get_position_orientation()[1]
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
+        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
+        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
         self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
@@ -320,8 +323,8 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
         # See comments of self.set_linear_velocity
-        orn = self.root_link.get_position_orientation()[1]
-        velocity_in_root_link = T.quat2mat(orn).T @ velocity
+        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
+        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
         self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
@@ -347,7 +350,7 @@ class HolonomicBaseRobot(LocomotionRobot):
         action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
         return action
 
-    @property
+    @cached_property
     def base_footprint_link_name(self):
         raise NotImplementedError("base_footprint_link_name is not implemented for HolonomicBaseRobot")
 

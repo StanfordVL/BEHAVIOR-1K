@@ -8,8 +8,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
-from omnigibson.macros import gm, macros
-from omnigibson.object_states import Touching
+from omnigibson.macros import gm
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 
@@ -236,6 +235,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
+            collision_activation_distance=0.01,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
@@ -360,6 +360,10 @@ def test_curobo():
         target_pos_in_world_frame = dict(target_pos_in_world_frame)
 
         print(f"Planning for {len(target_pos[robot.eef_link_names[robot.default_arm]])} eef targets...")
+
+        # Make sure robot is kept still for better determinism before planning
+        robot.keep_still()
+        og.sim.step_physics()
 
         # Generate collision-free trajectories to the sampled eef poses (including self-collisions)
         successes, traj_paths = cmg.compute_trajectories(

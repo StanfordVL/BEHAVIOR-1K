@@ -1,8 +1,9 @@
 import math
 
+import numpy as np
 import torch as th
+from numba import jit
 
-import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -11,6 +12,8 @@ from omnigibson.controllers import (
     ManipulationController,
 )
 from omnigibson.macros import create_module_macros
+from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -20,8 +23,6 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 m.DEFAULT_JOINT_POS_KP = 50.0
-m.DEFAULT_JOINT_POS_KI = 0.0  # do not use integral term by default
-m.DEFAULT_JOINT_MAX_INTEGRAL_ERROR = 1.0
 m.DEFAULT_JOINT_POS_DAMPING_RATIO = 1.0  # critically damped
 m.DEFAULT_JOINT_VEL_KP = 2.0
 
@@ -47,7 +48,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         command_output_limits="default",
         pos_kp=None,
         pos_damping_ratio=None,
-        pos_ki=None,
         max_integral_error=None,
         vel_kp=None,
         use_impedances=False,
@@ -106,10 +106,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         if self._motor_type == "position":
             pos_kp = m.DEFAULT_JOINT_POS_KP if pos_kp is None else pos_kp
             pos_damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if pos_damping_ratio is None else pos_damping_ratio
-            pos_ki = m.DEFAULT_JOINT_POS_KI if pos_ki is None else pos_ki
-            max_integral_error = (
-                m.DEFAULT_JOINT_MAX_INTEGRAL_ERROR if max_integral_error is None else max_integral_error
-            )
         elif self._motor_type == "velocity":
             vel_kp = m.DEFAULT_JOINT_VEL_KP if vel_kp is None else vel_kp
             assert (
@@ -121,9 +117,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             assert vel_kp is None, "Cannot set vel_kp for JointController with motor_type=effort!"
         self.pos_kp = pos_kp
         self.pos_kd = None if pos_kp is None or pos_damping_ratio is None else 2 * math.sqrt(pos_kp) * pos_damping_ratio
-        self.pos_ki = pos_ki
-        self._integral_error = th.zeros_like(dof_idx, dtype=th.float32)
-        self.max_integral_error = max_integral_error
         self.vel_kp = vel_kp
         self._use_impedances = use_impedances
         self._use_gravity_compensation = use_gravity_compensation
@@ -139,7 +132,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self._use_delta_commands and type(command_output_limits) == str and command_output_limits == "default"
+            self._use_delta_commands and type(command_output_limits) is str and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
@@ -149,6 +142,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+        )
+
+    def _generate_default_command_output_limits(self):
+        # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
+        # but controls low-level efforts
+        return (
+            self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx],
+            self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx],
         )
 
     def _update_goal(self, command, control_dict):
@@ -169,10 +170,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 delta_rots = command[[rx_ind, ry_ind, rz_ind]]
 
                 # Compute the final rotations in the quaternion space.
-                _, end_quat = T.pose_transform(
-                    th.zeros(3), T.euler2quat(delta_rots), th.zeros(3), T.euler2quat(start_rots)
+                _, end_quat = cb.T.pose_transform(
+                    cb.zeros(3), cb.T.euler2quat(delta_rots), cb.zeros(3), cb.T.euler2quat(start_rots)
                 )
-                end_rots = T.quat2euler(end_quat)
+                end_rots = cb.T.quat2euler(end_quat)
 
                 # Update the command
                 target[[rx_ind, ry_ind, rz_ind]] = end_rots
@@ -214,12 +215,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._motor_type == "position":
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
-                vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
-
-                # Update integral error
-                self._integral_error += position_error * (1.0 / self.control_freq)  # Integrate error over time
-                self._integral_error = self._integral_error.clip(-self.max_integral_error, self.max_integral_error)
-                u = position_error * self.pos_kp + vel_pos_error * self.pos_kd + self._integral_error * self.pos_ki
+                vel_pos_error = -control_dict["joint_velocity"][self.dof_idx]
+                u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
                 velocity_error = target - base_value
@@ -227,9 +224,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            dof_idxs_mat = th.meshgrid(self.dof_idx, self.dof_idx, indexing="xy")
-            mm = control_dict["mass_matrix"][dof_idxs_mat]
-            u = mm @ u
+            u = cb.compute_joint_torques(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:
@@ -253,21 +248,21 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             target = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         else:
             # For velocity / effort, directly set to 0
-            target = th.zeros(self.control_dim)
+            target = cb.zeros(self.control_dim)
 
         return dict(target=target)
 
     def _compute_no_op_action(self, control_dict):
         if self.motor_type == "position":
             if self._use_delta_commands:
-                return th.zeros(self.command_dim)
+                return cb.zeros(self.command_dim)
             else:
-                return control_dict[f"joint_position"][self.dof_idx]
+                return control_dict["joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -control_dict[f"joint_velocity"][self.dof_idx]
+                return -control_dict["joint_velocity"][self.dof_idx]
             else:
-                return th.zeros(self.command_dim)
+                return cb.zeros(self.command_dim)
 
         raise ValueError("Cannot compute noop action for effort motor type.")
 
@@ -301,3 +296,52 @@ class JointController(LocomotionController, ManipulationController, GripperContr
     @property
     def command_dim(self):
         return len(self.dof_idx)
+
+
+@th.compile
+def _compute_joint_torques_torch(
+    u: th.Tensor,
+    mm: th.Tensor,
+    dof_idx: th.Tensor,
+):
+    dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
+    return mm[dof_idxs_mat] @ u
+
+
+# Use numba since faster
+@jit(nopython=True)
+def numba_ix(arr, rows, cols):
+    """
+    Numba compatible implementation of arr[np.ix_(rows, cols)] for 2D arrays.
+
+    Implementation from:
+    https://github.com/numba/numba/issues/5894#issuecomment-974701551
+
+    :param arr: 2D array to be indexed
+    :param rows: Row indices
+    :param cols: Column indices
+    :return: 2D array with the given rows and columns of the input array
+    """
+    one_d_index = np.zeros(len(rows) * len(cols), dtype=np.int32)
+    for i, r in enumerate(rows):
+        start = i * len(cols)
+        one_d_index[start : start + len(cols)] = cols + arr.shape[1] * r
+
+    arr_1d = arr.reshape((arr.shape[0] * arr.shape[1], 1))
+    slice_1d = np.take(arr_1d, one_d_index)
+    return slice_1d.reshape((len(rows), len(cols)))
+
+
+@jit(nopython=True)
+def _compute_joint_torques_numpy(
+    u,
+    mm,
+    dof_idx,
+):
+    return numba_ix(mm, dof_idx, dof_idx) @ u
+
+
+# Set these as part of the backend values
+setattr(_ComputeBackend, "compute_joint_torques", None)
+setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
+setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)

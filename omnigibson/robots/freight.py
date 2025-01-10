@@ -1,8 +1,7 @@
-import os
+from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -24,7 +23,7 @@ class Freight(TwoWheelRobot):
     def wheel_axle_length(self):
         return 0.372
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["l_wheel_joint", "r_wheel_joint"]
 

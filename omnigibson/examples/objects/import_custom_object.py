@@ -61,8 +61,8 @@ def import_custom_object(
     overwrite: bool,
 ):
     """
-    Imports an externally-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
-    files to the external dataset directory (gm.CUSTOM_DATASET_PATH)
+    Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
+    files to the custom dataset directory (gm.CUSTOM_DATASET_PATH)
     """
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."
     collision_method = None if collision_method == "none" else collision_method
@@ -106,15 +106,15 @@ def import_custom_object(
         if confirm_bbox:
             if any(size > 3.0 for size in bbox_size):
                 click.echo(
-                    f"Warning: The bounding box sounds a bit large. Are you sure you don't need to scale? "
-                    f"We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
+                    "Warning: The bounding box sounds a bit large. Are you sure you don't need to scale? "
+                    "We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
                 )
                 click.confirm("Do you want to continue?", abort=True)
 
             elif any(size < 0.01 for size in bbox_size):
                 click.echo(
-                    f"Warning: The bounding box sounds a bit small. Are you sure you don't need to scale? "
-                    f"We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
+                    "Warning: The bounding box sounds a bit small. Are you sure you don't need to scale? "
+                    "We just wanted to confirm this is intentional. You can skip this check by passing --no-confirm-bbox."
                 )
                 click.confirm("Do you want to continue?", abort=True)
 

@@ -1,24 +1,27 @@
 import math
 
-import pytest
 import torch as th
-from utils import (
-    get_random_pose,
-    og_test,
-    place_obj_on_floor_plane,
-    place_objA_on_objB_bbox,
-    remove_all_systems,
-    retrieve_obj_cfg,
-)
+from utils import og_test, place_obj_on_floor_plane, remove_all_systems, retrieve_obj_cfg
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    Contains,
+    Cooked,
+    Covered,
+    Heated,
+    HeatSourceOrSink,
+    Inside,
+    OnTop,
+    Open,
+    Saturated,
+    Temperature,
+    ToggledOn,
+    Touching,
+)
 from omnigibson.objects import DatasetObject
 from omnigibson.transition_rules import REGISTERED_RULES
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 
 
 @og_test
@@ -1047,7 +1050,10 @@ def test_cooking_object_rule_failure_wrong_heat_source(env):
     place_obj_on_floor_plane(stove)
     og.sim.step()
 
-    heat_source_position = stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
+    # Check that the stove heat source link exists
+    stove.states[HeatSourceOrSink].link.get_position_orientation()[0]
+
+    # Put the baking sheet on the stove
     baking_sheet.set_position_orientation(position=[-0.20, 0, 0.80], orientation=[0, 0, 0, 1])
     og.sim.step()
 

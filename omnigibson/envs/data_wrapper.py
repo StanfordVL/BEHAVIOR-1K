@@ -196,7 +196,7 @@ class DataWrapper(EnvironmentWrapper):
         success = self.env.task.success or not self.only_successes
         if success and self.hdf5_file is not None:
             traj_grp_name = f"demo_{self.traj_count}"
-            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
+            self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
         else:
             # Remove this demo
@@ -232,7 +232,6 @@ class DataWrapper(EnvironmentWrapper):
             self.flush_current_traj()
 
         if self.hdf5_file is not None:
-
             log.info(
                 f"\nSaved:\n"
                 f"{self.traj_count} trajectories / {self.step_count} total steps\n"

@@ -11,8 +11,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.utils.constants import GROUND_CATEGORIES, JointType
-from omnigibson.utils.control_utils import FKSolver
+from omnigibson.utils.constants import JointType
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
 th.backends.cudnn.benchmark = True
@@ -167,6 +166,9 @@ class CuRoboMotionGenerator:
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
+            collision_activation_distance (float): Distance threshold at which a collision is detected.
+                Increasing this value will make the motion planner more conservative in its planning with respect
+                to the underlying sphere representation of the robot
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
             use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
             collision_activation_distance (float): Activation distance for collision checking; this affects

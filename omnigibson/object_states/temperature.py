@@ -17,7 +17,6 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(TensorizedValueState):
-
     def __init__(self, obj):
         # Run super first
         super(Temperature, self).__init__(obj)

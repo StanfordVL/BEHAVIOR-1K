@@ -1,9 +1,8 @@
 import math
-import os
+from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
@@ -90,15 +89,15 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["link_arm_l0", "link_arm_l3"],
         ]
 
-    @property
+    @cached_property
     def base_joint_names(self):
         return ["joint_left_wheel", "joint_right_wheel"]
 
-    @property
+    @cached_property
     def camera_joint_names(self):
         return ["joint_head_pan", "joint_head_tilt"]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
@@ -113,7 +112,7 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {
             self.default_arm: [
@@ -128,11 +127,11 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {self.default_arm: "eef_link"}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {
             self.default_arm: [
@@ -141,6 +140,6 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ]
         }
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}

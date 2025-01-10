@@ -3,11 +3,10 @@ A set of utility functions for general python usage
 """
 
 import inspect
-import re
 from abc import ABCMeta
 from collections.abc import Iterable
 from copy import deepcopy
-from functools import cache, wraps
+from functools import wraps
 from hashlib import md5
 from importlib import import_module
 
@@ -20,7 +19,6 @@ CLASS_NAMES = set()
 
 
 class classproperty:
-
     def __init__(self, fget):
         self.fget = fget
 
@@ -780,6 +778,25 @@ def recursively_convert_to_torch(state):
             state[key] = recursively_convert_to_torch(value)
         elif isinstance(value, list):
             state[key] = th.tensor(value, dtype=th.float32)
+    return state
+
+
+def recursively_convert_from_torch(state):
+    # For all the lists in state dict, convert from torch tensor -> numpy array
+    import numpy as np
+
+    for key, value in state.items():
+        if isinstance(value, dict):
+            state[key] = recursively_convert_from_torch(value)
+        elif isinstance(value, th.Tensor):
+            state[key] = value.cpu().numpy()
+        elif (isinstance(value, list) or isinstance(value, tuple)) and len(value) > 0:
+            if isinstance(value[0], dict):
+                state[key] = [recursively_convert_from_torch(val) for val in value]
+            elif isinstance(value[0], th.Tensor):
+                state[key] = [tensor.numpy() for tensor in value]
+            elif isinstance(value[0], int) or isinstance(value[0], float):
+                state[key] = np.array(value)
     return state
 
 

@@ -386,7 +386,7 @@ class SerializableRegistry(Registry, Serializable):
         validate_class = issubclass if isclass(obj) else isinstance
         assert any(
             [validate_class(obj, class_type) for class_type in (Serializable, SerializableNonInstance)]
-        ), f"Added object must be either an instance or subclass of Serializable or SerializableNonInstance!"
+        ), "Added object must be either an instance or subclass of Serializable or SerializableNonInstance!"
         # Run super like normal
         super().add(obj=obj)
 

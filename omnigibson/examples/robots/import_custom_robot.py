@@ -410,11 +410,9 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
     link_prim_path = f"{root_prim_path}/{link_name}"
     link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
-        assert (
-            not link_prim_exists
-        ), f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
-        link_prim = create_rigid_prim(
+        create_rigid_prim(
             stage=stage,
             link_prim_path=link_prim_path,
         )
@@ -443,10 +441,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     else:
         # Otherwise, link prim MUST exist
-        assert (
-            link_prim_exists
-        ), f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
-        link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(link_prim_path)
+        assert link_prim_exists, f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
 
     # Define functions to generate the desired sensor prim
     if sensor_type == "Camera":
@@ -720,11 +715,6 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         joint_prim = find_prim_with_name(name=joint_name, root_prim=root_prim)
         assert joint_prim is not None, f"Could not find joint prim with name {joint_name}!"
         return joint_prim.GetAttribute("physics:upperLimit").Get()
-
-    all_links = _find_prims_with_condition(
-        condition=lambda prim: prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI),
-        root_prim=robot_prim,
-    )
 
     # Generate list of collision link names -- this is simply the list of all link names from the
     # collision spheres specification

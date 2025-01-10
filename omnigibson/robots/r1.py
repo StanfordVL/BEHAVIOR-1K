@@ -1,19 +1,12 @@
-import math
-import os
+from functools import cached_property
 
 import torch as th
 
-import omnigibson as og
-import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
-from omnigibson.macros import create_module_macros, gm
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
-from omnigibson.utils.python_utils import assert_valid_key, classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
+from omnigibson.utils.python_utils import classproperty
 
 
 class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
@@ -197,15 +190,15 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             for arm in self.arm_names
         }
 
-    @property
+    @cached_property
     def floor_touching_base_link_names(self):
         return ["wheel_link1", "wheel_link2", "wheel_link3"]
 
-    @property
+    @cached_property
     def trunk_link_names(self):
         return ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
 
-    @property
+    @cached_property
     def trunk_joint_names(self):
         return [f"torso_joint{i}" for i in range(1, 5)]
 
@@ -217,23 +210,23 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def arm_names(cls):
         return ["left", "right"]
 
-    @property
+    @cached_property
     def arm_link_names(self):
         return {arm: [f"{arm}_arm_link{i}" for i in range(1, 7)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def arm_joint_names(self):
         return {arm: [f"{arm}_arm_joint{i}" for i in range(1, 7)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def eef_link_names(self):
         return {arm: f"{arm}_eef_link" for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_link_names(self):
         return {arm: [f"{arm}_gripper_link{i}" for i in range(1, 3)] for arm in self.arm_names}
 
-    @property
+    @cached_property
     def finger_joint_names(self):
         return {arm: [f"{arm}_gripper_axis{i}" for i in range(1, 3)] for arm in self.arm_names}
 

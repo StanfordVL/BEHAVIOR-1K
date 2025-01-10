@@ -5,7 +5,6 @@ from enum import IntEnum
 
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -244,7 +243,7 @@ class DatasetObject(USDObject):
             scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
         # Assert that the scale does not have too small dimensions
-        assert th.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
+        assert th.all(th.tensor(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
