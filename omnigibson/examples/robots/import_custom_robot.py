@@ -964,8 +964,6 @@ def import_custom_robot(config):
         local_pos[2] -= z_offset
         translate_attr.Set(local_pos)
 
-    breakpoint()
-
     # Add holonomic base if requested
     if cfg.base_motion.use_holonomic_joints:
         # Convert all wheel joints into fixed joints
