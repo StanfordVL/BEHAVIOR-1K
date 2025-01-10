@@ -12,10 +12,6 @@ from omnigibson.macros import gm
 from omnigibson.robots.tiago import Tiago
 from omnigibson.utils.ui_utils import choose_from_options
 
-# Don't use GPU dynamics and use flatcache for performance boost
-gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = True
-
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
@@ -36,8 +32,7 @@ def main():
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     config["scene"]["scene_model"] = "Rs_int"
-    config["scene"]["not_load_object_categories"] = ["ceilings", "loudspeaker", "standing_tv", "pot_plant"]
-    # config["scene"]["load_object_categories"] = ["floors", "breakfast_table", "bottom_cabinet", "walls"]
+    config["scene"]["not_load_object_categories"] = ["ceilings", "carpet"]
     config["objects"] = [
         {
             "type": "DatasetObject",
@@ -67,7 +62,7 @@ def main():
     env.scene.reset()
 
     og.sim.viewer_camera.set_position_orientation(
-        th.tensor([-0.6084, -3.3571, 1.2033]), th.tensor([0.6349, -0.1778, -0.2027, 0.7240])
+        th.tensor([1.8294, -3.2502, 1.6885]), th.tensor([0.5770, 0.1719, 0.2280, 0.7652])
     )
 
     # Let the object settle
@@ -78,7 +73,7 @@ def main():
     og.sim.enable_viewer_camera_teleoperation()
 
     controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=isinstance(robot, Tiago))
-    cabinet = scene.object_registry("name", "bottom_cabinet_jhymlr_0")
+    coffee_table = scene.object_registry("name", "coffee_table_fqluyq_0")
     apple = scene.object_registry("name", "apple")
 
     # Grasp apple
@@ -88,7 +83,7 @@ def main():
 
     # Place on cabinet
     print("Executing controller")
-    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, cabinet), env)
+    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, coffee_table), env)
     print("Finished executing place")
 
 
