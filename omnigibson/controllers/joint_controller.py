@@ -48,7 +48,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         command_output_limits="default",
         pos_kp=None,
         pos_damping_ratio=None,
-        max_integral_error=None,
         vel_kp=None,
         use_impedances=False,
         use_gravity_compensation=False,
