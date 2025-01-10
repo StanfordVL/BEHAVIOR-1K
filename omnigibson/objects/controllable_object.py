@@ -565,6 +565,12 @@ class ControllableObject(BaseObject):
                 positions=control[pos_idxs],
                 indices=pos_idxs,
             )
+            # If we're setting joint position targets, we should also set velocity targets to 0
+            ControllableObjectViewAPI.set_joint_velocity_targets(
+                self.articulation_root_path,
+                velocities=cb.zeros(len(pos_idxs)),
+                indices=pos_idxs,
+            )
         vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
         if len(vel_idxs) > 0:
             ControllableObjectViewAPI.set_joint_velocity_targets(
