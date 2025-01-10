@@ -26,6 +26,7 @@ from omnigibson.action_primitives.action_primitive_set_base import (
 )
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.controllers import (
+    HolonomicBaseJointController,
     InverseKinematicsController,
     JointController,
 )
@@ -108,6 +109,11 @@ log = create_module_logger(module_name=__name__)
 
 def indented_print(msg, *args, **kwargs):
     print("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
+
+
+def normalize_angle(angle):
+    """Normalize angle to [-pi, pi] range."""
+    return th.atan2(th.sin(angle), th.cos(angle))
 
 
 class StarterSemanticActionPrimitiveSet(IntEnum):
@@ -560,9 +566,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name},
             )
 
-        # TODO: ag force seems to not be enough to keep the object in hand. need to investigate
-        obj_in_hand.root_link.density = 1.0
-
         indented_print("Moving hand back")
         yield from self._reset_hand(self.arm)
 
@@ -945,8 +948,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         q_traj = self._motion_generator.path_to_joint_trajectory(
             traj_path, get_full_js=True, emb_sel=embodiment_selection
-        )
-        return q_traj.cpu()
+        ).cpu()
+
+        # Smooth out the trajectory
+        q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=q_traj, max_inter_dist=0.01))
+
+        return q_traj
 
     def _execute_motion_plan(
         self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False, ignore_physics=False
@@ -982,8 +989,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
                     if th.max(th.abs(articulation_joint_diff)).item() < articulation_threshold:
                         articulation_target_reached = True
-                    # TODO: genralize this to transaltion&rotation + high/low precision modes
-                    if th.max(th.abs(base_joint_diff)).item() < m.DEFAULT_DIST_THRESHOLD:
+                    if (
+                        th.max(th.abs(base_joint_diff[:2])).item() < m.DEFAULT_DIST_THRESHOLD
+                        and th.abs(normalize_angle(base_joint_diff[2])).item() < m.DEFAULT_ANGLE_THRESHOLD
+                    ):
                         base_target_reached = True
                     if base_target_reached and articulation_target_reached:
                         break
@@ -1011,6 +1020,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = []
         for controller in self.robot.controllers.values():
             command = q[controller.dof_idx]
+            if isinstance(controller, HolonomicBaseJointController):
+                # For a holonomic base joint controller, the command should be in the robot local frame
+                local_pose = self._world_pose_to_robot_pose(self._get_robot_pose_from_2d_pose(command))
+                command = th.tensor([local_pose[0][0], local_pose[0][1], T.quat2euler(local_pose[1])[2]])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
         assert action.shape[0] == self.robot.action_dim
@@ -1975,7 +1988,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Converts the pose in the world frame to the robot frame
 
         Args:
-            pose_2d (Iterable): (x, y, yaw) 2d pose
+            pose (Iterable): (pos, quat) Pose in the world frame
 
         Returns:
             2-tuple:
@@ -1990,7 +2003,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Converts the pose in the robot frame to the world frame
 
         Args:
-            pose_2d (Iterable): (x, y, yaw) 2d pose
+            pose (Iterable): (pos, quat) Pose in the robot frame
 
         Returns:
             2-tuple:
