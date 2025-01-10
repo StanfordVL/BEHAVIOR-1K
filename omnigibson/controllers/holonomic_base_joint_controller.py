@@ -1,6 +1,4 @@
-import torch as th
-
-import omnigibson.utils.transform_utils as T
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers.joint_controller import JointController
 
 
@@ -91,41 +89,41 @@ class HolonomicBaseJointController(JointController):
         """
         Updates the goal command by transforming it from the robot's local frame to its canonical frame.
         """
-        base_pose = T.pose2mat((control_dict["root_pos"], control_dict["root_quat"]))
-        canonical_pose = T.pose2mat((control_dict["canonical_pos"], control_dict["canonical_quat"]))
-        canonical_to_base_pose = T.pose_inv(canonical_pose) @ base_pose
+        base_pose = cb.T.pose2mat((control_dict["root_pos"], control_dict["root_quat"]))
+        canonical_pose = cb.T.pose2mat((control_dict["canonical_pos"], control_dict["canonical_quat"]))
+        canonical_to_base_pose = cb.T.pose_inv(canonical_pose) @ base_pose
 
         if self.motor_type == "position":
             # Handle position control mode
-            command_in_base_frame = th.eye(4)
+            command_in_base_frame = cb.eye(4)
             command_in_base_frame[:2, 3] = command[:2]  # Set x,y translation
-            command_in_base_frame[:3, :3] = T.euler2mat(th.tensor([0.0, 0.0, command[2]]))  # Set rotation
+            command_in_base_frame[:3, :3] = cb.T.euler2mat(cb.array([0.0, 0.0, command[2]]))  # Set rotation
 
             # Transform command to canonical frame
             command_in_canonical_frame = canonical_to_base_pose @ command_in_base_frame
 
             # Extract position and yaw from transformed command
             position = command_in_canonical_frame[:2, 3]
-            yaw = T.mat2euler(command_in_canonical_frame[:3, :3])[2:3]
-            command = th.cat([position, yaw])
+            yaw = cb.T.mat2euler(command_in_canonical_frame[:3, :3])[2:3]
+            command = cb.cat([position, yaw])
         else:
             # Handle velocity/effort control modes
             # Note: Only rotate the commands, don't translate
             rotation_matrix = canonical_to_base_pose[:3, :3]
 
             # Prepare poses for transformation
-            rotation_poses = th.zeros((2, 3, 3))
+            rotation_poses = cb.zeros((2, 3, 3))
             rotation_poses[:, :3, :3] = rotation_matrix
 
-            local_vectors = th.zeros((2, 3, 1))
-            local_vectors[0, :, 0] = th.tensor([command[0], command[1], 0.0])  # Linear
-            local_vectors[1, :, 0] = th.tensor([0.0, 0.0, command[2]])  # Angular
+            local_vectors = cb.zeros((2, 3, 1))
+            local_vectors[0, :, 0] = cb.array([command[0], command[1], 0.0])  # Linear
+            local_vectors[1, :, 0] = cb.array([0.0, 0.0, command[2]])  # Angular
 
             # Transform to global frame
             global_vectors = rotation_poses @ local_vectors
             linear_global = global_vectors[0]
             angular_global = global_vectors[1]
 
-            command = th.tensor([linear_global[0], linear_global[1], angular_global[2]])
+            command = cb.array([linear_global[0], linear_global[1], angular_global[2]])
 
         return super()._update_goal(command=command, control_dict=control_dict)
