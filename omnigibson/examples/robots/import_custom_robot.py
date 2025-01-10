@@ -670,14 +670,16 @@ def set_link_collision_approximation(stage, root_prim, link_name, approximation_
         mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
-def is_articulated_joint(prim):
+def is_joint(prim, only_articulated=True):
     prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
-    return "joint" in prim_type and "fixed" not in prim_type
+    if only_articulated and "fixed" in prim_type:
+        return False
+    return "joint" in prim_type
 
 
-def find_all_articulated_joints(root_prim):
+def find_all_joints(root_prim, only_articulated=True):
     return _find_prims_with_condition(
-        condition=is_articulated_joint,
+        condition=lambda x: is_joint(x, only_articulated=only_articulated),
         root_prim=root_prim,
     )
 
@@ -746,7 +748,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     collision_spheres = curobo_cfg.collision_spheres.to_dict()
     all_collision_link_names = list(collision_spheres.keys())
 
-    joint_prims = find_all_articulated_joints(robot_prim)
+    joint_prims = find_all_joints(robot_prim, only_articulated=True)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
     retract_cfg = curobo_cfg.default_qpos
     lock_joints = curobo_cfg.lock_joints.to_dict() if curobo_cfg.lock_joints else {}
@@ -945,7 +947,7 @@ def import_custom_robot(config):
         local_pos = translate_attr.Get()
         local_pos[2] -= z_offset
         translate_attr.Set(local_pos)
-    root_joints = find_all_articulated_joints(root_prim=articulation_root_prim)
+    root_joints = find_all_joints(root_prim=articulation_root_prim, only_articulated=False)
     root_prim_path = articulation_root_prim.GetPrimPath().pathString
     for joint in root_joints:
         body0_targets = joint.GetProperty("physics:body0").GetTargets()
