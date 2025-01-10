@@ -1,7 +1,7 @@
 """
 WARNING!
 The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with Tiago and R1 with their JointControllers set to absolute position mode with impedance.
+It currently only works with Tiago and R1 with their JointControllers set to absolute position mode.
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
@@ -26,7 +26,12 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     BaseActionPrimitiveSet,
 )
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
-from omnigibson.controllers import DifferentialDriveController, InverseKinematicsController, JointController
+from omnigibson.controllers import (
+    DifferentialDriveController,
+    HolonomicBaseJointController,
+    InverseKinematicsController,
+    JointController,
+)
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.robots import *
@@ -41,8 +46,6 @@ from omnigibson.utils.python_utils import multi_dim_linspace
 from omnigibson.utils.ui_utils import create_module_logger
 
 m = create_module_macros(module_path=__file__)
-
-m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.0
 
 m.KP_LIN_VEL = {
     Tiago: 0.3,
@@ -67,7 +70,8 @@ m.KP_ANGLE_VEL = {
     R1: 0.2,
 }
 
-m.MAX_PLANNING_ATTEMPTS = 20
+m.MAX_PLANNING_ATTEMPTS = 100
+m.MAX_IK_FAILURES_BEFORE_RETURN = 50
 
 m.MAX_STEPS_FOR_SETTLING = 500
 
@@ -83,7 +87,7 @@ m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
-m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE = 20
+m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE = 50
 m.PREDICATE_SAMPLING_Z_OFFSET = 0.02
 m.BASE_POSE_SAMPLING_LOWER_BOUND = 0.0
 m.BASE_POSE_SAMPLING_UPPER_BOUND = 1.5
@@ -92,8 +96,8 @@ m.GRASP_APPROACH_DISTANCE = 0.01
 m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.HAND_DIST_THRESHOLD = 0.002
-m.DEFAULT_DIST_THRESHOLD = 0.05
-m.DEFAULT_ANGLE_THRESHOLD = 0.05
+m.DEFAULT_DIST_THRESHOLD = 0.005
+m.DEFAULT_ANGLE_THRESHOLD = 0.1
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
@@ -157,7 +161,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
-            "It currently only works with Tiago and R1 with their JointControllers set to absolute position mode with impedance."
+            "It currently only works with Tiago and R1 with their JointControllers set to absolute position mode."
         )
         super().__init__(env, robot)
         self.controller_functions = {
@@ -516,7 +520,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
         grasp_pose, object_direction = random.choice(grasp_poses)
 
-        grasp_offset_in_z = self.robot.finger_lengths[self.arm] + m.GRASP_APPROACH_DISTANCE
+        grasp_offset_in_z = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
 
         # Adjust grasp pose with reset orientation and finger length offset
         reset_orientation = self._get_reset_eef_pose("world")[self.arm][1]
@@ -543,7 +547,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             # Use direct IK to move the hand to the approach pose.
-            yield from self._move_hand(approach_pose, avoid_collision=False)
+            yield from self._move_hand(approach_pose, avoid_collision=False, ignore_paths=[obj.prim_path])
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
             yield from self._move_hand(approach_pose)
@@ -658,35 +662,32 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "You need to be grasping an object first to place it somewhere.",
             )
 
-        # Sample location to place object
-        pose_candidates = []
-        directly_move_hand_pose = None
         self._motion_generator.update_obstacles()
-        while len(pose_candidates) < m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE:
+        target_in_reach = False
+        valid_navigation_pose = None
+        for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE):
+            # Sample one pose at a time
             obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
-            # TODO: why do we sample this orientation?
             obj_pose = (obj_pose[0], obj_in_hand.get_position_orientation()[1])
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-            if self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)[self.arm]:
-                directly_move_hand_pose = hand_pose
+
+            # First check if we can directly move the hand there
+            target_in_reach = self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)[self.arm]
+            if target_in_reach:
+                yield from self._move_hand(hand_pose)
                 break
-            else:
-                pose_candidates.append(hand_pose)
 
-        valid_navigation_pose = None
-        if directly_move_hand_pose is not None:
-            yield from self._move_hand(directly_move_hand_pose)
-        else:
-            for candidate in pose_candidates:
-                valid_navigation_pose = self._sample_pose_near_object(obj, pose_on_obj=candidate, sampling_attempts=20)
-                if valid_navigation_pose is None:
-                    continue
-                else:
-                    yield from self._navigate_to_pose(valid_navigation_pose)
-                    yield from self._move_hand(candidate)
-                    break
+            # If not, try to find a valid navigation pose for this hand pose
+            valid_navigation_pose = self._sample_pose_near_object(
+                obj, pose_on_obj=hand_pose, sampling_attempts=10, skip_obstacle_update=True
+            )
 
-        if valid_navigation_pose is None:
+            if valid_navigation_pose is not None:
+                yield from self._navigate_to_pose(valid_navigation_pose)
+                yield from self._move_hand(hand_pose)
+                break
+
+        if not target_in_reach and valid_navigation_pose is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 "Could not find a valid pose to place the object",
@@ -817,8 +818,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_pos=target_pos,
             target_quat=target_quat,
             is_local=False,
+            max_attempts=math.ceil(m.MAX_PLANNING_ATTEMPTS / self._motion_generator.batch_size),
             return_full_result=False,
             ik_only=True,
+            ik_fail_return=m.MAX_IK_FAILURES_BEFORE_RETURN,
             ik_world_collision_check=False,
             skip_obstacle_update=skip_obstacle_update,
             emb_sel=CuRoboEmbodimentSelection.ARM,
@@ -840,12 +843,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         motion_constraint=None,
         low_precision=False,
         lock_auxiliary_arm=False,
+        ignore_paths=None,
     ):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
+            avoid_collision (bool): Whether to avoid collision (this need to be false for grasping)
+            arm (str): Arm to use for the target pose
+            motion_constraint (MotionConstraint): Motion constraint for the motion
+            low_precision (bool): Whether to use low precision for the motion
+            lock_auxiliary_arm (bool): Whether to lock the other arm in place
+            ignore_paths (None or list of str): If specified, prim path substrings that should
+                be ignored when planning
 
         Returns:
             th.tensor or None: Action array for one step for the robot to move hand or None if its at the target pose
@@ -854,42 +865,37 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.debug_visual_marker.set_position_orientation(*target_pose)
         if arm is None:
             arm = self.arm
-        if avoid_collision:
-            yield from self._settle_robot()
-            # curobo motion generator takes a pose but outputs joint positions
-            if not lock_auxiliary_arm:
-                target_pos = {
-                    self.robot.eef_link_names[self.arm]: target_pose[0],
-                }
-                target_quat = {
-                    self.robot.eef_link_names[self.arm]: target_pose[1],
-                }
-            else:
-                left_hand_pos, left_hand_quat = target_pose if arm == "left" else self.robot.get_eef_pose(arm="left")
-                right_hand_pos, right_hand_quat = (
-                    target_pose if arm == "right" else self.robot.get_eef_pose(arm="right")
-                )
-                target_pos = {
-                    self.robot.eef_link_names["left"]: left_hand_pos,
-                    self.robot.eef_link_names["right"]: right_hand_pos,
-                }
-                target_quat = {
-                    self.robot.eef_link_names["left"]: left_hand_quat,
-                    self.robot.eef_link_names["right"]: right_hand_quat,
-                }
-            q_traj = self._plan_joint_motion(
-                target_pos=target_pos,
-                target_quat=target_quat,
-                embodiment_selection=CuRoboEmbodimentSelection.ARM,
-                motion_constraint=motion_constraint,
-            )
+
+        if ignore_paths is not None:
+            self._motion_generator.update_obstacles(ignore_paths=ignore_paths)
+
+        yield from self._settle_robot()
+        # curobo motion generator takes a pose but outputs joint positions
+        if not lock_auxiliary_arm:
+            target_pos = {
+                self.robot.eef_link_names[self.arm]: target_pose[0],
+            }
+            target_quat = {
+                self.robot.eef_link_names[self.arm]: target_pose[1],
+            }
         else:
-            # Move EEF directly without collsion checking
-            goal_arm_joint_pos = self._convert_cartesian_to_joint_space(target_pose, arm=arm)
-            curr_joint_pos = self.robot.get_joint_positions()
-            goal_joint_pos = curr_joint_pos.clone()
-            goal_joint_pos[self._manipulation_control_idx(arm)] = goal_arm_joint_pos
-            q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=[curr_joint_pos, goal_joint_pos]))
+            left_hand_pos, left_hand_quat = target_pose if arm == "left" else self.robot.get_eef_pose(arm="left")
+            right_hand_pos, right_hand_quat = target_pose if arm == "right" else self.robot.get_eef_pose(arm="right")
+            target_pos = {
+                self.robot.eef_link_names["left"]: left_hand_pos,
+                self.robot.eef_link_names["right"]: right_hand_pos,
+            }
+            target_quat = {
+                self.robot.eef_link_names["left"]: left_hand_quat,
+                self.robot.eef_link_names["right"]: right_hand_quat,
+            }
+        q_traj = self._plan_joint_motion(
+            target_pos=target_pos,
+            target_quat=target_quat,
+            embodiment_selection=CuRoboEmbodimentSelection.ARM,
+            motion_constraint=motion_constraint,
+            skip_obstalce_update=ignore_paths is not None,
+        )
 
         indented_print(f"Plan has {len(q_traj)} steps")
         yield from self._execute_motion_plan(q_traj, stop_on_contact=not avoid_collision, low_precision=low_precision)
@@ -900,6 +906,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_quat,
         embodiment_selection=CuRoboEmbodimentSelection.DEFAULT,
         motion_constraint=None,
+        skip_obstalce_update=False,
     ):
         # If an object is grasped, we need to pass it to the motion planner
         obj_in_hand = self._get_obj_in_hand()
@@ -913,18 +920,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             k: th.stack([v for _ in range(self._motion_generator.batch_size)]) for k, v in target_quat.items()
         }
 
-        self._motion_generator.update_obstacles()
+        if not skip_obstalce_update:
+            self._motion_generator.update_obstacles()
         successes, traj_paths = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
             is_local=False,
             max_attempts=math.ceil(m.MAX_PLANNING_ATTEMPTS / self._motion_generator.batch_size),
             timeout=60.0,
-            ik_fail_return=5,
+            ik_fail_return=m.MAX_IK_FAILURES_BEFORE_RETURN,
             enable_finetune_trajopt=True,
             finetune_attempts=1,
             return_full_result=False,
-            success_ratio=1.0,
             attached_obj=attached_obj,
             motion_constraint=motion_constraint,
             skip_obstacle_update=True,
@@ -955,6 +962,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if ignore_physics:
                 self.robot.set_joint_positions(joint_pos)
                 og.sim.step()
+                if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=True):
+                    return
             else:
                 # Convert target joint positions to command
                 action = self._q_to_action(joint_pos)
@@ -987,6 +996,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     if stop_on_contact and collision_detected:
                         return
                     yield self._postprocess_action(action)
+                    action = self._q_to_action(
+                        joint_pos
+                    )  # This is needed for holonomic base joint controller to update local frame pose
 
                 if not ignore_failure:
                     if not base_target_reached:
@@ -1023,9 +1035,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         assert len(plan) > 1, "Plan must have at least 2 waypoints to interpolate"
         interpolated_plan = []
         for i in range(len(plan) - 1):
-            max_diff = max(plan[i + 1] - plan[i])
-            num_intervals = math.ceil(max_diff / max_inter_dist)
+            # Calculate maximum difference across all dimensions
+            max_diff = (plan[i + 1] - plan[i]).abs().max()
+            num_intervals = math.ceil(max_diff.item() / max_inter_dist)
             interpolated_plan += multi_dim_linspace(plan[i], plan[i + 1], num_intervals)
+
         interpolated_plan.append(plan[-1])
         return interpolated_plan
 
@@ -1581,16 +1595,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
+        self._motion_generator.update_obstacles()
         if pose_on_obj is not None:
-            if self._target_in_reach_of_robot(pose_on_obj)[self.arm]:
+            if self._target_in_reach_of_robot(pose_on_obj, skip_obstacle_update=True)[self.arm]:
                 # No need to navigate.
                 return
-        elif self._target_in_reach_of_robot(obj.get_position_orientation())[self.arm]:
+        elif self._target_in_reach_of_robot(obj.get_position_orientation(), skip_obstacle_update=True)[self.arm]:
             return
 
-        yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, **kwargs)
+        yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, skip_obstacle_update=True, **kwargs)
 
-    def _navigate_to_obj(self, obj, pose_on_obj=None, **kwargs):
+    def _navigate_to_obj(self, obj, pose_on_obj=None, skip_obstacle_update=False, **kwargs):
         """
         Yields action to navigate the robot to be in range of the pose
 
@@ -1601,7 +1616,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
-        pose = self._sample_pose_near_object(obj, pose_on_obj=pose_on_obj, **kwargs)
+        pose = self._sample_pose_near_object(
+            obj, pose_on_obj=pose_on_obj, skip_obstacle_update=skip_obstacle_update, **kwargs
+        )
         if pose is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -1723,7 +1740,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield self._postprocess_action(empty_action)
 
     def _sample_pose_near_object(
-        self, obj, pose_on_obj=None, sampling_attempts=m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT, **kwargs
+        self,
+        obj,
+        pose_on_obj=None,
+        sampling_attempts=m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT,
+        skip_obstacle_update=False,
+        **kwargs,
     ):
         """
         Returns a 2d pose for the robot within in the range of the object and where the robot is not in collision with anything
@@ -1751,8 +1773,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
         attempt = 0
-        # Update obstacle once before sampling
-        self._motion_generator.update_obstacles()
+        if not skip_obstacle_update:
+            # Update obstacle once before sampling
+            self._motion_generator.update_obstacles()
         while attempt < sampling_attempts:
             candidate_poses = []
             for _ in range(self._collision_check_batch_size):
@@ -1938,8 +1961,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return ~invalid_results
 
-    @staticmethod
-    def _get_robot_pose_from_2d_pose(pose_2d):
+    def _get_robot_pose_from_2d_pose(self, pose_2d):
         """
         Gets 3d pose from 2d pose
 
@@ -1950,7 +1972,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor: (x,y,z) Position in the world frame
             th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        pos = th.tensor([pose_2d[0], pose_2d[1], m.DEFAULT_BODY_OFFSET_FROM_FLOOR], dtype=th.float32)
+        pos = th.tensor([pose_2d[0], pose_2d[1], self.robot.get_position_orientation()[0][2]], dtype=th.float32)
         orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
         return pos, orn
 

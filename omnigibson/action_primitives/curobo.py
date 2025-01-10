@@ -25,6 +25,9 @@ m = create_module_macros(module_path=__file__)
 m.HOLONOMIC_BASE_PRISMATIC_JOINT_LIMIT = 5.0  # meters
 m.HOLONOMIC_BASE_REVOLUTE_JOINT_LIMIT = math.pi * 2  # radians
 
+m.DEFAULT_COLLISION_ACTIVATION_DISTANCE = 0.005
+m.DEFAULT_ATTACHED_OBJECT_SCALE = 0.8
+
 
 class CuRoboEmbodimentSelection(str, Enum):
     BASE = "base"
@@ -150,7 +153,7 @@ class CuRoboMotionGenerator:
         use_cuda_graph=True,
         debug=False,
         use_default_embodiment_only=False,
-        collision_activation_distance=0.005,
+        collision_activation_distance=m.DEFAULT_COLLISION_ACTIVATION_DISTANCE,
     ):
         """
         Args:
@@ -915,7 +918,7 @@ class CuRoboMotionGenerator:
             quaternion = quaternion[[3, 0, 1, 2]]
             ee_pose = lazy.curobo.types.math.Pose(position=position, quaternion=quaternion).to(self._tensor_args)
 
-            scale = 0.99 if attached_obj_scale is None else attached_obj_scale[ee_link_name]
+            scale = m.DEFAULT_ATTACHED_OBJECT_SCALE if attached_obj_scale is None else attached_obj_scale[ee_link_name]
 
             self.mg[emb_sel].attach_objects_to_robot(
                 joint_state=cu_js_batch,
