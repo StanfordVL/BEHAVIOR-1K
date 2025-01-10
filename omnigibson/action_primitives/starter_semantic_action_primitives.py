@@ -2050,7 +2050,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to do nothing
         """
-        for _ in range(10):
+        for _ in range(50):
             empty_action = self._q_to_action(self.robot.get_joint_positions())
             yield self._postprocess_action(empty_action)
 
