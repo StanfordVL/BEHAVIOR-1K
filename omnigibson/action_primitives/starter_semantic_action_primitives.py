@@ -26,7 +26,6 @@ from omnigibson.action_primitives.action_primitive_set_base import (
 )
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.controllers import (
-    HolonomicBaseJointController,
     InverseKinematicsController,
     JointController,
 )
@@ -968,7 +967,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     return
             else:
                 # Convert target joint positions to command
-                action = self._q_to_action(joint_pos)
+                action = self.robot.q_to_action(joint_pos)
 
                 base_target_reached = False
                 articulation_target_reached = False
@@ -1000,7 +999,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     if stop_on_contact and collision_detected:
                         return
                     yield self._postprocess_action(action)
-                    action = self._q_to_action(
+                    action = self.robot.q_to_action(
                         joint_pos
                     )  # This is needed for holonomic base joint controller to update local frame pose
 
@@ -1015,19 +1014,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                             ActionPrimitiveError.Reason.EXECUTION_ERROR,
                             "Could not reach the target articulation joint positions. Try again",
                         )
-
-    def _q_to_action(self, q):
-        action = []
-        for controller in self.robot.controllers.values():
-            command = q[controller.dof_idx]
-            if isinstance(controller, HolonomicBaseJointController):
-                # For a holonomic base joint controller, the command should be in the robot local frame
-                local_pose = self._world_pose_to_robot_pose(self._get_robot_pose_from_2d_pose(command))
-                command = th.tensor([local_pose[0][0], local_pose[0][1], T.quat2euler(local_pose[1])[2]])
-            action.append(controller._reverse_preprocess_command(command))
-        action = th.cat(action, dim=0)
-        assert action.shape[0] == self.robot.action_dim
-        return action
 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist=0.01):
         """
@@ -1306,7 +1292,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for finger_joint in self.robot.finger_joints[self.arm]:
             idx = joint_names.index(finger_joint.joint_name)
             q[idx] = getattr(finger_joint, f"{limit_type}_limit")
-        action = self._q_to_action(q)
+        action = self.robot.q_to_action(q)
         finger_joint_limits = getattr(self.robot, f"joint_{limit_type}_limits")[
             self.robot.gripper_control_idx[self.arm]
         ]
@@ -2051,11 +2037,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor or None: Action array for one step for the robot to do nothing
         """
         for _ in range(50):
-            empty_action = self._q_to_action(self.robot.get_joint_positions())
+            empty_action = self.robot.q_to_action(self.robot.get_joint_positions())
             yield self._postprocess_action(empty_action)
 
         for _ in range(m.MAX_STEPS_FOR_SETTLING):
             if th.norm(self.robot.get_linear_velocity()) < 0.01:
                 break
-            empty_action = self._q_to_action(self.robot.get_joint_positions())
+            empty_action = self.robot.q_to_action(self.robot.get_joint_positions())
             yield self._postprocess_action(empty_action)

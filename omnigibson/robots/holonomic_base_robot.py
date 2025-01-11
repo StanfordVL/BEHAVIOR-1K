@@ -7,10 +7,12 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
+from omnigibson.controllers import JointController, HolonomicBaseJointController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import classproperty
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 m = create_module_macros(module_path=__file__)
@@ -352,6 +354,45 @@ class HolonomicBaseRobot(LocomotionRobot):
         fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
 
         return fcns
+
+    def q_to_action(self, q):
+        """
+        Converts a target joint configuration to an action that can be applied to this object.
+        All controllers should be JointController with use_delta_commands=False
+        """
+        action = []
+        for name, controller in self.controllers.items():
+            assert (
+                isinstance(controller, JointController) and not controller.use_delta_commands
+            ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
+            command = q[controller.dof_idx]
+            if isinstance(controller, HolonomicBaseJointController):
+                # For a holonomic base joint controller, the command should be in the robot local frame
+                local_pose = self._2d_world_pose_to_robot_pose(command)
+                command = th.tensor([local_pose[0][0], local_pose[0][1], T.quat2euler(local_pose[1])[2]])
+            action.append(controller._reverse_preprocess_command(command))
+        action = th.cat(action, dim=0)
+        assert (
+            action.shape[0] == self.action_dim
+        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        return action
+
+    def _2d_world_pose_to_robot_pose(self, pose_2d):
+        """
+        Converts 2D pose (x, y, yaw) directly to robot-relative pose
+
+        Args:
+            pose_2d (Iterable): (x, y, yaw) 2D pose
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the robot frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the robot frame
+        """
+        body_pose = self.get_position_orientation()
+        world_pos = th.tensor([pose_2d[0], pose_2d[1], body_pose[0][2]], dtype=th.float32)
+        world_orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
+        return T.relative_pose_transform(world_pos, world_orn, *body_pose)
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)

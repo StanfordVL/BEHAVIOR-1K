@@ -6,6 +6,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
 from omnigibson.sensors import VisionSensor
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
 
@@ -285,7 +286,7 @@ def test_grasping_mode():
         for _ in range(10):
             og.sim.step()
 
-        action_primitives = StarterSemanticActionPrimitives(robot)
+        action_primitives = StarterSemanticActionPrimitives(env=env, robot=robot, skip_curobo_initilization=True)
 
         box_object = env.scene.object_registry("name", "box")
         target_eef_pos = box_object.get_position_orientation()[0]
@@ -295,9 +296,12 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
+        gripper_controller = robot.controllers["gripper_0"]
+
         # Grasp the box
-        for action in action_primitives._execute_grasp():
-            env.step(action)
+        gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+        for _ in range(20):
+            og.sim.step()
 
         assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to grasp the object"
 
@@ -309,9 +313,8 @@ def test_grasping_mode():
         assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        for action in action_primitives._execute_release():
-            env.step(action)
-        for _ in range(10):
+        gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+        for _ in range(20):
             og.sim.step()
 
         assert not object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to release the object"
