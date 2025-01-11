@@ -116,6 +116,7 @@ robots:
         use_impedances: false
       camera:
         name: JointController
+        use_delta_commands: false
 
 objects: []
 

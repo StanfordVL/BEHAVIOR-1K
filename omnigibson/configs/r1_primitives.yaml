@@ -83,6 +83,7 @@ robots:
         use_impedances: false
       camera:
         name: JointController
+        use_delta_commands: false
     reset_joint_pos: [     0.0000,     -0.0000,      0.0247,      0.0009,      0.0004,
             -0.0000,      0.0000,      0.0000,      0.0000,      0.0000,
             -0.0464,      0.0464,      2.6172,      2.6168,     -1.4584,
