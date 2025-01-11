@@ -10,6 +10,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers.joint_controller import JointController
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
@@ -667,6 +668,24 @@ class ControllableObject(BaseObject):
         fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
             self.articulation_root_path
         )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
+
+    def q_to_action(self, q):
+        """
+        Converts a target joint configuration to an action that can be applied to this object.
+        All controllers should be JointController with use_delta_commands=False
+        """
+        action = []
+        for name, controller in self.controllers.items():
+            assert (
+                isinstance(controller, JointController) and not controller.use_delta_commands
+            ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
+            command = q[controller.dof_idx]
+            action.append(controller._reverse_preprocess_command(command))
+        action = th.cat(action, dim=0)
+        assert (
+            action.shape[0] == self.action_dim
+        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        return action
 
     def dump_action(self):
         """

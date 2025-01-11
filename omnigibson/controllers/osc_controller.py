@@ -457,7 +457,7 @@ class OperationalSpaceController(ManipulationController):
             target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         pos_relative = control_dict[f"{self.task_name}_pos_relative"]
         quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
