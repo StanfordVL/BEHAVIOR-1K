@@ -96,7 +96,7 @@ class NullJointController(JointController):
 
         self.default_goal = cb.array(target)
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         # Empty tensor since no action should be received
         return cb.array([])
 

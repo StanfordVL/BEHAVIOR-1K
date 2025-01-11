@@ -235,7 +235,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
-            collision_activation_distance=0.01,  # Use larger activation distance for better reproducibility
+            collision_activation_distance=0.02,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
@@ -427,18 +427,14 @@ def test_curobo():
                                 False
                             ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
                     else:
-                        # Convert target joint positions to command
+                        # Convert target joint positions to action
                         q = q.cpu()
-                        command = []
-                        for controller in robot.controllers.values():
-                            command.append(q[controller.dof_idx])
-                        command = th.cat(command, dim=0)
-                        assert command.shape[0] == robot.action_dim
+                        action = robot.q_to_action(q)
 
                         num_repeat = 3
                         for j in range(num_repeat):
                             print(f"Executing waypoint {i}/{len(q_traj)}, step {j}")
-                            env.step(command)
+                            env.step(action)
 
                             for contact in robot.contact_list():
                                 assert contact.body0 in robot.link_prim_paths
