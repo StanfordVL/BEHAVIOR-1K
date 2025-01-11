@@ -97,7 +97,6 @@ class HolonomicBaseJointController(JointController):
             # Handle position control mode
             command_in_base_frame = cb.eye(4)
             command_in_base_frame[:2, 3] = command[:2]  # Set x,y translation
-            command_in_base_frame[:3, :3] = cb.T.euler2mat(cb.array([0.0, 0.0, command[2]]))  # Set rotation
 
             # Transform command to canonical frame
             command_in_canonical_frame = canonical_to_base_pose @ command_in_base_frame
@@ -124,6 +123,6 @@ class HolonomicBaseJointController(JointController):
             linear_global = global_vectors[0]
             angular_global = global_vectors[1]
 
-            command = cb.array([linear_global[0], linear_global[1], angular_global[2]])
+            command = cb.cat([linear_global[0], linear_global[1], angular_global[2]])
 
         return super()._update_goal(command=command, control_dict=control_dict)

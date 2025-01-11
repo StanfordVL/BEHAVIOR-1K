@@ -1,6 +1,7 @@
 from functools import cached_property
 from typing import Literal
 
+import math
 import torch as th
 
 import omnigibson as og
@@ -205,6 +206,13 @@ class HolonomicBaseRobot(LocomotionRobot):
 
         # Reload the controllers to update their command_output_limits and control_limits
         self.reload_controllers(self._controller_config)
+
+    def apply_action(self, action):
+        j_pos = self.joints["base_footprint_rz_joint"].get_state()[0]
+        if j_pos < -math.pi or j_pos > math.pi:
+            j_pos = (j_pos + math.pi) % (2 * math.pi) - math.pi
+            self.joints["base_footprint_rz_joint"].set_pos(j_pos, drive=False)
+        super().apply_action(action)
 
     @cached_property
     def base_idx(self):
