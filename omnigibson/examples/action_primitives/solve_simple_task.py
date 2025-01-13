@@ -56,6 +56,10 @@ def main():
     scene = env.scene
     robot = env.robots[0]
 
+    # Let the objects settle
+    for _ in range(30):
+        og.sim.step()
+
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 

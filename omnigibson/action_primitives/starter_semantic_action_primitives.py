@@ -543,7 +543,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             # Use direct IK to move the hand to the approach pose.
-            yield from self._move_hand(approach_pose, avoid_collision=False, ignore_objects=[obj])
+            yield from self._move_hand(
+                approach_pose, motion_constraint=[1, 1, 1, 1, 1, 0], avoid_collision=False, ignore_objects=[obj]
+            )
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
             yield from self._move_hand(approach_pose)
@@ -1753,7 +1755,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 
         target_pose = (
-            (self._sample_position_on_aabb_side(obj), th.tensor([0, 0, 0, 1])) if pose_on_obj is None else pose_on_obj
+            (self._sample_position_on_aabb_side(obj), self._get_reset_eef_pose()[self.arm][1])
+            if pose_on_obj is None
+            else pose_on_obj
         )
 
         obj_rooms = (
