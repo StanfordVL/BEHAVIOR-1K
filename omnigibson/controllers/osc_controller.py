@@ -9,6 +9,7 @@ import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -562,7 +563,7 @@ def _compute_osc_torques_torch(
     # roboticsproceedings.org/rss07/p31.pdf
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + math.pi) % (2 * math.pi) - math.pi)
+        u_null = kd_null * -qd + kp_null * wrap_angle(rest_qpos - q)
         u_null = mm @ th.unsqueeze(u_null, dim=-1)
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 

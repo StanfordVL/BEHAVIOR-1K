@@ -35,6 +35,7 @@ from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husk
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky, get_grasp_position_for_open
 from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
@@ -108,11 +109,6 @@ log = create_module_logger(module_name=__name__)
 
 def indented_print(msg, *args, **kwargs):
     print("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
-
-
-def normalize_angle(angle):
-    """Normalize angle to [-pi, pi] range."""
-    return th.atan2(th.sin(angle), th.cos(angle))
 
 
 class StarterSemanticActionPrimitiveSet(IntEnum):
@@ -989,7 +985,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         articulation_target_reached = True
                     if (
                         th.max(th.abs(base_joint_diff[:2])).item() < m.DEFAULT_DIST_THRESHOLD
-                        and th.abs(normalize_angle(base_joint_diff[2])).item() < m.DEFAULT_ANGLE_THRESHOLD
+                        and wrap_angle(base_joint_diff[2]) < m.DEFAULT_ANGLE_THRESHOLD
                     ):
                         base_target_reached = True
                     if base_target_reached and articulation_target_reached:

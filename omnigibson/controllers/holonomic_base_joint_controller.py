@@ -1,5 +1,6 @@
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.controllers.joint_controller import JointController
+from omnigibson.utils.geometry_utils import wrap_angle
 
 
 class HolonomicBaseJointController(JointController):
@@ -101,28 +102,42 @@ class HolonomicBaseJointController(JointController):
             # Transform command to canonical frame
             command_in_canonical_frame = canonical_to_base_pose @ command_in_base_frame
 
-            # Extract position and yaw from transformed command
+            # Extract x,y translation from transformed command
             position = command_in_canonical_frame[:2, 3]
-            yaw = cb.T.mat2euler(command_in_canonical_frame[:3, :3])[2:3]
-            command = cb.cat([position, yaw])
+
+            # Since our virtual joints are in the order of ["x", "y", "z", "rx", "ry", "rz"],
+            # the "base_footprint_rz_link" is aligned with @self.base_footprint_link in the z-axis
+            # We just need to directly apply the command as delta to the current joint position of "base_footprint_rz_joint"
+            # Note that the current joint position is guaranteed to be in the range of [-pi, pi] because
+            # @HolonomicBaseRobot.apply_action explicitly wraps the joint position to [-pi, pi] if it's out of range
+            rz_joint_pos = control_dict["joint_position"][self.dof_idx][2:3]
+
+            # Wrap the delta joint position to [-pi, pi]. In other words, we don't expect the commanded delta joint position
+            # to have a magnitude greater than pi, because the robot can't reasonably rotate more than pi in a single step
+            delta_joint_pos = wrap_angle(command[2])
+
+            # Calculate the new joint position. This is guaranteed to be in the range of [-pi * 2, pi * 2], because both quantities
+            # are in the range of [-pi, pi]. This is important because revolute joints in Isaac Sim have a joint position (target) range of [-pi * 2, pi * 2]
+            new_joint_pos = rz_joint_pos + delta_joint_pos
+
+            command = cb.cat([position, new_joint_pos])
         else:
             # Handle velocity/effort control modes
             # Note: Only rotate the commands, don't translate
-            rotation_matrix = canonical_to_base_pose[:3, :3]
+            command_in_base_frame = cb.eye(4)
+            command_in_base_frame[:2, 3] = command[:2]  # Set x,y linear velocity
 
-            # Prepare poses for transformation
-            rotation_poses = cb.zeros((2, 3, 3))
-            rotation_poses[:, :3, :3] = rotation_matrix
+            canonical_to_base_pose_rotation = cb.eye(4)
+            canonical_to_base_pose_rotation[:3, :3] = canonical_to_base_pose[:3, :3]
 
-            local_vectors = cb.zeros((2, 3, 1))
-            local_vectors[0, :, 0] = cb.array([command[0], command[1], 0.0])  # Linear
-            local_vectors[1, :, 0] = cb.array([0.0, 0.0, command[2]])  # Angular
+            # Transform command to canonical frame
+            command_in_canonical_frame = canonical_to_base_pose_rotation @ command_in_base_frame
 
-            # Transform to global frame
-            global_vectors = rotation_poses @ local_vectors
-            linear_global = global_vectors[0]
-            angular_global = global_vectors[1]
+            # Extract x,y linear velocity from transformed command
+            linear_velocity = command_in_canonical_frame[:2, 3]
 
-            command = cb.cat([linear_global[0], linear_global[1], angular_global[2]])
+            angular_velocity = command[2:3]
+
+            command = cb.cat([linear_velocity, angular_velocity])
 
         return super()._update_goal(command=command, control_dict=control_dict)

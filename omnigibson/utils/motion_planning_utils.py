@@ -8,6 +8,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import GripperRigidContactAPI
@@ -17,19 +18,6 @@ logger = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 m.ANGLE_DIFF = 0.3
 m.DIST_DIFF = 0.1
-
-
-def _wrap_angle(theta):
-    """ "
-    Converts an angle to the range [-pi, pi).
-
-    Args:
-        theta (float): angle in radians
-
-    Returns:
-        float: angle in radians in range [-pi, pi)
-    """
-    return (theta + math.pi) % (2 * math.pi) - math.pi
 
 
 def plan_base_motion(
@@ -89,7 +77,7 @@ def plan_base_motion(
 
         @staticmethod
         def is_valid_rotation(si, start_conf, final_orientation):
-            diff = _wrap_angle(final_orientation - start_conf[2])
+            diff = wrap_angle(final_orientation - start_conf[2])
             direction = th.sign(diff)
             diff = abs(diff)
             num_points = math.ceil(diff / m.ANGLE_DIFF) + 1
@@ -117,7 +105,7 @@ def plan_base_motion(
         state = ob.State(space)
         state().setX(x)
         state().setY(y)
-        state().setYaw(_wrap_angle(yaw))
+        state().setYaw(wrap_angle(yaw))
         return state
 
     def state_valid_fn(q, verbose=False):

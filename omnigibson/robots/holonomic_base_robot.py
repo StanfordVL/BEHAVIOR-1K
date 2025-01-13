@@ -11,6 +11,7 @@ from omnigibson.controllers import JointController, HolonomicBaseJointController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import classproperty
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
@@ -212,7 +213,7 @@ class HolonomicBaseRobot(LocomotionRobot):
     def apply_action(self, action):
         j_pos = self.joints["base_footprint_rz_joint"].get_state()[0]
         if j_pos < -math.pi or j_pos > math.pi:
-            j_pos = (j_pos + math.pi) % (2 * math.pi) - math.pi
+            j_pos = wrap_angle(j_pos)
             self.joints["base_footprint_rz_joint"].set_pos(j_pos, drive=False)
         super().apply_action(action)
 
@@ -368,8 +369,11 @@ class HolonomicBaseRobot(LocomotionRobot):
             command = q[controller.dof_idx]
             if isinstance(controller, HolonomicBaseJointController):
                 # For a holonomic base joint controller, the command should be in the robot local frame
+                cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
+                delta_q = wrap_angle(command[2] - cur_rz_joint_pos)
                 local_pose = self._2d_world_pose_to_robot_pose(command)
-                command = th.tensor([local_pose[0][0], local_pose[0][1], T.quat2euler(local_pose[1])[2]])
+
+                command = th.tensor([local_pose[0][0], local_pose[0][1], delta_q])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
         assert (
