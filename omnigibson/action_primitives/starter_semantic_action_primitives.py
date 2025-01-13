@@ -547,7 +547,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             # Use direct IK to move the hand to the approach pose.
-            yield from self._move_hand(approach_pose, avoid_collision=False, ignore_paths=[obj.prim_path])
+            yield from self._move_hand(approach_pose, avoid_collision=False, ignore_objects=[obj])
         elif self.robot.grasping_mode == "assisted":
             indented_print("Performing grasp approach")
             yield from self._move_hand(approach_pose)
@@ -840,7 +840,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         motion_constraint=None,
         low_precision=False,
         lock_auxiliary_arm=False,
-        ignore_paths=None,
+        ignore_objects=None,
     ):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
@@ -852,8 +852,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             motion_constraint (MotionConstraint): Motion constraint for the motion
             low_precision (bool): Whether to use low precision for the motion
             lock_auxiliary_arm (bool): Whether to lock the other arm in place
-            ignore_paths (None or list of str): If specified, prim path substrings that should
-                be ignored when planning
+            ignore_objects (None or list of str): If specified, objects that should be ignored when planning
 
         Returns:
             th.tensor or None: Action array for one step for the robot to move hand or None if its at the target pose
@@ -863,8 +862,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if arm is None:
             arm = self.arm
 
-        if ignore_paths is not None:
-            self._motion_generator.update_obstacles(ignore_paths=ignore_paths)
+        if ignore_objects is not None:
+            self._motion_generator.update_obstacles(ignore_objects=ignore_objects)
 
         yield from self._settle_robot()
         # curobo motion generator takes a pose but outputs joint positions
@@ -891,7 +890,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_quat=target_quat,
             embodiment_selection=CuRoboEmbodimentSelection.ARM,
             motion_constraint=motion_constraint,
-            skip_obstalce_update=ignore_paths is not None,
+            skip_obstalce_update=ignore_objects is not None,
         )
 
         indented_print(f"Plan has {len(q_traj)} steps")

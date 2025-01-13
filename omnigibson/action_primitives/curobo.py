@@ -218,9 +218,13 @@ class CuRoboMotionGenerator:
         robot_world.add_obstacle(mesh_world.mesh[0])
         robot_world.save_world_as_mesh(file_path)
 
-    def update_obstacles(self):
+    def update_obstacles(self, ignore_objects=None):
         """
         Updates internal world collision cache representation based on sim state
+
+        Args:
+            ignore_objects (None or list of DatasetObject): If specified, objects that should
+                be ignored when updating obstacles
         """
         obstacles = {"cuboid": None, "sphere": None, "mesh": [], "cylinder": None, "capsule": None}
         robot_transform = T.pose_inv(T.pose2mat(self.robot.root_link.get_position_orientation()))
@@ -236,6 +240,8 @@ class CuRoboMotionGenerator:
             if obj == self.robot:
                 continue
             if obj.visual_only:
+                continue
+            if ignore_objects is not None and obj in ignore_objects:
                 continue
             for link in obj.links.values():
                 for collision_mesh in link.collision_meshes.values():
