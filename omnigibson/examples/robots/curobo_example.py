@@ -98,10 +98,9 @@ def test_curobo():
         "grasping_mode": "assisted",
         "controller_config": {
             "base": {
-                "name": "JointController",
+                "name": "HolonomicBaseJointController",
                 "motor_type": "position",
                 "command_input_limits": None,
-                "use_delta_commands": False,
                 "use_impedances": True,
             },
             "trunk": {

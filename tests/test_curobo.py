@@ -148,35 +148,35 @@ def test_curobo():
                     "name": "HolonomicBaseJointController",
                     "motor_type": "position",
                     "command_input_limits": None,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "trunk": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "camera": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_left": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_right": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_left": {
                     "name": "JointController",
@@ -233,7 +233,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
-            collision_activation_distance=0.02,  # Use larger activation distance for better reproducibility
+            collision_activation_distance=0.03,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
