@@ -564,6 +564,9 @@ class CuRoboMotionGenerator:
             success_ratio=1.0 / self.batch_size if success_ratio is None else success_ratio,
         )
 
+        # Store original target_pos keys before adding dummy targets
+        original_target_links = set(target_pos.keys())
+
         # Add the pose cost metric
         # Details can be found here: https://curobo.org/advanced_examples/3_constrained_planning.html
         # The motion constraint vector is a 6D vector controlling end-effector movement:
@@ -574,9 +577,8 @@ class CuRoboMotionGenerator:
         if motion_constraint is None:
             motion_constraint = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
-            hold_partial_pose=False, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
+            hold_partial_pose=True, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
         )
-        plan_cfg.pose_cost_metric = pose_cost_metric
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -713,6 +715,10 @@ class CuRoboMotionGenerator:
                 ik_goal_batch_by_link = None
 
             plan_fn = self.plan_batch if not ik_only else self.solve_ik_batch
+            if self.ee_link[emb_sel] in original_target_links:
+                plan_cfg.pose_cost_metric = pose_cost_metric
+            else:
+                plan_cfg.pose_cost_metric = None
             result, success, joint_state = plan_fn(
                 cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link, emb_sel=emb_sel
             )
