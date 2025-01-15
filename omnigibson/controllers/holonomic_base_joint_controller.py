@@ -120,7 +120,7 @@ class HolonomicBaseJointController(JointController):
             # are in the range of [-pi, pi]. This is important because revolute joints in Isaac Sim have a joint position (target) range of [-pi * 2, pi * 2]
             new_joint_pos = rz_joint_pos + delta_joint_pos
 
-            command = cb.as_float32(cb.cat([position, new_joint_pos]))
+            command = cb.cat([position, new_joint_pos])
         else:
             # Handle velocity/effort control modes
             # Note: Only rotate the commands, don't translate
@@ -138,6 +138,6 @@ class HolonomicBaseJointController(JointController):
 
             angular_velocity = command[2:3]
 
-            command = cb.as_float32(cb.cat([linear_velocity, angular_velocity]))
+            command = cb.cat([linear_velocity, angular_velocity])
 
         return super()._update_goal(command=command, control_dict=control_dict)
