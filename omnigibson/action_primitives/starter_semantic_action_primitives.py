@@ -183,7 +183,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._enable_head_tracking = enable_head_tracking
         self._always_track_eef = always_track_eef
         self._tracking_object = None
-        self._arm = self.robot.default_arm if isinstance(self.robot, ManipulationRobot) else None
 
         # Store the current position of the arm as the arm target
         control_dict = self.robot.get_control_dict()
@@ -207,17 +206,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @property
     def arm(self):
-        if not isinstance(self.robot, ManipulationRobot):
-            raise ValueError("Cannot use arm for non-manipulation robot")
-        return self._arm
-
-    @arm.setter
-    def arm(self, value):
-        if not isinstance(self.robot, ManipulationRobot):
-            raise ValueError("Cannot use arm for non-manipulation robot")
-        if value not in self.robot.arm_names:
-            raise ValueError(f"Invalid arm name: {value}. Must be one of {self.robot.arm_names}")
-        self._arm = value
+        assert isinstance(self.robot, ManipulationRobot), "Cannot use arm for non-manipulation robot"
+        return self.robot.default_arm
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking."""
@@ -564,7 +554,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         indented_print("Moving hand back")
-        yield from self._reset_hand(self.arm)
+        yield from self._reset_hand()
 
         indented_print("Done with grasp")
 
@@ -667,7 +657,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
 
             # First check if we can directly move the hand there
-            target_in_reach = self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)[self.arm]
+            target_in_reach = self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)
             if target_in_reach:
                 yield from self._move_hand(hand_pose)
                 break
@@ -707,7 +697,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         yield from self._reset_hand()
 
-    def _convert_cartesian_to_joint_space(self, target_pose, arm=None):
+    def _convert_cartesian_to_joint_space(self, target_pose):
         """
         Gets joint positions for the arm so eef is at the target pose
 
@@ -719,7 +709,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach target pose
                 - th.tensor: Indices for joints in the robot
         """
-        joint_pos = self._ik_solver_cartesian_to_joint_space(target_pose, arm=arm, frame="world")
+        joint_pos = self._ik_solver_cartesian_to_joint_space(target_pose, frame="world")
         if joint_pos is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -736,20 +726,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
-            dict: Whether each eef can reach the target pose
+            bool: Whether the default eef can reach the target pose
         """
-        target_in_reach = dict()
-        for arm in self.robot.arm_names:
-            target_in_reach[arm] = (
-                self._ik_solver_cartesian_to_joint_space(
-                    target_pose,
-                    arm=arm,
-                    skip_obstacle_update=skip_obstacle_update,
-                    frame="world",
-                )
-                is not None
+        return (
+            self._ik_solver_cartesian_to_joint_space(
+                target_pose,
+                skip_obstacle_update=skip_obstacle_update,
+                frame="world",
             )
-        return target_in_reach
+            is not None
+        )
 
     def _target_in_reach_of_robot_relative(self, relative_target_pose, skip_obstacle_update=False):
         """
@@ -760,35 +746,28 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
-            dict: Whether each eef can reach the target pose
+            bool: Whether the default eef can reach the target pose
         """
-        target_in_reach = dict()
-        for arm in self.robot.arm_names:
-            target_in_reach[arm] = (
-                self._ik_solver_cartesian_to_joint_space(
-                    relative_target_pose,
-                    arm=arm,
-                    skip_obstacle_update=skip_obstacle_update,
-                    frame="robot",
-                )
-                is not None
+
+        return (
+            self._ik_solver_cartesian_to_joint_space(
+                relative_target_pose,
+                skip_obstacle_update=skip_obstacle_update,
+                frame="robot",
             )
-        return target_in_reach
+            is not None
+        )
 
-    def _manipulation_control_idx(self, arm=None):
+    def _manipulation_control_idx(self):
         """The appropriate manipulation control idx for the current settings."""
-        if arm is None:
-            arm = self.arm
+        return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
-        return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[arm]])
-
-    def _ik_solver_cartesian_to_joint_space(self, target_pose, arm=None, skip_obstacle_update=False, frame="robot"):
+    def _ik_solver_cartesian_to_joint_space(self, target_pose, skip_obstacle_update=False, frame="robot"):
         """
         Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
 
         Args:
             relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose in the robot frame
-            arm (str): Arm to use for the target pose
             skip_obstacle_update (bool): Whether to skip updating obstacles
             frame (str): Frame to use for the target pose
 
@@ -797,9 +776,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach the target pose
                 - th.tensor: Indices for joints in the robot
         """
-        if arm is None:
-            arm = self.arm
-
         if frame == "robot":
             target_pose = self._robot_pose_to_world_pose(target_pose)
         elif frame == "world":
@@ -807,8 +783,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         else:
             raise ValueError(f"Unsupported frame: {frame}")
 
-        target_pos = {self.robot.eef_link_names[arm]: target_pose[0]}
-        target_quat = {self.robot.eef_link_names[arm]: target_pose[1]}
+        target_pos = {self.robot.eef_link_names[self.arm]: target_pose[0]}
+        target_quat = {self.robot.eef_link_names[self.arm]: target_pose[1]}
         successes, joint_states = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
@@ -828,13 +804,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         joint_pos = self._motion_generator.path_to_joint_trajectory(
             joint_state, get_full_js=False, emb_sel=CuRoboEmbodimentSelection.ARM
         )
-        return joint_pos[self._manipulation_control_idx(arm)].cpu()
+        return joint_pos[self._manipulation_control_idx()].cpu()
 
     def _move_hand(
         self,
         target_pose,
         avoid_collision=True,
-        arm=None,
         motion_constraint=None,
         low_precision=False,
         lock_auxiliary_arm=False,
@@ -846,7 +821,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
             avoid_collision (bool): Whether to avoid collision (this need to be false for grasping)
-            arm (str): Arm to use for the target pose
             motion_constraint (MotionConstraint): Motion constraint for the motion
             low_precision (bool): Whether to use low precision for the motion
             lock_auxiliary_arm (bool): Whether to lock the other arm in place
@@ -857,9 +831,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*target_pose)
-        if arm is None:
-            arm = self.arm
-
         if ignore_objects is not None:
             self._motion_generator.update_obstacles(ignore_objects=ignore_objects)
 
@@ -873,8 +844,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 self.robot.eef_link_names[self.arm]: target_pose[1],
             }
         else:
-            left_hand_pos, left_hand_quat = target_pose if arm == "left" else self.robot.get_eef_pose(arm="left")
-            right_hand_pos, right_hand_quat = target_pose if arm == "right" else self.robot.get_eef_pose(arm="right")
+            left_hand_pos, left_hand_quat = target_pose if self.arm == "left" else self.robot.get_eef_pose(arm="left")
+            right_hand_pos, right_hand_quat = (
+                target_pose if self.arm == "right" else self.robot.get_eef_pose(arm="right")
+            )
             target_pos = {
                 self.robot.eef_link_names["left"]: left_hand_pos,
                 self.robot.eef_link_names["right"]: right_hand_pos,
@@ -1055,7 +1028,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._arm_targets[controller_name] = joint_pos
 
         for i in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
-            current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx(self.arm)]
+            current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx()]
             diff_joint_pos = joint_pos - current_joint_pos
             if th.max(th.abs(diff_joint_pos)).item() < m.JOINT_POS_DIFF_THRESHOLD:
                 return
@@ -1237,11 +1210,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             for joint_pos in joint_space_data:
                 # Check if the movement can be done roughly linearly.
-                current_joint_positions = self.robot.get_joint_positions()[self._manipulation_control_idx(self.arm)]
+                current_joint_positions = self.robot.get_joint_positions()[self._manipulation_control_idx()]
 
                 failed_joints = []
                 for joint_idx, target_joint_pos, current_joint_pos in zip(
-                    self._manipulation_control_idx(self.arm), joint_pos, current_joint_positions
+                    self._manipulation_control_idx(), joint_pos, current_joint_positions
                 ):
                     if th.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
                         failed_joints.append(joints[joint_idx].joint_name)
@@ -1442,7 +1415,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         raise ValueError("Unexpected IK control mode")
                 else:
                     target_joint_pos = self._arm_targets[name]
-                    current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx(self.arm)]
+                    current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx()]
                     if controller.use_delta_commands:
                         partial_action = target_joint_pos - current_joint_pos
                     else:
@@ -1474,21 +1447,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print(f"Plan has {len(q_traj)} steps")
         yield from self._execute_motion_plan(q_traj, low_precision=True)
 
-    def _reset_hand(self, arm=None):
+    def _reset_hand(self):
         """
         Yields action to move the hand to the position optimal for executing subsequent action primitives
 
         Returns:
             th.tensor or None: Action array for one step for the robot to reset its hand or None if it is done resetting
         """
-        if arm is None:
-            arm = self.arm
         indented_print("Resetting hand")
         # TODO: make this work with both hands
-        reset_eef_pose = self._get_reset_eef_pose("world")[arm]
+        reset_eef_pose = self._get_reset_eef_pose("world")[self.arm]
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*reset_eef_pose)
-        yield from self._move_hand(reset_eef_pose, arm=arm, low_precision=True)
+        yield from self._move_hand(reset_eef_pose, low_precision=True)
 
     def _get_reset_eef_pose(self, frame="robot"):
         """
@@ -1587,10 +1558,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         self._motion_generator.update_obstacles()
         if pose_on_obj is not None:
-            if self._target_in_reach_of_robot(pose_on_obj, skip_obstacle_update=True)[self.arm]:
+            if self._target_in_reach_of_robot(pose_on_obj, skip_obstacle_update=True):
                 # No need to navigate.
                 return
-        elif self._target_in_reach_of_robot(obj.get_position_orientation(), skip_obstacle_update=True)[self.arm]:
+        elif self._target_in_reach_of_robot(obj.get_position_orientation(), skip_obstacle_update=True):
             return
 
         yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, skip_obstacle_update=True, **kwargs)
@@ -1898,7 +1869,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    def _validate_poses(self, candidate_poses, pose_on_obj=None, arm=None, skip_obstacle_update=False):
+    def _validate_poses(self, candidate_poses, pose_on_obj=None, skip_obstacle_update=False):
         """
         Determines whether the robot can reach all poses on the objects and is not in collision at the specified 2d poses
 
@@ -1906,16 +1877,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
             pose_on_obj (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
                 Can be a single pose or list of poses.
-            arm (str): Name of the arm to check reachability for
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the motion generator
 
         Returns:
-            list of bool: Whether any robot arm can reach all poses on the objects and is not in collision
+            list of bool: Whether the default arm can reach all poses on the objects and is not in collision
                 at the specified 2d poses
         """
-        if arm is None:
-            arm = self.arm
-
         # First check collisions for all candidate poses
         candidate_joint_positions = []
         current_joint_pos = self.robot.get_joint_positions()
@@ -1948,7 +1915,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 relative_pose = T.relative_pose_transform(*pose_on_obj, *pose)
                 if not self._target_in_reach_of_robot_relative(
                     relative_pose, skip_obstacle_update=skip_obstacle_update
-                )[arm]:
+                ):
                     invalid_results[i] = True
 
         return ~invalid_results
