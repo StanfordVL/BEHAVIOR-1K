@@ -212,6 +212,9 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def apply_action(self, action):
         j_pos = self.joints["base_footprint_rz_joint"].get_state()[0]
+        # In preparation for the base controller's @update_goal, we need to wrap the current joint pos
+        # to be in range [-pi, pi], so that once the command (a delta joint pos in range [-pi, pi])
+        # is applied, the final target joint pos is in range [-pi * 2, pi * 2], which is required by Isaac.
         if j_pos < -math.pi or j_pos > math.pi:
             j_pos = wrap_angle(j_pos)
             self.joints["base_footprint_rz_joint"].set_pos(j_pos, drive=False)
@@ -369,34 +372,21 @@ class HolonomicBaseRobot(LocomotionRobot):
             command = q[controller.dof_idx]
             if isinstance(controller, HolonomicBaseJointController):
                 # For a holonomic base joint controller, the command should be in the robot local frame
+                # For orientation, we need to convert the command to a delta angle
                 cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
                 delta_q = wrap_angle(command[2] - cur_rz_joint_pos)
-                local_pose = self._2d_world_pose_to_robot_pose(command)
 
-                command = th.tensor([local_pose[0][0], local_pose[0][1], delta_q])
+                # For translation, we need to convert the command to the robot local frame
+                body_pose = self.get_position_orientation()
+                canonical_pos = th.tensor([command[0], command[1], body_pose[0][2]], dtype=th.float32)
+                local_pos = T.relative_pose_transform(canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), *body_pose)[0]
+                command = th.tensor([local_pos[0], local_pos[1], delta_q])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
         assert (
             action.shape[0] == self.action_dim
         ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
         return action
-
-    def _2d_world_pose_to_robot_pose(self, pose_2d):
-        """
-        Converts 2D pose (x, y, yaw) directly to robot-relative pose
-
-        Args:
-            pose_2d (Iterable): (x, y, yaw) 2D pose
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) Position in the robot frame
-                - 4-array: (x,y,z,w) Quaternion orientation in the robot frame
-        """
-        body_pose = self.get_position_orientation()
-        world_pos = th.tensor([pose_2d[0], pose_2d[1], body_pose[0][2]], dtype=th.float32)
-        world_orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
-        return T.relative_pose_transform(world_pos, world_orn, *body_pose)
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)

@@ -6,7 +6,7 @@ import torch as th  # MUST come before importing omni!!!
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
@@ -101,8 +101,6 @@ class CuRoboMotionGenerator:
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
-
-        assert not gm.ENABLE_FLATCACHE, "CuRobo does not support flatcache for now"
 
         # Store internal variables
         self._tensor_args = lazy.curobo.types.base.TensorDeviceType(device=th.device(device))
@@ -564,9 +562,6 @@ class CuRoboMotionGenerator:
             success_ratio=1.0 / self.batch_size if success_ratio is None else success_ratio,
         )
 
-        # Store original target_pos keys before adding dummy targets
-        original_target_links = set(target_pos.keys())
-
         # Add the pose cost metric
         # Details can be found here: https://curobo.org/advanced_examples/3_constrained_planning.html
         # The motion constraint vector is a 6D vector controlling end-effector movement:
@@ -574,11 +569,10 @@ class CuRoboMotionGenerator:
         # Linear constraints: [x, y, z] - translation along each axis
         # Setting any component to 1.0 locks that axis, forcing the planner to reach
         # the target using only the remaining unlocked axes
-        if motion_constraint is None:
-            motion_constraint = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
-            hold_partial_pose=True, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
-        )
+        if self.ee_link[emb_sel] in target_pos and motion_constraint is not None:
+            plan_cfg.pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
+                hold_partial_pose=True, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
+            )
 
         # Construct initial state
         q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
@@ -715,10 +709,6 @@ class CuRoboMotionGenerator:
                 ik_goal_batch_by_link = None
 
             plan_fn = self.plan_batch if not ik_only else self.solve_ik_batch
-            if self.ee_link[emb_sel] in original_target_links:
-                plan_cfg.pose_cost_metric = pose_cost_metric
-            else:
-                plan_cfg.pose_cost_metric = None
             result, success, joint_state = plan_fn(
                 cu_js_batch, main_ik_goal_batch, plan_cfg, link_poses=ik_goal_batch_by_link, emb_sel=emb_sel
             )
