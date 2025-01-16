@@ -85,6 +85,8 @@ def main():
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, coffee_table), env)
     print("Finished executing place")
 
+    og.shutdown()
+
 
 if __name__ == "__main__":
     main()

@@ -443,8 +443,8 @@ class CuRoboMotionGenerator:
         return_full_result=False,
         success_ratio=None,
         attached_obj=None,
-        motion_constraint=None,
         attached_obj_scale=None,
+        motion_constraint=None,
         skip_obstacle_update=False,
         ik_only=False,
         ik_world_collision_check=True,
@@ -481,6 +481,10 @@ class CuRoboMotionGenerator:
                 link names and the values are the corresponding BaseObject instances to attach to that link
             attached_obj_scale (None or Dict[str, float]): If specified, a dictionary where the keys are the end-effector
                 link names and the values are the corresponding scale to apply to the attached object
+            motion_constraint (None or List[float]): If specified, the motion constraint vector is a 6D vector controlling
+                end-effector movement (angular first, linear next): [qx, qy, qz, x, y, z]. Setting any component to 1.0
+                locks that axis, forcing the planner to reach the target using only the remaining unlocked axes.
+                Details can be found here: https://curobo.org/advanced_examples/3_constrained_planning.html
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
             ik_only (bool): Whether to only run the IK solver and not the trajectory optimization
             ik_world_collision_check (bool): Whether to check for collisions in the world when running the IK solver for ik_only mode
@@ -563,12 +567,6 @@ class CuRoboMotionGenerator:
         )
 
         # Add the pose cost metric
-        # Details can be found here: https://curobo.org/advanced_examples/3_constrained_planning.html
-        # The motion constraint vector is a 6D vector controlling end-effector movement:
-        # Angular constraints: [qx, qy, qz] - rotation around each axis
-        # Linear constraints: [x, y, z] - translation along each axis
-        # Setting any component to 1.0 locks that axis, forcing the planner to reach
-        # the target using only the remaining unlocked axes
         if self.ee_link[emb_sel] in target_pos and motion_constraint is not None:
             plan_cfg.pose_cost_metric = lazy.curobo.wrap.reacher.motion_gen.PoseCostMetric(
                 hold_partial_pose=True, hold_vec_weight=self._tensor_args.to_device(motion_constraint)
