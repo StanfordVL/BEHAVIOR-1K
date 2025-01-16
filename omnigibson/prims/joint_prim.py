@@ -784,12 +784,11 @@ class JointPrim(BasePrim):
             pos = self._denormalize_pos(pos)
 
         # Set the DOF(s) in this joint
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+        else:
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             PoseAPI.invalidate()
-
-        # Also set the target
-        self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
 
     def set_vel(self, vel, normalized=False, drive=False):
         """
@@ -828,11 +827,10 @@ class JointPrim(BasePrim):
             vel = self._denormalize_vel(vel)
 
         # Set the DOF(s) in this joint
-        if not drive:
+        if drive:
+            self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+        else:
             self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
-
-        # Also set the target
-        self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
 
     def set_effort(self, effort, normalized=False):
         """

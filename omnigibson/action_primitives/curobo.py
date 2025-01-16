@@ -1,5 +1,4 @@
 import math
-from collections.abc import Iterable
 from enum import Enum
 
 import torch as th  # MUST come before importing omni!!!
@@ -8,10 +7,10 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.factory import METALINK_PREFIXES
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
+
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
 th.backends.cudnn.benchmark = True
@@ -56,81 +55,6 @@ def create_world_mesh_collision(tensor_args, obb_cache_size=10, mesh_cache_size=
 
     # To update, run world_coll_checker.load_collision_model(obstacles)
     return lazy.curobo.geom.sdf.utils.create_collision_checker(world_cfg)
-
-
-def get_obstacles(
-    reference_prim_path=None,
-    only_paths=None,
-    ignore_paths=None,
-    only_substring=None,
-    ignore_substring=None,
-):
-    """
-    Grabs world collision representation
-
-    Args:
-        reference_prim_path (None or str): If specified, the prim path defining the collision world frame
-        only_paths (None or list of str): If specified, only include these sets of prim paths in the resulting
-            collision representation
-        ignore_paths (None or list of str): If specified, exclude these sets of prim paths from the resulting
-            collision representation
-        only_substring (None or list of str): If specified, only include any prim path that includes any of these
-            substrings in the resulting collision representation
-        ignore_substring (None or list of str): If specified, exclude any prim path that includes any of these substrings
-            from the resulting collision representation
-    """
-    usd_help = lazy.curobo.util.usd_helper.UsdHelper()
-    usd_help.stage = og.sim.stage
-    return usd_help.get_obstacles_from_stage(
-        reference_prim_path=reference_prim_path,
-        only_paths=only_paths,
-        ignore_paths=ignore_paths,
-        only_substring=only_substring,
-        ignore_substring=ignore_substring,
-    ).get_collision_check_world()  # WorldConfig
-
-
-def get_obstacles_sphere_representation(
-    obstacles,
-    tensor_args,
-    n_spheres=20,
-    sphere_radius=0.001,
-):
-    """
-    Gest the collision sphere representation of obstacles @obstacles
-    Args:
-        obstacles (list of Obstacle): Obstacles whose aggregate sphere representation will be computed
-        tensor_args (TensorDeviceType): Tensor device information
-        n_spheres (int or list of int): Either per-obstacle or default number of collision spheres for representing
-            each obstacle
-        sphere_radius (float or list of float): Either per-obstacle or default radius of collision spheres for
-            representing each obstacle
-
-    Returns:
-        th.Tensor: (N, 4)-shaped tensor, where each of the N computed collision spheres are defined by (x,y,z,r),
-            where (x,y,z) is the global position and r defines the sphere radius
-    """
-    n_obstacles = len(obstacles)
-    if not isinstance(n_spheres, Iterable):
-        n_spheres = [n_spheres] * n_obstacles
-    if not isinstance(sphere_radius, Iterable):
-        sphere_radius = [sphere_radius] * n_obstacles
-
-    sph_list = []
-    for obs, n_sph, sph_radius in zip(obstacles, n_spheres, sphere_radius):
-        sph = obs.get_bounding_spheres(
-            n_sph,
-            sph_radius,
-            pre_transform_pose=lazy.curobo.types.math.Pose(
-                position=th.zeros(3), quaternion=th.tensor([1.0, 0, 0, 0])
-            ).to(tensor_args),
-            tensor_args=tensor_args,
-            fit_type=lazy.curobo.geom.sphere_fit.SphereFitType.VOXEL_VOLUME_SAMPLE_SURFACE,
-            voxelize_method="ray",
-        )
-        sph_list += [s.position + [s.radius] for s in sph]
-
-    return tensor_args.to_device(th.as_tensor(sph_list))
 
 
 class CuRoboMotionGenerator:
@@ -193,6 +117,10 @@ class CuRoboMotionGenerator:
         world_coll_checker = create_world_mesh_collision(
             self._tensor_args, obb_cache_size=10, mesh_cache_size=2048, max_distance=0.05
         )
+
+        usd_help = lazy.curobo.util.usd_helper.UsdHelper()
+        usd_help.stage = og.sim.stage
+        self.usd_help = usd_help
 
         self.mg = dict()
         self.ee_link = dict()
@@ -282,55 +210,47 @@ class CuRoboMotionGenerator:
         robot_world.add_obstacle(mesh_world.mesh[0])
         robot_world.save_world_as_mesh(file_path)
 
-    def update_obstacles(self, ignore_paths=None):
+    def update_obstacles(self):
         """
         Updates internal world collision cache representation based on sim state
-
-        Args:
-            ignore_paths (None or list of str): If specified, prim path substrings that should
-                be ignored when updating obstacles
         """
-        print("Updating CuRobo world, reading w.r.t.", self.robot.prim_path)
-        ignore_paths = [] if ignore_paths is None else ignore_paths
+        obstacles = {"cuboid": None, "sphere": None, "mesh": [], "cylinder": None, "capsule": None}
+        robot_transform = T.pose_inv(T.pose2mat(self.robot.root_link.get_position_orientation()))
 
-        # Ignore any visual only objects and any objects not part of the robot's current scene
-        ignore_scenes = [scene.prim_path for scene in og.sim.scenes]
-        del ignore_scenes[self.robot.scene.idx]
-        ignore_visual_only = [obj.prim_path for obj in self.robot.scene.objects if obj.visual_only]
+        if og.sim.floor_plane is not None:
+            prim = og.sim.floor_plane.prim.GetChildren()[0]
+            m = lazy.curobo.util.usd_helper.get_mesh_attrs(
+                prim, cache=self.usd_help._xform_cache, transform=robot_transform.numpy()
+            )
+            obstacles["mesh"].append(m)
 
-        obstacles = get_obstacles(
-            reference_prim_path=self.robot.root_link.prim_path,
-            ignore_substring=[
-                self.robot.prim_path,  # Don't include robot paths
-                "/curobo",  # Don't include curobo prim
-                "visual",  # Don't include any visuals
-                *METALINK_PREFIXES,  # Don't include any metalinks
-                *ignore_scenes,  # Don't include any scenes the robot is not in
-                *ignore_visual_only,  # Don't include any visual-only objects
-                *ignore_paths,  # Don't include any additional specified paths
-            ],
-        )
-        # All embodiment selections share the same world collision checker
-        self.mg[CuRoboEmbodimentSelection.DEFAULT].update_world(obstacles)
-        print("Synced CuRobo world from stage.")
-
-    def update_obstacles_fast(self):
-        # All embodiment selections share the same world collision checker
-        world_coll_checker = self.mg[CuRoboEmbodimentSelection.DEFAULT].world_coll_checker
-        for i, prim_path in enumerate(world_coll_checker._env_mesh_names[0]):
-            if prim_path is None:
+        for obj in self.robot.scene.objects:
+            if obj == self.robot:
                 continue
-            prim_path_tokens = prim_path.split("/")
-            obj_name = prim_path_tokens[3]
-            link_name = prim_path_tokens[4]
-            mesh_name = prim_path_tokens[-1]
-            mesh = self.robot.scene.object_registry("name", obj_name).links[link_name].collision_meshes[mesh_name]
-            pos, orn = mesh.get_position_orientation()
-            inv_pos, inv_orn = T.invert_pose_transform(pos, orn)
-            # xyzw -> wxyz
-            inv_orn = inv_orn[[3, 0, 1, 2]]
-            inv_pose = self._tensor_args.to_device(th.cat([inv_pos, inv_orn]))
-            world_coll_checker._mesh_tensor_list[1][0, i, :7] = inv_pose
+            if obj.visual_only:
+                continue
+            for link in obj.links.values():
+                for collision_mesh in link.collision_meshes.values():
+                    assert (
+                        collision_mesh.geom_type == "Mesh"
+                    ), f"collision_mesh {collision_mesh.prim_path} is not a mesh, but a {collision_mesh.geom_type}"
+                    obj_pose = T.pose2mat(collision_mesh.get_position_orientation())
+                    pose = robot_transform @ obj_pose
+                    pos, orn = T.mat2pose(pose)
+                    # xyzw -> wxyz
+                    orn = orn[[3, 0, 1, 2]]
+                    m = lazy.curobo.geom.types.Mesh(
+                        name=collision_mesh.prim_path,
+                        pose=th.cat([pos, orn]).tolist(),
+                        vertices=collision_mesh.points.numpy(),
+                        faces=collision_mesh.faces.numpy(),
+                        scale=collision_mesh.get_world_scale().numpy(),
+                    )
+                    obstacles["mesh"].append(m)
+
+        world = lazy.curobo.geom.types.WorldConfig(**obstacles)
+        world = world.get_collision_check_world()
+        self.mg[CuRoboEmbodimentSelection.DEFAULT].update_world(world)
 
     def check_collisions(
         self,

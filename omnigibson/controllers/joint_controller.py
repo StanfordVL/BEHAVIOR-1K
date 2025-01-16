@@ -251,7 +251,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         return dict(target=target)
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         if self.motor_type == "position":
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)

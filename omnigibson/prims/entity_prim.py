@@ -1616,6 +1616,9 @@ class EntityPrim(XFormPrim):
             # We do NOT save joint pos / vel targets because this is only relevant for motorized joints (e.g.: robots).
             # Such control (a) only relies on the joint state, and not joint targets, when computing control, and
             # (b) these targets will be immediately overwritten as soon as the next physics step occurs.
+            # In other words, when loading the sim state, we will load the joint pos / vel and the controller state (e.g. goal)
+            # and then when we take a physics step, right before the physics step actually occurs, @og.sim._on_physics_step()
+            # will be called, which computes the control based on the just-loaded joint state and overwrites the joint targets with the new control.
             # So because these values are not used and require additional memory / compute, we do not save targets
 
         return state
