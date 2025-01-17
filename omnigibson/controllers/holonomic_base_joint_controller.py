@@ -84,6 +84,8 @@ class HolonomicBaseJointController(JointController):
             use_impedances=use_impedances,
             use_gravity_compensation=use_gravity_compensation,
             use_cc_compensation=use_cc_compensation,
+            use_delta_commands=False,
+            compute_delta_in_quat_space=None,
         )
 
     def _update_goal(self, command, control_dict):

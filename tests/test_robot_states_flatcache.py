@@ -206,6 +206,7 @@ def test_robot_load_drive():
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
             assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
+            assert robot.get_rpy()[2] - goal_location[2] < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()

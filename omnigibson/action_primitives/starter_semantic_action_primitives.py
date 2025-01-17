@@ -27,7 +27,8 @@ from omnigibson.action_primitives.action_primitive_set_base import (
 from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
 from omnigibson.controllers import (
     InverseKinematicsController,
-    JointController,
+    HolonomicBaseJointController,
+    DifferentialDriveController,
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
@@ -95,7 +96,7 @@ m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.HAND_DIST_THRESHOLD = 0.002
 m.DEFAULT_DIST_THRESHOLD = 0.005
-m.DEFAULT_ANGLE_THRESHOLD = 0.1
+m.DEFAULT_ANGLE_THRESHOLD = 0.02
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
@@ -162,7 +163,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
-            "It currently only works with Tiago and R1 with their JointControllers set to absolute position mode."
+            "It currently only works with Tiago and R1 with their HolonomicBaseJointController/JointControllers set to absolute position mode."
         )
         super().__init__(env, robot)
         self.controller_functions = {
@@ -1497,7 +1498,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             embodiment_selection=CuRoboEmbodimentSelection.ARM,
         )
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(q_traj, low_precision=True)
+        yield from self._execute_motion_plan(q_traj)
 
     def _reset_hand(self):
         """
@@ -1511,7 +1512,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         reset_eef_pose = self._get_reset_eef_pose("world")[self.arm]
         if self.debug_visual_marker is not None:
             self.debug_visual_marker.set_position_orientation(*reset_eef_pose)
-        yield from self._move_hand(reset_eef_pose, low_precision=True)
+        yield from self._move_hand(reset_eef_pose)
 
     def _get_reset_eef_pose(self, frame="robot"):
         """
@@ -1634,6 +1635,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         end_pose = self._get_robot_pose_from_2d_pose(pose_2d)
         body_target_pose = self._world_pose_to_robot_pose(end_pose)
 
+        finished_rotating = False
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
             if th.norm(body_target_pose[0][:2]) < dist_threshold:
                 break
@@ -1645,25 +1647,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
             body_intermediate_pose = self._world_pose_to_robot_pose(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2].item()
-            if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
+            if not finished_rotating and abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
+                finished_rotating = True
                 action = self._empty_action()
-
-                if isinstance(self.robot.controllers["base"], JointController):
-                    base_action_size = self.robot.controller_action_idx["base"].numel()
+                if isinstance(self.robot.controllers["base"], HolonomicBaseJointController):
                     assert (
-                        base_action_size == 3
-                    ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                        self.robot.controllers["base"].motor_type == "velocity"
+                    ), "Holonomic base controller must be in velocity mode"
                     direction_vec = (
                         body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[type(self.robot)]
                     )
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
-                else:
-                    # Diff drive controller
+                elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
                     base_action = th.tensor([m.KP_LIN_VEL[type(self.robot)], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
+                else:
+                    raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
 
                 yield self._postprocess_action(action)
 
@@ -1689,10 +1691,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to rotate or None if it is done rotating
         """
-        body_target_pose = self._world_pose_to_robot_pose(end_pose)
-        diff_yaw = T.quat2euler(body_target_pose[1])[2].item()
-
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
+            body_target_pose = self._world_pose_to_robot_pose(end_pose)
+            diff_yaw = T.quat2euler(body_target_pose[1])[2].item()
             if abs(diff_yaw) < angle_threshold:
                 break
 
@@ -1703,22 +1704,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
-            if not isinstance(self.robot.controllers["base"], JointController):
-                base_action[0] = 0.0
-                base_action[1] = ang_vel
-            else:
+            if isinstance(self.robot.controllers["base"], HolonomicBaseJointController):
                 assert (
-                    base_action.numel() == 3
-                ), "Currently, the action primitives only support [x, y, theta] joint controller"
+                    self.robot.controllers["base"].motor_type == "velocity"
+                ), "Holonomic base controller must be in velocity mode"
                 base_action[0] = 0.0
                 base_action[1] = 0.0
                 base_action[2] = ang_vel
+            elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
+                base_action[0] = 0.0
+                base_action[1] = ang_vel
+            else:
+                raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
 
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)
-
-            body_target_pose = self._world_pose_to_robot_pose(end_pose)
-            diff_yaw = T.quat2euler(body_target_pose[1])[2].item()
         else:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
