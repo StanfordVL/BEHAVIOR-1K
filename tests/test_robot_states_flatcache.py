@@ -9,6 +9,7 @@ from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 
 
 def setup_environment(flatcache):
@@ -259,10 +260,14 @@ def test_grasping_mode():
         physical="Physical Grasping - No additional grasping assistance applied",
     )
 
-    def object_is_in_hand(robot, obj):
-        eef_position = robot.get_eef_position()
-        obj_position = obj.get_position_orientation()[0]
-        return th.norm(eef_position - obj_position) < 0.05
+    def object_is_in_hand(robot, obj, grasping_mode):
+        if grasping_mode in ["sticky", "assisted"]:
+            return robot._ag_obj_in_hand[robot.default_arm] == obj
+        elif grasping_mode == "physical":
+            prim_paths = robot._find_gripper_raycast_collisions()
+            return obj in {obj for (obj, _) in prim_paths_to_rigid_prims(prim_paths, obj.scene)}
+        else:
+            raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 
     for grasping_mode in grasping_modes:
         robot = Fetch(
@@ -303,21 +308,27 @@ def test_grasping_mode():
         for _ in range(20):
             og.sim.step()
 
-        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to grasp the object"
+        assert object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to grasp the object"
 
         # Move eef
         eef_offset = th.tensor([0.0, 0.2, 0.2])
         for action in action_primitives._move_hand_direct_ik((target_eef_pos + eef_offset, target_eef_orn)):
             env.step(action)
 
-        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to keep the object in hand"
+        assert object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
         gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
         for _ in range(20):
             og.sim.step()
 
-        assert not object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to release the object"
+        assert not object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to release the object"
 
         # Stop the simulator and remove the robot
         og.sim.stop()

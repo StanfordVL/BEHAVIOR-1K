@@ -11,7 +11,8 @@ from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import GripperRigidContactAPI
+from omnigibson.utils.constants import GROUND_CATEGORIES
+from omnigibson.object_states import ContactBodies
 
 # Create module logger
 logger = create_module_logger(module_name=__name__)
@@ -522,7 +523,7 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
 
     Args:
         robot (BaseRobot): Robot object to detect collisions for
-        filter_objs (Array of StatefulObject or None): Objects to ignore collisions with
+        filter_objs (list of DatasetObject or None): Objects to ignore collisions with
         ignore_obj_in_hand (bool): Whether to ignore collisions with the object in the robot's hand
 
     Returns:
@@ -531,24 +532,22 @@ def detect_robot_collision_in_sim(robot, filter_objs=None, ignore_obj_in_hand=Tr
     if filter_objs is None:
         filter_objs = []
 
-    filter_categories = ["floors"]
+    if ignore_obj_in_hand:
+        for arm in robot.arm_names:
+            if robot.grasping_mode in ["sticky", "assisted"]:
+                if robot._ag_obj_in_hand[arm] is not None:
+                    filter_objs.append(robot._ag_obj_in_hand[arm])
+            elif robot.grasping_mode == "physical":
+                prim_paths = robot._find_gripper_raycast_collisions(arm=arm)
+                for obj, _ in prim_paths_to_rigid_prims(prim_paths, robot.scene):
+                    filter_objs.append(obj)
+            else:
+                raise ValueError(f"Unknown grasping mode: {robot.grasping_mode}")
 
-    obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
-    if obj_in_hand is not None and ignore_obj_in_hand:
-        filter_objs.append(obj_in_hand)
+    for category in GROUND_CATEGORIES:
+        filter_objs.extend(robot.scene.object_registry("category", category, []))
 
-    # Use the RigidCollisionAPI to get the things this robot is colliding with
-    scene_idx = robot.scene.idx
-    link_paths = set(robot.link_prim_paths)
-    collision_body_paths = {
-        row
-        for row, _ in GripperRigidContactAPI.get_contact_pairs(scene_idx, column_prim_paths=link_paths)
-        if row not in link_paths
-    }
-
-    # Convert to prim objects and filter out the necessary objects.
-    rigid_prims = prim_paths_to_rigid_prims(collision_body_paths, robot.scene)
-    return any(o not in filter_objs and o.category not in filter_categories for o, p in rigid_prims)
+    return any(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs), non_zero_impulse=True))
 
 
 def astar(search_map, start, goal, eight_connected=True):

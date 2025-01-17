@@ -76,14 +76,14 @@ def main():
     apple = scene.object_registry("name", "apple")
 
     # Grasp apple
-    print("Executing controller")
+    print("Start executing grasp")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, apple), env)
-    print("Finished executing grasp")
+    print("Finish executing grasp")
 
     # Place on cabinet
-    print("Executing controller")
+    print("Start executing place")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, coffee_table), env)
-    print("Finished executing place")
+    print("Finish executing place")
 
     og.shutdown()
 
