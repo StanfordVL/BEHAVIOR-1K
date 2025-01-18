@@ -488,6 +488,36 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][2]] = speed
             yield self._postprocess_action(action)
 
+    def _sample_grasp_pose(self, obj):
+        """
+        Samples an eef grasp pose for the object
+
+        Args:
+            obj (BaseObject): Object to sample grasp pose for
+
+        Returns:
+            Tuple[th.tensor, th.tensor]: Pregrasp pose and grasp pose of the robot eef in the world frame
+        """
+        indented_print("Sampling grasp pose")
+        grasp_poses = get_grasp_poses_for_object_sticky(obj)
+        grasp_pos, grasp_quat = random.choice(grasp_poses)
+
+        # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
+        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
+
+        pregrasp_offset = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
+
+        pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
+
+        # The sampled grasp pose is robot-agnostic
+        # We need to multiply by the quaternion of the robot's eef frame of top-down grasping (x-forward, y-right, z-down)
+        grasp_quat = T.quat_multiply(grasp_quat, th.tensor([1.0, 0.0, 0.0, 0.0]))
+
+        pregrasp_pose = (pregrasp_pos, grasp_quat)
+        grasp_pose = (grasp_pos, grasp_quat)
+
+        return pregrasp_pose, grasp_pose
+
     def _grasp(self, obj):
         """
         Yields action for the robot to navigate to object if needed, then to grasp it
@@ -530,24 +560,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Opening hand before grasping")
         yield from self._execute_release()
 
-        # Allow grasping from suboptimal extents if we've tried enough times.
-        indented_print("Sampling grasp pose")
-        grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pos, grasp_quat = random.choice(grasp_poses)
-
-        # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
-        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
-
-        pregrasp_offset = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
-
-        pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
-
-        # The sampled grasp pose is robot-agnostic
-        # We need to multiply by the quaternion of the robot's eef frame of top-down grasping (x-forward, y-right, z-down)
-        grasp_quat = T.quat_multiply(grasp_quat, th.tensor([1.0, 0.0, 0.0, 0.0]))
-
-        pregrasp_pose = (pregrasp_pos, grasp_quat)
-        grasp_pose = (grasp_pos, grasp_quat)
+        pregrasp_pose, grasp_pose = self._sample_grasp_pose(obj)
 
         # If the pre-grasp pose is too far, navigate.
         indented_print("Navigating to grasp pose if needed")
@@ -1600,7 +1613,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         self._motion_generator.update_obstacles()
-        eef_pose = eef_pose if eef_pose is not None else obj.get_position_orientation()
+
+        if eef_pose is None:
+            eef_pose, _ = self._sample_grasp_pose(obj)
+
         if self._target_in_reach_of_robot(eef_pose, skip_obstacle_update=True):
             # No need to navigate.
             return
@@ -1761,12 +1777,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yaw_lo, yaw_hi = -math.pi, math.pi
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 
-        target_pose = eef_pose if eef_pose is not None else obj.get_position_orientation()
-        # target_pose = (
-        #     (self._sample_position_on_aabb_side(obj), self._get_reset_eef_pose()[self.arm][1])
-        #     if eef_pose is None
-        #     else eef_pose
-        # )
+        if eef_pose is None:
+            eef_pose, _ = self._sample_grasp_pose(obj)
+
+        target_pose = eef_pose
 
         obj_rooms = (
             obj.in_rooms if obj.in_rooms else [self.robot.scene._seg_map.get_room_instance_by_point(target_pose[0][:2])]
