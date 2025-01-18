@@ -79,7 +79,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
     for _ in range(30):
         og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(env, env.robots[0], enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(env, env.robots[0], enable_head_tracking=False, curobo_batch_size=1)
     try:
         for primitive, args in zip(primitives, primitives_args):
             execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)
