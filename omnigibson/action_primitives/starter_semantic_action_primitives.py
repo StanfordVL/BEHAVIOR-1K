@@ -34,6 +34,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husky, Locobot, Stretch, Tiago, Turtlebot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.geometry_utils import wrap_angle
@@ -97,7 +98,7 @@ m.OPEN_GRASP_APPROACH_DISTANCE = 0.4
 
 m.HAND_DIST_THRESHOLD = 0.002
 m.DEFAULT_DIST_THRESHOLD = 0.005
-m.DEFAULT_ANGLE_THRESHOLD = 0.02
+m.DEFAULT_ANGLE_THRESHOLD = 0.03
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
@@ -185,7 +186,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 collision_activation_distance=m.DEFAULT_COLLISION_ACTIVATION_DISTANCE,
             )
         )
-        self._reset_eef_pose = {arm: self.robot.get_relative_eef_pose(arm) for arm in self.robot.arm_names}
 
         self._task_relevant_objects_only = task_relevant_objects_only
 
@@ -196,6 +196,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Store the current position of the arm as the arm target
         control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
+        self._reset_eef_pose = {}
         if isinstance(self.robot, ManipulationRobot):
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
@@ -209,6 +210,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 else:
                     arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
+
+                self._reset_eef_pose[arm_name] = self.robot.get_relative_eef_pose(arm_name)
 
         self._curobo_batch_size = curobo_batch_size
         self.debug_visual_marker = debug_visual_marker
@@ -1641,10 +1644,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         angle_threshold = m.LOW_PRECISION_ANGLE_THRESHOLD if low_precision else m.DEFAULT_ANGLE_THRESHOLD
 
         end_pose = self._get_robot_pose_from_2d_pose(pose_2d)
-        body_target_pose = self._world_pose_to_robot_pose(end_pose)
 
-        finished_rotating = False
         for _ in range(m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION):
+            body_target_pose = self._world_pose_to_robot_pose(end_pose)
             if th.norm(body_target_pose[0][:2]) < dist_threshold:
                 break
 
@@ -1655,10 +1657,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
             body_intermediate_pose = self._world_pose_to_robot_pose(intermediate_pose)
             diff_yaw = T.quat2euler(body_intermediate_pose[1])[2].item()
-            if not finished_rotating and abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
+            if abs(diff_yaw) > m.DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=m.DEFAULT_ANGLE_THRESHOLD)
             else:
-                finished_rotating = True
                 action = self._empty_action()
                 if isinstance(self.robot.controllers["base"], HolonomicBaseJointController):
                     assert (
@@ -1676,8 +1677,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
 
                 yield self._postprocess_action(action)
-
-            body_target_pose = self._world_pose_to_robot_pose(end_pose)
         else:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
@@ -1990,16 +1989,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor: (x,y,z) Position in the world frame
             th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
-        pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
-        euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
-        mat_x = T.euler2mat(th.tensor([euler_intrinsic_xyz[0], 0, 0], dtype=th.float32))
-        mat_y = T.euler2mat(th.tensor([0, euler_intrinsic_xyz[1], 0], dtype=th.float32))
-        mat_z = T.euler2mat(th.tensor([0, 0, euler_intrinsic_xyz[2]], dtype=th.float32))
-        # intrinsic x-y-z is the same as extrinsic z-y-x
-        # multiply mat_z first, then mat_y, then mat_x
-        mat = mat_x @ mat_y @ mat_z
-        orn = T.mat2quat(mat)
+        if isinstance(self.robot, HolonomicBaseRobot):
+            base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
+            pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
+            euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
+            mat_x = T.euler2mat(th.tensor([euler_intrinsic_xyz[0], 0, 0], dtype=th.float32))
+            mat_y = T.euler2mat(th.tensor([0, euler_intrinsic_xyz[1], 0], dtype=th.float32))
+            mat_z = T.euler2mat(th.tensor([0, 0, euler_intrinsic_xyz[2]], dtype=th.float32))
+            # intrinsic x-y-z is the same as extrinsic z-y-x
+            # multiply mat_z first, then mat_y, then mat_x
+            mat = mat_x @ mat_y @ mat_z
+            orn = T.mat2quat(mat)
+        else:
+            pos = th.tensor([pose_2d[0], pose_2d[1], 0.0], dtype=th.float32)
+            orn = T.euler2quat(th.tensor([0.0, 0.0, pose_2d[2]], dtype=th.float32))
         return pos, orn
 
     def _world_pose_to_robot_pose(self, pose):
