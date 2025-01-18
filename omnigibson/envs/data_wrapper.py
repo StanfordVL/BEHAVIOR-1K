@@ -37,8 +37,8 @@ class DataWrapper(EnvironmentWrapper):
         """
         # Make sure the wrapped environment inherits correct omnigibson format
         assert isinstance(
-            env, og.Environment
-        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class!"
+            env, (og.Environment, EnvironmentWrapper)
+        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
 
         # Only one scene is supported for now
         assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
@@ -419,6 +419,8 @@ class DataPlaybackWrapper(DataWrapper):
         robot_obs_modalities,
         robot_sensor_config=None,
         external_sensors_config=None,
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         n_render_iterations=5,
         only_successes=False,
     ):
@@ -440,6 +442,12 @@ class DataPlaybackWrapper(DataWrapper):
                 dictionary specifying an individual external sensor's relevant parameters. See the example
                 external_sensors key in fetch_behavior.yaml env config. This can be used to specify additional sensors
                 to collect observations during playback.
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors during playback
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors during playback
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data. This is needed because the omniverse real-time raytracing always lags behind the
                 underlying physical state by a few frames, and additionally produces transient visual artifacts when
@@ -472,6 +480,9 @@ class DataPlaybackWrapper(DataWrapper):
         # Set observation modalities and update sensor config
         for robot_cfg in config["robots"]:
             robot_cfg["obs_modalities"] = robot_obs_modalities
+            robot_cfg["include_sensor_names"] = include_sensor_names
+            robot_cfg["exclude_sensor_names"] = exclude_sensor_names
+
             if robot_sensor_config is not None:
                 robot_cfg["sensor_config"] = robot_sensor_config
         if external_sensors_config is not None:
