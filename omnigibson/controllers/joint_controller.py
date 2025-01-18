@@ -341,4 +341,6 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-add_compute_function(name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch)
+add_compute_function(
+    name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch
+)
