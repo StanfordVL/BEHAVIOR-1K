@@ -13,7 +13,7 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -223,7 +223,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            u = cb.compute_joint_torques(u, control_dict["mass_matrix"], self.dof_idx)
+            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:
@@ -341,6 +341,4 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_joint_torques", None)
-setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
-setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+add_compute_function(name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch)
