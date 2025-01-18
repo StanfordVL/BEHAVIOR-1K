@@ -85,6 +85,7 @@ m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
+m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_FOR_CORRECT_ROOM = 20
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE = 50
 m.PREDICATE_SAMPLING_Z_OFFSET = 0.02
@@ -140,8 +141,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         enable_head_tracking=True,
         always_track_eef=False,
         task_relevant_objects_only=False,
-        planning_batch_size=3,
-        collision_check_batch_size=5,
+        curobo_batch_size=3,
         debug_visual_marker=None,
         skip_curobo_initilization=False,
     ):
@@ -156,8 +156,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
               to switching between target object and end effector based on context. Defaults to False.
             task_relevant_objects_only (bool): Whether to only consider objects relevant to the task
               when computing the action space. Defaults to False.
-            planning_batch_size (int): The batch size for curobo motion planning. Defaults to 3.
-            collision_check_batch_size (int): The batch size for curobo collision checking. Defaults to 5.
+            curobo_batch_size (int): The batch size for curobo motion planning and collision checking. Defaults to 3.
             debug_visual_marker (PrimitiveObject): The object to use for debug visual markers. Defaults to None.
             skip_curobo_initilization (bool): Whether to skip curobo initialization. Defaults to False.
         """
@@ -182,7 +181,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if skip_curobo_initilization
             else CuRoboMotionGenerator(
                 robot=self.robot,
-                batch_size=planning_batch_size,
+                batch_size=curobo_batch_size,
                 collision_activation_distance=m.DEFAULT_COLLISION_ACTIVATION_DISTANCE,
             )
         )
@@ -211,7 +210,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     arm_target = cb.to_torch(control_dict["joint_position"])[arm_ctrl.dof_idx]
                     self._arm_targets[arm] = arm_target
 
-        self._collision_check_batch_size = collision_check_batch_size
+        self._curobo_batch_size = curobo_batch_size
         self.debug_visual_marker = debug_visual_marker
 
     @property
@@ -321,7 +320,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         raise ActionPrimitiveErrorGroup(errors)
 
-        # One-attempt debug version
+        # # One-attempt debug version
         # ctrl = self.controller_functions[primitive]
         # yield from ctrl(*args)
         # if not self._get_obj_in_hand():
@@ -377,7 +376,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 approach_pose = (approach_pos, grasp_pose[1])
 
                 # If the grasp pose is too far, navigate
-                yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+                yield from self._navigate_if_needed(obj, eef_pose=grasp_pose)
 
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
@@ -387,7 +386,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
                 # It's okay if we can't go all the way because we run into the object.
-                yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)
+                yield from self._navigate_if_needed(obj, eef_pose=approach_pose)
 
                 if should_open:
                     yield from self._move_hand_linearly_cartesian(
@@ -531,42 +530,50 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Allow grasping from suboptimal extents if we've tried enough times.
         indented_print("Sampling grasp pose")
         grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        grasp_pose, object_direction = random.choice(grasp_poses)
+        grasp_pos, grasp_quat = random.choice(grasp_poses)
 
-        grasp_offset_in_z = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
+        # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
+        approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
 
-        # Adjust grasp pose with reset orientation and finger length offset
-        reset_orientation = self._get_reset_eef_pose("world")[self.arm][1]
-        grasp_pos = grasp_pose[0] - object_direction * grasp_offset_in_z
-        grasp_quat = T.quat_multiply(grasp_pose[1], reset_orientation)
+        pregrasp_offset = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
+
+        pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
+
+        # The sampled grasp pose is robot-agnostic
+        # We need to multiply by the quaternion of the robot's eef frame of top-down grasping (x-forward, y-right, z-down)
+        grasp_quat = T.quat_multiply(grasp_quat, th.tensor([1.0, 0.0, 0.0, 0.0]))
+
+        pregrasp_pose = (pregrasp_pos, grasp_quat)
         grasp_pose = (grasp_pos, grasp_quat)
 
-        # Prepare data for the approach later.
-        approach_pos = grasp_pose[0] + object_direction * grasp_offset_in_z
-        approach_pose = (approach_pos, grasp_pose[1])
-
-        # If the grasp pose is too far, navigate.
+        # If the pre-grasp pose is too far, navigate.
         indented_print("Navigating to grasp pose if needed")
-        yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+        yield from self._navigate_if_needed(obj, eef_pose=pregrasp_pose)
 
         indented_print("Moving hand to grasp pose")
-        yield from self._move_hand(grasp_pose)
+        yield from self._move_hand(pregrasp_pose)
 
         if self.robot.grasping_mode == "sticky":
-            # Pre-grasp in sticky grasping mode.
-            indented_print("Pregrasp squeeze")
+            indented_print("Sticky grasping: close gripper")
+            # Close the gripper
             yield from self._execute_grasp()
-            # Since the pregrasp pose is slightly away from the object, we want to move towards the object
-            # It's okay if we can't go all the way because we run into the object.
-            indented_print("Performing grasp approach")
-            # Only translate in the z direction.
-            # Ignore the object during motion planning because the fingers are closed.
+
+            indented_print("Sticky grasping: approach")
+            # Only translate in the z-axis of the goal frame (assuming z-axis points out of the gripper)
+            # This is the same as requesting the end-effector to move along the approach_dir direction.
+            # By default, it's NOT the z-axis of the world frame unless `project_pose_to_goal_frame=False` is set in curobo.
+            # For sticky grasping, we also need to ignore the object during motion planning because the fingers are already closed.
             yield from self._move_hand(
-                approach_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_contact=True, ignore_objects=[obj]
+                grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_contact=True, ignore_objects=[obj]
             )
         elif self.robot.grasping_mode == "assisted":
-            indented_print("Performing grasp approach")
-            yield from self._move_hand(approach_pose)
+            indented_print("Assisted grasping: approach")
+            # Same as above in terms of moving along the approach_dir direction, but we don't ignore the object.
+            # For this approach motion, we expect the fingers to move towards and eventually "wrap" around the object without collisions.
+            yield from self._move_hand(grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0])
+
+            # Now we close the fingers to grasp the object with AG.
+            indented_print("Assisted grasping: close gripper")
             yield from self._execute_grasp()
 
         # Step a few times to update
@@ -682,8 +689,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         valid_navigation_pose = None
         for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE):
             # Sample one pose at a time
-            obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
-            obj_pose = (obj_pose[0], obj_in_hand.get_position_orientation()[1])
+            obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, keep_orientation=True)
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
 
             # First check if we can directly move the hand there
@@ -694,7 +700,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # If not, try to find a valid navigation pose for this hand pose
             valid_navigation_pose = self._sample_pose_near_object(
-                obj, pose_on_obj=hand_pose, sampling_attempts=10, skip_obstacle_update=True
+                obj, eef_pose=hand_pose, sampling_attempts=10, skip_obstacle_update=True
             )
 
             if valid_navigation_pose is not None:
@@ -955,6 +961,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Grab the first successful trajectory if found
         success_idx = th.where(successes)[0].cpu()
         if len(success_idx) == 0:
+            # print("motion planning fails")
+            # breakpoint()
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
                 "There is no accessible path from where you are to the desired pose. Try again",
@@ -1548,6 +1556,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_pos = {self.robot.base_footprint_link_name: pose_3d[0]}
         target_quat = {self.robot.base_footprint_link_name: pose_3d[1]}
 
+        # print("base motion planning")
+        # breakpoint()
         q_traj = self._plan_joint_motion(target_pos, target_quat, CuRoboEmbodimentSelection.BASE)
         yield from self._execute_motion_plan(q_traj)
 
@@ -1575,40 +1585,38 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             cv2.imshow("SceneGraph", img)
             cv2.waitKey(1)
 
-    def _navigate_if_needed(self, obj, pose_on_obj=None, **kwargs):
+    def _navigate_if_needed(self, obj, eef_pose=None, **kwargs):
         """
         Yields action to navigate the robot to be in range of the object if it not in the range
 
         Args:
             obj (StatefulObject): Object for the robot to be in range of
-            pose_on_obj (Iterable): (pos, quat) Pose
+            eef_pose (Iterable): (pos, quat) Pose
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
         self._motion_generator.update_obstacles()
-        if pose_on_obj is not None:
-            if self._target_in_reach_of_robot(pose_on_obj, skip_obstacle_update=True):
-                # No need to navigate.
-                return
-        elif self._target_in_reach_of_robot(obj.get_position_orientation(), skip_obstacle_update=True):
+        eef_pose = eef_pose if eef_pose is not None else obj.get_position_orientation()
+        if self._target_in_reach_of_robot(eef_pose, skip_obstacle_update=True):
+            # No need to navigate.
             return
 
-        yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, skip_obstacle_update=True, **kwargs)
+        yield from self._navigate_to_obj(obj, eef_pose=eef_pose, skip_obstacle_update=True, **kwargs)
 
-    def _navigate_to_obj(self, obj, pose_on_obj=None, skip_obstacle_update=False, **kwargs):
+    def _navigate_to_obj(self, obj, eef_pose=None, skip_obstacle_update=False, **kwargs):
         """
         Yields action to navigate the robot to be in range of the pose
 
         Args:
             obj (StatefulObject or list of StatefulObject): object(s) to be in range of
-            pose_on_obj (Iterable or list of Iterable): (pos, quat) Pose(s)
+            eef_pose (Iterable or list of Iterable): (pos, quat) Pose(s)
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
         pose = self._sample_pose_near_object(
-            obj, pose_on_obj=pose_on_obj, skip_obstacle_update=skip_obstacle_update, **kwargs
+            obj, eef_pose=eef_pose, skip_obstacle_update=skip_obstacle_update, **kwargs
         )
         if pose is None:
             raise ActionPrimitiveError(
@@ -1732,7 +1740,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def _sample_pose_near_object(
         self,
         obj,
-        pose_on_obj=None,
+        eef_pose=None,
         sampling_attempts=m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT,
         skip_obstacle_update=False,
         **kwargs,
@@ -1742,7 +1750,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             obj (StatefulObject or list of StatefulObject): object(s) to sample a 2d pose near
-            pose_on_obj (Iterable or list of Iterable): (pos, quat) Pose(s) to sample near.
+            eef_pose (Iterable or list of Iterable): (pos, quat) Pose(s) to sample near.
                 If provided, must match the length of obj list if obj is a list
 
         Returns:
@@ -1754,11 +1762,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yaw_lo, yaw_hi = -math.pi, math.pi
         avg_arm_workspace_range = th.mean(self.robot.arm_workspace_range[self.arm])
 
-        target_pose = (
-            (self._sample_position_on_aabb_side(obj), self._get_reset_eef_pose()[self.arm][1])
-            if pose_on_obj is None
-            else pose_on_obj
-        )
+        target_pose = eef_pose if eef_pose is not None else obj.get_position_orientation()
+        # target_pose = (
+        #     (self._sample_position_on_aabb_side(obj), self._get_reset_eef_pose()[self.arm][1])
+        #     if eef_pose is None
+        #     else eef_pose
+        # )
 
         obj_rooms = (
             obj.in_rooms if obj.in_rooms else [self.robot.scene._seg_map.get_room_instance_by_point(target_pose[0][:2])]
@@ -1770,8 +1779,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self._motion_generator.update_obstacles()
         while attempt < sampling_attempts:
             candidate_poses = []
-            for _ in range(self._collision_check_batch_size):
-                while True:
+            for _ in range(self._curobo_batch_size):
+                for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_FOR_CORRECT_ROOM):
                     distance = (th.rand(1) * (distance_hi - distance_lo) + distance_lo).item()
                     yaw = th.rand(1) * (yaw_hi - yaw_lo) + yaw_lo
                     candidate_2d_pose = th.cat(
@@ -1784,19 +1793,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                     # Check room
                     if self.robot.scene._seg_map.get_room_instance_by_point(candidate_2d_pose[:2]) in obj_rooms:
-                        # indented_print("Candidate position is in the wrong room.")
                         break
                 candidate_poses.append(candidate_2d_pose)
 
-            result = self._validate_poses(candidate_poses, pose_on_obj=target_pose, skip_obstacle_update=True, **kwargs)
+            # Normally candidate_poses will have length equal to self._curobo_batch_size
+            # In case we are unable to find a valid pose in the room, we will have less than self._curobo_batch_size.
+            # We skip the following steps if the list is empty.
+            if len(candidate_poses) > 0:
+                result = self._validate_poses(
+                    candidate_poses, eef_pose=target_pose, skip_obstacle_update=True, **kwargs
+                )
 
-            # If anything in result is true, return the pose
-            for i, res in enumerate(result):
-                if res:
-                    indented_print("Found valid position near object.")
-                    return candidate_poses[i]
+                # If anything in result is true, return the pose
+                for i, res in enumerate(result):
+                    if res:
+                        indented_print("Found valid position near object.")
+                        return candidate_poses[i]
 
-            attempt += self._collision_check_batch_size
+            attempt += self._curobo_batch_size
         return None
 
     @staticmethod
@@ -1850,7 +1864,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     #     )
 
     def _sample_pose_with_object_and_predicate(
-        self, predicate, held_obj, target_obj, near_poses=None, near_poses_threshold=None
+        self, predicate, held_obj, target_obj, keep_orientation=False, near_poses=None, near_poses_threshold=None
     ):
         """
         Returns a pose for the held object relative to the target object that satisfies the predicate
@@ -1859,6 +1873,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             predicate (object_states.OnTop or object_states.Inside): Relation between held object and the target object
             held_obj (StatefulObject): Object held by the robot
             target_obj (StatefulObject): Object to sample a pose relative to
+            keep_orientation (bool): Whether to keep the current orientation of the held object after placing.
+                If True, the sampled cuboid will be aligned with the current orientation of the held object.
+                If False, the sampled cuboid will be aligned with the base link of the held object.
             near_poses (Iterable of arrays): Poses in the world frame to sample near
             near_poses_threshold (float): The distance threshold to check if the sampled pose is near the poses in near_poses
 
@@ -1870,16 +1887,28 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
 
         for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
-            _, _, bb_extents, bb_center_in_base = held_obj.get_base_aligned_bbox()
+            if keep_orientation:
+                # Take the bbox aligned to the world frame because we want to keep the orientation
+                bb_extents = held_obj.aabb_extent
+                bb_center = held_obj.aabb_center
+                # Compute bbox pose in the object base link frame
+                bb_pos_in_base, bb_orn_in_base = T.relative_pose_transform(
+                    bb_center, th.tensor([0, 0, 0, 1], dtype=th.float32), *held_obj.get_position_orientation()
+                )
+            else:
+                _, _, bb_extents, bb_pos_in_base = held_obj.get_base_aligned_bbox()
+                bb_orn_in_base = th.tensor([0, 0, 0, 1], dtype=th.float32)
+
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
             if sampling_results[0][0] is None:
                 continue
             sampled_bb_center = sampling_results[0][0] + th.tensor([0, 0, m.PREDICATE_SAMPLING_Z_OFFSET])
             sampled_bb_orn = sampling_results[0][2]
 
-            # Get the object pose by subtracting the offset
+            # Tobj_in_world @ Tbbox_in_obj = Tbbox_in_world
+            # Tobj_in_world = Tbbox_in_world @ inv(Tbbox_in_obj)
             sampled_obj_pose = T.pose2mat((sampled_bb_center, sampled_bb_orn)) @ T.pose_inv(
-                T.pose2mat((bb_center_in_base, th.tensor([0, 0, 0, 1], dtype=th.float32)))
+                T.pose2mat((bb_pos_in_base, bb_orn_in_base))
             )
 
             # Check that the pose is near one of the poses in the near_poses list if provided.
@@ -1898,13 +1927,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    def _validate_poses(self, candidate_poses, pose_on_obj=None, skip_obstacle_update=False):
+    def _validate_poses(self, candidate_poses, eef_pose=None, skip_obstacle_update=False):
         """
         Determines whether the robot can reach all poses on the objects and is not in collision at the specified 2d poses
 
         Args:
             candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
-            pose_on_obj (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
+            eef_pose (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
                 Can be a single pose or list of poses.
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the motion generator
 
@@ -1917,8 +1946,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         current_joint_pos = self.robot.get_joint_positions()
         for pose in candidate_poses:
             joint_pos = current_joint_pos.clone()
-            joint_pos[self.robot.base_idx[:2]] = pose[:2]
-            joint_pos[self.robot.base_idx[3:]] = th.tensor([0.0, 0.0, pose[2]])
+            joint_pos[self.robot.base_control_idx] = pose
             candidate_joint_positions.append(joint_pos)
 
         candidate_joint_positions = th.stack(candidate_joint_positions)
@@ -1927,6 +1955,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         obj_in_hand = self._get_obj_in_hand()
         attached_obj = {self.robot.eef_link_names[self.arm]: obj_in_hand.root_link} if obj_in_hand is not None else None
 
+        # No need to check for self-collision here because we are only testing for new base poses
+        # This assumes the robot doesn't have self collisions currently.
         invalid_results = self._motion_generator.check_collisions(
             candidate_joint_positions,
             self_collision_check=False,
@@ -1939,9 +1969,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if invalid_results[i].item():
                 continue
 
-            if pose_on_obj is not None:
+            if eef_pose is not None:
                 pose = self._get_robot_pose_from_2d_pose(candidate_poses[i])
-                relative_pose = T.relative_pose_transform(*pose_on_obj, *pose)
+                relative_pose = T.relative_pose_transform(*eef_pose, *pose)
                 if not self._target_in_reach_of_robot_relative(
                     relative_pose, skip_obstacle_update=skip_obstacle_update
                 ):
@@ -1960,8 +1990,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor: (x,y,z) Position in the world frame
             th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        pos = th.tensor([pose_2d[0], pose_2d[1], self.robot.get_position_orientation()[0][2]], dtype=th.float32)
-        orn = T.euler2quat(th.tensor([0, 0, pose_2d[2]], dtype=th.float32))
+        base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
+        pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
+        euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
+        mat_x = T.euler2mat(th.tensor([euler_intrinsic_xyz[0], 0, 0], dtype=th.float32))
+        mat_y = T.euler2mat(th.tensor([0, euler_intrinsic_xyz[1], 0], dtype=th.float32))
+        mat_z = T.euler2mat(th.tensor([0, 0, euler_intrinsic_xyz[2]], dtype=th.float32))
+        # intrinsic x-y-z is the same as extrinsic z-y-x
+        # multiply mat_z first, then mat_y, then mat_x
+        mat = mat_x @ mat_y @ mat_z
+        orn = T.mat2quat(mat)
         return pos, orn
 
     def _world_pose_to_robot_pose(self, pose):

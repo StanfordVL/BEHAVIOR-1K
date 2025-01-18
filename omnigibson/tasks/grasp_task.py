@@ -114,7 +114,7 @@ class GraspTask(BaseTask):
             # Randomize the robot's 2d pose
             obj = env.scene.object_registry("name", self.obj_name)
             grasp_poses = get_grasp_poses_for_object_sticky(obj)
-            grasp_pose, _ = random.choice(grasp_poses)
+            grasp_pose = random.choice(grasp_poses)
             sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
             robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
