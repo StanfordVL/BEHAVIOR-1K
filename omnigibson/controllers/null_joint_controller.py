@@ -17,7 +17,7 @@ class NullJointController(JointController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
-        default_command=None,
+        default_goal=None,
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
@@ -45,8 +45,8 @@ class NullJointController(JointController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
-            default_command (None or n-array): if specified, should be the same length as @dof_idx, specifying
-                the default control for this controller to output
+            default_goal (None or n-array): if specified, should be the same length as @dof_idx, specifying
+                the default joint goal for this controller to converge to
             pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
             pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
@@ -57,7 +57,7 @@ class NullJointController(JointController):
                 applied
         """
         # Store values
-        self._default_command = cb.zeros(len(dof_idx)) if default_command is None else default_command
+        self.default_goal = cb.zeros(len(dof_idx)) if default_goal is None else default_goal
 
         # Run super init
         super().__init__(
@@ -76,11 +76,11 @@ class NullJointController(JointController):
 
     def compute_no_op_goal(self, control_dict):
         # Set the goal to be internal stored default value
-        return dict(target=self._default_command)
+        return dict(target=self.default_goal)
 
     def _preprocess_command(self, command):
-        # Override super and force the processed command to be internal stored default value
-        return cb.array(self._default_command)
+        # Override super and force the processed goal to be internal stored default value
+        return cb.array(self.default_goal)
 
     def update_default_goal(self, target):
         """
@@ -92,9 +92,9 @@ class NullJointController(JointController):
         """
         assert (
             len(target) == self.control_dim
-        ), f"Default control must be length: {self.control_dim}, got length: {len(target)}"
+        ), f"Default goal must be length: {self.control_dim}, got length: {len(target)}"
 
-        self._default_command = cb.array(target)
+        self.default_goal = cb.array(target)
 
     def _compute_no_op_action(self, control_dict):
         # Empty tensor since no action should be received

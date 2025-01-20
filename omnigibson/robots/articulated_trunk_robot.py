@@ -143,7 +143,7 @@ class ArticulatedTrunkRobot(ManipulationRobot):
             "motor_type": "position",
             "control_limits": self.control_limits,
             "dof_idx": self.trunk_control_idx,
-            "default_command": self.reset_joint_pos[self.trunk_control_idx],
+            "default_goal": self.reset_joint_pos[self.trunk_control_idx],
             "use_impedances": False,
         }
 

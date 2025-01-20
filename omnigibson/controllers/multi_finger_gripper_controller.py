@@ -105,9 +105,9 @@ class MultiFingerGripperController(GripperController):
         # Create ring buffer for velocity history to avoid high frequency nosie during grasp state inference
         self._vel_filter = MovingAverageFilter(obs_dim=len(dof_idx), filter_width=5)
 
-        # If we're using binary signal, we override the command output limits
+        # If we're using binary signal, these values will be overridden manually, so set to default for now
         if mode == "binary":
-            command_output_limits = (-1.0, 1.0)
+            command_output_limits = "default"
 
         # Run super init
         super().__init__(
@@ -119,9 +119,17 @@ class MultiFingerGripperController(GripperController):
         )
 
     def _generate_default_command_output_limits(self):
+        # By default (independent mode), this is simply the super call
         command_output_limits = super()._generate_default_command_output_limits()
 
-        return cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+        # If we're in binary mode, output limits should just be (-1.0, 1.0)
+        if self._mode == "binary":
+            command_output_limits = (-1.0, 1.0)
+        # If we're in smoothing mode, output limits should be the average of the independent limits
+        elif self._mode == "smoothing":
+            command_output_limits = cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+
+        return command_output_limits
 
     def reset(self):
         # Call super first

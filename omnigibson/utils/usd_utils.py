@@ -15,7 +15,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
@@ -1118,7 +1118,7 @@ class BatchControlViewAPIImpl:
                 self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
             idx = self._idx[prim_path]
-            self._read_cache["relative_poses"][prim_path] = cb.compute_relative_poses(
+            self._read_cache["relative_poses"][prim_path] = cb.get_custom_method("compute_relative_poses")(
                 idx,
                 len(self._link_idx[idx]),
                 self._read_cache["link_transforms"],
@@ -1964,6 +1964,6 @@ def _compute_relative_poses_numpy(idx, n_links, all_tfs, base_pose):
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_relative_poses", None)
-setattr(_ComputeTorchBackend, "compute_relative_poses", _compute_relative_poses_torch)
-setattr(_ComputeNumpyBackend, "compute_relative_poses", _compute_relative_poses_numpy)
+add_compute_function(
+    name="compute_relative_poses", np_function=_compute_relative_poses_numpy, th_function=_compute_relative_poses_torch
+)

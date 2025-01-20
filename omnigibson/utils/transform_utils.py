@@ -1,6 +1,8 @@
 """
 Utility functions of matrix and vector transformations.
 
+NOTE: This file has a 1-to-1 correspondence to transform_utils_np.py
+
 NOTE: convention for quaternions is (x, y, z, w)
 """
 
@@ -309,6 +311,31 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
 
 
 @torch.compile
+def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
+    """
+    Generate random rotation quaternions, uniformly distributed over SO(3).
+
+    Arguments:
+        num_quaternions (int): number of quaternions to generate (default: 1)
+
+    Returns:
+        torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
+    """
+    # Generate four random numbers between 0 and 1
+    rand = torch.rand(num_quaternions, 4)
+
+    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
+    r1 = torch.sqrt(1.0 - rand[:, 0])
+    r2 = torch.sqrt(rand[:, 0])
+    t1 = 2 * torch.pi * rand[:, 1]
+    t2 = 2 * torch.pi * rand[:, 2]
+
+    quaternions = torch.stack([r1 * torch.sin(t1), r1 * torch.cos(t1), r2 * torch.sin(t2), r2 * torch.cos(t2)], dim=1)
+
+    return quaternions
+
+
+@torch.compile
 def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     """
     Samples an axis-angle rotation by first sampling a random axis
@@ -442,6 +469,20 @@ def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
         quat = quat.squeeze(0)
 
     return quat
+
+
+def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
+    """
+    Converts given rotation matrix to quaternion. Version optimized for batch operations
+
+    Args:
+        rmat (torch.Tensor): (3, 3) or (..., 3, 3) rotation matrix
+
+    Returns:
+        torch.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
+    """
+    # For torch, no different than basic version
+    return mat2quat(rmat)
 
 
 @torch.compile
@@ -944,12 +985,10 @@ def rotation_matrix(angle: float, direction: torch.Tensor) -> torch.Tensor:
 def transformation_matrix(angle: float, direction: torch.Tensor, point: Optional[torch.Tensor] = None) -> torch.Tensor:
     """
     Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
-
     Args:
         angle (float): Magnitude of rotation in radians
         direction (torch.Tensor): (ax,ay,az) axis about which to rotate
         point (Optional[torch.Tensor]): If specified, is the (x,y,z) point about which the rotation will occur
-
     Returns:
         torch.Tensor: 4x4 homogeneous transformation matrix
     """
@@ -1290,31 +1329,6 @@ def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     x = ((-1) ** m) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n)) % 2) - math.ceil(m / 2))
     y = ((-1) ** (m + 1)) * ((n - m * (m + 1)) * (math.floor(2 * math.sqrt(n) + 1) % 2) + math.ceil(m / 2))
     return int(x), int(y)
-
-
-@torch.compile
-def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
-    """
-    Generate random rotation quaternions, uniformly distributed over SO(3).
-
-    Arguments:
-        num_quaternions: int, number of quaternions to generate (default: 1)
-
-    Returns:
-        torch.Tensor: A tensor of shape (num_quaternions, 4) containing random unit quaternions.
-    """
-    # Generate four random numbers between 0 and 1
-    rand = torch.rand(num_quaternions, 4)
-
-    # Use the formula from Ken Shoemake's "Uniform Random Rotations"
-    r1 = torch.sqrt(1.0 - rand[:, 0])
-    r2 = torch.sqrt(rand[:, 0])
-    t1 = 2 * torch.pi * rand[:, 1]
-    t2 = 2 * torch.pi * rand[:, 2]
-
-    quaternions = torch.stack([r1 * torch.sin(t1), r1 * torch.cos(t1), r2 * torch.sin(t2), r2 * torch.cos(t2)], dim=1)
-
-    return quaternions
 
 
 @torch.compile

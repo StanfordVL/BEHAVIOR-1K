@@ -2,7 +2,7 @@ import math
 
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
@@ -404,7 +404,7 @@ class OperationalSpaceController(ManipulationController):
         base_ang_vel = control_dict["root_rel_ang_vel"]
 
         # Calculate torques
-        u = cb.compute_osc_torques(
+        u = cb.get_custom_method("compute_osc_torques")(
             q=q,
             qd=qd,
             mm=mm,
@@ -652,6 +652,6 @@ def _compute_osc_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_osc_torques", None)
-setattr(_ComputeTorchBackend, "compute_osc_torques", _compute_osc_torques_torch)
-setattr(_ComputeNumpyBackend, "compute_osc_torques", _compute_osc_torques_numpy)
+add_compute_function(
+    name="compute_osc_torques", np_function=_compute_osc_torques_numpy, th_function=_compute_osc_torques_torch
+)

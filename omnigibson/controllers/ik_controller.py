@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -312,7 +312,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
 
         # Calculate desired joint positions
-        target_joint_pos = cb.compute_ik_qpos(
+        target_joint_pos = cb.get_custom_method("compute_ik_qpos")(
             q=q,
             j_eef=j_eef,
             ee_pos=cb.as_float32(ee_pos),
@@ -332,13 +332,10 @@ class InverseKinematicsController(JointController, ManipulationController):
 
     def compute_no_op_goal(self, control_dict):
         # No-op is maintaining current pose
-        target_pos = cb.copy(control_dict[f"{self.task_name}_pos_relative"])
-        target_quat = cb.copy(control_dict[f"{self.task_name}_quat_relative"])
-
         # Convert quat into eef ori mat
         return dict(
-            target_pos=cb.as_float32(target_pos),
-            target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
+            target_pos=cb.as_float32(control_dict[f"{self.task_name}_pos_relative"]),
+            target_ori_mat=cb.as_float32(cb.T.quat2mat(control_dict[f"{self.task_name}_quat_relative"])),
         )
 
     def _compute_no_op_action(self, control_dict):
@@ -442,6 +439,4 @@ def _compute_ik_qpos_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_ik_qpos", None)
-setattr(_ComputeTorchBackend, "compute_ik_qpos", _compute_ik_qpos_torch)
-setattr(_ComputeNumpyBackend, "compute_ik_qpos", _compute_ik_qpos_numpy)
+add_compute_function(name="compute_ik_qpos", np_function=_compute_ik_qpos_numpy, th_function=_compute_ik_qpos_torch)

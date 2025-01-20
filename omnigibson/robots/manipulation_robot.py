@@ -1090,7 +1090,7 @@ class ManipulationRobot(BaseRobot):
                 "motor_type": "position",
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
-                "default_command": self.reset_joint_pos[self.arm_control_idx[arm]],
+                "default_goal": self.reset_joint_pos[self.arm_control_idx[arm]],
                 "use_impedances": False,
             }
         return dic
@@ -1153,7 +1153,7 @@ class ManipulationRobot(BaseRobot):
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
                 "dof_idx": self.gripper_control_idx[arm],
-                "default_command": th.zeros(len(self.gripper_control_idx[arm])),
+                "default_goal": th.zeros(len(self.gripper_control_idx[arm])),
                 "use_impedances": False,
             }
         return dic

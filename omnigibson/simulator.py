@@ -243,7 +243,7 @@ def _launch_app():
     # Set compute backend
     import omnigibson.utils.backend_utils as _backend_utils
 
-    _backend_utils._compute_backend.set_methods(
+    _backend_utils._compute_backend.set_methods_from_backend(
         _backend_utils._ComputeNumpyBackend if gm.USE_NUMPY_CONTROLLER_BACKEND else _backend_utils._ComputeTorchBackend
     )
 
