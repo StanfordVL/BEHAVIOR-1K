@@ -244,13 +244,13 @@ class OVXRSystem(TeleopSystem):
         #     )
         self.head_canonical_transformation = None
         KeyboardEventHandler.add_keyboard_callback(
-            key=lazy.carb.input.KeyboardInput.ENTER,
+            key=lazy.carb.input.KeyboardInput.R,
             callback_fn=self.register_head_canonical_transformation,
         )
-        KeyboardEventHandler.add_keyboard_callback(
-            key=lazy.carb.input.KeyboardInput.ESCAPE,
-            callback_fn=self.stop,
-        )
+        # KeyboardEventHandler.add_keyboard_callback(
+        #     key=lazy.carb.input.KeyboardInput.ESCAPE,
+        #     callback_fn=self.stop,
+        # )
         self._update_camera_callback = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
             lazy.omni.kit.xr.core.XRCoreEventType.pre_render_update, self._update_camera_pose, name="update camera"
         )
@@ -272,6 +272,8 @@ class OVXRSystem(TeleopSystem):
             self._view_blackout_prim.load(scene)
             self._view_blackout_prim.initialize()
             self._view_blackout_prim.visible = False
+
+        self._current_trunk_height = 0.5  # Initial height
 
     def _update_camera_pose(self, e) -> None:
         if self.align_anchor_to == "touchpad":

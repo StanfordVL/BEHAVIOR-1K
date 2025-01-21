@@ -251,3 +251,9 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             ["base_link", "wheel_link2"],
             ["base_link", "wheel_link3"],
         ]
+
+    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
+        action = HolonomicBaseRobot.teleop_data_to_action(self, teleop_action)
+        # print("Torso action: ", teleop_action.torso)
+        # action[self.trunk_action_idx][2] = teleop_action.torso
+        return action
