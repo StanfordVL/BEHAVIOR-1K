@@ -1134,29 +1134,8 @@ def align_vector_sets(vec_set1, vec_set2):
     Returns:
         np.array: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
-
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
-
-    # Construct the quaternion
-    quat = np.stack([x, y, z, w])
-
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = np.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
-
-    # Normalize the quaternion
-    quat = quat / (np.linalg.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    rot, _ = R.align_vectors(vec_set1, vec_set2)
+    return rot.as_quat()
 
 
 def l2_distance(v1, v2):

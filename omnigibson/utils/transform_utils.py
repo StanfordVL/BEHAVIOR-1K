@@ -1231,6 +1231,7 @@ def vecs2quat(vec0: torch.Tensor, vec1: torch.Tensor, normalized: bool = False) 
     return quat_unnormalized / torch.norm(quat_unnormalized, dim=-1, keepdim=True)
 
 
+# Ref: https://github.com/scipy/scipy/blob/9974222eb58ec3eafe5d12f25ee960f3170c277a/scipy/spatial/transform/_rotation.pyx#L3249
 @torch.compile
 def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.Tensor:
     """
@@ -1243,29 +1244,21 @@ def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.T
     Returns:
         torch.Tensor: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
+    B = torch.einsum("ji,jk->ik", vec_set1, vec_set2)
+    u, s, vh = torch.linalg.svd(B)
 
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
+    # Correct improper rotation if necessary (as in Kabsch algorithm)
+    if torch.linalg.det(u @ vh) < 0:
+        s[-1] = -s[-1]
+        u[:, -1] = -u[:, -1]
 
-    # Construct the quaternion
-    quat = torch.stack([x, y, z, w])
+    C = u @ vh
 
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = torch.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
+    # if s[1] + s[2] < 1e-16 * s[0]:
+    #     warnings.warn("Optimal rotation is not uniquely or poorly defined "
+    #                     "for the given sets of vectors.")
 
-    # Normalize the quaternion
-    quat = quat / (torch.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    return mat2quat(C)
 
 
 @torch.compile
