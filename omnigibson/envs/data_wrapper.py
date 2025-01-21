@@ -330,6 +330,10 @@ class DataCollectionWrapper(DataWrapper):
         # Call super first
         init_obs, init_info = super().reset()
 
+        # Make sure all objects are awake to begin to guarantee we save their initial states
+        for obj in self.scene.objects:
+            obj.wake()
+
         # Store this initial state as part of the trajectory
         state = og.sim.dump_state(serialized=True)
         step_data = {
@@ -523,10 +527,21 @@ class DataPlaybackWrapper(DataWrapper):
         # Run super
         super().__init__(env=env, output_path=output_path, only_successes=only_successes)
 
+    def _process_obs(self, obs, info):
+        """
+        Modifies @obs inplace for any relevant post-processing
+
+        Args:
+            obs (dict): Keyword-mapped relevant observations from the immediate env step
+            info (dict): Keyword-mapped relevant information from the immediate env step
+        """
+        # Default is a no-op
+        return obs
+
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         # Store action, obs, reward, terminated, truncated, info
         step_data = dict()
-        step_data["obs"] = obs
+        step_data["obs"] = self._process_obs(obs=obs, info=info)
         step_data["action"] = action
         step_data["reward"] = reward
         step_data["terminated"] = terminated
@@ -565,8 +580,8 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If record, record initial observations
         if record:
-            init_obs, _, _, _, _ = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
-            step_data = {"obs": init_obs}
+            init_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
+            step_data = {"obs": self._process_obs(obs=init_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
         for i, (a, s, ss, r, te, tr) in enumerate(
