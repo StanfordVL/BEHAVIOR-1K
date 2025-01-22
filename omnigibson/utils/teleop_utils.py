@@ -539,9 +539,12 @@ class OVXRSystem(TeleopSystem):
                 raise ValueError(f"Invalid anchor: {self.align_anchor_to}")
             pos, orn = reference_frame.get_position_orientation()
         self.robot.keep_still()
-        self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-            self.og2xr(pos, orn).numpy(), self.hmd
-        )
+        try:
+            self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
+                self.og2xr(pos, orn).numpy(), self.hmd
+            )
+        except Exception as e:
+            pass
 
     def _pose_in_robot_frame(self, pos: th.tensor, orn: th.tensor) -> Tuple[th.tensor, th.tensor]:
         """
