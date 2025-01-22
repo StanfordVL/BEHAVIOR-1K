@@ -101,7 +101,7 @@ playback_env = DataPlaybackWrapper.create_from_hdf5(
 )
 
 # Playback the entire dataset and record observations
-playback_env.playback_dataset(record=True)
+playback_env.playback_dataset(record_data=True)
 
 # Save the recorded playback data
 playback_env.save_data()
