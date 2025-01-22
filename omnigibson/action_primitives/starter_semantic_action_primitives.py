@@ -131,7 +131,8 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_OFF = auto(), "Toggle an object off"
 
 
-# TODO: overwrite_head_action might move the head that causes self-collision with curobo-generated motion plans
+# (TODO) execution failure: overwrite_head_action might move the head that causes self-collision with curobo-generated motion plans (at the time of curobo planning, it assumes the head doesn't move).
+# (TODO) planning failure: after placing an object and opening the gripper, the robot might fail to plan during the subsequent reset_robot() because the opened gripper fingers collides with the world.
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -705,7 +706,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         valid_navigation_pose = None
         for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_PLACE_POSE):
             # Sample one pose at a time
-            obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, keep_orientation=True)
+            obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, world_aligned=True)
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
 
             # First check if we can directly move the hand there
@@ -720,7 +721,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
             if valid_navigation_pose is not None:
-                yield from self._navigate_to_pose(valid_navigation_pose)
+                yield from self._navigate_to_pose(valid_navigation_pose, skip_obstacle_update=True)
                 yield from self._move_hand(hand_pose)
                 break
 
@@ -755,14 +756,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Gets joint positions for the arm so eef is at the target pose
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef
+            target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
 
         Returns:
             2-tuple
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach target pose
                 - th.tensor: Indices for joints in the robot
         """
-        joint_pos = self._ik_solver_cartesian_to_joint_space(target_pose, frame="world")
+        joint_pos = self._ik_solver_cartesian_to_joint_space(target_pose)
         if joint_pos is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -770,12 +771,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
         return joint_pos
 
-    def _target_in_reach_of_robot(self, target_pose, skip_obstacle_update=False):
+    def _target_in_reach_of_robot(self, target_pose, initial_joint_pos=None, skip_obstacle_update=False):
         """
         Determines whether the eef for the robot can reach the target pose in the world frame
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for the pose for the eef
+            target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
             skip_obstacle_update (bool): Whether to skip updating obstacles
 
         Returns:
@@ -784,29 +785,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return (
             self._ik_solver_cartesian_to_joint_space(
                 target_pose,
+                initial_joint_pos=initial_joint_pos,
                 skip_obstacle_update=skip_obstacle_update,
-                frame="world",
-            )
-            is not None
-        )
-
-    def _target_in_reach_of_robot_relative(self, relative_target_pose, skip_obstacle_update=False):
-        """
-        Determines whether eef for the robot can reach the target pose where the target pose is in the robot frame
-
-        Args:
-            relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef in the robot frame
-            skip_obstacle_update (bool): Whether to skip updating obstacles
-
-        Returns:
-            bool: Whether the default eef can reach the target pose
-        """
-
-        return (
-            self._ik_solver_cartesian_to_joint_space(
-                relative_target_pose,
-                skip_obstacle_update=skip_obstacle_update,
-                frame="robot",
             )
             is not None
         )
@@ -815,27 +795,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """The appropriate manipulation control idx for the current settings."""
         return th.cat([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
 
-    def _ik_solver_cartesian_to_joint_space(self, target_pose, skip_obstacle_update=False, frame="robot"):
+    def _ik_solver_cartesian_to_joint_space(self, target_pose, initial_joint_pos=None, skip_obstacle_update=False):
         """
-        Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
+        Get joint positions for the arm so eef is at the target pose in the world frame
 
         Args:
-            relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose in the robot frame
+            target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
+            initial_joint_pos (None or th.tensor): If specified, the initial joint positions to set the locked joints.
+                Default is the current joint positions of the robot
             skip_obstacle_update (bool): Whether to skip updating obstacles
-            frame (str): Frame to use for the target pose
 
         Returns:
             2-tuple
                 - th.tensor or None: Joint positions to reach target pose or None if impossible to reach the target pose
                 - th.tensor: Indices for joints in the robot
         """
-        if frame == "robot":
-            target_pose = self._robot_pose_to_world_pose(target_pose)
-        elif frame == "world":
-            pass
-        else:
-            raise ValueError(f"Unsupported frame: {frame}")
-
         target_pos = {self.robot.eef_link_names[self.arm]: target_pose[0]}
         target_quat = {self.robot.eef_link_names[self.arm]: target_pose[1]}
 
@@ -847,6 +821,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         successes, joint_states = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
+            initial_joint_pos=initial_joint_pos,
             is_local=False,
             max_attempts=math.ceil(m.MAX_PLANNING_ATTEMPTS / self._motion_generator.batch_size),
             timeout=60.0,
@@ -860,9 +835,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             motion_constraint=None,
             skip_obstacle_update=skip_obstacle_update,
             ik_only=True,
-            ik_world_collision_check=False,
+            ik_world_collision_check=True,
             emb_sel=CuRoboEmbodimentSelection.ARM,
         )
+
         # Grab the first successful joint state if found
         success_idx = th.where(successes)[0].cpu()
         if len(success_idx) == 0:
@@ -887,7 +863,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
+            target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
             stop_on_contact (bool): Whether to stop executing motion plan if contact is detected
             motion_constraint (MotionConstraint): Motion constraint for the motion
             low_precision (bool): Whether to use low precision for the motion
@@ -939,7 +915,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_quat,
         embodiment_selection=CuRoboEmbodimentSelection.DEFAULT,
         motion_constraint=None,
-        skip_obstalce_update=False,
+        skip_obstacle_update=False,
         ignore_objects=None,
     ):
         # If an object is grasped, we need to pass it to the motion planner
@@ -952,7 +928,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             k: th.stack([v for _ in range(self._motion_generator.batch_size)]) for k, v in target_quat.items()
         }
 
-        if not skip_obstalce_update:
+        if not skip_obstacle_update:
             self._motion_generator.update_obstacles(ignore_objects=ignore_objects)
 
         successes, traj_paths = self._motion_generator.compute_trajectories(
@@ -998,7 +974,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False, ignore_physics=False
     ):
         for i, joint_pos in enumerate(q_traj):
-            indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
+            # indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
             if ignore_physics:
                 self.robot.set_joint_positions(joint_pos)
                 og.sim.step()
@@ -1222,7 +1198,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         space from its current pose
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
+            target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
             stop_on_contact (boolean): Determines whether to stop move once an object is hit
             ignore_failure (boolean): Determines whether to throw error for not reaching final joint positions
 
@@ -1556,12 +1532,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         else:
             raise ValueError(f"Unsupported frame: {frame}")
 
-    def _navigate_to_pose(self, pose_2d):
+    def _navigate_to_pose(self, pose_2d, skip_obstacle_update=False):
         """
         Yields the action to navigate robot to the specified 2d pose
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
+            skip_obstacle_update (bool): Determines whether to skip updating the obstacles in the scene
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -1574,7 +1551,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # print("base motion planning")
         # breakpoint()
-        q_traj = self._plan_joint_motion(target_pos, target_quat, CuRoboEmbodimentSelection.BASE)
+        q_traj = self._plan_joint_motion(
+            target_pos,
+            target_quat,
+            embodiment_selection=CuRoboEmbodimentSelection.BASE,
+            skip_obstacle_update=skip_obstacle_update,
+        )
         yield from self._execute_motion_plan(q_traj)
 
     def _draw_plan(self, plan):
@@ -1607,7 +1589,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             obj (StatefulObject): Object for the robot to be in range of
-            eef_pose (Iterable): (pos, quat) Pose
+            eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -1629,7 +1611,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             obj (StatefulObject or list of StatefulObject): object(s) to be in range of
-            eef_pose (Iterable or list of Iterable): (pos, quat) Pose(s)
+            eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
 
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
@@ -1643,7 +1625,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Could not find a valid pose near the object",
                 {"object": obj.name},
             )
-        yield from self._navigate_to_pose(pose)
+        yield from self._navigate_to_pose(pose, skip_obstacle_update=skip_obstacle_update)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
         """
@@ -1765,8 +1747,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             obj (StatefulObject or list of StatefulObject): object(s) to sample a 2d pose near
-            eef_pose (Iterable or list of Iterable): (pos, quat) Pose(s) to sample near.
-                If provided, must match the length of obj list if obj is a list
+            eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
 
         Returns:
             2-tuple:
@@ -1877,7 +1858,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     #     )
 
     def _sample_pose_with_object_and_predicate(
-        self, predicate, held_obj, target_obj, keep_orientation=False, near_poses=None, near_poses_threshold=None
+        self, predicate, held_obj, target_obj, world_aligned=False, near_poses=None, near_poses_threshold=None
     ):
         """
         Returns a pose for the held object relative to the target object that satisfies the predicate
@@ -1886,9 +1867,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             predicate (object_states.OnTop or object_states.Inside): Relation between held object and the target object
             held_obj (StatefulObject): Object held by the robot
             target_obj (StatefulObject): Object to sample a pose relative to
-            keep_orientation (bool): Whether to keep the current orientation of the held object after placing.
-                If True, the sampled cuboid will be aligned with the current orientation of the held object.
-                If False, the sampled cuboid will be aligned with the base link of the held object.
+            world_aligned (bool): Whether to align the current world-aligned bbox to the sampled cuboid on the target_obj
+                If True, align the current world-aligned bbox; if False, align the base-link aligned bbox
             near_poses (Iterable of arrays): Poses in the world frame to sample near
             near_poses_threshold (float): The distance threshold to check if the sampled pose is near the poses in near_poses
 
@@ -1900,8 +1880,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
 
         for _ in range(m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
-            if keep_orientation:
-                # Take the bbox aligned to the world frame because we want to keep the orientation
+            if world_aligned:
+                # Take the bbox in the world frame because we want to keep the x-y component of the current orientation
                 bb_extents = held_obj.aabb_extent
                 bb_center = held_obj.aabb_center
                 # Compute bbox pose in the object base link frame
@@ -1946,8 +1926,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
-            eef_pose (Iterable of arrays or list of Iterables): Pose(s) on the object(s) in the world frame.
-                Can be a single pose or list of poses.
+            eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the motion generator
 
         Returns:
@@ -1983,10 +1962,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 continue
 
             if eef_pose is not None:
-                pose = self._get_robot_pose_from_2d_pose(candidate_poses[i])
-                relative_pose = T.relative_pose_transform(*eef_pose, *pose)
-                if not self._target_in_reach_of_robot_relative(
-                    relative_pose, skip_obstacle_update=skip_obstacle_update
+                # Use the candidate joint position as the initial joint position to update the lock joints in curobo
+                # This effectively moves the robot base in curobo when testing for arm reachability to the target eef_pose
+                candidate_joint_position = candidate_joint_positions[i]
+                if not self._target_in_reach_of_robot(
+                    eef_pose, initial_joint_pos=candidate_joint_position, skip_obstacle_update=skip_obstacle_update
                 ):
                     invalid_results[i] = True
 
