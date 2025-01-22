@@ -265,7 +265,13 @@ class CuRoboMotionGenerator:
         self.mg[CuRoboEmbodimentSelection.DEFAULT].update_world(world)
 
     def check_collisions(
-        self, q, self_collision_check=True, skip_obstacle_update=False, attached_obj=None, attached_obj_scale=None
+        self,
+        q,
+        initial_joint_pos=None,
+        self_collision_check=True,
+        skip_obstacle_update=False,
+        attached_obj=None,
+        attached_obj_scale=None,
     ):
         """
         Checks collisions between the sphere representation of the robot and the rest of the current scene
@@ -273,6 +279,8 @@ class CuRoboMotionGenerator:
         Args:
             q (th.tensor): (N, D)-shaped tensor, representing N-total different joint configurations to check
                 collisions against the world
+            initial_joint_pos (None or th.tensor): If specified, the initial joint positions to set the locked joints.
+                Default is the current joint positions of the robot
             self_collision_check (bool): Whether to check self-collisions or not
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the world collision checker
             attached_obj (None or Dict[str, BaseObject]): If specified, a dictionary where the keys are the end-effector
@@ -290,7 +298,8 @@ class CuRoboMotionGenerator:
         if not skip_obstacle_update:
             self.update_obstacles()
 
-        q_pos = self.robot.get_joint_positions().unsqueeze(0)
+        q_pos = self.robot.get_joint_positions() if initial_joint_pos is None else initial_joint_pos
+        q_pos = q_pos.unsqueeze(0)
         cu_joint_state = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
             joint_names=self.robot_joint_names,
@@ -348,18 +357,47 @@ class CuRoboMotionGenerator:
         # Update the lock joint state position
         kc.lock_jointstate.position = cu_joint_state.get_ordered_joint_state(kc.lock_jointstate.joint_names).position[0]
         # Update all the fixed transforms between the parent links and the child links of these joints
-        for joint_name in kc.lock_jointstate.joint_names:
+        for i, joint_name in enumerate(kc.lock_jointstate.joint_names):
             joint = self.robot.joints[joint_name]
-            parent_link_name, child_link_name = joint.body0.split("/")[-1], joint.body1.split("/")[-1]
-            parent_link = self.robot.links[parent_link_name]
-            child_link = self.robot.links[child_link_name]
-            relative_pose = T.pose2mat(
-                T.relative_pose_transform(
-                    *child_link.get_position_orientation(), *parent_link.get_position_orientation()
-                )
-            )
+            joint_pos = kc.lock_jointstate.position[i]
+            child_link_name = joint.body1.split("/")[-1]
+
+            # Compute the fixed transform between the parent link and the child link
+            # Note that we cannot directly query the parent and child link poses from OG
+            # because the cu_joint_state might not represent the current joint position in OG
+
+            jf_to_cf_pose = joint.local_position_1, joint.local_orientation_1
+            # Compute the transform from child frame to joint frame
+            cf_to_jf_pose = T.invert_pose_transform(*jf_to_cf_pose)
+
+            # Compute the transform from the joint frame to the joint frame moved by the joint position
+            if joint.joint_type == JointType.JOINT_FIXED:
+                jf_to_jf_moved_pos = th.zeros(3)
+                jf_to_jf_moved_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+            elif joint.joint_type == JointType.JOINT_PRISMATIC:
+                jf_to_jf_moved_pos = th.tensor([0.0, 0.0, 0.0])
+                jf_to_jf_moved_pos[["X", "Y", "Z"].index(joint.axis)] = joint_pos
+                jf_to_jf_moved_quat = th.tensor([0.0, 0.0, 0.0, 1.0])
+            elif joint.joint_type == JointType.JOINT_REVOLUTE:
+                jf_to_jf_moved_pos = th.zeros(3)
+                axis = th.zeros(3)
+                axis[["X", "Y", "Z"].index(joint.axis)] = 1.0
+                jf_to_jf_moved_quat = T.axisangle2quat(axis * joint_pos.cpu())
+            else:
+                raise NotImplementedError(f"Joint type {joint.joint_type} not supported")
+
+            # Compute the transform from the child frame to the joint frame moved by the joint position
+            cf_to_jf_moved_pose = T.pose_transform(jf_to_jf_moved_pos, jf_to_jf_moved_quat, *cf_to_jf_pose)
+
+            # Compute the transform from the joint frame moved by the joint position to the parent frame
+            jf_moved_to_pf_pose = joint.local_position_0, joint.local_orientation_0
+
+            # Compute the transform from the child frame to the parent frame
+            cf_to_pf_pose = T.pose_transform(*jf_moved_to_pf_pose, *cf_to_jf_moved_pose)
+            cf_to_pf_pose = T.pose2mat(cf_to_pf_pose)
+
             link_idx = kc.link_name_to_idx_map[child_link_name]
-            kc.fixed_transforms[link_idx] = relative_pose
+            kc.fixed_transforms[link_idx] = cf_to_pf_pose
 
     def solve_ik_batch(
         self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuRoboEmbodimentSelection.DEFAULT
@@ -434,6 +472,7 @@ class CuRoboMotionGenerator:
         self,
         target_pos,
         target_quat,
+        initial_joint_pos=None,
         is_local=False,
         max_attempts=5,
         timeout=2.0,
@@ -462,6 +501,8 @@ class CuRoboMotionGenerator:
                 where each entry is an individual (x,y,z,w) quaternion to reach with the default end-effector link specified
                 @self.ee_link[emb_sel]. If a dictionary is given, the keys should be the end-effector links and
                 the values should be the corresponding (N, 4) tensors
+            initial_joint_pos (None or th.Tensor): If specified, the initial joint positions to start the trajectory.
+                Default is the current joint positions of the robot
             is_local (bool): Whether @target_pos and @target_quat are specified in the robot's local frame or the world
                 global frame
             max_attempts (int): Maximum number of attempts for trying to compute a valid trajectory
@@ -573,9 +614,15 @@ class CuRoboMotionGenerator:
             )
 
         # Construct initial state
-        q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
-        q_vel = th.stack([self.robot.get_joint_velocities()] * self.batch_size, axis=0)
-        q_eff = th.stack([self.robot.get_joint_efforts()] * self.batch_size, axis=0)
+        if initial_joint_pos is None:
+            q_pos = th.stack([self.robot.get_joint_positions()] * self.batch_size, axis=0)
+            q_vel = th.stack([self.robot.get_joint_velocities()] * self.batch_size, axis=0)
+            q_eff = th.stack([self.robot.get_joint_efforts()] * self.batch_size, axis=0)
+        else:
+            q_pos = th.stack([initial_joint_pos] * self.batch_size, axis=0)
+            q_vel = th.zeros_like(q_pos)
+            q_eff = th.zeros_like(q_pos)
+
         cu_joint_state = lazy.curobo.types.state.JointState(
             position=self._tensor_args.to_device(q_pos),
             # TODO: Ideally these should be nonzero, but curobo fails to compute a solution if so
