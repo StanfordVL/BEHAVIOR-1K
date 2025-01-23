@@ -64,12 +64,13 @@ class DataWrapper(EnvironmentWrapper):
         # Run super
         super().__init__(env=env)
 
-    def step(self, action):
+    def step(self, action, n_render_iterations=1):
         """
         Run the environment step() function and collect data
 
         Args:
             action (th.Tensor): action to take in environment
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             5-tuple:
@@ -84,7 +85,7 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        next_obs, reward, terminated, truncated, info = self.env.step(action)
+        next_obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
         self.step_count += 1
 
         # Aggregate step data
@@ -429,6 +430,7 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         only_successes=False,
         include_env_wrapper=False,
+        additional_wrapper_configs=None,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -461,6 +463,8 @@ class DataPlaybackWrapper(DataWrapper):
                 speed.
             only_successes (bool): Whether to only save successful episodes
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
+            additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
+                environment wrappers to wrap the internal environment class in
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -506,6 +510,10 @@ class DataPlaybackWrapper(DataWrapper):
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
+
+        if additional_wrapper_configs is not None:
+            for wrapper_cfg in additional_wrapper_configs:
+                env = create_wrapper(env=env, wrapper_cfg=wrapper_cfg)
 
         # Wrap and return env
         return cls(

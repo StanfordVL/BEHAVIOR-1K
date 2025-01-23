@@ -10,11 +10,16 @@ REGISTERED_ENV_WRAPPERS = dict()
 log = create_module_logger(module_name=__name__)
 
 
-def create_wrapper(env):
+def create_wrapper(env, wrapper_cfg=None):
     """
-    Wraps environment @env with wrapper defined by env.wrapper_config
+    Wraps environment @env with wrapper defined @wrapper_cfg
+
+    Args:
+        env (og.Environment): environment to wrap
+        wrapper_cfg (None or dict): Specified, configuration to wrap environment with
+            If not specified, will default to env.wrapper_config
     """
-    wrapper_cfg = deepcopy(env.wrapper_config)
+    wrapper_cfg = deepcopy(env.wrapper_config if wrapper_cfg is None else wrapper_cfg)
     wrapper_type = wrapper_cfg.pop("type")
     wrapper_cfg["env"] = env
 
@@ -41,12 +46,13 @@ class EnvironmentWrapper(Wrapper, Registerable):
         # Run super
         super().__init__(obj=env)
 
-    def step(self, action):
+    def step(self, action, n_render_iterations=1):
         """
         By default, run the normal environment step() function
 
         Args:
             action (th.tensor): action to take in environment
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             4-tuple:
@@ -56,7 +62,7 @@ class EnvironmentWrapper(Wrapper, Registerable):
                 - (bool) whether the current episode is truncated
                 - (dict) misc information
         """
-        return self.env.step(action)
+        return self.env.step(action, n_render_iterations=n_render_iterations)
 
     def reset(self):
         """
