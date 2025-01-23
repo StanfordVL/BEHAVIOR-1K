@@ -132,7 +132,6 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
 
 
 # (TODO) execution failure: overwrite_head_action might move the head that causes self-collision with curobo-generated motion plans (at the time of curobo planning, it assumes the head doesn't move).
-# (TODO) planning failure: after placing an object and opening the gripper, the robot might fail to plan during the subsequent reset_robot() because the opened gripper fingers collides with the world.
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -710,14 +709,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
 
             # First check if we can directly move the hand there
-            target_in_reach = self._target_in_reach_of_robot(hand_pose, skip_obstacle_update=True)
+            # We want to plan with the fingers at their upper (open) limits to avoid collisions
+            # because later we will open-loop open the gripper with _execute_release after placing.
+            initial_joint_pos = self._get_joint_position_with_fingers_at_limit("upper")
+            target_in_reach = self._target_in_reach_of_robot(
+                hand_pose, initial_joint_pos=initial_joint_pos, skip_obstacle_update=True
+            )
             if target_in_reach:
                 yield from self._move_hand(hand_pose)
                 break
 
             # If not, try to find a valid navigation pose for this hand pose
             valid_navigation_pose = self._sample_pose_near_object(
-                obj, eef_pose=hand_pose, sampling_attempts=10, skip_obstacle_update=True
+                obj, eef_pose=hand_pose, plan_with_open_gripper=True, sampling_attempts=10, skip_obstacle_update=True
             )
 
             if valid_navigation_pose is not None:
@@ -934,6 +938,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         successes, traj_paths = self._motion_generator.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
+            initial_joint_pos=None,
             is_local=False,
             max_attempts=math.ceil(m.MAX_PLANNING_ATTEMPTS / self._motion_generator.batch_size),
             timeout=60.0,
@@ -1301,6 +1306,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     "Your hand was obstructed from moving to the desired world position",
                 )
 
+    def _get_joint_position_with_fingers_at_limit(self, limit_type):
+        """
+        Helper function to get the joint positions when the robot's fingers are at their limit positions.
+
+        Args:
+            limit_type (str): Either 'lower' for grasping or 'upper' for releasing.
+
+        Yields:
+            th.tensor: Joint positions for the robot with fingers at their limit positions.
+        """
+        target_joint_positions = self.robot.get_joint_positions()
+        gripper_ctrl_idx = self.robot.gripper_control_idx[self.arm]
+        if limit_type == self.robot._grasping_direction:
+            finger_joint_limits = self.robot.joint_lower_limits[gripper_ctrl_idx]
+        else:
+            finger_joint_limits = self.robot.joint_upper_limits[gripper_ctrl_idx]
+        target_joint_positions[gripper_ctrl_idx] = finger_joint_limits
+        return target_joint_positions
+
     def _move_fingers_to_limit(self, limit_type):
         """
         Helper function to move the robot's fingers to their limit positions.
@@ -1311,17 +1335,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields:
             th.tensor or None: Action array for one step for the robot to move fingers or None if done.
         """
-        target_joint_positions = self.robot.get_joint_positions()
-        gripper_ctrl_idx = self.robot.gripper_control_idx[self.arm]
-        if limit_type == self.robot._grasping_direction:
-            finger_joint_limits = self.robot.joint_lower_limits[gripper_ctrl_idx]
-        else:
-            finger_joint_limits = self.robot.joint_upper_limits[gripper_ctrl_idx]
-        target_joint_positions[gripper_ctrl_idx] = finger_joint_limits
+        target_joint_positions = self._get_joint_position_with_fingers_at_limit(limit_type)
         action = self.robot.q_to_action(target_joint_positions)
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            finger_joint_positions = self.robot.get_joint_positions()[gripper_ctrl_idx]
-            if th.allclose(finger_joint_positions, finger_joint_limits, atol=0.005):
+            current_joint_positinos = self.robot.get_joint_positions()
+            if th.allclose(current_joint_positinos, target_joint_positions, atol=0.005):
                 break
             elif limit_type == "lower" and self._get_obj_in_hand() is not None:
                 # If we are grasping an object, we should stop when object is detected in hand
@@ -1583,7 +1601,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             cv2.imshow("SceneGraph", img)
             cv2.waitKey(1)
 
-    def _navigate_if_needed(self, obj, eef_pose=None, **kwargs):
+    def _navigate_if_needed(self, obj, eef_pose=None):
         """
         Yields action to navigate the robot to be in range of the object if it not in the range
 
@@ -1603,9 +1621,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # No need to navigate.
             return
 
-        yield from self._navigate_to_obj(obj, eef_pose=eef_pose, skip_obstacle_update=True, **kwargs)
+        yield from self._navigate_to_obj(obj, eef_pose=eef_pose, skip_obstacle_update=True)
 
-    def _navigate_to_obj(self, obj, eef_pose=None, skip_obstacle_update=False, **kwargs):
+    def _navigate_to_obj(self, obj, eef_pose=None, skip_obstacle_update=False):
         """
         Yields action to navigate the robot to be in range of the pose
 
@@ -1616,9 +1634,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             th.tensor or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
-        pose = self._sample_pose_near_object(
-            obj, eef_pose=eef_pose, skip_obstacle_update=skip_obstacle_update, **kwargs
-        )
+        pose = self._sample_pose_near_object(obj, eef_pose=eef_pose, skip_obstacle_update=skip_obstacle_update)
         if pose is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -1738,9 +1754,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self,
         obj,
         eef_pose=None,
+        plan_with_open_gripper=False,
         sampling_attempts=m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT,
         skip_obstacle_update=False,
-        **kwargs,
     ):
         """
         Returns a 2d pose for the robot within in the range of the object and where the robot is not in collision with anything
@@ -1748,7 +1764,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Args:
             obj (StatefulObject or list of StatefulObject): object(s) to sample a 2d pose near
             eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
-
+            plan_with_open_gripper (bool): Determines whether to plan with the gripper open even though it might be closed now.
+                This is useful for the placing primitive because we will open-loop open the gripper after placing
+            sampling_attempts (int): Number of attempts to sample a valid pose
+            skip_obstacle_update (bool): Determines whether to skip updating the obstacles in the scene
         Returns:
             2-tuple:
                 - 3-array: (x,y,z) Position in the world frame
@@ -1795,7 +1814,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # We skip the following steps if the list is empty.
             if len(candidate_poses) > 0:
                 result = self._validate_poses(
-                    candidate_poses, eef_pose=target_pose, skip_obstacle_update=True, **kwargs
+                    candidate_poses,
+                    eef_pose=target_pose,
+                    plan_with_open_gripper=plan_with_open_gripper,
+                    skip_obstacle_update=True,
                 )
 
                 # If anything in result is true, return the pose
@@ -1920,13 +1942,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    def _validate_poses(self, candidate_poses, eef_pose=None, skip_obstacle_update=False):
+    def _validate_poses(self, candidate_poses, eef_pose=None, plan_with_open_gripper=False, skip_obstacle_update=False):
         """
         Determines whether the robot can reach all poses on the objects and is not in collision at the specified 2d poses
 
         Args:
             candidate_poses (list of arrays): Candidate 2d poses (x, y, yaw)
             eef_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
+            plan_with_open_gripper (bool): Determines whether to plan with the gripper open even though it might be closed now.
+                This is useful for the placing primitive because we will open-loop open the gripper after placing
             skip_obstacle_update (bool): Whether to skip updating the obstacles in the motion generator
 
         Returns:
@@ -1935,7 +1959,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         # First check collisions for all candidate poses
         candidate_joint_positions = []
-        current_joint_pos = self.robot.get_joint_positions()
+        if plan_with_open_gripper:
+            current_joint_pos = self._get_joint_position_with_fingers_at_limit("upper")
+        else:
+            current_joint_pos = self.robot.get_joint_positions()
         for pose in candidate_poses:
             joint_pos = current_joint_pos.clone()
             joint_pos[self.robot.base_control_idx] = pose
