@@ -1987,12 +1987,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
             pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
             euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)
-            mat_x = T.euler2mat(th.tensor([euler_intrinsic_xyz[0], 0, 0], dtype=th.float32))
-            mat_y = T.euler2mat(th.tensor([0, euler_intrinsic_xyz[1], 0], dtype=th.float32))
-            mat_z = T.euler2mat(th.tensor([0, 0, euler_intrinsic_xyz[2]], dtype=th.float32))
-            # intrinsic x-y-z is the same as extrinsic z-y-x
-            # multiply mat_z first, then mat_y, then mat_x
-            mat = mat_x @ mat_y @ mat_z
+            mat = T.euler_intrinsic2mat(euler_intrinsic_xyz)
             orn = T.mat2quat(mat)
         else:
             pos = th.tensor([pose_2d[0], pose_2d[1], 0.0], dtype=th.float32)

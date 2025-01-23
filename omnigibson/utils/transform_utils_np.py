@@ -526,7 +526,7 @@ def vec2quat(vec, up=(0, 0, 1.0)):
 
 def euler2quat(euler):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -542,7 +542,7 @@ def euler2quat(euler):
 
 def quat2euler(quat):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
@@ -558,7 +558,7 @@ def quat2euler(quat):
 
 def euler2mat(euler):
     """
-    Converts euler angles into rotation matrix form
+    Converts extrinsic euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -578,13 +578,13 @@ def euler2mat(euler):
 
 def mat2euler(rmat):
     """
-    Converts given rotation matrix to euler angles in radian.
+    Converts given rotation matrix to extrinsic euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
 
     Returns:
-        np.array: (r,p,y) converted euler angles in radian vec3 float
+        np.array: (r,p,y) converted extrinsic euler angles in radian vec3 float
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
@@ -1276,3 +1276,63 @@ def orientation_error(desired, current):
     error = error.reshape(*input_shape, 3)
 
     return error
+
+
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (np.array): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        np.array: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = np.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return np.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis
+    K = np.array([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+
+    return R
+
+
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (np.array): 3x3 rotation matrix
+
+    Returns:
+        np.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    return R.from_matrix(rmat).as_euler("XYZ")
+
+
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (np.array): (r,p,y) angles
+
+    Returns:
+        np.array: 3x3 rotation matrix
+    """
+    return R.from_euler("XYZ", euler).as_matrix()

@@ -1408,3 +1408,91 @@ def orientation_error(desired, current):
     error = 0.5 * (torch.linalg.cross(rc1, rd1) + torch.linalg.cross(rc2, rd2) + torch.linalg.cross(rc3, rd3))
 
     return error.reshape(desired.shape[:-2] + (3,))
+
+
+@torch.compile
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (torch.tensor): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        torch.tensor: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = torch.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return torch.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis
+    K = torch.tensor([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = torch.eye(3) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
+
+    return R
+
+
+@torch.compile
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (torch.tensor): 3x3 rotation matrix
+
+    Returns:
+        torch.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    # Check for gimbal lock (pitch = +-90 degrees)
+    if abs(rmat[0, 2]) != 1:
+        # General case
+        pitch = torch.arcsin(rmat[0, 2])
+        roll = torch.arctan2(-rmat[1, 2], rmat[2, 2])
+        yaw = torch.arctan2(-rmat[0, 1], rmat[0, 0])
+    else:
+        # Gimbal lock case
+        pitch = math.pi / 2 if rotation_matrix[0, 2] == 1 else -math.pi / 2
+        roll = torch.arctan2(rotation_matrix[1, 0], rotation_matrix[1, 1])
+        yaw = 0  # Can set yaw to 0 in gimbal lock
+
+    return torch.tensor([roll, pitch, yaw], dtype=torch.float32)
+
+
+@torch.compile
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (torch.tensor): (r,p,y) intrinsic euler angles in radian vec3 float
+
+    Returns:
+        torch.tensor: 3x3 rotation matrix
+    """
+    roll, pitch, yaw = euler
+    # Rotation matrix around X-axis
+    Rx = torch.tensor([[1, 0, 0], [0, torch.cos(roll), -torch.sin(roll)], [0, torch.sin(roll), torch.cos(roll)]])
+
+    # Rotation matrix around Y-axis
+    Ry = torch.tensor([[torch.cos(pitch), 0, torch.sin(pitch)], [0, 1, 0], [-torch.sin(pitch), 0, torch.cos(pitch)]])
+
+    # Rotation matrix around Z-axis
+    Rz = torch.tensor([[torch.cos(yaw), -torch.sin(yaw), 0], [torch.sin(yaw), torch.cos(yaw), 0], [0, 0, 1]])
+
+    # Combine the rotation matrices
+    # Intrinsic x-y-z is the same as extrinsic z-y-x
+    # Multiply Rz first, then Ry, then Rx
+    return Rx @ Ry @ Rz

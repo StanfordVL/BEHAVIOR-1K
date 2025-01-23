@@ -10,7 +10,6 @@ from omnigibson.macros import create_module_macros
 from omnigibson.controllers import JointController, HolonomicBaseJointController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
-from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import classproperty
 import omnigibson.utils.transform_utils as T
@@ -45,7 +44,6 @@ class HolonomicBaseRobot(LocomotionRobot):
         relative_prim_path=None,
         scale=None,
         visible=True,
-        fixed_base=False,
         visual_only=False,
         self_collisions=True,
         load_config=None,
@@ -71,7 +69,6 @@ class HolonomicBaseRobot(LocomotionRobot):
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -117,7 +114,7 @@ class HolonomicBaseRobot(LocomotionRobot):
             relative_prim_path=relative_prim_path,
             scale=scale,
             visible=visible,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
@@ -296,19 +293,15 @@ class HolonomicBaseRobot(LocomotionRobot):
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
             joint_pos, joint_orn = self.root_link.get_position_orientation()
-            joint_pos, joint_orn = cb.from_torch(joint_pos), cb.from_torch(joint_orn)
-            inv_joint_pos, inv_joint_orn = cb.T.mat2pose(cb.T.pose_inv(cb.T.pose2mat((joint_pos, joint_orn))))
-
-            relative_pos, relative_orn = cb.T.pose_transform(
-                inv_joint_pos, inv_joint_orn, cb.from_torch(position), cb.from_torch(orientation)
-            )
-            relative_rpy = cb.T.quat2euler(relative_orn)
+            inv_joint_pos, inv_joint_orn = T.invert_pose_transform(joint_pos, joint_orn)
+            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
+            intrinsic_eulers = T.mat2euler_intrinsic(T.quat2mat(relative_orn))
             self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
             self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
             self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
-            self.joints["base_footprint_rx_joint"].set_pos(relative_rpy[0], drive=False)
-            self.joints["base_footprint_ry_joint"].set_pos(relative_rpy[1], drive=False)
-            self.joints["base_footprint_rz_joint"].set_pos(relative_rpy[2], drive=False)
+            self.joints["base_footprint_rx_joint"].set_pos(intrinsic_eulers[0], drive=False)
+            self.joints["base_footprint_ry_joint"].set_pos(intrinsic_eulers[1], drive=False)
+            self.joints["base_footprint_rz_joint"].set_pos(intrinsic_eulers[2], drive=False)
 
         # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
         else:
@@ -325,8 +318,8 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
-        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
+        orn = self.root_link.get_position_orientation()[1]
+        velocity_in_root_link = T.quat2mat(orn).T @ velocity
         self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
         self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
         self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
@@ -336,12 +329,23 @@ class HolonomicBaseRobot(LocomotionRobot):
         return self.base_footprint_link.get_linear_velocity()
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
-        # See comments of self.set_linear_velocity
-        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
-        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
-        self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
-        self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
-        self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
+        # 1e-3 is emperically tuned to be a good value for the time step
+        delta_t = 1e-3 / (velocity.norm() + 1e-6)
+        delta_mat = T.delta_rotation_matrix(velocity, delta_t)
+        base_link_orn = self.get_position_orientation()[1]
+        rot_mat = T.quat2mat(base_link_orn)
+        desired_mat = delta_mat @ rot_mat
+        root_link_orn = self.root_link.get_position_orientation()[1]
+        desired_mat_in_root_link = T.quat2mat(root_link_orn).T @ desired_mat
+        desired_intrinsic_eulers = T.mat2euler_intrinsic(desired_mat_in_root_link)
+
+        cur_joint_pos = self.get_joint_positions()[self.base_idx[3:]]
+        delta_intrinsic_eulers = desired_intrinsic_eulers - cur_joint_pos
+        velocity_intrinsic = delta_intrinsic_eulers / delta_t
+
+        self.joints["base_footprint_rx_joint"].set_vel(velocity_intrinsic[0], drive=False)
+        self.joints["base_footprint_ry_joint"].set_vel(velocity_intrinsic[1], drive=False)
+        self.joints["base_footprint_rz_joint"].set_vel(velocity_intrinsic[2], drive=False)
 
     def get_angular_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
