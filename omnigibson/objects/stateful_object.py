@@ -1,4 +1,3 @@
-import sys
 from collections import defaultdict
 from typing import Literal
 
@@ -24,7 +23,6 @@ from omnigibson.object_states.factory import (
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
-from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import EmitterType, PrimType

@@ -1,7 +1,3 @@
-from abc import abstractmethod
-
-import torch as th
-
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 

@@ -9,7 +9,6 @@ from omnigibson.utils.object_state_utils import sample_kinematics
 
 
 class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
-
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()

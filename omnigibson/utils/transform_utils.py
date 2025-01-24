@@ -7,7 +7,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 
@@ -575,7 +575,6 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
 
 @torch.compile
 def quat2euler(q):
-
     single_dim = q.dim() == 1
 
     if single_dim:
@@ -1232,6 +1231,7 @@ def vecs2quat(vec0: torch.Tensor, vec1: torch.Tensor, normalized: bool = False) 
     return quat_unnormalized / torch.norm(quat_unnormalized, dim=-1, keepdim=True)
 
 
+# Ref: https://github.com/scipy/scipy/blob/9974222eb58ec3eafe5d12f25ee960f3170c277a/scipy/spatial/transform/_rotation.pyx#L3249
 @torch.compile
 def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.Tensor:
     """
@@ -1244,29 +1244,21 @@ def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.T
     Returns:
         torch.Tensor: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
+    B = torch.einsum("ji,jk->ik", vec_set1, vec_set2)
+    u, s, vh = torch.linalg.svd(B)
 
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
+    # Correct improper rotation if necessary (as in Kabsch algorithm)
+    if torch.linalg.det(u @ vh) < 0:
+        s[-1] = -s[-1]
+        u[:, -1] = -u[:, -1]
 
-    # Construct the quaternion
-    quat = torch.stack([x, y, z, w])
+    C = u @ vh
 
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = torch.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
+    # if s[1] + s[2] < 1e-16 * s[0]:
+    #     warnings.warn("Optimal rotation is not uniquely or poorly defined "
+    #                     "for the given sets of vectors.")
 
-    # Normalize the quaternion
-    quat = quat / (torch.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    return mat2quat(C)
 
 
 @torch.compile
@@ -1416,3 +1408,91 @@ def orientation_error(desired, current):
     error = 0.5 * (torch.linalg.cross(rc1, rd1) + torch.linalg.cross(rc2, rd2) + torch.linalg.cross(rc3, rd3))
 
     return error.reshape(desired.shape[:-2] + (3,))
+
+
+@torch.compile
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (torch.tensor): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        torch.tensor: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = torch.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return torch.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis
+    K = torch.tensor([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = torch.eye(3) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
+
+    return R
+
+
+@torch.compile
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (torch.tensor): 3x3 rotation matrix
+
+    Returns:
+        torch.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    # Check for gimbal lock (pitch = +-90 degrees)
+    if abs(rmat[0, 2]) != 1:
+        # General case
+        pitch = torch.arcsin(rmat[0, 2])
+        roll = torch.arctan2(-rmat[1, 2], rmat[2, 2])
+        yaw = torch.arctan2(-rmat[0, 1], rmat[0, 0])
+    else:
+        # Gimbal lock case
+        pitch = math.pi / 2 if rotation_matrix[0, 2] == 1 else -math.pi / 2
+        roll = torch.arctan2(rotation_matrix[1, 0], rotation_matrix[1, 1])
+        yaw = 0  # Can set yaw to 0 in gimbal lock
+
+    return torch.tensor([roll, pitch, yaw], dtype=torch.float32)
+
+
+@torch.compile
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (torch.tensor): (r,p,y) intrinsic euler angles in radian vec3 float
+
+    Returns:
+        torch.tensor: 3x3 rotation matrix
+    """
+    roll, pitch, yaw = euler
+    # Rotation matrix around X-axis
+    Rx = torch.tensor([[1, 0, 0], [0, torch.cos(roll), -torch.sin(roll)], [0, torch.sin(roll), torch.cos(roll)]])
+
+    # Rotation matrix around Y-axis
+    Ry = torch.tensor([[torch.cos(pitch), 0, torch.sin(pitch)], [0, 1, 0], [-torch.sin(pitch), 0, torch.cos(pitch)]])
+
+    # Rotation matrix around Z-axis
+    Rz = torch.tensor([[torch.cos(yaw), -torch.sin(yaw), 0], [torch.sin(yaw), torch.cos(yaw), 0], [0, 0, 1]])
+
+    # Combine the rotation matrices
+    # Intrinsic x-y-z is the same as extrinsic z-y-x
+    # Multiply Rz first, then Ry, then Rx
+    return Rx @ Ry @ Rz

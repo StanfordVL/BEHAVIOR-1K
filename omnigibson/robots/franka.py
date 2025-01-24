@@ -5,7 +5,6 @@ import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from omnigibson.utils.transform_utils import euler2quat
 
 
 class FrankaPanda(ManipulationRobot):
@@ -114,14 +113,14 @@ class FrankaPanda(ManipulationRobot):
             )
             self._teleop_rotation_offset = th.tensor([0, 0.7071, 0, 0.7071])
             self._ag_start_points = [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([0.015, 0, -0.03])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([0.015, 0, -0.08])),
-                GraspingPoint(link_name=f"link_15_0_tip", position=th.tensor([0, 0.015, 0.007])),
+                GraspingPoint(link_name="base_link", position=th.tensor([0.015, 0, -0.03])),
+                GraspingPoint(link_name="base_link", position=th.tensor([0.015, 0, -0.08])),
+                GraspingPoint(link_name="link_15_0_tip", position=th.tensor([0, 0.015, 0.007])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name=f"link_3_0_tip", position=th.tensor([0.012, 0, 0.007])),
-                GraspingPoint(link_name=f"link_7_0_tip", position=th.tensor([0.012, 0, 0.007])),
-                GraspingPoint(link_name=f"link_11_0_tip", position=th.tensor([0.012, 0, 0.007])),
+                GraspingPoint(link_name="link_3_0_tip", position=th.tensor([0.012, 0, 0.007])),
+                GraspingPoint(link_name="link_7_0_tip", position=th.tensor([0.012, 0, 0.007])),
+                GraspingPoint(link_name="link_11_0_tip", position=th.tensor([0.012, 0, 0.007])),
             ]
         elif "leap" in end_effector:
             self._model_name = f"franka_{end_effector}"
@@ -139,14 +138,14 @@ class FrankaPanda(ManipulationRobot):
             )
             self._teleop_rotation_offset = th.tensor([-0.7071, 0.7071, 0, 0])
             self._ag_start_points = [
-                GraspingPoint(link_name=f"palm_center", position=th.tensor([0, -0.025, 0.035])),
-                GraspingPoint(link_name=f"palm_center", position=th.tensor([0, 0.03, 0.035])),
-                GraspingPoint(link_name=f"fingertip_4", position=th.tensor([-0.0115, -0.07, -0.015])),
+                GraspingPoint(link_name="palm_center", position=th.tensor([0, -0.025, 0.035])),
+                GraspingPoint(link_name="palm_center", position=th.tensor([0, 0.03, 0.035])),
+                GraspingPoint(link_name="fingertip_4", position=th.tensor([-0.0115, -0.07, -0.015])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name=f"fingertip_1", position=th.tensor([-0.0115, -0.06, 0.015])),
-                GraspingPoint(link_name=f"fingertip_2", position=th.tensor([-0.0115, -0.06, 0.015])),
-                GraspingPoint(link_name=f"fingertip_3", position=th.tensor([-0.0115, -0.06, 0.015])),
+                GraspingPoint(link_name="fingertip_1", position=th.tensor([-0.0115, -0.06, 0.015])),
+                GraspingPoint(link_name="fingertip_2", position=th.tensor([-0.0115, -0.06, 0.015])),
+                GraspingPoint(link_name="fingertip_3", position=th.tensor([-0.0115, -0.06, 0.015])),
             ]
         elif end_effector == "inspire":
             self._model_name = f"franka_{end_effector}"
@@ -162,15 +161,15 @@ class FrankaPanda(ManipulationRobot):
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             # TODO: add ag support for inspire hand
             self._ag_start_points = [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
-                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.025, -0.07, 0.012])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.015, -0.11, 0.012])),
+                GraspingPoint(link_name="link14", position=th.tensor([-0.01, 0.015, 0.004])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
-                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link22", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link32", position=th.tensor([0.006, 0.045, 0.003])),
+                GraspingPoint(link_name="link42", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link52", position=th.tensor([0.006, 0.04, 0.003])),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for FrankaPanda")

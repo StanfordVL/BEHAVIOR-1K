@@ -89,14 +89,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     renderer_setting.common_settings.materials_settings.skip_material_loading.set(True)
 
     # Get setting (3 lines below are equivalent).
-    assert renderer_setting.get_setting_from_path(path="/app/renderer/skipMaterialLoading") == True
-    assert renderer_setting.common_settings.materials_settings.skip_material_loading.value == True
-    assert renderer_setting.common_settings.materials_settings.skip_material_loading.get() == True
+    assert renderer_setting.get_setting_from_path(path="/app/renderer/skipMaterialLoading")
+    assert renderer_setting.common_settings.materials_settings.skip_material_loading.value
+    assert renderer_setting.common_settings.materials_settings.skip_material_loading.get()
 
     # Reset setting (2 lines below are equivalent).
     renderer_setting.reset_setting(path="/app/renderer/skipMaterialLoading")
     renderer_setting.common_settings.materials_settings.skip_material_loading.reset()
-    assert renderer_setting.get_setting_from_path(path="/app/renderer/skipMaterialLoading") == False
+    assert not renderer_setting.get_setting_from_path(path="/app/renderer/skipMaterialLoading")
 
     # Set setting to an unallowed value using top-level method.
     # Examples below will use the "top-level" setting method.

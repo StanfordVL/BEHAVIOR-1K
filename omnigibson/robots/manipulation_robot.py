@@ -28,7 +28,7 @@ from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
+from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, create_joint
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -254,8 +254,8 @@ class ManipulationRobot(BaseRobot):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
-
+                if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
+                    is_grasping = IsGraspingState.FALSE
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
@@ -1246,9 +1246,9 @@ class ManipulationRobot(BaseRobot):
                     break
 
         assert contact_pos is not None, (
-            f"contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
-            f"self._find_gripper_contacts(return_contact_positions=False). This is likely because "
-            f"GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
+            "contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
+            "self._find_gripper_contacts(return_contact_positions=False). This is likely because "
+            "GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
         )
 
         # Joint frame set at the contact point
@@ -1526,6 +1526,8 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         # TODO: currently does not take care of cloth objects
         # TODO: add unit tests
+        if "ag_obj_constraint_params" not in state:
+            return
         for arm in state["ag_obj_constraint_params"].keys():
             if len(state["ag_obj_constraint_params"][arm]) > 0:
                 data = state["ag_obj_constraint_params"][arm]

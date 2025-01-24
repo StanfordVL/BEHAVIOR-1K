@@ -1,11 +1,8 @@
-import os
-
 import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject
 
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
@@ -67,7 +64,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     shelf_cfg = dict(
         type="DatasetObject",
-        name=f"shelf",
+        name="shelf",
         category="shelf",
         model="pkgbcp",
         bounding_box=th.tensor([1.0, 0.4, 2.0]),

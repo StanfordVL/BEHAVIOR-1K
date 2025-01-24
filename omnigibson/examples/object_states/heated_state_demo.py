@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(th.empty(0))
         # Also print temperatures
         temps = [f"{obj.states[object_states.Temperature].get_value():>7.2f}" for obj in objs]
-        print(f"obj temps:", *temps, end="\r")
+        print("obj temps:", *temps, end="\r")
     print()
 
     # Objects are not heated anymore.
