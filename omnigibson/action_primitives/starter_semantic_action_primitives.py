@@ -132,6 +132,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
 
 
 # (TODO) execution failure: overwrite_head_action might move the head that causes self-collision with curobo-generated motion plans (at the time of curobo planning, it assumes the head doesn't move).
+# (TODO) R1 improvement: create a new CuRoboEmbodimentSelection type that only allows for arm movement, and not torso movement.
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -604,9 +605,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name},
             )
 
-        # indented_print("Moving hand back")
-        # yield from self._reset_hand()
-
         indented_print("Done with grasp")
 
         if self._get_obj_in_hand() != obj:
@@ -751,9 +749,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Failed to place object at the desired place (probably dropped). The object was still released, so you need to grasp it again to continue",
                 {"dropped object": obj_in_hand.name, "target object": obj.name},
             )
-
-        # indented_print("Moving hand back")
-        # yield from self._reset_hand()
 
     def _convert_cartesian_to_joint_space(self, target_pose):
         """
@@ -970,6 +965,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             traj_path, get_full_js=True, emb_sel=embodiment_selection
         ).cpu()
 
+        # (TODO) investigate why this is necessary to prevent jerky motion during execution
         # Smooth out the trajectory
         q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=q_traj, max_inter_dist=0.01))
 
