@@ -1717,11 +1717,13 @@ class Cloth(MicroParticleSystem):
                     # Make sure the clothes is watertight
                     ms.meshing_repair_non_manifold_edges()
                     ms.meshing_repair_non_manifold_vertices()
-                    
+
                     # If the cloth has multiple pieces, only keep the largest one
                     ms.generate_splitting_by_connected_components(delete_source_mesh=True)
                     if len(ms) > 1:
-                        log.warning(f"The cloth mesh has {len(ms)} disconnected pieces. To simplify, we only keep the mesh with largest face number.")
+                        log.warning(
+                            f"The cloth mesh has {len(ms)} disconnected pieces. To simplify, we only keep the mesh with largest face number."
+                        )
                         biggest_face_num = 0
                         for split_mesh in ms:
                             face_num = split_mesh.face_number()
