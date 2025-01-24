@@ -131,7 +131,7 @@ class TestPrimitives:
         objects = []
         obj_1 = {
             "object": DatasetObject(name="table", category="breakfast_table", model="rjgmmy", scale=[0.3, 0.3, 0.3]),
-            "position": [-0.7, 0.5, 0.2],
+            "position": [-0.7, 0.5, 0.09],
             "orientation": [0, 0, 0, 1],
         }
         obj_2 = {
