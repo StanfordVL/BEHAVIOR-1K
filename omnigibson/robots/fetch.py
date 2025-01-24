@@ -212,8 +212,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.012, 0.0])),
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.012, 0.0])),
+                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.02, 0.0])),
+                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.02, 0.0])),
             ]
         }
 
@@ -221,8 +221,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.012, 0.0])),
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.012, 0.0])),
+                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.02, 0.0])),
+                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.02, 0.0])),
             ]
         }
 

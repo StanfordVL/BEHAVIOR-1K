@@ -723,7 +723,7 @@ class KeyboardRobotController:
 
         # Iterate over all controller info and populate mapping
         for component, info in self.controller_info.items():
-            if info["name"] == "JointController":
+            if info["name"] in ["JointController", "HolonomicBaseJointController"]:
                 for i in range(info["command_dim"]):
                     cmd_idx = info["start_idx"] + i
                     self.joint_command_idx.append(cmd_idx)

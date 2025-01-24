@@ -6,7 +6,6 @@ from collections import defaultdict
 import torch as th
 
 import omnigibson as og
-import omnigibson.utils.transform_utils as T
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
@@ -74,14 +73,14 @@ def test_curobo():
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_0": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
             },
         },
@@ -94,46 +93,45 @@ def test_curobo():
             "action_normalize": False,
             "controller_config": {
                 "base": {
-                    "name": "JointController",
+                    "name": "HolonomicBaseJointController",
                     "motor_type": "position",
                     "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "trunk": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_left": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_right": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_left": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_right": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
             },
         },
@@ -146,53 +144,52 @@ def test_curobo():
             "action_normalize": False,
             "controller_config": {
                 "base": {
-                    "name": "JointController",
+                    "name": "HolonomicBaseJointController",
                     "motor_type": "position",
                     "command_input_limits": None,
-                    "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "trunk": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "camera": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_left": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "arm_right": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_left": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
                 "gripper_right": {
                     "name": "JointController",
                     "motor_type": "position",
                     "command_input_limits": None,
                     "use_delta_commands": False,
-                    "use_impedances": True,
+                    "use_impedances": False,
                 },
             },
         },
@@ -235,7 +232,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
-            collision_activation_distance=0.02,  # Use larger activation distance for better reproducibility
+            collision_activation_distance=0.03,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
@@ -264,7 +261,6 @@ def test_curobo():
         false_positive = 0
         false_negative = 0
 
-        target_pos_in_world_frame = defaultdict(list)
         for i, (q, curobo_has_contact) in enumerate(zip(random_qs, collision_results)):
             # Set robot to desired qpos
             robot.set_joint_positions(q)
@@ -322,18 +318,9 @@ def test_curobo():
             # neither cuRobo nor physx reports contact, valid planning goals
             elif not curobo_has_contact and not physx_has_contact:
                 for arm_name in robot.arm_names:
-                    # For holonomic base robots, we need to be in the frame of @robot.root_link, not @robot.base_footprint_link
-                    if isinstance(robot, HolonomicBaseRobot):
-                        base_link_pose = robot.root_link.get_position_orientation()
-                        eef_link_pose = robot.eef_links[arm_name].get_position_orientation()
-                        eef_pos, eef_quat = T.relative_pose_transform(*eef_link_pose, *base_link_pose)
-                    else:
-                        eef_pos, eef_quat = robot.get_relative_eef_pose(arm_name)
-
+                    eef_pos, eef_quat = robot.get_eef_pose(arm_name)
                     target_pos[robot.eef_link_names[arm_name]].append(eef_pos)
                     target_quat[robot.eef_link_names[arm_name]].append(eef_quat)
-
-                    target_pos_in_world_frame[robot.eef_link_names[arm_name]].append(robot.get_eef_position(arm_name))
 
         print(
             f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
@@ -350,14 +337,10 @@ def test_curobo():
         for arm_name in robot.arm_names:
             target_pos[robot.eef_link_names[arm_name]] = th.stack(target_pos[robot.eef_link_names[arm_name]], dim=0)
             target_quat[robot.eef_link_names[arm_name]] = th.stack(target_quat[robot.eef_link_names[arm_name]], dim=0)
-            target_pos_in_world_frame[robot.eef_link_names[arm_name]] = th.stack(
-                target_pos_in_world_frame[robot.eef_link_names[arm_name]], dim=0
-            )
 
         # Cast defaultdict to dict
         target_pos = dict(target_pos)
         target_quat = dict(target_quat)
-        target_pos_in_world_frame = dict(target_pos_in_world_frame)
 
         print(f"Planning for {len(target_pos[robot.eef_link_names[robot.default_arm]])} eef targets...")
 
@@ -369,7 +352,7 @@ def test_curobo():
         successes, traj_paths = cmg.compute_trajectories(
             target_pos=target_pos,
             target_quat=target_quat,
-            is_local=True,
+            is_local=False,
             max_attempts=1,
             timeout=60.0,
             ik_fail_return=5,
@@ -402,7 +385,7 @@ def test_curobo():
                 # Move the markers to the desired eef positions
                 for marker, arm_name in zip(eef_markers, robot.arm_names):
                     eef_link_name = robot.eef_link_names[arm_name]
-                    marker.set_position_orientation(position=target_pos_in_world_frame[eef_link_name][traj_idx])
+                    marker.set_position_orientation(position=target_pos[eef_link_name][traj_idx])
 
                 q_traj = cmg.path_to_joint_trajectory(traj_path)
                 # joint_positions_set_point = []

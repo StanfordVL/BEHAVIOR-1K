@@ -25,8 +25,8 @@ def load_robot_config(robot_name):
         return full_config.get("robots", {})[0]
 
 
-def setup_environment(load_object_categories, robot="Fetch"):
-    if robot not in ["Fetch", "Tiago"]:
+def setup_environment(load_object_categories, robot="R1"):
+    if robot not in ["R1", "Tiago"]:
         raise ValueError("Invalid robot configuration")
 
     robots = load_robot_config(robot)
@@ -75,7 +75,11 @@ def primitive_tester(env, objects, primitives, primitives_args):
         obj["object"].set_position_orientation(position=obj["position"], orientation=obj["orientation"])
         og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    # Let the objects settle
+    for _ in range(30):
+        og.sim.step()
+
+    controller = StarterSemanticActionPrimitives(env, env.robots[0], enable_head_tracking=False, curobo_batch_size=1)
     try:
         for primitive, args in zip(primitives, primitives_args):
             execute_controller(controller.apply_ref(primitive, *args, attempts=1), env)
@@ -84,7 +88,7 @@ def primitive_tester(env, objects, primitives, primitives_args):
         og.clear()
 
 
-@pytest.mark.parametrize("robot", ["Tiago", "Fetch"])
+@pytest.mark.parametrize("robot", ["Tiago", "R1"])
 class TestPrimitives:
     def test_navigate(self, robot):
         categories = ["floors", "ceilings", "walls"]
@@ -127,7 +131,7 @@ class TestPrimitives:
         objects = []
         obj_1 = {
             "object": DatasetObject(name="table", category="breakfast_table", model="rjgmmy", scale=[0.3, 0.3, 0.3]),
-            "position": [-0.7, 0.5, 0.2],
+            "position": [-0.7, 0.5, 0.09],
             "orientation": [0, 0, 0, 1],
         }
         obj_2 = {

@@ -96,7 +96,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             name=name,
             scale=scale,
             visible=visible,
-            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
@@ -139,7 +138,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def _default_controllers(self):
         controllers = super()._default_controllers
         # We use joint controllers for base as default
-        controllers["base"] = "JointController"
+        controllers["base"] = "HolonomicBaseJointController"
         controllers["trunk"] = "JointController"
         # We use IK and multi finger gripper controllers as default
         for arm in self.arm_names:
@@ -232,7 +231,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
 
     @property
     def arm_workspace_range(self):
-        return {arm: [th.deg2rad(-45), th.deg2rad(45)] for arm in self.arm_names}
+        return {arm: th.deg2rad(th.tensor([-45, 45], dtype=th.float32)) for arm in self.arm_names}
 
     @property
     def disabled_collision_pairs(self):

@@ -55,7 +55,7 @@ def plan_and_execute_trajectory(
     if success:
         print("Successfully planned trajectory")
         if not dry_run:
-            q_traj = cmg.path_to_joint_trajectory(traj_path, emb_sel)
+            q_traj = cmg.path_to_joint_trajectory(traj_path, get_full_js=True, emb_sel=emb_sel)
             execute_trajectory(q_traj, env, robot, attached_obj)
     else:
         print("Failed to plan trajectory")
@@ -98,25 +98,24 @@ def test_curobo():
         "grasping_mode": "assisted",
         "controller_config": {
             "base": {
-                "name": "JointController",
+                "name": "HolonomicBaseJointController",
                 "motor_type": "position",
                 "command_input_limits": None,
-                "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
             },
             "trunk": {
                 "name": "JointController",
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
             },
             "arm_left": {
                 "name": "JointController",
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 200.0,
             },
             "arm_right": {
@@ -124,7 +123,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 200.0,
             },
             "gripper_left": {
@@ -132,7 +131,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 1500.0,
             },
             "gripper_right": {
@@ -140,7 +139,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 1500.0,
             },
         },
@@ -151,7 +150,7 @@ def test_curobo():
             "motor_type": "position",
             "command_input_limits": None,
             "use_delta_commands": False,
-            "use_impedances": True,
+            "use_impedances": False,
         }
 
     # Create env

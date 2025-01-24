@@ -111,7 +111,6 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             name=name,
             scale=scale,
             visible=visible,
-            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
@@ -222,7 +221,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         # Always call super first
         controllers = super()._default_controllers
         # We use joint controllers for base and camera as default
-        controllers["base"] = "JointController"
+        controllers["base"] = "HolonomicBaseJointController"
         controllers["trunk"] = "JointController"
         controllers["camera"] = "JointController"
         # We use multi finger gripper, and IK controllers for eefs as default
