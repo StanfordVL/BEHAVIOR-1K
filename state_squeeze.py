@@ -15,6 +15,7 @@ import omnigibson.utils.transform_utils as T
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 
+
 # Set up the 4 walls
 def generate_box(box_half_extent=torch.tensor([1, 1, 1], dtype=torch.float32), visualize_wall=False):
     # Temp function to generate the walls for squeezing the cloth
@@ -34,7 +35,6 @@ def generate_box(box_half_extent=torch.tensor([1, 1, 1], dtype=torch.float32), v
     plane_prims = []
     plane_motions = []
     for i, pc in enumerate(plane_centers):
-
         plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
             prim_path=f"/World/plane_{i}",
             name=f"plane_{i}",
@@ -62,6 +62,7 @@ def generate_box(box_half_extent=torch.tensor([1, 1, 1], dtype=torch.float32), v
         plane_prims.append(plane_as_prim)
         plane_motions.append(plane_z)
     return plane_prims, plane_motions
+
 
 def main(visualize_wall=False):
     """
@@ -145,7 +146,6 @@ def main(visualize_wall=False):
             if max_height > min_wall_dist:
                 print(f"Stopping: Cloth height ({max_height:.3f}) exceeds wall distance ({min_wall_dist:.3f})")
                 break
-        
 
         # TODO: save the cloth in the squeezed state
 
