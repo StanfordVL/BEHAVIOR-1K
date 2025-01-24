@@ -810,7 +810,7 @@ def h5py_group_to_torch(group):
     return state
 
 
-# @th.jit.script
+@th.jit.script
 def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int, endpoint: bool = True) -> th.Tensor:
     """
     Generate a tensor with evenly spaced values along multiple dimensions.
