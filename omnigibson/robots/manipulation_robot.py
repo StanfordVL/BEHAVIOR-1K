@@ -29,8 +29,13 @@ from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, create_joint, \
-    create_primitive_mesh, absolute_prim_path_to_scene_relative
+from omnigibson.utils.usd_utils import (
+    ControllableObjectViewAPI,
+    GripperRigidContactAPI,
+    create_joint,
+    create_primitive_mesh,
+    absolute_prim_path_to_scene_relative,
+)
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -164,7 +169,7 @@ class ManipulationRobot(BaseRobot):
         self._disable_grasp_handling = disable_grasp_handling
 
         # Other variables filled in at runtime
-        self._eef_to_fingertip_lengths = None      # dict mapping arm name to finger name to offset
+        self._eef_to_fingertip_lengths = None  # dict mapping arm name to finger name to offset
 
         # Initialize other variables used for assistive grasping
         self._ag_freeze_joint_pos = {
@@ -270,7 +275,9 @@ class ManipulationRobot(BaseRobot):
                     if finger_link.prim_path == joint.body1:
                         parent_prim_path = joint.body0
                         break
-                assert parent_prim_path is not None, f"Expected articulated parent joint for finger link {finger_link.name} but found none!"
+                assert (
+                    parent_prim_path is not None
+                ), f"Expected articulated parent joint for finger link {finger_link.name} but found none!"
                 for link in self.links.values():
                     if parent_prim_path == link.prim_path:
                         parent_link = link
@@ -280,18 +287,23 @@ class ManipulationRobot(BaseRobot):
                 if finger_parent_link is None:
                     finger_parent_link = parent_link
                     finger_parent_pts = finger_parent_link.collision_boundary_points_world
-                    assert finger_parent_pts is not None, f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
+                    assert (
+                        finger_parent_pts is not None
+                    ), f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
                     # Convert from world frame -> eef frame
                     finger_parent_pts = th.concatenate([finger_parent_pts, th.ones(len(finger_parent_pts), 1)], dim=-1)
                     finger_parent_pts = (finger_parent_pts @ eef_to_world_tf.T)[:, :3]
                     finger_parent_max_z = finger_parent_pts[:, 2].max().item()
                 else:
-                    assert finger_parent_link == parent_link, \
-                        f"Expected all fingers to have same parent link, but found multiple parents at {finger_parent_link.prim_path} and {parent_link.prim_path}"
+                    assert (
+                        finger_parent_link == parent_link
+                    ), f"Expected all fingers to have same parent link, but found multiple parents at {finger_parent_link.prim_path} and {parent_link.prim_path}"
 
                 # Calculate this finger's collision boundary points in the world frame
                 finger_pts = finger_link.collision_boundary_points_world
-                assert finger_pts is not None, f"Expected finger points to be defined for link {finger_link.name}, but got None!"
+                assert (
+                    finger_pts is not None
+                ), f"Expected finger points to be defined for link {finger_link.name}, but got None!"
                 # Convert from world frame -> eef frame
                 finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
                 finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
@@ -299,7 +311,9 @@ class ManipulationRobot(BaseRobot):
                 # Since we know the EEF frame always points with z outwards towards the fingers, the outer-most point /
                 # fingertip is the maximum z value
                 finger_max_z = finger_pts[:, 2].max().item()
-                assert finger_max_z > 0, f"Expected positive fingertip to eef frame offset for link {finger_link.name}, but got: {finger_max_z}. Does the EEF frame z-axis point in the direction of the fingers?"
+                assert (
+                    finger_max_z > 0
+                ), f"Expected positive fingertip to eef frame offset for link {finger_link.name}, but got: {finger_max_z}. Does the EEF frame z-axis point in the direction of the fingers?"
                 self._eef_to_fingertip_lengths[arm][finger_link.name] = finger_max_z
 
                 # Now, only keep points that are above the parent max z by 20% for inferring y values
@@ -308,7 +322,9 @@ class ManipulationRobot(BaseRobot):
                 finger_pts = finger_pts[valid_idxs]
                 # Make sure all points lie on a single side of the EEF's y-axis
                 y_signs = th.sign(finger_pts[:, 1])
-                assert th.all(y_signs == y_signs[0]).item(), "Expected all finger points to lie on single side of EEF y-axis!"
+                assert th.all(
+                    y_signs == y_signs[0]
+                ).item(), "Expected all finger points to lie on single side of EEF y-axis!"
                 y_sign = y_signs[0].item()
                 y_abs_min = th.abs(finger_pts[:, 1]).min().item()
 
@@ -324,14 +340,18 @@ class ManipulationRobot(BaseRobot):
                 # x - 0. This assumes that the EEF axis evenly splits each finger symmetrically on each side
                 if is_parallel_jaw:
                     # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
-                    grasp_pts = th.tensor([
-                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.2, 1],
-                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.8, 1],
-                    ])
+                    grasp_pts = th.tensor(
+                        [
+                            [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.2, 1],
+                            [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.8, 1],
+                        ]
+                    )
                     finger_to_world_tf = T.pose_inv(T.pose2mat(finger_link.get_position_orientation()))
                     finger_to_eef_tf = finger_to_world_tf @ world_to_eef_tf
                     grasp_pts = (grasp_pts @ finger_to_eef_tf.T)[:, :3]
-                    grasping_points = [GraspingPoint(link_name=finger_link.body_name, position=grasp_pt) for grasp_pt in grasp_pts]
+                    grasping_points = [
+                        GraspingPoint(link_name=finger_link.body_name, position=grasp_pt) for grasp_pt in grasp_pts
+                    ]
                     if i == 0:
                         # Start point
                         self._default_ag_start_points[arm] = grasping_points
@@ -835,7 +855,11 @@ class ManipulationRobot(BaseRobot):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        return self._assisted_grasp_start_points if self._assisted_grasp_start_points is not None else self._default_ag_start_points
+        return (
+            self._assisted_grasp_start_points
+            if self._assisted_grasp_start_points is not None
+            else self._default_ag_start_points
+        )
 
     @property
     def _assisted_grasp_end_points(self):
@@ -868,7 +892,11 @@ class ManipulationRobot(BaseRobot):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        return self._assisted_grasp_end_points if self._assisted_grasp_end_points is not None else self._default_ag_end_points
+        return (
+            self._assisted_grasp_end_points
+            if self._assisted_grasp_end_points is not None
+            else self._default_ag_end_points
+        )
 
     @property
     def eef_to_fingertip_lengths(self):
