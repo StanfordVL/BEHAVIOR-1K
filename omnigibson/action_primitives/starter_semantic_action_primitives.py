@@ -1573,6 +1573,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
         yield from self._execute_motion_plan(q_traj)
 
+    # (TODO) add a function to draw curobo-generated plans.
     def _draw_plan(self, plan):
         SEARCHED = []
         trav_map = self.robot.scene._trav_map
