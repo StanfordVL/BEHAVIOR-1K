@@ -242,44 +242,12 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return controllers
 
     @property
-    def assisted_grasp_start_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
     def arm_control_idx(self):
         # Add combined entry
         idxs = super().arm_control_idx
         # Concatenate all values and sort them
         idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
-
-    @property
-    def finger_lengths(self):
-        return {arm: 0.12 for arm in self.arm_names}
 
     @property
     def disabled_collision_link_names(self):

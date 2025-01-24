@@ -238,8 +238,8 @@ class FrankaPanda(ManipulationRobot):
         return self._default_robot_model_joint_pos
 
     @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
+    def eef_to_fingertip_lengths(self):
+        return {arm: {name: 0.1 for name in names} for arm, names in self.finger_link_names.items()}
 
     @cached_property
     def arm_link_names(self):
@@ -286,11 +286,11 @@ class FrankaPanda(ManipulationRobot):
         return {self.default_arm: self._teleop_rotation_offset}
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         return {self.default_arm: self._ag_start_points}
 
     @property
-    def assisted_grasp_end_points(self):
+    def _assisted_grasp_end_points(self):
         return {self.default_arm: self._ag_start_points}
 
     @property

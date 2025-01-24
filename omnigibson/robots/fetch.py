@@ -214,28 +214,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def wheel_axle_length(self):
         return 0.372
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.012, 0.0])),
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.012, 0.0])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.012, 0.0])),
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.012, 0.0])),
-            ]
-        }
-
     @cached_property
     def base_joint_names(self):
         return ["l_wheel_joint", "r_wheel_joint"]

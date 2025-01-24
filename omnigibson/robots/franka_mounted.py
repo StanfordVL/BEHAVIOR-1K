@@ -24,8 +24,8 @@ class FrankaMounted(FrankaPanda):
         return controllers
 
     @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.15}
+    def eef_to_fingertip_lengths(self):
+        return {arm: {name: 0.15 for name in names} for arm, names in self.finger_link_names.items()}
 
     @property
     def usd_path(self):
@@ -40,7 +40,7 @@ class FrankaMounted(FrankaPanda):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted_description_curobo.yaml")
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         return {
             self.default_arm: [
                 GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
@@ -48,7 +48,7 @@ class FrankaMounted(FrankaPanda):
         }
 
     @property
-    def assisted_grasp_end_points(self):
+    def _assisted_grasp_end_points(self):
         return {
             self.default_arm: [
                 GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),

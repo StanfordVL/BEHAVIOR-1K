@@ -138,10 +138,6 @@ class VX300S(ManipulationRobot):
     def _default_joint_pos(self):
         return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
     @cached_property
     def arm_link_names(self):
         return {
@@ -184,19 +180,3 @@ class VX300S(ManipulationRobot):
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-math.pi, 0, 0])}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="right_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="left_finger_link", position=th.tensor([0.0, 0.001, 0.057])),
-            ]
-        }

@@ -176,30 +176,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
         return pos
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.087}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.01])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.01])),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([-0.032, 0.0, -0.01])),
-                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([0.025, 0.0, -0.01])),
-            ]
-            for arm in self.arm_names
-        }
-
     @cached_property
     def floor_touching_base_link_names(self):
         return ["wheel_link1", "wheel_link2", "wheel_link3"]
