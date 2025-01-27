@@ -498,11 +498,6 @@ class DataPlaybackWrapper(DataWrapper):
                 robot_cfg["sensor_config"] = robot_sensor_config
         if external_sensors_config is not None:
             config["env"]["external_sensors"] = external_sensors_config
-            # config["env"]["external_sensors"] = merge_nested_dicts(
-            #     base_dict=config["env"]["external_sensors"],
-            #     extra_dict=external_sensors_config,
-            #     inplace=True,
-            # )
 
         # Load env
         env = og.Environment(configs=config)
