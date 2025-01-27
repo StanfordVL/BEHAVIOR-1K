@@ -782,7 +782,9 @@ class ManipulationRobot(BaseRobot):
         """
         Returns:
             dict: Dictionary mapping arm appendage name to robot link corresponding to that arm's
-                eef link
+                eef link. NOTE: These links always have a canonical local orientation frame -- assuming a parallel jaw
+                eef morphology, it is assumed that the eef z-axis points out from the tips of the fingers, the y-axis
+                points from the left finger to the right finger, and the x-axis inferred programmatically
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
 
@@ -1204,7 +1206,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": None,
                 "motor_type": "position",
                 "use_delta_commands": True,
-                "use_impedances": True,
+                "use_impedances": False,
             }
         return dic
 

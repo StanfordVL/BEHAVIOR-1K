@@ -102,21 +102,21 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
             },
             "trunk": {
                 "name": "JointController",
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
             },
             "arm_left": {
                 "name": "JointController",
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 200.0,
             },
             "arm_right": {
@@ -124,7 +124,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 200.0,
             },
             "gripper_left": {
@@ -132,7 +132,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 1500.0,
             },
             "gripper_right": {
@@ -140,7 +140,7 @@ def test_curobo():
                 "motor_type": "position",
                 "command_input_limits": None,
                 "use_delta_commands": False,
-                "use_impedances": True,
+                "use_impedances": False,
                 "pos_kp": 1500.0,
             },
         },
@@ -151,7 +151,7 @@ def test_curobo():
             "motor_type": "position",
             "command_input_limits": None,
             "use_delta_commands": False,
-            "use_impedances": True,
+            "use_impedances": False,
         }
 
     # Create env

@@ -53,7 +53,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
-        use_impedances=True,
+        use_impedances=False,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
