@@ -76,7 +76,7 @@ jobs:
         run: pytest -s tests/tests_of_examples/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
 
       - name: Deploy artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
           path: ${{ matrix.test_file }}.xml
@@ -93,12 +93,14 @@ jobs:
     needs: [run_test]
     steps:
       - name: Pull reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: True
       - name: Example Test Report0
         uses: dorny/test-reporter@v1
         with:
           name: Example Test Results
-          path: ${{ github.run_id }}-tests-*/*_test.xml
+          path: "*_test.xml"
           reporter: java-junit
           fail-on-error: 'true'
           fail-on-empty: 'true'
