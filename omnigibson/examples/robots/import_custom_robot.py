@@ -86,7 +86,10 @@ eef_vis_links:                      # (list of dict) information for adding came
     parent_link: left_arm_link6
     offset:
       position: [0, 0, 0.06]
-      orientation: [0, 0, 0, 1]
+      orientation: [0, 0, 0, 1]     # NOTE: Convention for these eef vis links should be tuned such that:
+                                    #   z-axis points out from the tips of the fingers
+                                    #   y-axis points in the direction from the left finger to the right finger
+                                    #   x-axis is automatically inferred from the above two axes
   - link: right_eef_link            # same format as @camera_links
     parent_link: right_arm_link6
     offset:
@@ -722,7 +725,9 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         is_holonomic (bool): Whether the robot has a holonomic base applied or not
     """
     robot_name = robot_prim.GetName()
-    ee_links = list(curobo_cfg.eef_to_gripper_info.keys())
+
+    # Left, then right by default if sorted alphabetically
+    ee_links = list(sorted(curobo_cfg.eef_to_gripper_info.keys()))
 
     # Find all joints that have a negative axis specified so we know to flip them in curobo
     tree = ET.parse(robot_urdf_path)
