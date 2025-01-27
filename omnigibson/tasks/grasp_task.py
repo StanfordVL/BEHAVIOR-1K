@@ -5,17 +5,13 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.action_primitives.starter_semantic_action_primitives import (
-    PlanningContext,
-    StarterSemanticActionPrimitives,
-)
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects.object_base import REGISTERED_OBJECTS
 from omnigibson.reward_functions.grasp_reward import GraspReward
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
-from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 from omnigibson.utils.python_utils import classproperty, create_class_from_registry_and_config
 
 MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
@@ -89,7 +85,7 @@ class GraspTask(BaseTask):
         # Otherwise, reset using the primitive controller.
         else:
             if self._primitive_controller is None:
-                self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+                self._primitive_controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=False)
 
             # Randomize the robots joint positions
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
@@ -104,21 +100,21 @@ class GraspTask(BaseTask):
                 initial_joint_pos = th.tensor(robot.get_joint_positions()[joint_control_idx])
                 control_idx_in_joint_pos = th.arange(dim)
 
-            with PlanningContext(
-                env, self._primitive_controller.robot, self._primitive_controller.robot_copy, "original"
-            ) as context:
-                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-                    joint_pos, joint_control_idx = self._get_random_joint_position(robot)
-                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-                    if not set_arm_and_detect_collision(context, initial_joint_pos):
-                        robot.set_joint_positions(joint_pos, joint_control_idx)
-                        og.sim.step()
-                        break
+            for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+                joint_pos, joint_control_idx = self._get_random_joint_position(robot)
+                initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+                collision_detected = self._primitive_controller._motion_generator.check_collisions(
+                    [initial_joint_pos],
+                ).cpu()[0]
+                if not collision_detected:
+                    robot.set_joint_positions(joint_pos, joint_control_idx)
+                    og.sim.step()
+                    break
 
             # Randomize the robot's 2d pose
             obj = env.scene.object_registry("name", self.obj_name)
             grasp_poses = get_grasp_poses_for_object_sticky(obj)
-            grasp_pose, _ = random.choice(grasp_poses)
+            grasp_pose = random.choice(grasp_poses)
             sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
             robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)

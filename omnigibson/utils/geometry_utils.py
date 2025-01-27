@@ -11,6 +11,19 @@ from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.usd_utils import mesh_prim_mesh_to_trimesh_mesh
 
 
+def wrap_angle(theta):
+    """ "
+    Converts an angle to the range [-pi, pi).
+
+    Args:
+        theta (float): angle in radians
+
+    Returns:
+        float: angle in radians in range [-pi, pi)
+    """
+    return (theta + math.pi) % (2 * math.pi) - math.pi
+
+
 def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     """
     Transforms particle positions @positions into the frame specified by @pos and @quat with new scale @scale,

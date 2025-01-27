@@ -21,27 +21,31 @@ m.OPENNESS_THRESHOLD_TO_CLOSE = 0.05
 def get_grasp_poses_for_object_sticky(target_obj):
     """
     Obtain a grasp pose for an object from top down, to be used with sticky grasping.
+    The grasp pose should be in the world frame.
 
     Args:
         target_object (StatefulObject): Object to get a grasp pose for
 
     Returns:
-        List of grasp candidates, where each grasp candidate is a tuple containing the grasp pose and the approach direction.
+        List of grasp poses.
     """
-    bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
-        visual=False
-    )
 
-    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
-    towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
+    aabb_min_world, aabb_max_world = target_obj.aabb
+
+    bbox_center_world = (aabb_min_world + aabb_max_world) / 2
+    bbox_extent_world = aabb_max_world - aabb_min_world
+
+    grasp_center_pos = bbox_center_world + th.tensor([0, 0, bbox_extent_world[2] / 2])
+    towards_object_in_world_frame = bbox_center_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
-    grasp_quat = T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32))
+    # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
+    grasp_quat = T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32))
 
     grasp_pose = (grasp_center_pos, grasp_quat)
-    grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
+    grasp_poses = [grasp_pose]
 
-    return grasp_candidate
+    return grasp_poses
 
 
 def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):

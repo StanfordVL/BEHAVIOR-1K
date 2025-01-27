@@ -425,7 +425,6 @@ class ManipulationRobot(BaseRobot):
                 finger_links = {link for link in self.finger_links[arm]}
                 if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
                     is_grasping = IsGraspingState.FALSE
-
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
@@ -1740,6 +1739,8 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         # TODO: currently does not take care of cloth objects
         # TODO: add unit tests
+        if "ag_obj_constraint_params" not in state:
+            return
         for arm in state["ag_obj_constraint_params"].keys():
             if len(state["ag_obj_constraint_params"][arm]) > 0:
                 data = state["ag_obj_constraint_params"][arm]
