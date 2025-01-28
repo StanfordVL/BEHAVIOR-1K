@@ -208,6 +208,22 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+                    # Possibly filter out the sensor based on name
+                    prim_path = str(prim.GetPrimPath())
+                    not_blacklisted = self._exclude_sensor_names is None or not any(
+                        name in prim_path for name in self._exclude_sensor_names
+                    )
+                    whitelisted = self._include_sensor_names is None or any(
+                        name in prim_path for name in self._include_sensor_names
+                    )
+                    # Also make sure that the include / exclude sensor names are mutually exclusive
+                    if self._exclude_sensor_names is not None and self._include_sensor_names is not None:
+                        assert len(set(self._exclude_sensor_names).intersection(set(self._include_sensor_names))) == 0, \
+                            (f"include_sensor_names and exclude_sensor_names must be mutually exclusive! "
+                             f"Got: {self._include_sensor_names} and {self._exclude_sensor_names}")
+                    if not (not_blacklisted and whitelisted):
+                        continue
+
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]
@@ -219,17 +235,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                         )
                     # If the modalities list is empty, don't import the sensor.
                     if not sensor_kwargs["modalities"]:
-                        continue
-
-                    # Possibly filter out the sensor based on name
-                    prim_path = str(prim.GetPrimPath())
-                    not_blacklisted = self._exclude_sensor_names is None or not any(
-                        name in prim_path for name in self._exclude_sensor_names
-                    )
-                    whitelisted = self._include_sensor_names is None or any(
-                        name in prim_path for name in self._include_sensor_names
-                    )
-                    if not (not_blacklisted and whitelisted):
                         continue
 
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
