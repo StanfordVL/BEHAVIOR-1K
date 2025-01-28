@@ -126,8 +126,15 @@ class MultiFingerGripperController(GripperController):
         if self._mode == "binary":
             command_output_limits = (-1.0, 1.0)
         # If we're in smoothing mode, output limits should be the average of the independent limits
-        elif self._mode == "smoothing":
-            command_output_limits = cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+        elif self._mode == "smooth":
+            command_output_limits = (
+                cb.mean(command_output_limits[0]),
+                cb.mean(command_output_limits[1]),
+            )
+        elif self._mode == "independent":
+            pass
+        else:
+            raise ValueError(f"Invalid mode {self._mode}")
 
         return command_output_limits
 
