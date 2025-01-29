@@ -195,8 +195,7 @@ def test_arm_control():
     # Record initial eef pose of all robots
     initial_eef_pose = dict()
     for i, robot in enumerate(env.robots):
-        initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in
-                                        robot.arm_names}
+        initial_eef_pose[robot.name] = {arm: robot.get_relative_eef_pose(arm=arm) for arm in robot.arm_names}
 
     for controller in ["InverseKinematicsController", "OperationalSpaceController"]:
         for controller_mode in ["pose_delta_ori", "absolute_pose"]:
