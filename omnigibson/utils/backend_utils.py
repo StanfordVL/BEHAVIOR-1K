@@ -96,7 +96,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     zeros = lambda *args: th.zeros(*args, dtype=th.float32)
     ones = lambda *args: th.ones(*args, dtype=th.float32)
     to_numpy = lambda x: x.numpy()
-    from_numpy = lambda x: th.from_numpy()
+    from_numpy = lambda x: th.from_numpy(x)
     to_torch = lambda x: x
     from_torch = lambda x: x
     from_torch_recursive = lambda dic: dic
@@ -145,7 +145,7 @@ class _ComputeNumpyBackend(_ComputeBackend):
     abs = np.abs
     sqrt = np.sqrt
     mean = lambda val, dim=None, keepdim=False: np.mean(val, axis=dim, keepdims=keepdim)
-    copy = lambda arr: np.array(arr)
+    copy = lambda arr: arr.copy()
     eye = np.eye
     view = lambda arr, shape: arr.reshape(shape)
     arange = np.arange
