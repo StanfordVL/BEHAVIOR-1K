@@ -506,7 +506,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
         approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
 
-        avg_finger_offset = th.mean(th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()]))
+        avg_finger_offset = th.mean(
+            th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()])
+        )
         pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
 
         pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
