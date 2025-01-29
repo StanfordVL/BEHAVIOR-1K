@@ -218,9 +218,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     )
                     # Also make sure that the include / exclude sensor names are mutually exclusive
                     if self._exclude_sensor_names is not None and self._include_sensor_names is not None:
-                        assert len(set(self._exclude_sensor_names).intersection(set(self._include_sensor_names))) == 0, \
-                            (f"include_sensor_names and exclude_sensor_names must be mutually exclusive! "
-                             f"Got: {self._include_sensor_names} and {self._exclude_sensor_names}")
+                        assert (
+                            len(set(self._exclude_sensor_names).intersection(set(self._include_sensor_names))) == 0
+                        ), (
+                            f"include_sensor_names and exclude_sensor_names must be mutually exclusive! "
+                            f"Got: {self._include_sensor_names} and {self._exclude_sensor_names}"
+                        )
                     if not (not_blacklisted and whitelisted):
                         continue
 

@@ -231,7 +231,9 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     )
 
     # Now apply the grasp offset.
-    avg_finger_offset = th.mean(th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()]))
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
     dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_grasp_pose_in_bbox_frame = (
         grasp_position_in_bbox_frame + canonical_push_axis * push_axis_closer_side_sign * dist_from_grasp_pos,
@@ -264,15 +266,16 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     waypoint_start_offset = (
         -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
     )
-    avg_finger_offset = th.mean(th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()]))
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
     waypoint_start_pose = (
         grasp_pose_in_world_frame[0]
         + -1 * approach_direction_in_world_frame * (avg_finger_offset + waypoint_start_offset),
         grasp_pose_in_world_frame[1],
     )
     waypoint_end_pose = (
-        target_hand_pose_in_world_frame[0]
-        + -1 * approach_direction_in_world_frame * avg_finger_offset,
+        target_hand_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * avg_finger_offset,
         target_hand_pose_in_world_frame[1],
     )
     waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose, num_waypoints=num_waypoints)
@@ -411,7 +414,9 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     # Now apply the grasp offset.
-    avg_finger_offset = th.mean(th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()]))
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
     dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * dist_from_grasp_pos
     offset_grasp_pose_in_bbox_frame = (grasp_position + offset_in_bbox_frame, grasp_quat_in_bbox_frame)
