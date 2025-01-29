@@ -50,6 +50,9 @@ m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
 m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
+m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
+m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.8
+
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
@@ -265,9 +268,7 @@ class ManipulationRobot(BaseRobot):
             # Infer parent link for this finger
             finger_parent_link, finger_parent_max_z = None, None
             is_parallel_jaw = len(finger_links) == 2
-            if not is_parallel_jaw:
-                self._default_ag_start_points[arm] = None
-                self._default_ag_end_points[arm] = None
+            assert is_parallel_jaw, "Inferring finger link information can only be done for parallel jaw gripper robots!"
             for i, finger_link in enumerate(finger_links):
                 # Find parent, and make sure one exists
                 parent_prim_path, parent_link = None, None
@@ -318,7 +319,7 @@ class ManipulationRobot(BaseRobot):
 
                 # Now, only keep points that are above the parent max z by 20% for inferring y values
                 finger_range = finger_max_z - finger_parent_max_z
-                valid_idxs = th.where(finger_pts[:, 2] > (finger_parent_max_z + finger_range * 0.2))[0]
+                valid_idxs = th.where(finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP))[0]
                 finger_pts = finger_pts[valid_idxs]
                 # Make sure all points lie on a single side of the EEF's y-axis
                 y_signs = th.sign(finger_pts[:, 1])
@@ -334,30 +335,30 @@ class ManipulationRobot(BaseRobot):
                 # In this case, this is defined as the x2 (x,y,z) tuples where:
                 # z - the 20% and 80% length between the range from [finger_parent_max_z, finger_max_z]
                 #       This is synonymous to inferring the length of the finger (lower bounded by the gripper base,
-                #       assumed to be the parent link), and then taking the values 20% and 80% along its length
+                #       assumed to be the parent link), and then taking the values MIN% and MAX% along its length
                 # y - the value closest to the edge of the finger surface in the direction of +/- EEF y-axis.
                 #       This assumes that each individual finger lies completely on one side of the EEF y-axis
                 # x - 0. This assumes that the EEF axis evenly splits each finger symmetrically on each side
-                if is_parallel_jaw:
-                    # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
-                    grasp_pts = th.tensor(
-                        [
-                            [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.2, 1],
-                            [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * 0.8, 1],
-                        ]
-                    )
-                    finger_to_world_tf = T.pose_inv(T.pose2mat(finger_link.get_position_orientation()))
-                    finger_to_eef_tf = finger_to_world_tf @ world_to_eef_tf
-                    grasp_pts = (grasp_pts @ finger_to_eef_tf.T)[:, :3]
-                    grasping_points = [
-                        GraspingPoint(link_name=finger_link.body_name, position=grasp_pt) for grasp_pt in grasp_pts
+                # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
+                grasp_pts = th.tensor(
+                    [
+                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP, 1],
+                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP, 1],
                     ]
-                    if i == 0:
-                        # Start point
-                        self._default_ag_start_points[arm] = grasping_points
-                    else:
-                        # End point
-                        self._default_ag_end_points[arm] = grasping_points
+                )
+                # Convert the grasping points from the EEF frame -> finger frame
+                finger_to_world_tf = T.pose_inv(T.pose2mat(finger_link.get_position_orientation()))
+                finger_to_eef_tf = finger_to_world_tf @ world_to_eef_tf
+                grasp_pts = (grasp_pts @ finger_to_eef_tf.T)[:, :3]
+                grasping_points = [
+                    GraspingPoint(link_name=finger_link.body_name, position=grasp_pt) for grasp_pt in grasp_pts
+                ]
+                if i == 0:
+                    # Start point
+                    self._default_ag_start_points[arm] = grasping_points
+                else:
+                    # End point
+                    self._default_ag_end_points[arm] = grasping_points
 
         # For each grasping point, if we're in DEBUG mode, visualize with spheres
         if gm.DEBUG:

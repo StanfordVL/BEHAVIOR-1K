@@ -237,10 +237,6 @@ class FrankaPanda(ManipulationRobot):
     def _default_joint_pos(self):
         return self._default_robot_model_joint_pos
 
-    @property
-    def eef_to_fingertip_lengths(self):
-        return {arm: {name: 0.1 for name in names} for arm, names in self.finger_link_names.items()}
-
     @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"panda_link{i}" for i in range(8)]}
@@ -263,11 +259,13 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/usd/franka_panda.usda") \
+            if self.model_name == "franka_panda" else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf") \
+            if self.model_name == "franka_panda" else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
 
     @property
     def curobo_path(self):
@@ -275,7 +273,7 @@ class FrankaPanda(ManipulationRobot):
         assert (
             self._model_name == "franka_panda"
         ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml")
 
     @cached_property
     def curobo_attached_object_link_names(self):

@@ -55,28 +55,6 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return 0.330
 
     @property
-    def eef_to_fingertip_lengths(self):
-        return {arm: {name: 0.04 for name in names} for arm, names in self.finger_link_names.items()}
-
-    @property
-    def _assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.01, 0.0, 0.009])),
-            ]
-        }
-
-    @property
-    def _assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([-0.01, 0.0, 0.009])),
-            ]
-        }
-
-    @property
     def disabled_collision_pairs(self):
         return [
             ["link_lift", "link_arm_l3"],

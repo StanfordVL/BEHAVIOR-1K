@@ -174,10 +174,6 @@ class A1(ManipulationRobot):
     def _default_joint_pos(self):
         return self._default_robot_model_joint_pos
 
-    @property
-    def eef_to_fingertip_lengths(self):
-        return {arm: {name: 0.087 for name in names} for arm, names in self.finger_link_names.items()}
-
     @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
