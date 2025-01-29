@@ -181,8 +181,16 @@ def test_arm_control():
     for robot in env.robots:
         robot.keep_still()
 
+        # We need to explicitly reset the controllers to unify the initial state that will be seen
+        # during downstream action executions -- i.e.: the state seen after robot.reload_controllers()
+        # is called each time
+        for controller in robot.controllers.values():
+            controller.reset()
+
     # Update initial state (robot should be stable and still)
     env.scene.update_initial_state()
+
+    env.scene.reset()
 
     # Record initial eef pose of all robots
     initial_eef_pose = dict()
