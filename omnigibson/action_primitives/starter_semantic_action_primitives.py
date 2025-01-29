@@ -102,7 +102,7 @@ m.DEFAULT_ANGLE_THRESHOLD = 0.03
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
-m.JOINT_POS_DIFF_THRESHOLD = 0.01
+m.JOINT_POS_DIFF_THRESHOLD = 0.005
 m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.05
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
@@ -506,7 +506,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
         approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
 
-        pregrasp_offset = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
+        avg_finger_offset = th.mean(th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()]))
+        pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
 
         pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
 
@@ -992,6 +993,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 articulation_control_idx = th.cat(articulation_control_idx)
                 for j in range(m.MAX_STEPS_FOR_JOINT_MOTION):
                     # indented_print(f"Step {j + 1}/{m.MAX_STEPS_FOR_JOINT_MOTION}")
+
+                    # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
+                    # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
+                    action = self.robot.q_to_action(joint_pos)
+                    yield self._postprocess_action(action)
+
                     current_joint_pos = self.robot.get_joint_positions()
                     joint_pos_diff = joint_pos - current_joint_pos
                     base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
@@ -1016,12 +1023,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     if stop_on_contact and collision_detected:
                         indented_print(f"Collision detected at step {i + 1}/{len(q_traj)}")
                         return
-
-                    # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
-                    # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
-                    action = self.robot.q_to_action(joint_pos)
-
-                    yield self._postprocess_action(action)
 
                 if not ignore_failure:
                     if not base_target_reached:
@@ -1334,13 +1335,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_joint_positions = self._get_joint_position_with_fingers_at_limit(limit_type)
         action = self.robot.q_to_action(target_joint_positions)
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            current_joint_positinos = self.robot.get_joint_positions()
-            if th.allclose(current_joint_positinos, target_joint_positions, atol=0.005):
+            yield self._postprocess_action(action)
+            current_joint_positions = self.robot.get_joint_positions()
+            if th.allclose(current_joint_positions, target_joint_positions, atol=m.JOINT_POS_DIFF_THRESHOLD):
                 break
             elif limit_type == "lower" and self._get_obj_in_hand() is not None:
                 # If we are grasping an object, we should stop when object is detected in hand
                 break
-            yield self._postprocess_action(action)
 
     def _execute_grasp(self):
         """
