@@ -33,4 +33,6 @@ class FrankaMounted(FrankaPanda):
 
     @property
     def curobo_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml")
+        return os.path.join(
+            gm.ASSET_PATH, "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml"
+        )
