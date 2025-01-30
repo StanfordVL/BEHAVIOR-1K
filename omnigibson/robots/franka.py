@@ -98,10 +98,10 @@ class FrankaPanda(ManipulationRobot):
         if end_effector == "gripper":
             self._model_name = "franka_panda"
             self._gripper_control_idx = th.arange(7, 9)
-            self._eef_link_names = "panda_hand"
+            self._eef_link_names = "eef_link"
             self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
             self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
+            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.04, 0.04])
             self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
             self._ag_start_points = [
                 GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
@@ -285,7 +285,10 @@ class FrankaPanda(ManipulationRobot):
 
     @cached_property
     def curobo_attached_object_link_names(self):
-        return {self._eef_link_names: "attached_object"}
+        assert (
+            self._model_name == "franka_panda"
+        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        return super().curobo_attached_object_link_names
 
     @property
     def teleop_rotation_offset(self):
