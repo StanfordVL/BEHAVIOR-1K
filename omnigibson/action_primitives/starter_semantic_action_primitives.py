@@ -911,7 +911,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(q_traj, stop_on_contact=stop_on_contact, stop_on_ag=stop_on_ag, low_precision=low_precision)
+        yield from self._execute_motion_plan(
+            q_traj, stop_on_contact=stop_on_contact, stop_on_ag=stop_on_ag, low_precision=low_precision
+        )
 
     def _plan_joint_motion(
         self,
@@ -977,7 +979,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return q_traj
 
     def _execute_motion_plan(
-        self, q_traj, stop_on_contact=False, stop_on_ag=False, ignore_failure=False, low_precision=False, ignore_physics=False
+        self,
+        q_traj,
+        stop_on_contact=False,
+        stop_on_ag=False,
+        ignore_failure=False,
+        low_precision=False,
+        ignore_physics=False,
     ):
         for i, joint_pos in enumerate(q_traj):
             # indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
