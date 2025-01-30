@@ -268,7 +268,9 @@ class ManipulationRobot(BaseRobot):
             # Infer parent link for this finger
             finger_parent_link, finger_parent_max_z = None, None
             is_parallel_jaw = len(finger_links) == 2
-            assert is_parallel_jaw, "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            assert (
+                is_parallel_jaw
+            ), "Inferring finger link information can only be done for parallel jaw gripper robots!"
             for i, finger_link in enumerate(finger_links):
                 # Find parent, and make sure one exists
                 parent_prim_path, parent_link = None, None
@@ -319,7 +321,9 @@ class ManipulationRobot(BaseRobot):
 
                 # Now, only keep points that are above the parent max z by 20% for inferring y values
                 finger_range = finger_max_z - finger_parent_max_z
-                valid_idxs = th.where(finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP))[0]
+                valid_idxs = th.where(
+                    finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP)
+                )[0]
                 finger_pts = finger_pts[valid_idxs]
                 # Make sure all points lie on a single side of the EEF's y-axis
                 y_signs = th.sign(finger_pts[:, 1])
@@ -342,8 +346,18 @@ class ManipulationRobot(BaseRobot):
                 # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
                 grasp_pts = th.tensor(
                     [
-                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP, 1],
-                        [0, (y_abs_min - 0.002) * y_sign, finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP, 1],
+                        [
+                            0,
+                            (y_abs_min - 0.002) * y_sign,
+                            finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                            1,
+                        ],
+                        [
+                            0,
+                            (y_abs_min - 0.002) * y_sign,
+                            finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                            1,
+                        ],
                     ]
                 )
                 # Convert the grasping points from the EEF frame -> finger frame
