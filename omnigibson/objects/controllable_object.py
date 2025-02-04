@@ -614,16 +614,24 @@ class ControllableObject(BaseObject):
         fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path, estimate=True)
-        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path, estimate=True)
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(
+            self.articulation_root_path, estimate=True
+        )
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(
+            self.articulation_root_path, estimate=True
+        )
         fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
-            self.articulation_root_path, estimate=True,
+            self.articulation_root_path,
+            estimate=True,
         )
         fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
-            self.articulation_root_path, estimate=True,
+            self.articulation_root_path,
+            estimate=True,
         )
         fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path, estimate=True)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(
+            self.articulation_root_path, estimate=True
+        )
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
         fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
@@ -653,10 +661,14 @@ class ControllableObject(BaseObject):
         fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
         fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
         fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
-            self.articulation_root_path, link_name, estimate=True,
+            self.articulation_root_path,
+            link_name,
+            estimate=True,
         )
         fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
-            self.articulation_root_path, link_name, estimate=True,
+            self.articulation_root_path,
+            link_name,
+            estimate=True,
         )
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
