@@ -282,6 +282,12 @@ def _set_mtl_opacity(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity_texture", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
+
+    # Set the opacity to use the alpha channel for its mono-channel value.
+    # This defaults to some other value, which takes opaque black channels in the
+    # image to be fully transparent. This is not what we want.
+    lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
+
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
@@ -699,7 +705,7 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
             if is_light:
                 # Create a light
                 light_type = _LIGHT_MAPPING[mesh_info["type"]]
-                prim_path = f"/{obj_model}/__meta_{link_name}_lights_{link_id}_0_link/light_{i}"
+                prim_path = f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/light_{i}"
                 prim = getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(stage, prim_path).GetPrim()
                 lazy.pxr.UsdLux.ShapingAPI.Apply(prim).GetShapingConeAngleAttr().Set(180.0)
             else:
@@ -708,7 +714,7 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                 else:
                     # Create a primitive shape
                     mesh_type = mesh_info["type"].capitalize() if mesh_info["type"] != "box" else "Cube"
-                prim_path = f"/{obj_model}/__meta_{link_name}_{meta_link_type}_{link_id}_0_link/mesh_{i}"
+                prim_path = f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/mesh_{i}"
                 assert hasattr(lazy.pxr.UsdGeom, mesh_type)
                 # togglebutton has to be a sphere
                 if meta_link_type in ["togglebutton"]:
@@ -940,11 +946,13 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
             _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_link_type, meta_link_infos)
 
     # Get all meta links, set them to guide purpose, and add some metadata
-    # Here we want to include every link that has the __meta prefix.
-    meta_link_prims = [p for p in prim.GetChildren() if p.GetName().startswith("__meta_")]
+    # Here we want to include every link that has the meta__ prefix.
+    # This includes meta links that get added into the URDF in earlier
+    # stages.
+    meta_link_prims = [p for p in prim.GetChildren() if p.GetName().startswith("meta__")]
     for meta_prim in meta_link_prims:
         # Get meta link information
-        unparsed_meta = meta_prim.GetName()[7:-5]  # remove __meta_ and _link
+        unparsed_meta = meta_prim.GetName()[6:-5]  # remove meta__ and _link
         link_name, meta_link_type, link_id, link_sub_id = unparsed_meta.rsplit("_", 3)
 
         # Add the is_meta_link, meta_link_type, and meta_link_id attributes
