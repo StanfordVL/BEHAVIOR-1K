@@ -1464,7 +1464,7 @@ def mat2euler_intrinsic(rmat):
         yaw = torch.arctan2(-rmat[0, 1], rmat[0, 0])
     else:
         # Gimbal lock case
-        pitch = torch.pi / 2 if rmat[0, 2] == 1 else -torch.pi / 2
+        pitch = torch.tensor(math.pi / 2 if rmat[0, 2] == 1 else -math.pi / 2)
         roll = torch.arctan2(rmat[1, 0], rmat[1, 1])
         yaw = torch.tensor(0)  # Can set yaw to 0 in gimbal lock
 
