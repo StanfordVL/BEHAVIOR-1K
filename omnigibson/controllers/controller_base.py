@@ -177,14 +177,22 @@ class BaseController(Serializable, Registerable, Recreatable):
             isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.VELOCITY:
             # No kp should be specified, but kd should be
-            assert isaac_kp is None, f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            assert (
+                isaac_kp is None
+            ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
             isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.EFFORT:
             # Neither kp nor kd should be specified
-            assert isaac_kp is None, f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
-            assert isaac_kd is None, f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            assert (
+                isaac_kp is None
+            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
+            assert (
+                isaac_kd is None
+            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
         else:
-            raise ValueError(f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}")
+            raise ValueError(
+                f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}"
+            )
 
         self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
         self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
