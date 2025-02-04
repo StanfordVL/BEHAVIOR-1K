@@ -1436,7 +1436,7 @@ def delta_rotation_matrix(omega, delta_t):
     axis = omega / omega_magnitude
 
     # Skew-symmetric matrix K
-    u_x, u_y, u_z = axis
+    u_x, u_y, u_z = axis[0], axis[1], axis[2]
     K = torch.tensor([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
 
     # Rodrigues' rotation formula
