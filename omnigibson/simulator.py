@@ -330,9 +330,15 @@ def _launch_simulator(*args, **kwargs):
                 self._on_contact
             )
             # The callback will be called right *before* the physics step
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
-                lambda _: self._on_physics_step(),
+            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_pre_physics_step(),
                 pre_step=True,
+                order=0,
+            )
+            # The callback will be called right *after* the physics step
+            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_post_physics_step(),
+                pre_step=False,
                 order=0,
             )
             self._simulation_event_callback = (
@@ -997,7 +1003,6 @@ def _launch_simulator(*args, **kwargs):
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
-            ControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -1120,10 +1125,7 @@ def _launch_simulator(*args, **kwargs):
             self._omni_update_step()
             PoseAPI.invalidate()
 
-        def _on_physics_step(self):
-            # Make the controllable object view API refresh
-            ControllableObjectViewAPI.clear()
-
+        def _on_pre_physics_step(self):
             # Run the controller step on every controllable object
             for scene in self.scenes:
                 for obj in scene.objects:
@@ -1132,6 +1134,10 @@ def _launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
+
+        def _on_post_physics_step(self):
+            # Run the post physics update for backend view
+            ControllableObjectViewAPI.post_physics_step()
 
         def _on_contact(self, contact_headers, contact_data):
             """

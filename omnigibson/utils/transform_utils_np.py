@@ -158,8 +158,16 @@ def convert_quat(q, to="xyzw"):
     raise Exception("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
 
 
-@jit(nopython=True)
 def quat_multiply(quaternion1, quaternion0):
+    if quaternion1.dtype != np.float32:
+        quaternion1 = quaternion1.astype(np.float32)
+    if quaternion0.dtype != np.float32:
+        quaternion0 = quaternion0.astype(np.float32)
+    return _quat_multiply(quaternion1, quaternion0)
+
+
+@jit(nopython=True)
+def _quat_multiply(quaternion1, quaternion0):
     """
     Return multiplication of two quaternions (q1 * q0).
 
@@ -175,16 +183,16 @@ def quat_multiply(quaternion1, quaternion0):
     Returns:
         np.array: (x,y,z,w) multiplied quaternion
     """
-    x0, y0, z0, w0 = quaternion0
-    x1, y1, z1, w1 = quaternion1
-    return np.array(
+    x0, y0, z0, w0 = np.split(quaternion0, 4, axis=-1)
+    x1, y1, z1, w1 = np.split(quaternion1, 4, axis=-1)
+    return np.concatenate(
         (
             x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
             -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
             x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
             -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
         ),
-        dtype=np.float32,
+        axis=-1,
     )
 
 
@@ -204,10 +212,8 @@ def quat_conjugate(quaternion):
     Returns:
         np.array: (x,y,z,w) quaternion conjugate
     """
-    return np.array(
-        (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
-        dtype=np.float32,
-    )
+    n_dims = len(quaternion.shape)
+    return quaternion * np.array([-1.0, -1.0, -1.0, 1.0], dtype=np.float32).reshape([1] * (n_dims - 1) + [4])
 
 
 def quat_inverse(quaternion):
@@ -226,7 +232,7 @@ def quat_inverse(quaternion):
     Returns:
         np.array: (x,y,z,w) quaternion inverse
     """
-    return quat_conjugate(quaternion) / np.dot(quaternion, quaternion)
+    return quat_conjugate(quaternion) / np.sum(quaternion * quaternion, axis=-1, keepdims=True)
 
 
 def quat_distance(quaternion1, quaternion0):

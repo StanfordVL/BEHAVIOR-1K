@@ -46,6 +46,7 @@ class _ComputeBackend:
     all = None
     abs = None
     sqrt = None
+    norm = None
     mean = None
     copy = None
     eye = None
@@ -111,6 +112,7 @@ class _ComputeTorchBackend(_ComputeBackend):
     all = th.all
     abs = th.abs
     sqrt = th.sqrt
+    norm = lambda val, dim=None, keepdim=False: th.norm(val, dim=dim, keepdim=keepdim)
     mean = lambda val, dim=None, keepdim=False: th.mean(val, dim=dim, keepdim=keepdim)
     copy = lambda arr: arr.clone()
     eye = th.eye
@@ -144,6 +146,7 @@ class _ComputeNumpyBackend(_ComputeBackend):
     all = np.all
     abs = np.abs
     sqrt = np.sqrt
+    norm = lambda val, dim=None, keepdim=False: np.linalg.norm(val, axis=dim, keepdims=keepdim)
     mean = lambda val, dim=None, keepdim=False: np.mean(val, axis=dim, keepdims=keepdim)
     copy = lambda arr: arr.copy()
     eye = np.eye
