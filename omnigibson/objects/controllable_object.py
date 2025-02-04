@@ -295,20 +295,16 @@ class ControllableObject(BaseObject):
         """
         # Update the control modes of each joint based on the outputted control from the controllers
         unused_dofs = {i for i in range(self.n_dof)}
-        for name in self._controllers:
-            for dof in self._controllers[name].dof_idx:
+        for controller in self._controllers.values():
+            for i, dof in enumerate(controller.dof_idx):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof.item() in unused_dofs
                 unused_dofs.remove(dof.item())
-                control_type = self._controllers[name].control_type
+                control_type = controller.control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
-                    kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=(
-                        self.default_kd
-                        if control_type == ControlType.POSITION or control_type == ControlType.VELOCITY
-                        else None
-                    ),
+                    kp=None if controller.isaac_kp is None else controller.isaac_kp[i],
+                    kd=None if controller.isaac_kd is None else controller.isaac_kd[i],
                 )
 
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
@@ -900,24 +896,6 @@ class ControllableObject(BaseObject):
             "effort": (-self.max_joint_efforts, self.max_joint_efforts),
             "has_limit": self.joint_has_limits,
         }
-
-    @property
-    def default_kp(self):
-        """
-        Returns:
-            float: Default kp gain to apply to any DOF when switching control modes (e.g.: switching from a
-                velocity control mode to a position control mode)
-        """
-        return 1e7
-
-    @property
-    def default_kd(self):
-        """
-        Returns:
-            float: Default kd gain to apply to any DOF when switching control modes (e.g.: switching from a
-                position control mode to a velocity control mode)
-        """
-        return 1e5
 
     @property
     def reset_joint_pos(self):

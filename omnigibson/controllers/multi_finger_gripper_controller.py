@@ -40,6 +40,8 @@ class MultiFingerGripperController(GripperController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
         inverted=False,
         mode="binary",
         open_qpos=None,
@@ -69,6 +71,12 @@ class MultiFingerGripperController(GripperController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             inverted (bool): whether or not the command direction (grasp is negative) and the control direction are
                 inverted, e.g. to grasp you need to move the joint in the positive direction.
             mode (str): mode for this controller. Valid options are:
@@ -116,6 +124,8 @@ class MultiFingerGripperController(GripperController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def _generate_default_command_output_limits(self):
