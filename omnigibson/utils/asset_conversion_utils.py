@@ -437,7 +437,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     # default_mat_is_used = False
 
     # Grab all visual objs for this object
-    urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/{obj_model}_with_metalinks.urdf"
+    urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/urdf/{obj_model}_with_meta_links.urdf"
     visual_objs = _get_visual_objs_from_urdf(urdf_path)
 
     # Extract absolute paths to mtl files for each link
@@ -630,13 +630,14 @@ def _add_xform_properties(prim):
     xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
 
-def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
+def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_link_type, meta_link_infos):
     """
     Process a meta link by creating visual meshes or lights below it.
 
     Args:
         stage (pxr.Usd.Stage): The USD stage where the meta link will be processed.
         obj_model (str): The object model name.
+        link_name (str): Name of the meta link's parent link (e.g. what part of the object the meta link is attached to).
         meta_link_type (str): The type of the meta link. Must be one of the allowed meta types.
         meta_link_infos (dict): A dictionary containing meta link information. The keys are link IDs and the values are lists of mesh information dictionaries.
 
@@ -648,18 +649,12 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
         ValueError: If an invalid light type or mesh type is encountered.
 
     Notes:
-        - Temporarily disables importing of fillable meshes for "container" meta link type.
         - Handles specific meta link types such as "togglebutton", "particleapplier", "particleremover", "particlesink", and "particlesource".
         - For "particleapplier" meta link type, adjusts the orientation if the mesh type is "cone".
         - Creates lights or primitive shapes based on the meta link type and mesh information.
         - Sets various attributes for lights and meshes, including color, intensity, size, and scale.
         - Makes meshes invisible and sets their local pose.
     """
-    # TODO: Reenable after fillable meshes are backported into 3ds Max.
-    # Temporarily disable importing of fillable meshes.
-    if meta_link_type in ["container"]:
-        return
-
     assert meta_link_type in _ALLOWED_META_TYPES
     if _ALLOWED_META_TYPES[meta_link_type] not in ["primitive", "light"] and meta_link_type != "particlesource":
         return
@@ -686,13 +681,13 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             assert len(mesh_info_list) == 1, f"Invalid number of meshes for {meta_link_type}"
 
         meta_link_in_parent_link_pos, meta_link_in_parent_link_orn = (
-            mesh_info_list[0]["position"],
-            mesh_info_list[0]["orientation"],
+            th.tensor(mesh_info_list[0]["position"]),
+            th.tensor(mesh_info_list[0]["orientation"]),
         )
 
         # For particle applier only, the orientation of the meta link matters (particle should shoot towards the negative z-axis)
         # If the meta link is created based on the orientation of the first mesh that is a cone, we need to rotate it by 180 degrees
-        # because the cone is pointing in the wrong direction. This is already done in update_obj_urdf_with_metalinks;
+        # because the cone is pointing in the wrong direction. This is already done in update_obj_urdf_with_meta_links;
         # we just need to make sure meta_link_in_parent_link_orn is updated correctly.
         if meta_link_type == "particleapplier" and mesh_info_list[0]["type"] == "cone":
             meta_link_in_parent_link_orn = T.quat_multiply(
@@ -704,7 +699,7 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             if is_light:
                 # Create a light
                 light_type = _LIGHT_MAPPING[mesh_info["type"]]
-                prim_path = f"/{obj_model}/lights_{link_id}_0_link/light_{i}"
+                prim_path = f"/{obj_model}/__meta_{link_name}_lights_{link_id}_0_link/light_{i}"
                 prim = getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(stage, prim_path).GetPrim()
                 lazy.pxr.UsdLux.ShapingAPI.Apply(prim).GetShapingConeAngleAttr().Set(180.0)
             else:
@@ -713,7 +708,7 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                 else:
                     # Create a primitive shape
                     mesh_type = mesh_info["type"].capitalize() if mesh_info["type"] != "box" else "Cube"
-                prim_path = f"/{obj_model}/{meta_link_type}_{link_id}_0_link/mesh_{i}"
+                prim_path = f"/{obj_model}/__meta_{link_name}_{meta_link_type}_{link_id}_0_link/mesh_{i}"
                 assert hasattr(lazy.pxr.UsdGeom, mesh_type)
                 # togglebutton has to be a sphere
                 if meta_link_type in ["togglebutton"]:
@@ -816,9 +811,6 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                     )
                 else:
                     raise ValueError(f"Invalid mesh type: {mesh_type}")
-
-                # Make invisible
-                lazy.pxr.UsdGeom.Imageable(xform_prim.prim).MakeInvisible()
 
             xform_prim.set_local_pose(
                 translation=mesh_in_meta_link_pos,
@@ -942,10 +934,32 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
 
     log.debug("Process meta links")
 
-    # TODO: Use parent link name
+    # Convert primitive meta links
     for link_name, link_metadata in meta_links.items():
         for meta_link_type, meta_link_infos in link_metadata.items():
-            _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos)
+            _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_link_type, meta_link_infos)
+
+    # Get all meta links, set them to guide purpose, and add some metadata
+    # Here we want to include every link that has the __meta prefix.
+    meta_link_prims = [p for p in prim.GetChildren() if p.GetName().startswith("__meta_")]
+    for meta_prim in meta_link_prims:
+        # Get meta link information
+        unparsed_meta = meta_prim.GetName()[7:-5]  # remove __meta_ and _link
+        link_name, meta_link_type, link_id, link_sub_id = unparsed_meta.rsplit("_", 3)
+
+        # Add the is_meta_link, meta_link_type, and meta_link_id attributes
+        meta_prim.CreateAttribute("ig:isMetaLink", lazy.pxr.Sdf.ValueTypeNames.Bool)
+        meta_prim.GetAttribute("ig:isMetaLink").Set(True)
+        meta_prim.CreateAttribute("ig:metaLinkType", lazy.pxr.Sdf.ValueTypeNames.String)
+        meta_prim.GetAttribute("ig:metaLinkType").Set(meta_link_type)
+        meta_prim.CreateAttribute("ig:metaLinkId", lazy.pxr.Sdf.ValueTypeNames.String)
+        meta_prim.GetAttribute("ig:metaLinkId").Set(link_id)
+        meta_prim.CreateAttribute("ig:metaLinkSubId", lazy.pxr.Sdf.ValueTypeNames.Int)
+        meta_prim.GetAttribute("ig:metaLinkId").Set(int(link_sub_id))
+
+        # Set the purpose of the meta link
+        purpose_attr = lazy.pxr.UsdGeom.Imageable(meta_prim).CreatePurposeAttr()
+        purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
 
     log.debug("Done processing meta links")
 
@@ -1152,8 +1166,8 @@ def import_obj_urdf(
             - str: Absolute path to post-processed URDF file used to generate USD
             - str: Absolute path to the imported USD file
     """
-    # Preprocess input URDF to account for metalinks
-    urdf_path = _add_metalinks_to_urdf(
+    # Preprocess input URDF to account for meta links
+    urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
     # Import URDF
@@ -1323,9 +1337,9 @@ def _create_urdf_link(name, subelements=None, mass=None, inertia=None):
     return link
 
 
-def _create_urdf_metalink(
+def _create_urdf_meta_link(
     root_element,
-    metalink_name,
+    meta_link_name,
     parent_link_name="base_link",
     pos=(0, 0, 0),
     rpy=(0, 0, 0),
@@ -1334,8 +1348,8 @@ def _create_urdf_metalink(
     Creates the appropriate URDF joint and link for a meta link and appends it to the root element.
 
     Args:
-        root_element (Element): The root XML element to which the metalink will be appended.
-        metalink_name (str): The name of the metalink to be created.
+        root_element (Element): The root XML element to which the meta link will be appended.
+        meta_link_name (str): The name of the meta link to be created.
         parent_link_name (str, optional): The name of the parent link. Defaults to "base_link".
         pos (tuple, optional): The position of the joint in the form (x, y, z). Defaults to (0, 0, 0).
         rpy (tuple, optional): The roll, pitch, and yaw of the joint in the form (r, p, y). Defaults to (0, 0, 0).
@@ -1345,16 +1359,16 @@ def _create_urdf_metalink(
     """
     # Create joint
     jnt = _create_urdf_joint(
-        name=f"{metalink_name}_joint",
+        name=f"{meta_link_name}_joint",
         parent=parent_link_name,
-        child=f"{metalink_name}_link",
+        child=f"{meta_link_name}_link",
         pos=pos,
         rpy=rpy,
         joint_type="fixed",
     )
     # Create child link
     link = _create_urdf_link(
-        name=f"{metalink_name}_link",
+        name=f"{meta_link_name}_link",
         mass=0.0001,
         inertia=[0.00001, 0.00001, 0.00001, 0, 0, 0],
     )
@@ -1393,7 +1407,7 @@ def _save_xmltree_as_urdf(root_element, name, dirpath, unique_urdf=False):
     return fpath
 
 
-def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
+def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     """
     Adds meta links to a URDF file based on metadata.
 
@@ -1446,11 +1460,6 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                     meta_link_name in _ALLOWED_META_TYPES
                 ), f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
 
-                # TODO: Reenable after fillable meshes are backported into 3ds Max.
-                # Temporarily disable importing of fillable meshes.
-                if meta_link_name in ["container"]:
-                    continue
-
                 for ml_id, attrs_list in ml_attrs.items():
                     if len(attrs_list) > 0:
                         if _ALLOWED_META_TYPES[meta_link_name] != "dimensionless":
@@ -1465,12 +1474,6 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                     len(attrs_list) == 1
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
 
-                        # TODO: Remove this after this is fixed.
-                        if type(attrs_list) is dict:
-                            keys = [str(x) for x in range(len(attrs_list))]
-                            assert set(attrs_list.keys()) == set(keys), "Unexpected keys"
-                            attrs_list = [attrs_list[k] for k in keys]
-
                         for i, attrs in enumerate(attrs_list):
                             pos = th.as_tensor(attrs["position"])
                             quat = th.as_tensor(attrs["orientation"])
@@ -1484,10 +1487,10 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
                                 quat = T.quat_multiply(quat, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0])))
 
-                            # Create metalink
-                            _create_urdf_metalink(
+                            # Create meta link
+                            _create_urdf_meta_link(
                                 root_element=root,
-                                metalink_name=f"{meta_link_name}_{ml_id}_{i}",
+                                meta_link_name=f"{meta_link_name}_{ml_id}_{i}",
                                 parent_link_name=parent_link_name,
                                 pos=pos,
                                 rpy=T.quat2euler(quat),
@@ -1496,7 +1499,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     # Export this URDF
     return _save_xmltree_as_urdf(
         root_element=root,
-        name=f"{obj_model}_with_metalinks",
+        name=f"{obj_model}_with_meta_links",
         dirpath=f"{model_root_path}/urdf",
         unique_urdf=False,
     )
@@ -2382,7 +2385,7 @@ def import_og_asset_from_urdf(
         merge_fixed_joints=merge_fixed_joints,
     )
 
-    # Copy metalinks URDF to original name of object model
+    # Copy meta links URDF to original name of object model
     shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
 
     prim = import_obj_metadata(
