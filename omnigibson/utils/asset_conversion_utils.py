@@ -1472,8 +1472,8 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                             attrs_list = [attrs_list[k] for k in keys]
 
                         for i, attrs in enumerate(attrs_list):
-                            pos = attrs["position"]
-                            quat = attrs["orientation"]
+                            pos = th.as_tensor(attrs["position"])
+                            quat = th.as_tensor(attrs["orientation"])
 
                             # For particle applier only, the orientation of the meta link matters (particle should shoot towards the negative z-axis)
                             # If the meta link is created based on the orientation of the first mesh that is a cone, we need to rotate it by 180 degrees
