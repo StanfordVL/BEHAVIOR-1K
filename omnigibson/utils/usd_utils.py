@@ -856,12 +856,16 @@ class BatchControlViewAPIImpl:
     def post_physics_step(self):
         # Should be called every sim physics step, right after a new physics step occurs
         # The current poses (if it exists) are now the former poses from the previous timestep
-        if "root_transforms" in self._read_cache:
+        if "root_transforms" in self._read_cache \
+                and "link_transforms" in self._read_cache \
+                and "dof_positions" in self._read_cache:
             self._last_state = {
                 "root_transforms": cb.copy(self._read_cache["root_transforms"]),
                 "link_transforms": cb.copy(self._read_cache["link_transforms"]),
                 "dof_positions": cb.copy(self._read_cache["dof_positions"]),
             }
+        else:
+            self._last_state = None
 
         # Clear the internal data since everything is outdated
         self.clear(keep_last_pose=True)
@@ -873,9 +877,10 @@ class BatchControlViewAPIImpl:
             self._last_state = None
 
         # Update the transforms internally so that they're guaranteed to exist during the beginning of the next timestep
-        self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
-        self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
-        self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
+        if og.sim.is_playing():
+            self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
+            self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+            self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
     def _set_dof_position_targets(self, data, indices, cast=True):
         # No casting results in better efficiency
