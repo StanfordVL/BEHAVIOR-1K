@@ -553,7 +553,8 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
     assert euler.shape[-1] == 3, "Invalid input shape"
 
     # Unpack roll, pitch, yaw
-    roll, pitch, yaw = euler.unbind(-1)
+    unbound_euler = euler.unbind(-1)
+    roll, pitch, yaw = unbound_euler[0], unbound_euler[1], unbound_euler[2]
 
     # Compute sines and cosines of half angles
     cy = torch.cos(yaw * 0.5)
@@ -1482,7 +1483,7 @@ def euler_intrinsic2mat(euler):
     Returns:
         torch.tensor: 3x3 rotation matrix
     """
-    roll, pitch, yaw = euler
+    roll, pitch, yaw = euler[0], euler[1], euler[2]
     # Rotation matrix around X-axis
     Rx = torch.tensor([[1, 0, 0], [0, torch.cos(roll), -torch.sin(roll)], [0, torch.sin(roll), torch.cos(roll)]])
 
