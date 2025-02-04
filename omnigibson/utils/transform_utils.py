@@ -383,21 +383,21 @@ def quat2mat(quaternion):
     yw = outer[..., 1, 3]
     zw = outer[..., 2, 3]
 
-    rotation_matrix = torch.empty(quaternion.shape[:-1] + (3, 3), dtype=quaternion.dtype, device=quaternion.device)
+    rmat = torch.empty(quaternion.shape[:-1] + (3, 3), dtype=quaternion.dtype, device=quaternion.device)
 
-    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
-    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
-    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
+    rmat[..., 0, 0] = 1 - 2 * (yy + zz)
+    rmat[..., 0, 1] = 2 * (xy - zw)
+    rmat[..., 0, 2] = 2 * (xz + yw)
 
-    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
-    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
-    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
+    rmat[..., 1, 0] = 2 * (xy + zw)
+    rmat[..., 1, 1] = 1 - 2 * (xx + zz)
+    rmat[..., 1, 2] = 2 * (yz - xw)
 
-    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
-    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
-    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
+    rmat[..., 2, 0] = 2 * (xz - yw)
+    rmat[..., 2, 1] = 2 * (yz + xw)
+    rmat[..., 2, 2] = 1 - 2 * (xx + yy)
 
-    return rotation_matrix
+    return rmat
 
 
 @torch.jit.script
@@ -531,9 +531,9 @@ def vec2quat(vec: torch.Tensor, up: torch.Tensor = torch.tensor([0.0, 0.0, 1.0])
     s_n = torch.cross(up_n, vec_n, dim=-1)
     u_n = torch.cross(vec_n, s_n, dim=-1)
 
-    rotation_matrix = torch.stack([vec_n, s_n, u_n], dim=-1)
+    rmat = torch.stack([vec_n, s_n, u_n], dim=-1)
 
-    return mat2quat(rotation_matrix)
+    return mat2quat(rmat)
 
 
 @torch.jit.script
@@ -1464,8 +1464,8 @@ def mat2euler_intrinsic(rmat):
         yaw = torch.arctan2(-rmat[0, 1], rmat[0, 0])
     else:
         # Gimbal lock case
-        pitch = math.pi / 2 if rotation_matrix[0, 2] == 1 else -math.pi / 2
-        roll = torch.arctan2(rotation_matrix[1, 0], rotation_matrix[1, 1])
+        pitch = math.pi / 2 if rmat[0, 2] == 1 else -math.pi / 2
+        roll = torch.arctan2(rmat[1, 0], rmat[1, 1])
         yaw = 0  # Can set yaw to 0 in gimbal lock
 
     return torch.tensor([roll, pitch, yaw], dtype=torch.float32)
