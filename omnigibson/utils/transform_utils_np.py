@@ -213,6 +213,7 @@ def quat_conjugate(quaternion):
         np.array: (x,y,z,w) quaternion conjugate
     """
     n_dims = len(quaternion.shape)
+    # Reshape to explicitly handle batched calls
     return quaternion * np.array([-1.0, -1.0, -1.0, 1.0], dtype=np.float32).reshape([1] * (n_dims - 1) + [4])
 
 
