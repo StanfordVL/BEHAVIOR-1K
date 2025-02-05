@@ -31,18 +31,16 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-
-# TODO: Tune these default values!
 # TODO (eric): figure out whether one offset can fit all
 m.MAX_CLOTH_PARTICLES = 20000  # Comes from a limitation in physx - do not increase
 m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
 m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
-m.CLOTH_STRETCH_STIFFNESS = 10000.0
-m.CLOTH_BEND_STIFFNESS = 200.0
-m.CLOTH_SHEAR_STIFFNESS = 100.0
-m.CLOTH_DAMPING = 0.2
+m.CLOTH_STRETCH_STIFFNESS = 100.0
+m.CLOTH_BEND_STIFFNESS = 50.0
+m.CLOTH_SHEAR_STIFFNESS = 70.0
+m.CLOTH_DAMPING = 0.02
 m.CLOTH_FRICTION = 0.4
-m.CLOTH_DRAG = 0.001
+m.CLOTH_DRAG = 0.02
 m.CLOTH_LIFT = 0.003
 m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for physical micro particles
 m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE = 0.8  # How much overlap expected between fluid particles at rest
@@ -1715,6 +1713,27 @@ class Cloth(MicroParticleSystem):
                     ms.meshing_isotropic_explicit_remeshing(
                         iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
                     )
+                    # Make sure the clothes is watertight
+                    ms.meshing_repair_non_manifold_edges()
+                    ms.meshing_repair_non_manifold_vertices()
+
+                    # If the cloth has multiple pieces, only keep the largest one
+                    ms.generate_splitting_by_connected_components(delete_source_mesh=True)
+                    if len(ms) > 1:
+                        log.warning(
+                            f"The cloth mesh has {len(ms)} disconnected pieces. To simplify, we only keep the mesh with largest face number."
+                        )
+                        biggest_face_num = 0
+                        for split_mesh in ms:
+                            face_num = split_mesh.face_number()
+                            if face_num > biggest_face_num:
+                                biggest_face_num = face_num
+                        new_ms = pymeshlab.MeshSet()
+                        for split_mesh in ms:
+                            if split_mesh.face_number() == biggest_face_num:
+                                new_ms.add_mesh(split_mesh)
+                        ms = new_ms
+
                     avg_edge_percentage_mismatch = abs(
                         1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"]
                     )
