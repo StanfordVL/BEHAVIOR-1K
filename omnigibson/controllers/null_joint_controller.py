@@ -17,6 +17,8 @@ class NullJointController(JointController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
         default_goal=None,
         pos_kp=None,
         pos_damping_ratio=None,
@@ -45,6 +47,12 @@ class NullJointController(JointController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             default_goal (None or n-array): if specified, should be the same length as @dof_idx, specifying
                 the default joint goal for this controller to converge to
             pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
@@ -67,6 +75,8 @@ class NullJointController(JointController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
             pos_kp=pos_kp,
             pos_damping_ratio=pos_damping_ratio,
             vel_kp=vel_kp,

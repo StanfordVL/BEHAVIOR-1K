@@ -116,7 +116,7 @@ class MovingAverageFilter(Filter):
         state = super()._dump_state()
 
         # Add info from this filter
-        state["past_samples"] = cb.to_torch(self.past_samples)
+        state["past_samples"] = cb.to_torch(cb.copy(self.past_samples))
         state["current_idx"] = self.current_idx
         state["fully_filled"] = self.fully_filled
 
@@ -127,7 +127,7 @@ class MovingAverageFilter(Filter):
         super()._load_state(state=state)
 
         # Load relevant info for this filter
-        self.past_samples = cb.from_torch(state["past_samples"])
+        self.past_samples = cb.copy(cb.from_torch(state["past_samples"]))
         self.current_idx = state["current_idx"]
         self.fully_filled = state["fully_filled"]
 

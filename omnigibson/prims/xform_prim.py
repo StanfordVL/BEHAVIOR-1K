@@ -344,7 +344,7 @@ class XFormPrim(BasePrim):
         logger.warning(
             'get_local_pose is deprecated and will be removed in a future release. Use get_position_orientation(frame="parent") instead'
         )
-        return self.get_position_orientation(self.prim_path, frame="parent")
+        return self.get_position_orientation(frame="parent")
 
     def set_local_pose(self, position=None, orientation=None):
         """
@@ -359,7 +359,7 @@ class XFormPrim(BasePrim):
         logger.warning(
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
-        return self.set_position_orientation(self.prim_path, position, orientation, frame="parent")
+        return self.set_position_orientation(position, orientation, frame="parent")
 
     def get_world_scale(self):
         """

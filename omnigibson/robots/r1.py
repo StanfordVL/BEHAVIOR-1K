@@ -4,7 +4,6 @@ import torch as th
 
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
 from omnigibson.utils.python_utils import classproperty
 
@@ -34,6 +33,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -73,6 +74,12 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -106,6 +113,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
@@ -164,30 +173,6 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
             pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
         return pos
-
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.087}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([-0.032, 0.0, -0.01])),
-                GraspingPoint(link_name=f"{arm}_gripper_link1", position=th.tensor([0.025, 0.0, -0.01])),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            arm: [
-                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([-0.032, 0.0, -0.01])),
-                GraspingPoint(link_name=f"{arm}_gripper_link2", position=th.tensor([0.025, 0.0, -0.01])),
-            ]
-            for arm in self.arm_names
-        }
 
     @cached_property
     def floor_touching_base_link_names(self):

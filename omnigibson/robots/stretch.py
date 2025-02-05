@@ -4,7 +4,7 @@ from functools import cached_property
 import torch as th
 
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -53,28 +53,6 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def wheel_axle_length(self):
         return 0.330
-
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.04}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.01, 0.0, 0.009])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.013, 0.0, 0.01])),
-                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([-0.01, 0.0, 0.009])),
-            ]
-        }
 
     @property
     def disabled_collision_pairs(self):

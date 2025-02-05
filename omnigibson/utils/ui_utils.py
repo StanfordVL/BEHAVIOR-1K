@@ -659,18 +659,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.1}
 
         return mapping
 
@@ -687,18 +687,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.25}
 
         return mapping
 

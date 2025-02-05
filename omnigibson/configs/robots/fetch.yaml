@@ -17,6 +17,8 @@ robot:
   self_collision: true
   grasping_mode: physical
   default_arm_pose: vertical
+  include_sensor_names: null
+  exclude_sensor_names: null
   sensor_config:
     VisionSensor:
       sensor_kwargs:
