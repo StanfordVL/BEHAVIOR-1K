@@ -18,7 +18,7 @@ class PathTracingSettings(SettingsBase):
     def __init__(self):
         self.anti_aliasing_settings = AntiAliasingSettings()
         self.firefly_filter_settings = FireflyFilterSettings()
-        self.path_tracing_settings = PathTracingSettings()
+        self.path_tracing_settings = PathTracingSpecificSettings()
         self.sampling_and_caching_settings = SamplingAndCachingSettings()
         self.denoising_settings = DenoisingSettings()
         self.path_traced_fog_settings = PathTracedFogSettings()
@@ -101,7 +101,7 @@ class FireflyFilterSettings(SubSettingsBase):
         return "/rtx/pathtracing/fireflyFilter/enabled"
 
 
-class PathTracingSettings(SubSettingsBase):
+class PathTracingSpecificSettings(SubSettingsBase):
     def __init__(self):
         self._carb_settings = lazy.carb.settings.get_settings()
 

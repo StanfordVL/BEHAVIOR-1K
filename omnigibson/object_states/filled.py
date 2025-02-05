@@ -1,5 +1,3 @@
-import torch as th
-
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
@@ -15,7 +13,6 @@ m.N_MAX_MICRO_PARTICLE_SAMPLES = 100000
 
 
 class Filled(RelativeObjectState, BooleanStateMixin):
-
     def _get_value(self, system):
         # Sanity check to make sure system is valid
         assert self.obj.scene.is_physical_particle_system(

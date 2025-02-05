@@ -10,7 +10,6 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import Serializable, get_uuid
-from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute

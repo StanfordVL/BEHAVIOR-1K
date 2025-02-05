@@ -295,7 +295,7 @@ class MultiFingerGripperController(GripperController):
         # Just use a zero vector
         return dict(target=cb.zeros(self.command_dim))
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         # Take care of the special case of binary control
         if self._mode == "binary":
             command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
@@ -304,7 +304,7 @@ class MultiFingerGripperController(GripperController):
             return cb.array([command_val])
 
         if self._motor_type == "position":
-            command = control_dict[f"joint_position"][self.dof_idx]
+            command = control_dict["joint_position"][self.dof_idx]
         elif self._motor_type == "velocity":
             command = cb.zeros(self.command_dim)
         else:

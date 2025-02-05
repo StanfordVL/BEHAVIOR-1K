@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 import torch as th
 
 import omnigibson as og
@@ -173,19 +172,20 @@ def test_arm_control():
             position=th.tensor([0.0, i * 5.0, 0.0]), orientation=T.euler2quat(th.tensor([0.0, 0.0, np.pi / 3]))
         )
         robot.reset()
-        robot.keep_still()
 
     # Take 10 steps to stabilize
     for _ in range(10):
         og.sim.step()
 
-    # Update initial state
+    # Keep all robots still
+    for robot in env.robots:
+        robot.keep_still()
+
+    # Update initial state (robot should be stable and still)
     env.scene.update_initial_state()
 
-    # Reset the environment and keep all robots still
-    env.reset()
-    for i, robot in enumerate(env.robots):
-        robot.keep_still()
+    # Reset the environment
+    env.scene.reset()
 
     # Record initial eef pose of all robots
     initial_eef_pose = dict()
@@ -268,17 +268,14 @@ def test_arm_control():
                     base_move_action[start_idx] = 0.1
                 actions["base_move"][robot.name] = base_move_action
 
-            # Update the state (e.g. goal) of the new controllers to the initial state
+            # Update the state (e.g. goal, which is None) of the new controllers to the initial state
             # This step is crucial because if env.reset() is called directly, we will load the state of the old controllers and step physics,
             # which causes can cause errors because the goal is obsolete.
             env.scene.update_initial_state()
 
-            # For each action set, reset all robots, then run actions and see if arm moves in expected way
+            # For each action set, reset the scene, then run actions and see if arm moves in expected way
             for action_name, action in actions.items():
-                # Reset the environment and keep all robots still
-                env.reset()
-                for i, robot in enumerate(env.robots):
-                    robot.keep_still()
+                env.scene.reset()
 
                 # Take N steps with given action and check for error
                 for _ in range(n_steps[controller_mode][action_name]):

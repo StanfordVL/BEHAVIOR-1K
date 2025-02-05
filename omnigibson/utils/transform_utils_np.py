@@ -82,12 +82,12 @@ def unit_vector(data, axis=None, out=None):
 
         >>> v0 = numpy.random.rand(5, 4, 3)
         >>> v1 = unit_vector(v0, axis=-1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=2)), 2)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0 * v0, axis=2)), 2)
         >>> numpy.allclose(v1, v2)
         True
 
         >>> v1 = unit_vector(v0, axis=1)
-        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0*v0, axis=1)), 1)
+        >>> v2 = v0 / numpy.expand_dims(numpy.sqrt(numpy.sum(v0 * v0, axis=1)), 1)
         >>> numpy.allclose(v1, v2)
         True
 
@@ -526,7 +526,7 @@ def vec2quat(vec, up=(0, 0, 1.0)):
 
 def euler2quat(euler):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -542,7 +542,7 @@ def euler2quat(euler):
 
 def quat2euler(quat):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
@@ -558,7 +558,7 @@ def quat2euler(quat):
 
 def euler2mat(euler):
     """
-    Converts euler angles into rotation matrix form
+    Converts extrinsic euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -578,13 +578,13 @@ def euler2mat(euler):
 
 def mat2euler(rmat):
     """
-    Converts given rotation matrix to euler angles in radian.
+    Converts given rotation matrix to extrinsic euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
 
     Returns:
-        np.array: (r,p,y) converted euler angles in radian vec3 float
+        np.array: (r,p,y) converted extrinsic euler angles in radian vec3 float
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
@@ -840,11 +840,11 @@ def rotation_matrix(angle, direction, point=None):
     Returns matrix to rotate about axis defined by point and direction.
 
     E.g.:
-        >>> angle = (random.random() - 0.5) * (2*math.pi)
+        >>> angle = (random.random() - 0.5) * (2 * math.pi)
         >>> direc = numpy.random.random(3) - 0.5
         >>> point = numpy.random.random(3) - 0.5
         >>> R0 = rotation_matrix(angle, direc, point)
-        >>> R1 = rotation_matrix(angle-2*math.pi, direc, point)
+        >>> R1 = rotation_matrix(angle - 2 * math.pi, direc, point)
         >>> is_same_transform(R0, R1)
         True
 
@@ -854,11 +854,10 @@ def rotation_matrix(angle, direction, point=None):
         True
 
         >>> I = numpy.identity(4, numpy.float32)
-        >>> numpy.allclose(I, rotation_matrix(math.pi*2, direc))
+        >>> numpy.allclose(I, rotation_matrix(math.pi * 2, direc))
         True
 
-        >>> numpy.allclose(2., numpy.trace(rotation_matrix(math.pi/2,
-        ...                                                direc, point)))
+        >>> numpy.allclose(2.0, numpy.trace(rotation_matrix(math.pi / 2, direc, point)))
         True
 
     Args:
@@ -1135,29 +1134,8 @@ def align_vector_sets(vec_set1, vec_set2):
     Returns:
         np.array: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
-
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
-
-    # Construct the quaternion
-    quat = np.stack([x, y, z, w])
-
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = np.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
-
-    # Normalize the quaternion
-    quat = quat / (np.linalg.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    rot, _ = R.align_vectors(vec_set1, vec_set2)
+    return rot.as_quat()
 
 
 def l2_distance(v1, v2):
@@ -1298,3 +1276,63 @@ def orientation_error(desired, current):
     error = error.reshape(*input_shape, 3)
 
     return error
+
+
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (np.array): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        np.array: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = np.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return np.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis
+    K = np.array([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+
+    return R
+
+
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (np.array): 3x3 rotation matrix
+
+    Returns:
+        np.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    return R.from_matrix(rmat).as_euler("XYZ")
+
+
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (np.array): (r,p,y) angles
+
+    Returns:
+        np.array: 3x3 rotation matrix
+    """
+    return R.from_euler("XYZ", euler).as_matrix()

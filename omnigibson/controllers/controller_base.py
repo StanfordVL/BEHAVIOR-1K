@@ -129,12 +129,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Standardize command input / output limits to be (min_array, max_array)
         command_input_limits = (
             self._generate_default_command_input_limits()
-            if type(command_input_limits) == str and command_input_limits == "default"
+            if type(command_input_limits) is str and command_input_limits == "default"
             else command_input_limits
         )
         command_output_limits = (
             self._generate_default_command_output_limits()
-            if type(command_output_limits) == str and command_output_limits == "default"
+            if type(command_output_limits) is str and command_output_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (
@@ -364,12 +364,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         if self._goal is None:
             self._goal = self.compute_no_op_goal(control_dict=control_dict)
-        command = self._compute_no_op_action(control_dict=control_dict)
+        command = self._compute_no_op_command(control_dict=control_dict)
         return cb.to_torch(self._reverse_preprocess_command(command))
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         """
-        Compute no-op action given the goal
+        Compute no-op command given the goal
         """
         raise NotImplementedError
 
@@ -451,7 +451,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         return (
             nums
             if isinstance(nums, cb.arr_type)
-            else cb.array(nums) if isinstance(nums, Iterable) else cb.ones(dim) * nums
+            else cb.array(nums)
+            if isinstance(nums, Iterable)
+            else cb.ones(dim) * nums
         )
 
     @property

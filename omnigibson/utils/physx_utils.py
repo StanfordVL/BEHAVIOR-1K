@@ -2,7 +2,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.utils.ui_utils import suppress_omni_log
 
 # Create settings for this module

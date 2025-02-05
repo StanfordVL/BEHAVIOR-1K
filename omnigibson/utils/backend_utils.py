@@ -21,7 +21,6 @@ def add_compute_function(name, np_function, th_function):
 
 
 class _ComputeBackend:
-
     # Dictionary mapping custom externally-defined function name to function
     _custom_fcns = None
 

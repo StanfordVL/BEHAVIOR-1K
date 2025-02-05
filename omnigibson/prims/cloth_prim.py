@@ -8,7 +8,6 @@
 #
 
 import math
-from collections.abc import Iterable
 from functools import cached_property
 
 import torch as th
@@ -20,7 +19,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -136,6 +135,19 @@ class ClothPrim(GeomPrim):
 
         # Store the default position of the points in the local frame
         self._default_positions = vtarray_to_torch(self.get_attribute(attr="points"))
+
+    # For cloth, points should NOT be @cached_property because their local poses change over time
+    @property
+    def points(self):
+        """
+        Returns:
+            th.tensor: Local poses of all points
+        """
+        # If the geom is a mesh we can directly return its points.
+        mesh = self.prim
+        mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+        assert mesh_type == "Mesh", f"Expected a mesh prim, got {mesh_type} instead!"
+        return vtarray_to_torch(mesh.GetAttribute("points").Get(), dtype=th.float32)
 
     @property
     def visual_aabb(self):

@@ -13,6 +13,8 @@ from numba import jit, prange
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.macros import gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
@@ -128,7 +130,7 @@ def create_joint(
     # Make sure at least body0 or body1 is specified
     assert (
         body0 is not None or body1 is not None
-    ), f"At least either body0 or body1 must be specified when creating a joint!"
+    ), "At least either body0 or body1 must be specified when creating a joint!"
 
     # Create the joint
     joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
@@ -1723,7 +1725,7 @@ def add_asset_to_stage(asset_path, prim_path):
     """
     # Make sure this is actually a supported asset type
     asset_type = asset_path.split(".")[-1]
-    assert asset_type in {"usd", "usda", "obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
+    assert asset_type in {"usd", "usda", "obj"}, "Cannot load a non-USD or non-OBJ file as a USD prim!"
 
     # Make sure the path exists
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
@@ -1876,9 +1878,6 @@ def delete_or_deactivate_prim(prim_path):
     return True
 
 
-import omnigibson.utils.transform_utils as TT
-
-
 @th.compile
 def _compute_relative_poses_torch(
     idx: int,
@@ -1904,9 +1903,6 @@ def _compute_relative_poses_torch(
     rel_poses[:, 3:] = TT.mat2quat(rel_tfs[:, :3, :3])
 
     return rel_poses
-
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 @jit(nopython=True)

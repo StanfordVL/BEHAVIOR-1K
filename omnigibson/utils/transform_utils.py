@@ -7,7 +7,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 """
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 
 import torch
 
@@ -43,27 +43,27 @@ _AXES2TUPLE = {
 }
 
 
-@torch.compile
+@torch.jit.script
 def copysign(a, b):
     # type: (float, torch.Tensor) -> torch.Tensor
     a = torch.tensor(a, device=b.device, dtype=torch.float).repeat(b.shape[0])
     return torch.abs(a) * torch.sign(b)
 
 
-@torch.compile
+@torch.jit.script
 def anorm(x: torch.Tensor, dim: Optional[int] = None, keepdim: bool = False) -> torch.Tensor:
     """Compute L2 norms along specified axes."""
     return torch.norm(x, dim=dim, keepdim=keepdim)
 
 
-@torch.compile
+@torch.jit.script
 def normalize(v: torch.Tensor, dim: Optional[int] = None, eps: float = 1e-10) -> torch.Tensor:
     """L2 Normalize along specified axes."""
     norm = anorm(v, dim=dim, keepdim=True)
     return v / torch.where(norm < eps, torch.full_like(norm, eps), norm)
 
 
-@torch.compile
+@torch.jit.script
 def dot(v1, v2, dim=-1, keepdim=False):
     """
     Computes dot product between two vectors along the provided dim, optionally keeping the dimension
@@ -81,7 +81,7 @@ def dot(v1, v2, dim=-1, keepdim=False):
     return torch.sum(v1 * v2, dim=dim, keepdim=keepdim)
 
 
-@torch.compile
+@torch.jit.script
 def unit_vector(data: torch.Tensor, dim: Optional[int] = None, out: Optional[torch.Tensor] = None) -> torch.Tensor:
     """
     Returns tensor normalized by length, i.e. Euclidean norm, along axis.
@@ -116,7 +116,7 @@ def unit_vector(data: torch.Tensor, dim: Optional[int] = None, out: Optional[tor
     return data
 
 
-@torch.compile
+@torch.jit.script
 def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
     """
     Apply a quaternion rotation to a vector (equivalent to R.from_quat(x).apply(y))
@@ -161,7 +161,7 @@ def quat_apply(quat: torch.Tensor, vec: torch.Tensor) -> torch.Tensor:
     return result.squeeze()
 
 
-@torch.compile
+@torch.jit.script
 def convert_quat(q: torch.Tensor, to: str = "xyzw") -> torch.Tensor:
     """
     Converts quaternion from one convention to another.
@@ -183,7 +183,7 @@ def convert_quat(q: torch.Tensor, to: str = "xyzw") -> torch.Tensor:
         raise ValueError("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
 
 
-@torch.compile
+@torch.jit.script
 def quat_multiply(quaternion1: torch.Tensor, quaternion0: torch.Tensor) -> torch.Tensor:
     """
     Return multiplication of two quaternions (q1 * q0).
@@ -209,7 +209,7 @@ def quat_multiply(quaternion1: torch.Tensor, quaternion0: torch.Tensor) -> torch
     )
 
 
-@torch.compile
+@torch.jit.script
 def quat_conjugate(quaternion: torch.Tensor) -> torch.Tensor:
     """
     Return conjugate of quaternion.
@@ -223,7 +223,7 @@ def quat_conjugate(quaternion: torch.Tensor) -> torch.Tensor:
     return torch.cat([-quaternion[:3], quaternion[3:]])
 
 
-@torch.compile
+@torch.jit.script
 def quat_inverse(quaternion: torch.Tensor) -> torch.Tensor:
     """
     Return inverse of quaternion.
@@ -243,7 +243,7 @@ def quat_inverse(quaternion: torch.Tensor) -> torch.Tensor:
     return quat_conjugate(quaternion) / torch.dot(quaternion, quaternion)
 
 
-@torch.compile
+@torch.jit.script
 def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
@@ -258,7 +258,7 @@ def quat_distance(quaternion1, quaternion0):
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
-@torch.compile
+@torch.jit.script
 def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
     """
     Return spherical linear interpolation between two quaternions.
@@ -310,7 +310,7 @@ def quat_slerp(quat0, quat1, frac, shortestpath=True, eps=1.0e-15):
     return val.reshape(list(quat_shape))
 
 
-@torch.compile
+@torch.jit.script
 def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
     """
     Generate random rotation quaternions, uniformly distributed over SO(3).
@@ -335,7 +335,7 @@ def random_quaternion(num_quaternions: int = 1) -> torch.Tensor:
     return quaternions
 
 
-@torch.compile
+@torch.jit.script
 def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     """
     Samples an axis-angle rotation by first sampling a random axis
@@ -357,7 +357,7 @@ def random_axis_angle(angle_limit: float = 2.0 * math.pi):
     return random_axis, random_angle.item()
 
 
-@torch.compile
+@torch.jit.script
 def quat2mat(quaternion):
     """
     Convert quaternions into rotation matrices.
@@ -383,24 +383,24 @@ def quat2mat(quaternion):
     yw = outer[..., 1, 3]
     zw = outer[..., 2, 3]
 
-    rotation_matrix = torch.empty(quaternion.shape[:-1] + (3, 3), dtype=quaternion.dtype, device=quaternion.device)
+    rmat = torch.empty(quaternion.shape[:-1] + (3, 3), dtype=quaternion.dtype, device=quaternion.device)
 
-    rotation_matrix[..., 0, 0] = 1 - 2 * (yy + zz)
-    rotation_matrix[..., 0, 1] = 2 * (xy - zw)
-    rotation_matrix[..., 0, 2] = 2 * (xz + yw)
+    rmat[..., 0, 0] = 1 - 2 * (yy + zz)
+    rmat[..., 0, 1] = 2 * (xy - zw)
+    rmat[..., 0, 2] = 2 * (xz + yw)
 
-    rotation_matrix[..., 1, 0] = 2 * (xy + zw)
-    rotation_matrix[..., 1, 1] = 1 - 2 * (xx + zz)
-    rotation_matrix[..., 1, 2] = 2 * (yz - xw)
+    rmat[..., 1, 0] = 2 * (xy + zw)
+    rmat[..., 1, 1] = 1 - 2 * (xx + zz)
+    rmat[..., 1, 2] = 2 * (yz - xw)
 
-    rotation_matrix[..., 2, 0] = 2 * (xz - yw)
-    rotation_matrix[..., 2, 1] = 2 * (yz + xw)
-    rotation_matrix[..., 2, 2] = 1 - 2 * (xx + yy)
+    rmat[..., 2, 0] = 2 * (xz - yw)
+    rmat[..., 2, 1] = 2 * (yz + xw)
+    rmat[..., 2, 2] = 1 - 2 * (xx + yy)
 
-    return rotation_matrix
+    return rmat
 
 
-@torch.compile
+@torch.jit.script
 def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
     """
     Converts given rotation matrix to quaternion.
@@ -485,7 +485,7 @@ def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
     return mat2quat(rmat)
 
 
-@torch.compile
+@torch.jit.script
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -507,7 +507,7 @@ def mat2pose(hmat):
     return pos, orn
 
 
-@torch.compile
+@torch.jit.script
 def vec2quat(vec: torch.Tensor, up: torch.Tensor = torch.tensor([0.0, 0.0, 1.0])) -> torch.Tensor:
     """
     Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
@@ -531,12 +531,12 @@ def vec2quat(vec: torch.Tensor, up: torch.Tensor = torch.tensor([0.0, 0.0, 1.0])
     s_n = torch.cross(up_n, vec_n, dim=-1)
     u_n = torch.cross(vec_n, s_n, dim=-1)
 
-    rotation_matrix = torch.stack([vec_n, s_n, u_n], dim=-1)
+    rmat = torch.stack([vec_n, s_n, u_n], dim=-1)
 
-    return mat2quat(rotation_matrix)
+    return mat2quat(rmat)
 
 
-@torch.compile
+@torch.jit.script
 def euler2quat(euler: torch.Tensor) -> torch.Tensor:
     """
     Converts euler angles into quaternion form
@@ -553,7 +553,8 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
     assert euler.shape[-1] == 3, "Invalid input shape"
 
     # Unpack roll, pitch, yaw
-    roll, pitch, yaw = euler.unbind(-1)
+    unbound_euler = euler.unbind(-1)
+    roll, pitch, yaw = unbound_euler[0], unbound_euler[1], unbound_euler[2]
 
     # Compute sines and cosines of half angles
     cy = torch.cos(yaw * 0.5)
@@ -573,9 +574,8 @@ def euler2quat(euler: torch.Tensor) -> torch.Tensor:
     return torch.stack([qx, qy, qz, qw], dim=-1)
 
 
-@torch.compile
+@torch.jit.script
 def quat2euler(q):
-
     single_dim = q.dim() == 1
 
     if single_dim:
@@ -603,7 +603,7 @@ def quat2euler(q):
     return euler
 
 
-@torch.compile
+@torch.jit.script
 def euler2mat(euler):
     """
     Converts euler angles into rotation matrix form
@@ -627,7 +627,7 @@ def euler2mat(euler):
     return quat2mat(quat)
 
 
-@torch.compile
+@torch.jit.script
 def mat2euler(rmat):
     """
     Converts given rotation matrix to euler angles in radian.
@@ -653,7 +653,7 @@ def mat2euler(rmat):
     return torch.stack([roll, pitch, yaw], dim=-1)
 
 
-@torch.compile
+@torch.jit.script
 def pose2mat(pose: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
     pos, orn = pose
 
@@ -672,7 +672,7 @@ def pose2mat(pose: Tuple[torch.Tensor, torch.Tensor]) -> torch.Tensor:
     return homo_pose_mat
 
 
-@torch.compile
+@torch.jit.script
 def quat2axisangle(quat):
     """
     Converts quaternion to axis-angle format.
@@ -706,7 +706,7 @@ def quat2axisangle(quat):
     return ret
 
 
-@torch.compile
+@torch.jit.script
 def axisangle2quat(vec, eps=1e-6):
     """
     Converts scaled axis-angle to quat.
@@ -745,7 +745,7 @@ def axisangle2quat(vec, eps=1e-6):
     return quat
 
 
-@torch.compile
+@torch.jit.script
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     """
     Converts a homogenous matrix corresponding to a point C in frame A
@@ -767,7 +767,7 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     return torch.matmul(pose_A_in_B, pose_A)
 
 
-@torch.compile
+@torch.jit.script
 def pose_inv(pose_mat):
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
@@ -800,7 +800,7 @@ def pose_inv(pose_mat):
     return pose_inv
 
 
-@torch.compile
+@torch.jit.script
 def pose_transform(pos1, quat1, pos0, quat0):
     """
     Conducts forward transform from pose (pos0, quat0) to pose (pos1, quat1):
@@ -826,7 +826,7 @@ def pose_transform(pos1, quat1, pos0, quat0):
     return mat2pose(mat1 @ mat0)
 
 
-@torch.compile
+@torch.jit.script
 def invert_pose_transform(pos, quat):
     """
     Inverts a pose transform
@@ -847,7 +847,7 @@ def invert_pose_transform(pos, quat):
     return mat2pose(pose_inv(mat))
 
 
-@torch.compile
+@torch.jit.script
 def relative_pose_transform(pos1, quat1, pos0, quat0):
     """
     Computes relative forward transform from pose (pos0, quat0) to pose (pos1, quat1), i.e.: solves:
@@ -873,7 +873,7 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     return mat2pose(pose_inv(mat0) @ mat1)
 
 
-@torch.compile
+@torch.jit.script
 def _skew_symmetric_translation(pos_A_in_B):
     """
     Helper function to get a skew symmetric translation matrix for converting quantities
@@ -896,7 +896,7 @@ def _skew_symmetric_translation(pos_A_in_B):
     )
 
 
-@torch.compile
+@torch.jit.script
 def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     """
     Converts linear and angular velocity of a point in frame A to the equivalent in frame B.
@@ -920,7 +920,7 @@ def vel_in_A_to_vel_in_B(vel_A, ang_vel_A, pose_A_in_B):
     return vel_B, ang_vel_B
 
 
-@torch.compile
+@torch.jit.script
 def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     """
     Converts linear and rotational force at a point in frame A to the equivalent in frame B.
@@ -944,7 +944,7 @@ def force_in_A_to_force_in_B(force_A, torque_A, pose_A_in_B):
     return force_B, torque_B
 
 
-@torch.compile
+@torch.jit.script
 def rotation_matrix(angle: float, direction: torch.Tensor) -> torch.Tensor:
     """
     Returns a 3x3 rotation matrix to rotate about the given axis.
@@ -981,7 +981,7 @@ def rotation_matrix(angle: float, direction: torch.Tensor) -> torch.Tensor:
     return R
 
 
-@torch.compile
+@torch.jit.script
 def transformation_matrix(angle: float, direction: torch.Tensor, point: Optional[torch.Tensor] = None) -> torch.Tensor:
     """
     Returns a 4x4 homogeneous transformation matrix to rotate about axis defined by point and direction.
@@ -1004,7 +1004,7 @@ def transformation_matrix(angle: float, direction: torch.Tensor, point: Optional
     return M
 
 
-@torch.compile
+@torch.jit.script
 def clip_translation(dpos, limit):
     """
     Limits a translation (delta position) to a specified limit
@@ -1025,7 +1025,7 @@ def clip_translation(dpos, limit):
     return (dpos * limit / input_norm, True) if input_norm > limit else (dpos, False)
 
 
-@torch.compile
+@torch.jit.script
 def clip_rotation(quat, limit):
     """
     Limits a (delta) rotation to a specified limit
@@ -1069,7 +1069,7 @@ def clip_rotation(quat, limit):
     return quat, clipped
 
 
-@torch.compile
+@torch.jit.script
 def make_pose(translation, rotation):
     """
     Makes a homogeneous pose matrix from a translation vector and a rotation matrix.
@@ -1088,7 +1088,7 @@ def make_pose(translation, rotation):
     return pose
 
 
-@torch.compile
+@torch.jit.script
 def get_orientation_error(desired, current):
     """
     This function calculates a 3-dimensional orientation error vector, where inputs are quaternions
@@ -1109,7 +1109,7 @@ def get_orientation_error(desired, current):
     return (q_r[:, 0:3] * torch.sign(q_r[:, 3]).unsqueeze(-1)).reshape(list(input_shape) + [3])
 
 
-@torch.compile
+@torch.jit.script
 def get_orientation_diff_in_radian(orn0: torch.Tensor, orn1: torch.Tensor) -> torch.Tensor:
     """
     Returns the difference between two quaternion orientations in radians.
@@ -1131,7 +1131,7 @@ def get_orientation_diff_in_radian(orn0: torch.Tensor, orn1: torch.Tensor) -> to
     return torch.norm(axis_angle)
 
 
-@torch.compile
+@torch.jit.script
 def get_pose_error(target_pose, current_pose):
     """
     Computes the error corresponding to target pose - current pose as a 6-dim vector.
@@ -1166,7 +1166,7 @@ def get_pose_error(target_pose, current_pose):
     return error
 
 
-@torch.compile
+@torch.jit.script
 def matrix_inverse(matrix):
     """
     Helper function to have an efficient matrix inversion function.
@@ -1180,7 +1180,7 @@ def matrix_inverse(matrix):
     return torch.linalg.inv_ex(matrix).inverse
 
 
-@torch.compile
+@torch.jit.script
 def vecs2axisangle(vec0, vec1):
     """
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into an axis-angle representation of the angle
@@ -1197,7 +1197,7 @@ def vecs2axisangle(vec0, vec1):
     return torch.linalg.cross(vec0, vec1) * torch.arccos((vec0 * vec1).sum(-1, keepdim=True))
 
 
-@torch.compile
+@torch.jit.script
 def vecs2quat(vec0: torch.Tensor, vec1: torch.Tensor, normalized: bool = False) -> torch.Tensor:
     """
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into a quaternion representation of the angle
@@ -1232,7 +1232,8 @@ def vecs2quat(vec0: torch.Tensor, vec1: torch.Tensor, normalized: bool = False) 
     return quat_unnormalized / torch.norm(quat_unnormalized, dim=-1, keepdim=True)
 
 
-@torch.compile
+# Ref: https://github.com/scipy/scipy/blob/9974222eb58ec3eafe5d12f25ee960f3170c277a/scipy/spatial/transform/_rotation.pyx#L3249
+@torch.jit.script
 def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.Tensor:
     """
     Computes a single quaternion representing the rotation that best aligns vec_set1 to vec_set2.
@@ -1244,38 +1245,30 @@ def align_vector_sets(vec_set1: torch.Tensor, vec_set2: torch.Tensor) -> torch.T
     Returns:
         torch.Tensor: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
+    B = torch.einsum("ji,jk->ik", vec_set1, vec_set2)
+    u, s, vh = torch.linalg.svd(B)
 
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
+    # Correct improper rotation if necessary (as in Kabsch algorithm)
+    if torch.linalg.det(u @ vh) < 0:
+        s[-1] = -s[-1]
+        u[:, -1] = -u[:, -1]
 
-    # Construct the quaternion
-    quat = torch.stack([x, y, z, w])
+    C = u @ vh
 
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = torch.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
+    # if s[1] + s[2] < 1e-16 * s[0]:
+    #     warnings.warn("Optimal rotation is not uniquely or poorly defined "
+    #                     "for the given sets of vectors.")
 
-    # Normalize the quaternion
-    quat = quat / (torch.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    return mat2quat(C)
 
 
-@torch.compile
+@torch.jit.script
 def l2_distance(v1: torch.Tensor, v2: torch.Tensor) -> torch.Tensor:
     """Returns the L2 distance between vector v1 and v2."""
     return torch.norm(v1 - v2)
 
 
-@torch.compile
+@torch.jit.script
 def cartesian_to_polar(x, y):
     """Convert cartesian coordinate to polar coordinate"""
     rho = torch.sqrt(x**2 + y**2)
@@ -1291,7 +1284,7 @@ def rad2deg(rad):
     return rad * 180.0 / math.pi
 
 
-@torch.compile
+@torch.jit.script
 def check_quat_right_angle(quat: torch.Tensor, atol: float = 5e-2) -> torch.Tensor:
     """
     Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
@@ -1311,14 +1304,14 @@ def check_quat_right_angle(quat: torch.Tensor, atol: float = 5e-2) -> torch.Tens
     return torch.any(torch.abs(l1_norm.unsqueeze(-1) - reference_norms) < atol, dim=-1)
 
 
-@torch.compile
+@torch.jit.script
 def z_angle_from_quat(quat):
     """Get the angle around the Z axis produced by the quaternion."""
     rotated_X_axis = quat_apply(quat, torch.tensor([1, 0, 0], dtype=torch.float32))
     return torch.arctan2(rotated_X_axis[1], rotated_X_axis[0])
 
 
-@torch.compile
+@torch.jit.script
 def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     """A function to map integers to 2D coordinates in a spiral pattern around the origin."""
     # Map integers from Z to Z^2 in a spiral pattern around the origin.
@@ -1331,7 +1324,7 @@ def integer_spiral_coordinates(n: int) -> Tuple[int, int]:
     return int(x), int(y)
 
 
-@torch.compile
+@torch.jit.script
 def transform_points(points: torch.Tensor, matrix: torch.Tensor, translate: bool = True) -> torch.Tensor:
     """
     Returns points rotated by a homogeneous
@@ -1367,7 +1360,7 @@ def transform_points(points: torch.Tensor, matrix: torch.Tensor, translate: bool
         return torch.mm(matrix[:dim, :dim], points.t()).t()
 
 
-@torch.compile
+@torch.jit.script
 def quaternions_close(q1: torch.Tensor, q2: torch.Tensor, atol: float = 1e-3) -> bool:
     """
     Whether two quaternions represent the same rotation,
@@ -1388,7 +1381,7 @@ def quaternions_close(q1: torch.Tensor, q2: torch.Tensor, atol: float = 1e-3) ->
     return torch.allclose(q1, q2, atol=atol) or torch.allclose(q1, -q2, atol=atol)
 
 
-@torch.compile
+@torch.jit.script
 def orientation_error(desired, current):
     """
     This function calculates a 3-dimensional orientation error vector for use in the
@@ -1416,3 +1409,91 @@ def orientation_error(desired, current):
     error = 0.5 * (torch.linalg.cross(rc1, rd1) + torch.linalg.cross(rc2, rd2) + torch.linalg.cross(rc3, rd3))
 
     return error.reshape(desired.shape[:-2] + (3,))
+
+
+@torch.jit.script
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (torch.tensor): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        torch.tensor: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = torch.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return torch.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis[0], axis[1], axis[2]
+    K = torch.tensor([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = torch.eye(3) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
+
+    return R
+
+
+@torch.jit.script
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (torch.tensor): 3x3 rotation matrix
+
+    Returns:
+        torch.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    # Check for gimbal lock (pitch = +-90 degrees)
+    if abs(rmat[0, 2]) != 1:
+        # General case
+        pitch = torch.arcsin(rmat[0, 2])
+        roll = torch.arctan2(-rmat[1, 2], rmat[2, 2])
+        yaw = torch.arctan2(-rmat[0, 1], rmat[0, 0])
+    else:
+        # Gimbal lock case
+        pitch = torch.tensor(math.pi / 2 if rmat[0, 2] == 1 else -math.pi / 2)
+        roll = torch.arctan2(rmat[1, 0], rmat[1, 1])
+        yaw = torch.tensor(0)  # Can set yaw to 0 in gimbal lock
+
+    return torch.tensor([roll, pitch, yaw], dtype=torch.float32)
+
+
+@torch.jit.script
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (torch.tensor): (r,p,y) intrinsic euler angles in radian vec3 float
+
+    Returns:
+        torch.tensor: 3x3 rotation matrix
+    """
+    roll, pitch, yaw = euler[0], euler[1], euler[2]
+    # Rotation matrix around X-axis
+    Rx = torch.tensor([[1, 0, 0], [0, torch.cos(roll), -torch.sin(roll)], [0, torch.sin(roll), torch.cos(roll)]])
+
+    # Rotation matrix around Y-axis
+    Ry = torch.tensor([[torch.cos(pitch), 0, torch.sin(pitch)], [0, 1, 0], [-torch.sin(pitch), 0, torch.cos(pitch)]])
+
+    # Rotation matrix around Z-axis
+    Rz = torch.tensor([[torch.cos(yaw), -torch.sin(yaw), 0], [torch.sin(yaw), torch.cos(yaw), 0], [0, 0, 1]])
+
+    # Combine the rotation matrices
+    # Intrinsic x-y-z is the same as extrinsic z-y-x
+    # Multiply Rz first, then Ry, then Rx
+    return Rx @ Ry @ Rz

@@ -9,7 +9,6 @@ import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -55,8 +54,8 @@ def set_carb_settings_for_fluid_isosurface():
     min_frame_rate = 60
     # Make sure we have at least 60 FPS before setting "persistent/simulation/minFrameRate" to 60
     assert (
-        1 / og.sim.get_rendering_dt()
-    ) >= min_frame_rate, f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
+        (1 / og.sim.get_rendering_dt()) >= min_frame_rate
+    ), f"isosurface HQ rendering requires at least {min_frame_rate} FPS; consider increasing rendering_frequency of env_config to {min_frame_rate}."
 
     # Settings for Isosurface
     isregistry = lazy.carb.settings.acquire_settings_interface()
@@ -580,8 +579,8 @@ class MicroParticleSystem(BaseSystem):
             prim_path=self.mat_path,
             name=self.mat_name,
             load_config={
-                "mdl_name": f"OmniPBR.mdl",
-                "mtl_name": f"OmniPBR",
+                "mdl_name": "OmniPBR.mdl",
+                "mtl_name": "OmniPBR",
             },
         )
 

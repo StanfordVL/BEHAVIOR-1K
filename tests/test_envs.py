@@ -1,5 +1,3 @@
-import pytest
-
 import omnigibson as og
 from omnigibson.macros import gm
 

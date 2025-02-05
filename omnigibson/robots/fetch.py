@@ -1,20 +1,15 @@
 import math
-import os
 from functools import cached_property
 
 import torch as th
 
-from omnigibson.controllers import ControlType
-from omnigibson.macros import gm
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
-from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.transform_utils import euler2quat
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, JointType
 
 log = create_module_logger(module_name=__name__)
 
@@ -217,8 +212,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.012, 0.0])),
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.012, 0.0])),
+                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.02, 0.0])),
+                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.02, 0.0])),
             ]
         }
 
@@ -226,8 +221,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     def assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.012, 0.0])),
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.012, 0.0])),
+                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.02, 0.0])),
+                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.02, 0.0])),
             ]
         }
 

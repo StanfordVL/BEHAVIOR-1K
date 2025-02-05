@@ -1,11 +1,6 @@
-import argparse
-import cProfile
-import io
 import os
-import pstats
 import time
 
-import torch as th
 import yaml
 
 import omnigibson as og
@@ -26,7 +21,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Load the environment
     vec_env = og.VectorEnvironment(5, config)
-    import time
 
     max_iterations = 100 if not short_exec else 1
     for _ in range(max_iterations):

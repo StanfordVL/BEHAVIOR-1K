@@ -2,7 +2,41 @@ from collections import namedtuple
 
 import networkx as nx
 
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    REGISTERED_OBJECT_STATES,
+    AttachedTo,
+    Burnt,
+    Contains,
+    Cooked,
+    Covered,
+    Draped,
+    Filled,
+    Folded,
+    Frozen,
+    Heated,
+    HeatSourceOrSink,
+    Inside,
+    IsGrasping,
+    MaxTemperature,
+    NextTo,
+    ObjectsInFOVOfRobot,
+    OnFire,
+    OnTop,
+    Open,
+    Overlaid,
+    ParticleApplier,
+    ParticleRemover,
+    ParticleRequirement,
+    ParticleSink,
+    ParticleSource,
+    Saturated,
+    SliceableRequirement,
+    SlicerActive,
+    ToggledOn,
+    Touching,
+    Under,
+    Unfolded,
+)
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 

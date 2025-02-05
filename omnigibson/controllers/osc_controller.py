@@ -1,9 +1,15 @@
 import math
 
+import numpy as np
+import torch as th
+from numba import jit
+
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
-from omnigibson.utils.processing_utils import MovingAverageFilter
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -176,7 +182,7 @@ class OperationalSpaceController(ManipulationController):
         self.mode = mode
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if type(command_input_limits) == str and command_input_limits == "default":
+                if type(command_input_limits) is str and command_input_limits == "default":
                     command_input_limits = [
                         [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
@@ -185,7 +191,7 @@ class OperationalSpaceController(ManipulationController):
                     command_input_limits[0][3:] = -math.pi
                     command_input_limits[1][3:] = math.pi
             if command_output_limits is not None:
-                if type(command_output_limits) == str and command_output_limits == "default":
+                if type(command_output_limits) is str and command_output_limits == "default":
                     command_output_limits = [
                         [-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi],
                         [1.0, 1.0, 1.0, math.pi, math.pi, math.pi],
@@ -452,7 +458,7 @@ class OperationalSpaceController(ManipulationController):
             target_ori_mat=cb.as_float32(cb.T.quat2mat(target_quat)),
         )
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         pos_relative = control_dict[f"{self.task_name}_pos_relative"]
         quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
@@ -487,11 +493,6 @@ class OperationalSpaceController(ManipulationController):
     @property
     def command_dim(self):
         return self._command_dim
-
-
-import torch as th
-
-import omnigibson.utils.transform_utils as TT
 
 
 @th.jit.script
@@ -562,17 +563,11 @@ def _compute_osc_torques_torch(
     # roboticsproceedings.org/rss07/p31.pdf
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + math.pi) % (2 * math.pi) - math.pi)
+        u_null = kd_null * -qd + kp_null * wrap_angle(rest_qpos - q)
         u_null = mm @ th.unsqueeze(u_null, dim=-1)
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 
     return u
-
-
-import numpy as np
-from numba import jit
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 # Use numba since faster

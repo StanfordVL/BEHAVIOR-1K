@@ -5,7 +5,6 @@ from omnigibson.utils.constants import PrimType
 
 
 class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
-
     @staticmethod
     def _check_contact(obj_a, obj_b):
         return len(set(obj_a.links.values()) & obj_b.states[ContactBodies].get_value()) > 0
