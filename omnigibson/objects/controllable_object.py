@@ -610,6 +610,11 @@ class ControllableObject(BaseObject):
         fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
+
+        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
+        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
+        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
+        # which is not used anywhere else in the codebase
         fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(
             self.articulation_root_path, estimate=True
         )
@@ -656,6 +661,11 @@ class ControllableObject(BaseObject):
         )
         fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
         fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
+
+        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
+        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
+        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
+        # which is not used anywhere else in the codebase
         fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
             self.articulation_root_path,
             link_name,

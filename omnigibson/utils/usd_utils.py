@@ -856,6 +856,7 @@ class BatchControlViewAPIImpl:
     def post_physics_step(self):
         # Should be called every sim physics step, right after a new physics step occurs
         # The current poses (if it exists) are now the former poses from the previous timestep
+        # These values are needed to compute velocity estimates
         if "root_transforms" in self._read_cache \
                 and "link_transforms" in self._read_cache \
                 and "dof_positions" in self._read_cache:
@@ -873,10 +874,13 @@ class BatchControlViewAPIImpl:
     def clear(self, keep_last_pose=False):
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
+
+        # Clear our last timestep's cached values by default
         if not keep_last_pose:
             self._last_state = None
 
-        # Update the transforms internally so that they're guaranteed to exist during the beginning of the next timestep
+        # Cache the (now current) transforms so that they're guaranteed to exist throughout the duration of this
+        # timestep, and available for caching during the next timestep's post_physics_step() call
         if og.sim.is_playing():
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
@@ -1196,7 +1200,7 @@ class BatchControlViewAPIImpl:
         rel_pose = self._get_relative_poses(prim_path)[link_idx]
         return rel_pose[:3], rel_pose[3:]
 
-    def _get_link_velocities(self, prim_path, link_name, estimate=True):
+    def _get_link_velocities(self, prim_path, link_name, estimate=False):
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
