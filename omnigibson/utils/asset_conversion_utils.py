@@ -350,31 +350,6 @@ def _get_visual_objs_from_urdf(urdf_path):
     return visual_objs
 
 
-def _copy_object_state_textures(obj_category, obj_model, dataset_root):
-    """
-    Copies specific object state texture files from the old material directory to the new material directory.
-
-    Args:
-        obj_category (str): The category of the object.
-        obj_model (str): The model of the object.
-        dataset_root (str): The root directory of the dataset.
-
-    Returns:
-        None
-    """
-    obj_root_dir = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-    old_mat_fpath = f"{obj_root_dir}/material"
-    new_mat_fpath = f"{obj_root_dir}/usd/materials"
-    for mat_file in os.listdir(old_mat_fpath):
-        should_copy = False
-        for object_state in _OBJECT_STATE_TEXTURES:
-            if object_state in mat_file.lower():
-                should_copy = True
-                break
-        if should_copy:
-            shutil.copy(f"{old_mat_fpath}/{mat_file}", new_mat_fpath)
-
-
 def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
     """
     Imports and binds rendering channels for a given object in an Omniverse USD stage.
@@ -400,15 +375,8 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         AssertionError: If a valid visual prim is not found for a mesh.
     """
     usd_dir = os.path.dirname(usd_path)
-    # # mat_dir = f"{model_root_path}/material/{obj_category}" if \
-    # #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
-    # mat_dir = f"{model_root_path}/material"
-    # # Compile all material files we have
-    # mat_files = set(os.listdir(mat_dir))
 
     # Remove the material prims as we will create them explictly later.
-    # TODO: Be a bit more smart about this. a material procedurally generated will lose its material without it having
-    # be regenerated
     stage = lazy.omni.usd.get_context().get_stage()
     for prim in obj_prim.GetChildren():
         looks_prim = None
@@ -427,20 +395,10 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                 stage.RemovePrim(subprim.GetPath()),
             )
 
-    # # Create new default material for this object.
-    # mtl_created_list = []
-    # lazy.omni.kit.commands.execute(
-    #     "CreateAndBindMdlMaterialFromLibrary",
-    #     mdl_name="OmniPBR.mdl",
-    #     mtl_name="OmniPBR",
-    #     mtl_created_list=mtl_created_list,
-    # )
-    # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-    # default_mat = rename_prim(prim=default_mat, name=f"default_material")
-    # log.debug("Created default material:", default_mat.GetPath())
-    #
-    # # We may delete this default material if it's never used
-    # default_mat_is_used = False
+    # Remove the materials copied over by the URDF importer
+    urdf_importer_mtl_dir = os.path.join(usd_dir, "materials")
+    if os.path.exists(urdf_importer_mtl_dir):
+        shutil.rmtree(urdf_importer_mtl_dir)
 
     # Grab all visual objs for this object
     urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/urdf/{obj_model}_with_meta_links.urdf"
@@ -449,15 +407,12 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
     # Extract absolute paths to mtl files for each link
     link_mtl_files = OrderedDict()  # maps link name to dictionary mapping mesh name to mtl file
     mtl_infos = OrderedDict()  # maps mtl name to dictionary mapping material channel name to png file
-    mat_files = OrderedDict()  # maps mtl name to corresponding list of material filenames
-    mtl_old_dirs = OrderedDict()  # maps mtl name to corresponding directory where the mtl file exists
-    mat_old_paths = OrderedDict()  # maps mtl name to corresponding list of relative mat paths from mtl directory
     for link_name, link_meshes in visual_objs.items():
         link_mtl_files[link_name] = OrderedDict()
         for mesh_name, obj_file in link_meshes.items():
             # Get absolute path and open the obj file if it exists:
             if obj_file is not None:
-                obj_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/{obj_file}"
+                obj_path = os.path.abspath(f"{dataset_root}/objects/{obj_category}/{obj_model}/urdf/{obj_file}")
                 with open(obj_path, "r") as f:
                     mtls = []
                     for line in f.readlines():
@@ -469,30 +424,30 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                     mtl = mtls[0]
                     # TODO: Make name unique
                     mtl_name = ".".join(os.path.basename(mtl).split(".")[:-1]).replace("-", "_").replace(".", "_")
-                    mtl_old_dir = os.path.dirname(obj_path)
+                    mtl_dir = os.path.dirname(obj_path)
                     link_mtl_files[link_name][mesh_name] = mtl_name
                     mtl_infos[mtl_name] = OrderedDict()
-                    mtl_old_dirs[mtl_name] = mtl_old_dir
-                    mat_files[mtl_name] = []
-                    mat_old_paths[mtl_name] = []
                     # Open the mtl file
-                    mtl_path = f"{mtl_old_dir}/{mtl}"
+                    mtl_path = os.path.join(mtl_dir, mtl)
                     with open(mtl_path, "r") as f:
                         # Read any lines beginning with map that aren't commented out
                         for line in f.readlines():
                             if line[:4] == "map_":
-                                map_type, map_file = line.split(" ")
-                                map_file = map_file.split("\n")[0]
-                                map_filename = os.path.basename(map_file)
-                                mat_files[mtl_name].append(map_filename)
-                                mat_old_paths[mtl_name].append(map_file)
-                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
+                                map_type, map_path_relative_to_mtl_dir = line.split(" ")
+                                map_path_relative_to_mtl_dir = map_path_relative_to_mtl_dir.split("\n")[0]
+                                print("Found map path in file as ", map_path_relative_to_mtl_dir)
+                                map_path_absolute = os.path.abspath(os.path.join(mtl_dir, map_path_relative_to_mtl_dir))
+                                print("Absolute map path is ", map_path_absolute)
+                                map_path_relative_to_usd_dir = os.path.relpath(map_path_absolute, usd_dir)
+                                print("USD path is ", usd_dir)
+                                print("Material path relative to USD is", map_path_relative_to_usd_dir)
+                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = (
+                                    map_path_relative_to_usd_dir
+                                )
 
                     print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
-    # Next, for each material information, we create a new material and port the material files to the USD directory
-    mat_new_fpath = os.path.join(usd_dir, "materials")
-    Path(mat_new_fpath).mkdir(parents=True, exist_ok=True)
+    # Next, for each material information, we create a new material
     shaders = OrderedDict()  # maps mtl name to shader prim
     rendering_channel_mappings = {
         "diffuse": _set_mtl_albedo,
@@ -505,9 +460,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         "emission": _set_mtl_emission,
     }
     for mtl_name, mtl_info in mtl_infos.items():
-        for mat_old_path in mat_old_paths[mtl_name]:
-            shutil.copy(os.path.join(mtl_old_dirs[mtl_name], mat_old_path), mat_new_fpath)
-
         # Create the new material
         mtl_created_list = []
         lazy.omni.kit.commands.execute(
@@ -522,7 +474,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         for mat_type, mat_file in mtl_info.items():
             render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
-                render_channel_fcn(mat, os.path.join("materials", mat_file))
+                render_channel_fcn(mat, mat_file)
             else:
                 # Warn user that we didn't find the correct rendering channel
                 log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
@@ -562,9 +514,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
-
-    # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
-    _copy_object_state_textures(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
 
 
 def _add_xform_properties(prim):
@@ -963,11 +912,12 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
         meta_prim.CreateAttribute("ig:metaLinkId", lazy.pxr.Sdf.ValueTypeNames.String)
         meta_prim.GetAttribute("ig:metaLinkId").Set(link_id)
         meta_prim.CreateAttribute("ig:metaLinkSubId", lazy.pxr.Sdf.ValueTypeNames.Int)
-        meta_prim.GetAttribute("ig:metaLinkId").Set(int(link_sub_id))
+        meta_prim.GetAttribute("ig:metaLinkSubId").Set(int(link_sub_id))
 
-        # Set the purpose of the meta link
-        purpose_attr = lazy.pxr.UsdGeom.Imageable(meta_prim).CreatePurposeAttr()
-        purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
+        # Set the purpose of the visual meshes to be guide
+        for visual_mesh in meta_prim.GetChild("visuals").GetChildren():
+            purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_mesh).CreatePurposeAttr()
+            purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
 
     log.debug("Done processing meta links")
 
@@ -1134,7 +1084,7 @@ def _create_urdf_import_config(
     import_config.set_merge_fixed_joints(merge_fixed_joints)
     import_config.set_convex_decomp(use_convex_decomposition)
     import_config.set_fix_base(False)
-    import_config.set_import_inertia_tensor(False)
+    import_config.set_import_inertia_tensor(True)
     import_config.set_distance_scale(1.0)
     import_config.set_density(0.0)
     import_config.set_default_drive_type(drive_mode.JOINT_DRIVE_NONE)
@@ -2116,23 +2066,6 @@ def generate_urdf_for_obj(
                 len(material_files) == 1
             ), f"Something's wrong: there's more than 1 material file in {list(temp_dir_path.iterdir())}"
             original_material_filename = material_files[0].name
-
-            # Fix texture file paths if necessary.
-            # original_material_dir = G.nodes[link_node]["material_dir"]
-            # if original_material_dir:
-            #     for src_texture_file in original_material_dir.iterdir():
-            #         fname = src_texture_file
-            #         # fname is in the same format as room_light-0-0_VRayAOMap.png
-            #         vray_name = fname[fname.index("VRay") : -4] if "VRay" in fname else None
-            #         if vray_name in VRAY_MAPPING:
-            #             dst_fname = VRAY_MAPPING[vray_name]
-            #         else:
-            #             raise ValueError(f"Unknown texture map: {fname}")
-
-            #         dst_texture_file = f"{obj_name}-base_link-{dst_fname}.png"
-
-            #         # Load the image
-            #         shutil.copy2(original_material_dir / src_texture_file, obj_link_material_folder / dst_texture_file)
 
             # Modify MTL reference in OBJ file
             mtl_name = f"{obj_name}-base_link.mtl"
