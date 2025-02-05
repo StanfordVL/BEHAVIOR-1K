@@ -4,7 +4,7 @@ from functools import cached_property
 import torch as th
 
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.ui_utils import create_module_logger
 

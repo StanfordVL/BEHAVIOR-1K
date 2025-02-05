@@ -4,7 +4,6 @@ import torch as th
 
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
 from omnigibson.utils.python_utils import classproperty
 

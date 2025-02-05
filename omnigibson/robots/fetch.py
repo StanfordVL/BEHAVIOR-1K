@@ -5,7 +5,6 @@ import torch as th
 
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.transform_utils import euler2quat

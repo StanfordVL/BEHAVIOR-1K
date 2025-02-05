@@ -386,7 +386,7 @@ class ManipulationRobot(BaseRobot):
                         link = self.links[arm_ag_point.link_name]
                         local_pos = arm_ag_point.position
                         vis_mesh_prim_path = f"{link.prim_path}/ag_point_{i}"
-                        vis_mesh = create_primitive_mesh(
+                        create_primitive_mesh(
                             prim_path=vis_mesh_prim_path,
                             extents=0.005,
                             primitive_type="Sphere",
