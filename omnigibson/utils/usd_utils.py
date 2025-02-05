@@ -857,9 +857,11 @@ class BatchControlViewAPIImpl:
         # Should be called every sim physics step, right after a new physics step occurs
         # The current poses (if it exists) are now the former poses from the previous timestep
         # These values are needed to compute velocity estimates
-        if "root_transforms" in self._read_cache \
-                and "link_transforms" in self._read_cache \
-                and "dof_positions" in self._read_cache:
+        if (
+            "root_transforms" in self._read_cache
+            and "link_transforms" in self._read_cache
+            and "dof_positions" in self._read_cache
+        ):
             self._last_state = {
                 "root_transforms": cb.copy(self._read_cache["root_transforms"]),
                 "link_transforms": cb.copy(self._read_cache["link_transforms"]),
