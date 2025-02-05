@@ -328,11 +328,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: keyword-mapped proprioception observations available for this robot.
                 Can be extended by subclasses
         """
-        joint_positions = cb.to_torch(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
-        joint_velocities = cb.to_torch(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
-        joint_efforts = cb.to_torch(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path))
+        joint_positions = cb.to_torch(
+            cb.copy(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
+        )
+        joint_velocities = cb.to_torch(
+            cb.copy(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
+        )
+        joint_efforts = cb.to_torch(cb.copy(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)))
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        pos, quat = cb.to_torch(pos), cb.to_torch(quat)
+        pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
         ori = T.quat2euler(quat)
 
         ori_2d = T.z_angle_from_quat(quat)
@@ -350,8 +354,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_2d_ori=ori_2d,
             robot_2d_ori_cos=th.cos(ori_2d),
             robot_2d_ori_sin=th.sin(ori_2d),
-            robot_lin_vel=cb.to_torch(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)),
-            robot_ang_vel=cb.to_torch(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)),
+            robot_lin_vel=cb.to_torch(
+                cb.copy(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path))
+            ),
+            robot_ang_vel=cb.to_torch(
+                cb.copy(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path))
+            ),
         )
 
     def _load_observation_space(self):
