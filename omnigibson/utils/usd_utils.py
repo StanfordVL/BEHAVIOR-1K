@@ -868,6 +868,7 @@ class BatchControlViewAPIImpl:
                 "dof_positions": cb.copy(self._read_cache["dof_positions"]),
             }
         else:
+            # We don't have enough info to populate the history, so simply clear it instead
             self._last_state = None
 
         # Clear the internal data since everything is outdated
