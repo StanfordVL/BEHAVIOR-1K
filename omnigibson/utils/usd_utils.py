@@ -1996,6 +1996,31 @@ def delete_or_deactivate_prim(prim_path):
     return True
 
 
+def get_sdf_value_type_name(val):
+    """
+    Determines the appropriate Sdf value type based on the input value.
+    Args:
+        val: The input value to determine the type for.
+    Returns:
+        lazy.pxr.Sdf.ValueTypeName: The corresponding Sdf value type.
+    Raises:
+        ValueError: If the input value type is not supported.
+    """
+    SDF_TYPE_MAPPING = {
+        lazy.pxr.Gf.Vec3f: lazy.pxr.Sdf.ValueTypeNames.Float3,
+        lazy.pxr.Gf.Vec2f: lazy.pxr.Sdf.ValueTypeNames.Float2,
+        lazy.pxr.Sdf.AssetPath: lazy.pxr.Sdf.ValueTypeNames.Asset,
+        int: lazy.pxr.Sdf.ValueTypeNames.Int,
+        float: lazy.pxr.Sdf.ValueTypeNames.Float,
+        bool: lazy.pxr.Sdf.ValueTypeNames.Bool,
+        str: lazy.pxr.Sdf.ValueTypeNames.String,
+    }
+    for type_, usd_type in SDF_TYPE_MAPPING.items():
+        if isinstance(val, type_):
+            return usd_type
+    raise ValueError(f"Unsupported input type: {type(val)}")
+
+
 @th.compile
 def _compute_relative_poses_torch(
     idx: int,

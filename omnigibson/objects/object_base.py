@@ -228,6 +228,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._highlight_cached_values = dict()
 
         for material in self.materials:
+            if material.is_glass:
+                # Skip glass materials
+                continue
             self._highlight_cached_values[material] = {
                 "enable_emission": material.enable_emission,
                 "emissive_color": material.emissive_color,
@@ -334,6 +337,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             return
 
         for material in self.materials:
+            if material.is_glass:
+                # Skip glass materials
+                continue
             if enabled:
                 # Store values before swapping
                 self._highlight_cached_values[material] = {
