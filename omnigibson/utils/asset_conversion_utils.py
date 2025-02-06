@@ -915,7 +915,10 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
         meta_prim.GetAttribute("ig:metaLinkSubId").Set(int(link_sub_id))
 
         # Set the purpose of the visual meshes to be guide
-        for visual_mesh in meta_prim.GetChild("visuals").GetChildren():
+        visual_prim = meta_prim.GetChild("visuals")
+        purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_prim).CreatePurposeAttr()
+        purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
+        for visual_mesh in visual_prim.GetChildren():
             purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_mesh).CreatePurposeAttr()
             purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
 
