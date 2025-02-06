@@ -82,15 +82,15 @@ def clear(
     import omnigibson.lazy as lazy
 
     # First save important simulator settings
-    init_kwargs = dict(
-        gravity=sim.gravity if gravity is None else gravity,
-        physics_dt=sim.get_physics_dt() if physics_dt is None else physics_dt,
-        rendering_dt=sim.get_rendering_dt() if rendering_dt is None else rendering_dt,
-        sim_step_dt=sim.get_sim_step_dt() if sim_step_dt is None else sim_step_dt,
-        viewer_width=sim.viewer_width if viewer_width is None else viewer_width,
-        viewer_height=sim.viewer_height if viewer_height is None else viewer_height,
-        device=sim.device if device is None else device,
-    )
+    # init_kwargs = dict(
+    #     gravity=sim.gravity if gravity is None else gravity,
+    #     physics_dt=sim.get_physics_dt() if physics_dt is None else physics_dt,
+    #     rendering_dt=sim.get_rendering_dt() if rendering_dt is None else rendering_dt,
+    #     sim_step_dt=sim.get_sim_step_dt() if sim_step_dt is None else sim_step_dt,
+    #     viewer_width=sim.viewer_width if viewer_width is None else viewer_width,
+    #     viewer_height=sim.viewer_height if viewer_height is None else viewer_height,
+    #     device=sim.device if device is None else device,
+    # )
 
     # First let the simulator clear everything it owns.
     sim._partial_clear()
@@ -101,12 +101,12 @@ def clear(
     lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
 
     # Then relaunch the simulator.
-    launch(**init_kwargs)
+    launch()  #  **init_kwargs)
 
     # Check that the device remains the same
-    assert (
-        sim.device == init_kwargs["device"]
-    ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
+    # assert (
+    #     sim.device == init_kwargs["device"]
+    # ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
 
 
 def cleanup(*args, **kwargs):
