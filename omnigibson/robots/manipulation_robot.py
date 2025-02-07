@@ -175,9 +175,6 @@ class ManipulationRobot(BaseRobot):
         self._eef_to_fingertip_lengths = None  # dict mapping arm name to finger name to offset
 
         # Initialize other variables used for assistive grasping
-        self._ag_freeze_joint_pos = {
-            arm: {} for arm in self.arm_names
-        }  # Frozen positions for keeping fingers held still
         self._ag_obj_in_hand = {arm: None for arm in self.arm_names}
         self._ag_obj_constraints = {arm: None for arm in self.arm_names}
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
@@ -548,11 +545,6 @@ class ManipulationRobot(BaseRobot):
         # Then run assisted grasping
         if self.grasping_mode != "physical" and not self._disable_grasp_handling:
             self._handle_assisted_grasping()
-
-        # Potentially freeze gripper joints
-        for arm in self.arm_names:
-            if self._ag_freeze_gripper[arm]:
-                self._freeze_gripper(arm)
 
     def _release_grasp(self, arm="default"):
         """
@@ -1189,20 +1181,6 @@ class ManipulationRobot(BaseRobot):
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
 
-    def _freeze_gripper(self, arm="default"):
-        """
-        Freezes gripper finger joints - used in assisted grasping.
-
-        Args:
-            arm (str): specific arm to freeze gripper.
-                Default is "default" which corresponds to the first entry in self.arm_names
-        """
-        arm = self.default_arm if arm == "default" else arm
-        for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
-            joint = self._joints[joint_name]
-            joint.set_pos(pos=j_val)
-            joint.set_vel(vel=0.0)
-
     @property
     def curobo_path(self):
         """
@@ -1528,9 +1506,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        for joint in self.finger_joints[arm]:
-            j_val = joint.get_state()[0][0]
-            self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
 
     def _handle_assisted_grasping(self):
         """
@@ -1717,9 +1692,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        for joint in self.finger_joints[arm]:
-            j_val = joint.get_state()[0][0]
-            self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
 
     def _dump_state(self):
         # Call super first
