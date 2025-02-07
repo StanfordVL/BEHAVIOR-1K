@@ -11,7 +11,7 @@ from omnigibson.utils.python_utils import classproperty
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Metalink naming prefixes
+# Meta link naming prefixes
 m.SOURCE_LINK_PREFIX = "particlesource"
 m.SINK_LINK_PREFIX = "particlesink"
 
