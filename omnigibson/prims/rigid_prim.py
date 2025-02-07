@@ -796,6 +796,25 @@ class RigidPrim(XFormPrim):
         min_corner, max_corner = self.visual_aabb
         return (max_corner + min_corner) / 2.0
 
+    @cached_property
+    def is_meta_link(self):
+        return self.prim.HasAttribute("ig:isMetaLink") and self.get_attribute("ig:isMetaLink")
+
+    @cached_property
+    def meta_link_type(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        return self.get_attribute("ig:metaLinkType")
+
+    @cached_property
+    def meta_link_id(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        return self.get_attribute("ig:metaLinkId")
+
+    @cached_property
+    def meta_link_sub_id(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        return self.get_attribute("ig:metaLinkSubId")
+
     def enable_gravity(self):
         """
         Enables gravity for this rigid body

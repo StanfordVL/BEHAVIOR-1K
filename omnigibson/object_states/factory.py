@@ -200,11 +200,11 @@ def get_states_by_dependency_order(states=None):
     return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
 
 
-# Define all metalinks
-METALINK_PREFIXES = set()
+# Define all meta links
+META_LINK_TYPES = set()
 for state in get_states_by_dependency_order():
     if issubclass(state, LinkBasedStateMixin):
         try:
-            METALINK_PREFIXES.add(state.metalink_prefix)
+            META_LINK_TYPES.add(state.meta_link_type)
         except NotImplementedError:
             pass

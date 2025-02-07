@@ -76,10 +76,10 @@ class AttachedTo(
         og.sim.remove_callback_on_stop(name=f"{self.obj.name}_detach")
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         """
         Returns:
-            str: Unique keyword that defines the metalink associated with this object state
+            str: Unique keyword that defines the meta link associated with this object state
         """
         return m.ATTACHMENT_LINK_PREFIX
 
@@ -375,7 +375,7 @@ class AttachedTo(
                         child_link.add_filtered_collision_pair(floor_link)
 
         # Temporary hack to disable gravity for the attached child object if the parent is kinematic_only
-        # Otherwise, the parent metalink will oscillate due to the gravity force of the child.
+        # Otherwise, the parent meta link will oscillate due to the gravity force of the child.
         if parent.kinematic_only:
             child.disable_gravity()
 

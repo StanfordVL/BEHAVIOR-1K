@@ -21,7 +21,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,
-    get_attachment_metalinks,
+    get_attachment_meta_links,
 )
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Wrapper
@@ -1111,7 +1111,7 @@ class BDDLSampler:
 
     def _filter_model_choices_by_attached_states(self, model_choices, category, obj_inst):
         # If obj_inst is a child object that depends on a parent object that has been imported or exists in the scene,
-        # we filter in only models that match the parent object's attachment metalinks.
+        # we filter in only models that match the parent object's attachment meta links.
         if obj_inst in self._attached_objects:
             parent_insts = self._attached_objects[obj_inst]
             parent_objects = []
@@ -1144,14 +1144,14 @@ class BDDLSampler:
             # Filter out models that don't support the attached states
             new_model_choices = set()
             for model_choice in model_choices:
-                child_attachment_links = get_attachment_metalinks(category, model_choice)
+                child_attachment_links = get_attachment_meta_links(category, model_choice)
                 # The child model choice needs to be able to attach to all parent instances.
                 # For in-room parent instances, there might be multiple parent objects (e.g. different wall nails),
                 # and the child object needs to be able to attach to at least one of them.
                 if all(
                     any(
                         can_attach(
-                            child_attachment_links, get_attachment_metalinks(parent_obj.category, parent_obj.model)
+                            child_attachment_links, get_attachment_meta_links(parent_obj.category, parent_obj.model)
                         )
                         for parent_obj in parent_objs_per_inst
                     )
@@ -1167,7 +1167,7 @@ class BDDLSampler:
             # Filter out models that don't support the attached states
             new_model_choices = set()
             for model_choice in model_choices:
-                if len(get_attachment_metalinks(category, model_choice)) > 0:
+                if len(get_attachment_meta_links(category, model_choice)) > 0:
                     new_model_choices.add(model_choice)
             return new_model_choices
 
