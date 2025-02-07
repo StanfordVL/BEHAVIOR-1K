@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     cloth_category_models = [
-        ("jeans", "nmvvil"),
+        ("jeans", "pvzxyp"),
     ]
 
     for cloth in cloth_category_models:

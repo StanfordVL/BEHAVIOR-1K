@@ -916,11 +916,15 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
 
         # Set the purpose of the visual meshes to be guide
         visual_prim = meta_prim.GetChild("visuals")
-        purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_prim).CreatePurposeAttr()
-        purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
-        for visual_mesh in visual_prim.GetChildren():
-            purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_mesh).CreatePurposeAttr()
-            purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
+        if visual_prim.IsValid():
+            # If it's an imageable, set the purpose to guide
+            if visual_prim.GetTypeName() == "Mesh":
+                purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_prim).CreatePurposeAttr()
+                purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
+            for visual_mesh in visual_prim.GetChildren():
+                if visual_mesh.GetTypeName() == "Mesh":
+                    purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_mesh).CreatePurposeAttr()
+                    purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
 
     log.debug("Done processing meta links")
 
@@ -1422,6 +1426,15 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                 ), f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
 
                 for ml_id, attrs_list in ml_attrs.items():
+                    # If the attrs list is a dictionary (legacy format), convert it to a list
+                    if isinstance(attrs_list, dict):
+                        keys = [int(k) for k in attrs_list.keys()]
+                        assert set(keys) == set(
+                            range(len(keys))
+                        ), f"Expected keys to be 0-indexed integers, but got {keys}"
+                        int_key_dict = {int(k): v for k, v in attrs_list.items()}
+                        attrs_list = [int_key_dict[i] for i in range(len(keys))]
+
                     if len(attrs_list) > 0:
                         if _ALLOWED_META_TYPES[meta_link_name] != "dimensionless":
                             # If not dimensionless, we create one meta link for a list of meshes below it
@@ -1484,7 +1497,7 @@ def convert_scene_urdf_to_json(urdf, json_path):
     # Play the simulator, then save
     og.sim.play()
     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
-    og.sim.save(json_path=json_path)
+    og.sim.save(json_paths=[json_path])
 
     # Load the json, remove the init_info because we don't need it, then save it again
     with open(json_path, "r") as f:
@@ -1535,7 +1548,7 @@ def _load_scene_from_urdf(urdf):
                 name=obj_name,
                 **obj_info["cfg"],
             )
-            og.sim.import_object(obj)
+            scene.add_object(obj)
             obj.set_bbox_center_position_orientation(position=obj_info["bbox_pos"], orientation=obj_info["bbox_quat"])
         except Exception as e:
             raise ValueError(f"Failed to load object {obj_name}") from e
