@@ -116,12 +116,12 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         return True, None
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.HEATSOURCE_LINK_PREFIX
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required if inside
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required if inside
         return not kwargs.get("requires_inside", False)
 
     @property
@@ -251,7 +251,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                         affected_objects.remove(obj)
 
             else:
-                # Position is either the AABB center of the default link or the metalink position itself
+                # Position is either the AABB center of the default link or the meta link position itself
                 heat_source_pos = (
                     self.link.aabb_center
                     if self.link == self._default_link

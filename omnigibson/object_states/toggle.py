@@ -78,7 +78,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                         cls._finger_contact_objs.add(obj)
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.TOGGLE_LINK_PREFIX
 
     def _get_value(self):

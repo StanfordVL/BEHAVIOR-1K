@@ -36,7 +36,7 @@ m.SINK_PARTICLES_LIMIT = 1e6
 class ParticleSource(ParticleApplier):
     """
     ParticleApplier where physical particles are spawned continuously in a cylindrical fashion from the
-    metalink pose.
+    meta link pose.
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
@@ -121,8 +121,8 @@ class ParticleSource(ParticleApplier):
         return m.MAX_SOURCE_PARTICLES_PER_STEP
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # Always requires metalink since projection is used
+    def requires_meta_link(cls, **kwargs):
+        # Always requires meta link since projection is used
         return True
 
     @property
@@ -131,7 +131,7 @@ class ParticleSource(ParticleApplier):
         return False
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.SOURCE_LINK_PREFIX
 
     @property
@@ -146,7 +146,7 @@ class ParticleSource(ParticleApplier):
 class ParticleSink(ParticleRemover):
     """
     ParticleRemover where physical particles are removed continuously within a cylindrical volume located
-    at the metalink pose.
+    at the meta link pose.
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
@@ -235,12 +235,12 @@ class ParticleSink(ParticleRemover):
         return False
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # Always requires metalink since projection is used
+    def requires_meta_link(cls, **kwargs):
+        # Always requires meta link since projection is used
         return True
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.SINK_LINK_PREFIX
 
     @property

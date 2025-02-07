@@ -60,8 +60,8 @@ class OnFire(HeatSourceOrSink):
         self.ignition_temperature = ignition_temperature
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # Does not require metalink to be specified
+    def requires_meta_link(cls, **kwargs):
+        # Does not require meta link to be specified
         return False
 
     @property
