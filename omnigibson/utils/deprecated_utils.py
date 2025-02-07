@@ -630,9 +630,11 @@ class RigidPrimView(_RigidPrimView):
              [0. 0. 0.]
              [0. 0. 0.]]
         """
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
 
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if self.is_physics_handle_valid():
             linear_velocities = self._physics_view.get_velocities()
             if clone:
                 # THIS LINE WAS NAMED INCORRECTLY!!!
@@ -692,8 +694,10 @@ class RigidPrimView(_RigidPrimView):
              [0. 0. 0.]
              [0. 0. 0.]]
         """
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
         indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if self.is_physics_handle_valid():
             angular_velocities = self._physics_view.get_velocities()
             if clone:
                 # THIS LINE WAS NAMED INCORRECTLY!!
@@ -775,7 +779,9 @@ class RigidPrimView(_RigidPrimView):
              [ 1.0000000e+00 -9.5171310e-07 -2.2615541e-07  5.5922797e-08]
              [ 1.0000000e+00 -7.9806580e-07 -1.3064776e-07  5.3154917e-08]]
         """
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
+        if self.is_physics_handle_valid():
             indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
             pose = self._physics_view.get_transforms()
             if clone:
@@ -797,7 +803,9 @@ class RigidPrimView(_RigidPrimView):
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
         """
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
+        if self.is_physics_handle_valid():
             indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
@@ -825,8 +833,10 @@ class RigidPrimView(_RigidPrimView):
                                                                                  Where M <= size of the encapsulated prims in the view.
                                                                                  Defaults to None (i.e: all prims in the view).
         """
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
         indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
-        if not omni.timeline.get_timeline_interface().is_stopped() and self._physics_view is not None:
+        if self.is_physics_handle_valid():
             data = self._physics_view.get_disable_gravities().reshape(self._count)
             data = self._backend_utils.assign(
                 self._backend_utils.create_tensor_from_list([True] * len(indices), dtype="uint8"), data, indices
