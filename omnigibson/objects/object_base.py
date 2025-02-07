@@ -142,9 +142,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
             scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
             if (
+                # no articulated joints
                 self.n_joints == 0
+                # no fixed joints or scaling is [1, 1, 1] (TODO verify [1, 1, 1] is still needed)
                 and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                and (self._load_config["kinematic_only"] is not False)
+                # users force the object to not have kinematic_only
+                and self._load_config["kinematic_only"] is not False  # if can be True or None
                 and not self.has_attachment_points
             ):
                 kinematic_only = True
@@ -166,6 +169,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # This renders, which causes a material lookup error since we're creating a temp file, so we suppress
             # the error explicitly here
             with suppress_omni_log(channels=["omni.hydra"]):
+                # if self.prim_path == "/World/scene_0/bed_zrumze_0":
+                #     breakpoint()
                 create_joint(
                     prim_path=f"{self.prim_path}/rootJoint",
                     joint_type="FixedJoint",

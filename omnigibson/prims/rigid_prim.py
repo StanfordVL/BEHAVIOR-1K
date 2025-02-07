@@ -85,16 +85,21 @@ class RigidPrim(XFormPrim):
         )
 
     def _post_load(self):
+        # Set it to be kinematic if necessary
+        kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
+        if not self.is_attribute_valid("physics:kinematicEnabled"):
+            self.create_attribute("physics:kinematicEnabled", kinematic_only)
+        if not self.is_attribute_valid("physics:rigidBodyEnabled"):
+            self.create_attribute("physics:rigidBodyEnabled", not kinematic_only)
+        self.set_attribute("physics:kinematicEnabled", kinematic_only)
+        self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
+
         # Create the view
         # Import now to avoid too-eager load of Omni classes due to inheritance
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
-        self._rigid_prim_view_direct = RigidPrimView(self.prim_path)
-
-        # Set it to be kinematic if necessary
-        kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
-        self.set_attribute("physics:kinematicEnabled", kinematic_only)
-        self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
+        if not self.kinematic_only:
+            self._rigid_prim_view_direct = RigidPrimView(self.prim_path)
 
         # Check if it's part of an articulation view
         self._belongs_to_articulation = (
@@ -282,7 +287,8 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_linear_velocities(velocity[None, :])
+        if not self.kinematic_only:
+            self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self, clone=True):
         """
@@ -292,7 +298,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_linear_velocities(clone=clone)[0]
+        return self._rigid_prim_view.get_linear_velocities(clone=clone)[0] if not self.kinematic_only else th.zeros(3)
 
     def set_angular_velocity(self, velocity):
         """
@@ -301,7 +307,8 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        self._rigid_prim_view.set_angular_velocities(velocity[None, :])
+        if not self.kinematic_only:
+            self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self, clone=True):
         """
@@ -311,7 +318,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_angular_velocities(clone=clone)[0]
+        return self._rigid_prim_view.get_angular_velocities(clone=clone)[0] if not self.kinematic_only else th.zeros(3)
 
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
@@ -346,7 +353,12 @@ class RigidPrim(XFormPrim):
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         # Actually set the pose.
-        self._rigid_prim_view.set_world_poses(positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]])
+        if not self.kinematic_only:
+            self._rigid_prim_view.set_world_poses(
+                positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
+            )
+        else:
+            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
 
         # Invalidate kinematic-only object pose caches when new pose is set
         if self.kinematic_only:
@@ -378,14 +390,18 @@ class RigidPrim(XFormPrim):
             return position, orientation
 
         # Otherwise, get the pose from the rigid prim view and convert to our format
-        positions, orientations = self._rigid_prim_view.get_world_poses(clone=clone)
-        position = positions[0]
-        orientation = orientations[0][[1, 2, 3, 0]]
+        if not self.kinematic_only:
+            positions, orientations = self._rigid_prim_view.get_world_poses(clone=clone)
+            position = positions[0]
+            orientation = orientations[0][[1, 2, 3, 0]]
+        else:
+            # If this is the first time we're getting the pose for a kinematic-only object, we need to cache it
+            position, orientation = XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
 
         # Assert that the orientation is a unit quaternion
         assert math.isclose(
-            th.norm(orientations).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
+            th.norm(orientation).item(), 1, abs_tol=1e-3
+        ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
 
         # Cache world pose if we're kinematic-only
         if self.kinematic_only:
@@ -501,7 +517,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        mass = self._rigid_prim_view.get_masses()[0]
+        mass = self._rigid_prim_view.get_masses()[0] if not self.kinematic_only else 0.0
 
         # Fallback to analytical computation of volume * density
         if mass == 0:
@@ -515,7 +531,8 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        self._rigid_prim_view.set_masses(th.tensor([mass]))
+        if not self.kinematic_only:
+            self._rigid_prim_view.set_masses(th.tensor([mass]))
 
     @property
     def density(self):
@@ -523,6 +540,8 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
+        if self.kinematic_only:
+            return 0.0
         mass = self._rigid_prim_view.get_masses()[0]
         # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
         # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
@@ -542,7 +561,8 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        self._rigid_prim_view.set_densities(th.tensor([density]))
+        if not self.kinematic_only:
+            self._rigid_prim_view.set_densities(th.tensor([density]))
 
     @cached_property
     def kinematic_only(self):
@@ -800,13 +820,15 @@ class RigidPrim(XFormPrim):
         """
         Enables gravity for this rigid body
         """
-        self._rigid_prim_view.enable_gravities()
+        if not self.kinematic_only:
+            self._rigid_prim_view.enable_gravities()
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
-        self._rigid_prim_view.disable_gravities()
+        if not self.kinematic_only:
+            self._rigid_prim_view.disable_gravities()
 
     def wake(self):
         """

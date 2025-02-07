@@ -252,6 +252,7 @@ class EntityPrim(XFormPrim):
                 "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
                 "scale": self._load_config.get("scale", None),
             }
+            # TODO: link_cls can be RigidPrim, KinematicOnlyPrin or ClothPrim
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
