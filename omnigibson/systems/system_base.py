@@ -203,7 +203,7 @@ class BaseSystem(Serializable):
             callback(self)
 
         self.reset()
-        lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
+        lazy.isaacsim.core.utils.prims.delete_prim(self.prim_path)
 
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()

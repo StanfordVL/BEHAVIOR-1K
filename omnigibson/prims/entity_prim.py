@@ -334,7 +334,7 @@ class EntityPrim(XFormPrim):
 
                         # Find the joint frame orientation in the parent link frame
                         joint_local_orn = th.tensor(
-                            lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
                                 joint.get_attribute("physics:localRot0")
                             )[[1, 2, 3, 0]],
                             dtype=th.float32,
@@ -1246,7 +1246,7 @@ class EntityPrim(XFormPrim):
             int: How many position iterations to take per physics step by the physx solver
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:solverPositionIterationCount"
             )
             if self.articulated
@@ -1262,7 +1262,7 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
             )
         else:
@@ -1276,7 +1276,7 @@ class EntityPrim(XFormPrim):
             int: How many velocity iterations to take per physics step by the physx solver
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:solverVelocityIterationCount"
             )
             if self.articulated
@@ -1292,7 +1292,7 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
             )
         else:
@@ -1306,7 +1306,7 @@ class EntityPrim(XFormPrim):
             float: threshold for stabilizing this articulation
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:stabilizationThreshold"
             )
             if self.articulated
@@ -1322,7 +1322,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Stabilization threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold
             )
         else:
@@ -1354,7 +1354,7 @@ class EntityPrim(XFormPrim):
             float: threshold for sleeping this articulation
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:sleepThreshold"
             )
             if self.articulated
@@ -1370,7 +1370,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
             )
         else:
@@ -1383,7 +1383,7 @@ class EntityPrim(XFormPrim):
         Returns:
             bool: Whether self-collisions are enabled for this prim or not
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(
+        return lazy.isaacsim.core.utils.prims.get_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
         )
 
@@ -1395,7 +1395,7 @@ class EntityPrim(XFormPrim):
         Args:
             flag (bool): Whether self collisions are enabled for this prim or not
         """
-        lazy.omni.isaac.core.utils.prims.set_prim_property(
+        lazy.isaacsim.core.utils.prims.set_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )
 
@@ -1558,7 +1558,7 @@ class EntityPrim(XFormPrim):
 
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
-        stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+        stage = lazy.isaacsim.core.utils.stage.get_current_stage()
         link_prim = stage.DefinePrim(f"{self.prim_path}/{link_name}", "Xform")
         vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/visuals").GetPrim()
         col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/collisions").GetPrim()

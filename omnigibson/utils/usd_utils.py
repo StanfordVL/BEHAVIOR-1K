@@ -81,7 +81,7 @@ def get_prim_nested_children(prim):
         list of Usd.Prim: nested prims
     """
     prims = []
-    for child in lazy.omni.isaac.core.utils.prims.get_prim_children(prim):
+    for child in lazy.isaacsim.core.utils.prims.get_prim_children(prim):
         prims.append(child)
         prims += get_prim_nested_children(prim=child)
 
@@ -137,14 +137,14 @@ def create_joint(
 
     # Possibly add body0, body1 targets
     if body0 is not None:
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
         joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
     if body1 is not None:
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     # Get the prim pointed to at this path
-    joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
     # Apply joint API interface
     lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
@@ -773,7 +773,7 @@ class PoseAPI:
         """
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         cls._refresh()
 
@@ -791,7 +791,7 @@ class PoseAPI:
         """
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         cls._refresh()
         # Avoid premature imports
@@ -803,7 +803,7 @@ class PoseAPI:
     def convert_world_pose_to_local(cls, prim, position, orientation):
         """Converts a world pose to a local pose under a prim's parent."""
         world_transform = T.pose2mat((position, orientation))
-        parent_path = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(prim).GetPath())
         parent_world_transform = cls.get_world_pose_with_scale(parent_path)
 
         local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
@@ -1849,8 +1849,8 @@ def add_asset_to_stage(asset_path, prim_path):
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
     # Add reference to stage and grab prim
-    lazy.omni.isaac.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
-    prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
+    prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
     # Make sure prim was loaded correctly
     assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
@@ -1863,7 +1863,7 @@ def get_world_prim():
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    return lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+    return lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
 
 
 def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
@@ -1970,11 +1970,11 @@ def delete_or_deactivate_prim(prim_path):
     Returns:
         bool: Whether the operation was successful or not
     """
-    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+    if not lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
         return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
+    if lazy.isaacsim.core.utils.prims.is_prim_no_delete(prim_path):
         return False
-    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+    if lazy.isaacsim.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
         return False
     if prim_path == "/World":
         return False
@@ -1985,7 +1985,7 @@ def delete_or_deactivate_prim(prim_path):
         return False
 
     # If the prim is not ancestral, we can delete it.
-    if not lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
+    if not lazy.isaacsim.core.utils.prims.is_prim_ancestral(prim_path):
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
 
     # Otherwise, we can only deactivate it, which essentially serves the same purpose.

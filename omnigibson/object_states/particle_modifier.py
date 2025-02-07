@@ -157,14 +157,14 @@ def create_projection_visualization(
     if material is not None:
         prototype.material = material
     # Override the prototype used by the instancer
-    instancer_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(instancer_path)
+    instancer_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(instancer_path)
     instancer_prim.GetProperty("inputs:prototypes").SetTargets([prototype_path])
 
     # Destroy the old mat path since we don't use the sprites
-    lazy.omni.isaac.core.utils.prims.delete_prim(mat_path)
+    lazy.isaacsim.core.utils.prims.delete_prim(mat_path)
 
     # Modify the settings of the emitter to match the desired shape from inputs
-    emitter_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(emitter_path)
+    emitter_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(emitter_path)
     emitter_prim.GetProperty("inputs:active").Set(True)
     emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
     emitter_prim.GetProperty("inputs:lifespan").Set(projection_height.item() / m.PROJECTION_VISUALIZATION_SPEED)
@@ -183,7 +183,7 @@ def create_projection_visualization(
             og.sim.render()
 
     # Return the particle system prim which "owns" everything
-    return lazy.omni.isaac.core.utils.prims.get_prim_at_path(system_path), emitter_prim
+    return lazy.isaacsim.core.utils.prims.get_prim_at_path(system_path), emitter_prim
 
 
 class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMixin):
@@ -351,7 +351,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
 
             # Create a primitive shape if it doesn't already exist
-            pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
             if not pre_existing_mesh:
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, (
@@ -1046,11 +1046,9 @@ class ParticleApplier(ParticleModifier):
             projection_name = f"{name_prefix}_projection_visualization"
             projection_path = f"/OmniGraph/{projection_name}"
             projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
-            if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(projection_path):
-                self.projection_system = lazy.omni.isaac.core.utils.prims.get_prim_at_path(projection_path)
-                self.projection_emitter = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
-                    f"{projection_path}/emitter"
-                )
+            if lazy.isaacsim.core.utils.prims.is_prim_path_valid(projection_path):
+                self.projection_system = lazy.isaacsim.core.utils.prims.get_prim_at_path(projection_path)
+                self.projection_emitter = lazy.isaacsim.core.utils.prims.get_prim_at_path(f"{projection_path}/emitter")
             else:
                 self.projection_system, self.projection_emitter = create_projection_visualization(
                     scene=self.obj.scene,

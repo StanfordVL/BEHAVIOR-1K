@@ -200,7 +200,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         root_prim = (
             None
             if self.articulation_root_path is None
-            else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+            else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
         )
         if root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
@@ -213,7 +213,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
 
         # Add semantics
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
             type_label="class",

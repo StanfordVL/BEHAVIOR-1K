@@ -99,7 +99,7 @@ class MaterialPrim(BasePrim):
         lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
 
         # Return generated material
-        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path)
+        return lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path)
 
     @classmethod
     def clear(cls):

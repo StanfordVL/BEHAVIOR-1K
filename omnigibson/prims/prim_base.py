@@ -100,10 +100,10 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._scene_assigned = True
 
         # Then check if the prim is already loaded
-        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
+        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
             # TODO(parallel-hang): make this more descriptive
             log.debug(f"prim {self.name} already exists, skipping load")
-            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+            self._prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
         else:
             # If not, we'll load it.
             self._prim = self._load()

@@ -144,21 +144,21 @@ def _launch_app():
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
-    assert lazy.omni.isaac.core.utils.stage.close_stage()
+    assert lazy.isaacsim.core.utils.stage.close_stage()
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
     # Enable additional extensions we need
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
+    lazy.isaacsim.core.utils.extensions.enable_extension("omni.flowusd")
 
     # Additional import for windows
     if os.name == "nt":
-        lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.window.viewport")
+        lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.window.viewport")
 
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
@@ -177,13 +177,13 @@ def _launch_app():
         if gm.REMOTE_STREAMING == "native":
             # Enable Native Livestream extension
             # Default App: Streaming Client from the Omniverse Launcher
-            lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.livestream.native")
+            lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.livestream.native")
             print(f"Now streaming on {ip} via Omniverse Streaming Client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
-            lazy.omni.isaac.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
+            lazy.isaacsim.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
             raise ValueError(
@@ -250,7 +250,7 @@ def _launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = _launch_app()
 
-    class Simulator(lazy.omni.isaac.core.simulation_context.SimulationContext, Serializable):
+    class Simulator(lazy.isaacsim.core.api.SimulationContext, Serializable):
         """
         Simulator class for directly interfacing with the physx physics engine.
 
@@ -284,7 +284,7 @@ def _launch_simulator(*args, **kwargs):
             device=None,
         ):
             assert (
-                lazy.omni.isaac.core.utils.stage.get_current_stage() is None
+                lazy.isaacsim.core.utils.stage.get_current_stage() is None
             ), "Stage should not exist when creating a new Simulator instance"
 
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
@@ -418,7 +418,7 @@ def _launch_simulator(*args, **kwargs):
                 self.viewer_height = viewer_height
 
             # Acquire contact sensor interface
-            self._contact_sensor = lazy.omni.isaac.sensor._sensor.acquire_contact_sensor_interface()
+            self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -606,7 +606,7 @@ def _launch_simulator(*args, **kwargs):
             if self._floor_plane is not None:
                 return
             ground_plane_relative_path = "/ground_plane"
-            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path="/World" + ground_plane_relative_path,
                 name="ground_plane",
                 z_position=0,
@@ -628,7 +628,7 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane.load(None)
 
             # Assign floors category to the floor plane
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=self._floor_plane.prim,
                 semantic_label="floors",
                 type_label="class",
@@ -1476,7 +1476,7 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 Usd.Prim: Prim at /World
             """
-            return lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path="/World")
+            return lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path="/World")
 
         @property
         def floor_plane(self):

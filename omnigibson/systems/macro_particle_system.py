@@ -455,14 +455,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=self.particle_object.prim_path,
                 path_to=prim_path,
             )
-            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,
                 type_label="class",
@@ -1206,16 +1206,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=self.particle_object.prim_path,
                 path_to=prim_path,
             )
             # Apply RigidBodyAPI to it so it is subject to physics
-            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,
                 type_label="class",

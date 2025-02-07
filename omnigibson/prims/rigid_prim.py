@@ -191,7 +191,7 @@ class RigidPrim(XFormPrim):
             mesh_type = prim.GetPrimTypeInfo().GetTypeName()
             if mesh_type in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
+                mesh_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=mesh_path)
                 is_collision = mesh_prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                 mesh_kwargs = {
                     "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),

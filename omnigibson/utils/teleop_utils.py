@@ -141,7 +141,7 @@ class OVXRSystem(TeleopSystem):
         """
         self.raw_data = {}
         # enable xr extension
-        lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
+        lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         self.xr_device_class = lazy.omni.kit.xr.core.XRDeviceClass
         # run super method
         super().__init__(teleop_config, robot, show_control_marker)

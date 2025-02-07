@@ -966,8 +966,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             )
 
         # Update semantics
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-            prim=lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
+            prim=lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
             semantic_label=self.name,
             type_label="class",
         )
@@ -1472,7 +1472,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
             semantic_label=self.name,
             type_label="class",
@@ -1594,7 +1594,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
             semantic_label=self.name,
             type_label="class",
