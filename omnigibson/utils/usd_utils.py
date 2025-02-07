@@ -2010,9 +2010,9 @@ def get_sdf_value_type_name(val):
         lazy.pxr.Gf.Vec3f: lazy.pxr.Sdf.ValueTypeNames.Float3,
         lazy.pxr.Gf.Vec2f: lazy.pxr.Sdf.ValueTypeNames.Float2,
         lazy.pxr.Sdf.AssetPath: lazy.pxr.Sdf.ValueTypeNames.Asset,
+        bool: lazy.pxr.Sdf.ValueTypeNames.Bool,
         int: lazy.pxr.Sdf.ValueTypeNames.Int,
         float: lazy.pxr.Sdf.ValueTypeNames.Float,
-        bool: lazy.pxr.Sdf.ValueTypeNames.Bool,
         str: lazy.pxr.Sdf.ValueTypeNames.String,
     }
     for type_, usd_type in SDF_TYPE_MAPPING.items():
