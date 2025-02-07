@@ -293,6 +293,9 @@ class DataCollectionWrapper(DataWrapper):
         # Denotes the maximum serialized state size for the current episode
         self.max_state_size = 0
 
+        # Dict capturing serialized per-episode initial information (e.g.: scales / visibilities) about every object
+        self.init_metadata = dict()
+
         # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
         # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
@@ -390,6 +393,19 @@ class DataCollectionWrapper(DataWrapper):
         # Update max state size
         self.max_state_size = max(self.max_state_size, len(state))
 
+        # Also store initial metadata (scale, visibility) not recorded in serialized state
+        # This is simply serialized
+        scales = th.zeros(self.scene.n_objects, 3)
+        visibilities = th.zeros(self.scene.n_objects, dtype=th.bool)
+        for i, obj in enumerate(self.scene.objects):
+            scales[i] = obj.scale
+            visibilities[i] = obj.visible
+
+        self.init_metadata = {
+            "scales": scales,
+            "visibilities": visibilities,
+        }
+
         return init_obs, init_info
 
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
@@ -421,6 +437,10 @@ class DataCollectionWrapper(DataWrapper):
 
         # Add in transition info
         self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
+
+        # Add initial metadata information
+        for name, data in self.init_metadata.items():
+            traj_grp.create_dataset(name, data=data)
 
         return traj_grp
 
@@ -634,6 +654,8 @@ class DataPlaybackWrapper(DataWrapper):
         # Grab episode data
         transitions = json.loads(traj_grp.attrs["transitions"])
         traj_grp = h5py_group_to_torch(traj_grp)
+        scales = traj_grp["scales"]
+        visibilities = traj_grp["visibilities"]
         action = traj_grp["action"]
         state = traj_grp["state"]
         state_size = traj_grp["state_size"]
@@ -643,6 +665,13 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Reset environment
         og.sim.restore(scene_files=[self.scene_file])
+
+        # Reset scales and visibilities
+        with og.sim.stopped():
+            assert len(scales) == self.scene.n_objects and len(visibilities) == self.scene.n_objects
+            for scale, visible, obj in zip(scales, visibilities, self.scene.objects):
+                obj.scale = scale
+                obj.visible = bool(visible)
         self.reset()
 
         # Restore to initial state
