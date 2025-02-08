@@ -654,7 +654,8 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
             if is_light:
                 # Create a light
                 light_type = _LIGHT_MAPPING[mesh_info["type"]]
-                prim_path = f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/light_{i}"
+                stage.DefinePrim(f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/lights", "Scope")
+                prim_path = f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/lights/light_{i}"
                 prim = getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(stage, prim_path).GetPrim()
                 lazy.pxr.UsdLux.ShapingAPI.Apply(prim).GetShapingConeAngleAttr().Set(180.0)
             else:
@@ -663,7 +664,9 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
                 else:
                     # Create a primitive shape
                     mesh_type = mesh_info["type"].capitalize() if mesh_info["type"] != "box" else "Cube"
-                prim_path = f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/mesh_{i}"
+                # Create the visuals prim
+                stage.DefinePrim(f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/visuals", "Scope")
+                prim_path = f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/visuals/mesh_{i}"
                 assert hasattr(lazy.pxr.UsdGeom, mesh_type)
                 # togglebutton has to be a sphere
                 if meta_link_type in ["togglebutton"]:
@@ -898,11 +901,15 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     # Here we want to include every link that has the meta__ prefix.
     # This includes meta links that get added into the URDF in earlier
     # stages.
-    meta_link_prims = [p for p in prim.GetChildren() if p.GetName().startswith("meta__")]
+    meta_link_prims = [
+        p for p in prim.GetChildren() if p.GetName().startswith("meta__") and p.GetName().endswith("_link")
+    ]
     for meta_prim in meta_link_prims:
         # Get meta link information
         unparsed_meta = meta_prim.GetName()[6:-5]  # remove meta__ and _link
-        link_name, meta_link_type, link_id, link_sub_id = unparsed_meta.rsplit("_", 3)
+        meta_parts = unparsed_meta.rsplit("_", 3)
+        assert len(meta_parts) == 4, f"Invalid meta link name: {unparsed_meta}"
+        link_name, meta_link_type, link_id, link_sub_id = meta_parts
 
         # Add the is_meta_link, meta_link_type, and meta_link_id attributes
         meta_prim.CreateAttribute("ig:isMetaLink", lazy.pxr.Sdf.ValueTypeNames.Bool)
@@ -1464,7 +1471,7 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                             # Create meta link
                             _create_urdf_meta_link(
                                 root_element=root,
-                                meta_link_name=f"{meta_link_name}_{ml_id}_{i}",
+                                meta_link_name=f"meta__{parent_link_name}_{meta_link_name}_{ml_id}_{i}",
                                 parent_link_name=parent_link_name,
                                 pos=pos,
                                 rpy=T.quat2euler(quat),
