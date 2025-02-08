@@ -62,6 +62,9 @@ class VisionSensor(BaseSensor):
         image_height (int): Height of generated images, in pixels
         image_width (int): Width of generated images, in pixels
         focal_length (float): Focal length to set
+        focus_distance (float): Focus distance to set
+        fstop (float): fStop value to set
+        horizontal_aperture (float): Horizontal aperture to set
         clipping_range (2-tuple): (min, max) viewing range of this vision sensor
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
             current camera. Otherwise, creates a new viewport
@@ -124,6 +127,9 @@ class VisionSensor(BaseSensor):
         image_height=128,
         image_width=128,
         focal_length=17.0,  # Default 17.0 since this is roughly the human eye focal length
+        focus_distance=0.0,
+        fstop=0.0,
+        horizontal_aperture=20.995,
         clipping_range=(0.001, 10000000.0),
         viewport_name=None,
     ):
@@ -132,6 +138,9 @@ class VisionSensor(BaseSensor):
         load_config["image_height"] = image_height
         load_config["image_width"] = image_width
         load_config["focal_length"] = focal_length
+        load_config["focus_distance"] = focus_distance
+        load_config["fstop"] = fstop
+        load_config["horizontal_aperture"] = horizontal_aperture
         load_config["clipping_range"] = clipping_range
         load_config["viewport_name"] = viewport_name
 
@@ -245,8 +254,11 @@ class VisionSensor(BaseSensor):
         # Set the viewer size (requires taking one render step afterwards)
         self._viewport.viewport_api.set_texture_resolution(resolution)
 
-        # Also update focal length and clipping range
+        # Also update relevant camera params from load config
         self.focal_length = self._load_config["focal_length"]
+        self.focus_distance = self._load_config["focus_distance"]
+        self.fstop = self._load_config["fstop"]
+        self.horizontal_aperture = self._load_config["horizontal_aperture"]
         self.clipping_range = self._load_config["clipping_range"]
 
         # Requires 3 render updates to propagate changes
@@ -794,6 +806,42 @@ class VisionSensor(BaseSensor):
             length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
+
+    @property
+    def focus_distance(self):
+        """
+        Returns:
+            float: focus distance of this sensor, in mm
+        """
+        return self.get_attribute("focusDistance")
+
+    @focus_distance.setter
+    def focus_distance(self, distance):
+        """
+        Sets the focus distance @distance for this sensor
+
+        Args:
+            distance (float): focus distance of this sensor, in mm
+        """
+        self.set_attribute("focusDistance", distance)
+
+    @property
+    def fstop(self):
+        """
+        Returns:
+            float: fstop of this sensor
+        """
+        return self.get_attribute("fStop")
+
+    @fstop.setter
+    def fstop(self, val):
+        """
+        Sets the fstop for this sensor
+
+        Args:
+            val (float): fstop of this sensor
+        """
+        self.set_attribute("fStop", val)
 
     @property
     def active_camera_path(self):
