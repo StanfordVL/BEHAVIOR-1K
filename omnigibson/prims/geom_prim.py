@@ -50,9 +50,6 @@ class GeomPrim(XFormPrim):
         # run super first
         super()._post_load()
 
-        # By default, GeomPrim shows up in the rendering.
-        self.purpose = "default"
-
     @property
     def purpose(self):
         """
