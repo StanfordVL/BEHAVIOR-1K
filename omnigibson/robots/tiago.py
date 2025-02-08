@@ -5,7 +5,6 @@ import torch as th
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.python_utils import classproperty
 
@@ -36,6 +35,8 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -79,6 +80,12 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -121,6 +128,8 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
@@ -231,44 +240,12 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return controllers
 
     @property
-    def assisted_grasp_start_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
     def arm_control_idx(self):
         # Add combined entry
         idxs = super().arm_control_idx
         # Concatenate all values and sort them
         idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
-
-    @property
-    def finger_lengths(self):
-        return {arm: 0.12 for arm in self.arm_names}
 
     @property
     def disabled_collision_link_names(self):

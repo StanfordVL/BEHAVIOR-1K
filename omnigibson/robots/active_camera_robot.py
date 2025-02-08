@@ -22,17 +22,6 @@ class ActiveCameraRobot(BaseRobot):
 
     """
 
-    def _validate_configuration(self):
-        # Make sure a camera controller is specified
-        assert (
-            "camera" in self._controllers
-        ), "Controller 'camera' must exist in controllers! Current controllers: {}".format(
-            list(self._controllers.keys())
-        )
-
-        # run super
-        super()._validate_configuration()
-
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
 

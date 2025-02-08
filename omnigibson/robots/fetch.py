@@ -5,7 +5,6 @@ import torch as th
 
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.transform_utils import euler2quat
@@ -41,6 +40,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -83,6 +84,12 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -121,6 +128,8 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
@@ -203,28 +212,6 @@ class Fetch(TwoWheelRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, ActiveCa
     @property
     def wheel_axle_length(self):
         return 0.372
-
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
-    @property
-    def assisted_grasp_start_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([0.025, -0.02, 0.0])),
-                GraspingPoint(link_name="r_gripper_finger_link", position=th.tensor([-0.025, -0.02, 0.0])),
-            ]
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            self.default_arm: [
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([0.025, 0.02, 0.0])),
-                GraspingPoint(link_name="l_gripper_finger_link", position=th.tensor([-0.025, 0.02, 0.0])),
-            ]
-        }
 
     @cached_property
     def base_joint_names(self):

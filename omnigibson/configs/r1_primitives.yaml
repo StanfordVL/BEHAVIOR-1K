@@ -32,6 +32,8 @@ scene:
 robots:
   - type: R1
     obs_modalities: [rgb]
+    include_sensor_names: null
+    exclude_sensor_names: null
     scale: 1.0
     self_collisions: true
     action_normalize: false

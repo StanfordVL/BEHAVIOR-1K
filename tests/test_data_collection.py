@@ -136,5 +136,5 @@ def test_data_collect_and_playback():
         n_render_iterations=1,
         only_successes=False,
     )
-    env.playback_dataset(record=True)
+    env.playback_dataset(record_data=True)
     env.save_data()
