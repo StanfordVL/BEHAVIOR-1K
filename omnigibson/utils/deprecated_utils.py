@@ -594,6 +594,11 @@ class ArticulationView(_ArticulationView):
             self._invalidate_physics_handle_event = None
             self._is_initialized = False
 
+    @property
+    def initialized(self):
+        # THIS IS THE FIX: another crazy bug from isaac, specifically isaac 4.5
+        return self._is_initialized
+
 
 class RigidPrimView(_RigidPrimView):
     def get_linear_velocities(
