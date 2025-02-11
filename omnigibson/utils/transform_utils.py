@@ -1438,7 +1438,13 @@ def delta_rotation_matrix(omega, delta_t):
 
     # Skew-symmetric matrix K
     u_x, u_y, u_z = axis[0], axis[1], axis[2]
-    K = torch.tensor([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+    K = torch.zeros((3, 3))
+    K[0, 1] = -u_z
+    K[0, 2] = u_y
+    K[1, 0] = u_z
+    K[1, 2] = -u_x
+    K[2, 0] = -u_y
+    K[2, 1] = u_x
 
     # Rodrigues' rotation formula
     R = torch.eye(3) + torch.sin(theta) * K + (1 - torch.cos(theta)) * (K @ K)
@@ -1484,14 +1490,21 @@ def euler_intrinsic2mat(euler):
         torch.tensor: 3x3 rotation matrix
     """
     roll, pitch, yaw = euler[0], euler[1], euler[2]
+
     # Rotation matrix around X-axis
-    Rx = torch.tensor([[1, 0, 0], [0, torch.cos(roll), -torch.sin(roll)], [0, torch.sin(roll), torch.cos(roll)]])
+    euler_x = torch.zeros(3)
+    euler_x[0] = roll
+    Rx = euler2mat(euler_x)
 
     # Rotation matrix around Y-axis
-    Ry = torch.tensor([[torch.cos(pitch), 0, torch.sin(pitch)], [0, 1, 0], [-torch.sin(pitch), 0, torch.cos(pitch)]])
+    euler_y = torch.zeros(3)
+    euler_y[1] = pitch
+    Ry = euler2mat(euler_y)
 
     # Rotation matrix around Z-axis
-    Rz = torch.tensor([[torch.cos(yaw), -torch.sin(yaw), 0], [torch.sin(yaw), torch.cos(yaw), 0], [0, 0, 1]])
+    euler_z = torch.zeros(3)
+    euler_z[2] = yaw
+    Rz = euler2mat(euler_z)
 
     # Combine the rotation matrices
     # Intrinsic x-y-z is the same as extrinsic z-y-x
