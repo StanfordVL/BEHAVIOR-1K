@@ -149,11 +149,11 @@ def test_arm_control():
 
     n_steps = {
         "pose_delta_ori": {
-            "zero": 10,
-            "forward": 10,
-            "side": 10,
-            "up": 10,
-            "rotate": 10,
+            "zero": 40,
+            "forward": 40,
+            "side": 40,
+            "up": 40,
+            "rotate": 20,
             "base_move": 30,
         },
         "absolute_pose": {
@@ -181,10 +181,15 @@ def test_arm_control():
     for robot in env.robots:
         robot.keep_still()
 
+        # We need to explicitly reset the controllers to unify the initial state that will be seen
+        # during downstream action executions -- i.e.: the state seen after robot.reload_controllers()
+        # is called each time
+        for controller in robot.controllers.values():
+            controller.reset()
+
     # Update initial state (robot should be stable and still)
     env.scene.update_initial_state()
 
-    # Reset the environment
     env.scene.reset()
 
     # Record initial eef pose of all robots
@@ -233,10 +238,10 @@ def test_arm_control():
                             break
                         start_idx += robot.controllers[c].command_dim
                     if controller_mode == "pose_delta_ori":
-                        forward_action[start_idx] = 0.1
-                        side_action[start_idx + 1] = 0.1
-                        up_action[start_idx + 2] = 0.1
-                        rot_action[start_idx + 3] = 0.1
+                        forward_action[start_idx] = 0.02
+                        side_action[start_idx + 1] = 0.02
+                        up_action[start_idx + 2] = 0.02
+                        rot_action[start_idx + 3] = 0.02
                     elif controller_mode == "absolute_pose":
                         for act in [zero_action, forward_action, side_action, up_action, rot_action]:
                             act[start_idx : start_idx + 3] = init_eef_pos.clone()

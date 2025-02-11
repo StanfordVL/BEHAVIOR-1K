@@ -102,7 +102,7 @@ m.DEFAULT_ANGLE_THRESHOLD = 0.03
 m.LOW_PRECISION_DIST_THRESHOLD = 0.1
 m.LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
-m.JOINT_POS_DIFF_THRESHOLD = 0.01
+m.JOINT_POS_DIFF_THRESHOLD = 0.005
 m.LOW_PRECISION_JOINT_POS_DIFF_THRESHOLD = 0.05
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = math.radians(45)
@@ -506,7 +506,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
         approach_dir = T.quat2mat(grasp_quat) @ th.tensor([0.0, 0.0, -1.0])
 
-        pregrasp_offset = self.robot.finger_lengths[self.arm] / 2.0 + m.GRASP_APPROACH_DISTANCE
+        avg_finger_offset = th.mean(
+            th.tensor([length for length in self.robot.eef_to_fingertip_lengths[self.arm].values()])
+        )
+        pregrasp_offset = avg_finger_offset + m.GRASP_APPROACH_DISTANCE
 
         pregrasp_pos = grasp_pos - approach_dir * pregrasp_offset
 
@@ -581,7 +584,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # By default, it's NOT the z-axis of the world frame unless `project_pose_to_goal_frame=False` is set in curobo.
             # For sticky grasping, we also need to ignore the object during motion planning because the fingers are already closed.
             yield from self._move_hand(
-                grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_contact=True, ignore_objects=[obj]
+                grasp_pose, motion_constraint=[1, 1, 1, 1, 1, 0], stop_on_ag=True, ignore_objects=[obj]
             )
         elif self.robot.grasping_mode == "assisted":
             indented_print("Assisted grasping: approach")
@@ -853,6 +856,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self,
         target_pose,
         stop_on_contact=False,
+        stop_on_ag=False,
         motion_constraint=None,
         low_precision=False,
         lock_auxiliary_arm=False,
@@ -864,6 +868,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Args:
             target_pose (Tuple[th.tensor, th.tensor]): target pose to reach for the default end-effector in the world frame
             stop_on_contact (bool): Whether to stop executing motion plan if contact is detected
+            stop_on_ag (bool): Whether to stop executing motion plan if assisted grasping is activated
             motion_constraint (MotionConstraint): Motion constraint for the motion
             low_precision (bool): Whether to use low precision for the motion
             lock_auxiliary_arm (bool): Whether to lock the other arm in place
@@ -906,7 +911,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
         indented_print(f"Plan has {len(q_traj)} steps")
-        yield from self._execute_motion_plan(q_traj, stop_on_contact=stop_on_contact, low_precision=low_precision)
+        yield from self._execute_motion_plan(
+            q_traj, stop_on_contact=stop_on_contact, stop_on_ag=stop_on_ag, low_precision=low_precision
+        )
 
     def _plan_joint_motion(
         self,
@@ -972,7 +979,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return q_traj
 
     def _execute_motion_plan(
-        self, q_traj, stop_on_contact=False, ignore_failure=False, low_precision=False, ignore_physics=False
+        self,
+        q_traj,
+        stop_on_contact=False,
+        stop_on_ag=False,
+        ignore_failure=False,
+        low_precision=False,
+        ignore_physics=False,
     ):
         for i, joint_pos in enumerate(q_traj):
             # indented_print(f"Executing motion plan step {i + 1}/{len(q_traj)}")
@@ -992,6 +1005,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 articulation_control_idx = th.cat(articulation_control_idx)
                 for j in range(m.MAX_STEPS_FOR_JOINT_MOTION):
                     # indented_print(f"Step {j + 1}/{m.MAX_STEPS_FOR_JOINT_MOTION}")
+
+                    # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
+                    # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
+                    action = self.robot.q_to_action(joint_pos)
+                    yield self._postprocess_action(action)
+
                     current_joint_pos = self.robot.get_joint_positions()
                     joint_pos_diff = joint_pos - current_joint_pos
                     base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
@@ -1014,14 +1033,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                     collision_detected = detect_robot_collision_in_sim(self.robot)
                     if stop_on_contact and collision_detected:
-                        indented_print(f"Collision detected at step {i + 1}/{len(q_traj)}")
                         return
 
-                    # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
-                    # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
-                    action = self.robot.q_to_action(joint_pos)
-
-                    yield self._postprocess_action(action)
+                    if stop_on_ag and self._get_obj_in_hand() is not None:
+                        return
 
                 if not ignore_failure:
                     if not base_target_reached:
@@ -1334,13 +1349,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_joint_positions = self._get_joint_position_with_fingers_at_limit(limit_type)
         action = self.robot.q_to_action(target_joint_positions)
         for _ in range(m.MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            current_joint_positinos = self.robot.get_joint_positions()
-            if th.allclose(current_joint_positinos, target_joint_positions, atol=0.005):
+            yield self._postprocess_action(action)
+            current_joint_positions = self.robot.get_joint_positions()
+            if th.allclose(current_joint_positions, target_joint_positions, atol=m.JOINT_POS_DIFF_THRESHOLD):
                 break
             elif limit_type == "lower" and self._get_obj_in_hand() is not None:
                 # If we are grasping an object, we should stop when object is detected in hand
                 break
-            yield self._postprocess_action(action)
 
     def _execute_grasp(self):
         """

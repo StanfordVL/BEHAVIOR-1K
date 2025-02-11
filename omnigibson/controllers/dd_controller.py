@@ -21,6 +21,8 @@ class DifferentialDriveController(LocomotionController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
     ):
         """
         Args:
@@ -47,6 +49,12 @@ class DifferentialDriveController(LocomotionController):
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the maximum linear and angular velocities calculated from @wheel_radius, @wheel_axle_length, and
                 @control_limits velocity limits entry
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
         """
         # Store internal variables
         self._wheel_radius = wheel_radius
@@ -76,6 +84,8 @@ class DifferentialDriveController(LocomotionController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def _update_goal(self, command, control_dict):

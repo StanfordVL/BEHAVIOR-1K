@@ -33,6 +33,8 @@ class FrankaPanda(ManipulationRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -71,6 +73,12 @@ class FrankaPanda(ManipulationRobot):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -90,10 +98,10 @@ class FrankaPanda(ManipulationRobot):
         if end_effector == "gripper":
             self._model_name = "franka_panda"
             self._gripper_control_idx = th.arange(7, 9)
-            self._eef_link_names = "panda_hand"
+            self._eef_link_names = "eef_link"
             self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
             self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
+            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.04, 0.04])
             self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
             self._ag_start_points = [
                 GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
@@ -191,6 +199,8 @@ class FrankaPanda(ManipulationRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
@@ -227,10 +237,6 @@ class FrankaPanda(ManipulationRobot):
     def _default_joint_pos(self):
         return self._default_robot_model_joint_pos
 
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.1}
-
     @cached_property
     def arm_link_names(self):
         return {self.default_arm: [f"panda_link{i}" for i in range(8)]}
@@ -253,11 +259,19 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
+        return (
+            os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/usd/franka_panda.usda")
+            if self.model_name == "franka_panda"
+            else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
+        )
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
+        return (
+            os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
+            if self.model_name == "franka_panda"
+            else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
+        )
 
     @property
     def curobo_path(self):
@@ -265,22 +279,27 @@ class FrankaPanda(ManipulationRobot):
         assert (
             self._model_name == "franka_panda"
         ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
-        return os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}_description_curobo.yaml")
+        return os.path.join(
+            gm.ASSET_PATH, "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml"
+        )
 
     @cached_property
     def curobo_attached_object_link_names(self):
-        return {self._eef_link_names: "attached_object"}
+        assert (
+            self._model_name == "franka_panda"
+        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        return super().curobo_attached_object_link_names
 
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: self._teleop_rotation_offset}
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         return {self.default_arm: self._ag_start_points}
 
     @property
-    def assisted_grasp_end_points(self):
+    def _assisted_grasp_end_points(self):
         return {self.default_arm: self._ag_start_points}
 
     @property
