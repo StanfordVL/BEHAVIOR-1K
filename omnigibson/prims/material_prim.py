@@ -710,7 +710,8 @@ class MaterialPrim(BasePrim):
         Args:
              constant (float): this material's applied opacity_constant
         """
-        self.set_input(inp="opacity_constant", val=constant)
+        # TODO: another instance of missing config type checking
+        self.set_input(inp="opacity_constant", val=float(constant))
 
     @property
     def opacity_texture(self):
