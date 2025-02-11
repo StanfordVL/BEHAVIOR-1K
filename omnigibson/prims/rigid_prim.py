@@ -30,7 +30,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_CONTACT_OFFSET = 0.001
 m.DEFAULT_REST_OFFSET = 0.0
-m.META_LINK_PATTERN = re.compile(r".*:(\w+)_(\d+)_(\d+)_link")
+m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 
 
 class RigidPrim(XFormPrim):
@@ -807,7 +807,7 @@ class RigidPrim(XFormPrim):
 
         # Check using the old format.
         # TODO: Remove this after the next dataset release
-        old_format = m.META_LINK_PATTERN.fullmatch(self.name) is not None
+        old_format = m.LEGACY_META_LINK_PATTERN.fullmatch(self.name) is not None
         if old_format:
             return True
 
@@ -821,7 +821,7 @@ class RigidPrim(XFormPrim):
 
         # Check using the old format.
         # TODO: Remove this after the next dataset release
-        return m.META_LINK_PATTERN.fullmatch(self.name).group(1)
+        return m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(1)
 
     @cached_property
     def meta_link_id(self):
@@ -831,7 +831,7 @@ class RigidPrim(XFormPrim):
 
         # Check using the old format.
         # TODO: Remove this after the next dataset release
-        return m.META_LINK_PATTERN.fullmatch(self.name).group(2)
+        return m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(2)
 
     @cached_property
     def meta_link_sub_id(self):
@@ -841,7 +841,7 @@ class RigidPrim(XFormPrim):
 
         # Check using the old format.
         # TODO: Remove this after the next dataset release
-        return int(m.META_LINK_PATTERN.fullmatch(self.name).group(3))
+        return int(m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(3))
 
     def enable_gravity(self):
         """
