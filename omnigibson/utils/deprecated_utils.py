@@ -599,6 +599,10 @@ class ArticulationView(_ArticulationView):
         # THIS IS THE FIX: another crazy bug from isaac, specifically isaac 4.5
         return self._is_initialized
 
+    def _on_prim_deletion(self, prim_path):
+        _XFormPrimView._on_prim_deletion(self, prim_path)
+        self._physics_view = None
+
 
 class RigidPrimView(_RigidPrimView):
     def get_linear_velocities(

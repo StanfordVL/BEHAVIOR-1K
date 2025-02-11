@@ -902,13 +902,9 @@ def _launch_simulator(*args, **kwargs):
             if not self.is_playing():
                 return
 
-            # First, refresh the physics sim view
-            self._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(self.backend)
-            self._physics_sim_view.set_subspace_roots("/")
-
             # Then update the handles for all objects
             for scene in self.scenes:
-                if scene is not None and scene.initialized:
+                if scene is not None:
                     for obj in scene.objects:
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
@@ -1037,15 +1033,14 @@ def _launch_simulator(*args, **kwargs):
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
-                    if len(self.scenes) > 0 and all([scene.initialized for scene in self.scenes]):
-                        for scene in self.scenes:
-                            for robot in scene.robots:
-                                if robot.initialized:
-                                    robot.update_controller_mode()
+                    for scene in self.scenes:
+                        for robot in scene.robots:
+                            if robot.initialized:
+                                robot.update_controller_mode()
 
-                            # Also refresh any transition rules that became stale while sim was stopped
-                            if gm.ENABLE_TRANSITION_RULES:
-                                scene.transition_rule_api.refresh_all_rules()
+                        # Also refresh any transition rules that became stale while sim was stopped
+                        if gm.ENABLE_TRANSITION_RULES:
+                            scene.transition_rule_api.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -1124,6 +1119,10 @@ def _launch_simulator(*args, **kwargs):
             PoseAPI.invalidate()
 
         def _on_pre_physics_step(self):
+            # Only do this if we're not in the warmup phase
+            if lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                return
+
             # Run the controller step on every controllable object
             for scene in self.scenes:
                 for obj in scene.objects:
@@ -1134,6 +1133,10 @@ def _launch_simulator(*args, **kwargs):
             ControllableObjectViewAPI.flush_control()
 
         def _on_post_physics_step(self):
+            # Only do this if we're not in the warmup phase
+            if lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                return
+
             # Run the post physics update for backend view
             ControllableObjectViewAPI.post_physics_step()
 

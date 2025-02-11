@@ -472,10 +472,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # One final plot show so all the figures get rendered
         plt.show()
 
-    def update_handles(self):
-        # Call super first
-        super().update_handles()
-
     def remove(self):
         """
         Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
