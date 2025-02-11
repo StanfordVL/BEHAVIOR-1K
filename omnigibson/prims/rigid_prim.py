@@ -30,7 +30,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_CONTACT_OFFSET = 0.001
 m.DEFAULT_REST_OFFSET = 0.0
-m.META_LINK_PATTERN = re.compile(r"(\w+)_(\d+)_(\d+)_link")
+m.META_LINK_PATTERN = re.compile(r".*:(\w+)_(\d+)_(\d+)_link")
 
 
 class RigidPrim(XFormPrim):
