@@ -112,9 +112,15 @@ class ClothPrim(GeomPrim):
         self.save_configuration("default", self.points)
 
         # Remesh the object if necessary
-        if self._load_config.get("force_remesh", False) or (
-            self._load_config.get("remesh", True) and not th.allclose(self.scale, th.ones(3))
-        ):
+        force_remesh = self._load_config.get("force_remesh", False)
+        should_remesh_because_of_scale = self._load_config.get("remesh", True) and not th.allclose(
+            self.scale, th.ones(3)
+        )
+        # TODO: Remove the legacy check after the next dataset release
+        should_remesh_because_legacy = self._load_config.get(
+            "remesh", True
+        ) and self.get_available_configurations() == ["default"]
+        if should_remesh_because_of_scale or should_remesh_because_legacy or force_remesh:
             # Remesh the object if necessary
             log.warning(
                 f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
