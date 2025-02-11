@@ -287,6 +287,7 @@ def _set_mtl_opacity(mtl_prim, texture):
     # This defaults to some other value, which takes opaque black channels in the
     # image to be fully transparent. This is not what we want.
     lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
+    lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
 
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)

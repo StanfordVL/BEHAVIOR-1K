@@ -50,6 +50,10 @@ class GeomPrim(XFormPrim):
         # run super first
         super()._post_load()
 
+        # Temporarily set the opacity threshold to be 0.1. This will be automated in later exports.
+        if self.material:
+            self.material.opacity_threshold = 0.1
+
     @property
     def purpose(self):
         """

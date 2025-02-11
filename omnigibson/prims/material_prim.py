@@ -231,6 +231,20 @@ class MaterialPrim(BasePrim):
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
         # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
+        if inp not in self.shader_input_names:
+            input_type = None
+            if isinstance(val, str):
+                input_type = lazy.pxr.Sdf.ValueTypeNames.String
+            elif isinstance(val, int):
+                input_type = lazy.pxr.Sdf.ValueTypeNames.Int
+            elif isinstance(val, float):
+                input_type = lazy.pxr.Sdf.ValueTypeNames.Float
+            elif isinstance(val, bool):
+                input_type = lazy.pxr.Sdf.ValueTypeNames.Bool
+            else:
+                raise ValueError(f"Invalid input type {type(val)} for input {inp}")
+
+            lazy.omni.usd.create_material_input(self.prim, "opacity_threshold", val, input_type)
         assert (
             inp in self.shader_input_names
         ), f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
