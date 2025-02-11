@@ -342,11 +342,6 @@ class RigidPrim(XFormPrim):
         position = th.as_tensor(position, dtype=th.float32)
         orientation = th.as_tensor(orientation, dtype=th.float32)
 
-        # Convert to from scene-relative to world if necessary
-        if frame == "scene":
-            assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-
         # Assert validity of the orientation
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
@@ -354,14 +349,17 @@ class RigidPrim(XFormPrim):
 
         # Actually set the pose.
         if not self.kinematic_only:
+            # Convert to from scene-relative to world if necessary
+            if frame == "scene":
+                assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
+                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
+
             self._rigid_prim_view.set_world_poses(
                 positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
             )
         else:
             XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-
-        # Invalidate kinematic-only object pose caches when new pose is set
-        if self.kinematic_only:
+            # Invalidate kinematic-only object pose caches when new pose is set
             self.clear_kinematic_only_cache()
         PoseAPI.invalidate()
 
@@ -396,7 +394,7 @@ class RigidPrim(XFormPrim):
             orientation = orientations[0][[1, 2, 3, 0]]
         else:
             # If this is the first time we're getting the pose for a kinematic-only object, we need to cache it
-            position, orientation = XFormPrim.get_position_orientation(self, frame=frame, clone=clone)
+            position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
 
         # Assert that the orientation is a unit quaternion
         assert math.isclose(

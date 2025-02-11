@@ -169,8 +169,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # This renders, which causes a material lookup error since we're creating a temp file, so we suppress
             # the error explicitly here
             with suppress_omni_log(channels=["omni.hydra"]):
-                # if self.prim_path == "/World/scene_0/bed_zrumze_0":
-                #     breakpoint()
                 create_joint(
                     prim_path=f"{self.prim_path}/rootJoint",
                     joint_type="FixedJoint",
