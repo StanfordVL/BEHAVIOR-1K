@@ -50,12 +50,17 @@ class LinkBasedStateMixin(BaseObjectState):
         meta_link_type = cls.meta_link_type
         for child in prim.GetChildren():
             if child.GetTypeName() == "Xform":
+                # With the new format, we can know for sure by checking the meta link type
                 if (
                     child.HasAttribute("ig:metaLinkType")
                     and child.GetAttribute("ig:metaLinkType").Get() == meta_link_type
                 ):
                     return True, None
 
+                # Until the next dataset release, also accept the old format
+                # TODO: Remove this block after the next dataset release
+                if meta_link_type in child.GetName():
+                    return True, None
         return (
             False,
             f"LinkBasedStateMixin {cls.__name__} requires meta link with prefix {cls.meta_link_type} "
@@ -113,7 +118,10 @@ class LinkBasedStateMixin(BaseObjectState):
 
         # TODO: Extend logic to account for multiple instances of the same meta link? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
-            if self.meta_link_type in name or (self._default_link is not None and link.name == self._default_link.name):
+            is_appropriate_meta_link = link.is_meta_link and link.meta_link_type == self.meta_link_type
+            # TODO: Remove support for this default meta link logic after the next dataset release
+            is_default_link = self._default_link is not None and link.name == self._default_link.name
+            if is_appropriate_meta_link or is_default_link:
                 self._links[name] = link
                 # Make sure the scale is similar if the link is not a cloth prim
                 if not isinstance(link, ClothPrim):
