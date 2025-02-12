@@ -78,7 +78,7 @@ def main():
     # start vrsys
     vrsys = OVXRSystem(
         robot=env.robots[0],
-        show_control_marker=True,
+        show_control_marker=False,
         system="SteamVR",
         eef_tracking_mode="controller",
         align_anchor_to="camera",
