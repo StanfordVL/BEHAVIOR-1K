@@ -1,4 +1,3 @@
-import sys
 from collections import defaultdict
 from typing import Literal
 
@@ -25,7 +24,7 @@ from omnigibson.object_states.factory import (
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
-from omnigibson.object_states.particle_modifier import ParticleApplier, ParticleRemover
+from omnigibson.object_states.particle_modifier import ParticleApplier
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import EmitterType, PrimType
@@ -302,11 +301,11 @@ class StatefulObject(BaseObject):
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
-            fire_at_metalink = True
+            fire_at_meta_link = True
             if OnFire in self.states:
                 # Note whether the heat source link is explicitly set
                 link = self.states[OnFire].link
-                fire_at_metalink = link != self.root_link
+                fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
                 # Otherwise, immediately return
@@ -319,7 +318,7 @@ class StatefulObject(BaseObject):
             emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
             emitter_config["position"] = (
-                (0.0, 0.0, 0.0) if fire_at_metalink else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
+                (0.0, 0.0, 0.0) if fire_at_meta_link else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
             )
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
@@ -409,7 +408,7 @@ class StatefulObject(BaseObject):
         if emitter_type == EmitterType.FIRE:
             # Radius is in the absolute world coordinate even though the fire is under the link frame.
             # In other words, scaling the object doesn't change the fire radius.
-            if fire_at_metalink:
+            if fire_at_meta_link:
                 # TODO: get radius of heat_source_link from metadata.
                 radius = 0.05
             else:

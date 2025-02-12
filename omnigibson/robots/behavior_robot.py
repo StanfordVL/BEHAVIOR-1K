@@ -8,7 +8,6 @@ from typing import Iterable, List, Literal, Tuple
 
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -80,6 +79,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities="rgb",
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         # Unique to ManipulationRobot
         grasping_mode="assisted",
@@ -109,6 +110,8 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             grasping_mode=grasping_mode,
             grasping_direction="upper",
@@ -401,7 +404,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 )
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
@@ -416,7 +419,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     @property
-    def assisted_grasp_end_points(self):
+    def _assisted_grasp_end_points(self):
         side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
@@ -469,8 +472,9 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Process local transform adjustments
             hand_data = 0
             if teleop_action.is_valid[part_name]:
-                des_world_part_pos, des_world_part_orn = teleop_action[part_name][:3], T.euler2quat(
-                    teleop_action[part_name][3:6]
+                des_world_part_pos, des_world_part_orn = (
+                    teleop_action[part_name][:3],
+                    T.euler2quat(teleop_action[part_name][3:6]),
                 )
                 if part_name in self.arm_names:
                     # compute gripper action

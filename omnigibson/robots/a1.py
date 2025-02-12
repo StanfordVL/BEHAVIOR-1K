@@ -33,6 +33,8 @@ class A1(ManipulationRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -70,6 +72,12 @@ class A1(ManipulationRobot):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -98,15 +106,15 @@ class A1(ManipulationRobot):
             )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             self._ag_start_points = [
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.025, -0.07, 0.012])),
-                GraspingPoint(link_name=f"base_link", position=th.tensor([-0.015, -0.11, 0.012])),
-                GraspingPoint(link_name=f"link14", position=th.tensor([-0.01, 0.015, 0.004])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.025, -0.07, 0.012])),
+                GraspingPoint(link_name="base_link", position=th.tensor([-0.015, -0.11, 0.012])),
+                GraspingPoint(link_name="link14", position=th.tensor([-0.01, 0.015, 0.004])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name=f"link22", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link32", position=th.tensor([0.006, 0.045, 0.003])),
-                GraspingPoint(link_name=f"link42", position=th.tensor([0.006, 0.04, 0.003])),
-                GraspingPoint(link_name=f"link52", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link22", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link32", position=th.tensor([0.006, 0.045, 0.003])),
+                GraspingPoint(link_name="link42", position=th.tensor([0.006, 0.04, 0.003])),
+                GraspingPoint(link_name="link52", position=th.tensor([0.006, 0.04, 0.003])),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for A1")
@@ -128,6 +136,8 @@ class A1(ManipulationRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
@@ -163,10 +173,6 @@ class A1(ManipulationRobot):
     @property
     def _default_joint_pos(self):
         return self._default_robot_model_joint_pos
-
-    @property
-    def finger_lengths(self):
-        return {self.default_arm: 0.087}
 
     @cached_property
     def arm_link_names(self):
@@ -205,12 +211,12 @@ class A1(ManipulationRobot):
         return {self.default_arm: self._teleop_rotation_offset}
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         return {self.default_arm: self._ag_start_points}
 
     @property
-    def assisted_grasp_end_points(self):
-        return {self.default_arm: self._ag_start_points}
+    def _assisted_grasp_end_points(self):
+        return {self.default_arm: self._ag_end_points}
 
     @property
     def disabled_collision_pairs(self):

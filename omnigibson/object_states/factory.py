@@ -2,7 +2,41 @@ from collections import namedtuple
 
 import networkx as nx
 
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    REGISTERED_OBJECT_STATES,
+    AttachedTo,
+    Burnt,
+    Contains,
+    Cooked,
+    Covered,
+    Draped,
+    Filled,
+    Folded,
+    Frozen,
+    Heated,
+    HeatSourceOrSink,
+    Inside,
+    IsGrasping,
+    MaxTemperature,
+    NextTo,
+    ObjectsInFOVOfRobot,
+    OnFire,
+    OnTop,
+    Open,
+    Overlaid,
+    ParticleApplier,
+    ParticleRemover,
+    ParticleRequirement,
+    ParticleSink,
+    ParticleSource,
+    Saturated,
+    SliceableRequirement,
+    SlicerActive,
+    ToggledOn,
+    Touching,
+    Under,
+    Unfolded,
+)
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 
@@ -176,11 +210,11 @@ def get_states_by_dependency_order(states=None):
     return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
 
 
-# Define all metalinks
-METALINK_PREFIXES = set()
+# Define all meta links
+META_LINK_TYPES = set()
 for state in get_states_by_dependency_order():
     if issubclass(state, LinkBasedStateMixin):
         try:
-            METALINK_PREFIXES.add(state.metalink_prefix)
+            META_LINK_TYPES.add(state.meta_link_type)
         except NotImplementedError:
             pass

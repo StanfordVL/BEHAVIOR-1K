@@ -17,11 +17,11 @@ def main():
     dataset_exists, assets_exist = os.path.exists(gm.DATASET_PATH), os.path.exists(gm.ASSET_PATH)
     if not (dataset_exists and assets_exist):
         # Ask user which dataset to install
-        print(f"OmniGibson will now install data under the following locations:")
+        print("OmniGibson will now install data under the following locations:")
         print(f"    dataset (~25GB): {gm.DATASET_PATH}")
         print(f"    assets (~2.5GB): {gm.ASSET_PATH}")
         print(
-            f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun omnigibson/download_datasets.py."
+            "If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun omnigibson/download_datasets.py."
         )
         if click.confirm("Do you want to continue?", default=True):
             # Only download if the dataset path doesn't exist

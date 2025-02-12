@@ -56,11 +56,11 @@ jobs:
         run: printenv
 
       - name: Run tests
-        run: pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml && cp ${{ matrix.test_file }}.xml ${GITHUB_WORKSPACE}/
+        run: pytest -s tests/${{ matrix.test_file }}.py --junitxml=${{ matrix.test_file }}.xml
         continue-on-error: true
 
       - name: Deploy artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
           path: ${{ matrix.test_file }}.xml
@@ -93,15 +93,16 @@ jobs:
           submodules: true
           path: omnigibson-src
       - name: Pull reports
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: omnigibson-src
+          merge-multiple: true
       - name: Test Report0
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
           working-directory: omnigibson-src
-          path: ${{ github.run_id }}-tests-*/test_*.xml
+          path: test_*.xml
           reporter: java-junit
           fail-on-error: 'false'
           fail-on-empty: 'false'

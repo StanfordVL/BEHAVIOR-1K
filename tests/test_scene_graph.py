@@ -11,7 +11,6 @@ from omnigibson.utils.constants import PrimType
 
 
 def test_scene_graph():
-
     if og.sim is None:
         # Set global flags
         gm.ENABLE_OBJECT_STATES = True
@@ -73,8 +72,7 @@ def test_scene_graph():
     }
 
     env = og.Environment(configs=config)
-
-    scene = og.sim.scenes[0]
+    scene = env.scene
 
     breakfast_table = scene.object_registry("name", "breakfast_table")
     bowl = scene.object_registry("name", "bowl")

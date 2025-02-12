@@ -3,26 +3,24 @@ A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
 
 import math
-from typing import Callable, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import carb
 import numpy as np
 import omni
-import omni.graph.core as ogc
 import omni.timeline
-import omni.usd as ou
 import torch
 import usdrt
 import warp as wp
 from omni.isaac.core.articulations import ArticulationView as _ArticulationView
 from omni.isaac.core.prims import RigidPrimView as _RigidPrimView
 from omni.isaac.core.prims import XFormPrimView as _XFormPrimView
-from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
+from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
-from pxr import PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics, UsdShade
+from pxr import PhysxSchema, Usd, UsdGeom, UsdPhysics
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0

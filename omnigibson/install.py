@@ -5,7 +5,6 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
-from importlib.util import find_spec
 from pathlib import Path
 from typing import List, Optional
 
@@ -254,7 +253,7 @@ def _pip_based_install():
 
         # Check that it can now be imported
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim
+        import isaacsim  # noqa: F401
     except ImportError:
         return False
 
@@ -323,7 +322,10 @@ def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_p
     # Check if the isaacsim package is already installed
     try:
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
-        import isaacsim
+
+        # We import this, skip the unused import warning, because the import actually has side effects
+        # in terms of what's included in the Python path.
+        import isaacsim  # noqa: F401
 
         click.echo("Isaac Sim is already installed via pip in your current env.")
         click.echo("If you need to download the datasets, please run omnigibson/download_datasets.py.")
@@ -363,12 +365,12 @@ def setup_omnigibson(install_datasets: bool, launcher_install: bool, isaac_sim_p
         dataset_exists, assets_exist = os.path.exists(gm.DATASET_PATH), os.path.exists(gm.ASSET_PATH)
         if not (dataset_exists and assets_exist):
             # Ask user which dataset to install
-            click.echo(f"OmniGibson will now install data under the following locations:")
+            click.echo("OmniGibson will now install data under the following locations:")
             click.echo(f"    dataset (~25GB): {gm.DATASET_PATH}")
             click.echo(f"    assets (~2.5GB): {gm.ASSET_PATH}")
             click.echo(
-                f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and "
-                f"rerun omnigibson/download_datasets.py."
+                "If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and "
+                "rerun omnigibson/download_datasets.py."
             )
             if click.confirm("Do you want to continue?", default=True):
                 # Only download if the dataset path doesn't exist

@@ -18,8 +18,7 @@ from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.prims.prim_base import BasePrim
-from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
+from omnigibson.systems.system_base import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     generate_points_in_volume_checker_function,
@@ -224,7 +223,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
     """
 
     def __init__(self, obj, conditions, method=ParticleModifyMethod.ADJACENCY, projection_mesh_params=None):
-
         # Store internal variables
         self.method = method
         self.projection_source_sphere = None
@@ -411,7 +409,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 len(self.link.visual_meshes) == 1
             ), f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
 
-            # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
+            # Make sure the mesh is translated so that its tip lies at the meta link origin, and rotated so the vector
             # from tip to tail faces the positive x axis
             z_offset = (
                 0.0
@@ -564,7 +562,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             # Make sure conds isn't empty and is a list
             if conds is None:
                 continue
-            assert type(conds) == list, f"Expected list of conditions for system {system_name}, got {conds}"
+            assert type(conds) is list, f"Expected list of conditions for system {system_name}, got {conds}"
             system_conditions = []
             for cond_type, cond_val in conds:
                 cond = self._generate_condition(condition_type=cond_type, value=cond_val)
@@ -925,12 +923,12 @@ class ParticleRemover(ParticleModifier):
         return False
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.REMOVAL_LINK_PREFIX
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @property
@@ -1409,12 +1407,12 @@ class ParticleApplier(ParticleModifier):
         return all(condition(self.obj) for condition in next(iter(self.conditions.values())))
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.APPLICATION_LINK_PREFIX
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @classmethod

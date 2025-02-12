@@ -1,6 +1,12 @@
 import math
 from collections.abc import Iterable
 
+import numpy as np
+import torch as th
+from numba import jit
+
+import omnigibson.utils.transform_utils as TT
+import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -44,10 +50,12 @@ class InverseKinematicsController(JointController, ManipulationController):
             (-0.2, -0.2, -0.2, -0.5, -0.5, -0.5),
             (0.2, 0.2, 0.2, 0.5, 0.5, 0.5),
         ),
+        isaac_kp=None,
+        isaac_kd=None,
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
-        use_impedances=True,
+        use_impedances=False,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
@@ -80,6 +88,12 @@ class InverseKinematicsController(JointController, ManipulationController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
             pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
@@ -142,7 +156,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         # The output orientation limits are also set to be values assuming delta commands, so those are updated too
         if self.mode == "pose_absolute_ori":
             if command_input_limits is not None:
-                if type(command_input_limits) == str and command_input_limits == "default":
+                if type(command_input_limits) is str and command_input_limits == "default":
                     command_input_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
@@ -156,7 +170,7 @@ class InverseKinematicsController(JointController, ManipulationController):
                         cb.array(command_output_limits[0]),
                         cb.array(command_output_limits[1]),
                     ]
-                if type(command_output_limits) == str and command_output_limits == "default":
+                if type(command_output_limits) is str and command_output_limits == "default":
                     command_output_limits = [
                         cb.array([-1.0, -1.0, -1.0, -math.pi, -math.pi, -math.pi]),
                         cb.array([1.0, 1.0, 1.0, math.pi, math.pi, math.pi]),
@@ -177,6 +191,8 @@ class InverseKinematicsController(JointController, ManipulationController):
             use_impedances=use_impedances,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def reset(self):
@@ -338,7 +354,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_ori_mat=cb.as_float32(cb.T.quat2mat(control_dict[f"{self.task_name}_quat_relative"])),
         )
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         pos_relative = control_dict[f"{self.task_name}_pos_relative"]
         quat_relative = control_dict[f"{self.task_name}_quat_relative"]
 
@@ -371,11 +387,6 @@ class InverseKinematicsController(JointController, ManipulationController):
         return IK_MODE_COMMAND_DIMS[self.mode]
 
 
-import torch as th
-
-import omnigibson.utils.transform_utils as TT
-
-
 @th.jit.script
 def _compute_ik_qpos_torch(
     q: th.Tensor,
@@ -403,12 +414,6 @@ def _compute_ik_qpos_torch(
         min=q_lower_limit,
         max=q_upper_limit,
     )
-
-
-import numpy as np
-from numba import jit
-
-import omnigibson.utils.transform_utils_np as NT
 
 
 # Use numba since faster

@@ -86,7 +86,10 @@ eef_vis_links:                      # (list of dict) information for adding came
     parent_link: left_arm_link6
     offset:
       position: [0, 0, 0.06]
-      orientation: [0, 0, 0, 1]
+      orientation: [0, 0, 0, 1]     # NOTE: Convention for these eef vis links should be tuned such that:
+                                    #   z-axis points out from the tips of the fingers
+                                    #   y-axis points in the direction from the left finger to the right finger
+                                    #   x-axis is automatically inferred from the above two axes
   - link: right_eef_link            # same format as @camera_links
     parent_link: right_arm_link6
     offset:
@@ -410,11 +413,9 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
     link_prim_path = f"{root_prim_path}/{link_name}"
     link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
-        assert (
-            not link_prim_exists
-        ), f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
-        link_prim = create_rigid_prim(
+        create_rigid_prim(
             stage=stage,
             link_prim_path=link_prim_path,
         )
@@ -443,10 +444,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     else:
         # Otherwise, link prim MUST exist
-        assert (
-            link_prim_exists
-        ), f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
-        link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(link_prim_path)
+        assert link_prim_exists, f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
 
     # Define functions to generate the desired sensor prim
     if sensor_type == "Camera":
@@ -675,14 +673,41 @@ def set_link_collision_approximation(stage, root_prim, link_name, approximation_
         mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
 
-def is_articulated_joint(prim):
+def is_joint(prim, only_articulated=True):
     prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
-    return "joint" in prim_type and "fixed" not in prim_type
+    if only_articulated and "fixed" in prim_type:
+        return False
+    return "joint" in prim_type
 
 
-def find_all_articulated_joints(root_prim):
+def find_all_joints(root_prim, only_articulated=True):
     return _find_prims_with_condition(
-        condition=is_articulated_joint,
+        condition=lambda x: is_joint(x, only_articulated=only_articulated),
+        root_prim=root_prim,
+    )
+
+
+def is_rigid_body(prim):
+    prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
+    has_rigid_api = prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI)
+    return "xform" in prim_type and has_rigid_api
+
+
+def find_all_rigid_bodies(root_prim):
+    return _find_prims_with_condition(
+        condition=is_rigid_body,
+        root_prim=root_prim,
+    )
+
+
+def is_mesh(prim):
+    prim_type = prim.GetPrimTypeInfo().GetTypeName().lower()
+    return "mesh" in prim_type
+
+
+def find_all_meshes(root_prim):
+    return _find_prims_with_condition(
+        condition=is_mesh,
         root_prim=root_prim,
     )
 
@@ -700,7 +725,9 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         is_holonomic (bool): Whether the robot has a holonomic base applied or not
     """
     robot_name = robot_prim.GetName()
-    ee_links = list(curobo_cfg.eef_to_gripper_info.keys())
+
+    # Left, then right by default if sorted alphabetically
+    ee_links = list(sorted(curobo_cfg.eef_to_gripper_info.keys()))
 
     # Find all joints that have a negative axis specified so we know to flip them in curobo
     tree = ET.parse(robot_urdf_path)
@@ -721,17 +748,12 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         assert joint_prim is not None, f"Could not find joint prim with name {joint_name}!"
         return joint_prim.GetAttribute("physics:upperLimit").Get()
 
-    all_links = _find_prims_with_condition(
-        condition=lambda prim: prim.HasAPI(lazy.pxr.UsdPhysics.RigidBodyAPI),
-        root_prim=robot_prim,
-    )
-
     # Generate list of collision link names -- this is simply the list of all link names from the
     # collision spheres specification
     collision_spheres = curobo_cfg.collision_spheres.to_dict()
     all_collision_link_names = list(collision_spheres.keys())
 
-    joint_prims = find_all_articulated_joints(robot_prim)
+    joint_prims = find_all_joints(robot_prim, only_articulated=True)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
     retract_cfg = curobo_cfg.default_qpos
     lock_joints = curobo_cfg.lock_joints.to_dict() if curobo_cfg.lock_joints else {}
@@ -902,6 +924,55 @@ def import_custom_robot(config):
     articulation_root_prim = find_articulation_root_prim(root_prim=prim)
     assert articulation_root_prim is not None, "Could not find any valid articulation root prim!"
     root_prim_name = articulation_root_prim.GetName()
+
+    # We always want our robot to have its canonical frame corresponding to the bottom surface
+    # So, we compute the AABB dynamically to calculate the current z-offset, and then apply the offset to the following:
+    #   - root link CoM
+    #   - root link's visual / collision meshes
+    #   - all of the root link's immediate child joints
+    #   - all of the root link's descendant links (all links except self)
+
+    # Compute AABB
+    bbox_cache = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
+    aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(
+        bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString
+    )
+    z_offset = aabb[2]
+
+    # Update the root link's CoM
+    com_attr = articulation_root_prim.GetAttribute("physics:centerOfMass")
+    com = com_attr.Get()
+    com[2] -= z_offset
+    com_attr.Set(com)
+
+    # Grab all of the root prim's nested children and joints, and modify their offsets based on AABB z-lower bound
+    root_meshes = find_all_meshes(root_prim=articulation_root_prim)
+    for mesh in root_meshes:
+        translate_attr = mesh.GetAttribute("xformOp:translate")
+        local_pos = translate_attr.Get()
+        local_pos[2] -= z_offset
+        translate_attr.Set(local_pos)
+    root_joints = find_all_joints(root_prim=articulation_root_prim, only_articulated=False)
+    root_prim_path = articulation_root_prim.GetPrimPath().pathString
+    for joint in root_joints:
+        body0_targets = joint.GetProperty("physics:body0").GetTargets()
+        # Don't include any joints where the articulation root link is not the parent
+        if len(body0_targets) == 0 or body0_targets[0].pathString != root_prim_path:
+            continue
+        pos0_attr = joint.GetAttribute("physics:localPos0")
+        pos0 = pos0_attr.Get()
+        pos0[2] -= z_offset
+        pos0_attr.Set(pos0)
+
+    # Update all links that are not the root link
+    all_links = find_all_rigid_bodies(root_prim=prim)
+    for link in all_links:
+        if link == articulation_root_prim:
+            continue
+        translate_attr = link.GetAttribute("xformOp:translate")
+        local_pos = translate_attr.Get()
+        local_pos[2] -= z_offset
+        translate_attr.Set(local_pos)
 
     # Add holonomic base if requested
     if cfg.base_motion.use_holonomic_joints:

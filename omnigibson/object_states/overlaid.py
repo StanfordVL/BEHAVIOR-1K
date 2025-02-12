@@ -23,7 +23,6 @@ m.SAMPLING_Z_OFFSET = 0.01
 
 
 class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
-
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()

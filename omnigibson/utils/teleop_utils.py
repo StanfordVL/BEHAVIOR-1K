@@ -1,5 +1,4 @@
 import time
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Iterable, Literal, Optional, Tuple
 
@@ -14,7 +13,6 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.sensors import VisionSensor
-from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
 from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 
@@ -118,8 +116,9 @@ class TeleopSystem(TeleopPolicy):
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(
-                    th.tensor(self.teleop_action[arm_name][3:6])
+                delta_pos, delta_orn = (
+                    self.teleop_action[arm_name][:3],
+                    T.euler2quat(th.tensor(self.teleop_action[arm_name][3:6])),
                 )
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])
@@ -543,7 +542,7 @@ class OVXRSystem(TeleopSystem):
             self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
                 self.og2xr(pos, orn).numpy(), self.hmd
             )
-        except Exception as e:
+        except Exception:
             pass
 
     def _pose_in_robot_frame(self, pos: th.tensor, orn: th.tensor) -> Tuple[th.tensor, th.tensor]:

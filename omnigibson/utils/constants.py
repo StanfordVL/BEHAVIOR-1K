@@ -3,14 +3,11 @@ Constant Definitions
 """
 
 import hashlib
-import os
 from enum import Enum, IntEnum
 from functools import cache
 
 import torch as th
 
-import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_all_object_categories, get_all_system_categories
 
 MAX_INSTANCE_COUNT = th.iinfo(th.int32).max

@@ -40,6 +40,8 @@ class MultiFingerGripperController(GripperController):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
         inverted=False,
         mode="binary",
         open_qpos=None,
@@ -69,6 +71,12 @@ class MultiFingerGripperController(GripperController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             inverted (bool): whether or not the command direction (grasp is negative) and the control direction are
                 inverted, e.g. to grasp you need to move the joint in the positive direction.
             mode (str): mode for this controller. Valid options are:
@@ -116,6 +124,8 @@ class MultiFingerGripperController(GripperController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def _generate_default_command_output_limits(self):
@@ -126,8 +136,15 @@ class MultiFingerGripperController(GripperController):
         if self._mode == "binary":
             command_output_limits = (-1.0, 1.0)
         # If we're in smoothing mode, output limits should be the average of the independent limits
-        elif self._mode == "smoothing":
-            command_output_limits = cb.mean(command_output_limits[0]), cb.mean(command_output_limits[1])
+        elif self._mode == "smooth":
+            command_output_limits = (
+                cb.mean(command_output_limits[0]),
+                cb.mean(command_output_limits[1]),
+            )
+        elif self._mode == "independent":
+            pass
+        else:
+            raise ValueError(f"Invalid mode {self._mode}")
 
         return command_output_limits
 
@@ -295,7 +312,7 @@ class MultiFingerGripperController(GripperController):
         # Just use a zero vector
         return dict(target=cb.zeros(self.command_dim))
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         # Take care of the special case of binary control
         if self._mode == "binary":
             command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
@@ -304,7 +321,7 @@ class MultiFingerGripperController(GripperController):
             return cb.array([command_val])
 
         if self._motor_type == "position":
-            command = control_dict[f"joint_position"][self.dof_idx]
+            command = control_dict["joint_position"][self.dof_idx]
         elif self._motor_type == "velocity":
             command = cb.zeros(self.command_dim)
         else:

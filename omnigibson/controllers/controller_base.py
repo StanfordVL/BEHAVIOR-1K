@@ -4,8 +4,16 @@ from enum import IntEnum
 
 import torch as th
 
+from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Set default isaac kp / kd for controllers
+m.DEFAULT_ISAAC_KP = 1e7
+m.DEFAULT_ISAAC_KD = 1e5
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = dict()
@@ -76,6 +84,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
     ):
         """
         Args:
@@ -99,6 +109,12 @@ class BaseController(Serializable, Registerable, Recreatable):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
         """
         # Store arguments
         self._control_freq = control_freq
@@ -129,12 +145,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         # Standardize command input / output limits to be (min_array, max_array)
         command_input_limits = (
             self._generate_default_command_input_limits()
-            if type(command_input_limits) == str and command_input_limits == "default"
+            if type(command_input_limits) is str and command_input_limits == "default"
             else command_input_limits
         )
         command_output_limits = (
             self._generate_default_command_output_limits()
-            if type(command_output_limits) == str and command_output_limits == "default"
+            if type(command_output_limits) is str and command_output_limits == "default"
             else command_output_limits
         )
         self._command_input_limits = (
@@ -153,6 +169,33 @@ class BaseController(Serializable, Registerable, Recreatable):
                 self.nums2array(command_output_limits[1], self.command_dim),
             )
         )
+
+        # Set gains
+        if self.control_type == ControlType.POSITION:
+            # Set default kp / kd values if not specified
+            isaac_kp = m.DEFAULT_ISAAC_KP if isaac_kp is None else isaac_kp
+            isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
+        elif self.control_type == ControlType.VELOCITY:
+            # No kp should be specified, but kd should be
+            assert (
+                isaac_kp is None
+            ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
+        elif self.control_type == ControlType.EFFORT:
+            # Neither kp nor kd should be specified
+            assert (
+                isaac_kp is None
+            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
+            assert (
+                isaac_kd is None
+            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+        else:
+            raise ValueError(
+                f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}"
+            )
+
+        self._isaac_kp = None if isaac_kp is None else self.nums2array(isaac_kp, self.control_dim)
+        self._isaac_kd = None if isaac_kd is None else self.nums2array(isaac_kd, self.control_dim)
 
     def _generate_default_command_input_limits(self):
         """
@@ -364,12 +407,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         if self._goal is None:
             self._goal = self.compute_no_op_goal(control_dict=control_dict)
-        command = self._compute_no_op_action(control_dict=control_dict)
+        command = self._compute_no_op_command(control_dict=control_dict)
         return cb.to_torch(self._reverse_preprocess_command(command))
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         """
-        Compute no-op action given the goal
+        Compute no-op command given the goal
         """
         raise NotImplementedError
 
@@ -451,7 +494,9 @@ class BaseController(Serializable, Registerable, Recreatable):
         return (
             nums
             if isinstance(nums, cb.arr_type)
-            else cb.array(nums) if isinstance(nums, Iterable) else cb.ones(dim) * nums
+            else cb.array(nums)
+            if isinstance(nums, Iterable)
+            else cb.ones(dim) * nums
         )
 
     @property
@@ -507,6 +552,24 @@ class BaseController(Serializable, Registerable, Recreatable):
             ControlType: Type of control returned by this controller
         """
         raise NotImplementedError
+
+    @property
+    def isaac_kp(self):
+        """
+        Returns:
+            None or Array[float]: Stiffness gains that should be applied to the underlying Isaac joint motors.
+                None if not specified.
+        """
+        return self._isaac_kp
+
+    @property
+    def isaac_kd(self):
+        """
+        Returns:
+            None or Array[float]: Stiffness gains that should be applied to the underlying Isaac joint motors.
+                None if not specified.
+        """
+        return self._isaac_kd
 
     @property
     def command_input_limits(self):

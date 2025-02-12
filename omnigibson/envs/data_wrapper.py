@@ -10,12 +10,12 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.envs.env_wrapper import EnvironmentWrapper
+from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
+from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -38,8 +38,8 @@ class DataWrapper(EnvironmentWrapper):
         """
         # Make sure the wrapped environment inherits correct omnigibson format
         assert isinstance(
-            env, og.Environment
-        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class!"
+            env, (og.Environment, EnvironmentWrapper)
+        ), "Expected wrapped @env to be a subclass of OmniGibson's Environment class or EnvironmentWrapper!"
 
         # Only one scene is supported for now
         assert len(og.sim.scenes) == 1, "Only one scene is currently supported for DataWrapper env!"
@@ -66,12 +66,13 @@ class DataWrapper(EnvironmentWrapper):
         # Run super
         super().__init__(env=env)
 
-    def step(self, action):
+    def step(self, action, n_render_iterations=1):
         """
         Run the environment step() function and collect data
 
         Args:
             action (th.Tensor): action to take in environment
+            n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
             5-tuple:
@@ -86,7 +87,7 @@ class DataWrapper(EnvironmentWrapper):
         if isinstance(action, dict):
             action = th.cat([act for act in action.values()])
 
-        next_obs, reward, terminated, truncated, info = self.env.step(action)
+        next_obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
         self.step_count += 1
 
         self._record_step_trajectory(action, next_obs, reward, terminated, truncated, info)
@@ -222,7 +223,7 @@ class DataWrapper(EnvironmentWrapper):
         # Only save successful demos and if actually recording
         if self.should_save_current_episode:
             traj_grp_name = f"demo_{self.traj_count}"
-            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
+            self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
         else:
             # Remove this demo
@@ -258,7 +259,6 @@ class DataWrapper(EnvironmentWrapper):
             self.flush_current_traj()
 
         if self.hdf5_file is not None:
-
             log.info(
                 f"\nSaved:\n"
                 f"{self.traj_count} trajectories / {self.step_count} total steps\n"
@@ -377,6 +377,10 @@ class DataCollectionWrapper(DataWrapper):
         # Call super first
         init_obs, init_info = super().reset()
 
+        # Make sure all objects are awake to begin to guarantee we save their initial states
+        for obj in self.scene.objects:
+            obj.wake()
+
         # Store this initial state as part of the trajectory
         state = og.sim.dump_state(serialized=True)
         step_data = {
@@ -468,11 +472,15 @@ class DataPlaybackWrapper(DataWrapper):
         cls,
         input_path,
         output_path,
-        robot_obs_modalities,
+        robot_obs_modalities=tuple(),
         robot_sensor_config=None,
         external_sensors_config=None,
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         n_render_iterations=5,
         only_successes=False,
+        include_env_wrapper=False,
+        additional_wrapper_configs=None,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -492,12 +500,21 @@ class DataPlaybackWrapper(DataWrapper):
                 dictionary specifying an individual external sensor's relevant parameters. See the example
                 external_sensors key in fetch_behavior.yaml env config. This can be used to specify additional sensors
                 to collect observations during playback.
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors during playback
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors during playback
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data. This is needed because the omniverse real-time raytracing always lags behind the
                 underlying physical state by a few frames, and additionally produces transient visual artifacts when
                 the physical state changes. Increasing this number will improve the rendered quality at the expense of
                 speed.
             only_successes (bool): Whether to only save successful episodes
+            include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
+            additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
+                environment wrappers to wrap the internal environment class in
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -527,7 +544,10 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Set observation modalities and update sensor config
         for robot_cfg in config["robots"]:
-            robot_cfg["obs_modalities"] = robot_obs_modalities
+            robot_cfg["obs_modalities"] = list(robot_obs_modalities)
+            robot_cfg["include_sensor_names"] = include_sensor_names
+            robot_cfg["exclude_sensor_names"] = exclude_sensor_names
+
             if robot_sensor_config is not None:
                 robot_cfg["sensor_config"] = robot_sensor_config
         if external_sensors_config is not None:
@@ -535,6 +555,14 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Load env
         env = og.Environment(configs=config)
+
+        # Optionally include the desired environment wrapper specified in the config
+        if include_env_wrapper:
+            env = create_wrapper(env=env)
+
+        if additional_wrapper_configs is not None:
+            for wrapper_cfg in additional_wrapper_configs:
+                env = create_wrapper(env=env, wrapper_cfg=wrapper_cfg)
 
         # Wrap and return env
         return cls(
@@ -568,31 +596,39 @@ class DataPlaybackWrapper(DataWrapper):
         # Run super
         super().__init__(env=env, output_path=output_path, only_successes=only_successes)
 
+    def _process_obs(self, obs, info):
+        """
+        Modifies @obs inplace for any relevant post-processing
+
+        Args:
+            obs (dict): Keyword-mapped relevant observations from the immediate env step
+            info (dict): Keyword-mapped relevant information from the immediate env step
+        """
+        # Default is a no-op
+        return obs
+
     def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
         # Store action, obs, reward, terminated, truncated, info
         step_data = dict()
-        step_data["obs"] = obs
+        step_data["obs"] = self._process_obs(obs=obs, info=info)
         step_data["action"] = action
         step_data["reward"] = reward
         step_data["terminated"] = terminated
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record=True, video_path=None, video_writer=None):
+    def playback_episode(self, episode_id, record_data=True, video_writer=None, video_rgb_key=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
         Args:
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
-            record (bool): Whether to record data during playback or not
-            video_path (None or str): If specified, path to write the playback video to
-            video_writer (None or str): If specified, an imageio video writer to use for writing the video (can be specified in place of @video_path)
+            record_data (bool): Whether to record data during playback or not
+            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
+            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
+                If @video_writer is specified, this must also be specified!
         """
-        using_external_writer = video_writer is not None
-        if video_writer is None and video_path is not None:
-            video_writer = imageio.get_writer(video_path, fps=30)
-
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
@@ -615,9 +651,9 @@ class DataPlaybackWrapper(DataWrapper):
         og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
 
         # If record, record initial observations
-        if record:
-            init_obs, _, _, _, _ = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
-            step_data = {"obs": init_obs}
+        if record_data:
+            init_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
+            step_data = {"obs": self._process_obs(obs=init_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
         for i, (a, s, ss, r, te, tr) in enumerate(
@@ -647,7 +683,7 @@ class DataPlaybackWrapper(DataWrapper):
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
-            if record:
+            if record_data:
                 step_data = self._parse_step_data(
                     action=a,
                     obs=self.current_obs,
@@ -658,33 +694,44 @@ class DataPlaybackWrapper(DataWrapper):
                 )
                 self.current_traj_history.append(step_data)
 
-            # If writing video, save the current frame
+            # If writing to video, write desired frame
             if video_writer is not None:
-                video_writer.append_data(og.sim.viewer_camera.get_obs()[0]["rgb"][:, :, :3].numpy())
+                assert_valid_key(video_rgb_key, self.current_obs.keys(), "video_rgb_key")
+                video_writer.append_data(self.current_obs[video_rgb_key][:, :, :3].numpy())
 
             self.step_count += 1
 
-        if record:
+        if record_data:
             self.flush_current_traj()
 
-        # If we weren't using an external writer but we're still writing a video, close the writer
-        if video_writer is not None and not using_external_writer:
-            video_writer.close()
-
-    def playback_dataset(self, record=True, video_path=None, video_writer=None):
+    def playback_dataset(self, record_data=False, video_writer=None, video_rgb_key=None):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
-            record (bool): Whether to record data during playback or not
-            video_path (None or str): If specified, path to write the playback video to
-            video_writer (None or str): If specified, an imageio video writer to use for writing the video (can be specified in place of @video_path)
+            record_data (bool): Whether to record data during playback or not
+            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
+            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
+                If @video_writer is specified, this must also be specified!
         """
-        if video_writer is None and video_path is not None:
-            video_writer = imageio.get_writer(video_path, fps=30)
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
-            self.playback_episode(episode_id=episode_id, record=record, video_path=None, video_writer=video_writer)
+            self.playback_episode(
+                episode_id=episode_id,
+                record_data=record_data,
+                video_writer=video_writer,
+                video_rgb_key=video_rgb_key,
+            )
 
-        # Close the video writer at the end if created
-        if video_writer is not None:
-            video_writer.close()
+    def create_video_writer(self, fpath, fps=30):
+        """
+        Creates a video writer to write video frames to when playing back the dataset
+
+        Args:
+            fpath (str): Absolute path that the generated video writer will write to. Should end in .mp4
+            fps (int): Desired frames per second when generating video
+
+        Returns:
+            imageio.Writer: Generated video writer
+        """
+        assert fpath.endswith(".mp4"), f"Video writer fpath must end with .mp4! Got: {fpath}"
+        return imageio.get_writer(fpath, fps=fps)

@@ -6,7 +6,6 @@ import torch as th
 import torch._dynamo
 
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_og_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import choose_from_options
@@ -24,8 +23,7 @@ def main():
     scene_model = choose_from_options(options=scenes, name="scene model")
 
     # Create the config for generating the environment we want
-    scene_cfg = {"type": "Scene"}
-    # scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": scene_model}
+    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": scene_model}
     robot0_cfg = {
         "type": "Fetch",
         "obs_modalities": [],
@@ -51,8 +49,8 @@ def main():
     )
 
     # generate a list of pitch angles in radians
-    pitch_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
-    yaw_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
+    # pitch_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
+    # yaw_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
 
     # main simulation loop
     while True:

@@ -1,14 +1,15 @@
 import math
 from functools import cached_property
+import re
 from typing import Literal
 
 import torch as th
-from scipy.spatial import ConvexHull, QhullError
+from scipy.spatial import ConvexHull
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import GEOM_TYPES
@@ -29,6 +30,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_CONTACT_OFFSET = 0.001
 m.DEFAULT_REST_OFFSET = 0.0
+m.META_LINK_PATTERN = re.compile(r".*:(\w+)_(\d+)_(\d+)_link")
 
 
 class RigidPrim(XFormPrim):
@@ -795,6 +797,51 @@ class RigidPrim(XFormPrim):
         """
         min_corner, max_corner = self.visual_aabb
         return (max_corner + min_corner) / 2.0
+
+    @cached_property
+    def is_meta_link(self):
+        # Check using the new format first
+        new_format = self.prim.HasAttribute("ig:isMetaLink") and self.get_attribute("ig:isMetaLink")
+        if new_format:
+            return True
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        old_format = m.META_LINK_PATTERN.fullmatch(self.name) is not None
+        if old_format:
+            return True
+
+        return False
+
+    @cached_property
+    def meta_link_type(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkType"):
+            return self.get_attribute("ig:metaLinkType")
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return m.META_LINK_PATTERN.fullmatch(self.name).group(1)
+
+    @cached_property
+    def meta_link_id(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkId"):
+            return self.get_attribute("ig:metaLinkId")
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return m.META_LINK_PATTERN.fullmatch(self.name).group(2)
+
+    @cached_property
+    def meta_link_sub_id(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkSubId"):
+            return int(self.get_attribute("ig:metaLinkSubId"))
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return int(m.META_LINK_PATTERN.fullmatch(self.name).group(3))
 
     def enable_gravity(self):
         """

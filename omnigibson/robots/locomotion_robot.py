@@ -7,7 +7,6 @@ from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.transform_utils import euler2quat, quat2mat, quat_multiply
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class LocomotionRobot(BaseRobot):
@@ -26,13 +25,11 @@ class LocomotionRobot(BaseRobot):
     """
 
     def _validate_configuration(self):
-        # We make sure that our base controller exists and is a locomotion controller
-        assert (
-            "base" in self._controllers
-        ), "Controller 'base' must exist in controllers! Current controllers: {}".format(list(self._controllers.keys()))
-        assert isinstance(
-            self._controllers["base"], LocomotionController
-        ), "Base controller must be a LocomotionController!"
+        # If we have a base controller, make sure it is a locomotion controller
+        if "base" in self._controllers:
+            assert isinstance(
+                self._controllers["base"], LocomotionController
+            ), "Base controller must be a LocomotionController!"
 
         # run super
         super()._validate_configuration()

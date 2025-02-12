@@ -1,7 +1,7 @@
 import torch as th
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, macros
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -116,12 +116,12 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         return True, None
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.HEATSOURCE_LINK_PREFIX
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required if inside
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required if inside
         return not kwargs.get("requires_inside", False)
 
     @property
@@ -199,7 +199,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
     def _update(self):
         # Avoid circular imports
         from omnigibson.object_states.temperature import Temperature
-        from omnigibson.objects.stateful_object import StatefulObject
 
         # Update the internally tracked nearby objects to accelerate filtering for affects_obj
         affected_objects = set()
@@ -252,7 +251,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                         affected_objects.remove(obj)
 
             else:
-                # Position is either the AABB center of the default link or the metalink position itself
+                # Position is either the AABB center of the default link or the meta link position itself
                 heat_source_pos = (
                     self.link.aabb_center
                     if self.link == self._default_link

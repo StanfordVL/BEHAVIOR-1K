@@ -6,7 +6,6 @@ env:
   flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
   flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
   use_external_obs: false               # (bool): Whether to use external observations or not
-  initial_pos_z_offset: 0.1
   external_sensors: null                # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
 
 render:
@@ -31,36 +30,85 @@ scene:
   include_robots: false
 
 robots:
-  - type: Fetch
+  - type: R1
     obs_modalities: [rgb]
+    include_sensor_names: null
+    exclude_sensor_names: null
     scale: 1.0
     self_collisions: true
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    default_arm_pose: diagonal30
+    reset_joint_pos: [
+      0.0000,
+      -0.0000,
+      0.0247,
+      0.0009,
+      0.0004,
+      -0.0000,
+      0.0000,
+      0.0000,
+      0.0000,
+      0.0000,
+      -0.0464,
+      0.0464,
+      2.6172,
+      2.6168,
+      -1.4584,
+      -1.4570,
+      -0.0433,
+      0.0418,
+      1.5899,
+      -1.5896,
+      -1.1587,
+      1.1593,
+      0.0300,
+      0.0300,
+      0.0300,
+      0.0300,
+    ]
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
     controller_config:
       base:
-        name: DifferentialDriveController
+        name: HolonomicBaseJointController
+        motor_type: position
+        command_input_limits: null
+        use_impedances: false
       trunk:
         name: JointController
-      arm_0:
-        name: JointController
-        subsume_controllers: [trunk]
         motor_type: position
         command_input_limits: null
         use_delta_commands: false
-      gripper_0:
+        use_impedances: false
+      arm_left:
         name: JointController
         motor_type: position
-        command_input_limits: [-1, 1]
-        command_output_limits: null
+        command_input_limits: null
         use_delta_commands: false
-      camera:
+        use_impedances: false
+      arm_right:
         name: JointController
-        use_delta_commands: False
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
+        use_impedances: false
+      gripper_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
+        use_impedances: false
+      gripper_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
+        use_impedances: false
 
 objects: []
-
 task:
   type: DummyTask

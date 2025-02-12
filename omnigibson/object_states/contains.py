@@ -37,7 +37,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         self._compute_info = None  # Intermediate computation information to store
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         return m.CONTAINER_LINK_PREFIX
 
     def _get_value(self, system):

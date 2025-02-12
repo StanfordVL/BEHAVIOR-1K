@@ -495,28 +495,6 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
             return 0.330
     
         @property
-        def finger_lengths(self):
-            return {self.default_arm: 0.04}
-    
-        @property
-        def assisted_grasp_start_points(self):
-            return {
-                self.default_arm: [
-                    GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([0.013, 0.0, 0.01])),
-                    GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.01, 0.0, 0.009])),
-                ]
-            }
-    
-        @property
-        def assisted_grasp_end_points(self):
-            return {
-                self.default_arm: [
-                    GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.013, 0.0, 0.01])),
-                    GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([-0.01, 0.0, 0.009])),
-                ]
-            }
-    
-        @property
         def disabled_collision_pairs(self):
             return [
                 ["link_lift", "link_arm_l3"],

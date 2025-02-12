@@ -2,8 +2,6 @@
 Example script for interacting with OmniGibson scenes with VR and BehaviorRobot.
 """
 
-import torch as th
-
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.teleop_utils import OVXRSystem

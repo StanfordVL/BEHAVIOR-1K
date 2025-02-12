@@ -5,7 +5,6 @@ import torch as th
 
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -22,17 +21,6 @@ class ActiveCameraRobot(BaseRobot):
                 values specified, but setting these individual kwargs will override them
 
     """
-
-    def _validate_configuration(self):
-        # Make sure a camera controller is specified
-        assert (
-            "camera" in self._controllers
-        ), "Controller 'camera' must exist in controllers! Current controllers: {}".format(
-            list(self._controllers.keys())
-        )
-
-        # run super
-        super()._validate_configuration()
 
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()

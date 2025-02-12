@@ -58,14 +58,9 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
         if not inspect.isabstract(cls):
             REGISTERED_PRIMITIVE_SETS[cls.__name__] = cls
 
-    def __init__(self, env):
+    def __init__(self, env, robot):
         self.env = env
-
-    @property
-    def robot(self):
-        # Currently returns the first robot in the environment, but can be scaled to multiple robots
-        # by creating multiple action generators and passing in a robot index etc.
-        return self.env.robots[0]
+        self.robot = robot
 
     @abstractmethod
     def get_action_space(self):
@@ -84,7 +79,7 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
         pass
 
     @abstractmethod
-    def apply_ref(self, action, *args):
+    def apply_ref(self, primitive, *args):
         """
         Apply a primitive action by reference.
 

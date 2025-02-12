@@ -7,7 +7,43 @@ from utils import SYSTEM_EXAMPLES, get_random_pose, og_test, place_obj_on_floor_
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import macros as m
-from omnigibson.object_states import *
+from omnigibson.object_states import (
+    AABB,
+    AttachedTo,
+    Burnt,
+    ContactBodies,
+    ContactParticles,
+    Contains,
+    Cooked,
+    Covered,
+    Draped,
+    Filled,
+    Folded,
+    Frozen,
+    Heated,
+    HeatSourceOrSink,
+    HorizontalAdjacency,
+    Inside,
+    Joint,
+    MaxTemperature,
+    NextTo,
+    OnFire,
+    OnTop,
+    Open,
+    Overlaid,
+    ParticleApplier,
+    ParticleRemover,
+    ParticleSink,
+    ParticleSource,
+    Pose,
+    Saturated,
+    Temperature,
+    ToggledOn,
+    Touching,
+    Under,
+    Unfolded,
+    VerticalAdjacency,
+)
 from omnigibson.systems import VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos
