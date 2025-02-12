@@ -6,11 +6,16 @@ import torch as th
 import torch._dynamo
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_og_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import choose_from_options
 
 torch._dynamo.config.suppress_errors = True
+
+gm.ENABLE_FLATCACHE = True
+gm.ENABLE_OBJECT_STATES = False
+gm.ENABLE_TRANSITION_RULES = False
 
 
 def main():
@@ -24,18 +29,14 @@ def main():
 
     # Create the config for generating the environment we want
     scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": scene_model}
-    robot0_cfg = {
-        "type": "Fetch",
-        "obs_modalities": [],
-    }
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg)
 
     # Create the environment
     env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys
     vrsys = OVXRSystem(
-        robot=env.robots[0],
+        robot=None,
         show_control_marker=False,
         system="SteamVR",
         eef_tracking_mode="disabled",
@@ -43,21 +44,14 @@ def main():
     )
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
-    # vrsys.set_initial_transform(pos=th.tensor([0.0, 0.2, 1.0]), orn=th.tensor([0.0, 0.0, 0.0, 1.0]))
     vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-        vrsys.og2xr(th.tensor([0.1, 0.2, 1.0]), th.tensor([0.0, 0.0, 0.0, 1.0])).numpy(), vrsys.hmd
+        vrsys.og2xr(th.tensor([0.0, 0.0, 1.0]), th.tensor([-0.5, 0.5, 0.5, -0.5])).numpy(), vrsys.hmd
     )
-
-    # generate a list of pitch angles in radians
-    # pitch_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
-    # yaw_angles = th.linspace(-th.pi / 2, th.pi / 2, 10)
 
     # main simulation loop
     while True:
         # step the VR system to get the latest data from VR runtime
-        # for angle in yaw_angles:
-        vrsys.update()
-        # vrsys.vr_profile.add_rotate_physical_world_around_device(yaw = angle.item(), device=vrsys.hmd)
+        vrsys.update(optimized_for_tour=True)
         og.sim.render()
 
     # Shut down the environment cleanly at the end
