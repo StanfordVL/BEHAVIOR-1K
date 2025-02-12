@@ -244,7 +244,7 @@ class MaterialPrim(BasePrim):
             else:
                 raise ValueError(f"Invalid input type {type(val)} for input {inp}")
 
-            lazy.omni.usd.create_material_input(self.prim, "opacity_threshold", val, input_type)
+            lazy.omni.usd.create_material_input(self.prim, inp, val, input_type)
         assert (
             inp in self.shader_input_names
         ), f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
