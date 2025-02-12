@@ -51,6 +51,10 @@ class GeomPrim(XFormPrim):
         super()._post_load()
 
         # Temporarily set the opacity threshold to be 0.1. This will be automated in later exports.
+        # We do this because in previous exports we included continuous alpha values for opacity
+        # but the ray tracing renderer can only handle binary opacity values. The default threshold
+        # leaves most objects entirely transparent, so we try to avoid that here.
+        # TODO: Remove this after the next dataset export
         if self.material:
             self.material.opacity_threshold = 0.1
 

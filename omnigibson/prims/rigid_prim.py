@@ -825,6 +825,14 @@ class RigidPrim(XFormPrim):
 
     @cached_property
     def meta_link_id(self):
+        """The meta link id of this link, if the link is a meta link.
+
+        The meta link ID is a semantic identifier for the meta link within the meta link type. It is
+        used when an object has multiple meta links of the same type. It can be just a numerical index,
+        or for some objects, it will be a string that can be matched to other meta links. For example,
+        a stove might have toggle buttons named "left" and "right", and heat sources named "left" and
+        "right". The meta link ID can be used to match the toggle button to the heat source.
+        """
         assert self.is_meta_link, f"{self.name} is not a meta link"
         if self.prim.HasAttribute("ig:metaLinkId"):
             return self.get_attribute("ig:metaLinkId")
@@ -835,6 +843,12 @@ class RigidPrim(XFormPrim):
 
     @cached_property
     def meta_link_sub_id(self):
+        """The integer meta link sub id of this link, if the link is a meta link.
+
+        The meta link sub ID identifies this link as one of the parts of a meta link. For example, an
+        attachment meta link's ID will be the attachment pair name, and each attachment point that
+        works with that pair will show up as a separate link with a unique sub ID.
+        """
         assert self.is_meta_link, f"{self.name} is not a meta link"
         if self.prim.HasAttribute("ig:metaLinkSubId"):
             return int(self.get_attribute("ig:metaLinkSubId"))
