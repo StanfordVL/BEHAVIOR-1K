@@ -64,7 +64,7 @@ m.KP_ANGLE_VEL = {
     Turtlebot: 0.2,
     Husky: 0.05,
     Freight: 0.1,
-    Locobot: 1.5,
+    Locobot: 1.0,
     BehaviorRobot: 0.2,
     R1: 0.2,
 }
