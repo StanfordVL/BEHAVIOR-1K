@@ -530,7 +530,7 @@ class ClothPrim(GeomPrim):
         attr_name = f"points_{configuration}"
         points = self.get_attribute(attr=attr_name)
         self.set_attribute(attr="points", val=points)
-        self.particle_velocities = th.zeros((self._n_particles, 3))
+        self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(th.zeros((len(points), 3)).tolist()))
 
     # For cloth, points should NOT be @cached_property because their local poses change over time
     @property
