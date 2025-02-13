@@ -176,9 +176,6 @@ class ClothPrim(GeomPrim):
         dists = th.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = th.argmin(dists)
 
-        # Store the default position of the points in the local frame
-        self._default_positions = vtarray_to_torch(self.get_attribute(attr="points"))
-
     def _remesh(self):
         assert self.prim is not None, "Cannot remesh a non-existent prim!"
         has_uv_mapping = self.prim.GetAttribute("primvars:st").Get() is not None
@@ -533,6 +530,7 @@ class ClothPrim(GeomPrim):
         attr_name = f"points_{configuration}"
         points = self.get_attribute(attr=attr_name)
         self.set_attribute(attr="points", val=points)
+        self.particle_velocities = th.zeros((self._n_particles, 3))
 
     # For cloth, points should NOT be @cached_property because their local poses change over time
     @property
@@ -1023,5 +1021,5 @@ class ClothPrim(GeomPrim):
         Reset the points to their default positions in the local frame, and also zeroes out velocities
         """
         if self.initialized:
-            self.set_attribute(attr="points", val=lazy.pxr.Vt.Vec3fArray(self._default_positions.tolist()))
-            self.particle_velocities = th.zeros((self._n_particles, 3))
+            points_configuration = self._load_config.get("default_point_configuration", "default")
+            self.reset_points_to_configuration(points_configuration)
