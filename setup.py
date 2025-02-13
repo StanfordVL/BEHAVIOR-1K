@@ -50,7 +50,7 @@ setup(
         "lxml>=5.2.2",
         "numba>=0.59.1",
         "cffi>=1.16.0",
-        "pillow~=10.2.0",
+        "pillow~=11.1.0",
     ],
     extras_require={
         "dev": [
