@@ -750,6 +750,9 @@ class PoseAPI:
     @classmethod
     def _refresh(cls):
         if og.sim is not None and not cls.VALID:
+            # Check that no reads from PoseAPI are happening during a physics step.
+            assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
@@ -771,6 +774,11 @@ class PoseAPI:
                 - torch.Tensor: (x,y,z) position in the world frame
                 - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
+        # Check that no reads from PoseAPI are happening during a physics step.
+        assert (
+            not og.sim.currently_stepping
+        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
             cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)

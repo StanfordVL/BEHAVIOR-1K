@@ -304,6 +304,7 @@ def _launch_simulator(*args, **kwargs):
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
+            self.currently_stepping = False
 
             self._floor_plane = None
             self._skybox = None
@@ -897,10 +898,24 @@ def _launch_simulator(*args, **kwargs):
             # During rendering, the Fabric API is updated, so we can mark it as clean
             PoseAPI.mark_valid()
 
+        def _refresh_physics_sim_view(self):
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
+
+            SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                SimulationManager._backend
+            )
+            SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._message_bus.dispatch(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+            SimulationManager._message_bus.dispatch(IsaacEvents.PHYSICS_READY.value, payload={})
+
         def update_handles(self):
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
+
+            # Refresh the sim view
+            self._refresh_physics_sim_view()
 
             # Then update the handles for all objects
             for scene in self.scenes:
@@ -925,9 +940,6 @@ def _launch_simulator(*args, **kwargs):
             # If we don't have a valid scene, immediately return
             if len(self.scenes) == 0:
                 return
-
-            # Update omni
-            self._omni_update_step()
 
             # If we're playing we, also run additional logic
             if self.is_playing():
@@ -990,14 +1002,6 @@ def _launch_simulator(*args, **kwargs):
                     for scene in self.scenes:
                         scene.transition_rule_api.step()
 
-        def _omni_update_step(self):
-            """
-            Step any omni-related things
-            """
-            # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            RigidContactAPI.clear()
-            GripperRigidContactAPI.clear()
-
         def play(self):
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
@@ -1017,7 +1021,9 @@ def _launch_simulator(*args, **kwargs):
                 if gm.ENABLE_FLATCACHE:
                     channels.append("omni.physx.plugin")
                 with suppress_omni_log(channels=channels):
-                    super().play()
+                    # Playing takes some steps, so we temporarily change the dt to 0 to avoid moving things.
+                    with self.slowed():
+                        super().play()
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
@@ -1114,31 +1120,34 @@ def _launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
 
-            # Update all APIs
-            self._omni_update_step()
-            PoseAPI.invalidate()
-
         def _on_pre_physics_step(self):
+            # Make it possible to identify that we are currently within a step
+            self.currently_stepping = True
+
+            # Invalidate various APIs so that any reads from them will be updated
+            PoseAPI.invalidate()
+            RigidContactAPI.clear()
+            GripperRigidContactAPI.clear()
+
             # Only do this if we're not in the warmup phase
-            if lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                return
+            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                # Run the controller step on every controllable object
+                for scene in self.scenes:
+                    for obj in scene.objects:
+                        if isinstance(obj, ControllableObject):
+                            obj.step()
 
-            # Run the controller step on every controllable object
-            for scene in self.scenes:
-                for obj in scene.objects:
-                    if isinstance(obj, ControllableObject):
-                        obj.step()
-
-            # Flush the controls from the ControllableObjectViewAPI
-            ControllableObjectViewAPI.flush_control()
+                # Flush the controls from the ControllableObjectViewAPI
+                ControllableObjectViewAPI.flush_control()
 
         def _on_post_physics_step(self):
             # Only do this if we're not in the warmup phase
-            if lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
-                return
+            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                # Run the post physics update for backend view
+                ControllableObjectViewAPI.post_physics_step()
 
-            # Run the post physics update for backend view
-            ControllableObjectViewAPI.post_physics_step()
+            # Record that we are done with the step context.
+            self.currently_stepping = False
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -1280,18 +1289,16 @@ def _launch_simulator(*args, **kwargs):
                 self.play()
 
         @contextlib.contextmanager
-        def slowed(self, dt):
+        def slowed(self, slow_dt=1e-6):
             """
             A context scope for making the simulator simulation dt slowed, e.g.: for taking micro-steps for propagating
             instantaneous kinematics with minimal impact on physics propagation.
-
-            NOTE: This will set both the physics dt and rendering dt to the same value during this scope.
 
             Upon leaving the scope, the prior simulator state is restored.
             """
             # Set dt, yield, then restore the original dt
             physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
-            self.set_simulation_dt(physics_dt=dt, rendering_dt=dt)
+            self._physics_context.set_physics_dt(slow_dt, 1)
             yield
             self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
 
