@@ -218,9 +218,6 @@ class ClothPrim(GeomPrim):
                 ms.meshing_isotropic_explicit_remeshing(
                     iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
                 )
-                # Make sure the clothes is watertight
-                ms.meshing_repair_non_manifold_edges()
-                ms.meshing_repair_non_manifold_vertices()
 
                 # If the cloth has multiple pieces, only keep the largest one
                 ms.generate_splitting_by_connected_components(delete_source_mesh=True)
