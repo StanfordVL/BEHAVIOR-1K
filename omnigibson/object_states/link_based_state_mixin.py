@@ -22,17 +22,17 @@ class LinkBasedStateMixin(BaseObjectState):
         if not compatible:
             return compatible, reason
 
-        # Check whether this state requires metalink
-        if not cls.requires_metalink(**kwargs):
+        # Check whether this state requires meta link
+        if not cls.requires_meta_link(**kwargs):
             return True, None
-        metalink_prefix = cls.metalink_prefix
+        meta_link_type = cls.meta_link_type
         for link in obj.links.values():
-            if metalink_prefix in link.name:
+            if link.is_meta_link and link.meta_link_type == meta_link_type:
                 return True, None
 
         return (
             False,
-            f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} "
+            f"LinkBasedStateMixin {cls.__name__} requires meta link with type {cls.meta_link_type} "
             f"for obj {obj.name} but none was found! To get valid compatible object models, please use "
             f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
         )
@@ -44,35 +44,43 @@ class LinkBasedStateMixin(BaseObjectState):
         if not compatible:
             return compatible, reason
 
-        # Check whether this state requires metalink
-        if not cls.requires_metalink(**kwargs):
+        # Check whether this state requires meta link
+        if not cls.requires_meta_link(**kwargs):
             return True, None
-        metalink_prefix = cls.metalink_prefix
+        meta_link_type = cls.meta_link_type
         for child in prim.GetChildren():
             if child.GetTypeName() == "Xform":
-                if metalink_prefix in child.GetName():
+                # With the new format, we can know for sure by checking the meta link type
+                if (
+                    child.HasAttribute("ig:metaLinkType")
+                    and child.GetAttribute("ig:metaLinkType").Get() == meta_link_type
+                ):
                     return True, None
 
+                # Until the next dataset release, also accept the old format
+                # TODO: Remove this block after the next dataset release
+                if meta_link_type in child.GetName():
+                    return True, None
         return (
             False,
-            f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} "
+            f"LinkBasedStateMixin {cls.__name__} requires meta link with prefix {cls.meta_link_type} "
             f"for asset prim {prim.GetName()} but none was found! To get valid compatible object models, "
             f"please use omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
         )
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         """
         Returns:
-            str: Unique keyword that defines the metalink associated with this object state
+            str: Unique keyword that defines the meta link associated with this object state
         """
         NotImplementedError()
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
+    def requires_meta_link(cls, **kwargs):
         """
         Returns:
-            Whether an object state instantiated with constructor arguments **kwargs will require a metalink
+            Whether an object state instantiated with constructor arguments **kwargs will require a meta link
                 or not
         """
         # True by default
@@ -91,7 +99,7 @@ class LinkBasedStateMixin(BaseObjectState):
     def links(self):
         """
         Returns:
-            dict: mapping from link names to links that match the metalink_prefix
+            dict: mapping from link names to links that match the meta_link_type
         """
         return self._links
 
@@ -100,7 +108,7 @@ class LinkBasedStateMixin(BaseObjectState):
         """
         Returns:
             None or RigidPrim: If supported, the fallback link associated with this link-based state if
-                no valid metalink is found
+                no valid meta link is found
         """
         # No default link by default
         return None
@@ -108,11 +116,12 @@ class LinkBasedStateMixin(BaseObjectState):
     def initialize_link_mixin(self):
         assert not self._initialized
 
-        # TODO: Extend logic to account for multiple instances of the same metalink? e.g: _0, _1, ... suffixes
+        # TODO: Extend logic to account for multiple instances of the same meta link? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
-            if self.metalink_prefix in name or (
-                self._default_link is not None and link.name == self._default_link.name
-            ):
+            is_appropriate_meta_link = link.is_meta_link and link.meta_link_type == self.meta_link_type
+            # TODO: Remove support for this default meta link logic after the next dataset release
+            is_default_link = self._default_link is not None and link.name == self._default_link.name
+            if is_appropriate_meta_link or is_default_link:
                 self._links[name] = link
                 # Make sure the scale is similar if the link is not a cloth prim
                 if not isinstance(link, ClothPrim):
