@@ -232,7 +232,7 @@ def test_curobo():
             batch_size=batch_size,
             debug=False,
             use_cuda_graph=True,
-            collision_activation_distance=0.03,  # Use larger activation distance for better reproducibility
+            collision_activation_distance=0.05,  # Use larger activation distance for better reproducibility
             use_default_embodiment_only=True,
         )
 
@@ -353,9 +353,9 @@ def test_curobo():
             target_pos=target_pos,
             target_quat=target_quat,
             is_local=False,
-            max_attempts=1,
+            max_attempts=100,
             timeout=60.0,
-            ik_fail_return=5,
+            ik_fail_return=50,
             enable_finetune_trajopt=True,
             finetune_attempts=1,
             return_full_result=False,

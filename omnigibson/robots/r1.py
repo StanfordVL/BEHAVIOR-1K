@@ -241,4 +241,5 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             ["base_link", "wheel_link1"],
             ["base_link", "wheel_link2"],
             ["base_link", "wheel_link3"],
+            ["torso_link2", "torso_link4"],
         ]
