@@ -16,9 +16,9 @@ def plan_trajectory(
         target_pos=target_pos,
         target_quat=target_quat,
         is_local=False,
-        max_attempts=50,
+        max_attempts=100,
         timeout=60.0,
-        ik_fail_return=5,
+        ik_fail_return=50,
         enable_finetune_trajopt=True,
         finetune_attempts=1,
         return_full_result=False,
@@ -32,14 +32,10 @@ def plan_trajectory(
 
 def execute_trajectory(q_traj, env, robot, attached_obj):
     for i, q in enumerate(q_traj):
-        q = q.cpu()
         q = set_gripper_joint_positions(robot, q, attached_obj)
         action = robot.q_to_action(q)
-
-        num_repeat = 5
         print(f"Executing waypoint {i}/{len(q_traj)}")
-        for _ in range(num_repeat):
-            env.step(action)
+        env.step(action)
 
 
 def plan_and_execute_trajectory(
@@ -55,7 +51,8 @@ def plan_and_execute_trajectory(
     if success:
         print("Successfully planned trajectory")
         if not dry_run:
-            q_traj = cmg.path_to_joint_trajectory(traj_path, get_full_js=True, emb_sel=emb_sel)
+            q_traj = cmg.path_to_joint_trajectory(traj_path, get_full_js=True, emb_sel=emb_sel).cpu().float()
+            q_traj = cmg.add_linearly_interpolated_waypoints(traj=q_traj, max_inter_dist=0.01)
             execute_trajectory(q_traj, env, robot, attached_obj)
     else:
         print("Failed to plan trajectory")
@@ -95,7 +92,7 @@ def test_curobo():
         "orientation": [0, 0, 0, 1],
         "self_collisions": True,
         "action_normalize": False,
-        "grasping_mode": "assisted",
+        "grasping_mode": "sticky",
         "controller_config": {
             "base": {
                 "name": "HolonomicBaseJointController",
@@ -116,7 +113,6 @@ def test_curobo():
                 "command_input_limits": None,
                 "use_delta_commands": False,
                 "use_impedances": False,
-                "pos_kp": 200.0,
             },
             "arm_right": {
                 "name": "JointController",
@@ -124,7 +120,6 @@ def test_curobo():
                 "command_input_limits": None,
                 "use_delta_commands": False,
                 "use_impedances": False,
-                "pos_kp": 200.0,
             },
             "gripper_left": {
                 "name": "JointController",
@@ -132,7 +127,6 @@ def test_curobo():
                 "command_input_limits": None,
                 "use_delta_commands": False,
                 "use_impedances": False,
-                "pos_kp": 1500.0,
             },
             "gripper_right": {
                 "name": "JointController",
@@ -140,7 +134,6 @@ def test_curobo():
                 "command_input_limits": None,
                 "use_delta_commands": False,
                 "use_impedances": False,
-                "pos_kp": 1500.0,
             },
         },
     }
@@ -197,7 +190,7 @@ def test_curobo():
                 "category": "bottle_of_cologne",
                 "model": "lyipur",
                 "position": [1.6, 0.15, 0.65],
-                "orientation": [0, 0, 0, 1],
+                "orientation": T.euler2quat(th.tensor([0, 0, math.pi / 2])),
             },
             {
                 "type": "DatasetObject",
@@ -225,11 +218,11 @@ def test_curobo():
     table = env.scene.object_registry("name", "table")
     cologne = env.scene.object_registry("name", "cologne")
     fridge = env.scene.object_registry("name", "fridge")
-    cologne_scale = 0.8
-    fridge_door_scale = 0.8
+    cologne_scale = 0.95
+    fridge_door_scale = 0.6
     if robot_type == "R1":
-        table_local_pose = (th.tensor([-0.8, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-        cologne_local_pose = (th.tensor([-0.03, 0.0, 0.052]), T.euler2quat(th.tensor([math.pi, -math.pi / 2.0, 0.0])))
+        table_local_pose = (th.tensor([-1.1, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
+        cologne_local_pose = (th.tensor([0.0, 0.0, 0.04]), th.tensor([0.5, -0.5, 0.5, 0.5]))
         fridge_local_pose = (th.tensor([-0.45, -1.2, -0.8576]), T.euler2quat(th.tensor([0.0, 0.0, math.pi / 2.0])))
         fridge_door_local_pose = (
             th.tensor([-0.28, -0.37, 0.15]),
@@ -245,19 +238,25 @@ def test_curobo():
         )
     elif robot_type == "Tiago":
         table_local_pose = (th.tensor([-1.1, 0.0, -0.402]), th.tensor([0.0, 0.0, 0.0, 1.0]))
-        cologne_local_pose = (th.tensor([-0.015, 0.0, 0.122]), T.euler2quat(th.tensor([math.pi, math.pi / 2.0, 0.0])))
+        cologne_local_pose = (th.tensor([0.0, 0.0, 0.04]), th.tensor([0.5, -0.5, 0.5, 0.5]))
         fridge_local_pose = (th.tensor([-0.55, -1.25, -0.8576]), T.euler2quat(th.tensor([0.0, 0.0, math.pi / 2.0])))
         fridge_door_local_pose = (
-            th.tensor([-0.28, -0.42, 0.15]),
-            T.euler2quat(th.tensor([math.pi, 0.0, math.pi / 2.0])),
+            th.tensor([-0.28, -0.37, 0.15]),
+            T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
         )
-        fridge_door_open_local_pose = (th.tensor([0.35, -0.97, 0.15]), T.euler2quat(th.tensor([math.pi, 0.0, math.pi])))
+        fridge_door_open_local_pose = (
+            th.tensor([0.35, -0.97, 0.15]),
+            T.euler2quat(th.tensor([0.0, -math.pi / 2, 0.0])),
+        )
         fridge_place_local_pose = (
             th.tensor([-0.10, -0.15, 0.5]),
-            T.euler2quat(th.tensor([math.pi, 0.0, math.pi / 2.0])),
+            T.euler2quat(th.tensor([-math.pi / 2, -math.pi / 2, 0.0])),
         )
     else:
         raise ValueError(f"Unknown robot type: {robot_type}")
+
+    # Set random seed for reproducibility
+    th.manual_seed(1)
 
     # Navigate to table (base)
     table_nav_pos, table_nav_quat = T.pose_transform(*table.get_position_orientation(), *table_local_pose)

@@ -519,11 +519,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
     @classmethod
     def get_max_contact_data_count(cls):
-        # 4x per finger link, to be safe.
-        # 4 here is not the finger count, it's the number of items we will record contacts with, per finger.
-        # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
-        # This number should very rarely go above 4.
-        return len(cls.get_column_filters()[0]) * 4
+        return len(cls.get_column_filters()[0]) * 128
 
 
 # Instantiate the GripperRigidContactAPI
