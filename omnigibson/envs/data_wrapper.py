@@ -74,7 +74,6 @@ class DataWrapper(EnvironmentWrapper):
 
         Returns:
             5-tuple:
-            5-tuple:
                 - dict: state, i.e. next observation
                 - float: reward, i.e. reward at this current timestep
                 - bool: terminated, i.e. whether this episode ended due to a failure or success
@@ -277,7 +276,13 @@ class DataCollectionWrapper(DataWrapper):
     """
 
     def __init__(
-        self, env, output_path, viewport_camera_path="/World/viewer_camera", only_successes=True, use_vr=False
+        self,
+        env,
+        output_path,
+        viewport_camera_path="/World/viewer_camera",
+        only_successes=True,
+        use_vr=False,
+        obj_attr_keys=None,
     ):
         """
         Args:
@@ -287,6 +292,11 @@ class DataCollectionWrapper(DataWrapper):
                 data collection
             only_successes (bool): Whether to only save successful episodes
             use_vr (bool): Whether to use VR headset for data collection
+            obj_attr_keys (None or list of str): If set, a list of object attributes that should be
+                cached at the beginning of every episode, e.g.: "scale", "visible", etc. This is useful
+                for domain randomization settings where specific object attributes not directly tied to
+                the object's runtime kinematic state are being modified once at the beginning of every episode,
+                while the simulation is stopped.
         """
         # Store additional variables needed for optimized data collection
 
@@ -294,6 +304,7 @@ class DataCollectionWrapper(DataWrapper):
         self.max_state_size = 0
 
         # Dict capturing serialized per-episode initial information (e.g.: scales / visibilities) about every object
+        self.obj_attr_keys = [] if obj_attr_keys is None else obj_attr_keys
         self.init_metadata = dict()
 
         # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
@@ -393,8 +404,10 @@ class DataCollectionWrapper(DataWrapper):
         # Update max state size
         self.max_state_size = max(self.max_state_size, len(state))
 
-        # Also store initial metadata (scale, visibility) not recorded in serialized state
+        # Also store initial metadata not recorded in serialized state
         # This is simply serialized
+        for i, obj in enumerate(self.scene.objects):
+
         scales = th.zeros(self.scene.n_objects, 3)
         visibilities = th.zeros(self.scene.n_objects, dtype=th.bool)
         for i, obj in enumerate(self.scene.objects):
