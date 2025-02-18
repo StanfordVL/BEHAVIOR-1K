@@ -123,16 +123,6 @@ class DatasetObject(USDObject):
             assert len(available_models) > 0, f"No available models found for category {category}!"
             model = random.choice(available_models)
 
-        # If the model is in BAD_CLOTH_MODELS, raise an error for now -- this is a model that's unstable and needs to be fixed
-        # TODO: Remove this once the asset is fixed!
-        from omnigibson.utils.bddl_utils import BAD_CLOTH_MODELS
-
-        if prim_type == PrimType.CLOTH and model in BAD_CLOTH_MODELS.get(category, dict()):
-            raise ValueError(
-                f"Cannot create cloth object category: {category}, model: {model} because it is "
-                f"currently broken ): This will be fixed in the next release!"
-            )
-
         self._model = model
         usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
 

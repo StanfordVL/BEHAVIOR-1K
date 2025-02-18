@@ -297,16 +297,16 @@ def get_all_object_category_models_with_abilities(category, abilities):
     return valid_models
 
 
-def get_attachment_metalinks(category, model):
+def get_attachment_meta_links(category, model):
     """
-    Get attachment metalinks for an object model
+    Get attachment meta links for an object model
 
     Args:
         category (str): Object category name
         model (str): Object model name
 
     Returns:
-        list of str: all attachment metalinks for the object model
+        list of str: all attachment meta links for the object model
     """
     # Avoid circular imports
     from omnigibson.object_states import AttachedTo
@@ -317,12 +317,12 @@ def get_attachment_metalinks(category, model):
     with decrypted(usd_path) as fpath:
         stage = lazy.pxr.Usd.Stage.Open(fpath)
         prim = stage.GetDefaultPrim()
-        attachment_metalinks = []
+        attachment_meta_links = []
         for child in prim.GetChildren():
             if child.GetTypeName() == "Xform":
-                if AttachedTo.metalink_prefix in child.GetName():
-                    attachment_metalinks.append(child.GetName())
-        return attachment_metalinks
+                if AttachedTo.meta_link_type in child.GetName():
+                    attachment_meta_links.append(child.GetName())
+        return attachment_meta_links
 
 
 def get_og_assets_version():
