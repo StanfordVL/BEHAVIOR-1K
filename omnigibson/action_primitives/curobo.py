@@ -132,12 +132,27 @@ class CuRoboMotionGenerator:
         self.ee_link = dict()
         self.additional_links = dict()
         self.base_link = dict()
+
+        # Grab mapping from robot joint name to index
+        reset_qpos = self.robot.reset_joint_pos
+        joint_idx_mapping = {joint.body_name: i for i, joint in enumerate(self.robot.joints.values())}
         for emb_sel, robot_cfg_path in robot_cfg_path_dict.items():
             content_path = lazy.curobo.types.file_path.ContentPath(
                 robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
             )
             robot_cfg_dict = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
             robot_cfg_dict["kinematics"]["use_usd_kinematics"] = True
+
+            # Automatically populate the locked joints and retract config from the robot values
+            for joint_name, lock_val in robot_cfg_dict["kinematics"]["lock_joints"].items():
+                if lock_val is None:
+                    joint_idx = joint_idx_mapping[joint_name]
+                    robot_cfg_dict["kinematics"]["lock_joints"][joint_name] = reset_qpos[joint_idx]
+            if robot_cfg_dict["kinematics"]["cspace"]["retract_config"] is None:
+                robot_cfg_dict["kinematics"]["cspace"]["retract_config"] = [
+                    reset_qpos[joint_idx_mapping[joint_name]]
+                    for joint_name in robot_cfg_dict["kinematics"]["cspace"]["joint_names"]
+                ]
 
             self.ee_link[emb_sel] = robot_cfg_dict["kinematics"]["ee_link"]
             # RobotConfig.from_dict will append ee_link to link_names, so we make a copy here.
