@@ -1,5 +1,6 @@
 import math
 from functools import cached_property
+import re
 from typing import Literal
 
 import torch as th
@@ -29,6 +30,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_CONTACT_OFFSET = 0.001
 m.DEFAULT_REST_OFFSET = 0.0
+m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 
 
 class RigidPrim(XFormPrim):
@@ -795,6 +797,65 @@ class RigidPrim(XFormPrim):
         """
         min_corner, max_corner = self.visual_aabb
         return (max_corner + min_corner) / 2.0
+
+    @cached_property
+    def is_meta_link(self):
+        # Check using the new format first
+        new_format = self.prim.HasAttribute("ig:isMetaLink") and self.get_attribute("ig:isMetaLink")
+        if new_format:
+            return True
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        old_format = m.LEGACY_META_LINK_PATTERN.fullmatch(self.name) is not None
+        if old_format:
+            return True
+
+        return False
+
+    @cached_property
+    def meta_link_type(self):
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkType"):
+            return self.get_attribute("ig:metaLinkType")
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(1)
+
+    @cached_property
+    def meta_link_id(self):
+        """The meta link id of this link, if the link is a meta link.
+
+        The meta link ID is a semantic identifier for the meta link within the meta link type. It is
+        used when an object has multiple meta links of the same type. It can be just a numerical index,
+        or for some objects, it will be a string that can be matched to other meta links. For example,
+        a stove might have toggle buttons named "left" and "right", and heat sources named "left" and
+        "right". The meta link ID can be used to match the toggle button to the heat source.
+        """
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkId"):
+            return self.get_attribute("ig:metaLinkId")
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(2)
+
+    @cached_property
+    def meta_link_sub_id(self):
+        """The integer meta link sub id of this link, if the link is a meta link.
+
+        The meta link sub ID identifies this link as one of the parts of a meta link. For example, an
+        attachment meta link's ID will be the attachment pair name, and each attachment point that
+        works with that pair will show up as a separate link with a unique sub ID.
+        """
+        assert self.is_meta_link, f"{self.name} is not a meta link"
+        if self.prim.HasAttribute("ig:metaLinkSubId"):
+            return int(self.get_attribute("ig:metaLinkSubId"))
+
+        # Check using the old format.
+        # TODO: Remove this after the next dataset release
+        return int(m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(3))
 
     def enable_gravity(self):
         """
