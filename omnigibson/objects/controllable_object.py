@@ -2,6 +2,7 @@ import math
 from abc import abstractmethod
 from copy import deepcopy
 from functools import cached_property
+from typing import Literal
 
 import gymnasium as gym
 import networkx as nx
@@ -10,6 +11,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
+from omnigibson.controllers.joint_controller import JointController
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
@@ -293,20 +295,16 @@ class ControllableObject(BaseObject):
         """
         # Update the control modes of each joint based on the outputted control from the controllers
         unused_dofs = {i for i in range(self.n_dof)}
-        for name in self._controllers:
-            for dof in self._controllers[name].dof_idx:
+        for controller in self._controllers.values():
+            for i, dof in enumerate(controller.dof_idx):
                 # Make sure the DOF has not already been set yet, and remove it afterwards
                 assert dof.item() in unused_dofs
                 unused_dofs.remove(dof.item())
-                control_type = self._controllers[name].control_type
+                control_type = controller.control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
-                    kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=(
-                        self.default_kd
-                        if control_type == ControlType.POSITION or control_type == ControlType.VELOCITY
-                        else None
-                    ),
+                    kp=None if controller.isaac_kp is None else controller.isaac_kp[i],
+                    kd=None if controller.isaac_kd is None else controller.isaac_kd[i],
                 )
 
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
@@ -565,6 +563,12 @@ class ControllableObject(BaseObject):
                 positions=control[pos_idxs],
                 indices=pos_idxs,
             )
+            # If we're setting joint position targets, we should also set velocity targets to 0
+            ControllableObjectViewAPI.set_joint_velocity_targets(
+                self.articulation_root_path,
+                velocities=cb.zeros(len(pos_idxs)),
+                indices=pos_idxs,
+            )
         vel_idxs = cb.where(control_type == ControlType.VELOCITY)[0]
         if len(vel_idxs) > 0:
             ControllableObjectViewAPI.set_joint_velocity_targets(
@@ -606,16 +610,29 @@ class ControllableObject(BaseObject):
         fcns["_root_pos_quat"] = lambda: ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
         fcns["root_pos"] = lambda: fcns["_root_pos_quat"][0]
         fcns["root_quat"] = lambda: fcns["_root_pos_quat"][1]
-        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)
-        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)
+
+        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
+        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
+        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
+        # which is not used anywhere else in the codebase
+        fcns["root_lin_vel"] = lambda: ControllableObjectViewAPI.get_linear_velocity(
+            self.articulation_root_path, estimate=True
+        )
+        fcns["root_ang_vel"] = lambda: ControllableObjectViewAPI.get_angular_velocity(
+            self.articulation_root_path, estimate=True
+        )
         fcns["root_rel_lin_vel"] = lambda: ControllableObjectViewAPI.get_relative_linear_velocity(
-            self.articulation_root_path
+            self.articulation_root_path,
+            estimate=True,
         )
         fcns["root_rel_ang_vel"] = lambda: ControllableObjectViewAPI.get_relative_angular_velocity(
-            self.articulation_root_path
+            self.articulation_root_path,
+            estimate=True,
         )
         fcns["joint_position"] = lambda: ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path)
-        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)
+        fcns["joint_velocity"] = lambda: ControllableObjectViewAPI.get_joint_velocities(
+            self.articulation_root_path, estimate=True
+        )
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
         fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
         fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
@@ -644,11 +661,20 @@ class ControllableObject(BaseObject):
         )
         fcns[f"{task_name}_pos_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][0]
         fcns[f"{task_name}_quat_relative"] = lambda: fcns[f"_{task_name}_pos_quat_relative"][1]
+
+        # NOTE: We explicitly compute hand-calculated (i.e.: non-Isaac native) values for velocity because
+        # Isaac has some numerical inconsistencies for low velocity values, which cause downstream issues for
+        # controllers when computing accurate control. This is why we explicitly set the `estimate=True` flag here,
+        # which is not used anywhere else in the codebase
         fcns[f"{task_name}_lin_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_linear_velocity(
-            self.articulation_root_path, link_name
+            self.articulation_root_path,
+            link_name,
+            estimate=True,
         )
         fcns[f"{task_name}_ang_vel_relative"] = lambda: ControllableObjectViewAPI.get_link_relative_angular_velocity(
-            self.articulation_root_path, link_name
+            self.articulation_root_path,
+            link_name,
+            estimate=True,
         )
         # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
         # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
@@ -662,18 +688,45 @@ class ControllableObject(BaseObject):
             self.articulation_root_path
         )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
 
+    def q_to_action(self, q):
+        """
+        Converts a target joint configuration to an action that can be applied to this object.
+        All controllers should be JointController with use_delta_commands=False
+        """
+        action = []
+        for name, controller in self.controllers.items():
+            assert (
+                isinstance(controller, JointController) and not controller.use_delta_commands
+            ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
+            command = q[controller.dof_idx]
+            action.append(controller._reverse_preprocess_command(command))
+        action = th.cat(action, dim=0)
+        assert (
+            action.shape[0] == self.action_dim
+        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        return action
+
     def dump_action(self):
         """
         Dump the last action applied to this object. For use in demo collection.
         """
         return self._last_action
 
+    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
+        # Run super first
+        super().set_position_orientation(position, orientation, frame)
+
+        # Clear the controllable view's backend since state has changed
+        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
         super().set_joint_positions(positions=positions, indices=indices, normalized=normalized, drive=drive)
 
         # If we're not driving the joints, reset the controllers so that the goals are updated wrt to the new state
+        # Also clear the controllable view's backend since state has changed
         if not drive:
+            ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
             for controller in self._controllers.values():
                 controller.reset()
 
@@ -865,24 +918,6 @@ class ControllableObject(BaseObject):
             "effort": (-self.max_joint_efforts, self.max_joint_efforts),
             "has_limit": self.joint_has_limits,
         }
-
-    @property
-    def default_kp(self):
-        """
-        Returns:
-            float: Default kp gain to apply to any DOF when switching control modes (e.g.: switching from a
-                velocity control mode to a position control mode)
-        """
-        return 1e7
-
-    @property
-    def default_kd(self):
-        """
-        Returns:
-            float: Default kd gain to apply to any DOF when switching control modes (e.g.: switching from a
-                position control mode to a velocity control mode)
-        """
-        return 1e5
 
     @property
     def reset_joint_pos(self):

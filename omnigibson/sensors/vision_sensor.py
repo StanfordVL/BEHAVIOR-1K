@@ -1,5 +1,4 @@
 import math
-import time
 
 import gymnasium as gym
 import torch as th
@@ -312,13 +311,13 @@ class VisionSensor(BaseSensor):
         # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
         if "seg_" in modality:
             obs = obs.astype(NumpyTypes.INT32)
-        return th.from_numpy(obs) if not "bbox_" in modality else obs
+        return th.from_numpy(obs) if "bbox_" not in modality else obs
 
     def _preprocess_gpu_obs(self, obs, modality):
         # All segmentation modalities return uint32 warp arrays on gpu, but PyTorch doesn't support it
         if "seg_" in modality:
             obs = obs.view(lazy.warp.int32)
-        return lazy.warp.to_torch(obs) if not "bbox_" in modality else obs
+        return lazy.warp.to_torch(obs) if "bbox_" not in modality else obs
 
     def _remap_modality(self, modality, obs, info, raw_obs):
         id_to_labels = raw_obs["info"]["idToLabels"]

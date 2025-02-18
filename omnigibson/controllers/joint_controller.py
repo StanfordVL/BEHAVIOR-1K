@@ -1,5 +1,9 @@
 import math
 
+import numpy as np
+import torch as th
+from numba import jit
+
 from omnigibson.controllers import (
     ControlType,
     GripperController,
@@ -9,7 +13,7 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
+from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -42,6 +46,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
@@ -74,6 +80,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
             pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
@@ -127,7 +139,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self._use_delta_commands and type(command_output_limits) == str and command_output_limits == "default"
+            self._use_delta_commands and type(command_output_limits) is str and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
@@ -137,6 +149,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def _generate_default_command_output_limits(self):
@@ -210,7 +224,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             if self._motor_type == "position":
                 # Run impedance controller -- effort = pos_err * kp + vel_err * kd
                 position_error = target - base_value
-                vel_pos_error = -control_dict[f"joint_velocity"][self.dof_idx]
+                vel_pos_error = -control_dict["joint_velocity"][self.dof_idx]
                 u = position_error * self.pos_kp + vel_pos_error * self.pos_kd
             elif self._motor_type == "velocity":
                 # Compute command torques via PI velocity controller plus gravity compensation torques
@@ -219,7 +233,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            u = cb.compute_joint_torques(u, control_dict["mass_matrix"], self.dof_idx)
+            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:
@@ -247,15 +261,15 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         return dict(target=target)
 
-    def _compute_no_op_action(self, control_dict):
+    def _compute_no_op_command(self, control_dict):
         if self.motor_type == "position":
             if self._use_delta_commands:
                 return cb.zeros(self.command_dim)
             else:
-                return control_dict[f"joint_position"][self.dof_idx]
+                return control_dict["joint_position"][self.dof_idx]
         elif self.motor_type == "velocity":
             if self._use_delta_commands:
-                return -control_dict[f"joint_velocity"][self.dof_idx]
+                return -control_dict["joint_velocity"][self.dof_idx]
             else:
                 return cb.zeros(self.command_dim)
 
@@ -293,9 +307,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return len(self.dof_idx)
 
 
-import torch as th
-
-
 @th.compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
@@ -304,10 +315,6 @@ def _compute_joint_torques_torch(
 ):
     dof_idxs_mat = th.meshgrid(dof_idx, dof_idx, indexing="xy")
     return mm[dof_idxs_mat] @ u
-
-
-import numpy as np
-from numba import jit
 
 
 # Use numba since faster
@@ -344,6 +351,6 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_joint_torques", None)
-setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
-setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+add_compute_function(
+    name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch
+)

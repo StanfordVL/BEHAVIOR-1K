@@ -15,13 +15,12 @@ from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_sc
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.TOGGLE_LINK_PREFIX = "togglebutton"
+m.TOGGLE_META_LINK_TYPE = "togglebutton"
 m.DEFAULT_SCALE = 0.1
 m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin, GlobalUpdateStateMixin):
-
     # List of set of prim paths defining robot finger links belonging to any manipulation robots per scene
     _robot_finger_paths = None
 
@@ -79,8 +78,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                         cls._finger_contact_objs.add(obj)
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.TOGGLE_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.TOGGLE_META_LINK_TYPE
 
     def _get_value(self):
         return self.value
@@ -107,7 +106,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             self.scale = m.DEFAULT_SCALE if self.scale is None else self.scale
             # Note: We have to create a mesh (instead of a sphere shape) because physx complains about non-uniform
             # scaling for non-meshes
-            mesh = create_primitive_mesh(
+            create_primitive_mesh(
                 prim_path=mesh_prim_path,
                 primitive_type="Sphere",
                 extents=1.0,

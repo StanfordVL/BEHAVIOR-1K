@@ -119,7 +119,7 @@ class PrimitiveObject(StatefulObject):
         prim = og.sim.stage.DefinePrim(self.prim_path, "Xform")
 
         # Define a nested mesh corresponding to the root link for this prim
-        base_link = og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
+        og.sim.stage.DefinePrim(f"{self.prim_path}/base_link", "Xform")
         self._vis_geom = create_primitive_mesh(
             prim_path=f"{self.prim_path}/base_link/visuals", primitive_type=self._primitive_type
         )
@@ -135,7 +135,7 @@ class PrimitiveObject(StatefulObject):
         # Create a material for this object for the base link
         og.sim.stage.DefinePrim(f"{self.prim_path}/Looks", "Scope")
         mat_path = f"{self.prim_path}/Looks/default"
-        mat = create_pbr_material(prim_path=mat_path)
+        create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
 
         return prim

@@ -3,7 +3,6 @@ from utils import og_test
 
 import omnigibson as og
 from omnigibson.objects import DatasetObject
-from omnigibson.utils.python_utils import NAMES
 
 
 @og_test

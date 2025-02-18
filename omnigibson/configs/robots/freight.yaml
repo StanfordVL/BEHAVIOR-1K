@@ -10,6 +10,8 @@ robot:
   base_name: null
   scale: 1.0
   self_collision: false
+  include_sensor_names: null
+  exclude_sensor_names: null
   sensor_config:
     VisionSensor:
       sensor_kwargs:

@@ -4,7 +4,6 @@ import torch as th
 
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 
 class ArticulatedTrunkRobot(ManipulationRobot):

@@ -30,6 +30,8 @@ scene:
 robots:
   - type: Turtlebot
     obs_modalities: [scan, rgb, depth]
+    include_sensor_names: null
+    exclude_sensor_names: null
     scale: 1.0
     self_collision: false
     action_normalize: true

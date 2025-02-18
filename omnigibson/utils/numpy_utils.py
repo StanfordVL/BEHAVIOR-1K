@@ -1,5 +1,6 @@
 import numpy as np
 import torch as th
+import omnigibson.lazy as lazy
 
 
 class NumpyTypes:
@@ -9,12 +10,22 @@ class NumpyTypes:
     UINT32 = np.uint32
 
 
-def vtarray_to_torch(vtarray, dtype=th.float32, device="cpu"):
+def numpy_to_torch(np_array, dtype=th.float32, device="cpu"):
     if device == "cpu":
-        return th.from_numpy(np.array(vtarray)).to(dtype)
+        return th.from_numpy(np_array).to(dtype)
     else:
         assert device.startswith("cuda")
-        return th.tensor(np.array(vtarray), dtype=dtype, device=device)
+        return th.tensor(np_array, dtype=dtype, device=device)
+
+
+def vtarray_to_torch(vtarray, dtype=th.float32, device="cpu"):
+    np_array = np.array(vtarray)
+    return numpy_to_torch(np_array, dtype=dtype, device=device)
+
+
+def gf_quat_to_torch(gf_quat, dtype=th.float32, device="cpu"):
+    np_array = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(gf_quat)[[1, 2, 3, 0]]
+    return numpy_to_torch(np_array, dtype=dtype, device=device)
 
 
 def pil_to_tensor(pil_image):

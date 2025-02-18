@@ -1,6 +1,3 @@
-import torch as th
-
-import omnigibson as og
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.sensors import VisionSensor
 

@@ -3,9 +3,6 @@ import colorsys
 import torch as th
 from PIL import Image, ImageDraw
 
-import omnigibson as og
-from omnigibson.utils.constants import semantic_class_name_to_id
-
 try:
     import accimage
 except ImportError:
@@ -139,7 +136,7 @@ class Remapper:
         for key in th.unique(image) if image_keys is None else image_keys:
             if key.item() not in old_mapping.keys():
                 new_key = next((k for k, v in new_mapping.items() if v == "unlabelled"), None)
-                assert new_key is not None, f"Could not find a new key for label 'unlabelled' in new_mapping!"
+                assert new_key is not None, "Could not find a new key for label 'unlabelled' in new_mapping!"
                 self.key_array[key] = new_key
 
         # Apply remapping

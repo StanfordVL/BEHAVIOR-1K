@@ -1,20 +1,18 @@
-import math
 from abc import ABCMeta
 from collections.abc import Iterable
 from functools import cached_property
 
 import torch as th
-import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.constants import PrimType, semantic_class_name_to_id
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
-from omnigibson.utils.usd_utils import CollisionAPI, create_joint
+from omnigibson.utils.usd_utils import create_joint
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -92,7 +90,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         load_config["scale"] = (
             scale
             if isinstance(scale, th.Tensor)
-            else th.tensor(scale, dtype=th.float32) if isinstance(scale, Iterable) else scale
+            else th.tensor(scale, dtype=th.float32)
+            if isinstance(scale, Iterable)
+            else scale
         )
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
@@ -144,7 +144,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             if (
                 self.n_joints == 0
                 and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                and (self._load_config["kinematic_only"] != False)
+                and (self._load_config["kinematic_only"] is not False)
                 and not self.has_attachment_points
             ):
                 kinematic_only = True

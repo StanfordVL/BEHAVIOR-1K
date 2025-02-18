@@ -120,9 +120,9 @@ class TwoWheelRobot(LocomotionRobot):
         cfg = super()._default_controller_config
 
         # Add differential drive option to base
-        cfg["base"][
-            self._default_base_differential_drive_controller_config["name"]
-        ] = self._default_base_differential_drive_controller_config
+        cfg["base"][self._default_base_differential_drive_controller_config["name"]] = (
+            self._default_base_differential_drive_controller_config
+        )
 
         return cfg
 

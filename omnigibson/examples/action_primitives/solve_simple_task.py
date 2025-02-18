@@ -7,7 +7,6 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import (
     StarterSemanticActionPrimitives,
     StarterSemanticActionPrimitiveSet,
 )
-from omnigibson.macros import gm
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -57,10 +56,14 @@ def main():
     scene = env.scene
     robot = env.robots[0]
 
+    # Let the objects settle
+    for _ in range(30):
+        og.sim.step()
+
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=True)
 
     # Grasp of cologne
     grasp_obj = scene.object_registry("name", "cologne")

@@ -1,9 +1,7 @@
-import os
 from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.ui_utils import create_module_logger
 

@@ -88,8 +88,9 @@ class TeleopSystem(TeleopPolicy):
         # optionally update control marker
         if self.show_control_marker:
             for arm_name in self.control_markers:
-                delta_pos, delta_orn = self.teleop_action[arm_name][:3], T.euler2quat(
-                    th.tensor(self.teleop_action[arm_name][3:6])
+                delta_pos, delta_orn = (
+                    self.teleop_action[arm_name][:3],
+                    T.euler2quat(th.tensor(self.teleop_action[arm_name][3:6])),
                 )
                 rel_target_pos = robot_obs[arm_name][:3] + delta_pos
                 rel_target_orn = T.quat_multiply(delta_orn, robot_obs[arm_name][3:7])

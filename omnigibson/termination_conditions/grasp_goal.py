@@ -1,4 +1,3 @@
-import omnigibson.utils.transform_utils as T
 from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 

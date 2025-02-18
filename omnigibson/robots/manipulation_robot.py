@@ -22,13 +22,24 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
-from omnigibson.utils.usd_utils import ControllableObjectViewAPI, GripperRigidContactAPI, RigidContactAPI, create_joint
+from omnigibson.utils.usd_utils import (
+    ControllableObjectViewAPI,
+    GripperRigidContactAPI,
+    create_joint,
+    create_primitive_mesh,
+    absolute_prim_path_to_scene_relative,
+)
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -39,6 +50,9 @@ m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
 m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
+m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
+m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.8
+
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
@@ -85,6 +99,8 @@ class ManipulationRobot(BaseRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
@@ -123,6 +139,12 @@ class ManipulationRobot(BaseRobot):
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -149,10 +171,10 @@ class ManipulationRobot(BaseRobot):
         self._grasping_direction = grasping_direction
         self._disable_grasp_handling = disable_grasp_handling
 
+        # Other variables filled in at runtime
+        self._eef_to_fingertip_lengths = None  # dict mapping arm name to finger name to offset
+
         # Initialize other variables used for assistive grasping
-        self._ag_freeze_joint_pos = {
-            arm: {} for arm in self.arm_names
-        }  # Frozen positions for keeping fingers held still
         self._ag_obj_in_hand = {arm: None for arm in self.arm_names}
         self._ag_obj_constraints = {arm: None for arm in self.arm_names}
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
@@ -178,6 +200,8 @@ class ManipulationRobot(BaseRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             **kwargs,
@@ -186,31 +210,31 @@ class ManipulationRobot(BaseRobot):
     def _validate_configuration(self):
         # Iterate over all arms
         for arm in self.arm_names:
-            # We make sure that our arm controller exists and is a manipulation controller
-            assert (
-                "arm_{}".format(arm) in self._controllers
-            ), "Controller 'arm_{}' must exist in controllers! Current controllers: {}".format(
-                arm, list(self._controllers.keys())
-            )
-            assert isinstance(
-                self._controllers["arm_{}".format(arm)], ManipulationController
-            ), "Arm {} controller must be a ManipulationController!".format(arm)
+            # If we have an arm controller, make sure it is a manipulation controller
+            if f"arm_{arm}" in self._controllers:
+                assert isinstance(
+                    self._controllers["arm_{}".format(arm)], ManipulationController
+                ), "Arm {} controller must be a ManipulationController!".format(arm)
 
-            # We make sure that our gripper controller exists and is a gripper controller
-            assert (
-                "gripper_{}".format(arm) in self._controllers
-            ), "Controller 'gripper_{}' must exist in controllers! Current controllers: {}".format(
-                arm, list(self._controllers.keys())
-            )
-            assert isinstance(
-                self._controllers["gripper_{}".format(arm)], GripperController
-            ), "Gripper {} controller must be a GripperController!".format(arm)
+            # If we have a gripper controller, make sure it is a manipulation controller
+            if f"gripper_{arm}" in self._controllers:
+                assert isinstance(
+                    self._controllers["gripper_{}".format(arm)], GripperController
+                ), "Gripper {} controller must be a GripperController!".format(arm)
 
         # run super
         super()._validate_configuration()
 
     def _initialize(self):
         super()._initialize()
+
+        # Infer relevant link properties, e.g.: fingertip location, AG grasping points
+        # We use a try / except to maintain backwards-compatibility with robots that do not follow our
+        # OG-specified convention
+        try:
+            self._infer_finger_properties()
+        except AssertionError as e:
+            log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
 
         if gm.AG_CLOTH:
             for arm in self.arm_names:
@@ -219,6 +243,163 @@ class ManipulationRobot(BaseRobot):
                         obj=self, volume_link=self.eef_links[arm], mesh_name_prefixes="container"
                     )
                 )
+
+    def _infer_finger_properties(self):
+        """
+        Infers relevant finger properties based on the given finger meshes of the robot
+
+        NOTE: This assumes the given EEF convention for parallel jaw grippers -- i.e.:
+        z points in the direction of the fingers, y points in the direction of grasp articulation, and x
+        is then inferred automatically
+        """
+        # Calculate and cache fingertip to eef frame offsets, as well as AG grasping points
+        self._eef_to_fingertip_lengths = dict()
+        self._default_ag_start_points = dict()
+        self._default_ag_end_points = dict()
+        for arm, finger_links in self.finger_links.items():
+            self._eef_to_fingertip_lengths[arm] = dict()
+            eef_link = self.eef_links[arm]
+            world_to_eef_tf = T.pose2mat(eef_link.get_position_orientation())
+            eef_to_world_tf = T.pose_inv(world_to_eef_tf)
+
+            # Infer parent link for this finger
+            finger_parent_link, finger_parent_max_z = None, None
+            is_parallel_jaw = len(finger_links) == 2
+            assert (
+                is_parallel_jaw
+            ), "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            for i, finger_link in enumerate(finger_links):
+                # Find parent, and make sure one exists
+                parent_prim_path, parent_link = None, None
+                for joint in self.joints.values():
+                    if finger_link.prim_path == joint.body1:
+                        parent_prim_path = joint.body0
+                        break
+                assert (
+                    parent_prim_path is not None
+                ), f"Expected articulated parent joint for finger link {finger_link.name} but found none!"
+                for link in self.links.values():
+                    if parent_prim_path == link.prim_path:
+                        parent_link = link
+                        break
+                assert parent_link is not None, f"Expected parent link located at {parent_prim_path} but found none!"
+                # Make sure all fingers share the same parent
+                if finger_parent_link is None:
+                    finger_parent_link = parent_link
+                    finger_parent_pts = finger_parent_link.collision_boundary_points_world
+                    assert (
+                        finger_parent_pts is not None
+                    ), f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
+                    # Convert from world frame -> eef frame
+                    finger_parent_pts = th.concatenate([finger_parent_pts, th.ones(len(finger_parent_pts), 1)], dim=-1)
+                    finger_parent_pts = (finger_parent_pts @ eef_to_world_tf.T)[:, :3]
+                    finger_parent_max_z = finger_parent_pts[:, 2].max().item()
+                else:
+                    assert (
+                        finger_parent_link == parent_link
+                    ), f"Expected all fingers to have same parent link, but found multiple parents at {finger_parent_link.prim_path} and {parent_link.prim_path}"
+
+                # Calculate this finger's collision boundary points in the world frame
+                finger_pts = finger_link.collision_boundary_points_world
+                assert (
+                    finger_pts is not None
+                ), f"Expected finger points to be defined for link {finger_link.name}, but got None!"
+                # Convert from world frame -> eef frame
+                finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
+                finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
+
+                # Since we know the EEF frame always points with z outwards towards the fingers, the outer-most point /
+                # fingertip is the maximum z value
+                finger_max_z = finger_pts[:, 2].max().item()
+                assert (
+                    finger_max_z > 0
+                ), f"Expected positive fingertip to eef frame offset for link {finger_link.name}, but got: {finger_max_z}. Does the EEF frame z-axis point in the direction of the fingers?"
+                self._eef_to_fingertip_lengths[arm][finger_link.name] = finger_max_z
+
+                # Now, only keep points that are above the parent max z by 20% for inferring y values
+                finger_range = finger_max_z - finger_parent_max_z
+                valid_idxs = th.where(
+                    finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP)
+                )[0]
+                finger_pts = finger_pts[valid_idxs]
+                # Make sure all points lie on a single side of the EEF's y-axis
+                y_signs = th.sign(finger_pts[:, 1])
+                assert th.all(
+                    y_signs == y_signs[0]
+                ).item(), "Expected all finger points to lie on single side of EEF y-axis!"
+                y_sign = y_signs[0].item()
+                y_abs_min = th.abs(finger_pts[:, 1]).min().item()
+
+                # Compute the default grasping points for this finger
+                # For now, we only have a strong heuristic defined for parallel jaw grippers, which assumes that
+                # there are exactly 2 fingers
+                # In this case, this is defined as the x2 (x,y,z) tuples where:
+                # z - the 20% and 80% length between the range from [finger_parent_max_z, finger_max_z]
+                #       This is synonymous to inferring the length of the finger (lower bounded by the gripper base,
+                #       assumed to be the parent link), and then taking the values MIN% and MAX% along its length
+                # y - the value closest to the edge of the finger surface in the direction of +/- EEF y-axis.
+                #       This assumes that each individual finger lies completely on one side of the EEF y-axis
+                # x - 0. This assumes that the EEF axis evenly splits each finger symmetrically on each side
+                # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
+                grasp_pts = th.tensor(
+                    [
+                        [
+                            0,
+                            (y_abs_min - 0.002) * y_sign,
+                            finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                            1,
+                        ],
+                        [
+                            0,
+                            (y_abs_min - 0.002) * y_sign,
+                            finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                            1,
+                        ],
+                    ]
+                )
+                # Convert the grasping points from the EEF frame -> finger frame
+                finger_to_world_tf = T.pose_inv(T.pose2mat(finger_link.get_position_orientation()))
+                finger_to_eef_tf = finger_to_world_tf @ world_to_eef_tf
+                grasp_pts = (grasp_pts @ finger_to_eef_tf.T)[:, :3]
+                grasping_points = [
+                    GraspingPoint(link_name=finger_link.body_name, position=grasp_pt) for grasp_pt in grasp_pts
+                ]
+                if i == 0:
+                    # Start point
+                    self._default_ag_start_points[arm] = grasping_points
+                else:
+                    # End point
+                    self._default_ag_end_points[arm] = grasping_points
+
+        # For each grasping point, if we're in DEBUG mode, visualize with spheres
+        if gm.DEBUG:
+            for ag_points in (self.assisted_grasp_start_points, self.assisted_grasp_end_points):
+                for arm_ag_points in ag_points.values():
+                    # Skip if None exist
+                    if arm_ag_points is None:
+                        continue
+                    # For each ag point, generate a small sphere at that point
+                    for i, arm_ag_point in enumerate(arm_ag_points):
+                        link = self.links[arm_ag_point.link_name]
+                        local_pos = arm_ag_point.position
+                        vis_mesh_prim_path = f"{link.prim_path}/ag_point_{i}"
+                        create_primitive_mesh(
+                            prim_path=vis_mesh_prim_path,
+                            extents=0.005,
+                            primitive_type="Sphere",
+                        )
+                        vis_geom = VisualGeomPrim(
+                            relative_prim_path=absolute_prim_path_to_scene_relative(
+                                scene=self.scene,
+                                absolute_prim_path=vis_mesh_prim_path,
+                            ),
+                            name=f"ag_point_{i}",
+                        )
+                        vis_geom.load(self.scene)
+                        vis_geom.set_position_orientation(
+                            position=local_pos,
+                            frame="parent",
+                        )
 
     def is_grasping(self, arm="default", candidate_obj=None):
         """
@@ -254,8 +435,8 @@ class ManipulationRobot(BaseRobot):
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping == IsGraspingState.TRUE and candidate_obj is not None:
                 finger_links = {link for link in self.finger_links[arm]}
-                is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
-
+                if len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) == 0:
+                    is_grasping = IsGraspingState.FALSE
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):
@@ -364,11 +545,6 @@ class ManipulationRobot(BaseRobot):
         # Then run assisted grasping
         if self.grasping_mode != "physical" and not self._disable_grasp_handling:
             self._handle_assisted_grasping()
-
-        # Potentially freeze gripper joints
-        for arm in self.arm_names:
-            if self._ag_freeze_gripper[arm]:
-                self._freeze_gripper(arm)
 
     def _release_grasp(self, arm="default"):
         """
@@ -632,7 +808,9 @@ class ManipulationRobot(BaseRobot):
         """
         Returns:
             dict: Dictionary mapping arm appendage name to robot link corresponding to that arm's
-                eef link
+                eef link. NOTE: These links always have a canonical local orientation frame -- assuming a parallel jaw
+                eef morphology, it is assumed that the eef z-axis points out from the tips of the fingers, the y-axis
+                points from the left finger to the right finger, and the x-axis inferred programmatically
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
 
@@ -655,6 +833,23 @@ class ManipulationRobot(BaseRobot):
         return {arm: [self._joints[joint] for joint in self.finger_joint_names[arm]] for arm in self.arm_names}
 
     @property
+    def _assisted_grasp_start_points(self):
+        """
+        Returns:
+            dict: Dictionary mapping individual arm appendage names to array of GraspingPoint tuples,
+                composed of (link_name, position) values specifying valid grasping start points located at
+                cartesian (x,y,z) coordinates specified in link_name's local coordinate frame.
+                These values will be used in conjunction with
+                @self.assisted_grasp_end_points to trigger assisted grasps, where objects that intersect
+                with any ray starting at any point in @self.assisted_grasp_start_points and terminating at any point in
+                @self.assisted_grasp_end_points will trigger an assisted grasp (calculated individually for each gripper
+                appendage). By default, each entry returns None, and must be implemented by any robot subclass that
+                wishes to use assisted grasping.
+        """
+        # Should be optionally implemented by subclass
+        return None
+
+    @property
     def assisted_grasp_start_points(self):
         """
         Returns:
@@ -668,7 +863,28 @@ class ManipulationRobot(BaseRobot):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        return {arm: None for arm in self.arm_names}
+        return (
+            self._assisted_grasp_start_points
+            if self._assisted_grasp_start_points is not None
+            else self._default_ag_start_points
+        )
+
+    @property
+    def _assisted_grasp_end_points(self):
+        """
+        Returns:
+            dict: Dictionary mapping individual arm appendage names to array of GraspingPoint tuples,
+                composed of (link_name, position) values specifying valid grasping end points located at
+                cartesian (x,y,z) coordinates specified in link_name's local coordinate frame.
+                These values will be used in conjunction with
+                @self.assisted_grasp_start_points to trigger assisted grasps, where objects that intersect
+                with any ray starting at any point in @self.assisted_grasp_start_points and terminating at any point in
+                @self.assisted_grasp_end_points will trigger an assisted grasp (calculated individually for each gripper
+                appendage). By default, each entry returns None, and must be implemented by any robot subclass that
+                wishes to use assisted grasping.
+        """
+        # Should be optionally implemented by subclass
+        return None
 
     @property
     def assisted_grasp_end_points(self):
@@ -684,16 +900,20 @@ class ManipulationRobot(BaseRobot):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
-        return {arm: None for arm in self.arm_names}
+        return (
+            self._assisted_grasp_end_points
+            if self._assisted_grasp_end_points is not None
+            else self._default_ag_end_points
+        )
 
     @property
-    def finger_lengths(self):
+    def eef_to_fingertip_lengths(self):
         """
         Returns:
-            dict: Dictionary mapping arm appendage name to corresponding length of the fingers in that
-                hand defined from the palm (assuming all fingers in one hand are equally long)
+            dict: Dictionary mapping arm appendage name to per-finger corresponding z-distance between EEF and each
+                respective fingertip
         """
-        raise NotImplementedError
+        return self._eef_to_fingertip_lengths
 
     @property
     def arm_workspace_range(self):
@@ -961,20 +1181,6 @@ class ManipulationRobot(BaseRobot):
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
 
-    def _freeze_gripper(self, arm="default"):
-        """
-        Freezes gripper finger joints - used in assisted grasping.
-
-        Args:
-            arm (str): specific arm to freeze gripper.
-                Default is "default" which corresponds to the first entry in self.arm_names
-        """
-        arm = self.default_arm if arm == "default" else arm
-        for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
-            joint = self._joints[joint_name]
-            joint.set_pos(pos=j_val)
-            joint.set_vel(vel=0.0)
-
     @property
     def curobo_path(self):
         """
@@ -1020,7 +1226,7 @@ class ManipulationRobot(BaseRobot):
                 "command_output_limits": None,
                 "motor_type": "position",
                 "use_delta_commands": True,
-                "use_impedances": True,
+                "use_impedances": False,
             }
         return dic
 
@@ -1246,9 +1452,9 @@ class ManipulationRobot(BaseRobot):
                     break
 
         assert contact_pos is not None, (
-            f"contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
-            f"self._find_gripper_contacts(return_contact_positions=False). This is likely because "
-            f"GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
+            "contact_pos in self._find_gripper_contacts(return_contact_positions=True) is not found in "
+            "self._find_gripper_contacts(return_contact_positions=False). This is likely because "
+            "GripperRigidContactAPI.get_contact_pairs and get_contact_data return inconsistent results."
         )
 
         # Joint frame set at the contact point
@@ -1300,9 +1506,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        for joint in self.finger_joints[arm]:
-            j_val = joint.get_state()[0][0]
-            self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
 
     def _handle_assisted_grasping(self):
         """
@@ -1489,9 +1692,6 @@ class ManipulationRobot(BaseRobot):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-        for joint in self.finger_joints[arm]:
-            j_val = joint.get_state()[0][0]
-            self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
 
     def _dump_state(self):
         # Call super first
@@ -1526,6 +1726,8 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         # TODO: currently does not take care of cloth objects
         # TODO: add unit tests
+        if "ag_obj_constraint_params" not in state:
+            return
         for arm in state["ag_obj_constraint_params"].keys():
             if len(state["ag_obj_constraint_params"][arm]) > 0:
                 data = state["ag_obj_constraint_params"][arm]

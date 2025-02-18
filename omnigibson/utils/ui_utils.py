@@ -359,13 +359,13 @@ class CameraMover:
         print("*" * 40)
         print("CameraMover! Commands:")
         print()
-        print(f"\t Right Click + Drag: Rotate camera")
-        print(f"\t W / S : Move camera forward / backward")
-        print(f"\t A / D : Move camera left / right")
-        print(f"\t T / G : Move camera up / down")
-        print(f"\t 9 / 0 : Increase / decrease the lights")
-        print(f"\t P : Print current camera pose")
-        print(f"\t O: Save the current camera view as an image")
+        print("\t Right Click + Drag: Rotate camera")
+        print("\t W / S : Move camera forward / backward")
+        print("\t A / D : Move camera left / right")
+        print("\t T / G : Move camera up / down")
+        print("\t 9 / 0 : Increase / decrease the lights")
+        print("\t P : Print current camera pose")
+        print("\t O: Save the current camera view as an image")
 
     def print_cam_pose(self):
         """
@@ -554,7 +554,6 @@ class CameraMover:
             event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
             or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
         ):
-
             if event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS and event.input in self.input_to_function:
                 self.input_to_function[event.input]()
 
@@ -635,7 +634,7 @@ class KeyboardRobotController:
         appwindow = lazy.omni.appwindow.get_default_app_window()
         input_interface = lazy.carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
-        sub_keyboard = input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
+        input_interface.subscribe_to_keyboard_events(keyboard, self.keyboard_event_handler)
 
     def register_custom_keymapping(self, key, description, callback_fn):
         """
@@ -664,18 +663,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.1}
+        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.1}
+        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.1}
 
         return mapping
 
@@ -692,18 +691,18 @@ class KeyboardRobotController:
         """
         mapping = {}
 
-        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
-        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
-        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+        mapping[lazy.carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.25}
+        mapping[lazy.carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.25}
+        mapping[lazy.carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.25}
 
         return mapping
 
@@ -728,7 +727,7 @@ class KeyboardRobotController:
 
         # Iterate over all controller info and populate mapping
         for component, info in self.controller_info.items():
-            if info["name"] == "JointController":
+            if info["name"] in ["JointController", "HolonomicBaseJointController"]:
                 for i in range(info["command_dim"]):
                     cmd_idx = info["start_idx"] + i
                     self.joint_command_idx.append(cmd_idx)
@@ -767,7 +766,6 @@ class KeyboardRobotController:
             event.type == lazy.carb.input.KeyboardEventType.KEY_PRESS
             or event.type == lazy.carb.input.KeyboardEventType.KEY_REPEAT
         ):
-
             # Handle special cases
             if (
                 event.input in {lazy.carb.input.KeyboardInput.KEY_1, lazy.carb.input.KeyboardInput.KEY_2}
@@ -887,7 +885,6 @@ class KeyboardRobotController:
 
         # Possibly set the persistent gripper action
         if len(self.binary_grippers) > 0 and self.keypress_mapping[lazy.carb.input.KeyboardInput.T]["val"] is not None:
-
             for i, binary_gripper in enumerate(self.binary_grippers):
                 # Possibly update the stored value if the toggle gripper key has been pressed and
                 # it's the active gripper being controlled
@@ -1118,9 +1115,7 @@ def draw_line(start, end, color=(1.0, 0.0, 0.0, 1.0), size=1.0):
     """
     Draws a single line between two points.
     """
-    from omni.isaac.debug_draw import _debug_draw
-
-    draw = _debug_draw.acquire_debug_draw_interface()
+    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.draw_lines([start], [end], [color], [size])
 
 
@@ -1146,7 +1141,5 @@ def clear_debug_drawing():
     """
     Clears all debug drawings.
     """
-    from omni.isaac.debug_draw import _debug_draw
-
-    draw = _debug_draw.acquire_debug_draw_interface()
+    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.clear_lines()

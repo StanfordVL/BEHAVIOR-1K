@@ -1,11 +1,8 @@
-import atexit
 import contextlib
-import itertools
 import json
 import logging
 import math
 import os
-import re
 import shutil
 import signal
 import socket
@@ -96,7 +93,6 @@ def _launch_app():
 
     # Omni's logging is super annoying and overly verbose, so suppress it by modifying the logging levels
     if not gm.DEBUG:
-        import sys
         import warnings
 
         try:
@@ -118,7 +114,7 @@ def _launch_app():
         os.environ["OMNI_KIT_ACCEPT_EULA"] = "YES"
         import isaacsim  # noqa: F401
     except ImportError:
-        isaacsim = None
+        pass
 
     # First obtain the Isaac Sim version
     isaac_path = os.environ["ISAAC_PATH"]
@@ -244,7 +240,7 @@ def _launch_app():
 
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
-    sub = shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
+    shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
 
     # Loading Isaac Sim disables Ctrl+C, so we need to re-enable it
     signal.signal(signal.SIGINT, og.shutdown_handler)
@@ -342,8 +338,17 @@ def _launch_simulator(*args, **kwargs):
             self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(
                 self._on_contact
             )
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_step_events(
-                lambda _: self._on_physics_step()
+            # The callback will be called right *before* the physics step
+            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_pre_physics_step(),
+                pre_step=True,
+                order=0,
+            )
+            # The callback will be called right *after* the physics step
+            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_post_physics_step(),
+                pre_step=False,
+                order=0,
             )
             self._simulation_event_callback = (
                 self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(
@@ -460,7 +465,7 @@ def _launch_simulator(*args, **kwargs):
             """
             Set the physics engine with specified settings
             """
-            assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
+            assert self.is_stopped(), "Cannot set simulator physics settings while simulation is playing!"
             self._physics_context.set_gravity(value=-self.gravity)
             # Also make sure we don't invert the collision group filter settings so that different collision groups by
             # default collide with each other, and modify settings for speed optimization
@@ -1007,7 +1012,6 @@ def _launch_simulator(*args, **kwargs):
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
-            ControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -1130,10 +1134,7 @@ def _launch_simulator(*args, **kwargs):
             self._omni_update_step()
             PoseAPI.invalidate()
 
-        def _on_physics_step(self):
-            # Make the controllable object view API refresh
-            ControllableObjectViewAPI.clear()
-
+        def _on_pre_physics_step(self):
             # Run the controller step on every controllable object
             for scene in self.scenes:
                 for obj in scene.objects:
@@ -1142,6 +1143,10 @@ def _launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
+
+        def _on_post_physics_step(self):
+            # Run the post physics update for backend view
+            ControllableObjectViewAPI.post_physics_step()
 
         def _on_contact(self, contact_headers, contact_data):
             """

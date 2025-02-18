@@ -16,3 +16,25 @@ from omnigibson.robots.tiago import Tiago
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.vx300s import VX300S
+
+__all__ = [
+    "A1",
+    "ActiveCameraRobot",
+    "BaseRobot",
+    "BehaviorRobot",
+    "Fetch",
+    "FrankaMounted",
+    "FrankaPanda",
+    "Freight",
+    "Husky",
+    "Locobot",
+    "LocomotionRobot",
+    "ManipulationRobot",
+    "R1",
+    "REGISTERED_ROBOTS",
+    "Stretch",
+    "Tiago",
+    "Turtlebot",
+    "TwoWheelRobot",
+    "VX300S",
+]

@@ -45,7 +45,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_cfgs.append(
         dict(
             type="DatasetObject",
-            name=f"shelf_side_left",
+            name="shelf_side_left",
             category="shelf_side",
             model="bxfkjj",
             position=[-0.4, 0, base_z + delta_z * idx],
@@ -57,7 +57,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_cfgs.append(
         dict(
             type="DatasetObject",
-            name=f"shelf_side_right",
+            name="shelf_side_right",
             category="shelf_side",
             model="yujrmw",
             position=[0.4, 0, base_z + delta_z * idx],
@@ -95,7 +95,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_cfgs.append(
         dict(
             type="DatasetObject",
-            name=f"shelf_baseboard",
+            name="shelf_baseboard",
             category="shelf_baseboard",
             model="hlhneo",
             position=[0, -10.97884506, base_z + delta_z * idx],
