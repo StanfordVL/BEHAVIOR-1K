@@ -89,6 +89,7 @@ class ManipulationRobot(BaseRobot):
         fixed_base=False,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -108,6 +109,8 @@ class ManipulationRobot(BaseRobot):
         grasping_mode="physical",
         grasping_direction="lower",
         disable_grasp_handling=False,
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         **kwargs,
     ):
         """
@@ -121,6 +124,10 @@ class ManipulationRobot(BaseRobot):
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -162,6 +169,10 @@ class ManipulationRobot(BaseRobot):
                 otherwise upper limit represents a closed grasp.
             disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
                 Instead, you will need to call the grasp handling methods yourself.
+            finger_static_friction (None or float): If specified, specific static friction to use for robot's fingers
+            finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
+                Note: If specified, this will override any ways that are found within @link_physics_materials for any
+                robot finger gripper links
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -193,6 +204,7 @@ class ManipulationRobot(BaseRobot):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -207,6 +219,17 @@ class ManipulationRobot(BaseRobot):
             sensor_config=sensor_config,
             **kwargs,
         )
+
+        # Update finger link material dictionary based on desired values
+        if finger_static_friction is not None or finger_dynamic_friction is not None:
+            for arm, finger_link_names in self.finger_link_names.items():
+                for finger_link_name in finger_link_names:
+                    if finger_link_name not in self._link_physics_materials:
+                        self._link_physics_materials[finger_link_name] = dict()
+                    if finger_static_friction is not None:
+                        self._link_physics_materials[finger_link_name]["static_friction"] = finger_static_friction
+                    if finger_dynamic_friction is not None:
+                        self._link_physics_materials[finger_link_name]["dynamic_friction"] = finger_dynamic_friction
 
     def _validate_configuration(self):
         # Iterate over all arms
