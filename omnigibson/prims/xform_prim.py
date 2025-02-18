@@ -364,7 +364,7 @@ class XFormPrim(BasePrim):
     @property
     def aabb(self):
         aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
-        return np.array(aabb_min), np.array(aabb_max)
+        return th.tensor(aabb_min), th.tensor(aabb_max)
 
     @property
     def aabb_center(self):

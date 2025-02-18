@@ -12,10 +12,8 @@ from pathlib import Path
 
 import imageio
 import matplotlib.path as mpath
-import matplotlib.pyplot as plt
 import torch as th
 from IPython import embed
-from matplotlib.font_manager import FontProperties
 from matplotlib.text import TextPath
 from PIL import Image
 from scipy.integrate import quad
@@ -24,6 +22,7 @@ from scipy.spatial.transform import Rotation as R
 from termcolor import colored
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 
@@ -1028,44 +1027,45 @@ def draw_text(
     # fp = FontProperties(family=font_family)
     path = TextPath((0, 0), text, size=font_size)
 
+    def _path_to_line_segments(path):
+        line_segments = []
+        subpath_start = None  # Store the start point of the current subpath
 
-def _path_to_line_segments(path):
-    line_segments = []
-    subpath_start = None  # Store the start point of the current subpath
+        for points, code in zip(path.vertices, path.codes):
+            points = th.as_tensor(points, dtype=th.float32)  # Ensure points is a tensor with float32 dtype
 
-    for points, code in zip(path.vertices, path.codes):
-        points = th.as_tensor(points, dtype=th.float32)  # Ensure points is a tensor with float32 dtype
+            if code == mpath.Path.MOVETO:
+                current_point = points
+                subpath_start = points  # Remember the start of the subpath
+            elif code == mpath.Path.LINETO:
+                start_point = current_point.clone()  # Create copies to avoid reference issues
+                end_point = points.clone()
+                line_segments.append(
+                    [start_point.tolist(), end_point.tolist()]
+                )  # Convert to list for consistent storage
+                current_point = points
+            elif code == mpath.Path.CURVE3 or code == mpath.Path.CURVE4:
+                start_point = current_point.clone()
+                end_point = points[:2].clone()
+                line_segments.append([start_point.tolist(), end_point.tolist()])
+                current_point = end_point
+            elif code == mpath.Path.CLOSEPOLY:
+                if not th.allclose(current_point, subpath_start):
+                    line_segments.append([current_point.tolist(), subpath_start.tolist()])
+                current_point = subpath_start
+            else:
+                raise ValueError(f"Unsupported path code: {code}")
 
-        if code == mpath.Path.MOVETO:
-            current_point = points
-            subpath_start = points  # Remember the start of the subpath
-        elif code == mpath.Path.LINETO:
-            start_point = current_point.clone()  # Create copies to avoid reference issues
-            end_point = points.clone()
-            line_segments.append([start_point.tolist(), end_point.tolist()])  # Convert to list for consistent storage
-            current_point = points
-        elif code == mpath.Path.CURVE3 or code == mpath.Path.CURVE4:
-            start_point = current_point.clone()
-            end_point = points[:2].clone()
-            line_segments.append([start_point.tolist(), end_point.tolist()])
-            current_point = end_point
-        elif code == mpath.Path.CLOSEPOLY:
-            if not th.allclose(current_point, subpath_start):
-                line_segments.append([current_point.tolist(), subpath_start.tolist()])
-            current_point = subpath_start
-        else:
-            raise ValueError(f"Unsupported path code: {code}")
-
-    # Convert the entire list of segments to a tensor at once
-    return th.tensor(line_segments, dtype=th.float32)
+        # Convert the entire list of segments to a tensor at once
+        return th.tensor(line_segments, dtype=th.float32)
 
     # Convert the Path to line segments
     line_segments = _path_to_line_segments(path)
 
     # Transform the line segments to the desired position
     all_verts = line_segments.reshape(-1, 2)
-    orig_min = th.min(all_verts, axis=0)
-    orig_max = th.max(all_verts, axis=0)
+    orig_min = th.min(all_verts, dim=0).values
+    orig_max = th.max(all_verts, dim=0).values
     orig_ext = orig_max - orig_min
 
     # Figure out the necessary scaling
@@ -1077,8 +1077,8 @@ def _path_to_line_segments(path):
 
     # Recompute the extents
     transformed_verts = transformed_line_segments.reshape(-1, 2)
-    min_pt = th.min(transformed_verts, axis=0)
-    max_pt = th.max(transformed_verts, axis=0)
+    min_pt = th.min(transformed_verts, dim=0).values
+    max_pt = th.max(transformed_verts, dim=0).values
     center = (min_pt + max_pt) / 2
 
     if anchor == "center":
