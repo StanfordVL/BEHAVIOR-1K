@@ -51,7 +51,8 @@ m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
 m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
-m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.8
+m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 1.0
+m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
@@ -322,37 +323,61 @@ class ManipulationRobot(BaseRobot):
                     finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP)
                 )[0]
                 finger_pts = finger_pts[valid_idxs]
-                # Make sure all points lie on a single side of the EEF's y-axis
-                y_signs = th.sign(finger_pts[:, 1])
-                assert th.all(
-                    y_signs == y_signs[0]
-                ).item(), "Expected all finger points to lie on single side of EEF y-axis!"
-                y_sign = y_signs[0].item()
-                y_abs_min = th.abs(finger_pts[:, 1]).min().item()
+                # Infer which side of the gripper corresponds to the inner side (i.e.: the side that touches betwen the
+                # two fingers
+                # Because we don't know what state the robot is in, the gripper might be open, closed, or some
+                # intermediate state.
+                # Therefore, we need to automatically infer which side is the inner
+                # We use the heuristic that given a set of points defining a gripper finger, we assume that it must one
+                # of (y_min, y_max) over all points, with the selection being chosen by using
+                # argmin(abs(y_min), abs(y_max). This accounts for the edge case where a closed gripper can result
+                # in a few points overlapping the EEF frame in the y-direction, leading to us having to check values
+                # that may be either positive or negative
+                y_min, y_max = finger_pts[:, 1].min(), finger_pts[:, 1].max()
+                abs_y_min, abs_y_max = abs(y_min), abs(y_max)
+                y_offset = abs_y_min if abs_y_min < abs_y_max else abs_y_max
+                y_sign = 1.0 if abs_y_min < abs_y_max else -1.0
 
                 # Compute the default grasping points for this finger
                 # For now, we only have a strong heuristic defined for parallel jaw grippers, which assumes that
                 # there are exactly 2 fingers
                 # In this case, this is defined as the x2 (x,y,z) tuples where:
-                # z - the 20% and 80% length between the range from [finger_parent_max_z, finger_max_z]
+                # z - the +/-40% from the EEF frame, bounded by the 20% and 100% length between the range from
+                #       [finger_parent_max_z, finger_max_z]
                 #       This is synonymous to inferring the length of the finger (lower bounded by the gripper base,
-                #       assumed to be the parent link), and then taking the values MIN% and MAX% along its length
+                #       assumed to be the parent link), and then taking the values +/-%, bounded by the MIN% and MAX%
+                #       along its length
                 # y - the value closest to the edge of the finger surface in the direction of +/- EEF y-axis.
                 #       This assumes that each individual finger lies completely on one side of the EEF y-axis
                 # x - 0. This assumes that the EEF axis evenly splits each finger symmetrically on each side
                 # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
+                z_lower = max(
+                    finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                    -finger_range * m.AG_DEFAULT_GRASP_POINT_Z_PROP,
+                )
+                z_upper = min(
+                    finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                    finger_range * m.AG_DEFAULT_GRASP_POINT_Z_PROP,
+                )
+                # We want to ensure the z value is symmetric about the EEF z frame, so make sure z_lower is negative
+                # and z_upper is positive, and use +/- the absolute minimum value between the two
+                assert (
+                    z_lower < 0 and z_upper > 0
+                ), f"Expected computed z_lower / z_upper bounds for finger grasping points to be negative / positive, but instead got: {z_lower}, {z_upper}"
+                z_offset = min(abs(z_lower), abs(z_upper))
+
                 grasp_pts = th.tensor(
                     [
                         [
                             0,
-                            (y_abs_min - 0.002) * y_sign,
-                            finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                            (y_offset - 0.002) * y_sign,
+                            -z_offset,
                             1,
                         ],
                         [
                             0,
-                            (y_abs_min - 0.002) * y_sign,
-                            finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                            (y_offset - 0.002) * y_sign,
+                            z_offset,
                             1,
                         ],
                     ]
