@@ -46,13 +46,6 @@ class GeomPrim(XFormPrim):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
 
-    def _post_load(self):
-        # run super first
-        super()._post_load()
-
-        # By default, GeomPrim shows up in the rendering.
-        self.purpose = "default"
-
     @property
     def purpose(self):
         """

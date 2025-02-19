@@ -15,7 +15,7 @@ from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_sc
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.TOGGLE_LINK_PREFIX = "togglebutton"
+m.TOGGLE_META_LINK_TYPE = "togglebutton"
 m.DEFAULT_SCALE = 0.1
 m.CAN_TOGGLE_STEPS = 5
 
@@ -78,8 +78,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                         cls._finger_contact_objs.add(obj)
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.TOGGLE_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.TOGGLE_META_LINK_TYPE
 
     def _get_value(self):
         return self.value

@@ -34,8 +34,8 @@ from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_PREFIX = "particleapplier"
-m.REMOVAL_LINK_PREFIX = "particleremover"
+m.APPLICATION_META_LINK_TYPE = "particleapplier"
+m.REMOVAL_META_LINK_TYPE = "particleremover"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
@@ -409,7 +409,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 len(self.link.visual_meshes) == 1
             ), f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
 
-            # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
+            # Make sure the mesh is translated so that its tip lies at the meta link origin, and rotated so the vector
             # from tip to tail faces the positive x axis
             z_offset = (
                 0.0
@@ -923,12 +923,12 @@ class ParticleRemover(ParticleModifier):
         return False
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.REMOVAL_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.REMOVAL_META_LINK_TYPE
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @property
@@ -1407,12 +1407,12 @@ class ParticleApplier(ParticleModifier):
         return all(condition(self.obj) for condition in next(iter(self.conditions.values())))
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.APPLICATION_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.APPLICATION_META_LINK_TYPE
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @classmethod

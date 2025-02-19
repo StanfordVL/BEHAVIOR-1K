@@ -23,7 +23,7 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.ATTACHMENT_LINK_PREFIX = "attachment"
+m.ATTACHMENT_META_LINK_TYPE = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
 m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([5.0])).item()  # 5 degrees
@@ -76,12 +76,12 @@ class AttachedTo(
         og.sim.remove_callback_on_stop(name=f"{self.obj.name}_detach")
 
     @classproperty
-    def metalink_prefix(cls):
+    def meta_link_type(cls):
         """
         Returns:
-            str: Unique keyword that defines the metalink associated with this object state
+            str: Unique keyword that defines the meta link associated with this object state
         """
-        return m.ATTACHMENT_LINK_PREFIX
+        return m.ATTACHMENT_META_LINK_TYPE
 
     @classmethod
     def get_dependencies(cls):
@@ -375,7 +375,7 @@ class AttachedTo(
                         child_link.add_filtered_collision_pair(floor_link)
 
         # Temporary hack to disable gravity for the attached child object if the parent is kinematic_only
-        # Otherwise, the parent metalink will oscillate due to the gravity force of the child.
+        # Otherwise, the parent meta link will oscillate due to the gravity force of the child.
         if parent.kinematic_only:
             child.disable_gravity()
 
