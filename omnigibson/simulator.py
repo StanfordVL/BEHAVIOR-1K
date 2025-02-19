@@ -498,7 +498,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", gm.ENABLE_FLATCACHE)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
