@@ -215,7 +215,7 @@ def _launcher_based_install(isaac_sim_path: Optional[Path]):
         isaac_version_str = version_content.split("-")[0]
         isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
 
-    if isaac_version_tuple not in ((4, 0, 0), (4, 1, 0), (4, 5, 0)):
+    if isaac_version_tuple not in ((4, 5, 0)):
         click.echo(f"Isaac Sim version {isaac_version_str} is not supported by OmniGibson.")
         return False
 
