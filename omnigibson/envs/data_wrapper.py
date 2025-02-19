@@ -365,7 +365,6 @@ class DataCollectionWrapper(DataWrapper):
             lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
             lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
             lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
