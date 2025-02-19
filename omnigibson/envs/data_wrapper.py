@@ -708,7 +708,7 @@ class DataPlaybackWrapper(DataWrapper):
         # Reset environment
         og.sim.restore(scene_files=[self.scene_file])
 
-        # Reset scales and visibilities
+        # Reset object attributes from the stored metadata
         with og.sim.stopped():
             for attr, vals in init_metadata.items():
                 assert len(vals) == self.scene.n_objects
