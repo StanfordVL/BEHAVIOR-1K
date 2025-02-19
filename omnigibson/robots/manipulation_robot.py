@@ -558,6 +558,7 @@ class ManipulationRobot(BaseRobot):
 
         # Remove joint and filtered collision restraints
         og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        og.sim.update_handles()
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
