@@ -359,7 +359,7 @@ class ManipulationRobot(BaseRobot):
                 finger_pts = finger_pts[valid_idxs]
                 # Infer which side of the gripper corresponds to the inner side (i.e.: the side that touches between the
                 # two fingers
-                # We use the heuristic that given a set of points defining a gripper finger, we assume that it must one
+                # We use the heuristic that given a set of points defining a gripper finger, we assume that it's one
                 # of (y_min, y_max) over all points, with the selection being chosen by inferring which of the limits
                 # corresponds to the inner side of the finger.
                 # This is the upper side of the y values if this finger is the lower finger, else the lower side
