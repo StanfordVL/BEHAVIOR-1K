@@ -610,6 +610,7 @@ class CollisionAPI:
 
         # Remove the collision groups tree
         og.sim.stage.RemovePrim("/World/collision_groups")
+        og.sim.update_handles()
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}

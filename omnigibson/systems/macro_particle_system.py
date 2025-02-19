@@ -287,6 +287,8 @@ class MacroParticleSystem(BaseSystem):
         for scale in scales:
             self.add_particle(relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
+        og.sim.update_handles()
+
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 

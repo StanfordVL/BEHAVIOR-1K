@@ -93,6 +93,7 @@ def bind_material(prim_path, material_path):
         material_path=material_path,
         strength=None,
     )
+    og.sim.update_handles()
 
 
 def create_physx_particleset_pointinstancer(
