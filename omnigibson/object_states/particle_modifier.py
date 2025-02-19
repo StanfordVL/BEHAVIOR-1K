@@ -348,7 +348,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 "height": 1.0,
                 "size": 1.0,
             }
-            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+            mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
 
             # Create a primitive shape if it doesn't already exist
             pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
