@@ -806,7 +806,7 @@ def h5py_group_to_torch(group):
         if isinstance(value, h5py.Group):
             state[key] = h5py_group_to_torch(value)
         else:
-            state[key] = th.tensor(value[()], dtype=th.float32)
+            state[key] = th.from_numpy(value[()])
     return state
 
 

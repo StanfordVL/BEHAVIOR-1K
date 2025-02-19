@@ -135,7 +135,7 @@ class CuRoboMotionGenerator:
 
         # Grab mapping from robot joint name to index
         reset_qpos = self.robot.reset_joint_pos
-        joint_idx_mapping = {joint.body_name: i for i, joint in enumerate(self.robot.joints.values())}
+        joint_idx_mapping = {joint.joint_name: i for i, joint in enumerate(self.robot.joints.values())}
         for emb_sel, robot_cfg_path in robot_cfg_path_dict.items():
             content_path = lazy.curobo.types.file_path.ContentPath(
                 robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path

@@ -29,11 +29,13 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, only_successes=True):
+    def __init__(self, env, output_path, overwrite=True, only_successes=True):
         """
         Args:
             env (Environment): The environment to wrap
             output_path (str): path to store hdf5 data file
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
         """
         # Make sure the wrapped environment inherits correct omnigibson format
@@ -53,13 +55,17 @@ class DataWrapper(EnvironmentWrapper):
 
         Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
         log.info(f"\nWriting OmniGibson dataset hdf5 to: {output_path}\n")
-        self.hdf5_file = h5py.File(output_path, "w")
-        data_grp = self.hdf5_file.create_group("data")
-        env.task.write_task_metadata()
-        scene_file = og.sim.save()[0]
-        config = deepcopy(env.config)
-        self.add_metadata(group=data_grp, name="config", data=config)
-        self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
+        self.hdf5_file = h5py.File(output_path, "w" if overwrite else "a")
+        if "data" not in set(self.hdf5_file.keys()):
+            data_grp = self.hdf5_file.create_group("data")
+        else:
+            data_grp = self.hdf5_file["data"]
+        if overwrite or "config" not in set(data_grp.attrs.keys()):
+            env.task.write_task_metadata()
+            scene_file = og.sim.save()[0]
+            config = deepcopy(env.config)
+            self.add_metadata(group=data_grp, name="config", data=config)
+            self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
         # Run super
         super().__init__(env=env)
@@ -280,6 +286,7 @@ class DataCollectionWrapper(DataWrapper):
         env,
         output_path,
         viewport_camera_path="/World/viewer_camera",
+        overwrite=True,
         only_successes=True,
         use_vr=False,
         obj_attr_keys=None,
@@ -290,6 +297,8 @@ class DataCollectionWrapper(DataWrapper):
             output_path (str): path to store hdf5 data file
             viewport_camera_path (str): prim path to the camera to use when rendering the main viewport during
                 data collection
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             use_vr (bool): Whether to use VR headset for data collection
             obj_attr_keys (None or list of str): If set, a list of object attributes that should be
@@ -329,7 +338,12 @@ class DataCollectionWrapper(DataWrapper):
         )
 
         # Run super
-        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+        super().__init__(
+            env=env,
+            output_path=output_path,
+            overwrite=overwrite,
+            only_successes=only_successes,
+        )
 
         # Configure the simulator to optimize for data collection
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
@@ -406,17 +420,13 @@ class DataCollectionWrapper(DataWrapper):
 
         # Also store initial metadata not recorded in serialized state
         # This is simply serialized
-        for i, obj in enumerate(self.scene.objects):
-
-        scales = th.zeros(self.scene.n_objects, 3)
-        visibilities = th.zeros(self.scene.n_objects, dtype=th.bool)
-        for i, obj in enumerate(self.scene.objects):
-            scales[i] = obj.scale
-            visibilities[i] = obj.visible
-
+        metadata = {key: [] for key in self.obj_attr_keys}
+        for obj in self.scene.objects:
+            for key in self.obj_attr_keys:
+                metadata[key].append(getattr(obj, key))
         self.init_metadata = {
-            "scales": scales,
-            "visibilities": visibilities,
+            key: th.stack(vals, dim=0) if isinstance(vals[0], th.Tensor) else th.tensor(vals, dtype=type(vals[0]))
+            for key, vals in metadata.items()
         }
 
         return init_obs, init_info
@@ -452,8 +462,9 @@ class DataCollectionWrapper(DataWrapper):
         self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
 
         # Add initial metadata information
+        metadata_grp = traj_grp.create_group("init_metadata")
         for name, data in self.init_metadata.items():
-            traj_grp.create_dataset(name, data=data)
+            metadata_grp.create_dataset(name, data=data)
 
         return traj_grp
 
@@ -509,6 +520,7 @@ class DataPlaybackWrapper(DataWrapper):
         include_sensor_names=None,
         exclude_sensor_names=None,
         n_render_iterations=5,
+        overwrite=True,
         only_successes=False,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
@@ -542,6 +554,8 @@ class DataPlaybackWrapper(DataWrapper):
                 underlying physical state by a few frames, and additionally produces transient visual artifacts when
                 the physical state changes. Increasing this number will improve the rendered quality at the expense of
                 speed.
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
@@ -601,10 +615,19 @@ class DataPlaybackWrapper(DataWrapper):
             input_path=input_path,
             output_path=output_path,
             n_render_iterations=n_render_iterations,
+            overwrite=overwrite,
             only_successes=only_successes,
         )
 
-    def __init__(self, env, input_path, output_path, n_render_iterations=5, only_successes=False):
+    def __init__(
+        self,
+        env,
+        input_path,
+        output_path,
+        n_render_iterations=5,
+        overwrite=True,
+        only_successes=False,
+    ):
         """
         Args:
             env (Environment): The environment to wrap
@@ -612,6 +635,8 @@ class DataPlaybackWrapper(DataWrapper):
             output_path (str): path to store output hdf5 data file
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
@@ -625,7 +650,12 @@ class DataPlaybackWrapper(DataWrapper):
         self.n_render_iterations = n_render_iterations
 
         # Run super
-        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+        super().__init__(
+            env=env,
+            output_path=output_path,
+            overwrite=overwrite,
+            only_successes=only_successes,
+        )
 
     def _process_obs(self, obs, info):
         """
@@ -667,8 +697,7 @@ class DataPlaybackWrapper(DataWrapper):
         # Grab episode data
         transitions = json.loads(traj_grp.attrs["transitions"])
         traj_grp = h5py_group_to_torch(traj_grp)
-        scales = traj_grp["scales"]
-        visibilities = traj_grp["visibilities"]
+        init_metadata = traj_grp["init_metadata"]
         action = traj_grp["action"]
         state = traj_grp["state"]
         state_size = traj_grp["state_size"]
@@ -681,10 +710,12 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Reset scales and visibilities
         with og.sim.stopped():
-            assert len(scales) == self.scene.n_objects and len(visibilities) == self.scene.n_objects
-            for scale, visible, obj in zip(scales, visibilities, self.scene.objects):
-                obj.scale = scale
-                obj.visible = bool(visible)
+            for attr, vals in init_metadata.items():
+                assert len(vals) == self.scene.n_objects
+            for i, obj in enumerate(self.scene.objects):
+                for attr, vals in init_metadata.items():
+                    val = vals[i]
+                    setattr(obj, attr, val.item() if val.ndim == 0 else val)
         self.reset()
 
         # Restore to initial state

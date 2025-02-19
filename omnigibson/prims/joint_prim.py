@@ -75,7 +75,6 @@ class JointPrim(BasePrim):
         self._joint_type = None
         self._control_type = None
         self._driven = None
-        self._body_name = None
         self._body0 = None
         self._body1 = None
 
@@ -138,7 +137,6 @@ class JointPrim(BasePrim):
 
         # Update the joint indices etc.
         self.update_handles()
-        self._body_name = self.prim_path.split("/")[-1]
 
         # Get control type
         if self.articulated:
@@ -226,14 +224,6 @@ class JointPrim(BasePrim):
             ), "Articulation view must be valid if physics is running!"
 
         return self._articulation_view_direct
-
-    @property
-    def body_name(self):
-        """
-        Returns:
-            str: Name of this body
-        """
-        return self._body_name
 
     @property
     def body0(self):
