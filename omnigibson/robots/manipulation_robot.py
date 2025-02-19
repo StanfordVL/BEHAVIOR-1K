@@ -292,6 +292,7 @@ class ManipulationRobot(BaseRobot):
             assert (
                 is_parallel_jaw
             ), "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            finger_pts_in_eef_frame = []
             for i, finger_link in enumerate(finger_links):
                 # Find parent, and make sure one exists
                 parent_prim_path, parent_link = None, None
@@ -331,7 +332,17 @@ class ManipulationRobot(BaseRobot):
                 # Convert from world frame -> eef frame
                 finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
                 finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
+                finger_pts_in_eef_frame.append(finger_pts)
 
+            # Determine how each finger is located relative to the other in the EEF frame along the y-axis
+            # This is used to infer which side of each finger's set of points correspond to the "inner" surface
+            finger_pts_mean = [finger_pts[:, 1].mean().item() for finger_pts in finger_pts_in_eef_frame]
+            first_finger_is_lower_y_finger = finger_pts_mean[0] < finger_pts_mean[1]
+            is_lower_y_fingers = [first_finger_is_lower_y_finger, not first_finger_is_lower_y_finger]
+
+            for i, (finger_link, finger_pts, is_lower_y_finger) in enumerate(
+                zip(finger_links, finger_pts_in_eef_frame, is_lower_y_fingers)
+            ):
                 # Since we know the EEF frame always points with z outwards towards the fingers, the outer-most point /
                 # fingertip is the maximum z value
                 finger_max_z = finger_pts[:, 2].max().item()
@@ -346,20 +357,16 @@ class ManipulationRobot(BaseRobot):
                     finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP)
                 )[0]
                 finger_pts = finger_pts[valid_idxs]
-                # Infer which side of the gripper corresponds to the inner side (i.e.: the side that touches betwen the
+                # Infer which side of the gripper corresponds to the inner side (i.e.: the side that touches between the
                 # two fingers
-                # Because we don't know what state the robot is in, the gripper might be open, closed, or some
-                # intermediate state.
-                # Therefore, we need to automatically infer which side is the inner
                 # We use the heuristic that given a set of points defining a gripper finger, we assume that it must one
-                # of (y_min, y_max) over all points, with the selection being chosen by using
-                # argmin(abs(y_min), abs(y_max). This accounts for the edge case where a closed gripper can result
-                # in a few points overlapping the EEF frame in the y-direction, leading to us having to check values
-                # that may be either positive or negative
+                # of (y_min, y_max) over all points, with the selection being chosen by inferring which of the limits
+                # corresponds to the inner side of the finger.
+                # This is the upper side of the y values if this finger is the lower finger, else the lower side
+                # of the y values
                 y_min, y_max = finger_pts[:, 1].min(), finger_pts[:, 1].max()
-                abs_y_min, abs_y_max = abs(y_min), abs(y_max)
-                y_offset = abs_y_min if abs_y_min < abs_y_max else abs_y_max
-                y_sign = 1.0 if abs_y_min < abs_y_max else -1.0
+                y_offset = y_max if is_lower_y_finger else y_min
+                y_sign = 1.0 if is_lower_y_finger else -1.0
 
                 # Compute the default grasping points for this finger
                 # For now, we only have a strong heuristic defined for parallel jaw grippers, which assumes that
@@ -393,13 +400,13 @@ class ManipulationRobot(BaseRobot):
                     [
                         [
                             0,
-                            (y_offset - 0.002) * y_sign,
+                            y_offset + 0.002 * y_sign,
                             -z_offset,
                             1,
                         ],
                         [
                             0,
-                            (y_offset - 0.002) * y_sign,
+                            y_offset + 0.002 * y_sign,
                             z_offset,
                             1,
                         ],
