@@ -747,12 +747,29 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[BaseObject]): list of objects to add
             """
-            # Immediately yield
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            if self.is_playing() and SimulationManager._physics_sim_view:
+                # Certain operations during object loading invalidate the physics simulation view.
+                # Since this view is required later if initialized, we preemptively invalidate
+                # and de-initialize it to avoid conflicts.
+                SimulationManager._physics_sim_view.invalidate()
+                SimulationManager._physics_sim_view = None
+
             yield
 
             # Run all post-processing on all newly added objects
             for obj in objs:
                 self._post_import_object(obj=obj)
+
+            if self.is_playing():
+                # The objects have been added to the USD stage but PhysX hasn't been synchronized yet.
+                # We must flush USD changes to PhysX before updating handles to avoid errors like
+                # "Provided pattern list did not match any rigid bodies".
+                # The order of operations should strictly be:
+                #   1. Flush USD changes to PhysX
+                #   2. Update handles to reinitialize physics view
+                SimulationManager._physx_sim_interface.flush_changes()
+                self.update_handles()
 
         def _post_import_object(self, obj):
             """
