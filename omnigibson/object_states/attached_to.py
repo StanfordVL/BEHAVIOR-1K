@@ -23,7 +23,7 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.ATTACHMENT_LINK_PREFIX = "attachment"
+m.ATTACHMENT_META_LINK_TYPE = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
 m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([5.0])).item()  # 5 degrees
@@ -81,7 +81,7 @@ class AttachedTo(
         Returns:
             str: Unique keyword that defines the meta link associated with this object state
         """
-        return m.ATTACHMENT_LINK_PREFIX
+        return m.ATTACHMENT_META_LINK_TYPE
 
     @classmethod
     def get_dependencies(cls):

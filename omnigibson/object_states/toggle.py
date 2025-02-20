@@ -15,7 +15,7 @@ from omnigibson.utils.usd_utils import RigidContactAPI, absolute_prim_path_to_sc
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.TOGGLE_LINK_PREFIX = "togglebutton"
+m.TOGGLE_META_LINK_TYPE = "togglebutton"
 m.DEFAULT_SCALE = 0.1
 m.CAN_TOGGLE_STEPS = 5
 
@@ -79,7 +79,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
     @classproperty
     def meta_link_type(cls):
-        return m.TOGGLE_LINK_PREFIX
+        return m.TOGGLE_META_LINK_TYPE
 
     def _get_value(self):
         return self.value
@@ -99,7 +99,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # Make sure this object is not cloth
         assert self.obj.prim_type != PrimType.CLOTH, f"Cannot create ToggledOn state for cloth object {self.obj.name}!"
 
-        mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+        mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
         pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
         if not pre_existing_mesh:

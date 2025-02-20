@@ -46,14 +46,6 @@ class GeomPrim(XFormPrim):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
 
-    def _post_load(self):
-        # run super first
-        super()._post_load()
-
-        # Temporarily set the opacity threshold to be 0.1. This will be automated in later exports.
-        if self.material:
-            self.material.opacity_threshold = 0.1
-
     @property
     def purpose(self):
         """

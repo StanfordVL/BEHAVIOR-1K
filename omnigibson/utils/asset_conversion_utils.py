@@ -287,6 +287,10 @@ def _set_mtl_opacity(mtl_prim, texture):
     # This defaults to some other value, which takes opaque black channels in the
     # image to be fully transparent. This is not what we want.
     lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
+
+    # We also need to set an opacity threshold. Our objects can include continuous alpha values for opacity
+    # but the ray tracing renderer can only handle binary opacity values. The default threshold
+    # leaves most objects entirely transparent, so we try to avoid that here.
     lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
 
     # Verify it was set

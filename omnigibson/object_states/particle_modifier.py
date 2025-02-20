@@ -34,8 +34,8 @@ from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_PREFIX = "particleapplier"
-m.REMOVAL_LINK_PREFIX = "particleremover"
+m.APPLICATION_META_LINK_TYPE = "particleapplier"
+m.REMOVAL_META_LINK_TYPE = "particleremover"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
@@ -347,7 +347,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 "height": 1.0,
                 "size": 1.0,
             }
-            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+            mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
 
             # Create a primitive shape if it doesn't already exist
             pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
@@ -924,7 +924,7 @@ class ParticleRemover(ParticleModifier):
 
     @classproperty
     def meta_link_type(cls):
-        return m.REMOVAL_LINK_PREFIX
+        return m.REMOVAL_META_LINK_TYPE
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
@@ -1408,7 +1408,7 @@ class ParticleApplier(ParticleModifier):
 
     @classproperty
     def meta_link_type(cls):
-        return m.APPLICATION_LINK_PREFIX
+        return m.APPLICATION_META_LINK_TYPE
 
     @classmethod
     def requires_meta_link(cls, **kwargs):

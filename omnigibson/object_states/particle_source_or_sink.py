@@ -12,8 +12,8 @@ from omnigibson.utils.python_utils import classproperty
 m = create_module_macros(module_path=__file__)
 
 # Meta link naming prefixes
-m.SOURCE_LINK_PREFIX = "particlesource"
-m.SINK_LINK_PREFIX = "particlesink"
+m.SOURCE_META_LINK_TYPE = "particlesource"
+m.SINK_META_LINK_TYPE = "particlesink"
 
 # Default radius and height
 m.DEFAULT_SOURCE_RADIUS = 0.0125
@@ -132,7 +132,7 @@ class ParticleSource(ParticleApplier):
 
     @classproperty
     def meta_link_type(cls):
-        return m.SOURCE_LINK_PREFIX
+        return m.SOURCE_META_LINK_TYPE
 
     @property
     def n_steps_per_modification(self):
@@ -241,7 +241,7 @@ class ParticleSink(ParticleRemover):
 
     @classproperty
     def meta_link_type(cls):
-        return m.SINK_LINK_PREFIX
+        return m.SINK_META_LINK_TYPE
 
     @property
     def n_steps_per_modification(self):
