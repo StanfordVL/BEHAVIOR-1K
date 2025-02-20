@@ -20,7 +20,7 @@ from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
@@ -1996,7 +1996,7 @@ def delete_or_deactivate_prim(prim_path):
     return True
 
 
-@th.compile
+@torch_compile
 def _compute_relative_poses_torch(
     idx: int,
     n_links: int,
