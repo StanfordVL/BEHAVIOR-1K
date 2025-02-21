@@ -14,7 +14,7 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -307,7 +307,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return len(self.dof_idx)
 
 
-@th.compile
+@torch_compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
     mm: th.Tensor,

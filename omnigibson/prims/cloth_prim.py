@@ -39,7 +39,7 @@ m = create_module_macros(module_path=__file__)
 CLOTH_CONFIGURATIONS = ["default", "settled", "folded", "crumpled"]
 
 # Subsample cloth particle points to boost performance
-m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS = False
+m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS = True  # TODO: Disable after new dataset release
 m.N_CLOTH_KEYPOINTS = 1000
 m.FOLDING_INCREMENTS = 100
 m.CRUMPLING_INCREMENTS = 100
@@ -1023,3 +1023,33 @@ class ClothPrim(GeomPrim):
         if self.initialized:
             points_configuration = self._load_config.get("default_point_configuration", "default")
             self.reset_points_to_configuration(points_configuration)
+
+    @cached_property
+    def is_meta_link(self):
+        return False
+
+    @cached_property
+    def meta_link_type(self):
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_id(self):
+        """The meta link id of this link, if the link is a meta link.
+
+        The meta link ID is a semantic identifier for the meta link within the meta link type. It is
+        used when an object has multiple meta links of the same type. It can be just a numerical index,
+        or for some objects, it will be a string that can be matched to other meta links. For example,
+        a stove might have toggle buttons named "left" and "right", and heat sources named "left" and
+        "right". The meta link ID can be used to match the toggle button to the heat source.
+        """
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_sub_id(self):
+        """The integer meta link sub id of this link, if the link is a meta link.
+
+        The meta link sub ID identifies this link as one of the parts of a meta link. For example, an
+        attachment meta link's ID will be the attachment pair name, and each attachment point that
+        works with that pair will show up as a separate link with a unique sub ID.
+        """
+        raise ValueError(f"{self.name} is not a meta link")
