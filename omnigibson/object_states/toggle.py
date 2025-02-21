@@ -105,7 +105,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         # If not, see if it exists in the legacy format's location
         # TODO: Remove this after new dataset release
-        if pre_existing_mesh is None:
+        if not pre_existing_mesh:
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
             pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
 
