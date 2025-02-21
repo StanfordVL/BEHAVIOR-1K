@@ -757,7 +757,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         "collision_sphere_buffer": 0.002,
         "extra_collision_spheres": {},
         "self_collision_ignore": curobo_cfg.self_collision_ignore.to_dict(),
-        "self_collision_buffer": {root_link: 0.02},
+        "self_collision_buffer": curobo_cfg.self_collision_buffer.to_dict(),
         "use_global_cumul": True,
         "mesh_link_names": deepcopy(all_collision_link_names),
         "external_asset_path": None,
@@ -818,6 +818,14 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         save_arm_fpath = f"{save_dir}/{robot_name}_description_curobo_arm.yaml"
         with open(save_arm_fpath, "w+") as f:
             yaml.dump({"robot_cfg": {"kinematics": arm_only_cfg}}, f)
+
+        # Create arm only no torso config
+        arm_only_no_torso_cfg = deepcopy(arm_only_cfg)
+        for jnt_name in curobo_cfg.torso_joints:
+            arm_only_no_torso_cfg["lock_joints"][jnt_name] = None
+        save_arm_no_torso_fpath = f"{save_dir}/{robot_name}_description_curobo_arm_no_torso.yaml"
+        with open(save_arm_no_torso_fpath, "w+") as f:
+            yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
 @click.command(help=_DOCSTRING)
