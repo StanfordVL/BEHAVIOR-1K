@@ -91,14 +91,11 @@ class CuRoboMotionGenerator:
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
-            collision_activation_distance (float): Distance threshold at which a collision is detected.
-                Increasing this value will make the motion planner more conservative in its planning with respect
-                to the underlying sphere representation of the robot
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
             use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
-            collision_activation_distance (float): Activation distance for collision checking; this affects
-                1) how close the computed trajectories can get to obstacles and
-                2) how close the robot can get to obstacles during collision checks
+            collision_activation_distance (float): Distance threshold at which a collision with the world is detected.
+                Increasing this value will make the motion planner more conservative in its planning with respect
+                to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
@@ -133,12 +130,27 @@ class CuRoboMotionGenerator:
         self.ee_link = dict()
         self.additional_links = dict()
         self.base_link = dict()
+
+        # Grab mapping from robot joint name to index
+        reset_qpos = self.robot.reset_joint_pos
+        joint_idx_mapping = {joint.joint_name: i for i, joint in enumerate(self.robot.joints.values())}
         for emb_sel, robot_cfg_path in robot_cfg_path_dict.items():
             content_path = lazy.curobo.types.file_path.ContentPath(
                 robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
             )
             robot_cfg_dict = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
             robot_cfg_dict["kinematics"]["use_usd_kinematics"] = True
+
+            # Automatically populate the locked joints and retract config from the robot values
+            for joint_name, lock_val in robot_cfg_dict["kinematics"]["lock_joints"].items():
+                if lock_val is None:
+                    joint_idx = joint_idx_mapping[joint_name]
+                    robot_cfg_dict["kinematics"]["lock_joints"][joint_name] = reset_qpos[joint_idx]
+            if robot_cfg_dict["kinematics"]["cspace"]["retract_config"] is None:
+                robot_cfg_dict["kinematics"]["cspace"]["retract_config"] = [
+                    reset_qpos[joint_idx_mapping[joint_name]]
+                    for joint_name in robot_cfg_dict["kinematics"]["cspace"]["joint_names"]
+                ]
 
             self.ee_link[emb_sel] = robot_cfg_dict["kinematics"]["ee_link"]
             # RobotConfig.from_dict will append ee_link to link_names, so we make a copy here.
