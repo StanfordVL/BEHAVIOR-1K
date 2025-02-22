@@ -42,6 +42,7 @@ class ControllableObject(BaseObject):
         visual_only=False,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        link_physics_materials=None,
         load_config=None,
         control_freq=None,
         controller_config=None,
@@ -63,6 +64,10 @@ class ControllableObject(BaseObject):
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
@@ -125,6 +130,7 @@ class ControllableObject(BaseObject):
             visual_only=visual_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             **kwargs,
         )
