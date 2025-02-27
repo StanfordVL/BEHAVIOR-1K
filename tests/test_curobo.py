@@ -368,11 +368,6 @@ def test_curobo():
         print(f"Collision-free trajectory generation success rate: {success_rate}")
         assert success_rate == 1.0, f"Collision-free trajectory generation success rate: {success_rate}"
 
-        # 1cm and 3 degrees error tolerance for prismatic and revolute joints, respectively
-        error_tol = th.tensor(
-            [0.01 if joint.joint_type == "PrismaticJoint" else 3.0 / 180.0 * math.pi for joint in robot.joints.values()]
-        )
-
         # for bypass_physics in [True, False]:
         for bypass_physics in [True]:
             for traj_idx, (success, traj_path) in enumerate(zip(successes, traj_paths)):
@@ -387,7 +382,9 @@ def test_curobo():
                     eef_link_name = robot.eef_link_names[arm_name]
                     marker.set_position_orientation(position=target_pos[eef_link_name][traj_idx])
 
-                q_traj = cmg.path_to_joint_trajectory(traj_path)
+                q_traj = cmg.path_to_joint_trajectory(traj_path).cpu().float()
+                if not bypass_physics:
+                    q_traj = cmg.add_linearly_interpolated_waypoints(traj=q_traj, max_inter_dist=0.01)
                 # joint_positions_set_point = []
                 # joint_positions_response = []
                 for i, q in enumerate(q_traj):
@@ -411,30 +408,23 @@ def test_curobo():
                             ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
                     else:
                         # Convert target joint positions to action
-                        q = q.cpu()
                         action = robot.q_to_action(q)
 
-                        num_repeat = 3
-                        for j in range(num_repeat):
-                            print(f"Executing waypoint {i}/{len(q_traj)}, step {j}")
-                            env.step(action)
+                        print(f"Executing waypoint {i}/{len(q_traj)}")
+                        env.step(action)
 
-                            for contact in robot.contact_list():
-                                assert contact.body0 in robot.link_prim_paths
-                                if (
-                                    contact.body1 in floor_plane_prim_paths
-                                    and contact.body0 in floor_touching_base_link_prim_paths
-                                ):
-                                    continue
-                                if th.tensor(list(contact.impulse)).norm() == 0:
-                                    continue
-                                print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
-                                # Controller is not perfect, so collisions might happen
-                                # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
-
-                            cur_joint_positions = robot.get_joint_positions()
-                            if ((cur_joint_positions - q).abs() < error_tol).all():
-                                break
+                        for contact in robot.contact_list():
+                            assert contact.body0 in robot.link_prim_paths
+                            if (
+                                contact.body1 in floor_plane_prim_paths
+                                and contact.body0 in floor_touching_base_link_prim_paths
+                            ):
+                                continue
+                            if th.tensor(list(contact.impulse)).norm() == 0:
+                                continue
+                            print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
+                            # Controller is not perfect, so collisions might happen
+                            # assert False, f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
 
         og.clear()
 

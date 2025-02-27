@@ -10,6 +10,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.python_utils import multi_dim_linspace
 
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
@@ -173,7 +174,7 @@ class CuRoboMotionGenerator:
                 optimize_dt=True,
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
-                interpolation_dt=0.03,
+                interpolation_dt=og.sim.get_sim_step_dt(),
                 collision_activation_distance=collision_activation_distance,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
@@ -195,7 +196,17 @@ class CuRoboMotionGenerator:
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         for mg in self.mg.values():
-            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
+            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size, warmup_joint_delta=0.0)
+
+            # Make sure all cuda graphs have been warmed up
+            for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
+                if solver.solver.use_cuda_graph_metrics:
+                    assert solver.solver.safety_rollout._metrics_cuda_graph_init
+                    if isinstance(solver, lazy.curobo.wrap.reacher.trajopt.TrajOptSolver):
+                        assert solver.interpolate_rollout._metrics_cuda_graph_init
+                for opt in solver.solver.optimizers:
+                    if opt.use_cuda_graph:
+                        assert opt.cu_opt_init
 
     def update_joint_limits(self, robot_cfg_obj, emb_sel):
         joint_limits = robot_cfg_obj.kinematics.kinematics_config.joint_limits
@@ -801,6 +812,29 @@ class CuRoboMotionGenerator:
         """
         cmd_plan = self.mg[emb_sel].get_full_js(path) if get_full_js else path
         return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
+
+    def add_linearly_interpolated_waypoints(self, traj, max_inter_dist=0.01):
+        """
+        Adds waypoints to the joint trajectory so that the joint position distance
+        between each pairs of neighboring waypoints is less than @max_inter_dist
+
+        Args:
+            traj: (T, D) tensor representing the joint trajectory
+            max_inter_dist (float): Maximum joint position distance between two neighboring waypoints
+
+        Returns:
+            torch.tensor: (T', D) tensor representing the interpolated joint trajectory
+        """
+        assert len(traj) > 1, "Plan must have at least 2 waypoints to interpolate"
+        interpolated_plan = []
+        for i in range(len(traj) - 1):
+            # Calculate maximum difference across all dimensions
+            max_diff = (traj[i + 1] - traj[i]).abs().max()
+            num_intervals = math.ceil(max_diff.item() / max_inter_dist)
+            interpolated_plan += multi_dim_linspace(traj[i], traj[i + 1], num_intervals, endpoint=False)
+
+        interpolated_plan.append(traj[-1])
+        return th.stack(interpolated_plan)
 
     def path_to_eef_trajectory(self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         """

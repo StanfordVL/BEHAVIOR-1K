@@ -34,7 +34,6 @@ m.CLOTH_FRICTION = 0.4
 m.CLOTH_DRAG = 0.001
 m.CLOTH_LIFT = 0.003
 m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for physical micro particles
-m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE = 0.8  # How much overlap expected between fluid particles at rest
 m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
 
 
@@ -1444,13 +1443,8 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @property
     def particle_radius(self):
         # Magic number from omni tutorials
-        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
+        # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#offset-autocomputation
         return 0.99 * 0.6 * self._particle_contact_offset
-
-    @property
-    def particle_particle_rest_distance(self):
-        # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
-        return self.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
 
     def _create_particle_prototypes(self):
         # Simulate particles with simple spheres

@@ -108,7 +108,7 @@ class HolonomicBaseJointController(JointController):
 
         if self.motor_type == "position":
             # Handle position control mode
-            command_in_base_frame = cb.eye(4)
+            command_in_base_frame = cb.as_float32(cb.eye(4))
             command_in_base_frame[:2, 3] = command[:2]  # Set x,y translation
 
             # Transform command to canonical frame
@@ -136,10 +136,10 @@ class HolonomicBaseJointController(JointController):
         else:
             # Handle velocity/effort control modes
             # Note: Only rotate the commands, don't translate
-            command_in_base_frame = cb.eye(4)
+            command_in_base_frame = cb.as_float32(cb.eye(4))
             command_in_base_frame[:2, 3] = command[:2]  # Set x,y linear velocity
 
-            canonical_to_base_pose_rotation = cb.eye(4)
+            canonical_to_base_pose_rotation = cb.as_float32(cb.eye(4))
             canonical_to_base_pose_rotation[:3, :3] = canonical_to_base_pose[:3, :3]
 
             # Transform command to canonical frame
@@ -153,3 +153,11 @@ class HolonomicBaseJointController(JointController):
             command = cb.cat([linear_velocity, angular_velocity])
 
         return super()._update_goal(command=command, control_dict=control_dict)
+
+    # For "position" control mode, this controller behaves similar to use_delta_commands=True,
+    # where the command [dx, dy, drz] means the robot should move by [dx, dy] and rotate by drz (in the base link frame)
+    # For "velocity" and "effort" control modes, this controller behaves similar to use_delta_commands=False,
+    # where the command [vx, vy, vrz] means the robot should move with linear velocity [vx, vy] and angular velocity vrz (in the base link frame)
+    # In all cases, no-op commands should be [0, 0, 0].
+    def _compute_no_op_command(self, control_dict):
+        return cb.zeros(self.command_dim)
