@@ -196,7 +196,7 @@ class CuRoboMotionGenerator:
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         for mg in self.mg.values():
-            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
+            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size, warmup_joint_delta=0.0)
 
             # Make sure all cuda graphs have been warmed up
             for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
