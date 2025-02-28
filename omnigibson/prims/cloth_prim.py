@@ -415,7 +415,7 @@ class ClothPrim(GeomPrim):
         plane_prims = []
         plane_motions = []
         for i, pc in enumerate(plane_centers):
-            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path=f"/World/plane_{i}",
                 name=f"plane_{i}",
                 z_position=0,
@@ -486,7 +486,7 @@ class ClothPrim(GeomPrim):
 
         # Remove the planes
         for plane_prim in plane_prims:
-            lazy.omni.isaac.core.utils.prims.delete_prim(plane_prim.prim_path)
+            lazy.isaacsim.core.utils.prims.delete_prim(plane_prim.prim_path)
 
     def get_available_configurations(self):
         """
