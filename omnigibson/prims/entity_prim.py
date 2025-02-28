@@ -12,6 +12,8 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.rigid_body_prim import RigidBodyPrim
+from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
 from omnigibson.utils.ui_utils import suppress_omni_log
@@ -202,13 +204,19 @@ class EntityPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         joint_children = set()
+        # Keep track of all the links we will create. We can't create that just yet because we need to find
+        # the base link first.
         links_to_create = {}
         for prim in self._prim.GetChildren():
-            link_cls = None
             link_name = prim.GetName()
-            if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                # For rigid body object, process prims that are Xforms (e.g. rigid links)
-                link_cls = RigidPrim
+            prim_type_name = prim.GetPrimTypeInfo().GetTypeName()
+
+            # Identify links based on prim type
+            if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
+                # For rigid body objects, process Xforms as potential rigid links
+                # Mark this as a link to create (we'll determine exact class later)
+                links_to_create[link_name] = ("rigid", prim)
+
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -219,40 +227,44 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
-            elif self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-                # For cloth object, process prims that are Meshes
-                link_cls = ClothPrim
-
-            # Keep track of all the links we will create. We can't create that just yet because we need to find
-            # the base link first.
-            if link_cls is not None:
-                links_to_create[link_name] = (link_cls, prim)
+            elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
+                # For cloth objects, process Meshes as cloth links
+                links_to_create[link_name] = ("cloth", prim)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
         valid_root_links = list(set(links_to_create.keys()) - joint_children)
 
         assert len(valid_root_links) == 1, (
-            f"Only a single root link should have been found for {self.name}, "
-            f"but found multiple instead: {valid_root_links}"
+            f"Exactly one single root link should have been found for {self.name}, "
+            f"but found none/multiple instead: {valid_root_links}"
         )
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
-        # Now actually create the links
+        # Now actually create the links with appropriate classes
         self._links = dict()
-        for link_name, (link_cls, prim) in links_to_create.items():
+        for link_name, (link_type, prim) in links_to_create.items():
+            # Determine link configuration
+            is_root_link = link_name == self._root_link_name
             # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
             # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
+            is_kinematic = self._load_config.get("kinematic_only", False) if is_root_link else False
+
             link_load_config = {
-                "kinematic_only": (
-                    self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
-                ),
-                "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
+                "kinematic_only": is_kinematic,
+                "belongs_to_articulation": self._articulation_view is not None and not is_root_link,
                 "remesh": self._load_config.get("remesh", True),
                 "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
                 "scale": self._load_config.get("scale", None),
             }
-            # TODO: link_cls can be RigidPrim, KinematicOnlyPrin or ClothPrim
+
+            # Determine the correct class based on link type and kinematic property
+            if link_type == "rigid":
+                link_cls = RigidKinematicPrim if is_kinematic else RigidBodyPrim
+            else:  # link_type == "cloth"
+                link_cls = ClothPrim
+
+            # Create and load the link
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",

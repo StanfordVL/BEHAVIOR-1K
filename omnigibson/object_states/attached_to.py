@@ -96,7 +96,7 @@ class AttachedTo(
         # Reference to the parent object (DatasetObject)
         self.parent = None
 
-        # Reference to the female meta link of the parent object (RigidPrim)
+        # Reference to the female meta link of the parent object (RigidBodyPrim)
         self.parent_link = None
 
         # Mapping from the female meta link names of self.obj to their children (Dict[str, Optional[DatasetObject] = None])
@@ -206,8 +206,8 @@ class AttachedTo(
 
         Returns:
             2-tuple:
-                - RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
-                - RigidPrim or None: the corresponding link of @other
+                - RigidBodyPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
+                - RigidBodyPrim or None: the corresponding link of @other
         """
         if pos_thresh is None:
             pos_thresh = m.DEFAULT_POSITION_THRESHOLD
@@ -274,8 +274,8 @@ class AttachedTo(
 
          Args:
             other (DatasetObject): parent object to attach to.
-            child_link (RigidPrim): male meta link of @self.obj.
-            parent_link (RigidPrim): female meta link of @other.
+            child_link (RigidBodyPrim): male meta link of @self.obj.
+            parent_link (RigidBodyPrim): female meta link of @other.
             joint_type (JointType): joint type of the attachment, {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}
             can_joint_break (bool): whether the joint can break or not.
         """
