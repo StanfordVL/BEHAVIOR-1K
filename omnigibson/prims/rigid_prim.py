@@ -35,12 +35,12 @@ m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 
 class RigidPrim(XFormPrim):
     """
-    Provides high level functions to deal with a rigid body prim and its attributes/ properties.
-    If there is an prim present at the path, it will use it. Otherwise, a new XForm prim at
-    the specified prim path will be created.
+    Base class that provides common functionality for all rigid prim types.
+    This serves as the parent class for RigidBodyPrim and RigidKinematicPrim.
 
-    Notes: if the prim does not already have a rigid body api applied to it before it is loaded,
-        it will apply it.
+    Provides high level functions to deal with a rigid body prim and its attributes/properties.
+    If there is a prim present at the path, it will use it. Otherwise, a new XForm prim at
+    the specified prim path will be created.
 
     Args:
         relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
@@ -56,8 +56,6 @@ class RigidPrim(XFormPrim):
             density (None or float): If specified, density of this body in kg / m^3
             visual_only (None or bool): If specified, whether this prim should include collisions or not.
                 Default is True.
-            kinematic_only (None or bool): If specified, whether this prim should be kinematic-only or not.
-            belongs_to_articulation (None or bool): If specified, whether this prim is part of an articulation or not.
     """
 
     def __init__(
@@ -66,18 +64,12 @@ class RigidPrim(XFormPrim):
         name,
         load_config=None,
     ):
-        # Other values that will be filled in at runtime
-        self._rigid_prim_view_direct = None
-        self._belongs_to_articulation = None
+        # Common values that will be used by both kinematic and dynamic rigid prims
         self._body_name = None
-
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
-
-        # Caches for kinematic-only objects
-        # This exists because RigidPrimView uses USD pose read, which is very slow
-        self._kinematic_world_pose_cache = None
+        self._belongs_to_articulation = None
 
         # Run super init
         super().__init__(
@@ -87,28 +79,7 @@ class RigidPrim(XFormPrim):
         )
 
     def _post_load(self):
-        # Set it to be kinematic if necessary
-        kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
-        if not self.is_attribute_valid("physics:kinematicEnabled"):
-            self.create_attribute("physics:kinematicEnabled", kinematic_only)
-        if not self.is_attribute_valid("physics:rigidBodyEnabled"):
-            self.create_attribute("physics:rigidBodyEnabled", not kinematic_only)
-        self.set_attribute("physics:kinematicEnabled", kinematic_only)
-        self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
-
-        # Create the view
-        # Import now to avoid too-eager load of Omni classes due to inheritance
-        from omnigibson.utils.deprecated_utils import RigidPrimView
-
-        if not self.kinematic_only:
-            self._rigid_prim_view_direct = RigidPrimView(self.prim_path)
-
-        # Check if it's part of an articulation view
-        self._belongs_to_articulation = (
-            "belongs_to_articulation" in self._load_config and self._load_config["belongs_to_articulation"]
-        )
-
-        # run super first
+        # Run super first
         super()._post_load()
 
         # Apply rigid body and mass APIs
@@ -119,7 +90,18 @@ class RigidPrim(XFormPrim):
         if not self._prim.HasAPI(lazy.pxr.UsdPhysics.MassAPI):
             lazy.pxr.UsdPhysics.MassAPI.Apply(self._prim)
 
+        # Check if it's part of an articulation view
+        self._belongs_to_articulation = (
+            "belongs_to_articulation" in self._load_config and self._load_config["belongs_to_articulation"]
+        )
+
         # Only create contact report api if we're not visual only
+        self._visual_only = (
+            self._load_config["visual_only"]
+            if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
+            else False
+        )
+
         if not self._visual_only:
             contact_api = (
                 lazy.pxr.PhysxSchema.PhysxContactReportAPI(self._prim)
@@ -145,11 +127,7 @@ class RigidPrim(XFormPrim):
 
         # Set the visual-only attribute
         # This automatically handles setting collisions / gravity appropriately
-        self.visual_only = (
-            self._load_config["visual_only"]
-            if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
-            else False
-        )
+        self.visual_only = self._visual_only
 
     def _initialize(self):
         # Run super method first
@@ -159,10 +137,6 @@ class RigidPrim(XFormPrim):
         for mesh_group in (self._collision_meshes, self._visual_meshes):
             for mesh in mesh_group.values():
                 mesh.initialize()
-
-        # Get contact info first
-        if self.contact_reporting_enabled:
-            og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -253,13 +227,38 @@ class RigidPrim(XFormPrim):
 
     def update_handles(self):
         """
-        Updates all internal handles for this prim, in case they change since initialization
+        Updates all internal handles for this prim, in case they change since initialization.
+        To be implemented by subclasses as needed.
         """
-        # We only do this for non-kinematic objects, because while the USD APIs for kinematic-only
-        # and dynamic objects are the same, physx tensor APIs do NOT exist for kinematic-only
-        # objects, meaning initializing the view actively breaks the view.
-        if not self.kinematic_only:
-            self._rigid_prim_view_direct.initialize(og.sim.physics_sim_view)
+        pass
+
+    def enable_gravity(self):
+        """
+        Enables gravity for this rigid body.
+        To be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement enable_gravity")
+
+    def disable_gravity(self):
+        """
+        Disables gravity for this rigid body.
+        To be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement disable_gravity")
+
+    def wake(self):
+        """
+        Enable physics for this rigid body.
+        To be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement wake")
+
+    def sleep(self):
+        """
+        Disable physics for this rigid body.
+        To be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement sleep")
 
     def contact_list(self):
         """
@@ -285,12 +284,12 @@ class RigidPrim(XFormPrim):
     def set_linear_velocity(self, velocity):
         """
         Sets the linear velocity of the prim in stage.
+        To be implemented by subclasses.
 
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        if not self.kinematic_only:
-            self._rigid_prim_view.set_linear_velocities(velocity[None, :])
+        raise NotImplementedError("Subclasses must implement set_linear_velocity")
 
     def get_linear_velocity(self, clone=True):
         """
@@ -300,17 +299,17 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_linear_velocities(clone=clone)[0] if not self.kinematic_only else th.zeros(3)
+        raise NotImplementedError("Subclasses must implement get_linear_velocity")
 
     def set_angular_velocity(self, velocity):
         """
         Sets the angular velocity of the prim in stage.
+        To be implemented by subclasses.
 
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        if not self.kinematic_only:
-            self._rigid_prim_view.set_angular_velocities(velocity[None, :])
+        raise NotImplementedError("Subclasses must implement set_angular_velocity")
 
     def get_angular_velocity(self, clone=True):
         """
@@ -320,11 +319,12 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        return self._rigid_prim_view.get_angular_velocities(clone=clone)[0] if not self.kinematic_only else th.zeros(3)
+        raise NotImplementedError("Subclasses must implement get_angular_velocity")
 
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
         Set the position and orientation of XForm Prim.
+        Base implementation that will be overridden by subclasses.
 
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
@@ -349,25 +349,14 @@ class RigidPrim(XFormPrim):
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
-        # Actually set the pose.
-        if not self.kinematic_only:
-            # Convert to from scene-relative to world if necessary
-            if frame == "scene":
-                assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
-                position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
-
-            self._rigid_prim_view.set_world_poses(
-                positions=position[None, :], orientations=orientation[None, [3, 0, 1, 2]]
-            )
-        else:
-            XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-            # Invalidate kinematic-only object pose caches when new pose is set
-            self.clear_kinematic_only_cache()
+        # Default implementation - will be overridden by subclasses
+        XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
         PoseAPI.invalidate()
 
     def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.
+        Base implementation that will be overridden by subclasses.
 
         Args:
             frame (Literal): frame to get the pose with respect to. Default to world.
@@ -381,31 +370,12 @@ class RigidPrim(XFormPrim):
         """
         assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
 
-        # Try to use caches for kinematic-only objects
-        if self.kinematic_only and self._kinematic_world_pose_cache is not None:
-            position, orientation = self._kinematic_world_pose_cache
-            if frame == "scene":
-                assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-                position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
-            return position, orientation
-
-        # Otherwise, get the pose from the rigid prim view and convert to our format
-        if not self.kinematic_only:
-            positions, orientations = self._rigid_prim_view.get_world_poses(clone=clone)
-            position = positions[0]
-            orientation = orientations[0][[1, 2, 3, 0]]
-        else:
-            # If this is the first time we're getting the pose for a kinematic-only object, we need to cache it
-            position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
+        position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
 
         # Assert that the orientation is a unit quaternion
         assert math.isclose(
             th.norm(orientation).item(), 1, abs_tol=1e-3
         ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
-
-        # Cache world pose if we're kinematic-only
-        if self.kinematic_only:
-            self._kinematic_world_pose_cache = (position, orientation)
 
         # If requested, compute the scene-local transform
         if frame == "scene":
@@ -413,24 +383,6 @@ class RigidPrim(XFormPrim):
             position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
 
         return position, orientation
-
-    @property
-    def _rigid_prim_view(self):
-        if self._rigid_prim_view_direct is None:
-            return None
-
-        # Validate that the if physics is running, the view is valid.
-        if not self.kinematic_only and og.sim.is_playing() and self.initialized:
-            assert (
-                self._rigid_prim_view_direct.is_physics_handle_valid()
-                and self._rigid_prim_view_direct._physics_view.check()
-            ), "Rigid prim view must be valid if physics is running!"
-
-        assert not (
-            og.sim.is_playing() and not self._rigid_prim_view_direct.is_valid
-        ), "Rigid prim view must be valid if physics is running!"
-
-        return self._rigid_prim_view_direct
 
     @property
     def body_name(self):
@@ -477,7 +429,7 @@ class RigidPrim(XFormPrim):
     @visual_only.setter
     def visual_only(self, val):
         """
-        Sets the visaul only state of this link
+        Sets the visual only state of this link
 
         Args:
             val (bool): Whether this link should be a visual-only link (i.e.: no gravity or collisions applied)
@@ -509,7 +461,7 @@ class RigidPrim(XFormPrim):
 
     @volume.setter
     def volume(self, volume):
-        raise NotImplementedError("Cannot set volume directly for an link!")
+        raise NotImplementedError("Cannot set volume directly for a link!")
 
     @property
     def mass(self):
@@ -517,13 +469,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        mass = self._rigid_prim_view.get_masses()[0] if not self.kinematic_only else 0.0
-
-        # Fallback to analytical computation of volume * density
-        if mass == 0:
-            return self.volume * self.density
-
-        return mass
+        raise NotImplementedError("Subclasses must implement the mass property getter")
 
     @mass.setter
     def mass(self, mass):
@@ -531,8 +477,7 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        if not self.kinematic_only:
-            self._rigid_prim_view.set_masses(th.tensor([mass]))
+        raise NotImplementedError("Subclasses must implement the mass property setter")
 
     @property
     def density(self):
@@ -540,20 +485,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        if self.kinematic_only:
-            return 0.0
-        mass = self._rigid_prim_view.get_masses()[0]
-        # We first check if the mass is specified, since mass overrides density. If so, density = mass / volume.
-        # Otherwise, we try to directly grab the raw usd density value, and if that value does not exist,
-        # we return 1000 since that is the canonical density assigned by omniverse
-        if mass != 0.0:
-            density = mass / self.volume
-        else:
-            density = self._rigid_prim_view.get_densities()[0]
-            if density == 0.0:
-                density = 1000.0
-
-        return density
+        raise NotImplementedError("Subclasses must implement the density property getter")
 
     @density.setter
     def density(self, density):
@@ -561,8 +493,7 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        if not self.kinematic_only:
-            self._rigid_prim_view.set_densities(th.tensor([density]))
+        raise NotImplementedError("Subclasses must implement the density property setter")
 
     @cached_property
     def kinematic_only(self):
@@ -632,15 +563,12 @@ class RigidPrim(XFormPrim):
     @property
     def is_asleep(self):
         """
+        To be implemented by subclasses.
+
         Returns:
             bool: whether this rigid prim is asleep or not
         """
-        # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
-        return (
-            False
-            if self.kinematic_only
-            else og.sim.psi.is_sleeping(og.sim.stage_id, lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path))
-        )
+        raise NotImplementedError("Subclasses must implement the is_asleep property")
 
     @property
     def sleep_threshold(self):
@@ -874,42 +802,6 @@ class RigidPrim(XFormPrim):
         # Check using the old format.
         # TODO: Remove this after the next dataset release
         return int(m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(3))
-
-    def enable_gravity(self):
-        """
-        Enables gravity for this rigid body
-        """
-        if not self.kinematic_only:
-            self._rigid_prim_view.enable_gravities()
-
-    def disable_gravity(self):
-        """
-        Disables gravity for this rigid body
-        """
-        if not self.kinematic_only:
-            self._rigid_prim_view.disable_gravities()
-
-    def wake(self):
-        """
-        Enable physics for this rigid body
-        """
-        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
-        og.sim.psi.wake_up(og.sim.stage_id, prim_id)
-
-    def sleep(self):
-        """
-        Disable physics for this rigid body
-        """
-        prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
-        og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
-
-    def clear_kinematic_only_cache(self):
-        """
-        Clears the internal kinematic only cached pose. Useful if the parent prim's pose
-        changes without explicitly calling this prim's pose setter
-        """
-        assert self.kinematic_only
-        self._kinematic_world_pose_cache = None
 
     def _dump_state(self):
         # Grab pose from super class
