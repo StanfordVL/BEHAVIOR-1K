@@ -5,7 +5,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
@@ -14,7 +14,6 @@ from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
-    FlatcacheAPI,
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
 )
@@ -541,10 +540,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
 
         bbox_extents_local = [(self.particle_object.aabb_extent * scale).tolist() for scale in scales]
-
-        # If we're using flatcache, we need to update the object's pose on the USD manually
-        if gm.ENABLE_FLATCACHE:
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=obj)
 
         # Generate particles
         z_up = th.zeros((3, 1))
