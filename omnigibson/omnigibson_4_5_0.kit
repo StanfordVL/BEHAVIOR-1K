@@ -8,6 +8,7 @@ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in
 
 [dependencies]
 "isaacsim.exp.base" = {}
+"omni.kit.xr.profile.vr" = {}
 
 [settings.app]
 name = "OmniGibson"
@@ -15,6 +16,11 @@ version = "4.5.0"
 settings.persistent = false       # settings reset on each run with this app
 window.title = "OmniGibson"
 vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
+
+[settings.app.livestream]
+proto = "ws"
+allowResize = true
+outDirectory = "${data}"
 
 [settings.app.exts.folders]
 '++' = [
