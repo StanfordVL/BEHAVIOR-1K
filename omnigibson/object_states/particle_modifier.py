@@ -347,11 +347,21 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 "height": 1.0,
                 "size": 1.0,
             }
-            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
 
-            # Create a primitive shape if it doesn't already exist
+            # See if the mesh exists at the latest dataset's target location
+            mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
             pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
+
+            # If not, see if it exists in the legacy format's location
+            # TODO: Remove this after new dataset release
             if not pre_existing_mesh:
+                mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+                pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+
+            # Create a primitive mesh neither option exists
+            if not pre_existing_mesh:
+                mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
+
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, (
                     f"Must specify projection_mesh_params for {self.obj.name}'s {self.__class__.__name__} "

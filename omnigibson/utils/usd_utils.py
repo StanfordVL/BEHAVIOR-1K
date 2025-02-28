@@ -20,7 +20,7 @@ from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
@@ -519,11 +519,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
     @classmethod
     def get_max_contact_data_count(cls):
-        # 4x per finger link, to be safe.
-        # 4 here is not the finger count, it's the number of items we will record contacts with, per finger.
-        # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
-        # This number should very rarely go above 4.
-        return len(cls.get_column_filters()[0]) * 4
+        return len(cls.get_column_filters()[0]) * 128
 
 
 # Instantiate the GripperRigidContactAPI
@@ -2030,7 +2026,7 @@ def get_sdf_value_type_name(val):
     raise ValueError(f"Unsupported input type: {type(val)}")
 
 
-@th.compile
+@torch_compile
 def _compute_relative_poses_torch(
     idx: int,
     n_links: int,

@@ -52,6 +52,7 @@ def test_data_collect_and_playback():
         env=env,
         output_path=collect_hdf5_path,
         only_successes=False,
+        obj_attr_keys=["scale", "visible"],
     )
 
     # Record 2 episodes

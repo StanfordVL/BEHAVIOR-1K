@@ -1768,7 +1768,7 @@ def find_all_prim_children_with_type(prim_type, root_prim):
     return found_prims
 
 
-def simplify_convex_hull(tm, max_vertices=60):
+def simplify_convex_hull(tm, max_vertices=60, max_faces=128):
     """
     Simplifies a convex hull mesh by using quadric edge collapse to reduce the number of faces
 
@@ -1781,7 +1781,6 @@ def simplify_convex_hull(tm, max_vertices=60):
         return tm
 
     # Use pymeshlab to reduce
-    max_faces = 64
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
     while len(ms.current_mesh().vertex_matrix()) > max_vertices:
