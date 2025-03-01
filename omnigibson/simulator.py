@@ -481,18 +481,11 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            if gm.ENABLE_HQ_RENDERING:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)  # "Auto"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
-            else:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
+            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
+            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
