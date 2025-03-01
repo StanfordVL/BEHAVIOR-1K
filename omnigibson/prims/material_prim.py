@@ -242,8 +242,8 @@ class MaterialPrim(BasePrim):
         elif inp in self.shader_default_input_names:
             input_type = get_sdf_value_type_name(val)
             self._shader.CreateInput(inp, input_type).Set(val)
-        else:
-            raise ValueError(f"Got invalid shader input to set! Got: {inp}")
+        # else:
+        #     raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
     def is_glass(self):
