@@ -30,6 +30,7 @@ log = create_module_logger(module_name=__name__)
 
 m = create_module_macros(module_path=__file__)
 m.movement_speed = 0.2  # the speed of the robot base movement
+m.rotation_speed = 0.1
 
 
 @dataclass
@@ -70,15 +71,19 @@ class TeleopSystem(TeleopPolicy):
         self.robot_arms = None if not self.robot else ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         # robot parameters
         self.movement_speed = m.movement_speed
+        self.rotation_speed = m.rotation_speed
         self.show_control_marker = show_control_marker
         self.control_markers = {}
         if show_control_marker:
-            for arm in robot.arm_names:
-                arm_name = "right" if arm == robot.default_arm else "left"
-                self.control_markers[arm_name] = USDObject(
-                    name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True
-                )
-                self.robot.scene.add_object(self.control_markers[arm_name])
+            if self.robot:
+                for arm in robot.arm_names:
+                    arm_name = "right" if arm == robot.default_arm else "left"
+                    self.control_markers[arm_name] = USDObject(
+                        name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True
+                    )
+                    self.robot.scene.add_object(self.control_markers[arm_name])
+            else:
+                pass
 
     def get_obs(self) -> TeleopObservation:
         """
@@ -180,6 +185,7 @@ class OVXRSystem(TeleopSystem):
         if align_to_prim:
             self.set_anchor_with_prim(self.align_anchor_to)
         self.raw_data = {}
+        self.old_raw_data = {}
         # enable xr extension
         lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         # run super method
@@ -203,7 +209,10 @@ class OVXRSystem(TeleopSystem):
             self.vr_profile.get_scene_persistent_path() + "anchorMode", "custom_anchor"
         )
         # set override leveled basis to be true (if this is false, headset would not track anchor pitch orientation)
-        lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "overrideLeveledBasis", True)
+        allow_roll = False if align_anchor_to == "touchpad" else True
+        lazy.carb.settings.get_settings().set(
+            self.vr_profile.get_persistent_path() + "overrideLeveledBasis", allow_roll
+        )
         # set vr system
         lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
         # set display mode
@@ -234,6 +243,7 @@ class OVXRSystem(TeleopSystem):
         # we want to further slow down the movement speed if we are using touchpad movement
         if self.align_anchor_to == "touchpad":
             self.movement_speed *= 0.3
+            self.rotation_speed *= 0.3
         # self.global_ik_solver = {}
         # for arm in self.robot_arms:
         #     control_idx = self.robot.arm_control_idx[arm]
@@ -247,6 +257,10 @@ class OVXRSystem(TeleopSystem):
         KeyboardEventHandler.add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.R,
             callback_fn=self.register_head_canonical_transformation,
+        )
+        KeyboardEventHandler.add_keyboard_callback(
+            key=lazy.carb.input.KeyboardInput.F,
+            callback_fn=self.reset_head_transform,
         )
         # KeyboardEventHandler.add_keyboard_callback(
         #     key=lazy.carb.input.KeyboardInput.ESCAPE,
@@ -280,7 +294,8 @@ class OVXRSystem(TeleopSystem):
         if self.align_anchor_to == "touchpad":
             # we use x, y from right controller for 2d movement and y from left controller for z movement
             self._move_anchor(
-                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]]))
+                pos_offset=th.cat((th.tensor([self.teleop_action.torso]), self.teleop_action.base[[0, 2]])),
+                rot_offset=self.teleop_action.base[1],
             )
         else:
             if self.anchor_prim is not None:
@@ -370,6 +385,7 @@ class OVXRSystem(TeleopSystem):
         """
         super().reset()
         self.raw_data = {}
+        self.old_raw_data = {}
         self.teleop_action.is_valid = {"left": False, "right": False, "head": False}
         self.teleop_action.reset = {"left": False, "right": False}
         self.teleop_action.head = th.zeros(6)
@@ -420,10 +436,21 @@ class OVXRSystem(TeleopSystem):
         Steps the VR system and update self.teleop_action
         """
         # update raw data
+        self.old_raw_data = self.raw_data
+        self.raw_data = {}
         if not optimized_for_tour:
             self._update_devices()
             self._update_device_transforms()
         self._update_button_data()
+
+        # Fire the button callbacks
+        # self.raw_data["button_data"]["left"]["press"]["y"]
+        for controller_name, controller_button_data in self.raw_data["button_data"].items():
+            for button_name, button_pressed in controller_button_data["press"].items():
+                if button_pressed and not self.old_raw_data["button_data"][controller_name]["press"][button_name]:
+                    print(f"Button {button_name} pressed on controller {controller_name}")
+                    KeyboardEventHandler.xr_callback(controller_name, button_name)
+
         # Update teleop data based on controller input
         if self.eef_tracking_mode == "controller":
             # update eef related info
@@ -458,14 +485,21 @@ class OVXRSystem(TeleopSystem):
         self.teleop_action.base = th.zeros(3)
         self.teleop_action.torso = 0.0
         for controller_name in self.controllers.keys():
-            self.teleop_action.reset[controller_name] = self.raw_data["button_data"][controller_name]["press"]["grip"]
+            # self.teleop_action.reset[controller_name] = self.raw_data["button_data"][controller_name]["press"]["grip"]
             axis = self.raw_data["button_data"][controller_name]["axis"]
-            if controller_name == "right":
+            if controller_name == "left":
                 self.teleop_action.base[0] = axis["touchpad_y"] * self.movement_speed
                 self.teleop_action.torso = -axis["touchpad_x"] * self.movement_speed
-            elif controller_name == "left":
-                self.teleop_action.base[1] = -axis["touchpad_x"] * self.movement_speed
-                self.teleop_action.base[2] = axis["touchpad_y"] * self.movement_speed
+            elif controller_name == "right":
+                # TODO: This is replaced with a button press
+                self.teleop_action.base[1] = -axis["touchpad_x"] * self.rotation_speed
+                # self.teleop_action.base[2] = axis["touchpad_y"] * self.movement_speed
+
+        if self.raw_data["button_data"]["left"]["press"]["grip"]:
+            self.teleop_action.base[2] += self.movement_speed
+        elif self.raw_data["button_data"]["right"]["press"]["grip"]:
+            self.teleop_action.base[2] += -self.movement_speed
+
         if not optimized_for_tour:
             # update head related info
             self.teleop_action.head = th.cat(
