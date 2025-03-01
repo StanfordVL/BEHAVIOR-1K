@@ -158,6 +158,14 @@ class KeyboardEventHandler:
         # Always return True
         return True
 
+    @classmethod
+    def xr_callback(cls, controller, button):
+        """
+        Meta callback function that is hooked up to omni's backend
+        """
+        # Check if we've received a key press or repeat
+        cls.KEYBOARD_CALLBACKS.get(f"{controller}_{button}", lambda: None)()
+
 
 @contextlib.contextmanager
 def suppress_omni_log(channels):
