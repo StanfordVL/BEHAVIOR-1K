@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.rigid_body_prim import RigidDynamicPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace

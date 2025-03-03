@@ -12,7 +12,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
-from omnigibson.prims.rigid_body_prim import RigidDynamicPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
