@@ -116,13 +116,15 @@ class RigidPrim(XFormPrim):
         self.update_meshes()
 
         # Possibly set the mass / density
-        if not self.has_collision_meshes:
+        if not self.has_collision_meshes and not self.kinematic_only:
             # A meta (virtual) link has no collision meshes; set a negligible mass and a zero density (ignored)
             self.mass = 1e-6
             self.density = 0.0
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
+            assert not self.kinematic_only, "Kinematic-only links should not have mass"
             self.mass = self._load_config["mass"]
         if "density" in self._load_config and self._load_config["density"] is not None:
+            assert not self.kinematic_only, "Kinematic-only links should not have density"
             self.density = self._load_config["density"]
 
         # Set the visual-only attribute
@@ -237,28 +239,28 @@ class RigidPrim(XFormPrim):
         Enables gravity for this rigid body.
         To be implemented by subclasses.
         """
-        raise NotImplementedError("This method is only supported for Rigid")
+        raise NotImplementedError("Enabling gravity is only supported for dynamic rigid bodies")
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body.
         To be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement disable_gravity")
+        raise NotImplementedError("Disabling gravity is only supported for dynamic rigid bodies")
 
     def wake(self):
         """
         Enable physics for this rigid body.
         To be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement wake")
+        raise NotImplementedError("Wake is only supported for dynamic rigid bodies")
 
     def sleep(self):
         """
         Disable physics for this rigid body.
         To be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement sleep")
+        raise NotImplementedError("Sleep is only supported for dynamic rigid bodies")
 
     def contact_list(self):
         """
@@ -289,7 +291,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
         """
-        raise NotImplementedError("Subclasses must implement set_linear_velocity")
+        raise NotImplementedError("Linear velocity setting is only supported for dynamic rigid bodies")
 
     def get_linear_velocity(self, clone=True):
         """
@@ -299,7 +301,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current linear velocity of the the rigid prim. Shape (3,).
         """
-        raise NotImplementedError("Subclasses must implement get_linear_velocity")
+        raise NotImplementedError("Linear velocity getting is only supported for dynamic rigid bodies")
 
     def set_angular_velocity(self, velocity):
         """
@@ -309,7 +311,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
         """
-        raise NotImplementedError("Subclasses must implement set_angular_velocity")
+        raise NotImplementedError("Angular velocity setting is only supported for dynamic rigid bodies")
 
     def get_angular_velocity(self, clone=True):
         """
@@ -319,7 +321,7 @@ class RigidPrim(XFormPrim):
         Returns:
             th.tensor: current angular velocity of the the rigid prim. Shape (3,).
         """
-        raise NotImplementedError("Subclasses must implement get_angular_velocity")
+        raise NotImplementedError("Angular velocity getting is only supported for dynamic rigid bodies")
 
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
@@ -437,10 +439,12 @@ class RigidPrim(XFormPrim):
         # Set gravity and collisions based on value
         if val:
             self.disable_collisions()
-            self.disable_gravity()
+            if not self.kinematic_only:
+                self.disable_gravity()
         else:
             self.enable_collisions()
-            self.enable_gravity()
+            if not self.kinematic_only:
+                self.enable_gravity()
 
         # Also set the internal value
         self._visual_only = val
@@ -469,7 +473,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        raise NotImplementedError("Subclasses must implement the mass property getter")
+        raise NotImplementedError("Mass getter is only applicable for dynamic rigid bodies")
 
     @mass.setter
     def mass(self, mass):
@@ -477,7 +481,7 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        raise NotImplementedError("Subclasses must implement the mass property setter")
+        raise NotImplementedError("Mass setter is only applicable for dynamic rigid bodies")
 
     @property
     def density(self):
@@ -485,7 +489,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        raise NotImplementedError("Subclasses must implement the density property getter")
+        raise NotImplementedError("Density getter is only applicable for dynamic rigid bodies")
 
     @density.setter
     def density(self, density):
@@ -493,7 +497,7 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        raise NotImplementedError("Subclasses must implement the density property setter")
+        raise NotImplementedError("Density setter is only applicable for dynamic rigid bodies")
 
     @cached_property
     def kinematic_only(self):
@@ -512,7 +516,7 @@ class RigidPrim(XFormPrim):
         Returns:
             int: How many position iterations to take per physics step by the physx solver
         """
-        return self.get_attribute("physxRigidBody:solverPositionIterationCount")
+        raise NotImplementedError("Solver position iteration count is only applicable for dynamic rigid bodies")
 
     @solver_position_iteration_count.setter
     def solver_position_iteration_count(self, count):
@@ -522,7 +526,7 @@ class RigidPrim(XFormPrim):
         Args:
             count (int): How many position iterations to take per physics step by the physx solver
         """
-        self.set_attribute("physxRigidBody:solverPositionIterationCount", count)
+        raise NotImplementedError("Solver position iteration count is only applicable for dynamic rigid bodies")
 
     @property
     def solver_velocity_iteration_count(self):
@@ -530,7 +534,7 @@ class RigidPrim(XFormPrim):
         Returns:
             int: How many velocity iterations to take per physics step by the physx solver
         """
-        return self.get_attribute("physxRigidBody:solverVelocityIterationCount")
+        raise NotImplementedError("Solver velocity iteration count is only applicable for dynamic rigid bodies")
 
     @solver_velocity_iteration_count.setter
     def solver_velocity_iteration_count(self, count):
@@ -540,7 +544,7 @@ class RigidPrim(XFormPrim):
         Args:
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
-        self.set_attribute("physxRigidBody:solverVelocityIterationCount", count)
+        raise NotImplementedError("Solver velocity iteration count is only applicable for dynamic rigid bodies")
 
     @property
     def stabilization_threshold(self):
@@ -548,7 +552,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: threshold for stabilizing this rigid body
         """
-        return self.get_attribute("physxRigidBody:stabilizationThreshold")
+        raise NotImplementedError("Stabilization threshold is only applicable for dynamic rigid bodies")
 
     @stabilization_threshold.setter
     def stabilization_threshold(self, threshold):
@@ -558,7 +562,7 @@ class RigidPrim(XFormPrim):
         Args:
             threshold (float): stabilizing threshold
         """
-        self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
+        raise NotImplementedError("Stabilization threshold is only applicable for dynamic rigid bodies")
 
     @property
     def is_asleep(self):
@@ -568,7 +572,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: whether this rigid prim is asleep or not
         """
-        raise NotImplementedError("Subclasses must implement the is_asleep property")
+        raise NotImplementedError("Sleep state is only applicable for dynamic rigid bodies")
 
     @property
     def sleep_threshold(self):
@@ -576,7 +580,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: threshold for sleeping this rigid body
         """
-        return self.get_attribute("physxRigidBody:sleepThreshold")
+        raise NotImplementedError("Sleep threshold is only applicable for dynamic rigid bodies")
 
     @sleep_threshold.setter
     def sleep_threshold(self, threshold):
@@ -586,7 +590,7 @@ class RigidPrim(XFormPrim):
         Args:
             threshold (float): Sleeping threshold
         """
-        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
+        raise NotImplementedError("Sleep threshold is only applicable for dynamic rigid bodies")
 
     @property
     def ccd_enabled(self):
@@ -802,49 +806,3 @@ class RigidPrim(XFormPrim):
         # Check using the old format.
         # TODO: Remove this after the next dataset release
         return int(m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(3))
-
-    def _dump_state(self):
-        # Grab pose from super class
-        state = super()._dump_state()
-        state["lin_vel"] = self.get_linear_velocity(clone=False)
-        state["ang_vel"] = self.get_angular_velocity(clone=False)
-
-        return state
-
-    def _load_state(self, state):
-        # If we are part of an articulation, there's nothing to do, the entityprim will take care
-        # of setting everything for us.
-        if self._belongs_to_articulation:
-            return
-
-        # Call super first
-        super()._load_state(state=state)
-
-        # Set velocities if not kinematic
-        self.set_linear_velocity(
-            state["lin_vel"] if isinstance(state["lin_vel"], th.Tensor) else th.tensor(state["lin_vel"])
-        )
-        self.set_angular_velocity(
-            state["ang_vel"] if isinstance(state["ang_vel"], th.Tensor) else th.tensor(state["ang_vel"])
-        )
-
-    def serialize(self, state):
-        # Run super first
-        state_flat = super().serialize(state=state)
-
-        return th.cat(
-            [
-                state_flat,
-                state["lin_vel"],
-                state["ang_vel"],
-            ]
-        )
-
-    def deserialize(self, state):
-        # Call supermethod first
-        state_dic, idx = super().deserialize(state=state)
-        # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
-        state_dic["lin_vel"] = state[idx : idx + 3]
-        state_dic["ang_vel"] = state[idx + 3 : idx + 6]
-
-        return state_dic, idx + 6

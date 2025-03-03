@@ -269,3 +269,122 @@ class RigidDynamicPrim(RigidPrim):
         """
         prim_id = lazy.pxr.PhysicsSchemaTools.sdfPathToInt(self.prim_path)
         og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
+
+    @property
+    def stabilization_threshold(self):
+        """
+        Returns:
+            float: threshold for stabilizing this rigid body
+        """
+        return self.get_attribute("physxRigidBody:stabilizationThreshold")
+
+    @stabilization_threshold.setter
+    def stabilization_threshold(self, threshold):
+        """
+        Sets threshold for stabilizing this rigid body
+
+        Args:
+            threshold (float): stabilizing threshold
+        """
+        self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
+
+    @property
+    def sleep_threshold(self):
+        """
+        Returns:
+            float: threshold for sleeping this rigid body
+        """
+        return self.get_attribute("physxRigidBody:sleepThreshold")
+
+    @sleep_threshold.setter
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this rigid body
+
+        Args:
+            threshold (float): Sleeping threshold
+        """
+        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
+
+    @property
+    def solver_position_iteration_count(self):
+        """
+        Returns:
+            int: How many position iterations to take per physics step by the physx solver
+        """
+        return self.get_attribute("physxRigidBody:solverPositionIterationCount")
+
+    @solver_position_iteration_count.setter
+    def solver_position_iteration_count(self, count):
+        """
+        Sets how many position iterations to take per physics step by the physx solver
+
+        Args:
+            count (int): How many position iterations to take per physics step by the physx solver
+        """
+        self.set_attribute("physxRigidBody:solverPositionIterationCount", count)
+
+    @property
+    def solver_velocity_iteration_count(self):
+        """
+        Returns:
+            int: How many velocity iterations to take per physics step by the physx solver
+        """
+        return self.get_attribute("physxRigidBody:solverVelocityIterationCount")
+
+    @solver_velocity_iteration_count.setter
+    def solver_velocity_iteration_count(self, count):
+        """
+        Sets how many velocity iterations to take per physics step by the physx solver
+
+        Args:
+            count (int): How many velocity iterations to take per physics step by the physx solver
+        """
+        self.set_attribute("physxRigidBody:solverVelocityIterationCount", count)
+
+    def _dump_state(self):
+        # Grab pose from super class
+        state = super()._dump_state()
+
+        state["lin_vel"] = self.get_linear_velocity(clone=False)
+        state["ang_vel"] = self.get_angular_velocity(clone=False)
+
+        return state
+
+    def _load_state(self, state):
+        # If we are part of an articulation, there's nothing to do, the entityprim will take care
+        # of setting everything for us.
+        if self._belongs_to_articulation:
+            return
+
+        # Call super first
+        super()._load_state(state=state)
+
+        # Set velocities
+        self.set_linear_velocity(
+            state["lin_vel"] if isinstance(state["lin_vel"], th.Tensor) else th.tensor(state["lin_vel"])
+        )
+        self.set_angular_velocity(
+            state["ang_vel"] if isinstance(state["ang_vel"], th.Tensor) else th.tensor(state["ang_vel"])
+        )
+
+    def serialize(self, state):
+        # Run super first
+        state_flat = super().serialize(state=state)
+
+        return th.cat(
+            [
+                state_flat,
+                state["lin_vel"],
+                state["ang_vel"],
+            ]
+        )
+
+    def deserialize(self, state):
+        # Call supermethod first
+        state_dic, idx = super().deserialize(state=state)
+        # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
+        state_dic["lin_vel"] = state[idx : idx + 3]
+        state_dic["ang_vel"] = state[idx + 3 : idx + 6]
+
+        return state_dic, idx + 6

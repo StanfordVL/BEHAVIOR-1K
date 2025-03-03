@@ -216,8 +216,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        # Set position / velocity solver iterations if we're not cloth
-        if self._prim_type != PrimType.CLOTH:
+        # Set position / velocity solver iterations if we're not cloth and not kinematic only
+        if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
             self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
 
@@ -304,7 +304,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         mass = 0.0
         for link in self._links.values():
-            mass += link.mass
+            if not link.kinematic_only:
+                mass += link.mass
 
         return mass
 

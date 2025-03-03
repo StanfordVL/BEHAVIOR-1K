@@ -51,54 +51,6 @@ class RigidKinematicPrim(RigidPrim):
         # Run super method to handle common functionality
         super()._post_load()
 
-    def update_handles(self):
-        """
-        Kinematic objects don't need to update handles as they don't use RigidPrimView
-        """
-        pass
-
-    def set_linear_velocity(self, velocity):
-        """
-        Kinematic objects don't have dynamic velocities - this is a no-op
-
-        Args:
-            velocity (th.tensor): linear velocity to set (ignored). Shape (3,).
-        """
-        pass
-
-    def get_linear_velocity(self, clone=True):
-        """
-        Kinematic objects don't have dynamic velocities
-
-        Args:
-            clone (bool): Whether to clone the internal buffer or not when grabbing data (ignored)
-
-        Returns:
-            th.tensor: zero velocity. Shape (3,).
-        """
-        return th.zeros(3)
-
-    def set_angular_velocity(self, velocity):
-        """
-        Kinematic objects don't have dynamic velocities - this is a no-op
-
-        Args:
-            velocity (th.tensor): angular velocity to set (ignored). Shape (3,).
-        """
-        pass
-
-    def get_angular_velocity(self, clone=True):
-        """
-        Kinematic objects don't have dynamic velocities
-
-        Args:
-            clone (bool): Whether to clone the internal buffer or not when grabbing data (ignored)
-
-        Returns:
-            th.tensor: zero velocity. Shape (3,).
-        """
-        return th.zeros(3)
-
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
         Set the position and orientation of the kinematic rigid body.
@@ -157,75 +109,6 @@ class RigidKinematicPrim(RigidPrim):
             position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
 
         return position, orientation
-
-    @property
-    def mass(self):
-        """
-        Returns:
-            float: mass of the rigid body in kg.
-            For kinematic bodies, this is 0 since they're not affected by physics.
-        """
-        return 0.0
-
-    @mass.setter
-    def mass(self, mass):
-        """
-        Args:
-            mass (float): mass of the rigid body in kg (ignored for kinematic bodies).
-        """
-        # No-op for kinematic bodies
-        pass
-
-    @property
-    def density(self):
-        """
-        Returns:
-            float: density of the rigid body in kg / m^3.
-            For kinematic bodies, this is 0 since they're not affected by physics.
-        """
-        return 0.0
-
-    @density.setter
-    def density(self, density):
-        """
-        Args:
-            density (float): density of the rigid body in kg / m^3 (ignored for kinematic bodies).
-        """
-        # No-op for kinematic bodies
-        pass
-
-    @property
-    def is_asleep(self):
-        """
-        Returns:
-            bool: whether this rigid prim is asleep or not
-            Kinematic bodies are never "asleep" in the traditional physics sense
-        """
-        return False
-
-    def enable_gravity(self):
-        """
-        Kinematic objects aren't affected by gravity anyway - this is a no-op
-        """
-        pass
-
-    def disable_gravity(self):
-        """
-        Kinematic objects aren't affected by gravity anyway - this is a no-op
-        """
-        pass
-
-    def wake(self):
-        """
-        Kinematic objects don't follow the sleep/wake paradigm - this is a no-op
-        """
-        pass
-
-    def sleep(self):
-        """
-        Kinematic objects don't follow the sleep/wake paradigm - this is a no-op
-        """
-        pass
 
     def clear_kinematic_only_cache(self):
         """

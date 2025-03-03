@@ -11,7 +11,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
-from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
@@ -79,8 +78,9 @@ class EntityPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
-        # Set the default sleep threshold
-        self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
+        if not self.kinematic_only:
+            # Set the default sleep threshold
+            self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
 
         # Force populate inputs and outputs of the shaders of all materials
         # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,
@@ -643,14 +643,16 @@ class EntityPrim(XFormPrim):
         Enables gravity for this entity
         """
         for link in self._links.values():
-            link.enable_gravity()
+            if not link.kinematic_only:
+                link.enable_gravity()
 
     def disable_gravity(self) -> None:
         """
         Disables gravity for this entity
         """
         for link in self._links.values():
-            link.disable_gravity()
+            if not link.kinematic_only:
+                link.disable_gravity()
 
     def reset(self):
         """
@@ -1536,7 +1538,8 @@ class EntityPrim(XFormPrim):
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                link.wake()
+                if not link.kinematic_only:
+                    link.wake()
 
     def sleep(self):
         """
@@ -1547,12 +1550,15 @@ class EntityPrim(XFormPrim):
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                link.sleep()
+                if not link.kinematic_only:
+                    link.sleep()
 
     def keep_still(self):
         """
         Zero out all velocities for this prim
         """
+        if self.kinematic_only:
+            return
         self.set_linear_velocity(velocity=th.zeros(3))
         self.set_angular_velocity(velocity=th.zeros(3))
         for joint in self._joints.values():
@@ -1595,7 +1601,7 @@ class EntityPrim(XFormPrim):
         lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
 
         # Create a attachment point link
-        link = RigidPrim(
+        link = RigidDynamicPrim(
             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, link_prim.GetPrimPath().pathString),
             name=f"{self._name}:{link_name}",
         )
@@ -1610,7 +1616,7 @@ class EntityPrim(XFormPrim):
 
         self._links[link_name] = link
 
-        # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidPrim)
+        # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidDynamicPrim)
         attachment_path = self.root_link.prim.GetPath().AppendElementString("attachment")
         lazy.omni.kit.commands.execute(
             "CreatePhysicsAttachment",
