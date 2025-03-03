@@ -1,16 +1,16 @@
 repos:
   - repo: https://github.com/psf/black-pre-commit-mirror
-    rev: 24.3.0
+    rev: 25.1.0
     hooks:
       - id: black
         language_version: python3.10
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 6.0.1
     hooks:
       - id: isort
         name: isort (python)
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: no-commit-to-branch
         name: Check for numpy imports
@@ -24,4 +24,4 @@ repos:
             omnigibson/utils/numpy_utils\.py|      # Utilities specifically for numpy operations and dtype
             tests/test_transform_utils\.py         # This test file uses Scipy and Numpy
           )$
-        stages: [commit]
+        stages: [pre-commit]
