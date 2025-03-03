@@ -809,7 +809,7 @@ class ControllableObject(BaseObject):
         this is the link that is the child of the last virtual joint in the robot's articulation.
 
         Returns:
-            RigidBodyPrim: Base footprint link for this object
+            RigidDynamicPrim: Base footprint link for this object
         """
         return self.links[self.base_footprint_link_name]
 

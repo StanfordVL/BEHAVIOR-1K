@@ -36,7 +36,7 @@ m.LEGACY_META_LINK_PATTERN = re.compile(r".*:(\w+)_([A-Za-z0-9]+)_(\d+)_link")
 class RigidPrim(XFormPrim):
     """
     Base class that provides common functionality for all rigid prim types.
-    This serves as the parent class for RigidBodyPrim and RigidKinematicPrim.
+    This serves as the parent class for RigidDynamicPrim and RigidKinematicPrim.
 
     Provides high level functions to deal with a rigid body prim and its attributes/properties.
     If there is a prim present at the path, it will use it. Otherwise, a new XForm prim at
@@ -237,7 +237,7 @@ class RigidPrim(XFormPrim):
         Enables gravity for this rigid body.
         To be implemented by subclasses.
         """
-        raise NotImplementedError("Subclasses must implement enable_gravity")
+        raise NotImplementedError("This method is only supported for Rigid")
 
     def disable_gravity(self):
         """

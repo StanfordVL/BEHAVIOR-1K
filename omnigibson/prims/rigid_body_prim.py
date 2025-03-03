@@ -10,7 +10,7 @@ from omnigibson.utils.usd_utils import PoseAPI
 from .rigid_prim import RigidPrim
 
 
-class RigidBodyPrim(RigidPrim):
+class RigidDynamicPrim(RigidPrim):
     """
     Provides high level functions to deal with a dynamic rigid body prim and its attributes/properties.
     This class is used for rigid bodies that are not kinematic-only, meaning they are subject to physics simulation
