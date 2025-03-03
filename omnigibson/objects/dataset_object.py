@@ -214,6 +214,8 @@ class DatasetObject(USDObject):
 
         # Apply any forced roughness updates
         for material in self.materials:
+            if material.is_glass:
+                continue
             material.reflection_roughness_texture_influence = 0.0
             material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
