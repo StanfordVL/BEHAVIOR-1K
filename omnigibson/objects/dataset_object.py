@@ -115,7 +115,8 @@ class DatasetObject(USDObject):
         load_config["bounding_box"] = bounding_box
         load_config["dataset_type"] = dataset_type
         # All DatasetObjects should have xform properties pre-loaded
-        load_config["xform_props_pre_loaded"] = True
+        # TODO: enable this after next dataset release
+        load_config["xform_props_pre_loaded"] = False
 
         # Infer the correct usd path to use
         if model is None:
