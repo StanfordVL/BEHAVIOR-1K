@@ -16,7 +16,6 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
-from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
@@ -87,13 +86,6 @@ class EntityPrim(XFormPrim):
         if not self.kinematic_only:
             # Set the default sleep threshold
             self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
-
-        # Force populate inputs and outputs of the shaders of all materials
-        # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,
-        # not the original location
-        with suppress_omni_log(channels=["omni.usd"]):
-            for material in self.materials:
-                material.shader_force_populate(render=False)
 
         # Initialize all the links
         for link in self._links.values():

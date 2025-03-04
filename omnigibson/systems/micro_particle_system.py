@@ -490,8 +490,6 @@ class MicroParticleSystem(BaseSystem):
         lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
             og.sim.stage, self.mat_path, **self._pbd_material_kwargs
         )
-        # Force populate inputs and outputs of the shader
-        self._material.shader_force_populate()
         # Potentially modify the material
         self._customize_particle_material() if self._customize_particle_material is not None else None
 

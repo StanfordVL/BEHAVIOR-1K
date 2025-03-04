@@ -76,7 +76,6 @@ class MacroParticleSystem(BaseSystem):
         self._particle_template = particle_template
 
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
-        self.particle_object.material.shader_force_populate(render=True)
         self.process_particle_object()
 
     @property

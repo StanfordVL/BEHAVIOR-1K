@@ -1,9 +1,7 @@
-import asyncio
 import os
 
 import torch as th
 
-import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
@@ -159,32 +157,6 @@ class MaterialPrim(BasePrim):
             target_prim_path (str): prim path of the Prim to bind to
         """
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
-
-    async def _load_mdl_parameters(self, render=True):
-        """
-        Loads MDL parameters internally so they can be accessed by our class instance
-
-        Args:
-            render (bool): If True, takes a rendering step before loading the mdl parameters.
-                Note that a rendering step is necessary to load these parameters, though if a step has already
-                occurred externally, no additional rendering step is needed
-        """
-        if render:
-            og.sim.render()
-        await lazy.omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
-
-    def shader_force_populate(self, render=True):
-        """
-        Force populate inputs and outputs of the shader
-
-        Args:
-            render (bool): If True, takes a rendering step before force populating the inputs and outputs.
-                Note that a rendering step is necessary to load these I/Os, though if a step has already
-                occurred externally, no additional rendering step is needed
-        """
-        # TODO: Consider optimizing this somehow.
-        assert self._shader is not None
-        asyncio.run(self._load_mdl_parameters(render=render))
 
     def shader_update_asset_paths_with_root_path(self, root_path, relative=False):
         """
