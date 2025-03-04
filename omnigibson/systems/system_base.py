@@ -206,12 +206,6 @@ class BaseSystem(Serializable):
         lazy.isaacsim.core.utils.prims.delete_prim(self.prim_path)
         og.sim.update_handles()
 
-        # This is a bit of a hack to address a very niche situation where we clear a system and immediately reinitialize it
-        # If we do not take a physics step here, the system will not be reinitialized properly
-        # We need to find a way around this since this causes some physics leakage
-        with og.sim.slowed():
-            og.sim.step()
-
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()
 

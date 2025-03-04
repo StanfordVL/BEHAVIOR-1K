@@ -2,6 +2,7 @@ import os
 
 import torch as th
 
+import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
@@ -95,6 +96,7 @@ class MaterialPrim(BasePrim):
 
         # Move prim to desired location
         lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
+        og.sim.update_handles()
 
         # Return generated material
         return lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path)

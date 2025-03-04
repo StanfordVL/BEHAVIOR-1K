@@ -36,3 +36,6 @@ def test_system_spawn_and_clear(env):
             assert system.n_particles > 0
             og.sim.step()
             env.scene.clear_system(system_name)
+            # This is a bit of a hack to address a very niche situation where we clear a system and immediately reinitialize it
+            # If we do not take a physics step here, the system will not be reinitialized properly
+            og.sim.step()
