@@ -747,7 +747,7 @@ class PoseAPI:
     @classmethod
     def _refresh(cls):
         if og.sim is not None and not cls.VALID:
-            # Check that no reads from PoseAPI are happening during a physics step.
+            # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
             # when flatcache is on
