@@ -3,15 +3,12 @@ Example script for interacting with OmniGibson scenes with VR.
 """
 
 import torch as th
-import torch._dynamo
 
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_og_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import choose_from_options
-
-torch._dynamo.config.suppress_errors = True
 
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = False
@@ -37,7 +34,7 @@ def main():
     # start vrsys
     vrsys = OVXRSystem(
         robot=None,
-        show_control_marker=False,
+        show_control_marker=True,
         system="SteamVR",
         eef_tracking_mode="disabled",
         align_anchor_to="touchpad",
@@ -49,12 +46,13 @@ def main():
     )
 
     # main simulation loop
-    while True:
+    for _ in range(3000):
         # step the VR system to get the latest data from VR runtime
         vrsys.update(optimized_for_tour=True)
         og.sim.render()
 
     # Shut down the environment cleanly at the end
+    print("Cleaning up...")
     vrsys.stop()
     og.clear()
 

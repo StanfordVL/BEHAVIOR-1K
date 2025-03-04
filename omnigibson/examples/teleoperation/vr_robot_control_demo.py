@@ -11,9 +11,6 @@ gm.ENABLE_TRANSITION_RULES = False
 gm.ENABLE_FLATCACHE = True
 gm.GUI_VIEWPORT_ONLY = True
 
-# import torch._dynamo
-# torch._dynamo.config.suppress_errors = True
-
 
 def main():
     """
