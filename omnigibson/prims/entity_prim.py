@@ -1,6 +1,7 @@
 import math
 from functools import cached_property
 from typing import Literal
+from enum import Enum, auto
 
 import networkx as nx
 import torch as th
@@ -24,6 +25,11 @@ m = create_module_macros(module_path=__file__)
 # Default sleep threshold for all objects -- see https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/simulation-control/physics-settings.html?highlight=sleep#sleeping
 # Mass-normalized kinetic energy threshold below which an actor may go to sleep
 m.DEFAULT_SLEEP_THRESHOLD = 0.00005
+
+
+class LinkType(Enum):
+    RIGID = auto()
+    CLOTH = auto()
 
 
 class EntityPrim(XFormPrim):
@@ -215,7 +221,7 @@ class EntityPrim(XFormPrim):
             if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
                 # For rigid body objects, process Xforms as potential rigid links
                 # Mark this as a link to create (we'll determine exact class later)
-                links_to_create[link_name] = ("rigid", prim)
+                links_to_create[link_name] = (LinkType.RIGID, prim)
 
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
@@ -229,7 +235,7 @@ class EntityPrim(XFormPrim):
 
             elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
                 # For cloth objects, process Meshes as cloth links
-                links_to_create[link_name] = ("cloth", prim)
+                links_to_create[link_name] = (LinkType.CLOTH, prim)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
@@ -259,9 +265,9 @@ class EntityPrim(XFormPrim):
             }
 
             # Determine the correct class based on link type and kinematic property
-            if link_type == "rigid":
+            if link_type == LinkType.RIGID:
                 link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
-            else:  # link_type == "cloth"
+            else:  # link_type == LinkType.CLOTH
                 link_cls = ClothPrim
 
             # Create and load the link
