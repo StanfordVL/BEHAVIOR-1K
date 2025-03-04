@@ -52,7 +52,8 @@ class RigidDynamicPrim(RigidPrim):
         # Import now to avoid too-eager load of Omni classes due to inheritance
         from omnigibson.utils.deprecated_utils import RigidPrimView
 
-        self._rigid_prim_view = RigidPrimView(self.prim_path)
+        # set reset_xform_properties to False for load time
+        self._rigid_prim_view = RigidPrimView(self.prim_path, reset_xform_properties=False)
 
         # Run super method to handle common functionality
         super()._post_load()
