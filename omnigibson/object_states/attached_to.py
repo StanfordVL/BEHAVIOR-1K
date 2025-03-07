@@ -390,7 +390,6 @@ class AttachedTo(
         if self.parent_link is not None:
             # Remove the attachment joint prim from the stage
             og.sim.stage.RemovePrim(self.attachment_joint_prim_path)
-            og.sim.update_handles()
 
             # Remove child reference from the parent object
             self.parent.states[AttachedTo].children[self.parent_link.body_name] = None

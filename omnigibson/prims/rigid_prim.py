@@ -141,7 +141,6 @@ class RigidPrim(XFormPrim):
                 mesh.initialize()
 
         # Grab handle to this rigid body and get name
-        self.update_handles()
         self._body_name = self.prim_path.split("/")[-1]
 
     def remove(self):
@@ -227,13 +226,6 @@ class RigidPrim(XFormPrim):
         # Iterate through all owned collision meshes and toggle off their collisions
         for col_mesh in self._collision_meshes.values():
             col_mesh.collision_enabled = False
-
-    def update_handles(self):
-        """
-        Updates all internal handles for this prim, in case they change since initialization.
-        To be implemented by subclasses as needed.
-        """
-        pass
 
     def enable_gravity(self):
         """

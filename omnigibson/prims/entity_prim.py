@@ -277,7 +277,6 @@ class EntityPrim(XFormPrim):
         """
         # Initialize joints dictionary
         self._joints = dict()
-        self.update_handles()
 
         # Handle case separately based on whether we are actually articulated or not
         if self._articulation_view and not self.kinematic_only:
@@ -379,10 +378,10 @@ class EntityPrim(XFormPrim):
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
-            assert (
-                self._articulation_view_direct.is_physics_handle_valid()
-                and self._articulation_view_direct._physics_view.check()
-            ), "Articulation view must be valid if physics is running!"
+            physics_valid = self._articulation_view_direct.is_physics_handle_valid() and self._articulation_view_direct._physics_view.check()
+            if not physics_valid:
+                breakpoint()
+            assert physics_valid, "Articulation view must be valid if physics is running!"
 
         return self._articulation_view_direct
 
@@ -863,27 +862,6 @@ class EntityPrim(XFormPrim):
             n- or k-array: de-normalized efforts for the specified DOFs
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
-
-    def update_handles(self):
-        """
-        Updates all internal handles for this prim, in case they change since initialization
-        """
-        assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
-
-        # Reinitialize the articulation view
-        if self._articulation_view_direct is not None:
-            self._articulation_view_direct.initialize(og.sim.physics_sim_view)
-
-        # Update all links and joints as well
-        for link in self._links.values():
-            if not link.initialized:
-                link.initialize()
-            link.update_handles()
-
-        for joint in self._joints.values():
-            if not joint.initialized:
-                joint.initialize()
-            joint.update_handles()
 
     def get_joint_positions(self, normalized=False):
         """

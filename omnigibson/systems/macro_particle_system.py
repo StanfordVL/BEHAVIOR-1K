@@ -285,8 +285,6 @@ class MacroParticleSystem(BaseSystem):
         for scale in scales:
             self.add_particle(relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
-        og.sim.update_handles()
-
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
@@ -1178,7 +1176,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_density = particle_density
 
         # Physics rigid body view for keeping track of all particles' state
-        self.particles_view = None
+        self._particles_view = None
 
         # Approximate radius of the macro particle, and distance from particle frame to approximate center
         self._particle_radius = None
@@ -1197,6 +1195,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # If sim is already playing, refresh particles immediately
         if og.sim.is_playing():
             self.refresh_particles_view()
+
+    @property
+    def particles_view(self):
+        self.refresh_particles_view()
+        return self._particles_view
 
     def _load_new_particle(self, relative_prim_path, name):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
@@ -1250,9 +1253,12 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         Should be called every time sim.play() is called
         """
+        # TODO: Figure out if we need to update?
+        breakpoint()
+
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            self.particles_view = og.sim.physics_sim_view.create_rigid_body_view(
+            self._particles_view = og.sim.physics_sim_view.create_rigid_body_view(
                 pattern=f"{self.prim_path}/particles/*"
             )
 
@@ -1261,7 +1267,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super()._clear()
 
         # Clear internal variables
-        self.particles_view = None
+        self._particles_view = None
         self._particle_radius = None
         self._particle_offset = None
 

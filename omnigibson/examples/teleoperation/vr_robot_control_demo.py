@@ -80,15 +80,19 @@ def main():
         eef_tracking_mode="controller",
         align_anchor_to="camera",
         # roll, pitch, yaw
-        view_angle_limits=[180, 30, 30],
+        # view_angle_limits=[180, 30, 30],
     )
     vrsys.start()
 
-    for _ in range(3000):
+    robot = env.robots[0]
+
+    for _ in range(2000):
         # update the VR system
         vrsys.update()
         # get the action from the VR system and step the environment
-        env.step(vrsys.get_robot_teleop_action())
+        action = vrsys.get_robot_teleop_action()
+        env.step(action)
+        print("Controller action: " + str(action[robot.base_action_idx]))
 
     print("Cleaning up...")
     vrsys.stop()
