@@ -879,7 +879,6 @@ class BatchControlViewAPIImpl:
         # all the robots are covered
         self.initialize_view()
 
-
     def post_physics_step(self):
         # Should be called every sim physics step, right after a new physics step occurs
         # The current poses (if it exists) are now the former poses from the previous timestep
@@ -912,7 +911,7 @@ class BatchControlViewAPIImpl:
         # Cache the (now current) transforms so that they're guaranteed to exist throughout the duration of this
         # timestep, and available for caching during the next timestep's post_physics_step() call
         if og.sim.is_playing():
-            self.initialize_view()   # TODO: Does this make sense here?
+            self.initialize_view()  # TODO: Does this make sense here?
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
