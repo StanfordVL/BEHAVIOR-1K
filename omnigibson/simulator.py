@@ -765,7 +765,11 @@ def _launch_simulator(*args, **kwargs):
                 # The objects have been added to the USD stage but PhysX hasn't been synchronized yet.
                 # We must flush USD changes to PhysX before updating handles to avoid errors like
                 # "Provided pattern list did not match any rigid bodies".
+                # The order of operations should strictly be:
+                #   1. Flush USD changes to PhysX
+                #   2. Update handles to reinitialize physics view
                 SimulationManager._physx_sim_interface.flush_changes()
+                self.update_handles()
 
         def _post_import_object(self, obj):
             """
@@ -842,6 +846,9 @@ def _launch_simulator(*args, **kwargs):
 
             # Run post-processing required if we were playing
             if playing:
+                # Update all handles that are now broken because objects have changed
+                self.update_handles()
+
                 if gm.ENABLE_TRANSITION_RULES:
                     # Prune the transition rules that are currently active
                     for scene in scenes_modified:
@@ -895,6 +902,9 @@ def _launch_simulator(*args, **kwargs):
                 # Remove prim
                 prim.remove()
 
+            # Update all handles that are now broken because prims have changed
+            self.update_handles()
+
         def _reset_variables(self):
             """
             Reset internal variables when a new stage is loaded
@@ -906,9 +916,6 @@ def _launch_simulator(*args, **kwargs):
             PoseAPI.mark_valid()
 
         def _refresh_physics_sim_view(self):
-            # TODO: Figure out if we need to refresh this
-            breakpoint()
-
             SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
             IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
 
@@ -918,6 +925,30 @@ def _launch_simulator(*args, **kwargs):
             SimulationManager._physics_sim_view.set_subspace_roots("/")
             SimulationManager._message_bus.dispatch(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
             SimulationManager._message_bus.dispatch(IsaacEvents.PHYSICS_READY.value, payload={})
+
+        def update_handles(self):
+            # Handles are only relevant when physx is running
+            if not self.is_playing():
+                return
+
+            # Refresh the sim view
+            self._refresh_physics_sim_view()
+
+            # Then update the handles for all objects
+            for scene in self.scenes:
+                if scene is not None:
+                    for obj in scene.objects:
+                        # Only need to update if object is already initialized as well
+                        if obj.initialized:
+                            obj.update_handles()
+                    for system in scene.active_systems.values():
+                        if isinstance(system, MacroPhysicalParticleSystem):
+                            system.refresh_particles_view()
+
+            # Finally update any unified views
+            RigidContactAPI.initialize_view()
+            GripperRigidContactAPI.initialize_view()
+            ControllableObjectViewAPI.initialize_view()
 
         def _non_physics_step(self):
             """
@@ -949,6 +980,9 @@ def _launch_simulator(*args, **kwargs):
                             self._objects_require_joint_break_callback = True
 
                     self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
+
+                    # Re-initialize the physics view because the number of objects has changed
+                    self.update_handles()
 
                     if gm.ENABLE_TRANSITION_RULES:
                         # Refresh the transition rules
@@ -1011,6 +1045,10 @@ def _launch_simulator(*args, **kwargs):
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
                 self.render()
+
+                # Update all object handles, unless this is a play during initialization
+                if og.sim is not None:
+                    self.update_handles()
 
                 if was_stopped:
                     # We need to update controller mode because kp and kd were set to the original (incorrect) values when
@@ -1423,7 +1461,6 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 IPhysxSimulation: Physx Simulation Interface (psi) for controlling low-level physx simulation
             """
-            self._refresh_physics_sim_view()
             return self._physx_simulation_interface
 
         @property

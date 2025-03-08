@@ -780,6 +780,10 @@ class ClothPrim(GeomPrim):
 
         return contacts
 
+    def update_handles(self):
+        # no handles to update
+        pass
+
     @property
     def volume(self):
         mesh = mesh_prim_to_trimesh_mesh(self.prim, include_normals=False, include_texcoord=False, world_frame=True)

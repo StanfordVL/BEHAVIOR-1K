@@ -96,6 +96,7 @@ class MaterialPrim(BasePrim):
 
         # Move prim to desired location
         lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
+        og.sim.update_handles()
 
         # Return generated material
         return lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path)

@@ -135,17 +135,8 @@ class JointPrim(BasePrim):
         # Always run super first
         super()._initialize()
 
-        # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
-        # first, then get the corresponding joint index from that dof offset.
-        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self.prim_path)
-        joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
-        # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
-        # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
-        self._joint_idx = next(
-            i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset
-        )
-        self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
-        self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
+        # Update the joint indices etc.
+        self.update_handles()
 
         # Get control type
         if self.articulated:
@@ -165,6 +156,22 @@ class JointPrim(BasePrim):
             # Make sure all the control types are the same -- if not, we had something go wrong!
             assert len(set(control_types)) == 1, f"Got multiple control types for this single joint: {control_types}"
             self._control_type = control_types[0]
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
+        # first, then get the corresponding joint index from that dof offset.
+        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self.prim_path)
+        joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
+        # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
+        # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
+        self._joint_idx = next(
+            i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset
+        )
+        self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
+        self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
 
     def set_control_type(self, control_type, kp=None, kd=None):
         """

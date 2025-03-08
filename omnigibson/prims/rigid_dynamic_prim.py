@@ -66,6 +66,22 @@ class RigidDynamicPrim(RigidPrim):
         if self.contact_reporting_enabled:
             og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
 
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        # Validate that the view is valid if physics is running
+        if og.sim.is_playing() and self.initialized:
+            assert (
+                self._rigid_prim_view.is_physics_handle_valid() and self._rigid_prim_view._physics_view.check()
+            ), "Rigid prim view must be valid if physics is running!"
+
+        assert not (
+            og.sim.is_playing() and not self._rigid_prim_view.is_valid
+        ), "Rigid prim view must be valid if physics is running!"
+
+        self._rigid_prim_view.initialize(og.sim.physics_sim_view)
+
     def set_linear_velocity(self, velocity):
         """
         Sets the linear velocity of the prim in stage.

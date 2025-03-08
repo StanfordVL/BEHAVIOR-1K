@@ -243,9 +243,6 @@ class RigidContactAPIImpl:
         """
         Initializes the rigid contact view. Note: Can only be done when sim is playing!
         """
-        # TODO: Figure out if we need to initialize the view
-        breakpoint()
-
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
         # Compile deterministic mapping from rigid body path to idx
@@ -302,7 +299,6 @@ class RigidContactAPIImpl:
         Returns:
             int: scene idx for the rigid body defined by @prim_path
         """
-        self.initialize_view()
         return self._PATH_TO_SCENE_IDX[prim_path]
 
     def get_body_row_idx(self, prim_path):
@@ -310,7 +306,6 @@ class RigidContactAPIImpl:
         Returns:
             int: row idx assigned to the rigid body defined by @prim_path
         """
-        self.initialize_view()
         scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
         return scene_idx, self._PATH_TO_ROW_IDX[scene_idx][prim_path]
 
@@ -319,7 +314,6 @@ class RigidContactAPIImpl:
         Returns:
             int: col idx assigned to the rigid body defined by @prim_path
         """
-        self.initialize_view()
         scene_idx = self._PATH_TO_SCENE_IDX[prim_path]
         return scene_idx, self._PATH_TO_COL_IDX[scene_idx][prim_path]
 
@@ -328,7 +322,6 @@ class RigidContactAPIImpl:
         Returns:
             str: @prim_path corresponding to the row idx @idx in the contact matrix
         """
-        self.initialize_view()
         return self._ROW_IDX_TO_PATH[scene_idx][idx]
 
     def get_col_idx_prim_path(self, scene_idx, idx):
@@ -336,7 +329,6 @@ class RigidContactAPIImpl:
         Returns:
             str: @prim_path corresponding to the column idx @idx in the contact matrix
         """
-        self.initialize_view()
         return self._COL_IDX_TO_PATH[scene_idx][idx]
 
     def get_all_impulses(self, scene_idx):
@@ -347,8 +339,6 @@ class RigidContactAPIImpl:
             n-array: (N, M, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
                 in the simulator and M tracked rigid bodies
         """
-        self.initialize_view()
-
         # Generate the contact matrix if it doesn't already exist
         if scene_idx not in self._CONTACT_MATRIX:
             self._CONTACT_MATRIX[scene_idx] = self._CONTACT_VIEW[scene_idx].get_contact_force_matrix(dt=1.0)
@@ -370,8 +360,6 @@ class RigidContactAPIImpl:
             n-array: (N, M, 3) impulse array defining current impulses between N bodies from @prim_paths_a and M bodies
                 from @prim_paths_b
         """
-        self.initialize_view()
-
         # Compute subset of matrix and return
         scene_idx = self._PATH_TO_SCENE_IDX[prim_paths_a[0]]
         idxs_a = [self._PATH_TO_ROW_IDX[scene_idx][path] for path in prim_paths_a]
@@ -379,8 +367,6 @@ class RigidContactAPIImpl:
         return self.get_all_impulses(scene_idx)[idxs_a][:, idxs_b]
 
     def get_contact_pairs(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
-        self.initialize_view()
-
         """Get pairs of prim paths that are in contact."""
         impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
@@ -419,8 +405,6 @@ class RigidContactAPIImpl:
         }
 
     def get_contact_data(self, scene_idx, row_prim_paths=None, column_prim_paths=None):
-        self.initialize_view()
-
         # First check if the object has any contacts
         impulses = th.norm(self.get_all_impulses(scene_idx), dim=-1)
         assert impulses.ndim == 2, f"Impulse matrix should be 2D, found shape {impulses.shape}"
@@ -499,8 +483,6 @@ class RigidContactAPIImpl:
         Returns:
             bool: Whether any body from @prim_paths_a is in contact with any body from @prim_paths_b
         """
-        self.initialize_view()
-
         # Check if the contact tuple already exists in the cache; if so, return the value
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
         if key not in self._CONTACT_CACHE:
@@ -624,6 +606,7 @@ class CollisionAPI:
 
         # Remove the collision groups tree
         og.sim.stage.RemovePrim("/World/collision_groups")
+        og.sim.update_handles()
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
@@ -875,11 +858,6 @@ class BatchControlViewAPIImpl:
         # Prior link transforms / dof positions for estimating velocities since Omni gives inaccurate values
         self._last_state = None
 
-        # We need to initialize here because the multi-robot view wants to get the matched prims list to check
-        # all the robots are covered
-        self.initialize_view()
-
-
     def post_physics_step(self):
         # Should be called every sim physics step, right after a new physics step occurs
         # The current poses (if it exists) are now the former poses from the previous timestep
@@ -912,13 +890,11 @@ class BatchControlViewAPIImpl:
         # Cache the (now current) transforms so that they're guaranteed to exist throughout the duration of this
         # timestep, and available for caching during the next timestep's post_physics_step() call
         if og.sim.is_playing():
-            self.initialize_view()   # TODO: Does this make sense here?
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
     def _set_dof_position_targets(self, data, indices, cast=True):
-        self.initialize_view()
         # No casting results in better efficiency
         if cast:
             data = self._view._frontend.as_contiguous_float32(data)
@@ -930,7 +906,6 @@ class BatchControlViewAPIImpl:
             raise Exception("Failed to set DOF positions in backend")
 
     def _set_dof_velocity_targets(self, data, indices, cast=True):
-        self.initialize_view()
         # No casting results in better efficiency
         if cast:
             data = self._view._frontend.as_contiguous_float32(data)
@@ -942,7 +917,6 @@ class BatchControlViewAPIImpl:
             raise Exception("Failed to set DOF velocities in backend")
 
     def _set_dof_actuation_forces(self, data, indices, cast=True):
-        self.initialize_view()
         # No casting results in better efficiency
         if cast:
             data = self._view._frontend.as_contiguous_float32(data)
@@ -954,8 +928,6 @@ class BatchControlViewAPIImpl:
             raise Exception("Failed to set DOF actuation forces in backend")
 
     def flush_control(self):
-        self.initialize_view()
-
         if "dof_position_targets" in self._write_idx_cache:
             pos_indices = cb.int_array(sorted(self._write_idx_cache["dof_position_targets"]))
             pos_targets = self._read_cache["dof_position_targets"]
@@ -972,9 +944,6 @@ class BatchControlViewAPIImpl:
             self._set_dof_actuation_forces(cb.to_torch(eff_targets), cb.to_torch(eff_indices), cast=False)
 
     def initialize_view(self):
-        # TODO: Figure out if we need to do this
-        breakpoint()
-
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.objects.controllable_object import ControllableObject
 
@@ -1017,7 +986,6 @@ class BatchControlViewAPIImpl:
         }
 
     def set_joint_position_targets(self, prim_path, positions, indices):
-        self.initialize_view()
         assert len(indices) == len(positions), "Indices and values must have the same length"
         idx = self._idx[prim_path]
 
@@ -1032,7 +1000,6 @@ class BatchControlViewAPIImpl:
         self._write_idx_cache["dof_position_targets"].add(idx)
 
     def set_joint_velocity_targets(self, prim_path, velocities, indices):
-        self.initialize_view()
         assert len(indices) == len(velocities), "Indices and values must have the same length"
         idx = self._idx[prim_path]
 
@@ -1047,7 +1014,6 @@ class BatchControlViewAPIImpl:
         self._write_idx_cache["dof_velocity_targets"].add(idx)
 
     def set_joint_efforts(self, prim_path, efforts, indices):
-        self.initialize_view()
         assert len(indices) == len(efforts), "Indices and values must have the same length"
         idx = self._idx[prim_path]
 
@@ -1062,7 +1028,6 @@ class BatchControlViewAPIImpl:
         self._write_idx_cache["dof_actuation_forces"].add(idx)
 
     def get_root_transform(self, prim_path):
-        self.initialize_view()
         if "root_transforms" not in self._read_cache:
             self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
 
@@ -1071,7 +1036,6 @@ class BatchControlViewAPIImpl:
         return pose[:3], pose[3:]
 
     def get_position_orientation(self, prim_path):
-        self.initialize_view()
         # Here we want to return the position of the base footprint link. If the base footprint link is None,
         # we return the position of the root link.
         if self._base_footprint_link_names[prim_path] is not None:
@@ -1081,7 +1045,6 @@ class BatchControlViewAPIImpl:
             return self.get_root_transform(prim_path)
 
     def _get_velocities(self, prim_path, estimate=False):
-        self.initialize_view()
         if self._base_footprint_link_names[prim_path] is not None:
             link_name = self._base_footprint_link_names[prim_path]
             return self._get_link_velocities(prim_path, link_name, estimate=estimate)
@@ -1089,7 +1052,6 @@ class BatchControlViewAPIImpl:
             return self._get_root_velocities(prim_path, estimate=estimate)
 
     def _get_relative_velocities(self, prim_path, estimate=False):
-        self.initialize_view()
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         if f"relative_{vel_str}" not in self._read_cache:
@@ -1120,15 +1082,12 @@ class BatchControlViewAPIImpl:
         return self._read_cache[f"relative_{vel_str}"][prim_path]
 
     def get_linear_velocity(self, prim_path, estimate=False):
-        self.initialize_view()
         return self._get_velocities(prim_path, estimate=estimate)[:3]
 
     def get_angular_velocity(self, prim_path, estimate=False):
-        self.initialize_view()
         return self._get_velocities(prim_path, estimate=estimate)[3:]
 
     def _get_root_velocities(self, prim_path, estimate=False):
-        self.initialize_view()
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
@@ -1154,17 +1113,14 @@ class BatchControlViewAPIImpl:
         return self._read_cache[f"root_{vel_str}"][idx]
 
     def get_relative_linear_velocity(self, prim_path, estimate=False):
-        self.initialize_view()
         # base corresponds to final index
         return self._get_relative_velocities(prim_path, estimate=estimate)[-1, :3]
 
     def get_relative_angular_velocity(self, prim_path, estimate=False):
-        self.initialize_view()
         # base corresponds to final index
         return self._get_relative_velocities(prim_path, estimate=estimate)[-1, 3:]
 
     def get_joint_positions(self, prim_path):
-        self.initialize_view()
         if "dof_positions" not in self._read_cache:
             self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
@@ -1172,7 +1128,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["dof_positions"][idx]
 
     def get_joint_velocities(self, prim_path, estimate=False):
-        self.initialize_view()
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
@@ -1190,7 +1145,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache[f"dof_{vel_str}"][idx]
 
     def get_joint_efforts(self, prim_path):
-        self.initialize_view()
         if "dof_projected_joint_forces" not in self._read_cache:
             self._read_cache["dof_projected_joint_forces"] = cb.from_torch(self._view.get_dof_projected_joint_forces())
 
@@ -1198,7 +1152,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["dof_projected_joint_forces"][idx]
 
     def get_mass_matrix(self, prim_path):
-        self.initialize_view()
         if "mass_matrices" not in self._read_cache:
             self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_mass_matrices())
 
@@ -1206,7 +1159,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["mass_matrices"][idx]
 
     def get_generalized_gravity_forces(self, prim_path):
-        self.initialize_view()
         if "generalized_gravity_forces" not in self._read_cache:
             self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_generalized_gravity_forces())
 
@@ -1214,7 +1166,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["generalized_gravity_forces"][idx]
 
     def get_coriolis_and_centrifugal_forces(self, prim_path):
-        self.initialize_view()
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
             self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
                 self._view.get_coriolis_and_centrifugal_forces()
@@ -1224,7 +1175,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["coriolis_and_centrifugal_forces"][idx]
 
     def get_link_transform(self, prim_path, link_name):
-        self.initialize_view()
         if "link_transforms" not in self._read_cache:
             self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
 
@@ -1234,7 +1184,6 @@ class BatchControlViewAPIImpl:
         return pose[:3], pose[3:]
 
     def _get_relative_poses(self, prim_path):
-        self.initialize_view()
         if "relative_poses" not in self._read_cache:
             self._read_cache["relative_poses"] = {}
 
@@ -1254,14 +1203,12 @@ class BatchControlViewAPIImpl:
         return self._read_cache["relative_poses"][prim_path]
 
     def get_link_relative_position_orientation(self, prim_path, link_name):
-        self.initialize_view()
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         rel_pose = self._get_relative_poses(prim_path)[link_idx]
         return rel_pose[:3], rel_pose[3:]
 
     def _get_link_velocities(self, prim_path, link_name, estimate=False):
-        self.initialize_view()
         vel_str = "velocities_estimate" if estimate else "velocities"
 
         # Use estimated calculation if requested and we have prior history info
@@ -1299,27 +1246,22 @@ class BatchControlViewAPIImpl:
         return vel
 
     def get_link_linear_velocity(self, prim_path, link_name, estimate=False):
-        self.initialize_view()
         return self._get_link_velocities(prim_path, link_name, estimate=estimate)[:3]
 
     def get_link_relative_linear_velocity(self, prim_path, link_name, estimate=False):
-        self.initialize_view()
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, :3]
 
     def get_link_angular_velocity(self, prim_path, link_name, estimate=False):
-        self.initialize_view()
         return self._get_link_velocities(prim_path, link_name, estimate=estimate)[3:]
 
     def get_link_relative_angular_velocity(self, prim_path, link_name, estimate=False):
-        self.initialize_view()
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
         return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, 3:]
 
     def get_jacobian(self, prim_path):
-        self.initialize_view()
         if "jacobians" not in self._read_cache:
             self._read_cache["jacobians"] = cb.from_torch(self._view.get_jacobians())
 
@@ -1327,7 +1269,6 @@ class BatchControlViewAPIImpl:
         return self._read_cache["jacobians"][idx]
 
     def get_relative_jacobian(self, prim_path):
-        self.initialize_view()
         if "relative_jacobians" not in self._read_cache:
             self._read_cache["relative_jacobians"] = {}
 
@@ -1387,9 +1328,6 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def initialize_view(cls):
-        # TODO: Figure out when we need to do this, check if any is invalid
-        breakpoint()
-
         cls._VIEWS_BY_PATTERN = {}
 
         # First, get all of the controllable objects in the scene (avoiding circular import)
@@ -1409,6 +1347,10 @@ class ControllableObjectViewAPI:
         for pattern in patterns:
             if pattern not in cls._VIEWS_BY_PATTERN:
                 cls._VIEWS_BY_PATTERN[pattern] = BatchControlViewAPIImpl(pattern)
+
+        # Initialize the views
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.initialize_view()
 
         # Assert that the views' prim paths are disjoint
         all_prim_paths = []
@@ -1447,57 +1389,48 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def set_joint_position_targets(cls, prim_path, positions, indices):
-        cls.initialize_view()
         cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_position_targets(
             prim_path, positions, indices
         )
 
     @classmethod
     def set_joint_velocity_targets(cls, prim_path, velocities, indices):
-        cls.initialize_view()
         cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_velocity_targets(
             prim_path, velocities, indices
         )
 
     @classmethod
     def set_joint_efforts(cls, prim_path, efforts, indices):
-        cls.initialize_view()
         cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].set_joint_efforts(prim_path, efforts, indices)
 
     @classmethod
     def get_position_orientation(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_position_orientation(prim_path)
 
     @classmethod
     def get_root_position_orientation(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_root_transform(prim_path)
 
     @classmethod
     def get_linear_velocity(cls, prim_path, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(
             prim_path, estimate=estimate
         )
 
     @classmethod
     def get_angular_velocity(cls, prim_path, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(
             prim_path, estimate=estimate
         )
 
     @classmethod
     def get_relative_linear_velocity(cls, prim_path, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(
             prim_path, estimate=estimate
         )
 
     @classmethod
     def get_relative_angular_velocity(cls, prim_path, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
             prim_path,
             estimate=estimate,
@@ -1505,57 +1438,48 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_joint_positions(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
 
     @classmethod
     def get_joint_velocities(cls, prim_path, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(
             prim_path, estimate=estimate
         )
 
     @classmethod
     def get_joint_efforts(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
 
     @classmethod
     def get_mass_matrix(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
 
     @classmethod
     def get_generalized_gravity_forces(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
             prim_path
         )
 
     @classmethod
     def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
             prim_path
         )
 
     @classmethod
     def get_link_position_orientation(cls, prim_path, link_name):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_transform(
             prim_path, link_name
         )
 
     @classmethod
     def get_link_relative_position_orientation(cls, prim_path, link_name):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_position_orientation(
             prim_path, link_name
         )
 
     @classmethod
     def get_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
             prim_path,
             link_name,
@@ -1564,7 +1488,6 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
             prim_path,
             link_name,
@@ -1573,12 +1496,10 @@ class ControllableObjectViewAPI:
 
     @classmethod
     def get_jacobian(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_jacobian(prim_path)
 
     @classmethod
     def get_relative_jacobian(cls, prim_path):
-        cls.initialize_view()
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_jacobian(prim_path)
 
 

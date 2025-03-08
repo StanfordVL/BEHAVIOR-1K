@@ -41,12 +41,9 @@ def main():
     )
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
-    # vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-    #     vrsys.og2xr(th.tensor([0.0, 0.0, 1.0]), th.tensor([-0.5, 0.5, 0.5, -0.5])).numpy(), vrsys.hmd
-    # )
-
-    # anchor_pose = self.og2xr(anchor_pos, anchor_orn)
-    # self.xr_core.schedule_set_camera(anchor_pose.numpy())
+    vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
+        vrsys.og2xr(th.tensor([0.0, 0.0, 1.0]), th.tensor([-0.5, 0.5, 0.5, -0.5])).numpy(), vrsys.hmd
+    )
 
     # main simulation loop
     for _ in range(3000):
