@@ -22,7 +22,13 @@ from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.bddl_utils import BEHAVIOR_ACTIVITIES, BDDLEntity, BDDLSampler, OmniGibsonBDDLBackend, get_processed_bddl
+from omnigibson.utils.bddl_utils import (
+    BEHAVIOR_ACTIVITIES,
+    BDDLEntity,
+    BDDLSampler,
+    OmniGibsonBDDLBackend,
+    get_processed_bddl,
+)
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -110,7 +116,7 @@ class BehaviorTask(BaseTask):
         self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
-        self.activity_natural_language_initial_conditions = None    # str
+        self.activity_natural_language_initial_conditions = None  # str
         self.activity_natural_language_goal_conditions = None  # str
 
         # Run super init

@@ -473,8 +473,7 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
         str: Post-processed BDDL string
     """
     # Load bddl string
-    problem_filename = get_definition_filename(
-        behavior_activity, activity_definition)
+    problem_filename = get_definition_filename(behavior_activity, activity_definition)
     with open(problem_filename, "r") as f:
         raw_bddl = f.readlines()
 
@@ -485,8 +484,9 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
         if "*" in line:
             # Make sure we're not in the goal conditions -- we ONLY expect the wildcard to be
             # specified in either the object scope or init conditions
-            assert not in_goal, \
-                "Found wildcard in BDDL goal conditions, but only expected in object_scope and init conditions!"
+            assert (
+                not in_goal
+            ), "Found wildcard in BDDL goal conditions, but only expected in object_scope and init conditions!"
 
             # Infer whether this line is part of the object scope or goal conditions
             if "-" in line:
@@ -497,16 +497,18 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
 
                 # Synset should be a scene object instance
                 abilities = OBJECT_TAXONOMY.get_abilities(synset)
-                assert "sceneObject" in abilities, \
-                    f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
+                assert (
+                    "sceneObject" in abilities
+                ), f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
 
                 # Get all valid categories that are mapped to this synset
                 og_categories = OBJECT_TAXONOMY.get_subtree_categories(synset)
 
                 # Wildcard should be specified in the final instance
                 wildcard_instance = instances[-1]
-                assert "*" in wildcard_instance, \
-                    f"Expected wildcard to be specified in final instance in raw BDDL object scope line:\n{line}"
+                assert (
+                    "*" in wildcard_instance
+                ), f"Expected wildcard to be specified in final instance in raw BDDL object scope line:\n{line}"
 
                 # Make sure this hasn't been specified yet
                 assert wildcard_instance not in swap_info, f"Already found wildcard previously for synset {synset}!"
@@ -525,10 +527,13 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 # For now, we ONLY support inroom condition, so assert that this is the case
                 tokens = line.strip(" ()\n\t").split(" ")
                 assert len(tokens) == 3, f"Expected 3 total parsed tokens for wildcard init condition line:\n{line}"
-                assert tokens[0] == "inroom", f"Only inroom is supported for wildcard init condition, but found: {tokens[0]}"
+                assert (
+                    tokens[0] == "inroom"
+                ), f"Only inroom is supported for wildcard init condition, but found: {tokens[0]}"
                 _, wildcard_instance, room = tokens
-                assert wildcard_instance in swap_info, \
-                    f"Expected wildcard instance {wildcard_instance} to already be specified in object_scope, but found none!"
+                assert (
+                    wildcard_instance in swap_info
+                ), f"Expected wildcard instance {wildcard_instance} to already be specified in object_scope, but found none!"
                 swap_info[wildcard_instance]["room"] = room
                 swap_info[wildcard_instance]["init_cond_idx"] = idx
 
@@ -546,8 +551,9 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
         # Make sure we have the minimum number of objects requested
         n_min_instances = info["n_minimum_instances"]
         synset = info["synset"]
-        assert n_valid_objects >= n_min_instances, \
-            f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+        assert (
+            n_valid_objects >= n_min_instances
+        ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
 
         # Hot swap this information into the BDDL
         extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
@@ -556,8 +562,10 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
         init_cond_idx = info["init_cond_idx"] + init_cond_offset
         raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
         init_cond_line = raw_bddl[init_cond_idx]
-        extra_cond_lines = [init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances]
-        raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1:]
+        extra_cond_lines = [
+            init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
+        ]
+        raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1 :]
         init_cond_offset += len(extra_instances)
 
     # Return the compiled processed BDDL as a single string
