@@ -22,7 +22,13 @@ from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
-from omnigibson.utils.bddl_utils import BEHAVIOR_ACTIVITIES, BDDLEntity, BDDLSampler, OmniGibsonBDDLBackend
+from omnigibson.utils.bddl_utils import (
+    BEHAVIOR_ACTIVITIES,
+    BDDLEntity,
+    BDDLSampler,
+    OmniGibsonBDDLBackend,
+    get_processed_bddl,
+)
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -85,9 +91,10 @@ class BehaviorTask(BaseTask):
         self.backend = OmniGibsonBDDLBackend()
 
         # Activity info
-        self.activity_name = None
+        self.activity_name = activity_name
         self.activity_definition_id = activity_definition_id
         self.activity_instance_id = activity_instance_id
+        self.predefined_problem = predefined_problem
         self.activity_conditions = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
@@ -109,14 +116,8 @@ class BehaviorTask(BaseTask):
         self.instruction_order = None  # th.tensor of int
         self.currently_viewed_index = None  # int
         self.currently_viewed_instruction = None  # tuple of str
+        self.activity_natural_language_initial_conditions = None  # str
         self.activity_natural_language_goal_conditions = None  # str
-
-        # Load the initial behavior configuration
-        self.update_activity(
-            activity_name=activity_name,
-            activity_definition_id=activity_definition_id,
-            predefined_problem=predefined_problem,
-        )
 
         # Run super init
         super().__init__(termination_config=termination_config, reward_config=reward_config)
@@ -189,6 +190,14 @@ class BehaviorTask(BaseTask):
         return rewards
 
     def _load(self, env):
+        # Load the initial behavior configuration
+        self.update_activity(
+            env=env,
+            activity_name=self.activity_name,
+            activity_definition_id=self.activity_definition_id,
+            predefined_problem=self.predefined_problem,
+        )
+
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
         # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
@@ -216,11 +225,12 @@ class BehaviorTask(BaseTask):
         # No non-low dim observations so we return an empty dict
         return dict()
 
-    def update_activity(self, activity_name, activity_definition_id, predefined_problem=None):
+    def update_activity(self, env, activity_name, activity_definition_id, predefined_problem=None):
         """
         Update the active Behavior activity being deployed
 
         Args:
+            env (og.Environment): OmniGibson active environment
             activity_name (None or str): Name of the Behavior Task to instantiate
             activity_definition_id (int): Specification to load for the desired task. For a given Behavior Task, multiple task
                 specifications can be used (i.e.: differing goal conditions, or "ways" to complete a given task). This
@@ -228,7 +238,16 @@ class BehaviorTask(BaseTask):
             predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
                 load. This will automatically override @activity_name and @activity_definition_id.
         """
-        # Update internal variables based on values
+        # We parse the raw BDDL to be compatible with OmniGibson
+        # This requires converting wildcard-denoted synset instances into explicit synsets
+        # that are compatible with all valid scene objects in the current OG scene
+        if predefined_problem is None:
+            # Process the task
+            predefined_problem = get_processed_bddl(
+                activity_name,
+                activity_definition_id,
+                scene=env.scene,
+            )
 
         # Activity info
         self.activity_name = activity_name
