@@ -320,6 +320,10 @@ class DataCollectionWrapper(DataWrapper):
         # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
 
+        # Cached state to rollback to if requested
+        self.checkpoint_state = None
+        self.checkpoint_step_idx = None
+
         self._is_recording = True
         self.use_vr = use_vr
 
@@ -347,6 +351,40 @@ class DataCollectionWrapper(DataWrapper):
 
         # Configure the simulator to optimize for data collection
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
+
+    def update_checkpoint(self):
+        """
+        Updates the internal cached checkpoint state to be the current simulation state. If @rollback_to_checkpoint() is
+        called, it will rollback to this cached checkpoint state
+        """
+        # Save the current full state and corresponding step idx
+        self.checkpoint_state = og.sim.save(json_paths=None, as_dict=True)[0]
+        self.checkpoint_step_idx = len(self.current_traj_history)
+
+    def rollback_to_checkpoint(self):
+        """
+        Rolls back the current state to the checkpoint stored in @self.checkpoint_state. If no checkpoint
+        is found, this results in reset() being called
+        """
+        if self.checkpoint_state is None:
+            self.reset()
+
+        else:
+            # Restore to checkpoint
+            og.sim.restore(scene_files=[self.checkpoint_state])
+
+            # Prune all data stored at the current checkpoint step and beyond
+            n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
+            self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
+            self.step_count -= n_steps_to_remove
+
+            # Also prune any transition info that occurred after the checkpoint step idx
+            for step in tuple(self.current_transitions.keys()):
+                if step >= self.checkpoint_step_idx:
+                    self.current_transitions.pop(step)
+
+            # Update environment env step count
+            self.env._current_step = self.checkpoint_step_idx - 1
 
     @property
     def is_recording(self):
@@ -393,7 +431,6 @@ class DataCollectionWrapper(DataWrapper):
             lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
             lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
             lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
@@ -428,6 +465,10 @@ class DataCollectionWrapper(DataWrapper):
             key: th.stack(vals, dim=0) if isinstance(vals[0], th.Tensor) else th.tensor(vals, dtype=type(vals[0]))
             for key, vals in metadata.items()
         }
+
+        # Clear checkpoint state
+        self.checkpoint_state = None
+        self.checkpoint_step_idx = None
 
         return init_obs, init_info
 
@@ -489,6 +530,17 @@ class DataCollectionWrapper(DataWrapper):
             obj (BaseObject or BaseSystem): Object / system whose information should be stored
             add (bool): If True, assumes the object is being imported. Else, assumes the object is being removed
         """
+        # If we're at the current checkpoint idx, this means that we JUST created a checkpoint and we're still at
+        # the same sim step.
+        # This is dangerous because it means that a transition is happening that will NOT be tracked properly
+        # if we rollback the state -- i.e.: the state will be rolled back to just BEFORE this transition was executed,
+        # and will therefore not be tracked properly in subsequent states during playback. So we assert that the current
+        # idx is NOT the current checkpoint idx
+        if self.checkpoint_step_idx is not None:
+            assert (
+                self.checkpoint_step_idx - 1 != self.env.episode_steps
+            ), "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
+
         if self.env.episode_steps not in self.current_transitions:
             self.current_transitions[self.env.episode_steps] = {
                 "systems": {"add": [], "remove": []},
