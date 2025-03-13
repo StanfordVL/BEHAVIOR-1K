@@ -733,9 +733,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def instancer_idns(self):
         """
         Returns:
-            int: Number of active particles in this system
+            list of int: Per-instancer number of active particles in this system
         """
-        return th.tensor([inst.idn for inst in self.particle_instancers.values()])
+        return [inst.idn for inst in self.particle_instancers.values()]
 
     @property
     def self_collision(self):
@@ -1265,8 +1265,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
-            instancer_particle_groups=(th.tensor([inst.particle_group for inst in self.particle_instancers.values()])),
-            instancer_particle_counts=(th.tensor([inst.n_particles for inst in self.particle_instancers.values()])),
+            instancer_particle_groups=[inst.particle_group for inst in self.particle_instancers.values()],
+            instancer_particle_counts=[inst.n_particles for inst in self.particle_instancers.values()],
             particle_states=(
                 dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
             ),
@@ -1276,12 +1276,20 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Synchronize the particle instancers
         self._sync_particle_instancers(
             idns=(
-                state["instancer_idns"].tolist()
+                state["instancer_idns"].int().tolist()
                 if isinstance(state["instancer_idns"], th.Tensor)
                 else state["instancer_idns"]
             ),
-            particle_groups=state["instancer_particle_groups"],
-            particle_counts=state["instancer_particle_counts"],
+            particle_groups=(
+                state["instancer_particle_groups"].int().tolist()
+                if isinstance(state["instancer_particle_groups"], th.Tensor)
+                else state["instancer_particle_groups"]
+            ),
+            particle_counts=(
+                state["instancer_particle_counts"].int().tolist()
+                if isinstance(state["instancer_particle_counts"], th.Tensor)
+                else state["instancer_particle_counts"]
+            ),
         )
 
         # Iterate over all particle states and load their respective states
@@ -1293,9 +1301,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return th.cat(
             [
                 th.tensor([state["n_instancers"]]),
-                state["instancer_idns"],
-                state["instancer_particle_groups"],
-                state["instancer_particle_counts"],
+                th.tensor(state["instancer_idns"]),
+                th.tensor(state["instancer_particle_groups"]),
+                th.tensor(state["instancer_particle_counts"]),
                 *[
                     self.particle_instancers[name].serialize(inst_state)
                     for name, inst_state in state["particle_states"].items()
@@ -1313,7 +1321,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             idx += n_instancers
 
         # Syncing is needed so that each particle instancer can further deserialize its own state
-        log.debug(f"Syncing {self.name} particles with {n_instancers} instancers..")
+        log.debug(f"Syncing {self.name} particles with {n_instancers} instancers...")
         self._sync_particle_instancers(
             idns=instancer_info["instancer_idns"],
             particle_groups=instancer_info["instancer_particle_groups"],
