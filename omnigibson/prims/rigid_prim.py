@@ -235,34 +235,6 @@ class RigidPrim(XFormPrim):
         """
         pass
 
-    def enable_gravity(self):
-        """
-        Enables gravity for this rigid body.
-        To be implemented by subclasses.
-        """
-        raise NotImplementedError("Enabling gravity is only supported for dynamic rigid bodies")
-
-    def disable_gravity(self):
-        """
-        Disables gravity for this rigid body.
-        To be implemented by subclasses.
-        """
-        raise NotImplementedError("Disabling gravity is only supported for dynamic rigid bodies")
-
-    def wake(self):
-        """
-        Enable physics for this rigid body.
-        To be implemented by subclasses.
-        """
-        raise NotImplementedError("Wake is only supported for dynamic rigid bodies")
-
-    def sleep(self):
-        """
-        Disable physics for this rigid body.
-        To be implemented by subclasses.
-        """
-        raise NotImplementedError("Sleep is only supported for dynamic rigid bodies")
-
     def contact_list(self):
         """
         Get list of all current contacts with this rigid body
@@ -283,46 +255,6 @@ class RigidPrim(XFormPrim):
                 c[3] = og.sim.contact_sensor.decode_body_name(c[3])
                 contacts.append(CsRawData(*c))
         return contacts
-
-    def set_linear_velocity(self, velocity):
-        """
-        Sets the linear velocity of the prim in stage.
-        To be implemented by subclasses.
-
-        Args:
-            velocity (th.tensor): linear velocity to set the rigid prim to. Shape (3,).
-        """
-        raise NotImplementedError("Linear velocity setting is only supported for dynamic rigid bodies")
-
-    def get_linear_velocity(self, clone=True):
-        """
-        Args:
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Returns:
-            th.tensor: current linear velocity of the the rigid prim. Shape (3,).
-        """
-        raise NotImplementedError("Linear velocity getting is only supported for dynamic rigid bodies")
-
-    def set_angular_velocity(self, velocity):
-        """
-        Sets the angular velocity of the prim in stage.
-        To be implemented by subclasses.
-
-        Args:
-            velocity (th.tensor): angular velocity to set the rigid prim to. Shape (3,).
-        """
-        raise NotImplementedError("Angular velocity setting is only supported for dynamic rigid bodies")
-
-    def get_angular_velocity(self, clone=True):
-        """
-        Args:
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Returns:
-            th.tensor: current angular velocity of the the rigid prim. Shape (3,).
-        """
-        raise NotImplementedError("Angular velocity getting is only supported for dynamic rigid bodies")
 
     def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
         """
@@ -355,37 +287,6 @@ class RigidPrim(XFormPrim):
         # Default implementation - will be overridden by subclasses
         XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
         PoseAPI.invalidate()
-
-    def get_position_orientation(self, frame: Literal["world", "scene"] = "world", clone=True):
-        """
-        Gets prim's pose with respect to the specified frame.
-        Base implementation that will be overridden by subclasses.
-
-        Args:
-            frame (Literal): frame to get the pose with respect to. Default to world.
-                scene frame gets position relative to the scene.
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Returns:
-            2-tuple:
-                - th.Tensor: (x,y,z) position in the specified frame
-                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
-        """
-        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world', or 'scene'."
-
-        position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
-
-        # Assert that the orientation is a unit quaternion
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
-
-        # If requested, compute the scene-local transform
-        if frame == "scene":
-            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
-            position, orientation = self.scene.convert_world_pose_to_scene_relative(position, orientation)
-
-        return position, orientation
 
     @property
     def body_name(self):
@@ -464,42 +365,6 @@ class RigidPrim(XFormPrim):
             for collision_mesh in self._collision_meshes.values()
         )
 
-    @volume.setter
-    def volume(self, volume):
-        raise NotImplementedError("Cannot set volume directly for a link!")
-
-    @property
-    def mass(self):
-        """
-        Returns:
-            float: mass of the rigid body in kg.
-        """
-        raise NotImplementedError("Mass getter is only applicable for dynamic rigid bodies")
-
-    @mass.setter
-    def mass(self, mass):
-        """
-        Args:
-            mass (float): mass of the rigid body in kg.
-        """
-        raise NotImplementedError("Mass setter is only applicable for dynamic rigid bodies")
-
-    @property
-    def density(self):
-        """
-        Returns:
-            float: density of the rigid body in kg / m^3.
-        """
-        raise NotImplementedError("Density getter is only applicable for dynamic rigid bodies")
-
-    @density.setter
-    def density(self, density):
-        """
-        Args:
-            density (float): density of the rigid body in kg / m^3.
-        """
-        raise NotImplementedError("Density setter is only applicable for dynamic rigid bodies")
-
     @cached_property
     def kinematic_only(self):
         """
@@ -510,88 +375,6 @@ class RigidPrim(XFormPrim):
                 for more information
         """
         return self.get_attribute("physics:kinematicEnabled")
-
-    @property
-    def solver_position_iteration_count(self):
-        """
-        Returns:
-            int: How many position iterations to take per physics step by the physx solver
-        """
-        raise NotImplementedError("Solver position iteration count is only applicable for dynamic rigid bodies")
-
-    @solver_position_iteration_count.setter
-    def solver_position_iteration_count(self, count):
-        """
-        Sets how many position iterations to take per physics step by the physx solver
-
-        Args:
-            count (int): How many position iterations to take per physics step by the physx solver
-        """
-        raise NotImplementedError("Solver position iteration count is only applicable for dynamic rigid bodies")
-
-    @property
-    def solver_velocity_iteration_count(self):
-        """
-        Returns:
-            int: How many velocity iterations to take per physics step by the physx solver
-        """
-        raise NotImplementedError("Solver velocity iteration count is only applicable for dynamic rigid bodies")
-
-    @solver_velocity_iteration_count.setter
-    def solver_velocity_iteration_count(self, count):
-        """
-        Sets how many velocity iterations to take per physics step by the physx solver
-
-        Args:
-            count (int): How many velocity iterations to take per physics step by the physx solver
-        """
-        raise NotImplementedError("Solver velocity iteration count is only applicable for dynamic rigid bodies")
-
-    @property
-    def stabilization_threshold(self):
-        """
-        Returns:
-            float: threshold for stabilizing this rigid body
-        """
-        raise NotImplementedError("Stabilization threshold is only applicable for dynamic rigid bodies")
-
-    @stabilization_threshold.setter
-    def stabilization_threshold(self, threshold):
-        """
-        Sets threshold for stabilizing this rigid body
-
-        Args:
-            threshold (float): stabilizing threshold
-        """
-        raise NotImplementedError("Stabilization threshold is only applicable for dynamic rigid bodies")
-
-    @property
-    def is_asleep(self):
-        """
-        To be implemented by subclasses.
-
-        Returns:
-            bool: whether this rigid prim is asleep or not
-        """
-        raise NotImplementedError("Sleep state is only applicable for dynamic rigid bodies")
-
-    @property
-    def sleep_threshold(self):
-        """
-        Returns:
-            float: threshold for sleeping this rigid body
-        """
-        raise NotImplementedError("Sleep threshold is only applicable for dynamic rigid bodies")
-
-    @sleep_threshold.setter
-    def sleep_threshold(self, threshold):
-        """
-        Sets threshold for sleeping this rigid body
-
-        Args:
-            threshold (float): Sleeping threshold
-        """
-        raise NotImplementedError("Sleep threshold is only applicable for dynamic rigid bodies")
 
     @property
     def ccd_enabled(self):

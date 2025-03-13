@@ -71,10 +71,6 @@ def test_readdition(env):
         )
         env.scene.add_object(apple2)
 
-    # Manually update physics simulation handles since we bypassed the normal adding_objects context
-    # due to the expected exception
-    og.sim.update_handles()
-
     # Check that apple exists
     assert env.scene.object_registry("name", "apple_unique") is not None
 
