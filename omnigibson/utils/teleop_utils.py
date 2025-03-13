@@ -180,7 +180,10 @@ class OVXRSystem(TeleopSystem):
         self.vr_profile = self.xr_core.get_profile("vr")
         self.disable_display_output = disable_display_output
         # visualize control markers
-        lazy.carb.settings.get_settings().set("/defaults/xr/profile/" + self.xr_core.get_current_profile_name() + "/controllers/visible", self.show_control_marker)
+        lazy.carb.settings.get_settings().set(
+            "/defaults/xr/profile/" + self.xr_core.get_current_profile_name() + "/controllers/visible",
+            self.show_control_marker,
+        )
         # set anchor mode to be custom anchor
         lazy.carb.settings.get_settings().set(
             self.vr_profile.get_scene_persistent_path() + "anchorMode", "custom_anchor"
@@ -231,17 +234,26 @@ class OVXRSystem(TeleopSystem):
         self._update_camera_callback = self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
             lazy.omni.kit.xr.core.XRCoreEventType.pre_sync_update, self._update_camera_pose, name="update camera"
         )
-        # Whenever controller state is updated, e.g. on_disabled, on_changed, 
+        # Whenever controller state is updated, e.g. on_disabled, on_changed,
         # the clear_controller_model method gets called and removes a prim from stage
         # this effetively triggers _on_prim_deletion in articulation view and invalidates its physics view
         # proposed fix: register whatever event that do this and update_handles afterwards
-        controller_state_change_event_names = ["xr_input.user_hand_left.model_change", "xr_input.user_hand_right.model_change", "xr_input.user_hand_left.disable", "xr_input.user_hand_right.disable"] # potentially also setting change - visibility
+        controller_state_change_event_names = [
+            "xr_input.user_hand_left.model_change",
+            "xr_input.user_hand_right.model_change",
+            "xr_input.user_hand_left.disable",
+            "xr_input.user_hand_right.disable",
+        ]  # potentially also setting change - visibility
         for event_name in controller_state_change_event_names:
             self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
-                lazy.carb.events.type_from_string(event_name), self._post_controller_change, name=f"controller change event {event_name}"
+                lazy.carb.events.type_from_string(event_name),
+                self._post_controller_change,
+                name=f"controller change event {event_name}",
             )
-        lazy.omni.kit.app.SettingChangeSubscription(self.vr_profile.get_persistent_path() + "controllers/visible", self._post_controller_change)
-        
+        lazy.omni.kit.app.SettingChangeSubscription(
+            self.vr_profile.get_persistent_path() + "controllers/visible", self._post_controller_change
+        )
+
         self._view_blackout_prim = None
         self._view_angle_limits = (
             [T.deg2rad(limit) for limit in view_angle_limits] if view_angle_limits is not None else None
@@ -260,7 +272,7 @@ class OVXRSystem(TeleopSystem):
             self._view_blackout_prim.load(scene)
             self._view_blackout_prim.initialize()
             self._view_blackout_prim.visible = False
-    
+
     def _post_controller_change(self, e) -> None:
         pass
         # og.sim.update_handles()
@@ -383,7 +395,7 @@ class OVXRSystem(TeleopSystem):
             print("[VRSys] Waiting for VR headset and controllers to become active...")
             og.sim.app.update()
             self._update_devices()
-            if self.hmd is not None and 'left' in self.controllers and 'right' in self.controllers:
+            if self.hmd is not None and "left" in self.controllers and "right" in self.controllers:
                 print("[VRSys] VR headset connected, put on the headset to start")
                 # When taking the first step, xr internally calls clear_controller_model(hand) which removes a prim from stage
                 # note that this does not invalidate the physics sim view but instead removes the physics view from articulation views
@@ -392,7 +404,7 @@ class OVXRSystem(TeleopSystem):
                 # og.sim.update_handles()
                 # for idx in range(50):
                 #     self.update()
-                #     # somehow, internally xr calls clear_controller_model(hand) which removes a prim from stage; 
+                #     # somehow, internally xr calls clear_controller_model(hand) which removes a prim from stage;
                 #     # note that this does not invalidate the physics sim view but instead removes the physics view from articulation views
                 #     breakpoint()
                 #     og.sim.step()
@@ -434,7 +446,15 @@ class OVXRSystem(TeleopSystem):
                     # When trigger is pressed, this value would be 1.0, otherwise 0.0
                     # Our multi-finger gripper controller closes the gripper when the value is -1.0 and opens when > 0.0
                     # So we need to negate the value here
-                    trigger_press = -self.raw_data["button_data"][arm]["trigger"]["value"] if ("button_data" in self.raw_data and arm in self.raw_data["button_data"] and "trigger" in self.raw_data["button_data"][arm]) else 0.0
+                    trigger_press = (
+                        -self.raw_data["button_data"][arm]["trigger"]["value"]
+                        if (
+                            "button_data" in self.raw_data
+                            and arm in self.raw_data["button_data"]
+                            and "trigger" in self.raw_data["button_data"][arm]
+                        )
+                        else 0.0
+                    )
                     self.teleop_action[arm_name] = th.cat(
                         (
                             controller_pose_in_robot_frame[0],
@@ -554,7 +574,7 @@ class OVXRSystem(TeleopSystem):
             # TODO: Fix this later
             rot_offset = th.tensor(rot_offset).double().tolist()
             # self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
-            self.xr_core.schedule_rotate_space_origin_relative_to_camera(*rot_offset) # this takes yaw and pitch
+            self.xr_core.schedule_rotate_space_origin_relative_to_camera(*rot_offset)  # this takes yaw and pitch
 
     # TODO: check if this is necessary
     def _is_valid_transform(self, transform: Tuple[th.tensor, th.tensor]) -> bool:
@@ -598,22 +618,22 @@ class OVXRSystem(TeleopSystem):
         """
         if "button_data" not in self.raw_data:
             self.raw_data["button_data"] = {}
-        
+
         for name, controller in self.controllers.items():
             if len(controller.get_output_names()) == 0 and len(controller.get_input_names()) == 0:
                 continue
-                
+
             # Initialize controller entry if it doesn't exist
             if name not in self.raw_data["button_data"]:
                 self.raw_data["button_data"][name] = {}
-                
+
             # Add input data
             for input_name in controller.get_input_names():
                 input_name = str(input_name)
                 # Initialize input entry if it doesn't exist
                 if input_name not in self.raw_data["button_data"][name]:
                     self.raw_data["button_data"][name][input_name] = {}
-                    
+
                 # Add gesture data
                 for gesture_name in controller.get_input_gesture_names(input_name):
                     gesture_name = str(gesture_name)
