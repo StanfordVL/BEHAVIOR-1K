@@ -1023,6 +1023,10 @@ class ParticleApplier(ParticleModifier):
         self.projection_system_prim = None
         self.projection_emitter = None
 
+        # TODO: particle visualization module has been deprecated since Isaac 4.2.0
+        # this is a placeholder to replace a part of the visualization code
+        self._projection_is_active = False
+
         # Run super
         super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
 
@@ -1035,7 +1039,9 @@ class ParticleApplier(ParticleModifier):
         # This will initialize the system if it's not initialized already.
         system = self.obj.scene.get_system(system_name)
 
-        if self.visualize:
+        # TODO: particle visualization module has been deprecated since Isaac 4.2.0
+        # We need to find a new way for this visualization; keeping this code for now for future reference
+        if self.visualize and False:
             assert self._projection_mesh_params["type"] in {
                 "Cylinder",
                 "Cone",
@@ -1205,7 +1211,10 @@ class ParticleApplier(ParticleModifier):
         if self.visualize and self._current_step == 0:
             # Only one system in our conditions, so next(iter()) suffices
             is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
-            self.projection_emitter.GetProperty("inputs:active").Set(is_active)
+            # TODO: particle visualization module has been deprecated since Isaac 4.2.0
+            # We need to find a new way for this visualization; keeping this code for now for future reference
+            # self.projection_emitter.GetProperty("inputs:active").Set(is_active)
+            self._projection_is_active = is_active
 
         # Run super
         super()._update()
@@ -1496,8 +1505,11 @@ class ParticleApplier(ParticleModifier):
 
     @property
     def projection_is_active(self):
-        # Only active if the projection mesh is enabled
-        return self.projection_emitter.GetProperty("inputs:active").Get()
+        # TODO: particle visualization module has been deprecated since Isaac 4.2.0
+        # We need to find a new way for this visualization; keeping this code for now for future reference
+        # # Only active if the projection mesh is enabled
+        # return self.projection_emitter.GetProperty("inputs:active").Get()
+        return self._projection_is_active
 
     @classproperty
     def meta_link_type(cls):
