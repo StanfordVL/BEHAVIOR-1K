@@ -1059,6 +1059,12 @@ def _launch_simulator(*args, **kwargs):
                         for robot in scene.robots:
                             if robot.initialized:
                                 robot.update_controller_mode()
+                                # TODO: Typically, robots should be initialized on the first play() call
+                                # Problem: In multi-environment setups, import_scene() for subsequent environments
+                                # calls play()+stop(), which prematurely triggers initialization before all environments
+                                # are loaded. This is a temporary workaround.
+                                robot.reset()
+                                robot.keep_still()
 
                         # Also refresh any transition rules that became stale while sim was stopped
                         if gm.ENABLE_TRANSITION_RULES:
