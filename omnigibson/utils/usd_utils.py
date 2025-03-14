@@ -231,6 +231,7 @@ class RigidContactAPIImpl:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
                         from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+
                         if isinstance(link, RigidDynamicPrim):
                             filters[scene_idx].append(link.prim_path)
 

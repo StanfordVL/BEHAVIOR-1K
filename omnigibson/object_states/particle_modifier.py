@@ -30,7 +30,12 @@ from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh, delete_or_deactivate_prim
+from omnigibson.utils.usd_utils import (
+    FlatcacheAPI,
+    absolute_prim_path_to_scene_relative,
+    create_primitive_mesh,
+    delete_or_deactivate_prim,
+)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

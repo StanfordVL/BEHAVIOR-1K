@@ -19,7 +19,7 @@ try:
     from telemoma.configs.base_config import teleop_config
 
     # TODO: the imported telemoma interfaces does not work for our purposes because
-    # 1) dimensionality mismatch - telemoma torso action is 1 dim 2) telemoma strictly uses numpy 
+    # 1) dimensionality mismatch - telemoma torso action is 1 dim 2) telemoma strictly uses numpy
     # from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
     from telemoma.human_interface.teleop_policy import TeleopPolicy
     from telemoma.utils.general_utils import AttrDict

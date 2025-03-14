@@ -116,12 +116,12 @@ class RigidKinematicPrim(RigidPrim):
         changes without explicitly calling this prim's pose setter
         """
         self._kinematic_world_pose_cache = None
-    
-    # The following methods implement the same interface as RigidDynamicPrim, but as no-op 
-    # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim 
-    # without type checking, while maintaining proper physics behavior based on the actual 
+
+    # The following methods implement the same interface as RigidDynamicPrim, but as no-op
+    # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim
+    # without type checking, while maintaining proper physics behavior based on the actual
     # runtime type (dynamic vs. kinematic).
-    
+
     @property
     def mass(self):
         """
@@ -129,7 +129,7 @@ class RigidKinematicPrim(RigidPrim):
             float: mass of the rigid body in kg.
         """
         return 0.0
-    
+
     @mass.setter
     def mass(self, _):
         """
