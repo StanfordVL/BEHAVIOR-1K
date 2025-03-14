@@ -1,34 +1,43 @@
-2,3c2,3
-< title = "OmniGibson"
-< description = "A platform for accelerating Embodied AI research"
----
-> title = "Isaac Sim Python"
-> description = "A trimmed down app for use with python samples"
-13c13
-< ## "omni.isaac.core_archive" = {}
----
-> "omni.isaac.core_archive" = {}
-18d17
-< ## "omni.isaac.dofbot" = {}
-25c24
-< ## "omni.isaac.ml_archive" = {}
----
-> "omni.isaac.ml_archive" = {}
-38,40c37,39
-< ## "omni.kit.property.isaac" = {}
-< ## "omni.pip.cloud" = {}
-< ## "omni.pip.compute" = {}
----
-> "omni.kit.property.isaac" = {}
-> "omni.pip.cloud" = {}
-> "omni.pip.compute" = {}
-79d77
-< 
-82d79
-< 
-158c155
-< title = "OmniGibson"
----
-> title = "Isaac Sim Python"
-271d267
-< pathStatCacheEnabled = false
+--- isaacsim.exp.base.python.kit	2025-03-11 10:50:57.495966820 -0700
++++ omnigibson_4_5_0.kit	2025-03-13 23:51:00.615656858 -0700
+@@ -1,21 +1,27 @@
+ [package]
+-description = "A trimmed down app for use with python samples"
+-title = "Isaac Sim Python"
+-version = "4.5.0"
++description = "A platform for accelerating Embodied AI research"
++title = "OmniGibson"
++version = "1.5.0"
+ 
+ keywords = ["experience", "app", "usd", "isaacsim"] # That makes it browsable in UI with "experience" filter
+ 
+ 
+ [dependencies]
+ "isaacsim.exp.base" = {}
++"omni.flowusd" = {}
+ 
+ [settings.app]
+-name = "Isaac-Sim Python"
+-version = "4.5.0"
++name = "OmniGibson"
++version = "1.5.0"
+ settings.persistent = false       # settings reset on each run with this app
+-window.title = "Isaac Sim Python"
++window.title = "OmniGibson"
+ vulkan = true # Explicitly enable Vulkan (on by default on Linux, off by default on Windows)
+ 
++[settings.app.livestream]
++proto = "ws"
++allowResize = true
++outDirectory = "${data}"
++
+ [settings.app.exts.folders]
+ '++' = [
+     "${app}/../exts",
+@@ -31,3 +37,6 @@
+ 	{ name = "kit/sdk", url = "https://ovextensionsprod.blob.core.windows.net/exts/kit/prod/sdk/${kit_version_short}/${kit_git_hash}" },
+ 	{ name = "kit/community", url = "https://dw290v42wisod.cloudfront.net/exts/kit/community" },
+ ]
++
++[settings.app.extensions]
++pathStatCacheEnabled = false
