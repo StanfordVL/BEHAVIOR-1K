@@ -35,6 +35,7 @@ from omnigibson.utils.usd_utils import (
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
+    delete_or_deactivate_prim,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -612,8 +613,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
-        og.sim.update_handles()
+        delete_or_deactivate_prim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False

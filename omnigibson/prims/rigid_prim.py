@@ -116,15 +116,13 @@ class RigidPrim(XFormPrim):
         self.update_meshes()
 
         # Possibly set the mass / density
-        if not self.has_collision_meshes and not self.kinematic_only:
+        if not self.has_collision_meshes:
             # A meta (virtual) link has no collision meshes; set a negligible mass and a zero density (ignored)
             self.mass = 1e-6
             self.density = 0.0
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
-            assert not self.kinematic_only, "Kinematic-only links should not have mass"
             self.mass = self._load_config["mass"]
         if "density" in self._load_config and self._load_config["density"] is not None:
-            assert not self.kinematic_only, "Kinematic-only links should not have density"
             self.density = self._load_config["density"]
 
         # Set the visual-only attribute
@@ -256,38 +254,6 @@ class RigidPrim(XFormPrim):
                 contacts.append(CsRawData(*c))
         return contacts
 
-    def set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "scene"] = "world"):
-        """
-        Set the position and orientation of XForm Prim.
-        Base implementation that will be overridden by subclasses.
-
-        Args:
-            position (None or 3-array): The position to set the object to. If None, the position is not changed.
-            orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (Literal): The frame in which to set the position and orientation. Defaults to world.
-                Scene frame sets position relative to the scene.
-        """
-        assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
-
-        # If no position or no orientation are given, get the current position and orientation of the object
-        if position is None or orientation is None:
-            current_position, current_orientation = self.get_position_orientation(frame=frame)
-        position = current_position if position is None else position
-        orientation = current_orientation if orientation is None else orientation
-
-        # Convert to th.Tensor if necessary
-        position = th.as_tensor(position, dtype=th.float32)
-        orientation = th.as_tensor(orientation, dtype=th.float32)
-
-        # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-
-        # Default implementation - will be overridden by subclasses
-        XFormPrim.set_position_orientation(self, position=position, orientation=orientation, frame=frame)
-        PoseAPI.invalidate()
-
     @property
     def body_name(self):
         """
@@ -341,12 +307,10 @@ class RigidPrim(XFormPrim):
         # Set gravity and collisions based on value
         if val:
             self.disable_collisions()
-            if not self.kinematic_only:
-                self.disable_gravity()
+            self.disable_gravity()
         else:
             self.enable_collisions()
-            if not self.kinematic_only:
-                self.enable_gravity()
+            self.enable_gravity()
 
         # Also set the internal value
         self._visual_only = val
@@ -364,17 +328,6 @@ class RigidPrim(XFormPrim):
             get_mesh_volume_and_com(collision_mesh.prim, world_frame=True)[0]
             for collision_mesh in self._collision_meshes.values()
         )
-
-    @cached_property
-    def kinematic_only(self):
-        """
-        Returns:
-            bool: Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
-                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
-                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
-                for more information
-        """
-        return self.get_attribute("physics:kinematicEnabled")
 
     @property
     def ccd_enabled(self):

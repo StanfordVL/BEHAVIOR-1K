@@ -30,7 +30,7 @@ from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
-from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh
+from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene_relative, create_primitive_mesh, delete_or_deactivate_prim
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -161,7 +161,7 @@ def create_projection_visualization(
     instancer_prim.GetProperty("inputs:prototypes").SetTargets([prototype_path])
 
     # Destroy the old mat path since we don't use the sprites
-    lazy.isaacsim.core.utils.prims.delete_prim(mat_path)
+    delete_or_deactivate_prim(mat_path)
 
     # Modify the settings of the emitter to match the desired shape from inputs
     emitter_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(emitter_path)

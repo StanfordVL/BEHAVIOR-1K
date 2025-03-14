@@ -8,6 +8,7 @@ import torch as th
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
 from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
@@ -265,7 +266,7 @@ class DatasetObject(USDObject):
         if self._prim_type == PrimType.RIGID:
             for link in self._links.values():
                 # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                if link.has_collision_meshes and not link.kinematic_only:
+                if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
                     link.mass = 0.0
                     link.density = density
 

@@ -151,9 +151,6 @@ def _launch_app():
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
-    # Enable additional extensions we need
-    lazy.isaacsim.core.utils.extensions.enable_extension("omni.flowusd")
-
     # Additional import for windows
     if os.name == "nt":
         lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.window.viewport")
@@ -498,7 +495,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", gm.ENABLE_FLATCACHE)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", True)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
@@ -737,6 +734,8 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
             log.info(f"Imported scene {scene.idx}.")
 
+        # TODO: Remove this context manager and call _post_import_object directly since the objects
+        # are already known when this is called.
         @contextlib.contextmanager
         def adding_objects(self, objs):
             """

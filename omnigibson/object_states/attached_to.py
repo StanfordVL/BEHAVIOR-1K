@@ -14,7 +14,7 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin, Relati
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint, delete_or_deactivate_prim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -389,8 +389,7 @@ class AttachedTo(
         """
         if self.parent_link is not None:
             # Remove the attachment joint prim from the stage
-            og.sim.stage.RemovePrim(self.attachment_joint_prim_path)
-            og.sim.update_handles()
+            delete_or_deactivate_prim(self.attachment_joint_prim_path)
 
             # Remove child reference from the parent object
             self.parent.states[AttachedTo].children[self.parent_link.body_name] = None

@@ -9,6 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
@@ -304,7 +305,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         mass = 0.0
         for link in self._links.values():
-            if not link.kinematic_only:
+            if isinstance(link, RigidDynamicPrim):
                 mass += link.mass
 
         return mass

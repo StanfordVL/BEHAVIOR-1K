@@ -26,11 +26,6 @@ m = create_module_macros(module_path=__file__)
 m.DEFAULT_SLEEP_THRESHOLD = 0.00005
 
 
-class LinkType(Enum):
-    RIGID = auto()
-    CLOTH = auto()
-
-
 class EntityPrim(XFormPrim):
     """
     Provides high level functions to deal with an articulation prim and its attributes/ properties. Note that this
@@ -213,7 +208,7 @@ class EntityPrim(XFormPrim):
             if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
                 # For rigid body objects, process Xforms as potential rigid links
                 # Mark this as a link to create (we'll determine exact class later)
-                links_to_create[link_name] = (LinkType.RIGID, prim)
+                links_to_create[link_name] = (PrimType.RIGID, prim)
 
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
@@ -227,7 +222,7 @@ class EntityPrim(XFormPrim):
 
             elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
                 # For cloth objects, process Meshes as cloth links
-                links_to_create[link_name] = (LinkType.CLOTH, prim)
+                links_to_create[link_name] = (PrimType.CLOTH, prim)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
@@ -257,9 +252,9 @@ class EntityPrim(XFormPrim):
             }
 
             # Determine the correct class based on link type and kinematic property
-            if link_type == LinkType.RIGID:
+            if link_type == PrimType.RIGID:
                 link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
-            else:  # link_type == LinkType.CLOTH
+            else:  # link_type == PrimType.CLOTH
                 link_cls = ClothPrim
 
             # Create and load the link
@@ -639,7 +634,7 @@ class EntityPrim(XFormPrim):
         Enables gravity for this entity
         """
         for link in self._links.values():
-            if not link.kinematic_only:
+            if isinstance(link, RigidDynamicPrim):
                 link.enable_gravity()
 
     def disable_gravity(self) -> None:
@@ -647,7 +642,7 @@ class EntityPrim(XFormPrim):
         Disables gravity for this entity
         """
         for link in self._links.values():
-            if not link.kinematic_only:
+            if isinstance(link, RigidDynamicPrim):
                 link.disable_gravity()
 
     def reset(self):
@@ -1419,7 +1414,7 @@ class EntityPrim(XFormPrim):
                 body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
                 for more information
         """
-        return self.root_link.kinematic_only
+        return isinstance(self.root_link, RigidKinematicPrim)
 
     @property
     def aabb(self):
@@ -1534,7 +1529,7 @@ class EntityPrim(XFormPrim):
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                if not link.kinematic_only:
+                if isinstance(link, RigidDynamicPrim):
                     link.wake()
 
     def sleep(self):
@@ -1546,7 +1541,7 @@ class EntityPrim(XFormPrim):
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                if not link.kinematic_only:
+                if isinstance(link, RigidDynamicPrim):
                     link.sleep()
 
     def keep_still(self):

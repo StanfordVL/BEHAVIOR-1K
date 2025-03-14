@@ -116,3 +116,52 @@ class RigidKinematicPrim(RigidPrim):
         changes without explicitly calling this prim's pose setter
         """
         self._kinematic_world_pose_cache = None
+    
+    # The following methods implement the same interface as RigidDynamicPrim, but as no-op 
+    # versions for kinematic-only prims. This allows code to call these methods on any RigidPrim 
+    # without type checking, while maintaining proper physics behavior based on the actual 
+    # runtime type (dynamic vs. kinematic).
+    
+    @property
+    def mass(self):
+        """
+        Returns:
+            float: mass of the rigid body in kg.
+        """
+        return 0.0
+    
+    @mass.setter
+    def mass(self, _):
+        """
+        Args:
+            mass (float): mass of the rigid body in kg.
+        """
+        pass
+
+    @property
+    def density(self):
+        """
+        Returns:
+            float: density of the rigid body in kg / m^3.
+        """
+        return 0.0
+
+    @density.setter
+    def density(self, _):
+        """
+        Args:
+            density (float): density of the rigid body in kg / m^3.
+        """
+        pass
+
+    def enable_gravity(self):
+        """
+        Enables gravity for this rigid body
+        """
+        pass
+
+    def disable_gravity(self):
+        """
+        Disables gravity for this rigid body
+        """
+        pass

@@ -230,7 +230,8 @@ class RigidContactAPIImpl:
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
-                        if not link.kinematic_only:
+                        from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+                        if isinstance(link, RigidDynamicPrim):
                             filters[scene_idx].append(link.prim_path)
 
         return filters
@@ -602,11 +603,10 @@ class CollisionAPI:
         """
         # Remove all the collision group prims
         for col_group_prim in cls.ACTIVE_COLLISION_GROUPS.values():
-            og.sim.stage.RemovePrim(col_group_prim.GetPath().pathString)
+            delete_or_deactivate_prim(col_group_prim.GetPath().pathString)
 
         # Remove the collision groups tree
-        og.sim.stage.RemovePrim("/World/collision_groups")
-        og.sim.update_handles()
+        delete_or_deactivate_prim("/World/collision_groups")
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}

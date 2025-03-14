@@ -18,6 +18,8 @@ from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 try:
     from telemoma.configs.base_config import teleop_config
 
+    # TODO: the imported telemoma interfaces does not work for our purposes because
+    # 1) dimensionality mismatch - telemoma torso action is 1 dim 2) telemoma strictly uses numpy 
     # from telemoma.human_interface.teleop_core import TeleopAction, TeleopObservation
     from telemoma.human_interface.teleop_policy import TeleopPolicy
     from telemoma.utils.general_utils import AttrDict
@@ -234,25 +236,6 @@ class OVXRSystem(TeleopSystem):
         self._update_camera_callback = self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
             lazy.omni.kit.xr.core.XRCoreEventType.pre_sync_update, self._update_camera_pose, name="update camera"
         )
-        # Whenever controller state is updated, e.g. on_disabled, on_changed,
-        # the clear_controller_model method gets called and removes a prim from stage
-        # this effetively triggers _on_prim_deletion in articulation view and invalidates its physics view
-        # proposed fix: register whatever event that do this and update_handles afterwards
-        controller_state_change_event_names = [
-            "xr_input.user_hand_left.model_change",
-            "xr_input.user_hand_right.model_change",
-            "xr_input.user_hand_left.disable",
-            "xr_input.user_hand_right.disable",
-        ]  # potentially also setting change - visibility
-        for event_name in controller_state_change_event_names:
-            self.xr_core.get_message_bus().create_subscription_to_pop_by_type(
-                lazy.carb.events.type_from_string(event_name),
-                self._post_controller_change,
-                name=f"controller change event {event_name}",
-            )
-        lazy.omni.kit.app.SettingChangeSubscription(
-            self.vr_profile.get_persistent_path() + "controllers/visible", self._post_controller_change
-        )
 
         self._view_blackout_prim = None
         self._view_angle_limits = (
@@ -272,11 +255,6 @@ class OVXRSystem(TeleopSystem):
             self._view_blackout_prim.load(scene)
             self._view_blackout_prim.initialize()
             self._view_blackout_prim.visible = False
-
-    def _post_controller_change(self, e) -> None:
-        pass
-        # og.sim.update_handles()
-        # TODO: avoid updating handles here?
 
     def _update_camera_pose(self, e) -> None:
         if self.align_anchor_to == "touchpad":
