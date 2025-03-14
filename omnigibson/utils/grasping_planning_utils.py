@@ -21,27 +21,31 @@ m.OPENNESS_THRESHOLD_TO_CLOSE = 0.05
 def get_grasp_poses_for_object_sticky(target_obj):
     """
     Obtain a grasp pose for an object from top down, to be used with sticky grasping.
+    The grasp pose should be in the world frame.
 
     Args:
         target_object (StatefulObject): Object to get a grasp pose for
 
     Returns:
-        List of grasp candidates, where each grasp candidate is a tuple containing the grasp pose and the approach direction.
+        List of grasp poses.
     """
-    bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
-        visual=False
-    )
 
-    grasp_center_pos = bbox_center_in_world + th.tensor([0, 0, th.max(bbox_extent_in_base_frame) + 0.05])
-    towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
+    aabb_min_world, aabb_max_world = target_obj.aabb
+
+    bbox_center_world = (aabb_min_world + aabb_max_world) / 2
+    bbox_extent_world = aabb_max_world - aabb_min_world
+
+    grasp_center_pos = bbox_center_world + th.tensor([0, 0, bbox_extent_world[2] / 2])
+    towards_object_in_world_frame = bbox_center_world - grasp_center_pos
     towards_object_in_world_frame /= th.norm(towards_object_in_world_frame)
 
-    grasp_quat = T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32))
+    # Identity quaternion for top-down grasping (x-forward, y-right, z-down)
+    grasp_quat = T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32))
 
     grasp_pose = (grasp_center_pos, grasp_quat)
-    grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
+    grasp_poses = [grasp_pose]
 
-    return grasp_candidate
+    return grasp_poses
 
 
 def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
@@ -227,7 +231,10 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     )
 
     # Now apply the grasp offset.
-    dist_from_grasp_pos = robot.finger_lengths[robot.default_arm] + 0.05
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
+    dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_grasp_pose_in_bbox_frame = (
         grasp_position_in_bbox_frame + canonical_push_axis * push_axis_closer_side_sign * dist_from_grasp_pos,
         grasp_quat_in_bbox_frame,
@@ -259,14 +266,16 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     waypoint_start_offset = (
         -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
     )
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
     waypoint_start_pose = (
         grasp_pose_in_world_frame[0]
-        + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm] + waypoint_start_offset),
+        + -1 * approach_direction_in_world_frame * (avg_finger_offset + waypoint_start_offset),
         grasp_pose_in_world_frame[1],
     )
     waypoint_end_pose = (
-        target_hand_pose_in_world_frame[0]
-        + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm]),
+        target_hand_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * avg_finger_offset,
         target_hand_pose_in_world_frame[1],
     )
     waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose, num_waypoints=num_waypoints)
@@ -405,7 +414,10 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     )
 
     # Now apply the grasp offset.
-    dist_from_grasp_pos = robot.finger_lengths[robot.default_arm] + 0.05
+    avg_finger_offset = th.mean(
+        th.tensor([length for length in robot.eef_to_fingertip_lengths[robot.default_arm].values()])
+    )
+    dist_from_grasp_pos = avg_finger_offset + 0.05
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * dist_from_grasp_pos
     offset_grasp_pose_in_bbox_frame = (grasp_position + offset_in_bbox_frame, grasp_quat_in_bbox_frame)
     offset_grasp_pose_in_world_frame = T.pose_transform(

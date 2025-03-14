@@ -1,15 +1,18 @@
 from functools import cached_property
 from typing import Literal
 
+import math
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
+from omnigibson.controllers import JointController, HolonomicBaseJointController
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
-from omnigibson.utils.backend_utils import _compute_backend as cb
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import classproperty
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI
 
 m = create_module_macros(module_path=__file__)
@@ -41,9 +44,9 @@ class HolonomicBaseRobot(LocomotionRobot):
         relative_prim_path=None,
         scale=None,
         visible=True,
-        fixed_base=False,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -55,6 +58,8 @@ class HolonomicBaseRobot(LocomotionRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         **kwargs,
@@ -67,9 +72,12 @@ class HolonomicBaseRobot(LocomotionRobot):
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -90,6 +98,12 @@ class HolonomicBaseRobot(LocomotionRobot):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -101,15 +115,22 @@ class HolonomicBaseRobot(LocomotionRobot):
         """
         self._world_base_fixed_joint_prim = None
 
+        # Sanity check that the base controller is a HolonomicBaseJointController
+        if controller_config is not None and "base" in controller_config:
+            assert (
+                controller_config["base"]["name"] == "HolonomicBaseJointController"
+            ), "Base controller must be a HolonomicBaseJointController!"
+
         # Call super() method
         super().__init__(
             name=name,
             relative_prim_path=relative_prim_path,
             scale=scale,
             visible=visible,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -118,21 +139,49 @@ class HolonomicBaseRobot(LocomotionRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             **kwargs,
         )
 
     @property
-    def _default_base_joint_controller_config(self):
+    def _default_controllers(self):
+        # Always call super first
+        controllers = super()._default_controllers
+        controllers["base"] = "HolonomicBaseJointController"
+        return controllers
+
+    @property
+    def _default_holonomic_base_joint_controller_config(self):
         """
         Returns:
             dict: Default base joint controller config to control this robot's base. Uses velocity
                 control by default.
         """
-        cfg = super()._default_base_joint_controller_config
-        # The default value is too small for the base joints
-        cfg["pos_kp"] = m.BASE_JOINT_CONTROLLER_POSITION_KP
+        return {
+            "name": "HolonomicBaseJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.base_control_idx,
+            "command_output_limits": "default",
+        }
+
+    @property
+    def _default_controller_config(self):
+        # Always run super method first
+        cfg = super()._default_controller_config
+
+        # Add supported base controllers
+        cfg["base"] = {
+            self._default_holonomic_base_joint_controller_config[
+                "name"
+            ]: self._default_holonomic_base_joint_controller_config,
+            self._default_base_null_joint_controller_config["name"]: self._default_base_null_joint_controller_config,
+        }
+
         return cfg
 
     def _post_load(self):
@@ -173,6 +222,17 @@ class HolonomicBaseRobot(LocomotionRobot):
 
         # Reload the controllers to update their command_output_limits and control_limits
         self.reload_controllers(self._controller_config)
+
+    def apply_action(self, action):
+        rz_joint_dof_indices = rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
+        j_pos = self.get_joint_positions()[rz_joint_dof_indices]
+        # In preparation for the base controller's @update_goal, we need to wrap the current joint pos
+        # to be in range [-pi, pi], so that once the command (a delta joint pos in range [-pi, pi])
+        # is applied, the final target joint pos is in range [-pi * 2, pi * 2], which is required by Isaac.
+        if j_pos < -math.pi or j_pos > math.pi:
+            j_pos = wrap_angle(j_pos)
+            self.set_joint_positions(j_pos, indices=rz_joint_dof_indices, drive=False)
+        super().apply_action(action)
 
     @cached_property
     def base_idx(self):
@@ -243,26 +303,17 @@ class HolonomicBaseRobot(LocomotionRobot):
             assert self.scene is not None, "cannot set position and orientation relative to scene without a scene"
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
-        # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if og.sim.is_playing() and self.initialized:
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
             joint_pos, joint_orn = self.root_link.get_position_orientation()
-            joint_pos, joint_orn = cb.from_torch(joint_pos), cb.from_torch(joint_orn)
-            inv_joint_pos, inv_joint_orn = cb.T.mat2pose(cb.T.pose_inv(cb.T.pose2mat((joint_pos, joint_orn))))
-
-            relative_pos, relative_orn = cb.T.pose_transform(
-                inv_joint_pos, inv_joint_orn, cb.from_torch(position), cb.from_torch(orientation)
-            )
-            relative_rpy = cb.T.quat2euler(relative_orn)
-            self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
-            self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
-            self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
-            self.joints["base_footprint_rx_joint"].set_pos(relative_rpy[0], drive=False)
-            self.joints["base_footprint_ry_joint"].set_pos(relative_rpy[1], drive=False)
-            self.joints["base_footprint_rz_joint"].set_pos(relative_rpy[2], drive=False)
+            inv_joint_pos, inv_joint_orn = T.invert_pose_transform(joint_pos, joint_orn)
+            relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
+            intrinsic_eulers = T.mat2euler_intrinsic(T.quat2mat(relative_orn))
+            joint_positions = th.concatenate((relative_pos, intrinsic_eulers))
+            self.set_joint_positions(positions=joint_positions, indices=self.base_idx, drive=False)
 
         # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
         else:
@@ -279,54 +330,75 @@ class HolonomicBaseRobot(LocomotionRobot):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame
         # Note that this will also set the target to be the desired linear velocity (i.e. the robot will try to maintain
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
-        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
-        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
-        self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
-        self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
-        self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
+        orn = self.root_link.get_position_orientation()[1]
+        velocity_in_root_link = T.quat2mat(orn).T @ velocity
+        self.set_joint_velocities(velocity_in_root_link, indices=self.base_idx[:3], drive=False)
 
     def get_linear_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_linear_velocity()
 
     def set_angular_velocity(self, velocity: th.Tensor) -> None:
-        # See comments of self.set_linear_velocity
-        orn = cb.from_torch(self.root_link.get_position_orientation()[1])
-        velocity_in_root_link = cb.T.quat2mat(orn).T @ cb.from_torch(velocity)
-        self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
-        self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
-        self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
+        # 1e-3 is emperically tuned to be a good value for the time step
+        delta_t = 1e-3 / (velocity.norm() + 1e-6)
+        delta_mat = T.delta_rotation_matrix(velocity, delta_t)
+        base_link_orn = self.get_position_orientation()[1]
+        rot_mat = T.quat2mat(base_link_orn)
+        desired_mat = delta_mat @ rot_mat
+        root_link_orn = self.root_link.get_position_orientation()[1]
+        desired_mat_in_root_link = T.quat2mat(root_link_orn).T @ desired_mat
+        desired_intrinsic_eulers = T.mat2euler_intrinsic(desired_mat_in_root_link)
+
+        cur_joint_pos = self.get_joint_positions()[self.base_idx[3:]]
+        delta_intrinsic_eulers = desired_intrinsic_eulers - cur_joint_pos
+        velocity_intrinsic = delta_intrinsic_eulers / delta_t
+
+        self.set_joint_velocities(velocity_intrinsic, indices=self.base_idx[3:], drive=False)
 
     def get_angular_velocity(self) -> th.Tensor:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
 
-    def _postprocess_control(self, control, control_type):
-        # Run super method first
-        u_vec, u_type_vec = super()._postprocess_control(control=control, control_type=control_type)
+    def get_control_dict(self):
+        fcns = super().get_control_dict()
 
-        # Change the control from base_footprint_link ("base_footprint") frame to root_link ("base_footprint_x") frame
-        base_orn = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)[1]
-        root_link_orn = ControllableObjectViewAPI.get_root_position_orientation(self.articulation_root_path)[1]
-
-        cur_orn_mat = cb.T.quat2mat(root_link_orn).T @ cb.T.quat2mat(base_orn)
-        cur_pose = cb.zeros((2, 4, 4))
-        cur_pose[:, :3, :3] = cur_orn_mat
-        cur_pose[:, 3, 3] = 1.0
-
-        local_pose = cb.zeros((2, 4, 4))
-        local_pose[:] = cb.eye(4)
-        local_pose[:, :3, 3] = cb.view(u_vec[cb.from_torch(self.base_idx)], (2, 3))
-
-        # Rotate the linear and angular velocity to the desired frame
-        global_pose = cur_pose @ local_pose
-        lin_vel_global, ang_vel_global = global_pose[0, :3, 3], global_pose[1, :3, 3]
-
-        u_vec[cb.from_torch(self.base_control_idx)] = cb.array(
-            [lin_vel_global[0], lin_vel_global[1], ang_vel_global[2]]
+        # Add canonical position and orientation
+        fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
+            self.articulation_root_path
         )
+        fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
+        fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
 
-        return u_vec, u_type_vec
+        return fcns
+
+    def q_to_action(self, q):
+        """
+        Converts a target joint configuration to an action that can be applied to this object.
+        All controllers should be JointController with use_delta_commands=False
+        """
+        action = []
+        for name, controller in self.controllers.items():
+            assert (
+                isinstance(controller, JointController) and not controller.use_delta_commands
+            ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
+            command = q[controller.dof_idx]
+            if isinstance(controller, HolonomicBaseJointController):
+                # For a holonomic base joint controller, the command should be in the robot local frame
+                # For orientation, we need to convert the command to a delta angle
+                cur_rz_joint_pos = self.get_joint_positions()[self.base_idx][5]
+                delta_q = wrap_angle(command[2] - cur_rz_joint_pos)
+
+                # For translation, we need to convert the command to the robot local frame
+                body_pose = self.get_position_orientation()
+                canonical_pos = th.tensor([command[0], command[1], body_pose[0][2]], dtype=th.float32)
+                local_pos = T.relative_pose_transform(canonical_pos, th.tensor([0.0, 0.0, 0.0, 1.0]), *body_pose)[0]
+                command = th.tensor([local_pos[0], local_pos[1], delta_q])
+            action.append(controller._reverse_preprocess_command(command))
+        action = th.cat(action, dim=0)
+        assert (
+            action.shape[0] == self.action_dim
+        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        return action
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)

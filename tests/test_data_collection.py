@@ -52,10 +52,11 @@ def test_data_collect_and_playback():
         env=env,
         output_path=collect_hdf5_path,
         only_successes=False,
+        obj_attr_keys=["scale", "visible"],
     )
 
-    # Record 2 episodes
-    for i in range(2):
+    # Record 3 episodes
+    for i in range(3):
         env.reset()
         for _ in range(2):
             env.step(env.robots[0].action_space.sample())
@@ -75,6 +76,15 @@ def test_data_collect_and_playback():
         for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
+        # Checkpoint state here for our first episode
+        if i == 0:
+            env.update_checkpoint()
+            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+
+            # Take one step to avoid creating the system immediately after the checkpoint is updated, which
+            # will cause downstream errors during playback
+            env.step(env.robots[0].action_space.sample())
+
         # Add water particles
         water = env.scene.get_system("water")
         pos = th.rand(10, 3, dtype=th.float32) * 10.0
@@ -84,12 +94,51 @@ def test_data_collect_and_playback():
         for _ in range(2):
             env.step(env.robots[0].action_space.sample())
 
+        if i == 0:
+            # Rollback state here for our first episode
+            env.rollback_to_checkpoint()
+
+            # Make sure water doesn't exist
+            assert "water" not in env.scene.active_systems
+
+            # Make sure robot state is roughly the same
+            for arm, pos in robot_eef_state.items():
+                assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+
+        elif i == 1:
+            # Checkpoint state here for our second episode
+            env.update_checkpoint()
+            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+
+            # Take one step to avoid clearing the system immediately after the checkpoint is updated, which
+            # will cause downstream errors during playback
+            env.step(env.robots[0].action_space.sample())
+
         # Clear the system
         env.scene.clear_system("water")
 
         # Take a few more steps
         for _ in range(2):
             env.step(env.robots[0].action_space.sample())
+
+        if i == 1:
+            # Rollback state here for our first episode
+            env.rollback_to_checkpoint()
+
+            # Make sure water exists
+            assert "water" in env.scene.active_systems
+
+            # Make sure robot state is roughly the same
+            for arm, pos in robot_eef_state.items():
+                assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
+
+        if i == 1:
+            # Clear the water system since it was re-added
+            env.scene.clear_system("water")
 
     # Save this data
     env.save_data()
@@ -136,5 +185,5 @@ def test_data_collect_and_playback():
         n_render_iterations=1,
         only_successes=False,
     )
-    env.playback_dataset(record=True)
+    env.playback_dataset(record_data=True)
     env.save_data()

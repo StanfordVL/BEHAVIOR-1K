@@ -53,6 +53,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         fixed_base=False,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -64,6 +65,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         **kwargs,
@@ -79,6 +82,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -99,6 +106,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -124,6 +137,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         abilities = robot_abilities if abilities is None else robot_abilities.update(abilities)
 
         # Initialize internal attributes that will be loaded later
+        self._include_sensor_names = None if include_sensor_names is None else set(include_sensor_names)
+        self._exclude_sensor_names = None if exclude_sensor_names is None else set(exclude_sensor_names)
         self._sensors = None  # e.g.: scan sensor, vision sensor
 
         # All BaseRobots should have xform properties pre-loaded
@@ -143,6 +158,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             self_collisions=self_collisions,
             prim_type=PrimType.RIGID,
             include_default_states=True,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -198,6 +214,25 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+                    # Possibly filter out the sensor based on name
+                    prim_path = str(prim.GetPrimPath())
+                    not_blacklisted = self._exclude_sensor_names is None or not any(
+                        name in prim_path for name in self._exclude_sensor_names
+                    )
+                    whitelisted = self._include_sensor_names is None or any(
+                        name in prim_path for name in self._include_sensor_names
+                    )
+                    # Also make sure that the include / exclude sensor names are mutually exclusive
+                    if self._exclude_sensor_names is not None and self._include_sensor_names is not None:
+                        assert (
+                            len(set(self._exclude_sensor_names).intersection(set(self._include_sensor_names))) == 0
+                        ), (
+                            f"include_sensor_names and exclude_sensor_names must be mutually exclusive! "
+                            f"Got: {self._include_sensor_names} and {self._exclude_sensor_names}"
+                        )
+                    if not (not_blacklisted and whitelisted):
+                        continue
+
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]
@@ -210,11 +245,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # If the modalities list is empty, don't import the sensor.
                     if not sensor_kwargs["modalities"]:
                         continue
+
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim_path),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
                         **sensor_kwargs,
                     )
@@ -298,11 +334,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             dict: keyword-mapped proprioception observations available for this robot.
                 Can be extended by subclasses
         """
-        joint_positions = cb.to_torch(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
-        joint_velocities = cb.to_torch(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
-        joint_efforts = cb.to_torch(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path))
+        joint_positions = cb.to_torch(
+            cb.copy(ControllableObjectViewAPI.get_joint_positions(self.articulation_root_path))
+        )
+        joint_velocities = cb.to_torch(
+            cb.copy(ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path))
+        )
+        joint_efforts = cb.to_torch(cb.copy(ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)))
         pos, quat = ControllableObjectViewAPI.get_position_orientation(self.articulation_root_path)
-        pos, quat = cb.to_torch(pos), cb.to_torch(quat)
+        pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
         ori = T.quat2euler(quat)
 
         ori_2d = T.z_angle_from_quat(quat)
@@ -320,8 +360,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_2d_ori=ori_2d,
             robot_2d_ori_cos=th.cos(ori_2d),
             robot_2d_ori_sin=th.sin(ori_2d),
-            robot_lin_vel=cb.to_torch(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path)),
-            robot_ang_vel=cb.to_torch(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path)),
+            robot_lin_vel=cb.to_torch(
+                cb.copy(ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path))
+            ),
+            robot_ang_vel=cb.to_torch(
+                cb.copy(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path))
+            ),
         )
 
     def _load_observation_space(self):

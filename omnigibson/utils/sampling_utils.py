@@ -150,7 +150,8 @@ def get_parallel_rays(source, destination, offset, new_ray_per_horizontal_distan
     ray_direction = destination - source
 
     # Get an orthogonal vector using a random vector.
-    random_vector = th.rand(3)
+    random_vector = th.randn(3)
+    random_vector /= th.norm(random_vector)
     orthogonal_vector_1 = th.linalg.cross(ray_direction, random_vector)
     orthogonal_vector_1 /= th.norm(orthogonal_vector_1)
 

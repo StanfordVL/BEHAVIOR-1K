@@ -26,7 +26,7 @@ def main():
     picking_up_trash task using a hardcoded sequence of primitives.
     """
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "fetch_primitives.yaml")
+    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # Update it to run a grocery shopping task
@@ -44,11 +44,12 @@ def main():
 
     # Load the environment
     env = og.Environment(configs=config)
+    robot = env.robots[0]
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=False)
 
     # Grasp can of soda
     grasp_obj = env.task.object_scope["can__of__soda.n.01_2"]

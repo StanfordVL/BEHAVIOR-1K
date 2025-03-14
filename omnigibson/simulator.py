@@ -330,9 +330,15 @@ def _launch_simulator(*args, **kwargs):
                 self._on_contact
             )
             # The callback will be called right *before* the physics step
-            self._physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
-                lambda _: self._on_physics_step(),
+            self._pre_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_pre_physics_step(),
                 pre_step=True,
+                order=0,
+            )
+            # The callback will be called right *after* the physics step
+            self._post_physics_step_callback = self._physics_context._physx_interface.subscribe_physics_on_step_events(
+                lambda _: self._on_post_physics_step(),
+                pre_step=False,
                 order=0,
             )
             self._simulation_event_callback = (
@@ -997,7 +1003,6 @@ def _launch_simulator(*args, **kwargs):
             # Clear the bounding box and contact caches so that they get updated during the next time they're called
             RigidContactAPI.clear()
             GripperRigidContactAPI.clear()
-            ControllableObjectViewAPI.clear()
 
         def play(self):
             if not self.is_playing():
@@ -1120,10 +1125,7 @@ def _launch_simulator(*args, **kwargs):
             self._omni_update_step()
             PoseAPI.invalidate()
 
-        def _on_physics_step(self):
-            # Make the controllable object view API refresh
-            ControllableObjectViewAPI.clear()
-
+        def _on_pre_physics_step(self):
             # Run the controller step on every controllable object
             for scene in self.scenes:
                 for obj in scene.objects:
@@ -1132,6 +1134,10 @@ def _launch_simulator(*args, **kwargs):
 
             # Flush the controls from the ControllableObjectViewAPI
             ControllableObjectViewAPI.flush_control()
+
+        def _on_post_physics_step(self):
+            # Run the post physics update for backend view
+            ControllableObjectViewAPI.post_physics_step()
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -1526,7 +1532,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Parse each json path individually
             states = []
-            og.sim.stop()
+            self.stop()
             for i, scene_file in enumerate(scene_files):
                 if isinstance(scene_file, str):
                     if not scene_file.endswith(".json"):
@@ -1562,6 +1568,17 @@ def _launch_simulator(*args, **kwargs):
                             f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}"
                         )
 
+                    # Synchronize systems -- we need to check for pruning currently-existing systems,
+                    # as well as creating any non-existing systems
+                    current_systems = set(scene.active_systems.keys())
+                    load_systems = set(scene_info["state"]["system_registry"].keys())
+                    systems_to_remove = current_systems - load_systems
+                    systems_to_add = load_systems - current_systems
+                    for name in systems_to_remove:
+                        scene.clear_system(name)
+                    for name in systems_to_add:
+                        scene.get_system(name, force_init=True)
+
                     current_obj_names = set(scene.object_registry.get_dict("name").keys())
                     load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
 
@@ -1588,7 +1605,7 @@ def _launch_simulator(*args, **kwargs):
 
             log.info("The saved simulation environment loaded.")
 
-        def save(self, json_paths=None):
+        def save(self, json_paths=None, as_dict=False):
             """
             Saves the current simulation environment to @json_path.
 
@@ -1596,9 +1613,12 @@ def _launch_simulator(*args, **kwargs):
                 json_paths (None or List[str]): Full path of JSON files to save (should end with .json), each of which
                     contain information to recreate the current scenes, if specified. List should have one element per
                     currently loaded scene. If None, will return a list of JSON strings instead.
+                as_dict (bool): If set and @json_paths is None, will return the saved environment state as a list
+                    of dictionaries instead of encoded json strings
 
             Returns:
-                None or list of str: If @json_paths is None, returns list of dumped json strings. Else, None
+                None or list of str or list of dict: If @json_paths is None, returns list of dumped json strings (or
+                    list of dict if @as_dict is set). Else, None
             """
             # Make sure the sim is not stopped, since we need to grab joint states
             assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
@@ -1641,7 +1661,7 @@ def _launch_simulator(*args, **kwargs):
 
                 # Write this to the json file
                 if json_path is None:
-                    jsons.append(json.dumps(scene_info, cls=TorchEncoder, indent=4))
+                    jsons.append(scene_info if as_dict else json.dumps(scene_info, cls=TorchEncoder, indent=4))
 
                 else:
                     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)

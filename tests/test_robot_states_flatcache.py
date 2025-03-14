@@ -6,8 +6,10 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
 from omnigibson.sensors import VisionSensor
+from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
 from omnigibson.utils.usd_utils import PoseAPI
+from omnigibson.utils.sim_utils import prim_paths_to_rigid_prims
 
 
 def setup_environment(flatcache):
@@ -61,8 +63,8 @@ def camera_pose_test(flatcache):
         relative_pose_transform(sensor_world_pos, sensor_world_ori, robot_world_pos, robot_world_ori)
     )
 
-    sensor_world_pos_gt = th.tensor([150.5187, 149.8295, 101.0960])
-    sensor_world_ori_gt = th.tensor([0.0199, -0.1330, 0.9892, -0.0580])
+    sensor_world_pos_gt = th.tensor([150.5134, 149.8278, 101.0816])
+    sensor_world_ori_gt = th.tensor([0.0176, -0.1205, 0.9910, -0.0549])
 
     assert th.allclose(sensor_world_pos, sensor_world_pos_gt, atol=1e-3)
     assert quaternions_close(sensor_world_ori, sensor_world_ori_gt, atol=1e-3)
@@ -184,7 +186,7 @@ def test_robot_load_drive():
             robot.reload_controllers(controller_config=controller_config)
             env.scene.update_initial_state()
 
-            action_primitives = StarterSemanticActionPrimitives(env)
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 
             eef_pos = env.robots[0].get_eef_position()
             eef_orn = env.robots[0].get_eef_orientation()
@@ -199,11 +201,12 @@ def test_robot_load_drive():
 
         # If this is a locomotion robot, we want to test driving
         if isinstance(robot, LocomotionRobot):
-            action_primitives = StarterSemanticActionPrimitives(env)
+            action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
                 env.step(action)
             assert th.norm(robot.get_position()[:2] - goal_location[:2]) < 0.1
+            assert robot.get_rpy()[2] - goal_location[2] < 0.1
 
         # Stop the simulator and remove the robot
         og.sim.stop()
@@ -258,10 +261,14 @@ def test_grasping_mode():
         physical="Physical Grasping - No additional grasping assistance applied",
     )
 
-    def object_is_in_hand(robot, obj):
-        eef_position = robot.get_eef_position()
-        obj_position = obj.get_position_orientation()[0]
-        return th.norm(eef_position - obj_position) < 0.05
+    def object_is_in_hand(robot, obj, grasping_mode):
+        if grasping_mode in ["sticky", "assisted"]:
+            return robot._ag_obj_in_hand[robot.default_arm] == obj
+        elif grasping_mode == "physical":
+            prim_paths = robot._find_gripper_raycast_collisions()
+            return obj in {obj for (obj, _) in prim_paths_to_rigid_prims(prim_paths, obj.scene)}
+        else:
+            raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 
     for grasping_mode in grasping_modes:
         robot = Fetch(
@@ -285,7 +292,7 @@ def test_grasping_mode():
         for _ in range(10):
             og.sim.step()
 
-        action_primitives = StarterSemanticActionPrimitives(env)
+        action_primitives = StarterSemanticActionPrimitives(env=env, robot=robot, skip_curobo_initilization=True)
 
         box_object = env.scene.object_registry("name", "box")
         target_eef_pos = box_object.get_position_orientation()[0]
@@ -295,26 +302,34 @@ def test_grasping_mode():
         for action in action_primitives._move_hand_direct_ik((target_eef_pos, target_eef_orn), pos_thresh=0.01):
             env.step(action)
 
-        # Grasp the box
-        for action in action_primitives._execute_grasp():
-            env.step(action)
+        gripper_controller = robot.controllers["gripper_0"]
 
-        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to grasp the object"
+        # Grasp the box
+        gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
+        for _ in range(20):
+            og.sim.step()
+
+        assert object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to grasp the object"
 
         # Move eef
         eef_offset = th.tensor([0.0, 0.2, 0.2])
         for action in action_primitives._move_hand_direct_ik((target_eef_pos + eef_offset, target_eef_orn)):
             env.step(action)
 
-        assert object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to keep the object in hand"
+        assert object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to keep the object in hand"
 
         # Release the box
-        for action in action_primitives._execute_release():
-            env.step(action)
-        for _ in range(10):
+        gripper_controller.update_goal(cb.array([1]), robot.get_control_dict())
+        for _ in range(20):
             og.sim.step()
 
-        assert not object_is_in_hand(robot, box_object), f"Grasping mode {grasping_mode} failed to release the object"
+        assert not object_is_in_hand(
+            robot, box_object, grasping_mode
+        ), f"Grasping mode {grasping_mode} failed to release the object"
 
         # Stop the simulator and remove the robot
         og.sim.stop()

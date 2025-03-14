@@ -47,6 +47,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         kinematic_only=None,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        link_physics_materials=None,
         load_config=None,
         **kwargs,
     ):
@@ -66,6 +67,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 are satisfied (see object_base.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -80,6 +85,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._uuid = get_uuid(name, deterministic=True)
         self.category = category
         self.fixed_base = fixed_base
+        self._link_physics_materials = dict() if link_physics_materials is None else link_physics_materials
 
         # Values to be created at runtime
         self._highlight_cached_values = None
@@ -211,6 +217,20 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self._prim_type != PrimType.CLOTH:
             self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
+
+        # Add link materials if specified
+        if self._link_physics_materials is not None:
+            for link_name, material_info in self._link_physics_materials.items():
+                # We will permute the link materials dict in place to now point to the created material
+                mat_name = f"{link_name}_physics_mat"
+                physics_mat = lazy.omni.isaac.core.materials.PhysicsMaterial(
+                    prim_path=f"{self.prim_path}/Looks/{mat_name}",
+                    name=mat_name,
+                    **material_info,
+                )
+                for msh in self.links[link_name].collision_meshes.values():
+                    msh.apply_physics_material(physics_mat)
+                self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
         lazy.omni.isaac.core.utils.semantics.add_update_semantics(

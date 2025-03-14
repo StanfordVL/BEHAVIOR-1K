@@ -86,7 +86,10 @@ eef_vis_links:                      # (list of dict) information for adding came
     parent_link: left_arm_link6
     offset:
       position: [0, 0, 0.06]
-      orientation: [0, 0, 0, 1]
+      orientation: [0, 0, 0, 1]     # NOTE: Convention for these eef vis links should be tuned such that:
+                                    #   z-axis points out from the tips of the fingers
+                                    #   y-axis points in the direction from the left finger to the right finger
+                                    #   x-axis is automatically inferred from the above two axes
   - link: right_eef_link            # same format as @camera_links
     parent_link: right_arm_link6
     offset:
@@ -125,7 +128,8 @@ curobo:
   lock_joints: {}                   # (dict) Maps joint name to "locked" joint configuration. Any joints
                                     #       specified here will not be considered active when motion planning
                                     #       NOTE: All gripper joints and non-controllable holonomic joints
-                                    #       will automatically be added here
+                                    #       will automatically be added here. Null means that the value will be
+                                    #       dynamically computed at runtime based on the robot's reset qpos
   self_collision_ignore:            # (dict) Maps link name to list of other ignore links to ignore collisions
                                     #       with. Note that bi-directional specification is not necessary,
                                     #       e.g.: "torso_link1" does not need to be specified in
@@ -314,27 +318,6 @@ curobo:
         "radius": 0.005
       - "center": [0.02, 0.0, -0.007]
         "radius": 0.003
-  default_qpos:                     # (list of float): Default joint configuration
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.906
-    - 1.906
-    - -0.991
-    - -0.991
-    - 1.571
-    - 1.571
-    - 0.915
-    - 0.915
-    - -1.571
-    - -1.571
-    - 0.03
-    - 0.03
-    - 0.03
-    - 0.03
 
 """
 
@@ -722,7 +705,9 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         is_holonomic (bool): Whether the robot has a holonomic base applied or not
     """
     robot_name = robot_prim.GetName()
-    ee_links = list(curobo_cfg.eef_to_gripper_info.keys())
+
+    # Left, then right by default if sorted alphabetically
+    ee_links = list(sorted(curobo_cfg.eef_to_gripper_info.keys()))
 
     # Find all joints that have a negative axis specified so we know to flip them in curobo
     tree = ET.parse(robot_urdf_path)
@@ -750,17 +735,13 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
 
     joint_prims = find_all_joints(robot_prim, only_articulated=True)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
-    retract_cfg = curobo_cfg.default_qpos
     lock_joints = curobo_cfg.lock_joints.to_dict() if curobo_cfg.lock_joints else {}
     if is_holonomic:
         # Move the final six joints to the beginning, since the holonomic joints are added at the end
         all_joint_names = list(reversed(all_joint_names[-6:])) + all_joint_names[:-6]
-        retract_cfg = [0] * 6 + retract_cfg
-        lock_joints["base_footprint_z_joint"] = 0.0
-        lock_joints["base_footprint_rx_joint"] = 0.0
-        lock_joints["base_footprint_ry_joint"] = 0.0
-
-    joint_to_default_q = {jnt_name: q for jnt_name, q in zip(all_joint_names, retract_cfg)}
+        lock_joints["base_footprint_z_joint"] = None
+        lock_joints["base_footprint_rx_joint"] = None
+        lock_joints["base_footprint_ry_joint"] = None
 
     default_generated_cfg = {
         "usd_robot_root": f"/{robot_prim.GetName()}",
@@ -776,13 +757,13 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         "collision_sphere_buffer": 0.002,
         "extra_collision_spheres": {},
         "self_collision_ignore": curobo_cfg.self_collision_ignore.to_dict(),
-        "self_collision_buffer": {root_link: 0.02},
+        "self_collision_buffer": curobo_cfg.self_collision_buffer.to_dict(),
         "use_global_cumul": True,
         "mesh_link_names": deepcopy(all_collision_link_names),
         "external_asset_path": None,
         "cspace": {
             "joint_names": all_joint_names,
-            "retract_config": retract_cfg,
+            "retract_config": None,
             "null_space_weight": [1] * len(all_joint_names),
             "cspace_distance_weight": [1] * len(all_joint_names),
             "max_jerk": 500.0,
@@ -793,7 +774,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     for eef_link_name, gripper_info in curobo_cfg.eef_to_gripper_info.items():
         attached_obj_link_name = f"attached_object_{eef_link_name}"
         for jnt_name in gripper_info["joints"]:
-            default_generated_cfg["lock_joints"][jnt_name] = get_joint_upper_limit(robot_prim, jnt_name)
+            default_generated_cfg["lock_joints"][jnt_name] = None
         default_generated_cfg["extra_links"][attached_obj_link_name] = {
             "parent_link_name": eef_link_name,
             "link_name": attached_obj_link_name,
@@ -822,10 +803,10 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         base_only_cfg = deepcopy(default_generated_cfg)
         base_only_cfg["ee_link"] = root_link
         base_only_cfg["link_names"] = []
-        for jnt_name, default_q in joint_to_default_q.items():
+        for jnt_name in all_joint_names:
             if jnt_name not in base_only_cfg["lock_joints"] and "base_footprint" not in jnt_name:
                 # Lock this joint
-                base_only_cfg["lock_joints"][jnt_name] = default_q
+                base_only_cfg["lock_joints"][jnt_name] = None
         save_base_fpath = f"{save_dir}/{robot_name}_description_curobo_base.yaml"
         with open(save_base_fpath, "w+") as f:
             yaml.dump({"robot_cfg": {"kinematics": base_only_cfg}}, f)
@@ -833,10 +814,18 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         # Create arm only config
         arm_only_cfg = deepcopy(default_generated_cfg)
         for jnt_name in {"base_footprint_x_joint", "base_footprint_y_joint", "base_footprint_rz_joint"}:
-            arm_only_cfg["lock_joints"][jnt_name] = 0.0
+            arm_only_cfg["lock_joints"][jnt_name] = None
         save_arm_fpath = f"{save_dir}/{robot_name}_description_curobo_arm.yaml"
         with open(save_arm_fpath, "w+") as f:
             yaml.dump({"robot_cfg": {"kinematics": arm_only_cfg}}, f)
+
+        # Create arm only no torso config
+        arm_only_no_torso_cfg = deepcopy(arm_only_cfg)
+        for jnt_name in curobo_cfg.torso_joints:
+            arm_only_no_torso_cfg["lock_joints"][jnt_name] = None
+        save_arm_no_torso_fpath = f"{save_dir}/{robot_name}_description_curobo_arm_no_torso.yaml"
+        with open(save_arm_no_torso_fpath, "w+") as f:
+            yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
 @click.command(help=_DOCSTRING)

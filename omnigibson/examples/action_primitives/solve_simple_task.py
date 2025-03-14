@@ -54,11 +54,16 @@ def main():
     # Load the environment
     env = og.Environment(configs=config)
     scene = env.scene
+    robot = env.robots[0]
+
+    # Let the objects settle
+    for _ in range(30):
+        og.sim.step()
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
+    controller = StarterSemanticActionPrimitives(env, robot, enable_head_tracking=True)
 
     # Grasp of cologne
     grasp_obj = scene.object_registry("name", "cologne")
