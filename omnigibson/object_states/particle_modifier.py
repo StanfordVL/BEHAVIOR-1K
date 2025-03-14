@@ -18,6 +18,7 @@ from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
@@ -1020,6 +1021,7 @@ class ParticleApplier(ParticleModifier):
 
         self.projection_system = None
         self.projection_system_prim = None
+        self.projection_emitter = None
 
         # Run super
         super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
@@ -1032,6 +1034,77 @@ class ParticleApplier(ParticleModifier):
 
         # This will initialize the system if it's not initialized already.
         system = self.obj.scene.get_system(system_name)
+
+        if self.visualize:
+            assert self._projection_mesh_params["type"] in {
+                "Cylinder",
+                "Cone",
+            }, f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
+            radius, height = (
+                th.mean(self._projection_mesh_params["extents"][:2]) / 2.0,
+                self._projection_mesh_params["extents"][2],
+            )
+            # Generate the projection visualization
+            particle_radius = (
+                m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS
+                if self.obj.scene.is_visual_particle_system(system_name=system.name)
+                else system.particle_radius
+            )
+
+            name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
+            # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
+            projection_name = f"{name_prefix}_projection_visualization"
+            projection_path = f"/OmniGraph/{projection_name}"
+            projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
+            if lazy.isaacsim.core.utils.prims.is_prim_path_valid(projection_path):
+                self.projection_system = lazy.isaacsim.core.utils.prims.get_prim_at_path(projection_path)
+                self.projection_emitter = lazy.isaacsim.core.utils.prims.get_prim_at_path(f"{projection_path}/emitter")
+            else:
+                self.projection_system, self.projection_emitter = create_projection_visualization(
+                    scene=self.obj.scene,
+                    prim_path=projection_visualization_path,
+                    shape=self._projection_mesh_params["type"],
+                    projection_name=projection_name,
+                    projection_radius=radius,
+                    projection_height=height,
+                    particle_radius=particle_radius,
+                    parent_scale=self.link.scale,
+                    material=system.material,
+                )
+            relative_projection_system_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, self.projection_system.GetPrimPath().pathString
+            )
+            self.projection_system_prim = BasePrim(
+                relative_prim_path=relative_projection_system_path, name=projection_name
+            )
+            self.projection_system_prim.load(self.obj.scene)
+
+            # Create the visual geom instance referencing the generated source mesh prim, and then hide it
+            relative_projection_source_path = absolute_prim_path_to_scene_relative(
+                self.obj.scene, projection_visualization_path
+            )
+            self.projection_source_sphere = VisualGeomPrim(
+                relative_prim_path=relative_projection_source_path, name=f"{name_prefix}_projection_source_sphere"
+            )
+            self.projection_source_sphere.load(self.obj.scene)
+            self.projection_source_sphere.initialize()
+            self.projection_source_sphere.visible = False
+            # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
+            self.projection_source_sphere.set_position_orientation(
+                orientation=T.euler2quat(th.tensor([0, math.pi / 2, 0], dtype=th.float32)), frame="parent"
+            )
+
+            # Make sure the meta mesh is aligned with the meta link if visualizing
+            # This corresponds to checking (a) position of tip of projection mesh should align with origin of
+            # metalink, and (b) zero relative orientation between the metalink and the projection mesh
+            local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
+            assert th.all(
+                th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
+            ), "Projection mesh tip should align with metalink position!"
+            local_euler = T.quat2euler(local_quat)
+            assert th.all(
+                th.isclose(local_euler, th.zeros_like(local_euler))
+            ), "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -1126,6 +1199,16 @@ class ParticleApplier(ParticleModifier):
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!"
             )
         self._in_mesh_local_particle_directions = directions / th.norm(directions, dim=-1).reshape(-1, 1)
+
+    def _update(self):
+        # If we're about to check for modification, update whether it the visualization should be active or not
+        if self.visualize and self._current_step == 0:
+            # Only one system in our conditions, so next(iter()) suffices
+            is_active = all(condition(self.obj) for condition in next(iter(self.conditions.values())))
+            self.projection_emitter.GetProperty("inputs:active").Set(is_active)
+
+        # Run super
+        super()._update()
 
     def remove(self):
         # We need to remove the projection visualization if it exists
@@ -1413,8 +1496,8 @@ class ParticleApplier(ParticleModifier):
 
     @property
     def projection_is_active(self):
-        # Only one system in our conditions, so next(iter()) suffices
-        return all(condition(self.obj) for condition in next(iter(self.conditions.values())))
+        # Only active if the projection mesh is enabled
+        return self.projection_emitter.GetProperty("inputs:active").Get()
 
     @classproperty
     def meta_link_type(cls):

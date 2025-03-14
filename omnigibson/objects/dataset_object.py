@@ -253,6 +253,8 @@ class DatasetObject(USDObject):
         # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
         # original USD folder, i.e. <category>/<model>/usd.
         root_path = os.path.dirname(self._usd_path)
+        # if self.name=="sink_ksecxq_0":
+        #     breakpoint() # /World/scene_0/sink_ksecxq_0/Looks/sink_ksecxq_base_link/Shader' parameter 'metallic_texture'
         for material in self.materials:
             material.shader_update_asset_paths_with_root_path(root_path)
 
