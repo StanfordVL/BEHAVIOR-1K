@@ -657,28 +657,28 @@ def _launch_simulator(*args, **kwargs):
             """
             return self._sim_step_dt
 
-        def set_sim_step_dt(self, sim_step_dt):
+        def set_simulation_dt(self, physics_dt=None, rendering_dt=None, sim_step_dt=None):
             """
-            Sets the internal simulation step timestep size
+            Unified method to set simulation timestep parameters. Any of the parameters can be None to keep the current
 
             Args:
-                sim_step_dt (float): Timestep size to apply
+                physics_dt (float, optional): Physics simulation timestep
+                rendering_dt (float, optional): Rendering timestep
+                sim_step_dt (float, optional): Internal simulation step timestep
+                    If None, will default to the current value
             """
-            # Sanity check this new dt with respect to the rendering dt
-            rendering_dt = self.get_rendering_dt()
-            self._validate_dts(self.get_physics_dt(), rendering_dt, sim_step_dt)
-
-            self._sim_step_dt = sim_step_dt
-            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
-
-        def set_simulation_dt(self, physics_dt=None, rendering_dt=None):
-            # Call super first
             super().set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            current_physics_dt = self.get_physics_dt()
+            current_rendering_dt = self.get_rendering_dt()
 
-            # Sanity check all new dts
-            rendering_dt = self.get_rendering_dt()
-            physics_dt = self.get_physics_dt()
-            self._validate_dts(physics_dt, rendering_dt, self._sim_step_dt)
+            if sim_step_dt is not None:
+                self._validate_dts(current_physics_dt, current_rendering_dt, sim_step_dt)
+
+                # Update sim_step_dt and recalculate steps per loop
+                self._sim_step_dt = sim_step_dt
+                self._n_steps_per_loop = int(sim_step_dt // current_rendering_dt)
+            else:
+                self._validate_dts(current_physics_dt, current_rendering_dt, self._sim_step_dt)
 
         def set_lighting_mode(self, mode):
             """
@@ -1037,9 +1037,7 @@ def _launch_simulator(*args, **kwargs):
                 if gm.ENABLE_FLATCACHE:
                     channels.append("omni.physx.plugin")
                 with suppress_omni_log(channels=channels):
-                    # Playing takes some steps, so we temporarily change the dt to 0 to avoid moving things.
-                    with self.slowed():
-                        super().play()
+                    super().play()
 
                 # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
                 # correctly.
@@ -1319,10 +1317,10 @@ def _launch_simulator(*args, **kwargs):
             Upon leaving the scope, the prior simulator state is restored.
             """
             # Set dt, yield, then restore the original dt
-            physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
-            self._physics_context.set_physics_dt(slow_dt, 1)
+            physics_dt, rendering_dt, sim_step_dt = self.get_physics_dt(), self.get_rendering_dt(), self._sim_step_dt
+            self.set_simulation_dt(physics_dt=slow_dt, rendering_dt=slow_dt, sim_step_dt=slow_dt)
             yield
-            self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt, sim_step_dt=sim_step_dt)
 
         def add_callback_on_play(self, name, callback):
             """

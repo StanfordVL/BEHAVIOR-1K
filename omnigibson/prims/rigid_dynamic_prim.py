@@ -58,14 +58,6 @@ class RigidDynamicPrim(RigidPrim):
         # Run super method to handle common functionality
         super()._post_load()
 
-    def _initialize(self):
-        # Run super method first
-        super()._initialize()
-
-        # Get contact info first
-        if self.contact_reporting_enabled:
-            og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
-
     def update_handles(self):
         """
         Updates all internal handles for this prim, in case they change since initialization

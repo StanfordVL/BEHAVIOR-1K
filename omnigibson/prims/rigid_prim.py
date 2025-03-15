@@ -1,7 +1,5 @@
-import math
 from functools import cached_property
 import re
-from typing import Literal
 
 import torch as th
 from scipy.spatial import ConvexHull
@@ -16,7 +14,6 @@ from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
-    PoseAPI,
     absolute_prim_path_to_scene_relative,
     check_extent_radius_ratio,
     get_mesh_volume_and_com,
@@ -137,6 +134,10 @@ class RigidPrim(XFormPrim):
         for mesh_group in (self._collision_meshes, self._visual_meshes):
             for mesh in mesh_group.values():
                 mesh.initialize()
+
+        # Get contact info first
+        if self.contact_reporting_enabled:
+            og.sim.contact_sensor.get_rigid_body_raw_data(self.prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()

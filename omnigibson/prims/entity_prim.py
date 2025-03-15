@@ -1,7 +1,6 @@
 import math
 from functools import cached_property
 from typing import Literal
-from enum import Enum, auto
 
 import networkx as nx
 import torch as th
