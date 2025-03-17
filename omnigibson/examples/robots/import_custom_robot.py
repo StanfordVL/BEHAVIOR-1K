@@ -730,7 +730,10 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
 
     # Generate list of collision link names -- this is simply the list of all link names from the
     # collision spheres specification
-    collision_spheres = curobo_cfg.collision_spheres.to_dict()
+    if isinstance(curobo_cfg.collision_spheres, list):
+        collision_spheres = {k: v for c in curobo_cfg.collision_spheres for k, v in c.items()}
+    else:
+        collision_spheres = curobo_cfg.collision_spheres.to_dict()
     all_collision_link_names = list(collision_spheres.keys())
 
     joint_prims = find_all_joints(robot_prim, only_articulated=True)
@@ -833,7 +836,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     "--config",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
-    help="Absolute path to robot URDF file to import",
+    help="Absolute path to robot config yaml file to import",
 )
 def import_custom_robot(config):
     # Load config

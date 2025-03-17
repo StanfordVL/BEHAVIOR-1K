@@ -137,6 +137,15 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             **kwargs,
         )
 
+    def _post_load(self):
+        super()._post_load()
+
+        # Set the wheels back to using sphere approximations
+        for wheel_name in self.floor_touching_base_link_names:
+            wheel_link = self.links[wheel_name]
+            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+
     # Name of the actual root link that we are interested in. Note that this is different from self.root_link_name,
     # which is "base_footprint_x", corresponding to the first of the 6 1DoF joints to control the base.
     @property
@@ -175,7 +184,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         for arm in self.arm_names:
-            pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
+            pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
         return pos
 
     @property
@@ -184,7 +193,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         for arm in self.arm_names:
-            pos[self.gripper_control_idx[arm]] = th.tensor([0.03, 0.03])  # open gripper
+            pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
             pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
         return pos
 
