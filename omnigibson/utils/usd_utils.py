@@ -1152,24 +1152,24 @@ class BatchControlViewAPIImpl:
         idx = self._idx[prim_path]
         return self._read_cache["dof_projected_joint_forces"][idx]
 
-    def get_mass_matrix(self, prim_path):
+    def get_generalized_mass_matrices(self, prim_path):
         if "mass_matrices" not in self._read_cache:
-            self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_mass_matrices())
+            self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_generalized_mass_matrices())
 
         idx = self._idx[prim_path]
         return self._read_cache["mass_matrices"][idx]
 
-    def get_generalized_gravity_forces(self, prim_path):
+    def get_gravity_compensation_forces(self, prim_path):
         if "generalized_gravity_forces" not in self._read_cache:
-            self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_generalized_gravity_forces())
+            self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_gravity_compensation_forces())
 
         idx = self._idx[prim_path]
         return self._read_cache["generalized_gravity_forces"][idx]
 
-    def get_coriolis_and_centrifugal_forces(self, prim_path):
+    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
             self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
-                self._view.get_coriolis_and_centrifugal_forces()
+                self._view.get_coriolis_and_centrifugal_compensation_forces()
             )
 
         idx = self._idx[prim_path]
@@ -1452,20 +1452,22 @@ class ControllableObjectViewAPI:
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
 
     @classmethod
-    def get_mass_matrix(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
-
-    @classmethod
-    def get_generalized_gravity_forces(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
+    def get_generalized_mass_matrices(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_mass_matrices(
             prim_path
         )
 
     @classmethod
-    def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
+    def get_gravity_compensation_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_gravity_compensation_forces(
             prim_path
         )
+
+    @classmethod
+    def get_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[
+            cls._get_pattern_from_prim_path(prim_path)
+        ].get_coriolis_and_centrifugal_compensation_forces(prim_path)
 
     @classmethod
     def get_link_position_orientation(cls, prim_path, link_name):

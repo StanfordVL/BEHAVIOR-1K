@@ -640,11 +640,17 @@ class ControllableObject(BaseObject):
             self.articulation_root_path, estimate=True
         )
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
-        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+        # Similar to the jacobians, there may be an additional 6 entries at the beginning of the mass matrix, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        fcns["mass_matrix"] = lambda: (
+            ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)
+            if self.fixed_base
+            else ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)[6:, 6:]
+        )
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_gravity_compensation_forces(
             self.articulation_root_path
         )
-        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(
             self.articulation_root_path
         )
 
