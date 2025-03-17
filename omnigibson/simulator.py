@@ -1761,9 +1761,9 @@ def _launch_simulator(*args, **kwargs):
         def device(self):
             """
             Returns:
-                device (None or str): Device used in simulation backend
+                str: Device used in simulation backend
             """
-            return self._device
+            return lazy.isaacsim.core.simulation_manager.SimulationManager.get_physics_sim_device()
 
         @device.setter
         def device(self, device):
@@ -1771,12 +1771,9 @@ def _launch_simulator(*args, **kwargs):
             Sets the device used for sim backend
 
             Args:
-                device (None or str): Device to set for the simulation backend
+                str: Device to set for the simulation backend
             """
-            self._device = device
-            if self._device is not None and "cuda" in self._device:
-                device_id = self._settings.get_as_int("/physics/cudaDevice")
-                self._device = f"cuda:{device_id}"
+            lazy.isaacsim.core.simulation_manager.SimulationManager.set_physics_sim_device(device)
 
         @property
         def initial_physics_dt(self):
