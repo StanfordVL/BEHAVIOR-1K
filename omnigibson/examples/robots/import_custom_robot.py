@@ -731,7 +731,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     # Generate list of collision link names -- this is simply the list of all link names from the
     # collision spheres specification
     if isinstance(curobo_cfg.collision_spheres, list):
-        collision_spheres = {k: v for c in curobo_cfg.collision_spheres for k, v in c.items()}
+        collision_spheres = {k: v for c in curobo_cfg.collision_spheres for k, v in c.to_dict().items()}
     else:
         collision_spheres = curobo_cfg.collision_spheres.to_dict()
     all_collision_link_names = list(collision_spheres.keys())
