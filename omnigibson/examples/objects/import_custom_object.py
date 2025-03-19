@@ -118,33 +118,31 @@ def import_custom_object(
     if mesh_format != "urdf":
         temp_urdf_dir = tempfile.mkdtemp()
         temp_dirs.append(temp_urdf_dir)
-        try:
-            # Try to generate URDF, may raise ValueError if too many submeshes
-            urdf_path = generate_urdf_for_mesh(
-                asset_path,
-                temp_urdf_dir,
-                category,
-                model,
-                collision_method,
-                hull_count,
-                up_axis,
-                scale=scale,
-                check_scale=check_scale,
-                rescale=rescale,
-                overwrite=overwrite,
-                n_submesh=n_submesh
-            )
+
+        # Try to generate URDF, may raise ValueError if too many submeshes
+        urdf_path = generate_urdf_for_mesh(
+            asset_path,
+            temp_urdf_dir,
+            category,
+            model,
+            collision_method,
+            hull_count,
+            up_axis,
+            scale=scale,
+            check_scale=check_scale,
+            rescale=rescale,
+            overwrite=overwrite,
+            n_submesh=n_submesh
+        )
+        if urdf_path is not None:
             click.echo("URDF generation complete!")
             urdf_dep_paths = ["material"]
             collision_method = None
-            
-        except ValueError as e:
+        else:
             # Clean up temp directories before exiting
             for tmp_dir in temp_dirs:
                 shutil.rmtree(tmp_dir)
-            
-            # Re-raise the error with additional context
-            click.echo(f"Error during URDF generation: {str(e)}")
+            click.echo(f"Error during URDF generation")
             raise click.Abort()
     else:
         urdf_path = asset_path
@@ -182,10 +180,6 @@ def import_custom_object(
             if select.select([sys.stdin], [], [], 0)[0]:
                 sys.stdin.readline()  # Clear the input buffer
                 break
-        # start_time = time.time()
-        # while time.time() - start_time < 5:
-        #     og.sim.render()
-    # og.shutdown()
 
 if __name__ == "__main__":
     import_custom_object()

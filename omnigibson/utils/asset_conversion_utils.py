@@ -1813,7 +1813,7 @@ def simplify_convex_hull(tm, max_vertices=60):
     ).convex_hull
 
 
-def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, discard_not_volume=True):
+def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, discard_not_volume=True, error_handling = False):
     """
     Generates a set of collision meshes from a trimesh mesh using CoACD.
 
@@ -1834,106 +1834,24 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
         hulls = [trimesh_mesh.convex_hull]
 
     elif method == "coacd":
-        try:
-            import coacd
-        except ImportError:
-            raise ImportError("Please install the `coacd` package to use this function.")
-
-        # Get the vertices and faces
-        coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
-
-        # Run CoACD with the hull count 
-        result = coacd.run_coacd(
-            coacd_mesh,
-            max_convex_hull=hull_count,
-            max_ch_vertex=60,
-        )
-
-        # Convert the returned vertices and faces to trimesh meshes
-        # and assert that they are volumes (and if not, discard them if required)
-        hulls = []
-        coacd_vol = 0.0
-        for vs, fs in result:
-            hull = trimesh.Trimesh(vertices=vs, faces=fs, process=False)
-            if discard_not_volume and not hull.is_volume:
-                continue
-            hulls.append(hull)
-            coacd_vol += hull.convex_hull.volume
-
-        # Assert that we got _some_ collision meshes
-        assert len(hulls) > 0, "No collision meshes generated!"
-
-        # Compare coacd's generation compared to the original mesh's convex hull
-        # If the difference is small (<10% volume difference), simply keep the convex hull
-        vol_ratio = coacd_vol / trimesh_mesh.convex_hull.volume
-        if 0.95 < vol_ratio < 1.05:
-            print("MINIMAL CHANGE -- USING CONVEX HULL INSTEAD")
-            # from IPython import embed; embed()
-            hulls = [trimesh_mesh.convex_hull]
-
-    elif method == "convex":
-        hulls = [trimesh_mesh.convex_hull]
-
-    else:
-        raise ValueError(f"Invalid collision mesh generation method specified: {method}")
-
-    # Sanity check all convex hulls
-    # For whatever reason, some convex hulls are not true volumes, so we take the convex hull again
-    # See https://github.com/mikedh/trimesh/issues/535
-    hulls = [hull.convex_hull if not hull.is_volume else hull for hull in hulls]
-
-    # For each hull, simplify so that the complexity is guaranteed to be Omniverse-GPU compatible
-    # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/rigid-bodies.html#collision-settings
-    simplified_hulls = [simplify_convex_hull(hull) for hull in hulls]
-
-    return simplified_hulls
-
-def generate_collision_meshes_with_error_handling(trimesh_mesh, method="coacd", hull_count=32, discard_not_volume=True):
-    """
-    Generates a set of collision meshes from a trimesh mesh using CoACD.
-
-    Args:
-        trimesh_mesh (trimesh.Trimesh): The trimesh mesh to generate the collision mesh from.
-        method (str): Method to generate collision meshes. Valid options are {"coacd", "convex"}
-        hull_count (int): If @method="coacd", this sets the max number of hulls to generate
-        discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
-            that are not proper volumes
-
-    Returns:
-        List[trimesh.Trimesh]: The collision meshes.
-    """
-    # If the mesh is convex or the mesh is a proper volume and similar to its convex hull, simply return that directly
-    if trimesh_mesh.is_convex or (
-        trimesh_mesh.is_volume and (trimesh_mesh.volume / trimesh_mesh.convex_hull.volume) > 0.90
-    ):
-        hulls = [trimesh_mesh.convex_hull]
-
-    elif method == "coacd":
-        try:
-            import coacd
-        except ImportError:
-            raise ImportError("Please install the `coacd` package to use this function.")
-        
-        # Get the vertices and faces
-        coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
-        
-        # Run CoACD with error handling
-        import subprocess
-        import sys
-        import tempfile
-        import pickle
-        import os
-        
-        # Create separate temp files with proper extensions
-        with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as f:
-            data_path = f.name
-            pickle.dump((trimesh_mesh.vertices, trimesh_mesh.faces, hull_count), f)
-        
-        script_path = tempfile.mktemp(suffix='.py')
-        result_path = tempfile.mktemp(suffix='.pkl')
-        
-        # Create simple subprocess script with proper indentation
-        script = """
+        if error_handling:
+            # Run CoACD with error handling
+            import subprocess
+            import sys
+            import tempfile
+            import pickle
+            import os
+            
+            # Create separate temp files with proper extensions
+            with tempfile.NamedTemporaryFile(suffix='.pkl', delete=False) as f:
+                data_path = f.name
+                pickle.dump((trimesh_mesh.vertices, trimesh_mesh.faces, hull_count), f)
+            
+            script_path = tempfile.mktemp(suffix='.py')
+            result_path = tempfile.mktemp(suffix='.pkl')
+            
+            # Create simple subprocess script with proper indentation
+            script = """
 import pickle, coacd, sys
 try:
     with open('""" + data_path + """', 'rb') as f:
@@ -1947,22 +1865,67 @@ except Exception as e:
     print("Error in CoACD:", e)
     sys.exit(1)
 """
-        
-        # Write script with clean indentation
-        script = script.lstrip()
-
-        with open(script_path, "w") as f:
-            f.write(script)
-        
-        # Run subprocess with clean file paths
-        success = subprocess.call([sys.executable, script_path]) == 0
-        
-        # Process results or fallback
-        if success and os.path.exists(result_path):
-            with open(result_path, "rb") as f:
-                result = pickle.load(f)
             
-            # Process results as before
+            # Write script with clean indentation
+            script = script.lstrip()
+
+            with open(script_path, "w") as f:
+                f.write(script)
+            
+            # Run subprocess with clean file paths
+            success = subprocess.call([sys.executable, script_path]) == 0
+            
+            # Process results or fallback
+            if success and os.path.exists(result_path):
+                with open(result_path, "rb") as f:
+                    result = pickle.load(f)
+                
+                # Process results as before
+                hulls = []
+                coacd_vol = 0.0
+                for vs, fs in result:
+                    hull = trimesh.Trimesh(vertices=vs, faces=fs, process=False)
+                    if discard_not_volume and not hull.is_volume:
+                        continue
+                    hulls.append(hull)
+                    coacd_vol += hull.convex_hull.volume
+                    
+                # Check if we found any valid hulls
+                if len(hulls) == 0:
+                    print("No valid collision meshes generated, falling back to convex hull")
+                    hulls = [trimesh_mesh.convex_hull]
+                else:
+                    # Compare volume ratios as in original code
+                    vol_ratio = coacd_vol / trimesh_mesh.convex_hull.volume
+                    if 0.95 < vol_ratio < 1.05:
+                        print("MINIMAL CHANGE -- USING CONVEX HULL INSTEAD")
+                        hulls = [trimesh_mesh.convex_hull]
+            else:
+                print("CoACD processing failed, falling back to convex hull")
+                hulls = [trimesh_mesh.convex_hull]
+            
+            # Clean up temp files
+            for path in [data_path, script_path, result_path]:
+                if os.path.exists(path):
+                    os.remove(path)
+        else:
+            try:
+                import coacd
+            except ImportError:
+                raise ImportError("Please install the `coacd` package to use this function.")
+
+            # Get the vertices and faces
+            coacd_mesh = coacd.Mesh(trimesh_mesh.vertices, trimesh_mesh.faces)
+
+            # Run CoACD with the hull count 
+            result = coacd.run_coacd(
+                coacd_mesh,
+                max_convex_hull=hull_count,
+                max_ch_vertex=60,
+            )
+
+            # Convert the returned vertices and faces to trimesh meshes
+            # and assert that they are volumes (and if not, discard them if required)
             hulls = []
             coacd_vol = 0.0
             for vs, fs in result:
@@ -1971,25 +1934,17 @@ except Exception as e:
                     continue
                 hulls.append(hull)
                 coacd_vol += hull.convex_hull.volume
-                
-            # Check if we found any valid hulls
-            if len(hulls) == 0:
-                print("No valid collision meshes generated, falling back to convex hull")
+
+            # Assert that we got _some_ collision meshes
+            assert len(hulls) > 0, "No collision meshes generated!"
+
+            # Compare coacd's generation compared to the original mesh's convex hull
+            # If the difference is small (<10% volume difference), simply keep the convex hull
+            vol_ratio = coacd_vol / trimesh_mesh.convex_hull.volume
+            if 0.95 < vol_ratio < 1.05:
+                print("MINIMAL CHANGE -- USING CONVEX HULL INSTEAD")
+                # from IPython import embed; embed()
                 hulls = [trimesh_mesh.convex_hull]
-            else:
-                # Compare volume ratios as in original code
-                vol_ratio = coacd_vol / trimesh_mesh.convex_hull.volume
-                if 0.95 < vol_ratio < 1.05:
-                    print("MINIMAL CHANGE -- USING CONVEX HULL INSTEAD")
-                    hulls = [trimesh_mesh.convex_hull]
-        else:
-            print("CoACD processing failed, falling back to convex hull")
-            hulls = [trimesh_mesh.convex_hull]
-        
-        # Clean up temp files
-        for path in [data_path, script_path, result_path]:
-            if os.path.exists(path):
-                os.remove(path)
 
     elif method == "convex":
         hulls = [trimesh_mesh.convex_hull]
@@ -2419,7 +2374,7 @@ def generate_urdf_for_mesh(
         # Generate collision meshes if requested
         collision_meshes = []
         if collision_method is not None:
-            collision_meshes = generate_collision_meshes_with_error_handling(visual_mesh, method=collision_method, hull_count=hull_count)
+            collision_meshes = generate_collision_meshes(visual_mesh, method=collision_method, hull_count=hull_count, error_handling=True)
         
         # Add to links dictionary as a single link named "base_link"
         links["base_link"] = {
@@ -2431,14 +2386,12 @@ def generate_urdf_for_mesh(
     elif mesh_format in ['glb', 'gltf']:
         # Handle articulated files
         scene = trimesh.load(asset_path)
-        
-        # Debug print to check what's in the scene
-        # print(f"Scene geometries: {list(scene.geometry.keys())}")
-        # print(f"Scene graph: {scene.graph.nodes}")
+
         # Count geometries (submeshes)
         submesh_count = len(scene.geometry)
         if submesh_count > n_submesh:
-            raise ValueError(f"❌ Submesh count: {submesh_count} > {n_submesh}, skipping")
+            print(f"❌ Submesh count: {submesh_count} > {n_submesh}, skipping")
+            return None
         
         # Get transforms from graph and extract each geometry as a separate link
         link_index = 0
@@ -2449,13 +2402,9 @@ def generate_urdf_for_mesh(
                 continue
             
             # Get the geometry and transform
-            try:
-                geometry = scene.geometry[geometry_name]
-                transform = scene.graph.get(node_name)[0]
-                transform_tensor = th.from_numpy(transform.copy()).float()
-            except Exception as e:
-                print(f"Warning: Could not get geometry for node {node_name}: {e}")
-                continue
+            geometry = scene.geometry[geometry_name]
+            transform = scene.graph.get(node_name)[0]
+            transform_tensor = th.from_numpy(transform.copy()).float()
             
             # Process the geometry based on its type
             if isinstance(geometry, trimesh.Trimesh):
@@ -2471,20 +2420,16 @@ def generate_urdf_for_mesh(
                 # Generate collision meshes if requested
                 collision_meshes = []
                 if collision_method is not None:
-                    try:
-                        # Create collision meshes based on the original geometry
-                        # (not transformed yet - we'll handle transforms at the URDF level)
-                        collision_meshes = generate_collision_meshes_with_error_handling(
-                            geometry,
-                            method=collision_method,
-                            hull_count=hull_count,
-                            discard_not_volume=True
-                        )
-                    except Exception as e:
-                        print(f"Warning: Collision mesh generation failed for mesh {link_name}: {e}")
-                        # Fallback to simple convex hull
-                        collision_meshes = [geometry.convex_hull]
-                
+                    # Create collision meshes based on the original geometry
+                    # (not transformed yet - we'll handle transforms at the URDF level)
+                    collision_meshes = generate_collision_meshes(
+                        geometry,
+                        method=collision_method,
+                        hull_count=hull_count,
+                        discard_not_volume=True,
+                        error_handling=True
+                    )
+
                 # Add to links dictionary with original transform
                 links[link_name] = {
                     "visual_mesh": visual_mesh,
@@ -2508,20 +2453,17 @@ def generate_urdf_for_mesh(
                         
                         # Generate collision meshes if requested
                         collision_meshes = []
+
                         if collision_method is not None:
-                            try:
-                                # Create collision meshes based on the original geometry
-                                collision_meshes = generate_collision_meshes_with_error_handling(
-                                    submesh,
-                                    method=collision_method,
-                                    hull_count=hull_count,
-                                    discard_not_volume=True
-                                )
-                            except Exception as e:
-                                print(f"Warning: Collision mesh generation failed for submesh {link_name}: {e}")
-                                # Fallback to simple convex hull
-                                collision_meshes = [submesh.convex_hull]
-                        
+                            # Create collision meshes based on the original geometry
+                            collision_meshes = generate_collision_meshes(
+                                submesh,
+                                method=collision_method,
+                                hull_count=hull_count,
+                                discard_not_volume=True,
+                                error_handling=True
+                            )
+
                         # Add to links dictionary with original transform
                         links[link_name] = {
                             "visual_mesh": visual_mesh,
