@@ -19,7 +19,7 @@ parser.add_argument("-r", "--robot", type=int, default=0)
 parser.add_argument("-s", "--scene", default="")
 parser.add_argument("-c", "--cloth", action="store_true")
 parser.add_argument("-w", "--fluids", action="store_true")
-parser.add_argument("-g", "--gpu_denamics", action="store_true")
+parser.add_argument("-g", "--gpu_dynamics", action="store_true")
 parser.add_argument("-p", "--macro_particle_system", action="store_true")
 
 PROFILING_FIELDS = ["FPS", "Omni step time", "Non-omni step time", "Memory usage", "Vram usage"]
@@ -43,7 +43,7 @@ def main():
     gm.ENABLE_OBJECT_STATES = True
     gm.ENABLE_TRANSITION_RULES = True
     gm.ENABLE_FLATCACHE = not args.cloth
-    gm.USE_GPU_DYNAMICS = args.gpu_denamics
+    gm.USE_GPU_DYNAMICS = args.gpu_dynamics
 
     cfg = {
         "env": {

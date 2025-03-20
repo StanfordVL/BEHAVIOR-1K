@@ -1,6 +1,7 @@
 import itertools
 
 import networkx as nx
+import numpy as np
 import torch as th
 from PIL import Image
 
@@ -306,8 +307,7 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     fig.canvas.draw()
 
     # Convert the canvas to image
-    graph_view = th.frombuffer(fig.canvas.tostring_rgb(), dtype=th.uint8)
-    graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    graph_view = th.from_numpy(np.asarray(fig.canvas.renderer.buffer_rgba())[:, :, :3])
     assert graph_view.shape == robot_view.shape
     plt.close(fig)
 

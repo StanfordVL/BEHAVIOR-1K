@@ -5,14 +5,13 @@ from functools import cache
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import Serializable, get_uuid
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
+from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute, delete_or_deactivate_prim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -203,7 +202,7 @@ class BaseSystem(Serializable):
             callback(self)
 
         self.reset()
-        lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
+        delete_or_deactivate_prim(self.prim_path)
 
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()

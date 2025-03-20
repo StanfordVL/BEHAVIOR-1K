@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:4.1.0
+FROM nvcr.io/nvidia/isaac-sim:4.5.0
 
 # Set up all the prerequisites.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \

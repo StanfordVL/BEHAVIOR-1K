@@ -76,7 +76,7 @@ class HolonomicBaseRobot(LocomotionRobot):
             self_collisions (bool): Whether to enable self collisions for this object
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
                 "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
@@ -187,7 +187,7 @@ class HolonomicBaseRobot(LocomotionRobot):
     def _post_load(self):
         super()._post_load()
 
-        self._world_base_fixed_joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(
+        self._world_base_fixed_joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
             f"{self.prim_path}/rootJoint"
         )
         position, orientation = self.get_position_orientation()
@@ -402,7 +402,7 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = th.tensor(teleop_action.base).float() * 0.1
+        action[self.base_action_idx] = th.tensor(teleop_action.base).float()
         return action
 
     @cached_property

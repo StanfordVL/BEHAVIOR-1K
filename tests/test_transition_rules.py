@@ -1386,6 +1386,11 @@ def test_single_toggleable_machine_rule_output_system_failure_nonrecipe_objects(
 
     # Clean up
     remove_all_systems(env.scene)
+    # Spawning the bowl in the blender's location causes PhysX to crash,
+    # resulting in "Invalid PhysX transform detected" errors. To avoid this, we temporarily move the blender aside.
+    blender.set_position_orientation(
+        position=blender.get_position_orientation()[0] + th.tensor([1.0, 0.0, 0.0], dtype=th.float32)
+    )
     for obj_cfg in deleted_objs_cfg:
         obj = DatasetObject(**obj_cfg)
         env.scene.add_object(obj)

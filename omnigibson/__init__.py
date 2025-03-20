@@ -96,9 +96,9 @@ def clear(
     sim._partial_clear()
 
     # Then close the stage and remove pointers to the simulator object.
-    assert lazy.omni.isaac.core.utils.stage.close_stage()
+    assert lazy.isaacsim.core.utils.stage.close_stage()
     sim = None
-    lazy.omni.isaac.core.simulation_context.SimulationContext.clear_instance()
+    lazy.isaacsim.core.api.SimulationContext.clear_instance()
 
     # Then relaunch the simulator.
     launch(**init_kwargs)

@@ -66,7 +66,7 @@ class ControllableObject(BaseObject):
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
                 "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
@@ -640,11 +640,17 @@ class ControllableObject(BaseObject):
             self.articulation_root_path, estimate=True
         )
         fcns["joint_effort"] = lambda: ControllableObjectViewAPI.get_joint_efforts(self.articulation_root_path)
-        fcns["mass_matrix"] = lambda: ControllableObjectViewAPI.get_mass_matrix(self.articulation_root_path)
-        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_generalized_gravity_forces(
+        # Similar to the jacobians, there may be an additional 6 entries at the beginning of the mass matrix, if this robot does
+        # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+        fcns["mass_matrix"] = lambda: (
+            ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)
+            if self.fixed_base
+            else ControllableObjectViewAPI.get_generalized_mass_matrices(self.articulation_root_path)[6:, 6:]
+        )
+        fcns["gravity_force"] = lambda: ControllableObjectViewAPI.get_gravity_compensation_forces(
             self.articulation_root_path
         )
-        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_forces(
+        fcns["cc_force"] = lambda: ControllableObjectViewAPI.get_coriolis_and_centrifugal_compensation_forces(
             self.articulation_root_path
         )
 
@@ -809,7 +815,7 @@ class ControllableObject(BaseObject):
         this is the link that is the child of the last virtual joint in the robot's articulation.
 
         Returns:
-            RigidPrim: Base footprint link for this object
+            RigidDynamicPrim: Base footprint link for this object
         """
         return self.links[self.base_footprint_link_name]
 

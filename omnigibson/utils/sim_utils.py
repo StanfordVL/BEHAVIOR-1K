@@ -366,7 +366,7 @@ def meets_minimum_isaac_version(minimum_version, current_version=None):
 
     # If the user has not provided the current Isaac version, get it from the system.
     if current_version is None:
-        current_version = lazy.omni.isaac.version.get_version()[0]
+        current_version = lazy.isaacsim.core.version.get_version()[0]
 
     # Transform and compare.
     return python_utils.meets_minimum_version(
