@@ -5,7 +5,6 @@ from functools import cache
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
