@@ -478,7 +478,6 @@ class OVXRSystem(TeleopSystem):
         Returns:
             th.tensor: the robot teleop action
         """
-        print("Teleop action: " + str(self.teleop_action.base))
         return self.robot.teleop_data_to_action(self.teleop_action)
 
     def snap_controller_to_eef(self, arm: str = "right") -> None:
@@ -487,12 +486,13 @@ class OVXRSystem(TeleopSystem):
         Args:
             arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
-        robot_base_orn = self.robot.get_position_orientation()[1]
-        robot_eef_pos = self.robot.eef_links[
-            self.robot.arm_names[self.robot_arms.index(arm)]
-        ].get_position_orientation()[0]
-        target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         # TODO: fix this
+        pass
+        # robot_base_orn = self.robot.get_position_orientation()[1]
+        # robot_eef_pos = self.robot.eef_links[
+        #     self.robot.arm_names[self.robot_arms.index(arm)]
+        # ].get_position_orientation()[0]
+        # target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         # self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
         #     target_transform.numpy(), self.controllers[arm]
         # )
@@ -570,9 +570,9 @@ class OVXRSystem(TeleopSystem):
             device_name = str(device.get_name())
             if device_name == "/user/head" and self.hmd is None:
                 self.hmd = device
-            elif device_name == "/user/hand/left" and not "left" in self.controllers:
+            elif device_name == "/user/hand/left" and "left" not in self.controllers:
                 self.controllers["left"] = device
-            elif device_name == "/user/hand/right" and not "right" in self.controllers:
+            elif device_name == "/user/hand/right" and "right" not in self.controllers:
                 self.controllers["right"] = device
 
     def _update_device_transforms(self) -> None:
