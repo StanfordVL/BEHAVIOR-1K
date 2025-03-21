@@ -360,6 +360,21 @@ class XFormPrim(BasePrim):
         )
         return self.set_position_orientation(position, orientation, frame="parent")
 
+    @property
+    def aabb(self):
+        aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
+        return th.tensor(aabb_min), th.tensor(aabb_max)
+
+    @property
+    def aabb_center(self):
+        min_corner, max_corner = self.aabb
+        return (min_corner + max_corner) / 2
+
+    @property
+    def aabb_extent(self):
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
     def get_world_scale(self):
         """
         Gets prim's scale with respect to the world's frame.
