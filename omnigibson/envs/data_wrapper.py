@@ -29,11 +29,13 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, only_successes=True):
+    def __init__(self, env, output_path, overwrite=True, only_successes=True):
         """
         Args:
             env (Environment): The environment to wrap
             output_path (str): path to store hdf5 data file
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
         """
         # Make sure the wrapped environment inherits correct omnigibson format
@@ -53,13 +55,17 @@ class DataWrapper(EnvironmentWrapper):
 
         Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
         log.info(f"\nWriting OmniGibson dataset hdf5 to: {output_path}\n")
-        self.hdf5_file = h5py.File(output_path, "w")
-        data_grp = self.hdf5_file.create_group("data")
-        env.task.write_task_metadata()
-        scene_file = og.sim.save()[0]
-        config = deepcopy(env.config)
-        self.add_metadata(group=data_grp, name="config", data=config)
-        self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
+        self.hdf5_file = h5py.File(output_path, "w" if overwrite else "a")
+        if "data" not in set(self.hdf5_file.keys()):
+            data_grp = self.hdf5_file.create_group("data")
+        else:
+            data_grp = self.hdf5_file["data"]
+        if overwrite or "config" not in set(data_grp.attrs.keys()):
+            env.task.write_task_metadata()
+            scene_file = og.sim.save()[0]
+            config = deepcopy(env.config)
+            self.add_metadata(group=data_grp, name="config", data=config)
+            self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
         self.is_recording = True
 
@@ -75,7 +81,6 @@ class DataWrapper(EnvironmentWrapper):
             n_render_iterations (int): Number of rendering iterations to use before returning observations
 
         Returns:
-            5-tuple:
             5-tuple:
                 - dict: state, i.e. next observation
                 - float: reward, i.e. reward at this current timestep
@@ -279,7 +284,14 @@ class DataCollectionWrapper(DataWrapper):
     """
 
     def __init__(
-        self, env, output_path, viewport_camera_path="/World/viewer_camera", only_successes=True, use_vr=False
+        self,
+        env,
+        output_path,
+        viewport_camera_path="/World/viewer_camera",
+        overwrite=True,
+        only_successes=True,
+        use_vr=False,
+        obj_attr_keys=None,
     ):
         """
         Args:
@@ -287,17 +299,32 @@ class DataCollectionWrapper(DataWrapper):
             output_path (str): path to store hdf5 data file
             viewport_camera_path (str): prim path to the camera to use when rendering the main viewport during
                 data collection
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             use_vr (bool): Whether to use VR headset for data collection
+            obj_attr_keys (None or list of str): If set, a list of object attributes that should be
+                cached at the beginning of every episode, e.g.: "scale", "visible", etc. This is useful
+                for domain randomization settings where specific object attributes not directly tied to
+                the object's runtime kinematic state are being modified once at the beginning of every episode,
+                while the simulation is stopped.
         """
         # Store additional variables needed for optimized data collection
 
         # Denotes the maximum serialized state size for the current episode
         self.max_state_size = 0
 
+        # Dict capturing serialized per-episode initial information (e.g.: scales / visibilities) about every object
+        self.obj_attr_keys = [] if obj_attr_keys is None else obj_attr_keys
+        self.init_metadata = dict()
+
         # Maps episode step ID to dictionary of systems and objects that should be added / removed to the simulator at
         # the given simulator step. See add_transition_info() for more info
         self.current_transitions = dict()
+
+        # Cached state to rollback to if requested
+        self.checkpoint_state = None
+        self.checkpoint_step_idx = None
 
         self._is_recording = True
         self.use_vr = use_vr
@@ -317,10 +344,49 @@ class DataCollectionWrapper(DataWrapper):
         )
 
         # Run super
-        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+        super().__init__(
+            env=env,
+            output_path=output_path,
+            overwrite=overwrite,
+            only_successes=only_successes,
+        )
 
         # Configure the simulator to optimize for data collection
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
+
+    def update_checkpoint(self):
+        """
+        Updates the internal cached checkpoint state to be the current simulation state. If @rollback_to_checkpoint() is
+        called, it will rollback to this cached checkpoint state
+        """
+        # Save the current full state and corresponding step idx
+        self.checkpoint_state = og.sim.save(json_paths=None, as_dict=True)[0]
+        self.checkpoint_step_idx = len(self.current_traj_history)
+
+    def rollback_to_checkpoint(self):
+        """
+        Rolls back the current state to the checkpoint stored in @self.checkpoint_state. If no checkpoint
+        is found, this results in reset() being called
+        """
+        if self.checkpoint_state is None:
+            self.reset()
+
+        else:
+            # Restore to checkpoint
+            og.sim.restore(scene_files=[self.checkpoint_state])
+
+            # Prune all data stored at the current checkpoint step and beyond
+            n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
+            self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
+            self.step_count -= n_steps_to_remove
+
+            # Also prune any transition info that occurred after the checkpoint step idx
+            for step in tuple(self.current_transitions.keys()):
+                if step >= self.checkpoint_step_idx:
+                    self.current_transitions.pop(step)
+
+            # Update environment env step count
+            self.env._current_step = self.checkpoint_step_idx - 1
 
     @property
     def is_recording(self):
@@ -367,7 +433,6 @@ class DataCollectionWrapper(DataWrapper):
             lazy.carb.settings.get_settings().set_bool("/physics/mouseInteractionEnabled", False)
             lazy.carb.settings.get_settings().set_bool("/physics/mouseGrab", False)
             lazy.carb.settings.get_settings().set_bool("/physics/forceGrab", False)
-            lazy.carb.settings.get_settings().set_bool("/physics/suppressReadback", True)
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
@@ -391,6 +456,21 @@ class DataCollectionWrapper(DataWrapper):
 
         # Update max state size
         self.max_state_size = max(self.max_state_size, len(state))
+
+        # Also store initial metadata not recorded in serialized state
+        # This is simply serialized
+        metadata = {key: [] for key in self.obj_attr_keys}
+        for obj in self.scene.objects:
+            for key in self.obj_attr_keys:
+                metadata[key].append(getattr(obj, key))
+        self.init_metadata = {
+            key: th.stack(vals, dim=0) if isinstance(vals[0], th.Tensor) else th.tensor(vals, dtype=type(vals[0]))
+            for key, vals in metadata.items()
+        }
+
+        # Clear checkpoint state
+        self.checkpoint_state = None
+        self.checkpoint_step_idx = None
 
         return init_obs, init_info
 
@@ -424,6 +504,11 @@ class DataCollectionWrapper(DataWrapper):
         # Add in transition info
         self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
 
+        # Add initial metadata information
+        metadata_grp = traj_grp.create_group("init_metadata")
+        for name, data in self.init_metadata.items():
+            metadata_grp.create_dataset(name, data=data)
+
         return traj_grp
 
     def flush_current_traj(self):
@@ -447,6 +532,17 @@ class DataCollectionWrapper(DataWrapper):
             obj (BaseObject or BaseSystem): Object / system whose information should be stored
             add (bool): If True, assumes the object is being imported. Else, assumes the object is being removed
         """
+        # If we're at the current checkpoint idx, this means that we JUST created a checkpoint and we're still at
+        # the same sim step.
+        # This is dangerous because it means that a transition is happening that will NOT be tracked properly
+        # if we rollback the state -- i.e.: the state will be rolled back to just BEFORE this transition was executed,
+        # and will therefore not be tracked properly in subsequent states during playback. So we assert that the current
+        # idx is NOT the current checkpoint idx
+        if self.checkpoint_step_idx is not None:
+            assert (
+                self.checkpoint_step_idx - 1 != self.env.episode_steps
+            ), "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
+
         if self.env.episode_steps not in self.current_transitions:
             self.current_transitions[self.env.episode_steps] = {
                 "systems": {"add": [], "remove": []},
@@ -478,6 +574,7 @@ class DataPlaybackWrapper(DataWrapper):
         include_sensor_names=None,
         exclude_sensor_names=None,
         n_render_iterations=5,
+        overwrite=True,
         only_successes=False,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
@@ -511,6 +608,8 @@ class DataPlaybackWrapper(DataWrapper):
                 underlying physical state by a few frames, and additionally produces transient visual artifacts when
                 the physical state changes. Increasing this number will improve the rendered quality at the expense of
                 speed.
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
@@ -570,10 +669,19 @@ class DataPlaybackWrapper(DataWrapper):
             input_path=input_path,
             output_path=output_path,
             n_render_iterations=n_render_iterations,
+            overwrite=overwrite,
             only_successes=only_successes,
         )
 
-    def __init__(self, env, input_path, output_path, n_render_iterations=5, only_successes=False):
+    def __init__(
+        self,
+        env,
+        input_path,
+        output_path,
+        n_render_iterations=5,
+        overwrite=True,
+        only_successes=False,
+    ):
         """
         Args:
             env (Environment): The environment to wrap
@@ -581,6 +689,8 @@ class DataPlaybackWrapper(DataWrapper):
             output_path (str): path to store output hdf5 data file
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data
+            overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
+                Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
@@ -594,7 +704,12 @@ class DataPlaybackWrapper(DataWrapper):
         self.n_render_iterations = n_render_iterations
 
         # Run super
-        super().__init__(env=env, output_path=output_path, only_successes=only_successes)
+        super().__init__(
+            env=env,
+            output_path=output_path,
+            overwrite=overwrite,
+            only_successes=only_successes,
+        )
 
     def _process_obs(self, obs, info):
         """
@@ -636,6 +751,7 @@ class DataPlaybackWrapper(DataWrapper):
         # Grab episode data
         transitions = json.loads(traj_grp.attrs["transitions"])
         traj_grp = h5py_group_to_torch(traj_grp)
+        init_metadata = traj_grp["init_metadata"]
         action = traj_grp["action"]
         state = traj_grp["state"]
         state_size = traj_grp["state_size"]
@@ -645,6 +761,15 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Reset environment
         og.sim.restore(scene_files=[self.scene_file])
+
+        # Reset object attributes from the stored metadata
+        with og.sim.stopped():
+            for attr, vals in init_metadata.items():
+                assert len(vals) == self.scene.n_objects
+            for i, obj in enumerate(self.scene.objects):
+                for attr, vals in init_metadata.items():
+                    val = vals[i]
+                    setattr(obj, attr, val.item() if val.ndim == 0 else val)
         self.reset()
 
         # Restore to initial state

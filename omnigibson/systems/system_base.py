@@ -5,14 +5,13 @@ from functools import cache
 import torch as th
 
 import omnigibson as og
-import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import Serializable, get_uuid
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
+from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute, delete_or_deactivate_prim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -203,7 +202,7 @@ class BaseSystem(Serializable):
             callback(self)
 
         self.reset()
-        lazy.omni.isaac.core.utils.prims.delete_prim(self.prim_path)
+        delete_or_deactivate_prim(self.prim_path)
 
         if og.sim.is_playing() and gm.ENABLE_TRANSITION_RULES:
             self.scene.transition_rule_api.prune_active_rules()
@@ -868,18 +867,18 @@ class PhysicalParticleSystem(BaseSystem):
         except ValueError:
             low, high = obj.aabb
             extent = obj.aabb_extent
-        # We sample the range of each extent minus
-        sampling_distance = 2 * self.particle_radius if sampling_distance is None else sampling_distance
-        n_particles_per_axis = (extent / sampling_distance).int()
+
+        sampling_distance = self.particle_particle_rest_distance if sampling_distance is None else sampling_distance
+
+        # This guarantees that h - self.particle_radius > l + self.particle_radius
         assert th.all(
-            n_particles_per_axis
+            extent > 2 * self.particle_radius
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
 
-        # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [
-            th.arange(l + self.particle_radius, h - self.particle_radius + 1e-10, self.particle_particle_rest_distance)
-            for l, h, n in zip(low, high, n_particles_per_axis)
+            th.arange(l + self.particle_radius, h - self.particle_radius, sampling_distance) for l, h in zip(low, high)
         ]
+
         # Generate 3D-rectangular grid of points
         particle_positions = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those

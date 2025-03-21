@@ -7,9 +7,10 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.python_utils import multi_dim_linspace
 
 
 # Gives 1 - 5% better speedup, according to https://github.com/NVlabs/curobo/discussions/245#discussioncomment-9265692
@@ -90,14 +91,11 @@ class CuRoboMotionGenerator:
                 MotionGenConfig.load_from_robot_config(...)
             batch_size (int): Size of batches for computing trajectories. This must be FIXED
             use_cuda_graph (bool): Whether to use CUDA graph for motion generation or not
-            collision_activation_distance (float): Distance threshold at which a collision is detected.
-                Increasing this value will make the motion planner more conservative in its planning with respect
-                to the underlying sphere representation of the robot
             debug (bool): Whether to debug generation or not, setting this True will set use_cuda_graph to False implicitly
             use_default_embodiment_only (bool): Whether to use only the default embodiment for the robot or not
-            collision_activation_distance (float): Activation distance for collision checking; this affects
-                1) how close the computed trajectories can get to obstacles and
-                2) how close the robot can get to obstacles during collision checks
+            collision_activation_distance (float): Distance threshold at which a collision with the world is detected.
+                Increasing this value will make the motion planner more conservative in its planning with respect
+                to the underlying sphere representation of the robot. Note that this does not affect self-collisions detection.
         """
         # Only support one scene for now -- verify that this is the case
         assert len(og.sim.scenes) == 1
@@ -132,12 +130,27 @@ class CuRoboMotionGenerator:
         self.ee_link = dict()
         self.additional_links = dict()
         self.base_link = dict()
+
+        # Grab mapping from robot joint name to index
+        reset_qpos = self.robot.reset_joint_pos
+        joint_idx_mapping = {joint.joint_name: i for i, joint in enumerate(self.robot.joints.values())}
         for emb_sel, robot_cfg_path in robot_cfg_path_dict.items():
             content_path = lazy.curobo.types.file_path.ContentPath(
                 robot_config_absolute_path=robot_cfg_path, robot_usd_absolute_path=robot_usd_path
             )
             robot_cfg_dict = lazy.curobo.cuda_robot_model.util.load_robot_yaml(content_path)["robot_cfg"]
             robot_cfg_dict["kinematics"]["use_usd_kinematics"] = True
+
+            # Automatically populate the locked joints and retract config from the robot values
+            for joint_name, lock_val in robot_cfg_dict["kinematics"]["lock_joints"].items():
+                if lock_val is None:
+                    joint_idx = joint_idx_mapping[joint_name]
+                    robot_cfg_dict["kinematics"]["lock_joints"][joint_name] = reset_qpos[joint_idx]
+            if robot_cfg_dict["kinematics"]["cspace"]["retract_config"] is None:
+                robot_cfg_dict["kinematics"]["cspace"]["retract_config"] = [
+                    reset_qpos[joint_idx_mapping[joint_name]]
+                    for joint_name in robot_cfg_dict["kinematics"]["cspace"]["joint_names"]
+                ]
 
             self.ee_link[emb_sel] = robot_cfg_dict["kinematics"]["ee_link"]
             # RobotConfig.from_dict will append ee_link to link_names, so we make a copy here.
@@ -161,7 +174,7 @@ class CuRoboMotionGenerator:
                 optimize_dt=True,
                 num_trajopt_seeds=4,
                 num_graph_seeds=4,
-                interpolation_dt=0.03,
+                interpolation_dt=og.sim.get_sim_step_dt(),
                 collision_activation_distance=collision_activation_distance,
                 self_collision_check=True,
                 maximum_trajectory_dt=None,
@@ -183,7 +196,17 @@ class CuRoboMotionGenerator:
             self.mg[emb_sel] = lazy.curobo.wrap.reacher.motion_gen.MotionGen(motion_gen_config)
 
         for mg in self.mg.values():
-            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size)
+            mg.warmup(enable_graph=False, warmup_js_trajopt=False, batch=batch_size, warmup_joint_delta=0.0)
+
+            # Make sure all cuda graphs have been warmed up
+            for solver in [mg.ik_solver, mg.trajopt_solver, mg.finetune_trajopt_solver]:
+                if solver.solver.use_cuda_graph_metrics:
+                    assert solver.solver.safety_rollout._metrics_cuda_graph_init
+                    if isinstance(solver, lazy.curobo.wrap.reacher.trajopt.TrajOptSolver):
+                        assert solver.interpolate_rollout._metrics_cuda_graph_init
+                for opt in solver.solver.optimizers:
+                    if opt.use_cuda_graph:
+                        assert opt.cu_opt_init
 
     def update_joint_limits(self, robot_cfg_obj, emb_sel):
         joint_limits = robot_cfg_obj.kinematics.kinematics_config.joint_limits
@@ -790,6 +813,29 @@ class CuRoboMotionGenerator:
         cmd_plan = self.mg[emb_sel].get_full_js(path) if get_full_js else path
         return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
 
+    def add_linearly_interpolated_waypoints(self, traj, max_inter_dist=0.01):
+        """
+        Adds waypoints to the joint trajectory so that the joint position distance
+        between each pairs of neighboring waypoints is less than @max_inter_dist
+
+        Args:
+            traj: (T, D) tensor representing the joint trajectory
+            max_inter_dist (float): Maximum joint position distance between two neighboring waypoints
+
+        Returns:
+            torch.tensor: (T', D) tensor representing the interpolated joint trajectory
+        """
+        assert len(traj) > 1, "Plan must have at least 2 waypoints to interpolate"
+        interpolated_plan = []
+        for i in range(len(traj) - 1):
+            # Calculate maximum difference across all dimensions
+            max_diff = (traj[i + 1] - traj[i]).abs().max()
+            num_intervals = math.ceil(max_diff.item() / max_inter_dist)
+            interpolated_plan += multi_dim_linspace(traj[i], traj[i + 1], num_intervals, endpoint=False)
+
+        interpolated_plan.append(traj[-1])
+        return th.stack(interpolated_plan)
+
     def path_to_eef_trajectory(self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
         """
         Converts raw path from motion generator into end-effector trajectory sequence in the robot frame.
@@ -878,7 +924,7 @@ class CuRoboMotionGenerator:
 
         attached_info = []
         for ee_link_name, obj in attached_obj.items():
-            assert isinstance(obj, RigidPrim), "attached_object should be a RigidPrim object"
+            assert isinstance(obj, RigidDynamicPrim), "attached_object should be a RigidDynamicPrim object"
             obj_paths = [geom.prim_path for geom in obj.collision_meshes.values()]
             assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
 

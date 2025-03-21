@@ -53,6 +53,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         fixed_base=False,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -81,6 +82,10 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -153,6 +158,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             self_collisions=self_collisions,
             prim_type=PrimType.RIGID,
             include_default_states=True,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -471,10 +477,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # One final plot show so all the figures get rendered
         plt.show()
-
-    def update_handles(self):
-        # Call super first
-        super().update_handles()
 
     def remove(self):
         """

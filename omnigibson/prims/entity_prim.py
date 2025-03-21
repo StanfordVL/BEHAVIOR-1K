@@ -11,10 +11,10 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
-from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
-from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
@@ -77,15 +77,9 @@ class EntityPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
-        # Set the default sleep threshold
-        self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
-
-        # Force populate inputs and outputs of the shaders of all materials
-        # We suppress errors from omni.usd if we're using encrypted assets, because we're loading from tmp location,
-        # not the original location
-        with suppress_omni_log(channels=["omni.usd"]):
-            for material in self.materials:
-                material.shader_force_populate(render=False)
+        if not self.kinematic_only:
+            # Set the default sleep threshold
+            self.sleep_threshold = m.DEFAULT_SLEEP_THRESHOLD
 
         # Initialize all the links
         for link in self._links.values():
@@ -202,13 +196,19 @@ class EntityPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         joint_children = set()
+        # Keep track of all the links we will create. We can't create that just yet because we need to find
+        # the base link first.
         links_to_create = {}
         for prim in self._prim.GetChildren():
-            link_cls = None
             link_name = prim.GetName()
-            if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                # For rigid body object, process prims that are Xforms (e.g. rigid links)
-                link_cls = RigidPrim
+            prim_type_name = prim.GetPrimTypeInfo().GetTypeName()
+
+            # Identify links based on prim type
+            if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
+                # For rigid body objects, process Xforms as potential rigid links
+                # Mark this as a link to create (we'll determine exact class later)
+                links_to_create[link_name] = (PrimType.RIGID, prim)
+
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -219,39 +219,44 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
-            elif self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
-                # For cloth object, process prims that are Meshes
-                link_cls = ClothPrim
-
-            # Keep track of all the links we will create. We can't create that just yet because we need to find
-            # the base link first.
-            if link_cls is not None:
-                links_to_create[link_name] = (link_cls, prim)
+            elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
+                # For cloth objects, process Meshes as cloth links
+                links_to_create[link_name] = (PrimType.CLOTH, prim)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
         valid_root_links = list(set(links_to_create.keys()) - joint_children)
 
         assert len(valid_root_links) == 1, (
-            f"Only a single root link should have been found for {self.name}, "
-            f"but found multiple instead: {valid_root_links}"
+            f"Exactly one single root link should have been found for {self.name}, "
+            f"but found none/multiple instead: {valid_root_links}"
         )
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
-        # Now actually create the links
+        # Now actually create the links with appropriate classes
         self._links = dict()
-        for link_name, (link_cls, prim) in links_to_create.items():
+        for link_name, (link_type, prim) in links_to_create.items():
+            # Determine link configuration
+            is_root_link = link_name == self._root_link_name
             # Fixed child links of kinematic-only objects are not kinematic-only, to avoid the USD error:
             # PhysicsUSD: CreateJoint - cannot create a joint between static bodies, joint prim: ...
+            is_kinematic = self._load_config.get("kinematic_only", False) if is_root_link else False
+
             link_load_config = {
-                "kinematic_only": (
-                    self._load_config.get("kinematic_only", False) if link_name == self._root_link_name else False
-                ),
-                "belongs_to_articulation": self._articulation_view is not None and link_name != self._root_link_name,
+                "kinematic_only": is_kinematic,
+                "belongs_to_articulation": self._articulation_view is not None and not is_root_link,
                 "remesh": self._load_config.get("remesh", True),
                 "xform_props_pre_loaded": self._load_config.get("xform_props_pre_loaded", False),
                 "scale": self._load_config.get("scale", None),
             }
+
+            # Determine the correct class based on link type and kinematic property
+            if link_type == PrimType.RIGID:
+                link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
+            else:  # link_type == PrimType.CLOTH
+                link_cls = ClothPrim
+
+            # Create and load the link
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
                 name=f"{self._name}:{link_name}",
@@ -334,7 +339,7 @@ class EntityPrim(XFormPrim):
 
                         # Find the joint frame orientation in the parent link frame
                         joint_local_orn = th.tensor(
-                            lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                            lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
                                 joint.get_attribute("physics:localRot0")
                             )[[1, 2, 3, 0]],
                             dtype=th.float32,
@@ -368,10 +373,8 @@ class EntityPrim(XFormPrim):
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
-            assert (
-                self._articulation_view_direct.is_physics_handle_valid()
-                and self._articulation_view_direct._physics_view.check()
-            ), "Articulation view must be valid if physics is running!"
+            if not self._articulation_view_direct.is_physics_handle_valid():
+                og.sim.update_handles()
 
         return self._articulation_view_direct
 
@@ -630,14 +633,16 @@ class EntityPrim(XFormPrim):
         Enables gravity for this entity
         """
         for link in self._links.values():
-            link.enable_gravity()
+            if isinstance(link, RigidDynamicPrim):
+                link.enable_gravity()
 
     def disable_gravity(self) -> None:
         """
         Disables gravity for this entity
         """
         for link in self._links.values():
-            link.disable_gravity()
+            if isinstance(link, RigidDynamicPrim):
+                link.disable_gravity()
 
     def reset(self):
         """
@@ -1246,7 +1251,7 @@ class EntityPrim(XFormPrim):
             int: How many position iterations to take per physics step by the physx solver
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:solverPositionIterationCount"
             )
             if self.articulated
@@ -1262,7 +1267,7 @@ class EntityPrim(XFormPrim):
             count (int): How many position iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count
             )
         else:
@@ -1276,7 +1281,7 @@ class EntityPrim(XFormPrim):
             int: How many velocity iterations to take per physics step by the physx solver
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:solverVelocityIterationCount"
             )
             if self.articulated
@@ -1292,7 +1297,7 @@ class EntityPrim(XFormPrim):
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count
             )
         else:
@@ -1306,7 +1311,7 @@ class EntityPrim(XFormPrim):
             float: threshold for stabilizing this articulation
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:stabilizationThreshold"
             )
             if self.articulated
@@ -1322,7 +1327,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Stabilization threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold
             )
         else:
@@ -1354,7 +1359,7 @@ class EntityPrim(XFormPrim):
             float: threshold for sleeping this articulation
         """
         return (
-            lazy.omni.isaac.core.utils.prims.get_prim_property(
+            lazy.isaacsim.core.utils.prims.get_prim_property(
                 self.articulation_root_path, "physxArticulation:sleepThreshold"
             )
             if self.articulated
@@ -1370,7 +1375,7 @@ class EntityPrim(XFormPrim):
             threshold (float): Sleeping threshold
         """
         if self.articulated:
-            lazy.omni.isaac.core.utils.prims.set_prim_property(
+            lazy.isaacsim.core.utils.prims.set_prim_property(
                 self.articulation_root_path, "physxArticulation:sleepThreshold", threshold
             )
         else:
@@ -1383,7 +1388,7 @@ class EntityPrim(XFormPrim):
         Returns:
             bool: Whether self-collisions are enabled for this prim or not
         """
-        return lazy.omni.isaac.core.utils.prims.get_prim_property(
+        return lazy.isaacsim.core.utils.prims.get_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions"
         )
 
@@ -1395,7 +1400,7 @@ class EntityPrim(XFormPrim):
         Args:
             flag (bool): Whether self collisions are enabled for this prim or not
         """
-        lazy.omni.isaac.core.utils.prims.set_prim_property(
+        lazy.isaacsim.core.utils.prims.set_prim_property(
             self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag
         )
 
@@ -1408,7 +1413,7 @@ class EntityPrim(XFormPrim):
                 body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
                 for more information
         """
-        return self.root_link.kinematic_only
+        return isinstance(self.root_link, RigidKinematicPrim)
 
     @property
     def aabb(self):
@@ -1523,7 +1528,8 @@ class EntityPrim(XFormPrim):
             og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                link.wake()
+                if isinstance(link, RigidDynamicPrim):
+                    link.wake()
 
     def sleep(self):
         """
@@ -1534,12 +1540,15 @@ class EntityPrim(XFormPrim):
             og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
-                link.sleep()
+                if isinstance(link, RigidDynamicPrim):
+                    link.sleep()
 
     def keep_still(self):
         """
         Zero out all velocities for this prim
         """
+        if self.kinematic_only:
+            return
         self.set_linear_velocity(velocity=th.zeros(3))
         self.set_angular_velocity(velocity=th.zeros(3))
         for joint in self._joints.values():
@@ -1558,7 +1567,7 @@ class EntityPrim(XFormPrim):
 
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
-        stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+        stage = lazy.isaacsim.core.utils.stage.get_current_stage()
         link_prim = stage.DefinePrim(f"{self.prim_path}/{link_name}", "Xform")
         vis_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/visuals").GetPrim()
         col_prim = lazy.pxr.UsdGeom.Sphere.Define(stage, f"{self.prim_path}/{link_name}/collisions").GetPrim()
@@ -1582,7 +1591,7 @@ class EntityPrim(XFormPrim):
         lazy.pxr.PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
 
         # Create a attachment point link
-        link = RigidPrim(
+        link = RigidDynamicPrim(
             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, link_prim.GetPrimPath().pathString),
             name=f"{self._name}:{link_name}",
         )
@@ -1597,7 +1606,7 @@ class EntityPrim(XFormPrim):
 
         self._links[link_name] = link
 
-        # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidPrim)
+        # Create an attachment between the root link (ClothPrim) and the newly created attachment point link (RigidDynamicPrim)
         attachment_path = self.root_link.prim.GetPath().AppendElementString("attachment")
         lazy.omni.kit.commands.execute(
             "CreatePhysicsAttachment",

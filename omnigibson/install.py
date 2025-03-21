@@ -13,32 +13,32 @@ import tqdm
 
 # List of NVIDIA PyPI packages needed for OmniGibson
 ISAAC_SIM_PACKAGES = [
-    "omniverse_kit-106.1.0.140981",
-    "isaacsim_kernel-4.2.0.2",
-    "isaacsim_app-4.2.0.2",
-    "isaacsim_core-4.2.0.2",
-    "isaacsim_gui-4.2.0.2",
-    "isaacsim_utils-4.2.0.2",
-    "isaacsim_storage-4.2.0.2",
-    "isaacsim_asset-4.2.0.2",
-    "isaacsim_sensor-4.2.0.2",
-    "isaacsim_robot_motion-4.2.0.2",
-    "isaacsim_robot-4.2.0.2",
-    "isaacsim_benchmark-4.2.0.2",
-    "isaacsim_code_editor-4.2.0.2",
-    "isaacsim_ros1-4.2.0.2",
-    "isaacsim_cortex-4.2.0.2",
-    "isaacsim_example-4.2.0.2",
-    "isaacsim_replicator-4.2.0.2",
-    "isaacsim_rl-4.2.0.2",
-    "isaacsim_robot_setup-4.2.0.2",
-    "isaacsim_ros2-4.2.0.2",
-    "isaacsim_template-4.2.0.2",
-    "isaacsim_test-4.2.0.2",
-    "isaacsim-4.2.0.2",
-    "isaacsim_extscache_physics-4.2.0.2",
-    "isaacsim_extscache_kit-4.2.0.2",
-    "isaacsim_extscache_kit_sdk-4.2.0.2",
+    "omniverse_kit-106.5.0.162521",
+    "isaacsim_kernel-4.5.0.0",
+    "isaacsim_app-4.5.0.0",
+    "isaacsim_core-4.5.0.0",
+    "isaacsim_gui-4.5.0.0",
+    "isaacsim_utils-4.5.0.0",
+    "isaacsim_storage-4.5.0.0",
+    "isaacsim_asset-4.5.0.0",
+    "isaacsim_sensor-4.5.0.0",
+    "isaacsim_robot_motion-4.5.0.0",
+    "isaacsim_robot-4.5.0.0",
+    "isaacsim_benchmark-4.5.0.0",
+    "isaacsim_code_editor-4.5.0.0",
+    "isaacsim_ros1-4.5.0.0",
+    "isaacsim_cortex-4.5.0.0",
+    "isaacsim_example-4.5.0.0",
+    "isaacsim_replicator-4.5.0.0",
+    "isaacsim_rl-4.5.0.0",
+    "isaacsim_robot_setup-4.5.0.0",
+    "isaacsim_ros2-4.5.0.0",
+    "isaacsim_template-4.5.0.0",
+    "isaacsim_test-4.5.0.0",
+    "isaacsim-4.5.0.0",
+    "isaacsim_extscache_physics-4.5.0.0",
+    "isaacsim_extscache_kit-4.5.0.0",
+    "isaacsim_extscache_kit_sdk-4.5.0.0",
 ]
 BASE_URL = "https://pypi.nvidia.com"
 
@@ -215,7 +215,7 @@ def _launcher_based_install(isaac_sim_path: Optional[Path]):
         isaac_version_str = version_content.split("-")[0]
         isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
 
-    if isaac_version_tuple not in ((4, 0, 0), (4, 1, 0), (4, 2, 0)):
+    if isaac_version_tuple not in ((4, 5, 0)):
         click.echo(f"Isaac Sim version {isaac_version_str} is not supported by OmniGibson.")
         return False
 

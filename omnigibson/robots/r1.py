@@ -22,6 +22,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         visible=True,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -40,6 +41,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         **kwargs,
@@ -54,6 +57,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             visible (bool): whether to render this object or not in the stage
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -92,6 +99,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            finger_static_friction (None or float): If specified, specific static friction to use for robot's fingers
+            finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
+                Note: If specified, this will override any ways that are found within @link_physics_materials for any
+                robot finger gripper links
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -105,6 +116,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             visible=visible,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -119,6 +131,8 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
+            finger_static_friction=finger_static_friction,
+            finger_dynamic_friction=finger_dynamic_friction,
             default_reset_mode=default_reset_mode,
             **kwargs,
         )
@@ -227,6 +241,7 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
             ["base_link", "wheel_link1"],
             ["base_link", "wheel_link2"],
             ["base_link", "wheel_link3"],
+            ["torso_link2", "torso_link4"],
         ]
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:

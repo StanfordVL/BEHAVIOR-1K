@@ -28,7 +28,12 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+from omnigibson.utils.usd_utils import (
+    PoseAPI,
+    mesh_prim_to_trimesh_mesh,
+    sample_mesh_keypoints,
+    delete_or_deactivate_prim,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -39,7 +44,7 @@ m = create_module_macros(module_path=__file__)
 CLOTH_CONFIGURATIONS = ["default", "settled", "folded", "crumpled"]
 
 # Subsample cloth particle points to boost performance
-m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS = False
+m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS = True  # TODO: Disable after new dataset release
 m.N_CLOTH_KEYPOINTS = 1000
 m.FOLDING_INCREMENTS = 100
 m.CRUMPLING_INCREMENTS = 100
@@ -415,7 +420,7 @@ class ClothPrim(GeomPrim):
         plane_prims = []
         plane_motions = []
         for i, pc in enumerate(plane_centers):
-            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path=f"/World/plane_{i}",
                 name=f"plane_{i}",
                 z_position=0,
@@ -486,7 +491,7 @@ class ClothPrim(GeomPrim):
 
         # Remove the planes
         for plane_prim in plane_prims:
-            lazy.omni.isaac.core.utils.prims.delete_prim(plane_prim.prim_path)
+            delete_or_deactivate_prim(plane_prim.prim_path)
 
     def get_available_configurations(self):
         """
@@ -1023,3 +1028,33 @@ class ClothPrim(GeomPrim):
         if self.initialized:
             points_configuration = self._load_config.get("default_point_configuration", "default")
             self.reset_points_to_configuration(points_configuration)
+
+    @cached_property
+    def is_meta_link(self):
+        return False
+
+    @cached_property
+    def meta_link_type(self):
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_id(self):
+        """The meta link id of this link, if the link is a meta link.
+
+        The meta link ID is a semantic identifier for the meta link within the meta link type. It is
+        used when an object has multiple meta links of the same type. It can be just a numerical index,
+        or for some objects, it will be a string that can be matched to other meta links. For example,
+        a stove might have toggle buttons named "left" and "right", and heat sources named "left" and
+        "right". The meta link ID can be used to match the toggle button to the heat source.
+        """
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_sub_id(self):
+        """The integer meta link sub id of this link, if the link is a meta link.
+
+        The meta link sub ID identifies this link as one of the parts of a meta link. For example, an
+        attachment meta link's ID will be the attachment pair name, and each attachment point that
+        works with that pair will show up as a separate link with a unique sub ID.
+        """
+        raise ValueError(f"{self.name} is not a meta link")

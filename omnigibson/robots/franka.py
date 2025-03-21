@@ -21,6 +21,7 @@ class FrankaPanda(ManipulationRobot):
         visible=True,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         fixed_base=True,
         # Unique to USDObject hierarchy
@@ -39,6 +40,8 @@ class FrankaPanda(ManipulationRobot):
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         # Unique to Franka
         end_effector="gripper",
         **kwargs,
@@ -53,6 +56,10 @@ class FrankaPanda(ManipulationRobot):
             visible (bool): whether to render this object or not in the stage
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -89,6 +96,10 @@ class FrankaPanda(ManipulationRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            finger_static_friction (None or float): If specified, specific static friction to use for robot's fingers
+            finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
+                Note: If specified, this will override any ways that are found within @link_physics_materials for any
+                robot finger gripper links
             end_effector (str): type of end effector to use. One of {"gripper", "allegro", "leap_right", "leap_left", "inspire"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
@@ -191,6 +202,7 @@ class FrankaPanda(ManipulationRobot):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -204,6 +216,8 @@ class FrankaPanda(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            finger_static_friction=finger_static_friction,
+            finger_dynamic_friction=finger_dynamic_friction,
             grasping_direction=(
                 "lower" if end_effector == "gripper" else "upper"
             ),  # gripper grasps in the opposite direction

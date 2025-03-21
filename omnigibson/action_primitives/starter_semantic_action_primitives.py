@@ -64,7 +64,7 @@ m.KP_ANGLE_VEL = {
     Turtlebot: 0.2,
     Husky: 0.05,
     Freight: 0.1,
-    Locobot: 1.5,
+    Locobot: 1.0,
     BehaviorRobot: 0.2,
     R1: 0.2,
 }
@@ -968,13 +968,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         traj_path = traj_paths[success_idx[0]]
-        q_traj = self._motion_generator.path_to_joint_trajectory(
-            traj_path, get_full_js=True, emb_sel=embodiment_selection
-        ).cpu()
-
-        # (TODO) investigate why this is necessary to prevent jerky motion during execution
-        # Smooth out the trajectory
-        q_traj = th.stack(self._add_linearly_interpolated_waypoints(plan=q_traj, max_inter_dist=0.01))
+        q_traj = (
+            self._motion_generator.path_to_joint_trajectory(traj_path, get_full_js=True, emb_sel=embodiment_selection)
+            .cpu()
+            .float()
+        )
+        q_traj = self._motion_generator.add_linearly_interpolated_waypoints(traj=q_traj, max_inter_dist=0.01)
 
         return q_traj
 
@@ -1054,28 +1053,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                             ActionPrimitiveError.Reason.EXECUTION_ERROR,
                             "Could not reach the target articulation joint positions. Try again",
                         )
-
-    def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist=0.01):
-        """
-        Adds waypoints to the plan so the distance between values in the plan never exceeds the max_inter_dist.
-
-        Args:
-            plan (Array of arrays): Planned path
-            max_inter_dist (float): Maximum distance between values in the plan
-
-        Returns:
-            Array of arrays: Planned path with additional waypoints
-        """
-        assert len(plan) > 1, "Plan must have at least 2 waypoints to interpolate"
-        interpolated_plan = []
-        for i in range(len(plan) - 1):
-            # Calculate maximum difference across all dimensions
-            max_diff = (plan[i + 1] - plan[i]).abs().max()
-            num_intervals = math.ceil(max_diff.item() / max_inter_dist)
-            interpolated_plan += multi_dim_linspace(plan[i], plan[i + 1], num_intervals, endpoint=False)
-
-        interpolated_plan.append(plan[-1])
-        return interpolated_plan
 
     def _move_hand_direct_joint(self, joint_pos, stop_on_contact=False, ignore_failure=False):
         """

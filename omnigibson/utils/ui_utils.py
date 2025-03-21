@@ -349,7 +349,7 @@ class CameraMover:
         self.set_lights(self.light_val)
 
     def set_lights(self, intensity):
-        world = lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+        world = lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
         for prim in world.GetChildren():
             for prim_child in prim.GetChildren():
                 for prim_child_child in prim_child.GetChildren():
@@ -1016,7 +1016,7 @@ def draw_line(start, end, color=(1.0, 0.0, 0.0, 1.0), size=1.0):
     """
     Draws a single line between two points.
     """
-    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
+    draw = lazy.isaacsim.util.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.draw_lines([start], [end], [color], [size])
 
 
@@ -1042,5 +1042,5 @@ def clear_debug_drawing():
     """
     Clears all debug drawings.
     """
-    draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
+    draw = lazy.isaacsim.util.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.clear_lines()

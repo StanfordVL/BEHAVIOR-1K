@@ -9,6 +9,7 @@ from copy import deepcopy
 from functools import wraps
 from hashlib import md5
 from importlib import import_module
+import sys
 
 import h5py
 import torch as th
@@ -711,6 +712,24 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
+def torch_compile(func):
+    """
+    Decorator to compile a function with torch.compile on Linux and torch.jit.script on Windows. This is because of poor support for torch.compile on Windows.
+
+    Args:
+        func (function): Function to compile
+
+    Returns:
+        function: Compiled function
+    """
+    # If we're on Windows, return a jitscript option
+    if sys.platform == "win32":
+        return th.jit.script(func)
+    # Otherwise, return a torch.compile option
+    else:
+        return th.compile(func)
+
+
 def nums2array(nums, dim, dtype=th.float32):
     """
     Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
@@ -806,7 +825,7 @@ def h5py_group_to_torch(group):
         if isinstance(value, h5py.Group):
             state[key] = h5py_group_to_torch(value)
         else:
-            state[key] = th.tensor(value[()], dtype=th.float32)
+            state[key] = th.from_numpy(value[()])
     return state
 
 

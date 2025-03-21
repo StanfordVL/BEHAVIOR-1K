@@ -1,4 +1,3 @@
-import asyncio
 import os
 
 import torch as th
@@ -97,9 +96,10 @@ class MaterialPrim(BasePrim):
 
         # Move prim to desired location
         lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self.prim_path)
+        og.sim.update_handles()
 
         # Return generated material
-        return lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path)
+        return lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path)
 
     @classmethod
     def clear(cls):
@@ -160,32 +160,6 @@ class MaterialPrim(BasePrim):
         """
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
 
-    async def _load_mdl_parameters(self, render=True):
-        """
-        Loads MDL parameters internally so they can be accessed by our class instance
-
-        Args:
-            render (bool): If True, takes a rendering step before loading the mdl parameters.
-                Note that a rendering step is necessary to load these parameters, though if a step has already
-                occurred externally, no additional rendering step is needed
-        """
-        if render:
-            og.sim.render()
-        await lazy.omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
-
-    def shader_force_populate(self, render=True):
-        """
-        Force populate inputs and outputs of the shader
-
-        Args:
-            render (bool): If True, takes a rendering step before force populating the inputs and outputs.
-                Note that a rendering step is necessary to load these I/Os, though if a step has already
-                occurred externally, no additional rendering step is needed
-        """
-        # TODO: Consider optimizing this somehow.
-        assert self._shader is not None
-        asyncio.run(self._load_mdl_parameters(render=render))
-
     def shader_update_asset_paths_with_root_path(self, root_path, relative=False):
         """
         Similar to @shader_update_asset_paths, except in this case, root_path is explicitly provided by the caller.
@@ -236,14 +210,14 @@ class MaterialPrim(BasePrim):
             inp (str): Name of the shader input whose value will be set
             val (any): Value to set for the input. This should be the valid type for that attribute.
         """
-        # # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
+        # Make sure the input exists first, so we avoid segfaults with "invalid null prim"
         if inp in self.shader_input_names:
             self._shader.GetInput(inp).Set(val)
         elif inp in self.shader_default_input_names:
             input_type = get_sdf_value_type_name(val)
             self._shader.CreateInput(inp, input_type).Set(val)
-        # else:
-        #     raise ValueError(f"Got invalid shader input to set! Got: {inp}")
+        else:
+            raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
     def is_glass(self):
@@ -282,7 +256,6 @@ class MaterialPrim(BasePrim):
         Args:
             input_type (str): input type
             include_default (bool): whether to include default inputs
-
         Returns:
             set: All the shader input names associated with this material that match the given input type
         """
@@ -711,7 +684,8 @@ class MaterialPrim(BasePrim):
         Args:
              constant (float): this material's applied opacity_constant
         """
-        self.set_input(inp="opacity_constant", val=constant)
+        # TODO: another instance of missing config type checking
+        self.set_input(inp="opacity_constant", val=float(constant))
 
     @property
     def opacity_texture(self):

@@ -128,7 +128,8 @@ curobo:
   lock_joints: {}                   # (dict) Maps joint name to "locked" joint configuration. Any joints
                                     #       specified here will not be considered active when motion planning
                                     #       NOTE: All gripper joints and non-controllable holonomic joints
-                                    #       will automatically be added here
+                                    #       will automatically be added here. Null means that the value will be
+                                    #       dynamically computed at runtime based on the robot's reset qpos
   self_collision_ignore:            # (dict) Maps link name to list of other ignore links to ignore collisions
                                     #       with. Note that bi-directional specification is not necessary,
                                     #       e.g.: "torso_link1" does not need to be specified in
@@ -317,27 +318,6 @@ curobo:
         "radius": 0.005
       - "center": [0.02, 0.0, -0.007]
         "radius": 0.003
-  default_qpos:                     # (list of float): Default joint configuration
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 0.0
-    - 1.906
-    - 1.906
-    - -0.991
-    - -0.991
-    - 1.571
-    - 1.571
-    - 0.915
-    - 0.915
-    - -1.571
-    - -1.571
-    - 0.03
-    - 0.03
-    - 0.03
-    - 0.03
 
 """
 
@@ -404,14 +384,14 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
         parent_link_prim = None
     else:
         parent_path = f"{root_prim_path}/{parent_link_name}"
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(
             parent_path
         ), f"Could not find parent link within robot with name {parent_link_name}!"
-        parent_link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(parent_path)
+        parent_link_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(parent_path)
 
     # If parent link is defined, link prim should NOT exist (this should be a new link)
     link_prim_path = f"{root_prim_path}/{link_name}"
-    link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
+    link_prim_exists = lazy.isaacsim.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
         assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
@@ -419,7 +399,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             stage=stage,
             link_prim_path=link_prim_path,
         )
-        link_prim_xform = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
+        link_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
 
         # Create fixed joint to connect the two together
         create_joint(
@@ -433,7 +413,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
         # Set child prim to the appropriate local pose -- this should be the parent local pose transformed by
         # the additional offset
-        parent_prim_xform = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
+        parent_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
         parent_pos, parent_quat = parent_prim_xform.get_local_pose()
         parent_quat = parent_quat[[1, 2, 3, 0]]
         parent_pose = T.pose2mat((th.tensor(parent_pos), th.tensor(parent_quat)))
@@ -755,17 +735,13 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
 
     joint_prims = find_all_joints(robot_prim, only_articulated=True)
     all_joint_names = [joint_prim.GetName() for joint_prim in joint_prims]
-    retract_cfg = curobo_cfg.default_qpos
     lock_joints = curobo_cfg.lock_joints.to_dict() if curobo_cfg.lock_joints else {}
     if is_holonomic:
         # Move the final six joints to the beginning, since the holonomic joints are added at the end
         all_joint_names = list(reversed(all_joint_names[-6:])) + all_joint_names[:-6]
-        retract_cfg = [0] * 6 + retract_cfg
-        lock_joints["base_footprint_z_joint"] = 0.0
-        lock_joints["base_footprint_rx_joint"] = 0.0
-        lock_joints["base_footprint_ry_joint"] = 0.0
-
-    joint_to_default_q = {jnt_name: q for jnt_name, q in zip(all_joint_names, retract_cfg)}
+        lock_joints["base_footprint_z_joint"] = None
+        lock_joints["base_footprint_rx_joint"] = None
+        lock_joints["base_footprint_ry_joint"] = None
 
     default_generated_cfg = {
         "usd_robot_root": f"/{robot_prim.GetName()}",
@@ -781,13 +757,13 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         "collision_sphere_buffer": 0.002,
         "extra_collision_spheres": {},
         "self_collision_ignore": curobo_cfg.self_collision_ignore.to_dict(),
-        "self_collision_buffer": {root_link: 0.02},
+        "self_collision_buffer": curobo_cfg.self_collision_buffer.to_dict(),
         "use_global_cumul": True,
         "mesh_link_names": deepcopy(all_collision_link_names),
         "external_asset_path": None,
         "cspace": {
             "joint_names": all_joint_names,
-            "retract_config": retract_cfg,
+            "retract_config": None,
             "null_space_weight": [1] * len(all_joint_names),
             "cspace_distance_weight": [1] * len(all_joint_names),
             "max_jerk": 500.0,
@@ -798,7 +774,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     for eef_link_name, gripper_info in curobo_cfg.eef_to_gripper_info.items():
         attached_obj_link_name = f"attached_object_{eef_link_name}"
         for jnt_name in gripper_info["joints"]:
-            default_generated_cfg["lock_joints"][jnt_name] = get_joint_upper_limit(robot_prim, jnt_name)
+            default_generated_cfg["lock_joints"][jnt_name] = None
         default_generated_cfg["extra_links"][attached_obj_link_name] = {
             "parent_link_name": eef_link_name,
             "link_name": attached_obj_link_name,
@@ -827,10 +803,10 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         base_only_cfg = deepcopy(default_generated_cfg)
         base_only_cfg["ee_link"] = root_link
         base_only_cfg["link_names"] = []
-        for jnt_name, default_q in joint_to_default_q.items():
+        for jnt_name in all_joint_names:
             if jnt_name not in base_only_cfg["lock_joints"] and "base_footprint" not in jnt_name:
                 # Lock this joint
-                base_only_cfg["lock_joints"][jnt_name] = default_q
+                base_only_cfg["lock_joints"][jnt_name] = None
         save_base_fpath = f"{save_dir}/{robot_name}_description_curobo_base.yaml"
         with open(save_base_fpath, "w+") as f:
             yaml.dump({"robot_cfg": {"kinematics": base_only_cfg}}, f)
@@ -838,10 +814,18 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         # Create arm only config
         arm_only_cfg = deepcopy(default_generated_cfg)
         for jnt_name in {"base_footprint_x_joint", "base_footprint_y_joint", "base_footprint_rz_joint"}:
-            arm_only_cfg["lock_joints"][jnt_name] = 0.0
+            arm_only_cfg["lock_joints"][jnt_name] = None
         save_arm_fpath = f"{save_dir}/{robot_name}_description_curobo_arm.yaml"
         with open(save_arm_fpath, "w+") as f:
             yaml.dump({"robot_cfg": {"kinematics": arm_only_cfg}}, f)
+
+        # Create arm only no torso config
+        arm_only_no_torso_cfg = deepcopy(arm_only_cfg)
+        for jnt_name in curobo_cfg.torso_joints:
+            arm_only_no_torso_cfg["lock_joints"][jnt_name] = None
+        save_arm_no_torso_fpath = f"{save_dir}/{robot_name}_description_curobo_arm_no_torso.yaml"
+        with open(save_arm_no_torso_fpath, "w+") as f:
+            yaml.dump({"robot_cfg": {"kinematics": arm_only_no_torso_cfg}}, f)
 
 
 @click.command(help=_DOCSTRING)
@@ -873,7 +857,7 @@ def import_custom_robot(config):
     )
 
     # Get current stage
-    stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
 
     # Add visual spheres, cameras, and lidars
     if cfg.eef_vis_links:
@@ -933,10 +917,8 @@ def import_custom_robot(config):
     #   - all of the root link's descendant links (all links except self)
 
     # Compute AABB
-    bbox_cache = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
-    aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(
-        bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString
-    )
+    bbox_cache = lazy.isaacsim.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
+    aabb = lazy.isaacsim.core.utils.bounds.compute_aabb(bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString)
     z_offset = aabb[2]
 
     # Update the root link's CoM

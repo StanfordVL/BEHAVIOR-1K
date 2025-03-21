@@ -35,6 +35,7 @@ from omnigibson.utils.usd_utils import (
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
+    delete_or_deactivate_prim,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -51,7 +52,8 @@ m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
 m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
-m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.8
+m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 1.0
+m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
@@ -88,6 +90,7 @@ class ManipulationRobot(BaseRobot):
         fixed_base=False,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -107,6 +110,8 @@ class ManipulationRobot(BaseRobot):
         grasping_mode="physical",
         grasping_direction="lower",
         disable_grasp_handling=False,
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         **kwargs,
     ):
         """
@@ -120,6 +125,10 @@ class ManipulationRobot(BaseRobot):
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -161,6 +170,10 @@ class ManipulationRobot(BaseRobot):
                 otherwise upper limit represents a closed grasp.
             disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
                 Instead, you will need to call the grasp handling methods yourself.
+            finger_static_friction (None or float): If specified, specific static friction to use for robot's fingers
+            finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
+                Note: If specified, this will override any ways that are found within @link_physics_materials for any
+                robot finger gripper links
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -192,6 +205,7 @@ class ManipulationRobot(BaseRobot):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -206,6 +220,17 @@ class ManipulationRobot(BaseRobot):
             sensor_config=sensor_config,
             **kwargs,
         )
+
+        # Update finger link material dictionary based on desired values
+        if finger_static_friction is not None or finger_dynamic_friction is not None:
+            for arm, finger_link_names in self.finger_link_names.items():
+                for finger_link_name in finger_link_names:
+                    if finger_link_name not in self._link_physics_materials:
+                        self._link_physics_materials[finger_link_name] = dict()
+                    if finger_static_friction is not None:
+                        self._link_physics_materials[finger_link_name]["static_friction"] = finger_static_friction
+                    if finger_dynamic_friction is not None:
+                        self._link_physics_materials[finger_link_name]["dynamic_friction"] = finger_dynamic_friction
 
     def _validate_configuration(self):
         # Iterate over all arms
@@ -268,6 +293,7 @@ class ManipulationRobot(BaseRobot):
             assert (
                 is_parallel_jaw
             ), "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            finger_pts_in_eef_frame = []
             for i, finger_link in enumerate(finger_links):
                 # Find parent, and make sure one exists
                 parent_prim_path, parent_link = None, None
@@ -307,7 +333,17 @@ class ManipulationRobot(BaseRobot):
                 # Convert from world frame -> eef frame
                 finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
                 finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
+                finger_pts_in_eef_frame.append(finger_pts)
 
+            # Determine how each finger is located relative to the other in the EEF frame along the y-axis
+            # This is used to infer which side of each finger's set of points correspond to the "inner" surface
+            finger_pts_mean = [finger_pts[:, 1].mean().item() for finger_pts in finger_pts_in_eef_frame]
+            first_finger_is_lower_y_finger = finger_pts_mean[0] < finger_pts_mean[1]
+            is_lower_y_fingers = [first_finger_is_lower_y_finger, not first_finger_is_lower_y_finger]
+
+            for i, (finger_link, finger_pts, is_lower_y_finger) in enumerate(
+                zip(finger_links, finger_pts_in_eef_frame, is_lower_y_fingers)
+            ):
                 # Since we know the EEF frame always points with z outwards towards the fingers, the outer-most point /
                 # fingertip is the maximum z value
                 finger_max_z = finger_pts[:, 2].max().item()
@@ -322,37 +358,57 @@ class ManipulationRobot(BaseRobot):
                     finger_pts[:, 2] > (finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP)
                 )[0]
                 finger_pts = finger_pts[valid_idxs]
-                # Make sure all points lie on a single side of the EEF's y-axis
-                y_signs = th.sign(finger_pts[:, 1])
-                assert th.all(
-                    y_signs == y_signs[0]
-                ).item(), "Expected all finger points to lie on single side of EEF y-axis!"
-                y_sign = y_signs[0].item()
-                y_abs_min = th.abs(finger_pts[:, 1]).min().item()
+                # Infer which side of the gripper corresponds to the inner side (i.e.: the side that touches between the
+                # two fingers
+                # We use the heuristic that given a set of points defining a gripper finger, we assume that it's one
+                # of (y_min, y_max) over all points, with the selection being chosen by inferring which of the limits
+                # corresponds to the inner side of the finger.
+                # This is the upper side of the y values if this finger is the lower finger, else the lower side
+                # of the y values
+                y_min, y_max = finger_pts[:, 1].min(), finger_pts[:, 1].max()
+                y_offset = y_max if is_lower_y_finger else y_min
+                y_sign = 1.0 if is_lower_y_finger else -1.0
 
                 # Compute the default grasping points for this finger
                 # For now, we only have a strong heuristic defined for parallel jaw grippers, which assumes that
                 # there are exactly 2 fingers
                 # In this case, this is defined as the x2 (x,y,z) tuples where:
-                # z - the 20% and 80% length between the range from [finger_parent_max_z, finger_max_z]
+                # z - the +/-40% from the EEF frame, bounded by the 20% and 100% length between the range from
+                #       [finger_parent_max_z, finger_max_z]
                 #       This is synonymous to inferring the length of the finger (lower bounded by the gripper base,
-                #       assumed to be the parent link), and then taking the values MIN% and MAX% along its length
+                #       assumed to be the parent link), and then taking the values +/-%, bounded by the MIN% and MAX%
+                #       along its length
                 # y - the value closest to the edge of the finger surface in the direction of +/- EEF y-axis.
                 #       This assumes that each individual finger lies completely on one side of the EEF y-axis
                 # x - 0. This assumes that the EEF axis evenly splits each finger symmetrically on each side
                 # (x,y,z,1) -- homogenous form for efficient transforming into finger link frame
+                z_lower = max(
+                    finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                    -finger_range * m.AG_DEFAULT_GRASP_POINT_Z_PROP,
+                )
+                z_upper = min(
+                    finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                    finger_range * m.AG_DEFAULT_GRASP_POINT_Z_PROP,
+                )
+                # We want to ensure the z value is symmetric about the EEF z frame, so make sure z_lower is negative
+                # and z_upper is positive, and use +/- the absolute minimum value between the two
+                assert (
+                    z_lower < 0 and z_upper > 0
+                ), f"Expected computed z_lower / z_upper bounds for finger grasping points to be negative / positive, but instead got: {z_lower}, {z_upper}"
+                z_offset = min(abs(z_lower), abs(z_upper))
+
                 grasp_pts = th.tensor(
                     [
                         [
                             0,
-                            (y_abs_min - 0.002) * y_sign,
-                            finger_parent_max_z + finger_range * m.MIN_AG_DEFAULT_GRASP_POINT_PROP,
+                            y_offset + 0.002 * y_sign,
+                            -z_offset,
                             1,
                         ],
                         [
                             0,
-                            (y_abs_min - 0.002) * y_sign,
-                            finger_parent_max_z + finger_range * m.MAX_AG_DEFAULT_GRASP_POINT_PROP,
+                            y_offset + 0.002 * y_sign,
+                            z_offset,
                             1,
                         ],
                     ]
@@ -557,7 +613,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        delete_or_deactivate_prim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
@@ -1043,7 +1099,7 @@ class ManipulationRobot(BaseRobot):
 
         Returns:
             None or 2-tuple: If a valid assisted-grasp object is found, returns the corresponding
-                (object, object_link) (i.e.: (BaseObject, RigidPrim)) pair to the contacted in-hand object.
+                (object, object_link) (i.e.: (BaseObject, RigidDynamicPrim)) pair to the contacted in-hand object.
                 Otherwise, returns None
         """
         arm = self.default_arm if arm == "default" else arm
@@ -1400,7 +1456,7 @@ class ManipulationRobot(BaseRobot):
 
         Args:
             ag_obj (BaseObject): Object targeted for an assisted grasp
-            ag_link (RigidPrim): Link of the object to be grasped
+            ag_link (RigidDynamicPrim): Link of the object to be grasped
 
         Returns:
             (None or str): If obj can be grasped, returns the joint type to use for assisted grasping.
@@ -1429,7 +1485,7 @@ class ManipulationRobot(BaseRobot):
         Args:
             arm (str): specific arm to establish grasp.
                 Default is "default" which corresponds to the first entry in self.arm_names
-            ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidPrim)).
+            ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidDynamicPrim)).
                 Otherwise, does a no-op
             contact_pos (None or th.tensor): if specified, contact position to use for grasp.
         """
@@ -1585,7 +1641,7 @@ class ManipulationRobot(BaseRobot):
         """
         Same as _calculate_in_hand_object_rigid, except for cloth. Only one should be used at any given time.
 
-        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, th.Tensor) tuple or
+        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidDynamicPrim, th.Tensor) tuple or
         None if no valid AG-enabled object can be found.
 
         1) Check if the gripper is closed enough
@@ -1601,7 +1657,7 @@ class ManipulationRobot(BaseRobot):
         Returns:
             None or 3-tuple: If a valid assisted-grasp object is found,
                 returns the corresponding (object, object_link, attachment_point_position), i.e.
-                ((BaseObject, RigidPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
+                ((BaseObject, RigidDynamicPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
         """
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03

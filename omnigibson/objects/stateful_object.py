@@ -77,6 +77,7 @@ class StatefulObject(BaseObject):
         kinematic_only=None,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        link_physics_materials=None,
         load_config=None,
         abilities=None,
         include_default_states=True,
@@ -98,6 +99,10 @@ class StatefulObject(BaseObject):
                 are satisfied (see object_base.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -135,6 +140,7 @@ class StatefulObject(BaseObject):
             kinematic_only=kinematic_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             **kwargs,
         )

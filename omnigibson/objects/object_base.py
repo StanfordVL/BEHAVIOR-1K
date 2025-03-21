@@ -9,6 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
@@ -47,6 +48,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         kinematic_only=None,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        link_physics_materials=None,
         load_config=None,
         **kwargs,
     ):
@@ -66,6 +68,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 are satisfied (see object_base.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -80,6 +86,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._uuid = get_uuid(name, deterministic=True)
         self.category = category
         self.fixed_base = fixed_base
+        self._link_physics_materials = dict() if link_physics_materials is None else link_physics_materials
 
         # Values to be created at runtime
         self._highlight_cached_values = None
@@ -142,9 +149,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
             scale = th.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
             if (
+                # no articulated joints
                 self.n_joints == 0
+                # no fixed joints or scaling is [1, 1, 1] (TODO verify [1, 1, 1] is still needed)
                 and (th.all(th.isclose(scale, th.ones_like(scale), atol=1e-3)).item() or self.n_fixed_joints == 0)
-                and (self._load_config["kinematic_only"] is not False)
+                # users force the object to not have kinematic_only
+                and self._load_config["kinematic_only"] is not False  # if can be True or None
                 and not self.has_attachment_points
             ):
                 kinematic_only = True
@@ -200,20 +210,34 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         root_prim = (
             None
             if self.articulation_root_path is None
-            else lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.articulation_root_path)
+            else lazy.isaacsim.core.utils.prims.get_prim_at_path(self.articulation_root_path)
         )
         if root_prim is not None:
             lazy.pxr.UsdPhysics.ArticulationRootAPI.Apply(root_prim)
             lazy.pxr.PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
-        # Set position / velocity solver iterations if we're not cloth
-        if self._prim_type != PrimType.CLOTH:
+        # Set position / velocity solver iterations if we're not cloth and not kinematic only
+        if self._prim_type != PrimType.CLOTH and not self.kinematic_only:
             self.solver_position_iteration_count = m.DEFAULT_SOLVER_POSITION_ITERATIONS
             self.solver_velocity_iteration_count = m.DEFAULT_SOLVER_VELOCITY_ITERATIONS
 
+        # Add link materials if specified
+        if self._link_physics_materials is not None:
+            for link_name, material_info in self._link_physics_materials.items():
+                # We will permute the link materials dict in place to now point to the created material
+                mat_name = f"{link_name}_physics_mat"
+                physics_mat = lazy.isaacsim.core.api.materials.physics_material.PhysicsMaterial(
+                    prim_path=f"{self.prim_path}/Looks/{mat_name}",
+                    name=mat_name,
+                    **material_info,
+                )
+                for msh in self.links[link_name].collision_meshes.values():
+                    msh.apply_physics_material(physics_mat)
+                self._link_physics_materials[link_name] = physics_mat
+
         # Add semantics
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=self._prim,
             semantic_label=self.category,
             type_label="class",
@@ -281,7 +305,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         """
         mass = 0.0
         for link in self._links.values():
-            mass += link.mass
+            if isinstance(link, RigidDynamicPrim):
+                mass += link.mass
 
         return mass
 

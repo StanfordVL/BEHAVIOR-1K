@@ -33,7 +33,7 @@ def make_glass(prim):
 
     # Grab the glass material prim; if it doesn't exist, we create it on the fly
     glass_prim_path = "/Looks/OmniGlass"
-    if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(glass_prim_path):
+    if not lazy.isaacsim.core.utils.prims.get_prim_at_path(glass_prim_path):
         mtl_created = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
@@ -71,4 +71,4 @@ def create_pbr_material(prim_path):
     lazy.omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
 
     # Return generated material
-    return lazy.omni.isaac.core.utils.prims.get_prim_at_path(material_path)
+    return lazy.isaacsim.core.utils.prims.get_prim_at_path(material_path)

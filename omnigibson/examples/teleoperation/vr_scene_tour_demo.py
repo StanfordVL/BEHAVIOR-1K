@@ -5,7 +5,6 @@ Example script for interacting with OmniGibson scenes with VR.
 import sys
 from typing import Optional
 import torch as th
-import torch._dynamo
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -13,8 +12,6 @@ from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_og_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
-
-torch._dynamo.config.suppress_errors = True
 
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = False
@@ -48,8 +45,8 @@ def main(scene_model: Optional[str] = None):
     )
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
-    vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(
-        vrsys.og2xr(th.tensor([0.0, 0.0, 1.0]), th.tensor([-0.5, 0.5, 0.5, -0.5])).numpy(), vrsys.hmd
+    vrsys.xr_core.schedule_set_camera(
+        vrsys.og2xr(th.tensor([0.0, 0.0, 1.0]), th.tensor([-0.5, 0.5, 0.5, -0.5])).numpy()
     )
 
     # main simulation loop

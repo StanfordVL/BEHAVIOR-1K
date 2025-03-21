@@ -22,4 +22,4 @@ repos:
             omnigibson/utils/numpy_utils\.py|      # Utilities specifically for numpy operations and dtype
             tests/test_transform_utils\.py         # This test file uses Scipy and Numpy
           )$
-        stages: [commit]
+        stages: [pre-commit]

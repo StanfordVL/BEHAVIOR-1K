@@ -20,7 +20,7 @@ from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
@@ -81,7 +81,7 @@ def get_prim_nested_children(prim):
         list of Usd.Prim: nested prims
     """
     prims = []
-    for child in lazy.omni.isaac.core.utils.prims.get_prim_children(prim):
+    for child in lazy.isaacsim.core.utils.prims.get_prim_children(prim):
         prims.append(child)
         prims += get_prim_nested_children(prim=child)
 
@@ -137,14 +137,14 @@ def create_joint(
 
     # Possibly add body0, body1 targets
     if body0 is not None:
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
         joint.GetBody0Rel().SetTargets([lazy.pxr.Sdf.Path(body0)])
     if body1 is not None:
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         joint.GetBody1Rel().SetTargets([lazy.pxr.Sdf.Path(body1)])
 
     # Get the prim pointed to at this path
-    joint_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
     # Apply joint API interface
     lazy.pxr.PhysxSchema.PhysxJointAPI.Apply(joint_prim)
@@ -230,7 +230,9 @@ class RigidContactAPIImpl:
             for obj in scene.objects:
                 if obj.prim_type == PrimType.RIGID:
                     for link in obj.links.values():
-                        if not link.kinematic_only:
+                        from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
+
+                        if isinstance(link, RigidDynamicPrim):
                             filters[scene_idx].append(link.prim_path)
 
         return filters
@@ -519,11 +521,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
     @classmethod
     def get_max_contact_data_count(cls):
-        # 4x per finger link, to be safe.
-        # 4 here is not the finger count, it's the number of items we will record contacts with, per finger.
-        # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
-        # This number should very rarely go above 4.
-        return len(cls.get_column_filters()[0]) * 4
+        return len(cls.get_column_filters()[0]) * 128
 
 
 # Instantiate the GripperRigidContactAPI
@@ -606,10 +604,10 @@ class CollisionAPI:
         """
         # Remove all the collision group prims
         for col_group_prim in cls.ACTIVE_COLLISION_GROUPS.values():
-            og.sim.stage.RemovePrim(col_group_prim.GetPath().pathString)
+            delete_or_deactivate_prim(col_group_prim.GetPath().pathString)
 
         # Remove the collision groups tree
-        og.sim.stage.RemovePrim("/World/collision_groups")
+        delete_or_deactivate_prim("/World/collision_groups")
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
@@ -750,6 +748,9 @@ class PoseAPI:
     @classmethod
     def _refresh(cls):
         if og.sim is not None and not cls.VALID:
+            # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
+            assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
@@ -771,9 +772,14 @@ class PoseAPI:
                 - torch.Tensor: (x,y,z) position in the world frame
                 - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
+        # Check that no reads from PoseAPI are happening during a physics step.
+        assert (
+            not og.sim.currently_stepping
+        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         cls._refresh()
 
@@ -791,7 +797,7 @@ class PoseAPI:
         """
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
-            cls.PRIMS[prim_path] = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
+            cls.PRIMS[prim_path] = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=prim_path, fabric=True)
 
         cls._refresh()
         # Avoid premature imports
@@ -803,7 +809,7 @@ class PoseAPI:
     def convert_world_pose_to_local(cls, prim, position, orientation):
         """Converts a world pose to a local pose under a prim's parent."""
         world_transform = T.pose2mat((position, orientation))
-        parent_path = str(lazy.omni.isaac.core.utils.prims.get_prim_parent(prim).GetPath())
+        parent_path = str(lazy.isaacsim.core.utils.prims.get_prim_parent(prim).GetPath())
         parent_world_transform = cls.get_world_pose_with_scale(parent_path)
 
         local_transform = th.linalg.inv_ex(parent_world_transform).inverse @ world_transform
@@ -1146,24 +1152,24 @@ class BatchControlViewAPIImpl:
         idx = self._idx[prim_path]
         return self._read_cache["dof_projected_joint_forces"][idx]
 
-    def get_mass_matrix(self, prim_path):
+    def get_generalized_mass_matrices(self, prim_path):
         if "mass_matrices" not in self._read_cache:
-            self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_mass_matrices())
+            self._read_cache["mass_matrices"] = cb.from_torch(self._view.get_generalized_mass_matrices())
 
         idx = self._idx[prim_path]
         return self._read_cache["mass_matrices"][idx]
 
-    def get_generalized_gravity_forces(self, prim_path):
+    def get_gravity_compensation_forces(self, prim_path):
         if "generalized_gravity_forces" not in self._read_cache:
-            self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_generalized_gravity_forces())
+            self._read_cache["generalized_gravity_forces"] = cb.from_torch(self._view.get_gravity_compensation_forces())
 
         idx = self._idx[prim_path]
         return self._read_cache["generalized_gravity_forces"][idx]
 
-    def get_coriolis_and_centrifugal_forces(self, prim_path):
+    def get_coriolis_and_centrifugal_compensation_forces(self, prim_path):
         if "coriolis_and_centrifugal_forces" not in self._read_cache:
             self._read_cache["coriolis_and_centrifugal_forces"] = cb.from_torch(
-                self._view.get_coriolis_and_centrifugal_forces()
+                self._view.get_coriolis_and_centrifugal_compensation_forces()
             )
 
         idx = self._idx[prim_path]
@@ -1446,20 +1452,22 @@ class ControllableObjectViewAPI:
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_efforts(prim_path)
 
     @classmethod
-    def get_mass_matrix(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_mass_matrix(prim_path)
-
-    @classmethod
-    def get_generalized_gravity_forces(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_gravity_forces(
+    def get_generalized_mass_matrices(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_generalized_mass_matrices(
             prim_path
         )
 
     @classmethod
-    def get_coriolis_and_centrifugal_forces(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_coriolis_and_centrifugal_forces(
+    def get_gravity_compensation_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_gravity_compensation_forces(
             prim_path
         )
+
+    @classmethod
+    def get_coriolis_and_centrifugal_compensation_forces(cls, prim_path):
+        return cls._VIEWS_BY_PATTERN[
+            cls._get_pattern_from_prim_path(prim_path)
+        ].get_coriolis_and_centrifugal_compensation_forces(prim_path)
 
     @classmethod
     def get_link_position_orientation(cls, prim_path, link_name):
@@ -1849,8 +1857,8 @@ def add_asset_to_stage(asset_path, prim_path):
     assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
     # Add reference to stage and grab prim
-    lazy.omni.isaac.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
-    prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+    lazy.isaacsim.core.utils.stage.add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
+    prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
 
     # Make sure prim was loaded correctly
     assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
@@ -1863,7 +1871,7 @@ def get_world_prim():
     Returns:
         Usd.Prim: Active world prim in the current stage
     """
-    return lazy.omni.isaac.core.utils.prims.get_prim_at_path("/World")
+    return lazy.isaacsim.core.utils.prims.get_prim_at_path("/World")
 
 
 def scene_relative_prim_path_to_absolute(scene, relative_prim_path):
@@ -1970,11 +1978,11 @@ def delete_or_deactivate_prim(prim_path):
     Returns:
         bool: Whether the operation was successful or not
     """
-    if not lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path):
+    if not lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
         return False
-    if lazy.omni.isaac.core.utils.prims.is_prim_no_delete(prim_path):
+    if lazy.isaacsim.core.utils.prims.is_prim_no_delete(prim_path):
         return False
-    if lazy.omni.isaac.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+    if lazy.isaacsim.core.utils.prims.get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
         return False
     if prim_path == "/World":
         return False
@@ -1985,7 +1993,7 @@ def delete_or_deactivate_prim(prim_path):
         return False
 
     # If the prim is not ancestral, we can delete it.
-    if not lazy.omni.isaac.core.utils.prims.is_prim_ancestral(prim_path):
+    if not lazy.isaacsim.core.utils.prims.is_prim_ancestral(prim_path):
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=True).do()
 
     # Otherwise, we can only deactivate it, which essentially serves the same purpose.
@@ -1999,13 +2007,10 @@ def delete_or_deactivate_prim(prim_path):
 def get_sdf_value_type_name(val):
     """
     Determines the appropriate Sdf value type based on the input value.
-
     Args:
         val: The input value to determine the type for.
-
     Returns:
         lazy.pxr.Sdf.ValueTypeName: The corresponding Sdf value type.
-
     Raises:
         ValueError: If the input value type is not supported.
     """
@@ -2013,9 +2018,9 @@ def get_sdf_value_type_name(val):
         lazy.pxr.Gf.Vec3f: lazy.pxr.Sdf.ValueTypeNames.Float3,
         lazy.pxr.Gf.Vec2f: lazy.pxr.Sdf.ValueTypeNames.Float2,
         lazy.pxr.Sdf.AssetPath: lazy.pxr.Sdf.ValueTypeNames.Asset,
+        bool: lazy.pxr.Sdf.ValueTypeNames.Bool,
         int: lazy.pxr.Sdf.ValueTypeNames.Int,
         float: lazy.pxr.Sdf.ValueTypeNames.Float,
-        bool: lazy.pxr.Sdf.ValueTypeNames.Bool,
         str: lazy.pxr.Sdf.ValueTypeNames.String,
     }
     for type_, usd_type in SDF_TYPE_MAPPING.items():
@@ -2024,7 +2029,7 @@ def get_sdf_value_type_name(val):
     raise ValueError(f"Unsupported input type: {type(val)}")
 
 
-@th.compile
+@torch_compile
 def _compute_relative_poses_torch(
     idx: int,
     n_links: int,

@@ -11,9 +11,6 @@ gm.ENABLE_TRANSITION_RULES = False
 gm.ENABLE_FLATCACHE = True
 gm.GUI_VIEWPORT_ONLY = True
 
-# import torch._dynamo
-# torch._dynamo.config.suppress_errors = True
-
 
 def main():
     """
@@ -78,7 +75,7 @@ def main():
     # start vrsys
     vrsys = OVXRSystem(
         robot=env.robots[0],
-        show_control_marker=False,
+        show_control_marker=True,
         system="SteamVR",
         eef_tracking_mode="controller",
         align_anchor_to="camera",
