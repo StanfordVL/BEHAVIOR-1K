@@ -717,7 +717,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                             log.error(f"Expected: {exp_obs[k]}")
                             log.error(f"Received: {real_obs[k]}")
 
-                    # raise ValueError("Observation space does not match returned observations!")
+                    raise ValueError("Observation space does not match returned observations!")
 
             return obs, {}
 

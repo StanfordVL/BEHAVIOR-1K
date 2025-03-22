@@ -73,7 +73,6 @@ class PrimType(IntEnum):
 class EmitterType(IntEnum):
     FIRE = 0
     STEAM = 1
-    MIST = 2
 
 
 # Valid primitive mesh types

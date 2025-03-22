@@ -189,16 +189,12 @@ class OVXRSystem(TeleopSystem):
             "/defaults/xr/profile/" + self.xr_core.get_current_profile_name() + "/controllers/visible",
             self.show_control_marker,
         )
-        # set anchor mode to be custom anchor
-        # lazy.carb.settings.get_settings().set(self.vr_profile.get_scene_persistent_path() + "anchorMode", "scene_origin")
-        lazy.carb.settings.get_settings().set(
-            self.vr_profile.get_scene_persistent_path() + "anchorMode", "custom_anchor"
-        )
         # set override leveled basis to be true (if this is false, headset would not track anchor pitch orientation)
         allow_roll = False if align_anchor_to == "touchpad" else True
         lazy.carb.settings.get_settings().set(
             self.vr_profile.get_persistent_path() + "overrideLeveledBasis", allow_roll
         )
+        # set anchor mode to be custom anchor
         lazy.carb.settings.get_settings().set(
             self.vr_profile.get_scene_persistent_path() + "anchorMode", "custom_anchor"
         )
@@ -484,7 +480,7 @@ class OVXRSystem(TeleopSystem):
                 continue
             if controller_name == "right" and "right" in self.raw_data["button_data"]:
                 thumbstick = self.raw_data["button_data"][controller_name]["thumbstick"]
-                self.teleop_action.base[2] = -thumbstick["x"] * self.movement_speed
+                self.teleop_action.base[2] = -thumbstick["x"] * self.rotation_speed
                 self.teleop_action.torso = -thumbstick["y"] * self.movement_speed
             elif controller_name == "left" and "left" in self.raw_data["button_data"]:
                 thumbstick = self.raw_data["button_data"][controller_name]["thumbstick"]

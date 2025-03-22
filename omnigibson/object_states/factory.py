@@ -99,12 +99,6 @@ _STEAM_STATE_SET = frozenset(
     ]
 )
 
-_MIST_STATE_SET = frozenset(
-    [
-        ParticleApplier,
-    ]
-)
-
 _TEXTURE_CHANGE_STATE_SET = frozenset(
     [
         Frozen,
@@ -124,7 +118,7 @@ _SYSTEM_STATE_SET = frozenset(
     ]
 )
 
-_VISUAL_STATE_SET = frozenset(_FIRE_STATE_SET | _STEAM_STATE_SET | _TEXTURE_CHANGE_STATE_SET | _MIST_STATE_SET)
+_VISUAL_STATE_SET = frozenset(_FIRE_STATE_SET | _STEAM_STATE_SET | _TEXTURE_CHANGE_STATE_SET)
 
 _TEXTURE_CHANGE_PRIORITY = {
     Frozen: 4,
@@ -145,10 +139,6 @@ def get_fire_states():
 
 def get_steam_states():
     return _STEAM_STATE_SET
-
-
-def get_mist_states():
-    return _MIST_STATE_SET
 
 
 def get_texture_change_states():

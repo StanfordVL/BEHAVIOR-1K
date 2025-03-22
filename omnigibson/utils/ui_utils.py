@@ -22,8 +22,8 @@ from scipy.spatial.transform import Rotation as R
 from termcolor import colored
 
 import omnigibson as og
-import omnigibson.utils.transform_utils as T
 import omnigibson.lazy as lazy
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 
 

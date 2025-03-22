@@ -394,7 +394,7 @@ class TestQuaternionApplications:
             key_rots = R.from_quat(np.stack([q1.cpu().numpy(), q2.cpu().numpy()]))
             key_times = [0, 1]
             slerp = Slerp(key_times, key_rots)
-            scipy_q_slerp = slerp(t).as_quat()[0].astype(NumpyTypes.FLOAT32)
+            scipy_q_slerp = slerp([t.item()]).as_quat()[0].astype(NumpyTypes.FLOAT32)
 
             assert quaternions_close(q_slerp, th.from_numpy(scipy_q_slerp))
             assert_close(th.norm(q_slerp), th.tensor(1.0))

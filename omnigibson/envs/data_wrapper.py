@@ -67,8 +67,6 @@ class DataWrapper(EnvironmentWrapper):
             self.add_metadata(group=data_grp, name="config", data=config)
             self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
-        self.is_recording = True
-
         # Run super
         super().__init__(env=env)
 

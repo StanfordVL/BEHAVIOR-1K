@@ -363,6 +363,10 @@ class XFormPrim(BasePrim):
     @property
     def aabb(self):
         aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
+        logger.warning(
+            "Computing AABB of an XFormPrim using the USD context is slow and unreliable, especially when Flatcache is enabled. "
+            "This is provided as a convenience for USD editing use cases and should generally not be used for physical objects."
+        )
         return th.tensor(aabb_min), th.tensor(aabb_max)
 
     @property

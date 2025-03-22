@@ -377,16 +377,13 @@ class BehaviorTask(BaseTask):
             if obj_inst in self.future_obj_instances:
                 entity = None
             else:
-                if obj_inst == "agent.n.01_1":
-                    entity = self.get_agent(env)
-                else:
-                    assert obj_inst in inst_to_name, (
-                        f"BDDL object instance {obj_inst} should exist in cached metadata "
-                        f"from loaded scene, but could not be found!"
-                    )
-                    name = inst_to_name[obj_inst]
-                    is_system = name in env.scene.available_systems.keys()
-                    entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
+                assert obj_inst in inst_to_name, (
+                    f"BDDL object instance {obj_inst} should exist in cached metadata "
+                    f"from loaded scene, but could not be found!"
+                )
+                name = inst_to_name[obj_inst]
+                is_system = name in env.scene.available_systems.keys()
+                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,

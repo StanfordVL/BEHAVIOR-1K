@@ -2,7 +2,6 @@ import collections.abc
 import json
 import os
 
-import numpy as np
 import torch as th
 import yaml
 
@@ -75,6 +74,6 @@ def load_default_config():
 
 class TorchEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, (th.Tensor, np.ndarray)):
+        if isinstance(obj, th.Tensor):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)

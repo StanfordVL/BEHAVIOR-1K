@@ -479,6 +479,9 @@ class MicroParticleSystem(BaseSystem):
         self.system_prim = self._create_particle_system()
         # Get material
         material = self._get_particle_material_template()
+        # Load the material if it's newly created and has never been loaded before
+        if not material.loaded:
+            material.load()
         material.add_user(self)
         self._material = material
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)

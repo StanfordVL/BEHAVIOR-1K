@@ -11,7 +11,6 @@ from omnigibson.object_states import Saturated
 from omnigibson.object_states.factory import (
     get_default_states,
     get_fire_states,
-    get_mist_states,
     get_requirements_for_ability,
     get_state_name,
     get_states_by_dependency_order,
@@ -24,7 +23,6 @@ from omnigibson.object_states.factory import (
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
-from omnigibson.object_states.particle_modifier import ParticleApplier
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import EmitterType, PrimType
@@ -172,9 +170,6 @@ class StatefulObject(BaseObject):
 
             if len(states_set & get_fire_states()) > 0:
                 self._create_emitter_apis(EmitterType.FIRE)
-
-            if len(states_set & get_mist_states()) > 0:
-                self._create_emitter_apis(EmitterType.MIST)
 
     def add_state(self, state):
         """
@@ -345,20 +340,8 @@ class StatefulObject(BaseObject):
             emitter_config["gravity"] = (0, 0, -50.0)
             emitter_config["constantMask"] = 10.0
             emitter_config["attenuation"] = 1.5
-        elif emitter_type == EmitterType.MIST:
-            link = self.states[ParticleApplier].link
-            emitter_config["name"] = "flowEmitterMesh"
-            emitter_config["type"] = "FlowEmitterMesh"
-            emitter_config["position"] = (0.0, 0.0, 0.0)
-            emitter_config["fuel"] = 1.0
-            emitter_config["coupleRateFuel"] = 0.5
-            emitter_config["buoyancyPerTemp"] = 0.05
-            emitter_config["burnPerTemp"] = 0.5
-            emitter_config["gravity"] = (0, 0, 0.0)
-            emitter_config["constantMask"] = 10.0
-            emitter_config["attenuation"] = 1.5
         else:
-            raise ValueError("Currently, only EmitterTypes FIRE, STEAM, and MIST are supported!")
+            raise ValueError("Currently, only EmitterTypes FIRE and STEAM are supported!")
 
         # Define prim paths.
         # The flow system is created under the root link so that it automatically updates its pose as the object moves
@@ -486,8 +469,6 @@ class StatefulObject(BaseObject):
                     emitter_enabled[EmitterType.STEAM] |= state.get_value()
                 if state_type in get_fire_states():
                     emitter_enabled[EmitterType.FIRE] |= state.get_value()
-                if state_type in get_mist_states():
-                    emitter_enabled[EmitterType.MIST] |= state.projection_is_active
 
             for emitter_type in emitter_enabled:
                 self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
