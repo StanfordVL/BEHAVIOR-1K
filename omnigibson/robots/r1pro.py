@@ -59,7 +59,13 @@ class R1Pro(R1):
         # badly modeled gripper collision meshes
         return [
             ["left_arm_link1", "torso_link4"],
+            ["left_arm_link2", "torso_link4"],
             ["right_arm_link1", "torso_link4"],
+            ["right_arm_link2", "torso_link4"],
+            ["left_arm_link5", "left_arm_link7"],
+            ["right_arm_link5", "right_arm_link7"],
+            ["left_gripper_finger_link1", "left_realsense_link"],
+            ["right_gripper_finger_link1", "right_realsense_link"],
             ["left_gripper_finger_link1", "left_gripper_finger_link2"],
             ["right_gripper_finger_link1", "right_gripper_finger_link2"],
             ["base_link", "wheel_motor_link1"],

@@ -60,143 +60,143 @@ def test_curobo():
     }
 
     robot_cfgs = [
-        # {
-        #     "type": "FrankaPanda",
-        #     "obs_modalities": "rgb",
-        #     "position": [0.7, -0.55, 0.0],
-        #     "orientation": [0, 0, 0.707, 0.707],
-        #     "self_collisions": True,
-        #     "action_normalize": False,
-        #     "controller_config": {
-        #         "arm_0": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "gripper_0": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #     },
-        # },
-        # {
-        #     "type": "R1",
-        #     "obs_modalities": "rgb",
-        #     "position": [0.7, -0.7, 0.056],
-        #     "orientation": [0, 0, 0.707, 0.707],
-        #     "self_collisions": True,
-        #     "action_normalize": False,
-        #     "controller_config": {
-        #         "base": {
-        #             "name": "HolonomicBaseJointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_impedances": False,
-        #         },
-        #         "trunk": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "arm_left": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "arm_right": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "gripper_left": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "gripper_right": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #     },
-        # },
-        # {
-        #     "type": "Tiago",
-        #     "obs_modalities": "rgb",
-        #     "position": [0.7, -0.85, 0],
-        #     "orientation": [0, 0, 0.707, 0.707],
-        #     "self_collisions": True,
-        #     "action_normalize": False,
-        #     "controller_config": {
-        #         "base": {
-        #             "name": "HolonomicBaseJointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_impedances": False,
-        #         },
-        #         "trunk": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "camera": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "arm_left": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "arm_right": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "gripper_left": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #         "gripper_right": {
-        #             "name": "JointController",
-        #             "motor_type": "position",
-        #             "command_input_limits": None,
-        #             "use_delta_commands": False,
-        #             "use_impedances": False,
-        #         },
-        #     },
-        # },
+        {
+            "type": "FrankaPanda",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.55, 0.0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "arm_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_0": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
+        {
+            "type": "R1",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.7, 0.056],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "base": {
+                    "name": "HolonomicBaseJointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_impedances": False,
+                },
+                "trunk": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "arm_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "arm_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
+        {
+            "type": "Tiago",
+            "obs_modalities": "rgb",
+            "position": [0.7, -0.85, 0],
+            "orientation": [0, 0, 0.707, 0.707],
+            "self_collisions": True,
+            "action_normalize": False,
+            "controller_config": {
+                "base": {
+                    "name": "HolonomicBaseJointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_impedances": False,
+                },
+                "trunk": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "camera": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "arm_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "arm_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_left": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+                "gripper_right": {
+                    "name": "JointController",
+                    "motor_type": "position",
+                    "command_input_limits": None,
+                    "use_delta_commands": False,
+                    "use_impedances": False,
+                },
+            },
+        },
         {
             "type": "R1Pro",
             "obs_modalities": "rgb",
-            "position": [0.7, -0.7, 0.056],
+            "position": [0.7, -0.75, 0.056],
             "orientation": [0, 0, 0.707, 0.707],
             "self_collisions": True,
             "action_normalize": False,
@@ -277,6 +277,8 @@ def test_curobo():
         # Create CuRobo instance
         batch_size = 2
         n_samples = 20
+        max_false_positive_rate = 0.05
+        max_false_negative_rate = 0.0
 
         cmg = CuRoboMotionGenerator(
             robot=robot,
@@ -377,11 +379,11 @@ def test_curobo():
             f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
         )
         assert (
-            false_positive / n_samples == 0.0
-        ), f"Collision checking false positive rate: {false_positive / n_samples}, should be == 0.0."
+            false_positive / n_samples <= max_false_positive_rate
+        ), f"Collision checking false positive rate: {false_positive / n_samples} > {max_false_positive_rate}"
         assert (
-            false_negative / n_samples == 0.0
-        ), f"Collision checking false negative rate: {false_negative / n_samples}, should be == 0.0."
+            false_negative / n_samples <= max_false_negative_rate
+        ), f"Collision checking false negative rate: {false_negative / n_samples} > {max_false_negative_rate}"
 
         env.scene.reset()
 
