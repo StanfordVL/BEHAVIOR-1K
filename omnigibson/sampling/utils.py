@@ -367,8 +367,8 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     env.scene.update_initial_state()
 
     # Save this as a stable file
-    path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{scene_model}_stable.json")
-    og.sim.save(json_path=path)
+    path = os.path.join(gm.DATASET_PATH, "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json")
+    og.sim.save(json_paths=[path])
 
     # record this feedback if requested
     if record_feedback:
@@ -376,7 +376,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
         worksheet.update_acell(f"Z{scene_row}", 1)
 
     og.sim.stop()
-    og.sim.clear()
+    og.clear()
 
 def validate_task(task, task_scene_dict, default_scene_dict):
     assert og.sim.is_playing()

@@ -12,7 +12,7 @@ from omnigibson.utils.python_utils import classproperty
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.CONTAINER_META_LINK_TYPE = "container"
+m.CONTAINER_META_LINK_TYPE = "fillable"
 m.VISUAL_PARTICLE_OFFSET = 0.01  # Offset to visual particles' poses when checking overlaps with container volume
 
 
