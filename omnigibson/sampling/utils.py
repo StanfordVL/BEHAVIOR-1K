@@ -384,7 +384,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     conditions = task.activity_conditions
     relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
     active_obj_names = set()
-    for obj in og.sim.scene.objects:
+    for obj in og.sim.scenes[0].objects:
         if isinstance(obj, DatasetObject):
             obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
             active = len(relevant_rooms.intersection(obj_rooms)) > 0 or obj.category in {"floors", "walls"}
@@ -420,7 +420,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 if key == "ori":
                     # Grab the axis angle representation to compute magnitude difference
                     obj_val = th.norm(T.quat2axisangle(T.quat_distance(val, obj_val)))
-                    val = 0
+                    val = 0.0
                 if not th.all(th.isclose(th.tensor(val), th.tensor(obj_val), atol=atol, rtol=0.0)).item():
                     return False, f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
 
@@ -471,7 +471,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
 
     # Need to enable transition rules before running step 3 and 4
     original_transition_rule_flag = gm.ENABLE_TRANSITION_RULES
-    gm.ENABLE_TRANSITION_RULES = True
+    with gm.unlocked():
+        gm.ENABLE_TRANSITION_RULES = True
 
     # 3. Validate object set is consistent (no faulty transition rules occurring) -- we expect the number
     #       of active systems (and number of active particles) and the number of objects to be the same after
@@ -540,7 +541,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # Sanity check scene
     valid_scene, err_msg = _validate_scene_stability(task=task, task_state=task_state_t0, current_state=task_state_t1, check_particle_positions=True)
     if not valid_scene:
-        gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
+        with gm.unlocked():
+            gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
         return False, f"Failed verification step 3: {err_msg}"
 
     # 4. Validate longer-term stability -- take N=10 timesteps, and make sure all object positions and velocities
@@ -558,9 +560,10 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     task_state_t11 = og.sim.dump_state(serialized=False)[0]
     valid_scene, err_msg = _validate_scene_stability(task=task, task_state=task_state_t0, current_state=task_state_t11, check_particle_positions=False)
     if not valid_scene:
-        gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
+        with gm.unlocked():
+            gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
         return False, f"Failed verification step 4: {err_msg}"
-
-    gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
+    with gm.unlocked():
+        gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
 
     return True, None

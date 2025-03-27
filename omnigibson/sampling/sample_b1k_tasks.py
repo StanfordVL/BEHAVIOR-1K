@@ -319,7 +319,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Clear task callbacks if sampled
             if should_sample:
                 callback_name = f"{activity}_refresh"
-                og.sim.remove_callback_on_import_obj(name=callback_name)
+                og.sim.remove_callback_on_add_obj(name=callback_name)
                 og.sim.remove_callback_on_remove_obj(name=callback_name)
                 og.sim.remove_callback_on_system_init(name=callback_name)
                 og.sim.remove_callback_on_system_clear(name=callback_name)
