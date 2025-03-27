@@ -7,6 +7,7 @@ but submodules within OmniGibson may import this dictionary and add to it dynami
 
 import os
 import pathlib
+import contextlib
 
 from addict import Dict
 
@@ -15,10 +16,12 @@ class MacroDict(Dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self["_read"] = set()
+        object.__setattr__(self, '__locked', True)  # disallow value updates after key is read
 
     def __setattr__(self, name, value):
-        if name in self.get("_read", set()):
-            raise AttributeError(f"Cannot set attribute {name} in MacroDict, it has already been used.")
+        if name in self.get("_read", set()) and self.is_locked:
+            raise AttributeError(f"Cannot set attribute {name} in MacroDict, it has already been used. "
+                                 f"If knowingly overwriting value, set value within context `with unlocked()`")
         # Use the super's setattr for setting attributes, but handle _read directly to avoid recursion.
         if name == "_read":
             self[name] = value
@@ -34,6 +37,67 @@ class MacroDict(Dict):
             return self[item]
         except KeyError:
             raise AttributeError(f"'MacroDict' object has no attribute '{item}'")
+
+    @property
+    def is_locked(self):
+        """
+        Returns True if the config is locked (no value updates allowed after initial read).
+        """
+        return object.__getattribute__(self, '__locked')
+
+    def lock(self):
+        """
+        Lock the config. Afterward, key values cannot be updated after initial read
+        """
+        object.__setattr__(self, '__locked', True)
+
+        for k in self:
+            if isinstance(self[k], MacroDict):
+                self[k].lock()
+
+    def unlock(self):
+        """
+        Unlock the config. Afterward, key values can be updated even after initial read
+        """
+        object.__setattr__(self, '__locked', False)
+
+        for k in self:
+            if isinstance(self[k], MacroDict):
+                self[k].unlock()
+
+    def _get_lock_state(self):
+        """
+        Retrieves the lock state of this config.
+
+        Returns:
+            lock_state (dict): a dictionary with a "locked" key that is True
+                if value updates are locked after the value has been read during runtime
+        """
+        return {
+            "locked": self.is_locked,
+        }
+
+    def _set_lock_state(self, lock_state):
+        """
+        Sets the lock state for this config.
+
+        Args:
+            lock_state (dict): a dictionary with an "locked" key that is True
+                if value updates are locked after the value has been read during runtime
+        """
+        if lock_state["locked"]:
+            self.lock()
+
+    @contextlib.contextmanager
+    def unlocked(self):
+        """
+        A context scope for modifying a Config object. Within the scope, values can be updated, even after an initial
+        read. Upon leaving the scope, the initial level of locking is restored.
+        """
+        lock_state = self._get_lock_state()
+        self.unlock()
+        yield
+        self._set_lock_state(lock_state)
 
 
 # Initialize settings
