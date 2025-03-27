@@ -52,7 +52,7 @@ gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_TRANSITION_RULES = False
+gm.ENABLE_TRANSITION_RULES = False               # Must be False! We permute this later
 
 macros.systems.micro_particle_system.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = 0.5
 
@@ -150,7 +150,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the environment
     # Attempt to sample the activity
     # env = create_env_with_stable_objects(cfg)
-    env = og.Environment(configs=copy.deepcopy(cfg))
+    with gm.unlocked():
+        gm.ENABLE_TRANSITION_RULES = True
+        env = og.Environment(configs=copy.deepcopy(cfg))
+        gm.ENABLE_TRANSITION_RULES = False
     if gm.HEADLESS:
         hide_all_lights()
 
@@ -289,6 +292,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     if not validated:
                         success = False
                         feedback = error_msg
+                        breakpoint()
 
                 if success:
                     env.scene.load_state(task_final_state)
@@ -362,7 +366,11 @@ def main(random_selection=False, headless=False, short_exec=False):
                 pass
 
             # env = create_env_with_stable_objects(cfg)
-            env = og.Environment(configs=copy.deepcopy(cfg))
+            # Make sure transition rules are loaded properly
+            with gm.unlocked():
+                gm.ENABLE_TRANSITION_RULES = True
+                env = og.Environment(configs=copy.deepcopy(cfg))
+                gm.ENABLE_TRANSITION_RULES = False
 
             if gm.HEADLESS:
                 hide_all_lights()
