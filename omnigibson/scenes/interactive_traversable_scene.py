@@ -34,7 +34,7 @@ class InteractiveTraversableScene(TraversableScene):
         load_room_types=None,
         load_room_instances=None,
         load_task_relevant_only=False,
-        seg_map_resolution=0.1,
+        seg_map_resolution=1.0,
         include_robots=True,
     ):
         """
@@ -54,7 +54,7 @@ class InteractiveTraversableScene(TraversableScene):
             load_room_types (None or list): only load objects in these room types into the scene
             load_room_instances (None or list): if specified, only load objects in these room instances into the scene
             load_task_relevant_only (bool): Whether only task relevant objects (and building structure) should be loaded
-            seg_map_resolution (float): room segmentation map resolution
+            seg_map_resolution (float): room segmentation map resolution (m)
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
 

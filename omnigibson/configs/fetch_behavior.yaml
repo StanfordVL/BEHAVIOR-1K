@@ -33,7 +33,7 @@ scene:
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
-  seg_map_resolution: 0.1
+  seg_map_resolution: 1.0
   scene_source: OG
   include_robots: true
 

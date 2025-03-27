@@ -125,6 +125,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             "type": "InteractiveTraversableScene",
             "scene_file": default_scene_fpath,
             "scene_model": args.scene_model,
+            "seg_map_resolution": 1.0,
         },
         "robots": [
             {
@@ -303,6 +304,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 else:
                     reason = feedback
                     og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
+                    breakpoint()
                 og.sim.stop()
             else:
                 og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")

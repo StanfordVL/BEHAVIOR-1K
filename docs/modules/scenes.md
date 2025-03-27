@@ -27,7 +27,7 @@ Every `Environment` instance includes a scene, defined by its config that is pas
       not_load_object_categories: null
       load_room_types: null
       load_room_instances: null
-      seg_map_resolution: 0.1
+      seg_map_resolution: 1.0
     ```
 
 Alternatively, a scene can be directly imported at runtime by first creating the scene class instance (e.g.: `scene = InteractiveTraversableScene(...)`) and then importing it via `og.sim.import_scene(obj)`. This can be useful for iteratively prototyping a desired scene configuration. Note that a scene _must_ be imported before any additional objects are imported!
