@@ -383,7 +383,11 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in env.scene.available_systems.keys()
-                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
+                if "agent.n." in obj_inst:
+                    idx = int(obj_inst.split("_")[-1].lstrip("0")) - 1
+                    entity = env.robots[idx]
+                else:
+                    entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,
