@@ -213,6 +213,7 @@ def _launch_app():
                 "Flow",
                 "Semantics Schema Editor",
                 "VR",
+                "Isaac Sim Assets [Beta]",
             ]
         )
 
