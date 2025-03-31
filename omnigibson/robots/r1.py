@@ -140,7 +140,10 @@ class R1(HolonomicBaseRobot, ArticulatedTrunkRobot, MobileManipulationRobot):
     def _post_load(self):
         super()._post_load()
 
-        # Set the wheels back to using sphere approximations
+        # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels (see the source URDFs)
+        # as opposed to sphere primitives. As a result, even though import robot script changes to sphere approximation,
+        # GeomPrim will change it back to convex hull approximation during post load. We need to manually set it back to sphere.
+        # TODO: replace the mesh collision mesh with sphere primitives in the import robot script if use_sphere_wheels=True.
         for wheel_name in self.floor_touching_base_link_names:
             wheel_link = self.links[wheel_name]
             assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"

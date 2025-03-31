@@ -728,12 +728,14 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         assert joint_prim is not None, f"Could not find joint prim with name {joint_name}!"
         return joint_prim.GetAttribute("physics:upperLimit").Get()
 
-    # Generate list of collision link names -- this is simply the list of all link names from the
-    # collision spheres specification
+    # The original format from Lula is a list of dicts, so we need to convert to a single dict
     if isinstance(curobo_cfg.collision_spheres, list):
         collision_spheres = {k: v for c in curobo_cfg.collision_spheres for k, v in c.to_dict().items()}
     else:
         collision_spheres = curobo_cfg.collision_spheres.to_dict()
+
+    # Generate list of collision link names -- this is simply the list of all link names from the
+    # collision spheres specification
     all_collision_link_names = list(collision_spheres.keys())
 
     joint_prims = find_all_joints(robot_prim, only_articulated=True)
