@@ -32,7 +32,19 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.robots import R1, BaseRobot, BehaviorRobot, Fetch, Freight, Husky, Locobot, Stretch, Tiago, Turtlebot
+from omnigibson.robots import (
+    R1,
+    R1Pro,
+    BaseRobot,
+    BehaviorRobot,
+    Fetch,
+    Freight,
+    Husky,
+    Locobot,
+    Stretch,
+    Tiago,
+    Turtlebot,
+)
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
@@ -56,6 +68,7 @@ m.KP_LIN_VEL = {
     Locobot: 1.5,
     BehaviorRobot: 0.3,
     R1: 0.3,
+    R1Pro: 0.3,
 }
 m.KP_ANGLE_VEL = {
     Tiago: 0.2,
@@ -67,6 +80,7 @@ m.KP_ANGLE_VEL = {
     Locobot: 1.0,
     BehaviorRobot: 0.2,
     R1: 0.2,
+    R1Pro: 0.2,
 }
 
 m.DEFAULT_COLLISION_ACTIVATION_DISTANCE = 0.02
