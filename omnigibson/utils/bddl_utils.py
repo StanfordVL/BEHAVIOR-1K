@@ -699,6 +699,8 @@ class BDDLSampler:
         }
 
         # Initialize other variables that will be filled in later
+        self._sampling_whitelist = None  # Maps str to str to list
+        self._sampling_blacklist = None  # Maps str to str to list
         self._room_type_to_object_instance = None  # dict
         self._inroom_object_instances = None  # set of str
         self._object_sampling_orders = None  # dict mapping str to list of str
@@ -708,12 +710,20 @@ class BDDLSampler:
         self._inroom_object_scope_filtered_initial = None  # dict mapping str to BDDLEntity
         self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
-    def sample(self, validate_goal=False):
+    def sample(self, validate_goal=False, sampling_whitelist=None, sampling_blacklist=None):
         """
         Run sampling for this BEHAVIOR task
 
         Args:
             validate_goal (bool): Whether the goal should be validated or not
+            sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+                mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
+                that category. During sampling, if a given synset is found in this whitelist, only the specified
+                models will be used as options
+            sampling_blacklist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+                mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
+                that category. During sampling, if a given synset is found in this blacklist, all specified
+                models will not be used as options
 
         Returns:
             2-tuple:
@@ -721,6 +731,10 @@ class BDDLSampler:
                 - None or str: None if successful, otherwise the associated error message
         """
         log.info("Sampling task...")
+        # Store sampling white / blacklists
+        self._sampling_whitelist = sampling_whitelist
+        self._sampling_blacklist = sampling_blacklist
+
         # Reject scenes with missing non-sampleable objects
         # Populate object_scope with sampleable objects and the robot
         accept_scene, feedback = self._prepare_scene_for_sampling()
@@ -1025,6 +1039,12 @@ class BDDLSampler:
             for obj_inst in self._room_type_to_object_instance[room_type]:
                 room_type_to_scene_objs[room_type][obj_inst] = {}
                 obj_synset = self._object_instance_to_synset[obj_inst]
+                synset_whitelist = (
+                    None if self._sampling_whitelist is None else self._sampling_whitelist.get(obj_synset, None)
+                )
+                synset_blacklist = (
+                    None if self._sampling_blacklist is None else self._sampling_blacklist.get(obj_synset, None)
+                )
 
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
@@ -1048,6 +1068,20 @@ class BDDLSampler:
                     cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst)
                     for cat, models in valid_models.items()
                 }
+
+                # Filter based on white / blacklist
+                if synset_whitelist is not None:
+                    valid_models = {
+                        cat: models.intersection(set(synset_whitelist[cat])) if cat in synset_whitelist else models
+                        for cat, models in valid_models.items()
+                    }
+
+                if synset_blacklist is not None:
+                    valid_models = {
+                        cat: models - set(synset_whitelist[cat]) if cat in synset_blacklist else models
+                        for cat, models in valid_models.items()
+                    }
+
                 room_insts = (
                     [None]
                     if self._scene_model is None

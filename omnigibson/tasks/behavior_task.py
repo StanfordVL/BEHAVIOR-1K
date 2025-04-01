@@ -50,6 +50,14 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
+        sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+            mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
+            that category. During sampling, if a given synset is found in this whitelist, only the specified
+            models will be used as options
+        sampling_blacklist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+            mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
+            that category. During sampling, if a given synset is found in this blacklist, all specified
+            models will not be used as options
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -68,6 +76,8 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
+        sampling_whitelist=None,
+        sampling_blacklist=None,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
@@ -107,6 +117,8 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
+        self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
+        self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to BDDLEntity
         self.object_instance_to_category = None  # Maps str to str
@@ -335,7 +347,10 @@ class BehaviorTask(BaseTask):
 
         if self.online_object_sampling:
             # Sample online
-            accept_scene, feedback = self.sampler.sample()
+            accept_scene, feedback = self.sampler.sample(
+                sampling_whitelist=self.sampling_whitelist,
+                sampling_blacklist=self.sampling_blacklist,
+            )
             if not accept_scene:
                 return accept_scene, feedback
         else:
