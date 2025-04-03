@@ -730,7 +730,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writer=None, video_rgb_key=None):
+    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_rgb_keys=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -738,10 +738,17 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
-            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
-            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
-                If @video_writer is specified, this must also be specified!
+            video_writers (None or list of imageio.Writer): If specified, writer objects that RGB frames will be written to
+            video_rgb_keys (None or list of str): If specified, observation keys representing the RGB frames to write to video.
+                If @video_writers is specified, this must also be specified!
         """
+        # Validate video_writers and video_rgb_keys
+        if video_writers is not None:
+            assert video_rgb_keys is not None, "If video_writers is specified, video_rgb_keys must also be specified!"
+            assert len(video_writers) == len(
+                video_rgb_keys
+            ), "video_writers and video_rgb_keys must have the same length!"
+
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
@@ -818,31 +825,32 @@ class DataPlaybackWrapper(DataWrapper):
                 self.current_traj_history.append(step_data)
 
             # If writing to video, write desired frame
-            if video_writer is not None:
-                assert_valid_key(video_rgb_key, self.current_obs.keys(), "video_rgb_key")
-                video_writer.append_data(self.current_obs[video_rgb_key][:, :, :3].numpy())
+            if video_writers is not None:
+                for writer, rgb_key in zip(video_writers, video_rgb_keys):
+                    assert_valid_key(rgb_key, self.current_obs.keys(), "video_rgb_key")
+                    writer.append_data(self.current_obs[rgb_key][:, :, :3].numpy())
 
             self.step_count += 1
 
         if record_data:
             self.flush_current_traj()
 
-    def playback_dataset(self, record_data=False, video_writer=None, video_rgb_key=None):
+    def playback_dataset(self, record_data=False, video_writers=None, video_rgb_keys=None):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record_data (bool): Whether to record data during playback or not
-            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
-            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
+            video_writers (None or list of imageio.Writer): If specified, writer object that RGB frames will be written to
+            video_rgb_keys (None or list of str): If specified, observation key representing the RGB frames to write to video.
                 If @video_writer is specified, this must also be specified!
         """
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
             self.playback_episode(
                 episode_id=episode_id,
                 record_data=record_data,
-                video_writer=video_writer,
-                video_rgb_key=video_rgb_key,
+                video_writers=video_writers,
+                video_rgb_keys=video_rgb_keys,
             )
 
     def create_video_writer(self, fpath, fps=30):
