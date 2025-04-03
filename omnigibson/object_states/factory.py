@@ -50,7 +50,7 @@ _ABILITY_DEPENDENCIES = {
     "robot": AbilityDependencies(states=[IsGrasping, ObjectsInFOVOfRobot], requirements=[]),
     "attachable": AbilityDependencies(states=[AttachedTo], requirements=[]),
     "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[ParticleRequirement]),
-    "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[ParticleRequirement]),
+    "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[]),
     "particleSource": AbilityDependencies(states=[ParticleSource], requirements=[ParticleRequirement]),
     "particleSink": AbilityDependencies(states=[ParticleSink], requirements=[ParticleRequirement]),
     "coldSource": AbilityDependencies(states=[HeatSourceOrSink], requirements=[]),
