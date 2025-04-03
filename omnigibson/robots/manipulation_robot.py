@@ -1575,21 +1575,17 @@ class ManipulationRobot(BaseRobot):
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             control = cb.to_torch(controller.control)
-            threshold = th.mean(
-                th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
-                dim=0,
-            )
             if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
-                    th.any(control < threshold)
+                    th.any(control < self.joint_upper_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
-                    th.any(control > threshold)
+                    th.any(control > self.joint_lower_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control > 0)
                 )
