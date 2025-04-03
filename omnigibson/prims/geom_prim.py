@@ -456,7 +456,12 @@ class CollisionGeomPrim(GeomPrim):
 
 
 class VisualGeomPrim(GeomPrim):
-    pass
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # Make sure mesh is visible by default
+        self.purpose = "default"
 
 
 class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
