@@ -75,6 +75,7 @@ class StatefulObject(BaseObject):
         kinematic_only=None,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        link_physics_materials=None,
         load_config=None,
         abilities=None,
         include_default_states=True,
@@ -96,6 +97,10 @@ class StatefulObject(BaseObject):
                 are satisfied (see object_base.py post_load function), else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -133,6 +138,7 @@ class StatefulObject(BaseObject):
             kinematic_only=kinematic_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             **kwargs,
         )
@@ -296,11 +302,11 @@ class StatefulObject(BaseObject):
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
-            fire_at_metalink = True
+            fire_at_meta_link = True
             if OnFire in self.states:
                 # Note whether the heat source link is explicitly set
                 link = self.states[OnFire].link
-                fire_at_metalink = link != self.root_link
+                fire_at_meta_link = link != self.root_link
             elif HeatSourceOrSink in self.states:
                 # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
                 # Otherwise, immediately return
@@ -313,7 +319,7 @@ class StatefulObject(BaseObject):
             emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
             emitter_config["position"] = (
-                (0.0, 0.0, 0.0) if fire_at_metalink else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
+                (0.0, 0.0, 0.0) if fire_at_meta_link else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
             )
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
@@ -391,7 +397,7 @@ class StatefulObject(BaseObject):
         if emitter_type == EmitterType.FIRE:
             # Radius is in the absolute world coordinate even though the fire is under the link frame.
             # In other words, scaling the object doesn't change the fire radius.
-            if fire_at_metalink:
+            if fire_at_meta_link:
                 # TODO: get radius of heat_source_link from metadata.
                 radius = 0.05
             else:

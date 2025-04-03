@@ -9,6 +9,7 @@ import torch as th
 from bddl.activity import get_goal_conditions, get_ground_goal_state_options, get_initial_conditions
 from bddl.backend_abc import BDDLBackend
 from bddl.condition_evaluation import Negation
+from bddl.config import get_definition_filename
 from bddl.logic_base import AtomicFormula, BinaryAtomicFormula, UnaryAtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
@@ -21,7 +22,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_all_object_category_models_with_abilities,
-    get_attachment_metalinks,
+    get_attachment_meta_links,
 )
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Wrapper
@@ -456,6 +457,119 @@ def translate_bddl_washer_rule_to_og_washer_rule(conditions):
                 solvent_names.append(solvent_name)
             og_washer_rule[solute_name] = solvent_names
     return og_washer_rule
+
+
+def get_processed_bddl(behavior_activity, activity_definition, scene):
+    """
+    Reads the raw bddl defined by @activity_name and @instance and converts it into OmniGibson-compatible
+    bddl by expanding any wildcard specified scene objects into a concrete set of objects
+
+    Args:
+        behavior_activity (str): behavior activity being used
+        activity_definition (int): specific definition of behavior_activity
+        scene (Scene): Current active OmniGibson scene
+
+    Returns:
+        str: Post-processed BDDL string
+    """
+    # Load bddl string
+    problem_filename = get_definition_filename(behavior_activity, activity_definition)
+    with open(problem_filename, "r") as f:
+        raw_bddl = f.readlines()
+
+    # Manually parse BDDL to hot-swap wildcard scene objects
+    swap_info = dict()
+    in_goal = False
+    for idx, line in enumerate(raw_bddl):
+        if "*" in line:
+            # Make sure we're not in the goal conditions -- we ONLY expect the wildcard to be
+            # specified in either the object scope or init conditions
+            assert (
+                not in_goal
+            ), "Found wildcard in BDDL goal conditions, but only expected in object_scope and init conditions!"
+
+            # Infer whether this line is part of the object scope or goal conditions
+            if "-" in line:
+                # This is the object scope
+                # Split by the delimiter, and then split by spaces
+                instances, synset = line.strip(" \n\t").split(" - ")
+                instances = instances.split(" ")
+
+                # Synset should be a scene object instance
+                abilities = OBJECT_TAXONOMY.get_abilities(synset)
+                assert (
+                    "sceneObject" in abilities
+                ), f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
+
+                # Get all valid categories that are mapped to this synset
+                og_categories = OBJECT_TAXONOMY.get_subtree_categories(synset)
+
+                # Wildcard should be specified in the final instance
+                wildcard_instance = instances[-1]
+                assert (
+                    "*" in wildcard_instance
+                ), f"Expected wildcard to be specified in final instance in raw BDDL object scope line:\n{line}"
+
+                # Make sure this hasn't been specified yet
+                assert wildcard_instance not in swap_info, f"Already found wildcard previously for synset {synset}!"
+                n_minimum_instances = len(instances) - 1
+
+                # Add swap info
+                swap_info[wildcard_instance] = {
+                    "object_scope_idx": idx,
+                    "n_minimum_instances": n_minimum_instances,
+                    "categories": set(og_categories),
+                    "synset": synset,
+                }
+
+            else:
+                # This is the init condition
+                # For now, we ONLY support inroom condition, so assert that this is the case
+                tokens = line.strip(" ()\n\t").split(" ")
+                assert len(tokens) == 3, f"Expected 3 total parsed tokens for wildcard init condition line:\n{line}"
+                assert (
+                    tokens[0] == "inroom"
+                ), f"Only inroom is supported for wildcard init condition, but found: {tokens[0]}"
+                _, wildcard_instance, room = tokens
+                assert (
+                    wildcard_instance in swap_info
+                ), f"Expected wildcard instance {wildcard_instance} to already be specified in object_scope, but found none!"
+                swap_info[wildcard_instance]["room"] = room
+                swap_info[wildcard_instance]["init_cond_idx"] = idx
+
+    # Now, infer how to convert the wildcard information given the number of valid objects in the current scene
+    # NOTE: For now, we only support room instance 0
+    init_cond_offset = 0
+    for wildcard_instance, info in swap_info.items():
+        valid_objs = set()
+        for category in info["categories"]:
+            valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
+        in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_0")
+        valid_objs = valid_objs.intersection(in_room_objs)
+        n_valid_objects = len(valid_objs)
+
+        # Make sure we have the minimum number of objects requested
+        n_min_instances = info["n_minimum_instances"]
+        synset = info["synset"]
+        assert (
+            n_valid_objects >= n_min_instances
+        ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+
+        # Hot swap this information into the BDDL
+        extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
+        extra_instances_str = " ".join(extra_instances)
+        obj_scope_idx = info["object_scope_idx"]
+        init_cond_idx = info["init_cond_idx"] + init_cond_offset
+        raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
+        init_cond_line = raw_bddl[init_cond_idx]
+        extra_cond_lines = [
+            init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
+        ]
+        raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1 :]
+        init_cond_offset += len(extra_instances)
+
+    # Return the compiled processed BDDL as a single string
+    return "".join(raw_bddl)
 
 
 class OmniGibsonBDDLBackend(BDDLBackend):
@@ -1111,7 +1225,7 @@ class BDDLSampler:
 
     def _filter_model_choices_by_attached_states(self, model_choices, category, obj_inst):
         # If obj_inst is a child object that depends on a parent object that has been imported or exists in the scene,
-        # we filter in only models that match the parent object's attachment metalinks.
+        # we filter in only models that match the parent object's attachment meta links.
         if obj_inst in self._attached_objects:
             parent_insts = self._attached_objects[obj_inst]
             parent_objects = []
@@ -1144,14 +1258,14 @@ class BDDLSampler:
             # Filter out models that don't support the attached states
             new_model_choices = set()
             for model_choice in model_choices:
-                child_attachment_links = get_attachment_metalinks(category, model_choice)
+                child_attachment_links = get_attachment_meta_links(category, model_choice)
                 # The child model choice needs to be able to attach to all parent instances.
                 # For in-room parent instances, there might be multiple parent objects (e.g. different wall nails),
                 # and the child object needs to be able to attach to at least one of them.
                 if all(
                     any(
                         can_attach(
-                            child_attachment_links, get_attachment_metalinks(parent_obj.category, parent_obj.model)
+                            child_attachment_links, get_attachment_meta_links(parent_obj.category, parent_obj.model)
                         )
                         for parent_obj in parent_objs_per_inst
                     )
@@ -1167,7 +1281,7 @@ class BDDLSampler:
             # Filter out models that don't support the attached states
             new_model_choices = set()
             for model_choice in model_choices:
-                if len(get_attachment_metalinks(category, model_choice)) > 0:
+                if len(get_attachment_meta_links(category, model_choice)) > 0:
                     new_model_choices.add(model_choice)
             return new_model_choices
 

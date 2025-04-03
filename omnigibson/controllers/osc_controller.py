@@ -9,6 +9,7 @@ import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
+from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -63,6 +64,8 @@ class OperationalSpaceController(ManipulationController):
         dof_idx,
         command_input_limits="default",
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
+        isaac_kp=None,
+        isaac_kd=None,
         kp=150.0,
         kp_limits=(10.0, 300.0),
         damping_ratio=1.0,
@@ -102,6 +105,12 @@ class OperationalSpaceController(ManipulationController):
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             kp (None, int, float, or array): Gain values to apply to 6DOF error.
                 If None, will be variable (part of action space)
             kp_limits (2-array): (min, max) values of kp
@@ -250,6 +259,8 @@ class OperationalSpaceController(ManipulationController):
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def reset(self):
@@ -562,7 +573,7 @@ def _compute_osc_torques_torch(
     # roboticsproceedings.org/rss07/p31.pdf
     if rest_qpos is not None:
         j_eef_inv = m_eef @ j_eef @ mm_inv
-        u_null = kd_null * -qd + kp_null * ((rest_qpos - q + math.pi) % (2 * math.pi) - math.pi)
+        u_null = kd_null * -qd + kp_null * wrap_angle(rest_qpos - q)
         u_null = mm @ th.unsqueeze(u_null, dim=-1)
         u += (th.eye(control_dim, dtype=th.float32) - j_eef.T @ j_eef_inv) @ u_null
 

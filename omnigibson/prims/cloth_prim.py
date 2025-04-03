@@ -9,8 +9,17 @@
 
 import math
 from functools import cached_property
+import os
+from pathlib import Path
+import tempfile
+from typing import Literal
+import uuid
 
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.python_utils import multi_dim_linspace
 import torch as th
+from omnigibson.utils.ui_utils import create_module_logger
+import trimesh
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -19,15 +28,26 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
+CLOTH_CONFIGURATIONS = ["default", "settled", "folded", "crumpled"]
+
 # Subsample cloth particle points to boost performance
+m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS = True  # TODO: Disable after new dataset release
 m.N_CLOTH_KEYPOINTS = 1000
+m.FOLDING_INCREMENTS = 100
+m.CRUMPLING_INCREMENTS = 100
 m.KEYPOINT_COVERAGE_THRESHOLD = 0.75
 m.N_CLOTH_KEYFACES = 500
+m.MAX_CLOTH_PARTICLES = 20000  # Comes from a limitation in physx - do not increase
+m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
+m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
 
 
 class ClothPrim(GeomPrim):
@@ -88,8 +108,31 @@ class ClothPrim(GeomPrim):
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
+        # Save the default point configuration
+        self.save_configuration("default", self.points)
+
+        # Remesh the object if necessary
+        force_remesh = self._load_config.get("force_remesh", False)
+        should_remesh_because_of_scale = self._load_config.get("remesh", True) and not th.allclose(
+            self.scale, th.ones(3)
+        )
+        # TODO: Remove the legacy check after the next dataset release
+        should_remesh_because_legacy = self._load_config.get(
+            "remesh", True
+        ) and self.get_available_configurations() == ["default"]
+        if should_remesh_because_of_scale or should_remesh_because_legacy or force_remesh:
+            # Remesh the object if necessary
+            log.warning(
+                f"Remeshing cloth {self.name}. This happens when cloth is loaded with non-unit scale or forced using the forced_remesh argument. It invalidates precached info for settled, folded, and crumpled configurations."
+            )
+            self._remesh()
+
+        # Set the mesh to use the desired configuration
+        points_configuration = self._load_config.get("default_point_configuration", "default")
+        self.reset_points_to_configuration(configuration=points_configuration)
+
         # Clothify this prim, which is assumed to be a mesh
-        self.cloth_system.clothify_mesh_prim(mesh_prim=self._prim, remesh=self._load_config.get("remesh", True))
+        self.cloth_system.clothify_mesh_prim(mesh_prim=self._prim)
 
         # Track generated particle count
         positions = self.compute_particle_positions()
@@ -133,8 +176,361 @@ class ClothPrim(GeomPrim):
         dists = th.norm(positions - aabb_center.reshape(1, 3), dim=-1)
         self._centroid_idx = th.argmin(dists)
 
-        # Store the default position of the points in the local frame
-        self._default_positions = vtarray_to_torch(self.get_attribute(attr="points"))
+    def _remesh(self):
+        assert self.prim is not None, "Cannot remesh a non-existent prim!"
+        has_uv_mapping = self.prim.GetAttribute("primvars:st").Get() is not None
+
+        # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
+        # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
+        scaled_world_transform = PoseAPI.get_world_pose_with_scale(self.prim.GetPath().pathString)
+        # Convert to trimesh mesh (in world frame)
+        tm = mesh_prim_to_trimesh_mesh(
+            mesh_prim=self.prim, include_normals=True, include_texcoord=True, world_frame=True
+        )
+        # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
+        tmp_name = str(uuid.uuid4())
+        tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
+        tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
+        Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+        tm.export(tmp_fpath)
+
+        # Start with the default particle distance
+        particle_distance = self.cloth_system.particle_contact_offset * 2 / 1.5
+
+        # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
+        import pymeshlab  # We import this here because it takes a few seconds to load.
+
+        for _ in range(10):
+            ms = pymeshlab.MeshSet()
+            ms.load_new_mesh(tmp_fpath)
+
+            # Re-mesh based on @particle_distance - distance chosen such that at rest particles should be just touching
+            # each other. The 1.5 magic number comes from the particle cloth demo from omni
+            # Note that this means that the particles will overlap with each other, since at dist = 2 * contact_offset
+            # the particles are just touching each other at rest
+
+            avg_edge_percentage_mismatch = 1.0
+            # Loop re-meshing until average edge percentage is within error threshold or we reach the max number of tries
+            for _ in range(5):
+                if avg_edge_percentage_mismatch <= m.CLOTH_REMESHING_ERROR_THRESHOLD:
+                    break
+
+                ms.meshing_isotropic_explicit_remeshing(
+                    iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
+                )
+
+                # If the cloth has multiple pieces, only keep the largest one
+                ms.generate_splitting_by_connected_components(delete_source_mesh=True)
+                if len(ms) > 1:
+                    assert m.ALLOW_MULTIPLE_CLOTH_MESH_COMPONENTS, "Cloth mesh has multiple components!"
+
+                    log.warning(
+                        f"The cloth mesh has {len(ms)} disconnected components. To simplify, we only keep the mesh with largest face number."
+                    )
+                    biggest_face_num = 0
+                    for split_mesh in ms:
+                        face_num = split_mesh.face_number()
+                        if face_num > biggest_face_num:
+                            biggest_face_num = face_num
+                    new_ms = pymeshlab.MeshSet()
+                    for split_mesh in ms:
+                        if split_mesh.face_number() == biggest_face_num:
+                            new_ms.add_mesh(split_mesh)
+                    ms = new_ms
+
+                avg_edge_percentage_mismatch = abs(
+                    1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"]
+                )
+            else:
+                # Terminate anyways, but don't fail
+                log.warning("The generated cloth may not have evenly distributed particles.")
+
+            # Check if we have too many vertices
+            cm = ms.current_mesh()
+            if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
+                # We have too many vertices, so we will re-mesh again
+                particle_distance *= math.sqrt(2)  # halve the number of vertices
+                log.warning(
+                    f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
+                )
+            else:
+                break
+        else:
+            raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
+
+        # Re-write data to @mesh_prim
+        new_faces = cm.face_matrix()
+        new_vertices = cm.vertex_matrix()
+        new_normals = cm.vertex_normal_matrix()
+        texcoord = cm.wedge_tex_coord_matrix() if has_uv_mapping else None
+        tm = trimesh.Trimesh(
+            vertices=new_vertices,
+            faces=new_faces,
+            vertex_normals=new_normals,
+        )
+        # Apply the inverse of the world transform to get the mesh back into its local frame
+        tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
+
+        # Update the mesh prim to store the new information. First update the non-configuration-
+        # dependent fields
+        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
+        self.prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
+        self.prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
+        self.prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
+        if has_uv_mapping:
+            self.prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
+
+        # Remove the properties for all configurations
+        for config in CLOTH_CONFIGURATIONS:
+            attr_name = f"points_{config}"
+            if self.prim.HasAttribute(attr_name):
+                self.prim.RemoveProperty(attr_name)
+
+        # Then update the configuration-dependent fields
+        self.save_configuration("default", th.tensor(tm.vertices, dtype=th.float32))
+
+        # Then update the points to the default configuration
+        self.reset_points_to_configuration("default")
+
+    def generate_settled_configuration(self):
+        """
+        Generate a settled configuration for the cloth by running a few steps of simulation to let the cloth settle
+        """
+        # Reset position first (moving to a position where the AABB is just on the floor)
+        self.reset_points_to_configuration("default")
+        self.set_position_orientation(position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]))
+        self.set_position_orientation(
+            position=th.tensor([0, 0, self.aabb_extent[2] / 2.0 - self.aabb_center[2]]),
+            orientation=th.tensor([0, 0, 0, 1.0]),
+        )
+
+        # Run a few steps of simulation to let the cloth settle
+        for _ in range(300):
+            og.sim.step()
+
+        # Save the settled configuration
+        self.save_configuration("settled", self.points)
+
+    def generate_folded_configuration(self):
+        # Settle and reset position first (moving to a position where the AABB is just on the floor)
+        self.reset_points_to_configuration("settled")
+        self.set_position_orientation(position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]))
+        self.set_position_orientation(
+            position=th.tensor([0, 0, self.aabb_extent[2] / 2.0 - self.aabb_center[2]]),
+            orientation=th.tensor([0, 0, 0, 1.0]),
+        )
+
+        for _ in range(100):
+            og.sim.step()
+
+        # Fold - first stage. Take the bottom third of Y positions and fold them over towards
+        # the middle third.
+        pos = self.compute_particle_positions()
+        y_min = th.min(pos[:, 1])
+        y_max = th.max(pos[:, 1])
+        y_bottom_third = y_min + (y_max - y_min) / 3
+        y_top_third = y_min + 2 * (y_max - y_min) / 3
+        first_folding_indices = th.where(pos[:, 1] < y_bottom_third)[0]
+        first_folding_initial_pos = th.clone(pos[first_folding_indices])
+        first_staying_pos = pos[pos[:, 1] >= y_bottom_third]
+        first_staying_z_height = th.max(first_staying_pos[:, 2]) - th.min(first_staying_pos[:, 2])
+        first_folding_final_pos = th.clone(first_folding_initial_pos)
+        first_folding_final_pos[:, 1] = (
+            2 * y_bottom_third - first_folding_final_pos[:, 1]
+        )  # Mirror bottom to the above of y_mid_bottom
+        first_folding_final_pos[:, 2] += first_staying_z_height  # Add a Z offset to keep particles from overlapping
+        for ctrl_pts in multi_dim_linspace(first_folding_initial_pos, first_folding_final_pos, m.FOLDING_INCREMENTS):
+            all_pts = th.clone(pos)
+            all_pts[first_folding_indices] = ctrl_pts
+            self.set_particle_positions(all_pts)
+            og.sim.step()
+
+        # Fold - second stage. Take the top third of original Y positions and fold them over towards the
+        # middle too.
+        pos = self.compute_particle_positions()
+        second_folding_indices = th.where(pos[:, 1] > y_top_third)[0]
+        second_folding_initial_pos = th.clone(pos[second_folding_indices])
+        second_staying_pos = pos[pos[:, 1] <= y_top_third]
+        second_staying_z_height = th.max(second_staying_pos[:, 2]) - th.min(second_staying_pos[:, 2])
+        second_folding_final_pos = th.clone(second_folding_initial_pos)
+        second_folding_final_pos[:, 1] = (
+            2 * y_top_third - second_folding_final_pos[:, 1]
+        )  # Mirror top to the below of y_mid
+        second_folding_final_pos[:, 2] += second_staying_z_height  # Add a Z offset to keep particles from overlapping
+        for ctrl_pts in multi_dim_linspace(second_folding_initial_pos, second_folding_final_pos, m.FOLDING_INCREMENTS):
+            all_pts = th.clone(pos)
+            all_pts[second_folding_indices] = ctrl_pts
+            self.set_particle_positions(all_pts)
+            og.sim.step()
+
+        # Fold - third stage. Fold along the X axis, in half.
+        pos = self.compute_particle_positions()
+        x_min = th.min(pos[:, 0])
+        x_max = th.max(pos[:, 0])
+        x_mid = (x_min + x_max) / 2
+        third_folding_indices = th.where(pos[:, 0] > x_mid)[0]
+        third_folding_initial_pos = th.clone(pos[third_folding_indices])
+        third_staying_pos = pos[pos[:, 0] <= x_mid]
+        third_staying_z_height = th.max(third_staying_pos[:, 2]) - th.min(third_staying_pos[:, 2])
+        third_folding_final_pos = th.clone(third_folding_initial_pos)
+        third_folding_final_pos[:, 0] = 2 * x_mid - third_folding_final_pos[:, 0]
+        third_folding_final_pos[:, 2] += third_staying_z_height  # Add a Z offset to keep particles from overlapping
+        for ctrl_pts in multi_dim_linspace(third_folding_initial_pos, third_folding_final_pos, m.FOLDING_INCREMENTS):
+            all_pts = th.clone(pos)
+            all_pts[third_folding_indices] = ctrl_pts
+            self.set_particle_positions(all_pts)
+            og.sim.step()
+
+        # Let things settle
+        for _ in range(100):
+            og.sim.step()
+
+        # Save the folded configuration
+        self.save_configuration("folded", self.points)
+
+    def generate_crumpled_configuration(self):
+        # Settle and reset position first (moving to a position where the AABB is just on the floor)
+        self.reset_points_to_configuration("settled")
+        self.set_position_orientation(position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]))
+        self.set_position_orientation(
+            position=th.tensor([0, 0, self.aabb_extent[2] / 2.0 - self.aabb_center[2]]),
+            orientation=th.tensor([0, 0, 0, 1.0]),
+        )
+        for _ in range(100):
+            og.sim.step()
+
+        # We just need to generate the side planes
+        box_half_extent = self.aabb_extent / 2
+        plane_centers = (
+            th.tensor(
+                [
+                    [1, 0, 1],
+                    [0, 1, 1],
+                    [-1, 0, 1],
+                    [0, -1, 1],
+                ]
+            )
+            * box_half_extent
+        )
+        plane_prims = []
+        plane_motions = []
+        for i, pc in enumerate(plane_centers):
+            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+                prim_path=f"/World/plane_{i}",
+                name=f"plane_{i}",
+                z_position=0,
+                size=box_half_extent[2].item(),
+                color=None,
+                visible=False,
+            )
+
+            plane_as_prim = XFormPrim(
+                relative_prim_path=f"/plane_{i}",
+                name=plane.name,
+            )
+            plane_as_prim.load(None)
+
+            # Build the plane orientation from the plane normal
+            horiz_dir = pc - th.tensor([0, 0, box_half_extent[2]])
+            plane_z = -1 * horiz_dir / th.norm(horiz_dir)
+            plane_x = th.tensor([0, 0, 1], dtype=th.float32)
+            plane_y = th.cross(plane_z, plane_x)
+            plane_mat = th.stack([plane_x, plane_y, plane_z], dim=1)
+            plane_quat = T.mat2quat(plane_mat)
+            plane_as_prim.set_position_orientation(pc, plane_quat)
+
+            plane_prims.append(plane_as_prim)
+            plane_motions.append(plane_z)
+
+        # Calculate end positions for all walls
+        end_positions = []
+        for i in range(4):
+            plane_prim = plane_prims[i]
+            position = plane_prim.get_position_orientation()[0]
+            end_positions.append(position + plane_motions[i] * box_half_extent)
+
+        for step in range(m.CRUMPLING_INCREMENTS):
+            # Move all walls a small amount
+            for i in range(4):
+                plane_prim = plane_prims[i]
+                current_pos = multi_dim_linspace(
+                    plane_prim.get_position_orientation()[0], end_positions[i], m.CRUMPLING_INCREMENTS
+                )[step]
+                plane_prim.set_position_orientation(position=current_pos)
+
+            og.sim.step()
+
+            # Check cloth height
+            cloth_positions = self.compute_particle_positions()
+            max_height = th.max(cloth_positions[:, 2])
+
+            # Get distance between facing walls (assuming walls 0-2 and 1-3 are facing pairs)
+            wall_dist_1 = th.linalg.norm(
+                plane_prims[0].get_position_orientation()[0] - plane_prims[2].get_position_orientation()[0]
+            )
+            wall_dist_2 = th.linalg.norm(
+                plane_prims[1].get_position_orientation()[0] - plane_prims[3].get_position_orientation()[0]
+            )
+            min_wall_dist = min(wall_dist_1, wall_dist_2)
+
+            # Stop if cloth height exceeds wall distance
+            if max_height > min_wall_dist:
+                break
+
+        # Let things settle
+        for _ in range(100):
+            og.sim.step()
+
+        # Save the folded configuration
+        self.save_configuration("crumpled", self.points)
+
+        # Remove the planes
+        for plane_prim in plane_prims:
+            lazy.omni.isaac.core.utils.prims.delete_prim(plane_prim.prim_path)
+
+    def get_available_configurations(self):
+        """
+        Returns:
+            list: List of available configurations for this cloth prim
+        """
+        return [x for x in CLOTH_CONFIGURATIONS if self.prim.HasAttribute(f"points_{x}")]
+
+    def save_configuration(self, configuration: Literal["default", "settled", "folded", "crumpled"], points: th.tensor):
+        """
+        Save the current configuration of the cloth to a specific configuration
+
+        Args:
+            configuration (Literal["default", "settled", "folded", "crumpled"]): Configuration to save the cloth to
+        """
+        # Get the points arguments stored on the USD prim
+        assert configuration in CLOTH_CONFIGURATIONS, f"Invalid cloth configuration {configuration}!"
+        assert self.prim is not None, "Cannot save configuration for a non-existent prim!"
+        attr_name = f"points_{configuration}"
+        points_default_attrib = (
+            self.prim.GetAttribute(attr_name)
+            if self.prim.HasAttribute(attr_name)
+            else self.prim.CreateAttribute(attr_name, lazy.pxr.Sdf.ValueTypeNames.Float3Array)
+        )
+        points_default_attrib.Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(points.cpu().numpy()))
+
+    def reset_points_to_configuration(self, configuration: Literal["default", "settled", "folded", "crumpled"]):
+        """
+        Reset the cloth to a specific configuration
+
+        Args:
+            configuration (Literal["default", "settled", "folded", "crumpled"]): Configuration to reset the cloth to
+        """
+        # Get the points arguments stored on the USD prim
+        assert (
+            configuration in self.get_available_configurations()
+        ), f"Invalid or unavailable cloth configuration {configuration}!"
+        attr_name = f"points_{configuration}"
+        points = self.get_attribute(attr=attr_name)
+        self.set_attribute(attr="points", val=points)
+
+        # Reset velocities to zero if velocities are present
+        if self.prim.HasAttribute("velocities"):
+            self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(th.zeros((len(points), 3)).tolist()))
 
     # For cloth, points should NOT be @cached_property because their local poses change over time
     @property
@@ -625,5 +1021,35 @@ class ClothPrim(GeomPrim):
         Reset the points to their default positions in the local frame, and also zeroes out velocities
         """
         if self.initialized:
-            self.set_attribute(attr="points", val=lazy.pxr.Vt.Vec3fArray(self._default_positions.tolist()))
-            self.particle_velocities = th.zeros((self._n_particles, 3))
+            points_configuration = self._load_config.get("default_point_configuration", "default")
+            self.reset_points_to_configuration(points_configuration)
+
+    @cached_property
+    def is_meta_link(self):
+        return False
+
+    @cached_property
+    def meta_link_type(self):
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_id(self):
+        """The meta link id of this link, if the link is a meta link.
+
+        The meta link ID is a semantic identifier for the meta link within the meta link type. It is
+        used when an object has multiple meta links of the same type. It can be just a numerical index,
+        or for some objects, it will be a string that can be matched to other meta links. For example,
+        a stove might have toggle buttons named "left" and "right", and heat sources named "left" and
+        "right". The meta link ID can be used to match the toggle button to the heat source.
+        """
+        raise ValueError(f"{self.name} is not a meta link")
+
+    @cached_property
+    def meta_link_sub_id(self):
+        """The integer meta link sub id of this link, if the link is a meta link.
+
+        The meta link sub ID identifies this link as one of the parts of a meta link. For example, an
+        attachment meta link's ID will be the attachment pair name, and each attachment point that
+        works with that pair will show up as a separate link with a unique sub ID.
+        """
+        raise ValueError(f"{self.name} is not a meta link")

@@ -68,6 +68,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         visible=True,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -79,9 +80,13 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities="rgb",
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         # Unique to ManipulationRobot
         grasping_mode="assisted",
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         # unique to BehaviorRobot
         use_ghost_hands=True,
         **kwargs,
@@ -100,6 +105,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -108,8 +114,12 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             grasping_mode=grasping_mode,
+            finger_static_friction=finger_static_friction,
+            finger_dynamic_friction=finger_dynamic_friction,
             grasping_direction="upper",
             **kwargs,
         )
@@ -400,7 +410,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 )
 
     @property
-    def assisted_grasp_start_points(self):
+    def _assisted_grasp_start_points(self):
         side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [
@@ -415,7 +425,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     @property
-    def assisted_grasp_end_points(self):
+    def _assisted_grasp_end_points(self):
         side_coefficients = {"left": th.tensor([1, -1, 1]), "right": th.tensor([1, 1, 1])}
         return {
             arm: [

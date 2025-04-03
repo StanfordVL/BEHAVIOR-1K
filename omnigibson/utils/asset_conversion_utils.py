@@ -17,6 +17,7 @@ import click
 import pymeshlab
 import torch as th
 import trimesh
+
 # import pyassimp
 import numpy as np
 
@@ -286,6 +287,17 @@ def _set_mtl_opacity(mtl_prim, texture):
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity_texture", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
+
+    # Set the opacity to use the alpha channel for its mono-channel value.
+    # This defaults to some other value, which takes opaque black channels in the
+    # image to be fully transparent. This is not what we want.
+    lazy.omni.usd.create_material_input(mtl_prim, "opacity_mode", 0, lazy.pxr.Sdf.ValueTypeNames.Int)
+
+    # We also need to set an opacity threshold. Our objects can include continuous alpha values for opacity
+    # but the ray tracing renderer can only handle binary opacity values. The default threshold
+    # leaves most objects entirely transparent, so we try to avoid that here.
+    lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
+
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
@@ -348,31 +360,6 @@ def _get_visual_objs_from_urdf(urdf_path):
     return visual_objs
 
 
-def _copy_object_state_textures(obj_category, obj_model, dataset_root):
-    """
-    Copies specific object state texture files from the old material directory to the new material directory.
-
-    Args:
-        obj_category (str): The category of the object.
-        obj_model (str): The model of the object.
-        dataset_root (str): The root directory of the dataset.
-
-    Returns:
-        None
-    """
-    obj_root_dir = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-    old_mat_fpath = f"{obj_root_dir}/material"
-    new_mat_fpath = f"{obj_root_dir}/usd/materials"
-    for mat_file in os.listdir(old_mat_fpath):
-        should_copy = False
-        for object_state in _OBJECT_STATE_TEXTURES:
-            if object_state in mat_file.lower():
-                should_copy = True
-                break
-        if should_copy:
-            shutil.copy(f"{old_mat_fpath}/{mat_file}", new_mat_fpath)
-
-
 def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
     """
     Imports and binds rendering channels for a given object in an Omniverse USD stage.
@@ -398,15 +385,8 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         AssertionError: If a valid visual prim is not found for a mesh.
     """
     usd_dir = os.path.dirname(usd_path)
-    # # mat_dir = f"{model_root_path}/material/{obj_category}" if \
-    # #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
-    # mat_dir = f"{model_root_path}/material"
-    # # Compile all material files we have
-    # mat_files = set(os.listdir(mat_dir))
 
     # Remove the material prims as we will create them explictly later.
-    # TODO: Be a bit more smart about this. a material procedurally generated will lose its material without it having
-    # be regenerated
     stage = lazy.omni.usd.get_context().get_stage()
     for prim in obj_prim.GetChildren():
         looks_prim = None
@@ -425,37 +405,24 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                 stage.RemovePrim(subprim.GetPath()),
             )
 
-    # # Create new default material for this object.
-    # mtl_created_list = []
-    # lazy.omni.kit.commands.execute(
-    #     "CreateAndBindMdlMaterialFromLibrary",
-    #     mdl_name="OmniPBR.mdl",
-    #     mtl_name="OmniPBR",
-    #     mtl_created_list=mtl_created_list,
-    # )
-    # default_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-    # default_mat = rename_prim(prim=default_mat, name=f"default_material")
-    # log.debug("Created default material:", default_mat.GetPath())
-    #
-    # # We may delete this default material if it's never used
-    # default_mat_is_used = False
+    # Remove the materials copied over by the URDF importer
+    urdf_importer_mtl_dir = os.path.join(usd_dir, "materials")
+    if os.path.exists(urdf_importer_mtl_dir):
+        shutil.rmtree(urdf_importer_mtl_dir)
 
     # Grab all visual objs for this object
-    urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/{obj_model}_with_metalinks.urdf"
+    urdf_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/urdf/{obj_model}_with_meta_links.urdf"
     visual_objs = _get_visual_objs_from_urdf(urdf_path)
 
     # Extract absolute paths to mtl files for each link
     link_mtl_files = OrderedDict()  # maps link name to dictionary mapping mesh name to mtl file
     mtl_infos = OrderedDict()  # maps mtl name to dictionary mapping material channel name to png file
-    mat_files = OrderedDict()  # maps mtl name to corresponding list of material filenames
-    mtl_old_dirs = OrderedDict()  # maps mtl name to corresponding directory where the mtl file exists
-    mat_old_paths = OrderedDict()  # maps mtl name to corresponding list of relative mat paths from mtl directory
     for link_name, link_meshes in visual_objs.items():
         link_mtl_files[link_name] = OrderedDict()
         for mesh_name, obj_file in link_meshes.items():
             # Get absolute path and open the obj file if it exists:
             if obj_file is not None:
-                obj_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/{obj_file}"
+                obj_path = os.path.abspath(f"{dataset_root}/objects/{obj_category}/{obj_model}/urdf/{obj_file}")
                 with open(obj_path, "r") as f:
                     mtls = []
                     for line in f.readlines():
@@ -467,30 +434,30 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                     mtl = mtls[0]
                     # TODO: Make name unique
                     mtl_name = ".".join(os.path.basename(mtl).split(".")[:-1]).replace("-", "_").replace(".", "_")
-                    mtl_old_dir = os.path.dirname(obj_path)
+                    mtl_dir = os.path.dirname(obj_path)
                     link_mtl_files[link_name][mesh_name] = mtl_name
                     mtl_infos[mtl_name] = OrderedDict()
-                    mtl_old_dirs[mtl_name] = mtl_old_dir
-                    mat_files[mtl_name] = []
-                    mat_old_paths[mtl_name] = []
                     # Open the mtl file
-                    mtl_path = f"{mtl_old_dir}/{mtl}"
+                    mtl_path = os.path.join(mtl_dir, mtl)
                     with open(mtl_path, "r") as f:
                         # Read any lines beginning with map that aren't commented out
                         for line in f.readlines():
                             if line[:4] == "map_":
-                                map_type, map_file = line.split(" ")
-                                map_file = map_file.split("\n")[0]
-                                map_filename = os.path.basename(map_file)
-                                mat_files[mtl_name].append(map_filename)
-                                mat_old_paths[mtl_name].append(map_file)
-                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
+                                map_type, map_path_relative_to_mtl_dir = line.split(" ")
+                                map_path_relative_to_mtl_dir = map_path_relative_to_mtl_dir.split("\n")[0]
+                                print("Found map path in file as ", map_path_relative_to_mtl_dir)
+                                map_path_absolute = os.path.abspath(os.path.join(mtl_dir, map_path_relative_to_mtl_dir))
+                                print("Absolute map path is ", map_path_absolute)
+                                map_path_relative_to_usd_dir = os.path.relpath(map_path_absolute, usd_dir)
+                                print("USD path is ", usd_dir)
+                                print("Material path relative to USD is", map_path_relative_to_usd_dir)
+                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = (
+                                    map_path_relative_to_usd_dir
+                                )
 
                     print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
-    # Next, for each material information, we create a new material and port the material files to the USD directory
-    mat_new_fpath = os.path.join(usd_dir, "materials")
-    Path(mat_new_fpath).mkdir(parents=True, exist_ok=True)
+    # Next, for each material information, we create a new material
     shaders = OrderedDict()  # maps mtl name to shader prim
     rendering_channel_mappings = {
         "diffuse": _set_mtl_albedo,
@@ -503,9 +470,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         "emission": _set_mtl_emission,
     }
     for mtl_name, mtl_info in mtl_infos.items():
-        for mat_old_path in mat_old_paths[mtl_name]:
-            shutil.copy(os.path.join(mtl_old_dirs[mtl_name], mat_old_path), mat_new_fpath)
-
         # Create the new material
         mtl_created_list = []
         lazy.omni.kit.commands.execute(
@@ -520,7 +484,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         for mat_type, mat_file in mtl_info.items():
             render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
-                render_channel_fcn(mat, os.path.join("materials", mat_file))
+                render_channel_fcn(mat, mat_file)
             else:
                 # Warn user that we didn't find the correct rendering channel
                 log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
@@ -560,9 +524,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             lazy.pxr.UsdShade.MaterialBindingAPI(visual_prim).Bind(
                 shaders[mtl_name], lazy.pxr.UsdShade.Tokens.strongerThanDescendants
             )
-
-    # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
-    _copy_object_state_textures(obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root)
 
 
 def _add_xform_properties(prim):
@@ -634,13 +595,14 @@ def _add_xform_properties(prim):
     xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
 
-def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
+def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_link_type, meta_link_infos):
     """
     Process a meta link by creating visual meshes or lights below it.
 
     Args:
         stage (pxr.Usd.Stage): The USD stage where the meta link will be processed.
         obj_model (str): The object model name.
+        link_name (str): Name of the meta link's parent link (e.g. what part of the object the meta link is attached to).
         meta_link_type (str): The type of the meta link. Must be one of the allowed meta types.
         meta_link_infos (dict): A dictionary containing meta link information. The keys are link IDs and the values are lists of mesh information dictionaries.
 
@@ -652,18 +614,12 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
         ValueError: If an invalid light type or mesh type is encountered.
 
     Notes:
-        - Temporarily disables importing of fillable meshes for "container" meta link type.
         - Handles specific meta link types such as "togglebutton", "particleapplier", "particleremover", "particlesink", and "particlesource".
         - For "particleapplier" meta link type, adjusts the orientation if the mesh type is "cone".
         - Creates lights or primitive shapes based on the meta link type and mesh information.
         - Sets various attributes for lights and meshes, including color, intensity, size, and scale.
         - Makes meshes invisible and sets their local pose.
     """
-    # TODO: Reenable after fillable meshes are backported into 3ds Max.
-    # Temporarily disable importing of fillable meshes.
-    if meta_link_type in ["container"]:
-        return
-
     assert meta_link_type in _ALLOWED_META_TYPES
     if _ALLOWED_META_TYPES[meta_link_type] not in ["primitive", "light"] and meta_link_type != "particlesource":
         return
@@ -690,13 +646,13 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             assert len(mesh_info_list) == 1, f"Invalid number of meshes for {meta_link_type}"
 
         meta_link_in_parent_link_pos, meta_link_in_parent_link_orn = (
-            mesh_info_list[0]["position"],
-            mesh_info_list[0]["orientation"],
+            th.tensor(mesh_info_list[0]["position"]),
+            th.tensor(mesh_info_list[0]["orientation"]),
         )
 
         # For particle applier only, the orientation of the meta link matters (particle should shoot towards the negative z-axis)
         # If the meta link is created based on the orientation of the first mesh that is a cone, we need to rotate it by 180 degrees
-        # because the cone is pointing in the wrong direction. This is already done in update_obj_urdf_with_metalinks;
+        # because the cone is pointing in the wrong direction. This is already done in update_obj_urdf_with_meta_links;
         # we just need to make sure meta_link_in_parent_link_orn is updated correctly.
         if meta_link_type == "particleapplier" and mesh_info_list[0]["type"] == "cone":
             meta_link_in_parent_link_orn = T.quat_multiply(
@@ -708,7 +664,8 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
             if is_light:
                 # Create a light
                 light_type = _LIGHT_MAPPING[mesh_info["type"]]
-                prim_path = f"/{obj_model}/lights_{link_id}_0_link/light_{i}"
+                stage.DefinePrim(f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/lights", "Scope")
+                prim_path = f"/{obj_model}/meta__{link_name}_lights_{link_id}_0_link/lights/light_{i}"
                 prim = getattr(lazy.pxr.UsdLux, f"{light_type}Light").Define(stage, prim_path).GetPrim()
                 lazy.pxr.UsdLux.ShapingAPI.Apply(prim).GetShapingConeAngleAttr().Set(180.0)
             else:
@@ -717,7 +674,9 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                 else:
                     # Create a primitive shape
                     mesh_type = mesh_info["type"].capitalize() if mesh_info["type"] != "box" else "Cube"
-                prim_path = f"/{obj_model}/{meta_link_type}_{link_id}_0_link/mesh_{i}"
+                # Create the visuals prim
+                stage.DefinePrim(f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/visuals", "Scope")
+                prim_path = f"/{obj_model}/meta__{link_name}_{meta_link_type}_{link_id}_0_link/visuals/mesh_{i}"
                 assert hasattr(lazy.pxr.UsdGeom, mesh_type)
                 # togglebutton has to be a sphere
                 if meta_link_type in ["togglebutton"]:
@@ -820,9 +779,6 @@ def _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos):
                     )
                 else:
                     raise ValueError(f"Invalid mesh type: {mesh_type}")
-
-                # Make invisible
-                lazy.pxr.UsdGeom.Imageable(xform_prim.prim).MakeInvisible()
 
             xform_prim.set_local_pose(
                 translation=mesh_in_meta_link_pos,
@@ -946,10 +902,46 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
 
     log.debug("Process meta links")
 
-    # TODO: Use parent link name
+    # Convert primitive meta links
     for link_name, link_metadata in meta_links.items():
         for meta_link_type, meta_link_infos in link_metadata.items():
-            _process_meta_link(stage, obj_model, meta_link_type, meta_link_infos)
+            _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_link_type, meta_link_infos)
+
+    # Get all meta links, set them to guide purpose, and add some metadata
+    # Here we want to include every link that has the meta__ prefix.
+    # This includes meta links that get added into the URDF in earlier
+    # stages.
+    meta_link_prims = [
+        p for p in prim.GetChildren() if p.GetName().startswith("meta__") and p.GetName().endswith("_link")
+    ]
+    for meta_prim in meta_link_prims:
+        # Get meta link information
+        unparsed_meta = meta_prim.GetName()[6:-5]  # remove meta__ and _link
+        meta_parts = unparsed_meta.rsplit("_", 3)
+        assert len(meta_parts) == 4, f"Invalid meta link name: {unparsed_meta}"
+        link_name, meta_link_type, link_id, link_sub_id = meta_parts
+
+        # Add the is_meta_link, meta_link_type, and meta_link_id attributes
+        meta_prim.CreateAttribute("ig:isMetaLink", lazy.pxr.Sdf.ValueTypeNames.Bool)
+        meta_prim.GetAttribute("ig:isMetaLink").Set(True)
+        meta_prim.CreateAttribute("ig:metaLinkType", lazy.pxr.Sdf.ValueTypeNames.String)
+        meta_prim.GetAttribute("ig:metaLinkType").Set(meta_link_type)
+        meta_prim.CreateAttribute("ig:metaLinkId", lazy.pxr.Sdf.ValueTypeNames.String)
+        meta_prim.GetAttribute("ig:metaLinkId").Set(link_id)
+        meta_prim.CreateAttribute("ig:metaLinkSubId", lazy.pxr.Sdf.ValueTypeNames.Int)
+        meta_prim.GetAttribute("ig:metaLinkSubId").Set(int(link_sub_id))
+
+        # Set the purpose of the visual meshes to be guide
+        visual_prim = meta_prim.GetChild("visuals")
+        if visual_prim.IsValid():
+            # If it's an imageable, set the purpose to guide
+            if visual_prim.GetTypeName() == "Mesh":
+                purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_prim).CreatePurposeAttr()
+                purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
+            for visual_mesh in visual_prim.GetChildren():
+                if visual_mesh.GetTypeName() == "Mesh":
+                    purpose_attr = lazy.pxr.UsdGeom.Imageable(visual_mesh).CreatePurposeAttr()
+                    purpose_attr.Set(lazy.pxr.UsdGeom.Tokens.guide)
 
     log.debug("Done processing meta links")
 
@@ -1117,7 +1109,7 @@ def _create_urdf_import_config(
     import_config.set_merge_fixed_joints(merge_fixed_joints)
     import_config.set_convex_decomp(use_convex_decomposition)
     import_config.set_fix_base(False)
-    import_config.set_import_inertia_tensor(False)
+    import_config.set_import_inertia_tensor(True)
     import_config.set_distance_scale(1.0)
     import_config.set_density(0.0)
     import_config.set_default_drive_type(drive_mode.JOINT_DRIVE_NONE)
@@ -1157,8 +1149,8 @@ def import_obj_urdf(
             - str: Absolute path to post-processed URDF file used to generate USD
             - str: Absolute path to the imported USD file
     """
-    # Preprocess input URDF to account for metalinks
-    urdf_path = _add_metalinks_to_urdf(
+    # Preprocess input URDF to account for meta links
+    urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
     # Import URDF
@@ -1328,9 +1320,9 @@ def _create_urdf_link(name, subelements=None, mass=None, inertia=None):
     return link
 
 
-def _create_urdf_metalink(
+def _create_urdf_meta_link(
     root_element,
-    metalink_name,
+    meta_link_name,
     parent_link_name="base_link",
     pos=(0, 0, 0),
     rpy=(0, 0, 0),
@@ -1339,8 +1331,8 @@ def _create_urdf_metalink(
     Creates the appropriate URDF joint and link for a meta link and appends it to the root element.
 
     Args:
-        root_element (Element): The root XML element to which the metalink will be appended.
-        metalink_name (str): The name of the metalink to be created.
+        root_element (Element): The root XML element to which the meta link will be appended.
+        meta_link_name (str): The name of the meta link to be created.
         parent_link_name (str, optional): The name of the parent link. Defaults to "base_link".
         pos (tuple, optional): The position of the joint in the form (x, y, z). Defaults to (0, 0, 0).
         rpy (tuple, optional): The roll, pitch, and yaw of the joint in the form (r, p, y). Defaults to (0, 0, 0).
@@ -1350,16 +1342,16 @@ def _create_urdf_metalink(
     """
     # Create joint
     jnt = _create_urdf_joint(
-        name=f"{metalink_name}_joint",
+        name=f"{meta_link_name}_joint",
         parent=parent_link_name,
-        child=f"{metalink_name}_link",
+        child=f"{meta_link_name}_link",
         pos=pos,
         rpy=rpy,
         joint_type="fixed",
     )
     # Create child link
     link = _create_urdf_link(
-        name=f"{metalink_name}_link",
+        name=f"{meta_link_name}_link",
         mass=0.0001,
         inertia=[0.00001, 0.00001, 0.00001, 0, 0, 0],
     )
@@ -1398,7 +1390,7 @@ def _save_xmltree_as_urdf(root_element, name, dirpath, unique_urdf=False):
     return fpath
 
 
-def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
+def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     """
     Adds meta links to a URDF file based on metadata.
 
@@ -1451,12 +1443,16 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                     meta_link_name in _ALLOWED_META_TYPES
                 ), f"meta_link_name {meta_link_name} not in {_ALLOWED_META_TYPES}"
 
-                # TODO: Reenable after fillable meshes are backported into 3ds Max.
-                # Temporarily disable importing of fillable meshes.
-                if meta_link_name in ["container"]:
-                    continue
-
                 for ml_id, attrs_list in ml_attrs.items():
+                    # If the attrs list is a dictionary (legacy format), convert it to a list
+                    if isinstance(attrs_list, dict):
+                        keys = [int(k) for k in attrs_list.keys()]
+                        assert set(keys) == set(
+                            range(len(keys))
+                        ), f"Expected keys to be 0-indexed integers, but got {keys}"
+                        int_key_dict = {int(k): v for k, v in attrs_list.items()}
+                        attrs_list = [int_key_dict[i] for i in range(len(keys))]
+
                     if len(attrs_list) > 0:
                         if _ALLOWED_META_TYPES[meta_link_name] != "dimensionless":
                             # If not dimensionless, we create one meta link for a list of meshes below it
@@ -1470,15 +1466,9 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                     len(attrs_list) == 1
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
 
-                        # TODO: Remove this after this is fixed.
-                        if type(attrs_list) is dict:
-                            keys = [str(x) for x in range(len(attrs_list))]
-                            assert set(attrs_list.keys()) == set(keys), "Unexpected keys"
-                            attrs_list = [attrs_list[k] for k in keys]
-
                         for i, attrs in enumerate(attrs_list):
-                            pos = attrs["position"]
-                            quat = attrs["orientation"]
+                            pos = th.as_tensor(attrs["position"])
+                            quat = th.as_tensor(attrs["orientation"])
 
                             # For particle applier only, the orientation of the meta link matters (particle should shoot towards the negative z-axis)
                             # If the meta link is created based on the orientation of the first mesh that is a cone, we need to rotate it by 180 degrees
@@ -1489,10 +1479,10 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
                                 ), f"Expected only one instance for meta_link {meta_link_name}_{ml_id}, but found {len(attrs_list)}"
                                 quat = T.quat_multiply(quat, T.axisangle2quat(th.tensor([math.pi, 0.0, 0.0])))
 
-                            # Create metalink
-                            _create_urdf_metalink(
+                            # Create meta link
+                            _create_urdf_meta_link(
                                 root_element=root,
-                                metalink_name=f"{meta_link_name}_{ml_id}_{i}",
+                                meta_link_name=f"meta__{parent_link_name}_{meta_link_name}_{ml_id}_{i}",
                                 parent_link_name=parent_link_name,
                                 pos=pos,
                                 rpy=T.quat2euler(quat),
@@ -1501,7 +1491,7 @@ def _add_metalinks_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     # Export this URDF
     return _save_xmltree_as_urdf(
         root_element=root,
-        name=f"{obj_model}_with_metalinks",
+        name=f"{obj_model}_with_meta_links",
         dirpath=f"{model_root_path}/urdf",
         unique_urdf=False,
     )
@@ -1525,7 +1515,7 @@ def convert_scene_urdf_to_json(urdf, json_path):
     # Play the simulator, then save
     og.sim.play()
     Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
-    og.sim.save(json_path=json_path)
+    og.sim.save(json_paths=[json_path])
 
     # Load the json, remove the init_info because we don't need it, then save it again
     with open(json_path, "r") as f:
@@ -1576,7 +1566,7 @@ def _load_scene_from_urdf(urdf):
                 name=obj_name,
                 **obj_info["cfg"],
             )
-            og.sim.import_object(obj)
+            scene.add_object(obj)
             obj.set_bbox_center_position_orientation(position=obj_info["bbox_pos"], orientation=obj_info["bbox_quat"])
         except Exception as e:
             raise ValueError(f"Failed to load object {obj_name}") from e
@@ -1784,7 +1774,7 @@ def find_all_prim_children_with_type(prim_type, root_prim):
     return found_prims
 
 
-def simplify_convex_hull(tm, max_vertices=60):
+def simplify_convex_hull(tm, max_vertices=60, max_faces=128):
     """
     Simplifies a convex hull mesh by using quadric edge collapse to reduce the number of faces
 
@@ -1797,7 +1787,6 @@ def simplify_convex_hull(tm, max_vertices=60):
         return tm
 
     # Use pymeshlab to reduce
-    max_faces = 64
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
     while len(ms.current_mesh().vertex_matrix()) > max_vertices:
@@ -1854,11 +1843,11 @@ def generate_collision_meshes(trimesh_mesh, method="coacd", hull_count=32, disca
             script = """
 import pickle, coacd, sys
 try:
-    with open('""" + data_path + """', 'rb') as f:
+    with open('"""+ data_path+ """', 'rb') as f:
         vertices, faces, hull_count = pickle.load(f)
     mesh = coacd.Mesh(vertices, faces)
     result = coacd.run_coacd(mesh, max_convex_hull=hull_count, max_ch_vertex=60)
-    with open('""" + result_path + """', 'wb') as f:
+    with open('"""+ result_path+ """', 'wb') as f:
         pickle.dump(result, f)
     sys.exit(0)
 except Exception as e:
@@ -1962,6 +1951,7 @@ except Exception as e:
     simplified_hulls = [simplify_convex_hull(hull) for hull in hulls]
 
     return simplified_hulls
+
 
 def get_collision_approximation_for_urdf(
     urdf_path,
@@ -2100,7 +2090,13 @@ def get_collision_approximation_for_urdf(
 
 
 def copy_urdf_to_dataset(
-    urdf_path, category, mdl, urdf_dep_paths=None, dataset_root=gm.CUSTOM_DATASET_PATH, suffix="original", overwrite=False
+    urdf_path,
+    category,
+    mdl,
+    urdf_dep_paths=None,
+    dataset_root=gm.CUSTOM_DATASET_PATH,
+    suffix="original",
+    overwrite=False,
 ):
     # Create a directory for the object
     obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
@@ -2133,183 +2129,6 @@ def copy_urdf_to_dataset(
         unique_urdf=False,
     )
 
-def generate_urdf_for_obj(
-    visual_mesh, obj_dir, collision_meshes, category, mdl, dataset_root=gm.CUSTOM_DATASET_PATH, overwrite=False
-):
-    # Create a directory for the object
-    # obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl
-    if isinstance(obj_dir, str):
-        obj_dir = pathlib.Path(obj_dir)
-    if not overwrite:
-        assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
-    obj_dir.mkdir(parents=True, exist_ok=True)
-
-    obj_name = "_".join([category, mdl])
-
-    # Prepare the URDF tree
-    tree_root = ET.Element("robot")
-    tree_root.attrib = {"name": mdl}
-
-    # Canonicalize the object by putting the origin at the visual mesh center
-    mesh_center = visual_mesh.centroid
-    if visual_mesh.is_watertight:
-        mesh_center = visual_mesh.center_mass
-    transform = th.eye(4)
-    transform[:3, 3] = th.as_tensor(mesh_center)
-    inv_transform = th.linalg.inv(transform)
-    visual_mesh.apply_transform(inv_transform.numpy())
-
-    # Somehow we need to manually write the vertex normals to cache
-    visual_mesh._cache.cache["vertex_normals"] = visual_mesh.vertex_normals
-
-    # Save the mesh
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_dir_path = pathlib.Path(temp_dir)
-        obj_relative_path = f"{obj_name}_base_link.obj"
-        obj_temp_path = temp_dir_path / obj_relative_path
-        visual_mesh.export(obj_temp_path, file_type="obj")
-
-        # Move the mesh to the correct path
-        obj_link_mesh_folder = obj_dir / "shape"
-        obj_link_mesh_folder.mkdir(exist_ok=True)
-        obj_link_visual_mesh_folder = obj_link_mesh_folder / "visual"
-        obj_link_visual_mesh_folder.mkdir(exist_ok=True)
-        obj_link_collision_mesh_folder = obj_link_mesh_folder / "collision"
-        obj_link_collision_mesh_folder.mkdir(exist_ok=True)
-        obj_link_material_folder = obj_dir / "material"
-        obj_link_material_folder.mkdir(exist_ok=True)
-
-        # Check if a material got exported.
-        material_files = [x for x in temp_dir_path.iterdir() if x.suffix == ".mtl"]
-        if material_files:
-            assert (
-                len(material_files) == 1
-            ), f"Something's wrong: there's more than 1 material file in {list(temp_dir_path.iterdir())}"
-            original_material_filename = material_files[0].name
-
-            # Fix texture file paths if necessary.
-            # original_material_dir = G.nodes[link_node]["material_dir"]
-            # if original_material_dir:
-            #     for src_texture_file in original_material_dir.iterdir():
-            #         fname = src_texture_file
-            #         # fname is in the same format as room_light-0-0_VRayAOMap.png
-            #         vray_name = fname[fname.index("VRay") : -4] if "VRay" in fname else None
-            #         if vray_name in VRAY_MAPPING:
-            #             dst_fname = VRAY_MAPPING[vray_name]
-            #         else:
-            #             raise ValueError(f"Unknown texture map: {fname}")
-
-            #         dst_texture_file = f"{obj_name}_base_link_{dst_fname}.png"
-
-            #         # Load the image
-            #         shutil.copy2(original_material_dir / src_texture_file, obj_link_material_folder / dst_texture_file)
-
-            # Modify MTL reference in OBJ file
-            mtl_name = f"{obj_name}_base_link.mtl"
-            with open(obj_temp_path, "r") as f:
-                new_lines = []
-                for line in f.readlines():
-                    if f"mtllib {original_material_filename}" in line:
-                        line = f"mtllib {mtl_name}\n"
-                    new_lines.append(line)
-
-            with open(obj_temp_path, "w") as f:
-                for line in new_lines:
-                    f.write(line)
-
-            # Modify texture reference in MTL file
-            with open(temp_dir_path / original_material_filename, "r") as f:
-                new_lines = []
-                for line in f.readlines():
-                    if "map_" in line:
-                        map_kind, texture_filename = line.split(" ")
-                        texture_filename = texture_filename.strip()
-                        map_kind = map_kind.strip().replace("map_", "")
-                        new_filename = f"../../material/{obj_name}_base_link_{map_kind}.png"
-
-                        # Copy from the texture_filename relative to the original path, to the new path relative to the target path
-                        texture_from_path = temp_dir_path / texture_filename
-                        assert texture_from_path.exists(), f"Texture file {texture_from_path} does not exist!"
-                        texture_to_path = obj_link_visual_mesh_folder / new_filename
-                        if not overwrite:
-                            assert not texture_to_path.exists(), f"Texture file {texture_to_path} already exists!"
-                        shutil.copy2(texture_from_path, texture_to_path)
-
-                        # Change the line to point to the new path
-                        line = line.replace(texture_filename, new_filename)
-
-                    # We temporarily disable this material renaming.
-                    # if "map_Kd material_0.png" in line:
-                    #     line = ""
-                    #     for key in MTL_MAPPING:
-                    #         line += f"{key} ../../material/{obj_name_{link_name}_{MTL_MAPPING[key]}.png\n"
-                    new_lines.append(line)
-
-            with open(obj_link_visual_mesh_folder / mtl_name, "w") as f:
-                for line in new_lines:
-                    f.write(line)
-
-        # Copy the OBJ into the right spot
-        obj_final_path = obj_link_visual_mesh_folder / obj_relative_path
-        shutil.copy2(obj_temp_path, obj_final_path)
-
-        # Save and merge precomputed collision mesh
-        collision_filenames_and_scales = []
-        for i, collision_mesh in enumerate(collision_meshes):
-            processed_collision_mesh = collision_mesh.copy()
-            processed_collision_mesh.apply_transform(inv_transform)
-            processed_collision_mesh._cache.cache["vertex_normals"] = processed_collision_mesh.vertex_normals
-            collision_filename = obj_relative_path.replace(".obj", f"_{i}.obj")
-
-            # OmniGibson requires unit-bbox collision meshes, so here we do that scaling
-            bounding_box = processed_collision_mesh.bounding_box.extents
-            assert all(x > 0 for x in bounding_box), f"Bounding box extents are not all positive: {bounding_box}"
-            collision_scale = 1.0 / bounding_box
-            collision_scale_matrix = th.eye(4)
-            collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
-            processed_collision_mesh.apply_transform(collision_scale_matrix.numpy())
-            processed_collision_mesh.export(obj_link_collision_mesh_folder / collision_filename, file_type="obj")
-            collision_filenames_and_scales.append((collision_filename, 1 / collision_scale))
-
-    # Create the link in URDF
-    link_xml = ET.SubElement(tree_root, "link")
-    link_xml.attrib = {"name": "base_link"}
-    visual_xml = ET.SubElement(link_xml, "visual")
-    visual_origin_xml = ET.SubElement(visual_xml, "origin")
-    visual_origin_xml.attrib = {"xyz": " ".join([str(item) for item in [0.0] * 3])}
-    visual_geometry_xml = ET.SubElement(visual_xml, "geometry")
-    visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
-    visual_mesh_xml.attrib = {
-        "filename": os.path.join("shape", "visual", obj_relative_path).replace("\\", "/"),
-        "scale": "1 1 1",
-    }
-
-    collision_origin_xmls = []
-    for collision_filename, collision_scale in collision_filenames_and_scales:
-        collision_xml = ET.SubElement(link_xml, "collision")
-        collision_xml.attrib = {"name": collision_filename.replace(".obj", "")}
-        collision_origin_xml = ET.SubElement(collision_xml, "origin")
-        collision_origin_xml.attrib = {"xyz": " ".join([str(item) for item in [0.0] * 3])}
-        collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
-        collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
-        collision_mesh_xml.attrib = {
-            "filename": os.path.join("shape", "collision", collision_filename).replace("\\", "/"),
-            "scale": " ".join([str(item) for item in collision_scale]),
-        }
-        collision_origin_xmls.append(collision_origin_xml)
-
-    # Save the URDF file.
-    xmlstr = minidom.parseString(ET.tostring(tree_root)).toprettyxml(indent="   ")
-    xmlio = io.StringIO(xmlstr)
-    tree = ET.parse(xmlio)
-
-    urdf_path = obj_dir / f"{mdl}.urdf"
-
-    with open(urdf_path, "wb") as f:
-        tree.write(f, xml_declaration=True)
-
-    return str(urdf_path)
-
 def generate_urdf_for_mesh(
     asset_path,
     obj_dir,
@@ -2327,10 +2146,10 @@ def generate_urdf_for_mesh(
 ):
     """
     Generate URDF file for either single mesh or articulated files.
-    Each submesh in articulated files (glb, gltf) will be extracted as a separate link.
+    Each submesh in articulated files (glb, gltf,dae) will be extracted as a separate link.
     
     Args:
-        asset_path: Path to the input mesh file (.obj, .glb, .gltf)
+        asset_path: Path to the input mesh file (.obj, .glb, .gltf, .dae)
         obj_dir: Output directory
         category: Category name for the object
         mdl: Model name
@@ -2342,13 +2161,14 @@ def generate_urdf_for_mesh(
         rescale: Whether to rescale mesh if check_scale
         dataset_root: Root directory for the dataset
         overwrite: Whether to overwrite existing files
+        n_submesh: If submesh number is more than n_submesh, will not convert and skip
     """
 
     # Validate file format
     valid_formats = trimesh.available_formats()
     mesh_format = pathlib.Path(asset_path).suffix[1:]  # Remove the dot
     assert mesh_format in valid_formats, f"Invalid mesh format: {mesh_format}. Valid formats: {valid_formats}"
-    assert mesh_format in ['obj', 'glb', 'gltf'] , f"Not obj, glb, gltf file, can only deal with these file types"
+    assert mesh_format in ['obj', 'glb', 'gltf','dae'] , f"Not obj, glb, gltf, dae file, can only deal with these file types"
 
     # Convert obj_dir to Path object
     if isinstance(obj_dir, str):
@@ -2383,10 +2203,9 @@ def generate_urdf_for_mesh(
             "transform": th.eye(4)
         }
     
-    elif mesh_format in ['glb', 'gltf']:
+    elif mesh_format in ['glb', 'gltf', 'dae']:
         # Handle articulated files
-        scene = trimesh.load(asset_path)
-
+        scene = trimesh.load(asset_path) 
         # Count geometries (submeshes)
         submesh_count = len(scene.geometry)
         if submesh_count > n_submesh:
@@ -2403,7 +2222,8 @@ def generate_urdf_for_mesh(
             
             # Get the geometry and transform
             geometry = scene.geometry[geometry_name]
-            transform = scene.graph.get(node_name)[0]
+           
+            transform, _ = scene.graph.get(frame_to = node_name, frame_from = scene.graph.base_frame)
             transform_tensor = th.from_numpy(transform.copy()).float()
             
             # Process the geometry based on its type
@@ -2576,12 +2396,14 @@ def generate_urdf_for_mesh(
         
         # Process each link
         for link_name, link_data in links.items():
-            visual_mesh = link_data["visual_mesh"]
-            collision_meshes = link_data["collision_meshes"]
+            visual_mesh = link_data["visual_mesh"].copy()  # Create a copy to avoid modifying original
+            collision_meshes = [mesh.copy() for mesh in link_data["collision_meshes"]]  # Copy all collision meshes
             transform = link_data["transform"]
             
-            # Export the mesh as is - without applying any transforms to the geometry
-            # This preserves the relative positions between parts
+            # Apply transform to visual mesh before exporting
+            visual_mesh.apply_transform(transform.numpy())
+            
+            # Export the transformed mesh
             visual_filename = f"{obj_name}_{link_name}.obj"
             visual_temp_path = temp_dir_path / visual_filename
             visual_mesh.export(visual_temp_path, file_type="obj")
@@ -2644,10 +2466,13 @@ def generate_urdf_for_mesh(
             # Process collision meshes
             collision_info = []
             for i, collision_mesh in enumerate(collision_meshes):
-                # Export collision mesh without transforming
+                # Apply transform to collision mesh before exporting
+                collision_mesh.apply_transform(transform.numpy())
+                
+                # Export collision mesh filename
                 collision_filename = visual_filename.replace(".obj", f"_collision_{i}.obj")
                 
-                # Scale collision mesh to unit bbox
+                # Scale collision mesh to unit bbox if needed
                 bounding_box = collision_mesh.bounding_box.extents
                 if all(x > 0 for x in bounding_box):
                     collision_scale = 1.0 / bounding_box
@@ -2662,22 +2487,23 @@ def generate_urdf_for_mesh(
                     collision_path = obj_link_collision_mesh_folder / collision_filename
                     scaled_collision_mesh.export(collision_path, file_type="obj")
                     
+                    # Since we've already applied the transform, scale includes only the sizing adjustment
                     collision_info.append({
                         "filename": collision_filename,
-                        "scale": 1.0 / collision_scale * scale
+                        "scale": 1.0 / collision_scale
                     })
                 else:
                     print(f"Warning: Skipping collision mesh with invalid bounding box: {bounding_box}")
             
-            # Store information for URDF generation
+            # Store information for URDF generation - now without transform since it's been applied
             urdf_links[link_name] = {
                 "visual_filename": visual_filename,
                 "collision_info": collision_info,
-                "transform": transform  # Original world transform
+                "transform": th.eye(4)  # Identity transform since we've already applied it to the meshes
             }
     
     if mesh_format == 'obj':
-    # Change the link name from "base_link" to "obj_link"
+        # Change the link name from "base_link" to "obj_link"
         if "base_link" in urdf_links:
             urdf_links["obj_link"] = urdf_links.pop("base_link")
 
@@ -2686,10 +2512,9 @@ def generate_urdf_for_mesh(
     tree_root.attrib = {"name": mdl}
     
     # Create a base_link as the root
-
     base_link = ET.SubElement(tree_root, "link")
     base_link.attrib = {"name": "base_link"}
-    
+
     # Add all other links and joints to connect them to the base_link
     for link_name, link_info in urdf_links.items():
         # Create link element
@@ -2699,12 +2524,12 @@ def generate_urdf_for_mesh(
         # Add visual geometry
         visual_xml = ET.SubElement(link_xml, "visual")
         visual_origin_xml = ET.SubElement(visual_xml, "origin")
-        visual_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}
+        visual_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}  # Zero transform since already applied
         visual_geometry_xml = ET.SubElement(visual_xml, "geometry")
         visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
         visual_mesh_xml.attrib = {
             "filename": os.path.join("shape", "visual", link_info["visual_filename"]).replace("\\", "/"),
-            "scale": f"{scale} {scale} {scale}",
+            "scale": f"1 1 1",  # Using 1.0 scale since transform already applied
         }
         
         # Add collision geometries
@@ -2712,7 +2537,7 @@ def generate_urdf_for_mesh(
             collision_xml = ET.SubElement(link_xml, "collision")
             collision_xml.attrib = {"name": f"{link_name}_collision_{i}"}
             collision_origin_xml = ET.SubElement(collision_xml, "origin")
-            collision_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}
+            collision_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}  # Zero transform since already applied
             collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
             collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
             collision_mesh_xml.attrib = {
@@ -2733,21 +2558,9 @@ def generate_urdf_for_mesh(
         child_xml = ET.SubElement(joint_xml, "child")
         child_xml.attrib = {"link": link_name}
         
-        # Extract translation and rotation from the transformation matrix
-        transform = link_info["transform"]
-        translation = transform[:3, 3].tolist()
-        
-        # Extract rotation as roll, pitch, yaw from the rotation matrix
-        rotation_matrix = transform[:3, :3].numpy()
-        rpy = trimesh.transformations.euler_from_matrix(rotation_matrix, 'sxyz')
-        rpy_str = " ".join([str(float(item)) for item in rpy])
-        
-        # Convert translation to string format for URDF
-        translation_str = " ".join([str(float(item)) for item in translation])
-        
-        # Set origin for the joint with proper rotation
+        # Set origin for the joint with zeros since transform was applied to meshes
         joint_origin_xml = ET.SubElement(joint_xml, "origin")
-        joint_origin_xml.attrib = {"xyz": translation_str, "rpy": rpy_str}
+        joint_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}
     
     # Save URDF file
     xmlstr = minidom.parseString(ET.tostring(tree_root)).toprettyxml(indent="   ")
@@ -2759,6 +2572,7 @@ def generate_urdf_for_mesh(
         tree.write(f, xml_declaration=True)
     
     return str(urdf_path)
+
 
 def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", overwrite=False):
     """
@@ -2921,7 +2735,7 @@ def import_og_asset_from_urdf(
         merge_fixed_joints=merge_fixed_joints,
     )
 
-    # Copy metalinks URDF to original name of object model
+    # Copy meta links URDF to original name of object model
     shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
 
     prim = import_obj_metadata(

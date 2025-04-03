@@ -267,8 +267,11 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
 
     state = og.sim.dump_state(serialized=False)
 
-    # Reset the cloth
-    obj.root_link.reset()
+    # Reset the cloth to the settled configuration if available
+    if "settled" in obj.root_link.get_available_configurations():
+        obj.root_link.reset_points_to_configuration("settled")
+    else:
+        obj.root_link.reset()
 
     obj_aabb_low, obj_aabb_high = obj.states[AABB].get_value()
     other_aabb_low, other_aabb_high = other.states[AABB].get_value()

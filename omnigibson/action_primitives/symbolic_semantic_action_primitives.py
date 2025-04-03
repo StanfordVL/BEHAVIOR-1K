@@ -40,8 +40,8 @@ class SymbolicSemanticActionPrimitiveSet(IntEnum):
 
 
 class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
-    def __init__(self, env):
-        super().__init__(env)
+    def __init__(self, env, robot):
+        super().__init__(env, robot, skip_curobo_initilization=True)
         self.controller_functions = {
             SymbolicSemanticActionPrimitiveSet.GRASP: self._grasp,
             SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
@@ -59,12 +59,12 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             SymbolicSemanticActionPrimitiveSet.RELEASE: self._release,
         }
 
-    def apply_ref(self, prim, *args, attempts=3):
+    def apply_ref(self, primitive, *args, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
-            prim (SymbolicSemanticActionPrimitiveSet): Primitive to execute
+            primitive (SymbolicSemanticActionPrimitiveSet): Primitive to execute
             args: Arguments for the primitive
             attempts (int): Number of attempts to make before raising an error
 
@@ -75,7 +75,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             ActionPrimitiveError: If primitive fails to execute
         """
         assert attempts > 0, "Must make at least one attempt"
-        ctrl = self.controller_functions[prim]
+        ctrl = self.controller_functions[primitive]
 
         if any(isinstance(arg, BaseRobot) for arg in args):
             raise ActionPrimitiveErrorGroup(

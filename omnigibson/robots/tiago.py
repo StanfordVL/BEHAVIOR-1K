@@ -5,7 +5,6 @@ import torch as th
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.manipulation_robot import GraspingPoint
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.utils.python_utils import classproperty
 
@@ -25,6 +24,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         visible=True,
         visual_only=False,
         self_collisions=True,
+        link_physics_materials=None,
         load_config=None,
         # Unique to USDObject hierarchy
         abilities=None,
@@ -36,11 +36,15 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         reset_joint_pos=None,
         # Unique to BaseRobot
         obs_modalities=("rgb", "proprio"),
+        include_sensor_names=None,
+        exclude_sensor_names=None,
         proprio_obs="default",
         sensor_config=None,
         # Unique to ManipulationRobot
         grasping_mode="physical",
         disable_grasp_handling=False,
+        finger_static_friction=None,
+        finger_dynamic_friction=None,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
         # Unique to UntuckedArmPoseRobot
@@ -59,6 +63,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             visible (bool): whether to render this object or not in the stage
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
+            link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
+                a specific physical material for that link's collision meshes, where the kwargs are arguments directly
+                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -79,6 +87,12 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
                     override any values specified from @obs_modalities!
+            include_sensor_names (None or list of str): If specified, substring(s) to check for in all raw sensor prim
+                paths found on the robot. A sensor must include one of the specified substrings in order to be included
+                in this robot's set of sensors
+            exclude_sensor_names (None or list of str): If specified, substring(s) to check against in all raw sensor
+                prim paths found on the robot. A sensor must not include any of the specified substrings in order to
+                be included in this robot's set of sensors
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
@@ -91,6 +105,10 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            finger_static_friction (None or float): If specified, specific static friction to use for robot's fingers
+            finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
+                Note: If specified, this will override any ways that are found within @link_physics_materials for any
+                robot finger gripper links
             default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
                 If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -111,9 +129,9 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             name=name,
             scale=scale,
             visible=visible,
-            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -122,10 +140,14 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
             action_normalize=action_normalize,
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
+            include_sensor_names=include_sensor_names,
+            exclude_sensor_names=exclude_sensor_names,
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
             disable_grasp_handling=disable_grasp_handling,
+            finger_static_friction=finger_static_friction,
+            finger_dynamic_friction=finger_dynamic_friction,
             default_reset_mode=default_reset_mode,
             default_arm_pose=default_arm_pose,
             **kwargs,
@@ -222,7 +244,7 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         # Always call super first
         controllers = super()._default_controllers
         # We use joint controllers for base and camera as default
-        controllers["base"] = "JointController"
+        controllers["base"] = "HolonomicBaseJointController"
         controllers["trunk"] = "JointController"
         controllers["camera"] = "JointController"
         # We use multi finger gripper, and IK controllers for eefs as default
@@ -232,44 +254,12 @@ class Tiago(HolonomicBaseRobot, ArticulatedTrunkRobot, UntuckedArmPoseRobot, Act
         return controllers
 
     @property
-    def assisted_grasp_start_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_right_finger_link".format(arm), position=th.tensor([-0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
-    def assisted_grasp_end_points(self):
-        return {
-            arm: [
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.2])
-                ),
-                GraspingPoint(
-                    link_name="gripper_{}_left_finger_link".format(arm), position=th.tensor([0.001, 0.0, -0.13])
-                ),
-            ]
-            for arm in self.arm_names
-        }
-
-    @property
     def arm_control_idx(self):
         # Add combined entry
         idxs = super().arm_control_idx
         # Concatenate all values and sort them
         idxs["combined"] = th.sort(th.cat([val for val in idxs.values()]))[0]
         return idxs
-
-    @property
-    def finger_lengths(self):
-        return {arm: 0.12 for arm in self.arm_names}
 
     @property
     def disabled_collision_link_names(self):

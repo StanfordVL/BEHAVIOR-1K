@@ -4,13 +4,13 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.constants import JointAxis, JointType
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.usd_utils import PoseAPI, create_joint
+from omnigibson.utils.numpy_utils import gf_quat_to_torch, vtarray_to_torch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -280,21 +280,36 @@ class JointPrim(BasePrim):
         self._body1 = None
 
     @property
-    def local_orientation(self):
+    def local_orientation_0(self):
         """
         Returns:
             4-array: (x,y,z,w) local quaternion orientation of this joint, relative to the parent link
         """
-        # Grab local rotation to parent and child links
-        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[
-            [1, 2, 3, 0]
-        ]
-        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[
-            [1, 2, 3, 0]
-        ]
+        return gf_quat_to_torch(self.get_attribute("physics:localRot0"))
 
-        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-        return T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+    @property
+    def local_orientation_1(self):
+        """
+        Returns:
+            4-array: (x,y,z,w) local quaternion orientation of this joint, relative to the child link
+        """
+        return gf_quat_to_torch(self.get_attribute("physics:localRot1"))
+
+    @property
+    def local_position_0(self):
+        """
+        Returns:
+            3-array: (x,y,z) local position of this joint, relative to the parent link
+        """
+        return vtarray_to_torch(self.get_attribute("physics:localPos0"))
+
+    @property
+    def local_position_1(self):
+        """
+        Returns:
+            3-array: (x,y,z) local position of this joint, relative to the child link
+        """
+        return vtarray_to_torch(self.get_attribute("physics:localPos1"))
 
     @property
     def joint_name(self):

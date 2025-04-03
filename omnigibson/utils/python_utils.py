@@ -9,6 +9,7 @@ from copy import deepcopy
 from functools import wraps
 from hashlib import md5
 from importlib import import_module
+import sys
 
 import h5py
 import torch as th
@@ -711,6 +712,24 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
+def torch_compile(func):
+    """
+    Decorator to compile a function with torch.compile on Linux and torch.jit.script on Windows. This is because of poor support for torch.compile on Windows.
+
+    Args:
+        func (function): Function to compile
+
+    Returns:
+        function: Compiled function
+    """
+    # If we're on Windows, return a jitscript option
+    if sys.platform == "win32":
+        return th.jit.script(func)
+    # Otherwise, return a torch.compile option
+    else:
+        return th.compile(func)
+
+
 def nums2array(nums, dim, dtype=th.float32):
     """
     Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
@@ -806,12 +825,12 @@ def h5py_group_to_torch(group):
         if isinstance(value, h5py.Group):
             state[key] = h5py_group_to_torch(value)
         else:
-            state[key] = th.tensor(value[()], dtype=th.float32)
+            state[key] = th.from_numpy(value[()])
     return state
 
 
 @th.jit.script
-def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int) -> th.Tensor:
+def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int, endpoint: bool = True) -> th.Tensor:
     """
     Generate a tensor with evenly spaced values along multiple dimensions.
     This function creates a tensor where each slice along the first dimension
@@ -822,12 +841,13 @@ def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int) -> th.Tensor
         start (th.Tensor): Starting values for each dimension.
         stop (th.Tensor): Ending values for each dimension.
         num (int): Number of samples to generate along the interpolated dimension.
+        endpoint (bool, optional): If True, stop is the last sample. Otherwise, it is not included.
     Returns:
         th.Tensor: A tensor of shape (num, *start.shape) containing the interpolated values.
     Example:
-        >>> start = th.tensor([0, 10, 100])
-        >>> stop = th.tensor([1, 20, 200])
-        >>> result = multi_dim_linspace(start, stop, num=5)
+        >>> start = th.tensor([0.0, 10.0, 100.0])
+        >>> stop = th.tensor([1.0, 20.0, 200.0])
+        >>> result = multi_dim_linspace(start, stop, num=5, endpoint=True)
         >>> print(result.shape)
         torch.Size([5, 3])
         >>> print(result)
@@ -836,8 +856,20 @@ def multi_dim_linspace(start: th.Tensor, stop: th.Tensor, num: int) -> th.Tensor
                 [  0.5000,  15.0000, 150.0000],
                 [  0.7500,  17.5000, 175.0000],
                 [  1.0000,  20.0000, 200.0000]])
+        >>> result = multi_dim_linspace(start, stop, num=5, endpoint=False)
+        >>> print(result.shape)
+        torch.Size([5, 3])
+        >>> print(result)
+        tensor([[  0.0000,  10.0000, 100.0000],
+                [  0.2000,  12.0000, 120.0000],
+                [  0.4000,  14.0000, 140.0000],
+                [  0.6000,  16.0000, 160.0000],
+                [  0.8000,  18.0000, 180.0000]])
     """
-    steps = th.linspace(0, 1, num, dtype=start.dtype, device=start.device)
+    if endpoint:
+        steps = th.linspace(0, 1, num, dtype=start.dtype, device=start.device)
+    else:
+        steps = th.linspace(0, 1, num + 1, dtype=start.dtype, device=start.device)[:-1]
 
     # Create a new shape for broadcasting
     new_shape = [num] + [1] * start.dim()

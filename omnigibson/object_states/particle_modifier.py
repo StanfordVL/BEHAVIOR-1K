@@ -35,8 +35,8 @@ from omnigibson.utils.usd_utils import FlatcacheAPI, absolute_prim_path_to_scene
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_PREFIX = "particleapplier"
-m.REMOVAL_LINK_PREFIX = "particleremover"
+m.APPLICATION_META_LINK_TYPE = "particleapplier"
+m.REMOVAL_META_LINK_TYPE = "particleremover"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
@@ -348,11 +348,21 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 "height": 1.0,
                 "size": 1.0,
             }
-            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
 
-            # Create a primitive shape if it doesn't already exist
+            # See if the mesh exists at the latest dataset's target location
+            mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
             pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+
+            # If not, see if it exists in the legacy format's location
+            # TODO: Remove this after new dataset release
             if not pre_existing_mesh:
+                mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+                pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+
+            # Create a primitive mesh neither option exists
+            if not pre_existing_mesh:
+                mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
+
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, (
                     f"Must specify projection_mesh_params for {self.obj.name}'s {self.__class__.__name__} "
@@ -410,7 +420,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 len(self.link.visual_meshes) == 1
             ), f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
 
-            # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
+            # Make sure the mesh is translated so that its tip lies at the meta link origin, and rotated so the vector
             # from tip to tail faces the positive x axis
             z_offset = (
                 0.0
@@ -924,12 +934,12 @@ class ParticleRemover(ParticleModifier):
         return False
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.REMOVAL_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.REMOVAL_META_LINK_TYPE
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @property
@@ -1088,15 +1098,15 @@ class ParticleApplier(ParticleModifier):
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
-            # metalink, and (b) zero relative orientation between the metalink and the projection mesh
+            # meta link, and (b) zero relative orientation between the meta link and the projection mesh
             local_pos, local_quat = self.projection_mesh.get_position_orientation(frame="parent")
             assert th.all(
                 th.isclose(local_pos + th.tensor([0, 0, height / 2.0]), th.zeros_like(local_pos))
-            ), "Projection mesh tip should align with metalink position!"
+            ), "Projection mesh tip should align with meta link position!"
             local_euler = T.quat2euler(local_quat)
             assert th.all(
                 th.isclose(local_euler, th.zeros_like(local_euler))
-            ), "Projection mesh orientation should align with metalink orientation!"
+            ), "Projection mesh orientation should align with meta link orientation!"
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -1492,12 +1502,12 @@ class ParticleApplier(ParticleModifier):
         return self.projection_emitter.GetProperty("inputs:active").Get()
 
     @classproperty
-    def metalink_prefix(cls):
-        return m.APPLICATION_LINK_PREFIX
+    def meta_link_type(cls):
+        return m.APPLICATION_META_LINK_TYPE
 
     @classmethod
-    def requires_metalink(cls, **kwargs):
-        # No metalink required for adjacency
+    def requires_meta_link(cls, **kwargs):
+        # No meta link required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @classmethod

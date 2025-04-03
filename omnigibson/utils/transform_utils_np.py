@@ -158,8 +158,16 @@ def convert_quat(q, to="xyzw"):
     raise Exception("convert_quat: choose a valid `to` argument (xyzw or wxyz)")
 
 
-@jit(nopython=True)
 def quat_multiply(quaternion1, quaternion0):
+    if quaternion1.dtype != np.float32:
+        quaternion1 = quaternion1.astype(np.float32)
+    if quaternion0.dtype != np.float32:
+        quaternion0 = quaternion0.astype(np.float32)
+    return _quat_multiply(quaternion1, quaternion0)
+
+
+@jit(nopython=True)
+def _quat_multiply(quaternion1, quaternion0):
     """
     Return multiplication of two quaternions (q1 * q0).
 
@@ -175,16 +183,16 @@ def quat_multiply(quaternion1, quaternion0):
     Returns:
         np.array: (x,y,z,w) multiplied quaternion
     """
-    x0, y0, z0, w0 = quaternion0
-    x1, y1, z1, w1 = quaternion1
-    return np.array(
+    x0, y0, z0, w0 = np.split(quaternion0, 4, axis=-1)
+    x1, y1, z1, w1 = np.split(quaternion1, 4, axis=-1)
+    return np.concatenate(
         (
             x1 * w0 + y1 * z0 - z1 * y0 + w1 * x0,
             -x1 * z0 + y1 * w0 + z1 * x0 + w1 * y0,
             x1 * y0 - y1 * x0 + z1 * w0 + w1 * z0,
             -x1 * x0 - y1 * y0 - z1 * z0 + w1 * w0,
         ),
-        dtype=np.float32,
+        axis=-1,
     )
 
 
@@ -204,10 +212,9 @@ def quat_conjugate(quaternion):
     Returns:
         np.array: (x,y,z,w) quaternion conjugate
     """
-    return np.array(
-        (-quaternion[0], -quaternion[1], -quaternion[2], quaternion[3]),
-        dtype=np.float32,
-    )
+    n_dims = len(quaternion.shape)
+    # Reshape to explicitly handle batched calls
+    return quaternion * np.array([-1.0, -1.0, -1.0, 1.0], dtype=np.float32).reshape([1] * (n_dims - 1) + [4])
 
 
 def quat_inverse(quaternion):
@@ -226,7 +233,7 @@ def quat_inverse(quaternion):
     Returns:
         np.array: (x,y,z,w) quaternion inverse
     """
-    return quat_conjugate(quaternion) / np.dot(quaternion, quaternion)
+    return quat_conjugate(quaternion) / np.sum(quaternion * quaternion, axis=-1, keepdims=True)
 
 
 def quat_distance(quaternion1, quaternion0):
@@ -526,7 +533,7 @@ def vec2quat(vec, up=(0, 0, 1.0)):
 
 def euler2quat(euler):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -542,7 +549,7 @@ def euler2quat(euler):
 
 def quat2euler(quat):
     """
-    Converts euler angles into quaternion form
+    Converts extrinsic euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
@@ -558,7 +565,7 @@ def quat2euler(quat):
 
 def euler2mat(euler):
     """
-    Converts euler angles into rotation matrix form
+    Converts extrinsic euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
@@ -578,13 +585,13 @@ def euler2mat(euler):
 
 def mat2euler(rmat):
     """
-    Converts given rotation matrix to euler angles in radian.
+    Converts given rotation matrix to extrinsic euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
 
     Returns:
-        np.array: (r,p,y) converted euler angles in radian vec3 float
+        np.array: (r,p,y) converted extrinsic euler angles in radian vec3 float
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
     return R.from_matrix(M).as_euler("xyz")
@@ -1134,29 +1141,8 @@ def align_vector_sets(vec_set1, vec_set2):
     Returns:
         np.array: (4,) Normalized quaternion representing the overall rotation
     """
-    # Compute the cross-covariance matrix
-    H = vec_set2.T @ vec_set1
-
-    # Compute the elements for the quaternion
-    trace = H.trace()
-    w = trace + 1
-    x = H[1, 2] - H[2, 1]
-    y = H[2, 0] - H[0, 2]
-    z = H[0, 1] - H[1, 0]
-
-    # Construct the quaternion
-    quat = np.stack([x, y, z, w])
-
-    # Handle the case where w is close to zero
-    if quat[3] < 1e-4:
-        quat[3] = 0
-        max_idx = np.argmax(quat[:3].abs()) + 1
-        quat[max_idx] = 1
-
-    # Normalize the quaternion
-    quat = quat / (np.linalg.norm(quat) + 1e-8)  # Add epsilon to avoid division by zero
-
-    return quat
+    rot, _ = R.align_vectors(vec_set1, vec_set2)
+    return rot.as_quat()
 
 
 def l2_distance(v1, v2):
@@ -1297,3 +1283,63 @@ def orientation_error(desired, current):
     error = error.reshape(*input_shape, 3)
 
     return error
+
+
+def delta_rotation_matrix(omega, delta_t):
+    """
+    Compute the delta rotation matrix given angular velocity and time elapsed.
+
+    Arguments:
+        omega (np.array): Angular velocity vector [omega_x, omega_y, omega_z].
+        delta_t (float): Time elapsed.
+
+    Returns:
+        np.array: 3x3 Delta rotation matrix.
+    """
+    # Magnitude of angular velocity (angular speed)
+    omega_magnitude = np.linalg.norm(omega)
+
+    # If angular speed is zero, return identity matrix
+    if omega_magnitude == 0:
+        return np.eye(3)
+
+    # Rotation angle
+    theta = omega_magnitude * delta_t
+
+    # Normalized axis of rotation
+    axis = omega / omega_magnitude
+
+    # Skew-symmetric matrix K
+    u_x, u_y, u_z = axis
+    K = np.array([[0, -u_z, u_y], [u_z, 0, -u_x], [-u_y, u_x, 0]])
+
+    # Rodrigues' rotation formula
+    R = np.eye(3) + np.sin(theta) * K + (1 - np.cos(theta)) * (K @ K)
+
+    return R
+
+
+def mat2euler_intrinsic(rmat):
+    """
+    Converts given rotation matrix to intrinsic euler angles in radian.
+
+    Parameters:
+        rmat (np.array): 3x3 rotation matrix
+
+    Returns:
+        np.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
+    """
+    return R.from_matrix(rmat).as_euler("XYZ")
+
+
+def euler_intrinsic2mat(euler):
+    """
+    Converts intrinsic euler angles into rotation matrix form
+
+    Parameters:
+        euler (np.array): (r,p,y) angles
+
+    Returns:
+        np.array: 3x3 rotation matrix
+    """
+    return R.from_euler("XYZ", euler).as_matrix()

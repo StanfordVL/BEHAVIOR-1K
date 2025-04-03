@@ -1,8 +1,4 @@
 import math
-import os
-import tempfile
-import uuid
-from pathlib import Path
 
 import torch as th
 import trimesh
@@ -19,9 +15,7 @@ from omnigibson.utils.physx_utils import create_physx_particle_system, create_ph
 from omnigibson.utils.python_utils import assert_valid_key, torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import (
-    PoseAPI,
     absolute_prim_path_to_scene_relative,
-    mesh_prim_to_trimesh_mesh,
     scene_relative_prim_path_to_absolute,
 )
 
@@ -31,21 +25,15 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-
-# TODO: Tune these default values!
-# TODO (eric): figure out whether one offset can fit all
-m.MAX_CLOTH_PARTICLES = 20000  # Comes from a limitation in physx - do not increase
 m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
-m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
-m.CLOTH_STRETCH_STIFFNESS = 10000.0
-m.CLOTH_BEND_STIFFNESS = 200.0
-m.CLOTH_SHEAR_STIFFNESS = 100.0
-m.CLOTH_DAMPING = 0.2
+m.CLOTH_STRETCH_STIFFNESS = 100.0
+m.CLOTH_BEND_STIFFNESS = 50.0
+m.CLOTH_SHEAR_STIFFNESS = 70.0
+m.CLOTH_DAMPING = 0.02
 m.CLOTH_FRICTION = 0.4
 m.CLOTH_DRAG = 0.001
 m.CLOTH_LIFT = 0.003
 m.MIN_PARTICLE_CONTACT_OFFSET = 0.005  # Minimum particle contact offset for physical micro particles
-m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE = 0.8  # How much overlap expected between fluid particles at rest
 m.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = None  # If set, the maximum particle velocity for micro particle systems
 
 
@@ -745,9 +733,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def instancer_idns(self):
         """
         Returns:
-            int: Number of active particles in this system
+            list of int: Per-instancer number of active particles in this system
         """
-        return th.tensor([inst.idn for inst in self.particle_instancers.values()])
+        return [inst.idn for inst in self.particle_instancers.values()]
 
     @property
     def self_collision(self):
@@ -1277,8 +1265,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return dict(
             n_instancers=self.n_instancers,
             instancer_idns=self.instancer_idns,
-            instancer_particle_groups=(th.tensor([inst.particle_group for inst in self.particle_instancers.values()])),
-            instancer_particle_counts=(th.tensor([inst.n_particles for inst in self.particle_instancers.values()])),
+            instancer_particle_groups=[inst.particle_group for inst in self.particle_instancers.values()],
+            instancer_particle_counts=[inst.n_particles for inst in self.particle_instancers.values()],
             particle_states=(
                 dict(((name, inst.dump_state(serialized=False)) for name, inst in self.particle_instancers.items()))
             ),
@@ -1288,12 +1276,20 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Synchronize the particle instancers
         self._sync_particle_instancers(
             idns=(
-                state["instancer_idns"].tolist()
+                state["instancer_idns"].int().tolist()
                 if isinstance(state["instancer_idns"], th.Tensor)
                 else state["instancer_idns"]
             ),
-            particle_groups=state["instancer_particle_groups"],
-            particle_counts=state["instancer_particle_counts"],
+            particle_groups=(
+                state["instancer_particle_groups"].int().tolist()
+                if isinstance(state["instancer_particle_groups"], th.Tensor)
+                else state["instancer_particle_groups"]
+            ),
+            particle_counts=(
+                state["instancer_particle_counts"].int().tolist()
+                if isinstance(state["instancer_particle_counts"], th.Tensor)
+                else state["instancer_particle_counts"]
+            ),
         )
 
         # Iterate over all particle states and load their respective states
@@ -1305,9 +1301,9 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return th.cat(
             [
                 th.tensor([state["n_instancers"]]),
-                state["instancer_idns"],
-                state["instancer_particle_groups"],
-                state["instancer_particle_counts"],
+                th.tensor(state["instancer_idns"]),
+                th.tensor(state["instancer_particle_groups"]),
+                th.tensor(state["instancer_particle_counts"]),
                 *[
                     self.particle_instancers[name].serialize(inst_state)
                     for name, inst_state in state["particle_states"].items()
@@ -1325,7 +1321,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             idx += n_instancers
 
         # Syncing is needed so that each particle instancer can further deserialize its own state
-        log.debug(f"Syncing {self.name} particles with {n_instancers} instancers..")
+        log.debug(f"Syncing {self.name} particles with {n_instancers} instancers...")
         self._sync_particle_instancers(
             idns=instancer_info["instancer_idns"],
             particle_groups=instancer_info["instancer_particle_groups"],
@@ -1455,13 +1451,8 @@ class FluidSystem(MicroPhysicalParticleSystem):
     @property
     def particle_radius(self):
         # Magic number from omni tutorials
-        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
+        # See https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#offset-autocomputation
         return 0.99 * 0.6 * self._particle_contact_offset
-
-    @property
-    def particle_particle_rest_distance(self):
-        # Magic number, based on intuition from https://docs.omniverse.nvidia.com/extensions/latest/ext_physics/physics-particles.html#particle-particle-interaction
-        return self.particle_radius * 2.0 * m.FLUID_PARTICLE_PARTICLE_DISTANCE_SCALE
 
     def _create_particle_prototypes(self):
         # Simulate particles with simple spheres
@@ -1649,116 +1640,14 @@ class Cloth(MicroParticleSystem):
         # Override base method since there are no particles to be deleted
         pass
 
-    def clothify_mesh_prim(self, mesh_prim, remesh=True, particle_distance=None):
+    def clothify_mesh_prim(self, mesh_prim):
         """
         Clothifies @mesh_prim by applying the appropriate Cloth API, optionally re-meshing the mesh so that the
         resulting generated particles are roughly @particle_distance apart from each other.
 
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
-            remesh (bool): If True, will remesh the input mesh before converting it into a cloth
-            particle_distance (None or float): If set and @remesh is True, specifies the absolute target distance
-                between generated cloth particles. If None, a value is automatically chosen such that the generated
-                cloth particles are roughly touching each other, given self._particle_contact_offset and
-                @mesh_prim's scale
         """
-        has_uv_mapping = mesh_prim.GetAttribute("primvars:st").Get() is not None
-        if not remesh:
-            # We always load into trimesh to remove redundant particles (since natively omni redundantly represents
-            # the number of vertices as 6x the total unique number of vertices)
-            tm = mesh_prim_to_trimesh_mesh(
-                mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=False
-            )
-            texcoord = (
-                vtarray_to_torch(mesh_prim.GetAttribute("primvars:st").Get(), dtype=th.float32)
-                if has_uv_mapping
-                else None
-            )
-        else:
-            # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
-            # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
-            scaled_world_transform = PoseAPI.get_world_pose_with_scale(mesh_prim.GetPath().pathString)
-            # Convert to trimesh mesh (in world frame)
-            tm = mesh_prim_to_trimesh_mesh(
-                mesh_prim=mesh_prim, include_normals=True, include_texcoord=True, world_frame=True
-            )
-            # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
-            tmp_name = str(uuid.uuid4())
-            tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
-            tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
-            Path(tmp_dir).mkdir(parents=True, exist_ok=True)
-            tm.export(tmp_fpath)
-
-            # Start with the default particle distance
-            particle_distance = (
-                self._particle_contact_offset * 2 / 1.5 if particle_distance is None else particle_distance
-            )
-
-            # Repetitively re-mesh at lower resolution until we have a mesh that has less than MAX_CLOTH_PARTICLES vertices
-            import pymeshlab  # We import this here because it takes a few seconds to load.
-
-            for _ in range(10):
-                ms = pymeshlab.MeshSet()
-                ms.load_new_mesh(tmp_fpath)
-
-                # Re-mesh based on @particle_distance - distance chosen such that at rest particles should be just touching
-                # each other. The 1.5 magic number comes from the particle cloth demo from omni
-                # Note that this means that the particles will overlap with each other, since at dist = 2 * contact_offset
-                # the particles are just touching each other at rest
-
-                avg_edge_percentage_mismatch = 1.0
-                # Loop re-meshing until average edge percentage is within error threshold or we reach the max number of tries
-                for _ in range(5):
-                    if avg_edge_percentage_mismatch <= m.CLOTH_REMESHING_ERROR_THRESHOLD:
-                        break
-
-                    ms.meshing_isotropic_explicit_remeshing(
-                        iterations=5, adaptive=True, targetlen=pymeshlab.AbsoluteValue(particle_distance)
-                    )
-                    avg_edge_percentage_mismatch = abs(
-                        1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"]
-                    )
-                else:
-                    # Terminate anyways, but don't fail
-                    log.warning("The generated cloth may not have evenly distributed particles.")
-
-                # Check if we have too many vertices
-                cm = ms.current_mesh()
-                if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
-                    # We have too many vertices, so we will re-mesh again
-                    particle_distance *= math.sqrt(2)  # halve the number of vertices
-                    log.warning(
-                        f"Too many vertices ({cm.vertex_number()})! Re-meshing with particle distance {particle_distance}..."
-                    )
-                else:
-                    break
-            else:
-                raise ValueError(
-                    f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!"
-                )
-
-            # Re-write data to @mesh_prim
-            new_faces = cm.face_matrix()
-            new_vertices = cm.vertex_matrix()
-            new_normals = cm.vertex_normal_matrix()
-            texcoord = cm.wedge_tex_coord_matrix() if has_uv_mapping else None
-            tm = trimesh.Trimesh(
-                vertices=new_vertices,
-                faces=new_faces,
-                vertex_normals=new_normals,
-            )
-            # Apply the inverse of the world transform to get the mesh back into its local frame
-            tm.apply_transform(th.linalg.inv_ex(scaled_world_transform).inverse)
-
-        # Update the mesh prim
-        face_vertex_counts = th.tensor([len(face) for face in tm.faces], dtype=int).cpu().numpy()
-        mesh_prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
-        mesh_prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertices))
-        mesh_prim.GetAttribute("faceVertexIndices").Set(tm.faces.flatten())
-        mesh_prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(tm.vertex_normals))
-        if has_uv_mapping:
-            mesh_prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(texcoord))
-
         # Convert into particle cloth
         lazy.omni.physx.scripts.particleUtils.add_physx_particle_cloth(
             stage=og.sim.stage,

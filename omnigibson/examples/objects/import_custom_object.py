@@ -2,6 +2,7 @@
 Helper script to download OmniGibson dataset and assets.
 Improved version that can import obj file and articulated file (glb, gltf).
 """
+
 from typing import Literal
 import click
 import trimesh
@@ -17,6 +18,7 @@ from omnigibson.utils.asset_conversion_utils import (
     generate_urdf_for_mesh,
 )
 
+
 @click.command()
 @click.option(
     "--asset-path",
@@ -24,12 +26,7 @@ from omnigibson.utils.asset_conversion_utils import (
     type=click.Path(exists=True, dir_okay=False),
     help="Absolute path to asset file to import. This can be a raw visual mesh (for single-bodied, static objects), e.g. .obj, .glb, etc., or a more complex (such as articulated) objects defined in .urdf format.",
 )
-@click.option(
-    "--category", 
-    required=True, 
-    type=click.STRING, 
-    help="Category name to assign to the imported asset"
-)
+@click.option("--category", required=True, type=click.STRING, help="Category name to assign to the imported asset")
 @click.option(
     "--model",
     required=True,
@@ -48,45 +45,13 @@ from omnigibson.utils.asset_conversion_utils import (
     default=32,
     help="Maximum number of convex hulls to decompose individual visual meshes into. Only relevant if --collision-method=coacd",
 )
-@click.option(
-    "--up-axis", 
-    type=click.Choice(["z", "y"]), 
-    default="z", 
-    help="Up axis for the mesh."
-)
-@click.option(
-    "--headless", 
-    is_flag=True, 
-    help="Run the script in headless mode."
-)
-@click.option(
-    "--scale", 
-    type=int, 
-    default = 1, 
-    help="User choice scale, will be overwritten if check_scale and rescale"
-)
-@click.option(
-    "--check_scale", 
-    is_flag=True, 
-    help="Check meshes scale based on heuristic"
-)
-@click.option(
-    "--rescale", 
-    is_flag=True, 
-    help="Rescale meshes based on heuristic if check_scale "
-)
-@click.option(
-    "--overwrite", 
-    is_flag=True, 
-    help="Overwrite any pre-existing files"
-)
-@click.option(
-    "--n_submesh", 
-    type=int, 
-    help="Maximum of submesh numnber"
-)
-
-
+@click.option("--up-axis", type=click.Choice(["z", "y"]), default="z", help="Up axis for the mesh.")
+@click.option("--headless", is_flag=True, help="Run the script in headless mode.")
+@click.option("--scale", type=int, default=1, help="User choice scale, will be overwritten if check_scale and rescale")
+@click.option("--check_scale", is_flag=True, help="Check meshes scale based on heuristic")
+@click.option("--rescale", is_flag=True, help="Rescale meshes based on heuristic if check_scale ")
+@click.option("--overwrite", is_flag=True, help="Overwrite any pre-existing files")
+@click.option("--n_submesh", type=int, help="Maximum of submesh numnber")
 def import_custom_object(
     asset_path: str,
     category: str,
@@ -99,13 +64,13 @@ def import_custom_object(
     check_scale: bool,
     rescale: bool,
     overwrite: bool,
-    n_submesh: int
+    n_submesh: int,
 ):
     """
     Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
     files to the custom dataset directory (gm.CUSTOM_DATASET_PATH)
     """
-        
+
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."
     collision_method = None if collision_method == "none" else collision_method
 
@@ -160,7 +125,7 @@ def import_custom_object(
             overwrite=overwrite,
             use_usda=False,
         )
-        
+
     except Exception as e:
         click.echo(f"Error during USD conversion: {str(e)}")
         # Clean up temp directories before exiting

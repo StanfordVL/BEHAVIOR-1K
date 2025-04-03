@@ -20,7 +20,7 @@ from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
@@ -519,11 +519,7 @@ class GripperRigidContactAPIImpl(RigidContactAPIImpl):
 
     @classmethod
     def get_max_contact_data_count(cls):
-        # 4x per finger link, to be safe.
-        # 4 here is not the finger count, it's the number of items we will record contacts with, per finger.
-        # e.g. it's N such that if the finger is touching more than N items at once, only the first N are recorded.
-        # This number should very rarely go above 4.
-        return len(cls.get_column_filters()[0]) * 4
+        return len(cls.get_column_filters()[0]) * 128
 
 
 # Instantiate the GripperRigidContactAPI
@@ -850,9 +846,44 @@ class BatchControlViewAPIImpl:
         # Mapping from prim path to base footprint link name if one exists, None if the root is the base link.
         self._base_footprint_link_names = {}
 
-    def clear(self):
+        # Prior link transforms / dof positions for estimating velocities since Omni gives inaccurate values
+        self._last_state = None
+
+    def post_physics_step(self):
+        # Should be called every sim physics step, right after a new physics step occurs
+        # The current poses (if it exists) are now the former poses from the previous timestep
+        # These values are needed to compute velocity estimates
+        if (
+            "root_transforms" in self._read_cache
+            and "link_transforms" in self._read_cache
+            and "dof_positions" in self._read_cache
+        ):
+            self._last_state = {
+                "root_transforms": cb.copy(self._read_cache["root_transforms"]),
+                "link_transforms": cb.copy(self._read_cache["link_transforms"]),
+                "dof_positions": cb.copy(self._read_cache["dof_positions"]),
+            }
+        else:
+            # We don't have enough info to populate the history, so simply clear it instead
+            self._last_state = None
+
+        # Clear the internal data since everything is outdated
+        self.clear(keep_last_pose=True)
+
+    def clear(self, keep_last_pose=False):
         self._read_cache = {}
         self._write_idx_cache = collections.defaultdict(set)
+
+        # Clear our last timestep's cached values by default
+        if not keep_last_pose:
+            self._last_state = None
+
+        # Cache the (now current) transforms so that they're guaranteed to exist throughout the duration of this
+        # timestep, and available for caching during the next timestep's post_physics_step() call
+        if og.sim.is_playing():
+            self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
+            self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+            self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
 
     def _set_dof_position_targets(self, data, indices, cast=True):
         # No casting results in better efficiency
@@ -1004,27 +1035,32 @@ class BatchControlViewAPIImpl:
         else:
             return self.get_root_transform(prim_path)
 
-    def _get_velocities(self, prim_path):
+    def _get_velocities(self, prim_path, estimate=False):
         if self._base_footprint_link_names[prim_path] is not None:
             link_name = self._base_footprint_link_names[prim_path]
-            return self._get_link_velocities(prim_path, link_name)
+            return self._get_link_velocities(prim_path, link_name, estimate=estimate)
         else:
-            return self._get_root_velocities(prim_path)
+            return self._get_root_velocities(prim_path, estimate=estimate)
 
-    def _get_relative_velocities(self, prim_path):
-        if "relative_velocities" not in self._read_cache:
-            self._read_cache["relative_velocities"] = {}
+    def _get_relative_velocities(self, prim_path, estimate=False):
+        vel_str = "velocities_estimate" if estimate else "velocities"
 
-        if prim_path not in self._read_cache["relative_velocities"]:
+        if f"relative_{vel_str}" not in self._read_cache:
+            self._read_cache[f"relative_{vel_str}"] = {}
+
+        if prim_path not in self._read_cache[f"relative_{vel_str}"]:
             # Compute all tfs at once, including base as well as all links
-            if "link_velocities" not in self._read_cache:
-                self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
-
             idx = self._idx[prim_path]
+            if f"link_{vel_str}" not in self._read_cache:
+                # Force the internal cache to update
+                self._get_link_velocities(
+                    prim_path=prim_path, link_name=next(iter(self._link_idx[idx].keys())), estimate=estimate
+                )
+
             vels = cb.zeros((len(self._link_idx[idx]) + 1, 6, 1))
             # base vel is the final -1 index
-            vels[:-1, :, 0] = self._read_cache["link_velocities"][idx, :]
-            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path)
+            vels[:-1, :, 0] = self._read_cache[f"link_{vel_str}"][idx, :]
+            vels[-1, :, 0] = self._get_velocities(prim_path=prim_path, estimate=estimate)
 
             tf = cb.zeros((1, 6, 6))
             orn_t = cb.T.quat2mat(self.get_position_orientation(prim_path)[1]).T
@@ -1032,30 +1068,48 @@ class BatchControlViewAPIImpl:
             tf[0, 3:, 3:] = orn_t
             # x.T --> transpose (inverse) orientation
             # (1, 6, 6) @ (n_links, 6, 1) -> (n_links, 6, 1) -> (n_links, 6)
-            self._read_cache["relative_velocities"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
+            self._read_cache[f"relative_{vel_str}"][prim_path] = cb.squeeze(tf @ vels, dim=-1)
 
-        return self._read_cache["relative_velocities"][prim_path]
+        return self._read_cache[f"relative_{vel_str}"][prim_path]
 
-    def get_linear_velocity(self, prim_path):
-        return self._get_velocities(prim_path)[:3]
+    def get_linear_velocity(self, prim_path, estimate=False):
+        return self._get_velocities(prim_path, estimate=estimate)[:3]
 
-    def get_angular_velocity(self, prim_path):
-        return self._get_velocities(prim_path)[3:]
+    def get_angular_velocity(self, prim_path, estimate=False):
+        return self._get_velocities(prim_path, estimate=estimate)[3:]
 
-    def _get_root_velocities(self, prim_path):
-        if "root_velocities" not in self._read_cache:
-            self._read_cache["root_velocities"] = cb.from_torch(self._view.get_root_velocities())
+    def _get_root_velocities(self, prim_path, estimate=False):
+        vel_str = "velocities_estimate" if estimate else "velocities"
+
+        # Use estimated calculation if requested and we have prior history info
+        if f"root_{vel_str}" not in self._read_cache:
+            if estimate and self._last_state is not None:
+                # Compute root velocities estimate as delta between prior timestep and current timestep
+                vels = cb.zeros((self._last_state["root_transforms"].shape[0], 6))
+
+                if "root_transforms" not in self._read_cache:
+                    self._read_cache["root_transforms"] = cb.from_torch(self._view.get_root_transforms())
+
+                vels[:, :3] = self._read_cache["root_transforms"][:, :3] - self._last_state["root_transforms"][:, :3]
+                vels[:, 3:] = cb.T.quat2axisangle(
+                    cb.T.quat_distance(
+                        self._read_cache["root_transforms"][:, 3:], self._last_state["root_transforms"][:, 3:]
+                    )
+                )
+                self._read_cache[f"root_{vel_str}"] = vels / og.sim.get_physics_dt()
+            else:
+                self._read_cache[f"root_{vel_str}"] = cb.from_torch(self._view.get_root_velocities())
 
         idx = self._idx[prim_path]
-        return self._read_cache["root_velocities"][idx]
+        return self._read_cache[f"root_{vel_str}"][idx]
 
-    def get_relative_linear_velocity(self, prim_path):
+    def get_relative_linear_velocity(self, prim_path, estimate=False):
         # base corresponds to final index
-        return self._get_relative_velocities(prim_path)[-1, :3]
+        return self._get_relative_velocities(prim_path, estimate=estimate)[-1, :3]
 
-    def get_relative_angular_velocity(self, prim_path):
+    def get_relative_angular_velocity(self, prim_path, estimate=False):
         # base corresponds to final index
-        return self._get_relative_velocities(prim_path)[-1, 3:]
+        return self._get_relative_velocities(prim_path, estimate=estimate)[-1, 3:]
 
     def get_joint_positions(self, prim_path):
         if "dof_positions" not in self._read_cache:
@@ -1064,12 +1118,22 @@ class BatchControlViewAPIImpl:
         idx = self._idx[prim_path]
         return self._read_cache["dof_positions"][idx]
 
-    def get_joint_velocities(self, prim_path):
-        if "dof_velocities" not in self._read_cache:
-            self._read_cache["dof_velocities"] = cb.from_torch(self._view.get_dof_velocities())
+    def get_joint_velocities(self, prim_path, estimate=False):
+        vel_str = "velocities_estimate" if estimate else "velocities"
+
+        # Use estimated calculation if requested and we have prior history info
+        if f"dof_{vel_str}" not in self._read_cache:
+            if estimate and self._last_state is not None:
+                if "dof_positions" not in self._read_cache:
+                    self._read_cache["dof_positions"] = cb.from_torch(self._view.get_dof_positions())
+                self._read_cache[f"dof_{vel_str}"] = (
+                    self._read_cache["dof_positions"] - self._last_state["dof_positions"]
+                ) / og.sim.get_physics_dt()
+            else:
+                self._read_cache[f"dof_{vel_str}"] = cb.from_torch(self._view.get_dof_velocities())
 
         idx = self._idx[prim_path]
-        return self._read_cache["dof_velocities"][idx]
+        return self._read_cache[f"dof_{vel_str}"][idx]
 
     def get_joint_efforts(self, prim_path):
         if "dof_projected_joint_forces" not in self._read_cache:
@@ -1135,31 +1199,58 @@ class BatchControlViewAPIImpl:
         rel_pose = self._get_relative_poses(prim_path)[link_idx]
         return rel_pose[:3], rel_pose[3:]
 
-    def _get_link_velocities(self, prim_path, link_name):
-        if "link_velocities" not in self._read_cache:
-            self._read_cache["link_velocities"] = cb.from_torch(self._view.get_link_velocities())
+    def _get_link_velocities(self, prim_path, link_name, estimate=False):
+        vel_str = "velocities_estimate" if estimate else "velocities"
+
+        # Use estimated calculation if requested and we have prior history info
+        if f"link_{vel_str}" not in self._read_cache:
+            if estimate and self._last_state is not None:
+                # Compute link velocities estimate as delta between prior timestep and current timestep
+                N, L, _ = self._last_state["link_transforms"].shape
+                vels = cb.zeros((N, L, 6))
+
+                if "link_transforms" not in self._read_cache:
+                    self._read_cache["link_transforms"] = cb.from_torch(self._view.get_link_transforms())
+
+                vels[:, :, :3] = (
+                    self._read_cache["link_transforms"][:, :, :3] - self._last_state["link_transforms"][:, :, :3]
+                )
+                vels[:, :, 3:] = cb.view(
+                    cb.T.quat2axisangle(
+                        cb.T.quat_distance(
+                            cb.view(self._read_cache["link_transforms"][:, :, 3:], (-1, 4)),
+                            cb.view(self._last_state["link_transforms"][:, :, 3:], (-1, 4)),
+                        )
+                    ),
+                    (N, L, 3),
+                )
+                self._read_cache[f"link_{vel_str}"] = vels / og.sim.get_physics_dt()
+
+            # Otherwise, directly grab velocities
+            else:
+                self._read_cache[f"link_{vel_str}"] = cb.from_torch(self._view.get_link_velocities())
 
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        vel = self._read_cache["link_velocities"][idx, link_idx]
+        vel = self._read_cache[f"link_{vel_str}"][idx, link_idx]
 
         return vel
 
-    def get_link_linear_velocity(self, prim_path, link_name):
-        return self._get_link_velocities(prim_path, link_name)[:3]
+    def get_link_linear_velocity(self, prim_path, link_name, estimate=False):
+        return self._get_link_velocities(prim_path, link_name, estimate=estimate)[:3]
 
-    def get_link_relative_linear_velocity(self, prim_path, link_name):
+    def get_link_relative_linear_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        return self._get_relative_velocities(prim_path)[link_idx, :3]
+        return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, :3]
 
-    def get_link_angular_velocity(self, prim_path, link_name):
-        return self._get_link_velocities(prim_path, link_name)[3:]
+    def get_link_angular_velocity(self, prim_path, link_name, estimate=False):
+        return self._get_link_velocities(prim_path, link_name, estimate=estimate)[3:]
 
-    def get_link_relative_angular_velocity(self, prim_path, link_name):
+    def get_link_relative_angular_velocity(self, prim_path, link_name, estimate=False):
         idx = self._idx[prim_path]
         link_idx = self._link_idx[idx][link_name]
-        return self._get_relative_velocities(prim_path)[link_idx, 3:]
+        return self._get_relative_velocities(prim_path, estimate=estimate)[link_idx, 3:]
 
     def get_jacobian(self, prim_path):
         if "jacobians" not in self._read_cache:
@@ -1207,9 +1298,19 @@ class ControllableObjectViewAPI:
     _VIEWS_BY_PATTERN = {}
 
     @classmethod
+    def post_physics_step(cls):
+        for view in cls._VIEWS_BY_PATTERN.values():
+            view.post_physics_step()
+
+    @classmethod
     def clear(cls):
         for view in cls._VIEWS_BY_PATTERN.values():
             view.clear()
+
+    @classmethod
+    def clear_object(cls, prim_path):
+        if cls._get_pattern_from_prim_path(prim_path) in cls._VIEWS_BY_PATTERN:
+            cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].clear()
 
     @classmethod
     def flush_control(cls):
@@ -1302,21 +1403,28 @@ class ControllableObjectViewAPI:
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_root_transform(prim_path)
 
     @classmethod
-    def get_linear_velocity(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(prim_path)
+    def get_linear_velocity(cls, prim_path, estimate=False):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_linear_velocity(
+            prim_path, estimate=estimate
+        )
 
     @classmethod
-    def get_angular_velocity(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(prim_path)
+    def get_angular_velocity(cls, prim_path, estimate=False):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_angular_velocity(
+            prim_path, estimate=estimate
+        )
 
     @classmethod
-    def get_relative_linear_velocity(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(prim_path)
+    def get_relative_linear_velocity(cls, prim_path, estimate=False):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_linear_velocity(
+            prim_path, estimate=estimate
+        )
 
     @classmethod
-    def get_relative_angular_velocity(cls, prim_path):
+    def get_relative_angular_velocity(cls, prim_path, estimate=False):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_relative_angular_velocity(
-            prim_path
+            prim_path,
+            estimate=estimate,
         )
 
     @classmethod
@@ -1324,8 +1432,10 @@ class ControllableObjectViewAPI:
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_positions(prim_path)
 
     @classmethod
-    def get_joint_velocities(cls, prim_path):
-        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(prim_path)
+    def get_joint_velocities(cls, prim_path, estimate=False):
+        return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_joint_velocities(
+            prim_path, estimate=estimate
+        )
 
     @classmethod
     def get_joint_efforts(cls, prim_path):
@@ -1360,15 +1470,19 @@ class ControllableObjectViewAPI:
         )
 
     @classmethod
-    def get_link_relative_linear_velocity(cls, prim_path, link_name):
+    def get_link_relative_linear_velocity(cls, prim_path, link_name, estimate=False):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_linear_velocity(
-            prim_path, link_name
+            prim_path,
+            link_name,
+            estimate=estimate,
         )
 
     @classmethod
-    def get_link_relative_angular_velocity(cls, prim_path, link_name):
+    def get_link_relative_angular_velocity(cls, prim_path, link_name, estimate=False):
         return cls._VIEWS_BY_PATTERN[cls._get_pattern_from_prim_path(prim_path)].get_link_relative_angular_velocity(
-            prim_path, link_name
+            prim_path,
+            link_name,
+            estimate=estimate,
         )
 
     @classmethod
@@ -1878,7 +1992,7 @@ def delete_or_deactivate_prim(prim_path):
     return True
 
 
-@th.compile
+@torch_compile
 def _compute_relative_poses_torch(
     idx: int,
     n_links: int,

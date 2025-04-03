@@ -32,13 +32,43 @@ scene:
 
 robots:
   - type: Tiago
-    obs_modalities: [rgb, depth, seg_semantic, normal, seg_instance, seg_instance_id]
+    obs_modalities: [rgb]
+    include_sensor_names: null
+    exclude_sensor_names: null
     scale: 1.0
     self_collisions: true
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    default_arm_pose: vertical
+    reset_joint_pos: [
+      0.0000,
+      0.0000,
+      -0.0000,
+      -0.0000,
+      -0.0000,
+      -0.0000,
+      0.3500,
+      0.9052,
+      0.9052,
+      0.0000,
+      -0.4281,
+      -0.4281,
+      -0.4500,
+      2.2350,
+      2.2350,
+      1.6463,
+      1.6463,
+      0.7687,
+      0.7687,
+      -0.7946,
+      -0.7946,
+      -1.0891,
+      -1.0891,
+      0.0450,
+      0.0450,
+      0.0450,
+      0.0450,
+    ]
     sensor_config:
       VisionSensor:
         sensor_kwargs:
@@ -46,37 +76,46 @@ robots:
           image_width: 128
     controller_config:
       base:
-        name: JointController
-      trunk:
-        name: JointController
-      arm_left:
-        name: JointController
-        subsume_controllers: [trunk]
+        name: HolonomicBaseJointController
         motor_type: position
         command_input_limits: null
-        command_output_limits: null
+        use_impedances: false
+      trunk:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
         use_delta_commands: false
+        use_impedances: false
+      arm_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
+        use_impedances: False
       arm_right:
         name: JointController
         motor_type: position
         command_input_limits: null
-        command_output_limits: null
         use_delta_commands: false
+        use_impedances: false
       gripper_left:
         name: JointController
         motor_type: position
-        command_input_limits: [-1, 1]
-        command_output_limits: null
+        command_input_limits: null
         use_delta_commands: false
+        use_impedances: false
       gripper_right:
         name: JointController
         motor_type: position
-        command_input_limits: [-1, 1]
-        command_output_limits: null
+        command_input_limits: null
         use_delta_commands: false
+        use_impedances: false
       camera:
         name: JointController
-
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: false
+        use_impedances: false
 objects: []
 
 task:

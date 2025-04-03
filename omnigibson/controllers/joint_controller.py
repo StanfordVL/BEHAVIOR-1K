@@ -13,8 +13,8 @@ from omnigibson.controllers import (
 )
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.backend_utils import _ComputeBackend, _ComputeNumpyBackend, _ComputeTorchBackend
-from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.backend_utils import add_compute_function
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -46,6 +46,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        isaac_kp=None,
+        isaac_kd=None,
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
@@ -78,6 +80,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 then all inputted command values will be scaled from the input range to the output range.
                 If either is None, no scaling will be used. If "default", then this range will automatically be set
                 to the @control_limits entry corresponding to self.control_type
+            isaac_kp (None or float or Array[float]): If specified, stiffness gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers.
+                Should only be nonzero if self.control_type is position
+            isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
+                isaac DOFs. Can either be a single number or a per-DOF set of numbers
+                Should only be nonzero if self.control_type is position or velocity
             pos_kp (None or float): If @motor_type is "position" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
             pos_damping_ratio (None or float): If @motor_type is "position" and @use_impedances=True, this is the
@@ -141,6 +149,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
+            isaac_kp=isaac_kp,
+            isaac_kd=isaac_kd,
         )
 
     def _generate_default_command_output_limits(self):
@@ -223,7 +233,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             else:  # effort
                 u = target
 
-            u = cb.compute_joint_torques(u, control_dict["mass_matrix"], self.dof_idx)
+            u = cb.get_custom_method("compute_joint_torques")(u, control_dict["mass_matrix"], self.dof_idx)
 
             # Add gravity compensation
             if self._use_gravity_compensation:
@@ -297,7 +307,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return len(self.dof_idx)
 
 
-@th.compile
+@torch_compile
 def _compute_joint_torques_torch(
     u: th.Tensor,
     mm: th.Tensor,
@@ -341,6 +351,6 @@ def _compute_joint_torques_numpy(
 
 
 # Set these as part of the backend values
-setattr(_ComputeBackend, "compute_joint_torques", None)
-setattr(_ComputeTorchBackend, "compute_joint_torques", _compute_joint_torques_torch)
-setattr(_ComputeNumpyBackend, "compute_joint_torques", _compute_joint_torques_numpy)
+add_compute_function(
+    name="compute_joint_torques", np_function=_compute_joint_torques_numpy, th_function=_compute_joint_torques_torch
+)
