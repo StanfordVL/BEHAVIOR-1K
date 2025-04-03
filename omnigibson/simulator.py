@@ -384,6 +384,8 @@ def _launch_simulator(*args, **kwargs):
             # Create world prim
             self.stage.DefinePrim("/World", "Xform")
 
+            # Cycle play / stop to validate sim.psi object to avoid getPhysXSceneStatistics errors
+            self.play()
             self.stop()
 
             for state in self.object_state_types_requiring_update:

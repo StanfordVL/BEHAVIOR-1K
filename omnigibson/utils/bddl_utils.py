@@ -1072,7 +1072,7 @@ class BDDLSampler:
                 # Filter based on white / blacklist
                 if synset_whitelist is not None:
                     valid_models = {
-                        cat: models.intersection(set(synset_whitelist[cat])) if cat in synset_whitelist else models
+                        cat: models.intersection(set(synset_whitelist[cat])) if cat in synset_whitelist else set()
                         for cat, models in valid_models.items()
                     }
 
@@ -1349,6 +1349,12 @@ class BDDLSampler:
         dependencies = {key: self._attached_objects.get(key, {}) for key in self._object_instance_to_synset.keys()}
         for obj_inst in list(reversed(list(nx.algorithms.topological_sort(nx.DiGraph(dependencies))))):
             obj_synset = self._object_instance_to_synset[obj_inst]
+            synset_whitelist = (
+                None if self._sampling_whitelist is None else self._sampling_whitelist.get(obj_synset, None)
+            )
+            synset_blacklist = (
+                None if self._sampling_blacklist is None else self._sampling_blacklist.get(obj_synset, None)
+            )
 
             # Don't populate agent
             if obj_synset == "agent.n.01":
@@ -1400,6 +1406,17 @@ class BDDLSampler:
                     )
                     model_choices -= BAD_CLOTH_MODELS.get(category, set())
                     model_choices = self._filter_model_choices_by_attached_states(model_choices, category, obj_inst)
+
+                    # Filter based on white / blacklist
+                    if synset_whitelist is not None:
+                        model_choices = model_choices.intersection(set(synset_whitelist[category])) \
+                            if category in synset_whitelist else set()
+
+                    if synset_blacklist is not None:
+                        model_choices = model_choices - set(synset_whitelist[category]) \
+                            if category in synset_blacklist else model_choices
+
+                    # Filter by category
                     if len(model_choices) > 0:
                         break
 
