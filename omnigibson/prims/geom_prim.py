@@ -460,8 +460,10 @@ class VisualGeomPrim(GeomPrim):
         # run super first
         super()._post_load()
 
-        # Make sure mesh is visible by default
-        self.purpose = "default"
+        # TODO: tmp fix for visible fillable volume
+        if "fillable" not in self.name:
+            # Make sure mesh is visible by default
+            self.purpose = "default"
 
 
 class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
