@@ -26,6 +26,18 @@ import numpy as np
 import random
 
 
+TASK_CUSTOM_LISTS = {
+    ("picking_up_trash", "Rs_int"): {
+        "whitelist": {
+            "pad.n.01": {
+                "sticky_note": ["tghqep"],
+            }
+        },
+        "blacklist": None,
+    }
+}
+
+
 # TODO:
 # 1. Set boundingCube approximation earlier (maybe right after importing the scene objects). Otherwise after loading the robot, we will elapse one physics step
 # 2. Enable transition rule and refresh all rules before online validation
@@ -232,6 +244,14 @@ def main(random_selection=False, headless=False, short_exec=False):
             reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
         env.task_config["activity_name"] = activity
+        activity_scene_combo = (activity, args.scene_model)
+        if activity_scene_combo in TASK_CUSTOM_LISTS:
+            whitelist = TASK_CUSTOM_LISTS[activity_scene_combo]["whitelist"]
+            blacklist = TASK_CUSTOM_LISTS[activity_scene_combo]["blacklist"]
+        else:
+            whitelist, blacklist = None, None
+        env.task_config["sampling_whitelist"] = whitelist
+        env.task_config["sampling_blacklist"] = blacklist
         scene_instance = BehaviorTask.get_cached_activity_scene_filename(
             scene_model=args.scene_model,
             activity_name=activity,
