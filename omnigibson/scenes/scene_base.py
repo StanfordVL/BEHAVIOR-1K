@@ -355,14 +355,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         )
 
         # Now load the objects with their own logic
-        for obj_name, obj in self._init_objs.items():
-            # Import into the simulator
-            self.add_object(obj)
-            # Set the init pose accordingly
-            obj.set_position_orientation(
-                position=self._init_state[obj_name]["root_link"]["pos"],
-                orientation=self._init_state[obj_name]["root_link"]["ori"],
-            )
+        with og.sim.adding_objects(objs=self._init_objs.values()):
+            for obj_name, obj in self._init_objs.items():
+                # Import into the simulator
+                self.add_object(obj, _batched_call=True)
+                # Set the init pose accordingly
+                obj.set_position_orientation(
+                    position=self._init_state[obj_name]["root_link"]["pos"],
+                    orientation=self._init_state[obj_name]["root_link"]["ori"],
+                )
 
         # Position the scene prim based on the last scene's right edge
         if self.idx != 0:
