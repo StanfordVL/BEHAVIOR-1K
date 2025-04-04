@@ -97,7 +97,7 @@ def import_custom_object(
             check_scale=check_scale,
             rescale=rescale,
             overwrite=overwrite,
-            n_submesh=n_submesh
+            n_submesh=n_submesh,
         )
         if urdf_path is not None:
             click.echo("URDF generation complete!")
@@ -145,6 +145,7 @@ def import_custom_object(
             if select.select([sys.stdin], [], [], 0)[0]:
                 sys.stdin.readline()  # Clear the input buffer
                 break
+
 
 if __name__ == "__main__":
     import_custom_object()
