@@ -1814,7 +1814,7 @@ def generate_collision_meshes(
         hull_count (int): If @method="coacd", this sets the max number of hulls to generate
         discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
             that are not proper volumes
-        error_handling: If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead 
+        error_handling: If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead
 
     Returns:
         List[trimesh.Trimesh]: The collision meshes.
@@ -1843,7 +1843,12 @@ def generate_collision_meshes(
             result_path = tempfile.mktemp(suffix=".pkl")
 
             # Run subprocess with clean file paths
-            success = subprocess.call([sys.executable, os.path.join(os.path.dirname(__file__), "coacd_runner.py"), data_path, result_path]) == 0
+            success = (
+                subprocess.call(
+                    [sys.executable, os.path.join(os.path.dirname(__file__), "coacd_runner.py"), data_path, result_path]
+                )
+                == 0
+            )
 
             # Process results or fallback
             if success and os.path.exists(result_path):
