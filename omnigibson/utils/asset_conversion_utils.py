@@ -2081,24 +2081,24 @@ def copy_urdf_to_dataset(
 ):
     """
     Copies a URDF file and its dependencies to a structured dataset directory.
-    
+
     Parameters:
         urdf_path (str): Path to the source URDF file.
         category (str): Category name for organizing the model in the dataset.
         mdl (str): Model identifier/name.
         urdf_dep_paths (list, optional): List of relative paths to URDF dependencies.
             If None, dependencies will be automatically detected. Defaults to None.
-        dataset_root (str, optional): Root directory of the dataset. 
+        dataset_root (str, optional): Root directory of the dataset.
             Defaults to gm.CUSTOM_DATASET_PATH.
         suffix (str, optional): Suffix to append to the model name in the new URDF.
             Defaults to "original".
         overwrite (bool, optional): Whether to overwrite existing directories.
             If False, raises an assertion error if target directory exists.
             Defaults to False.
-    
+
     Returns:
         str: Path to the newly created URDF file in the dataset.
-    
+
     Raises:
         AssertionError: If the target directory already exists and overwrite is False.
     """
