@@ -1814,7 +1814,7 @@ def generate_collision_meshes(
         hull_count (int): If @method="coacd", this sets the max number of hulls to generate
         discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
             that are not proper volumes
-        error_handling: If true, will handle the coacd assertion fault and use convex hull instead 
+        error_handling: If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead 
 
     Returns:
         List[trimesh.Trimesh]: The collision meshes.
@@ -1842,36 +1842,8 @@ def generate_collision_meshes(
             script_path = tempfile.mktemp(suffix=".py")
             result_path = tempfile.mktemp(suffix=".pkl")
 
-            # Create simple subprocess script with proper indentation
-            script = (
-                """
-import pickle, coacd, sys
-try:
-    with open('"""
-                + data_path
-                + """', 'rb') as f:
-        vertices, faces, hull_count = pickle.load(f)
-    mesh = coacd.Mesh(vertices, faces)
-    result = coacd.run_coacd(mesh, max_convex_hull=hull_count, max_ch_vertex=60)
-    with open('"""
-                + result_path
-                + """', 'wb') as f:
-        pickle.dump(result, f)
-    sys.exit(0)
-except Exception as e:
-    print("Error in CoACD:", e)
-    sys.exit(1)
-"""
-            )
-
-            # Write script with clean indentation
-            script = script.lstrip()
-
-            with open(script_path, "w") as f:
-                f.write(script)
-
             # Run subprocess with clean file paths
-            success = subprocess.call([sys.executable, script_path]) == 0
+            success = subprocess.call([sys.executable, os.path.join(os.path.dirname(__file__), "coacd_runner.py"), data_path, result_path]) == 0
 
             # Process results or fallback
             if success and os.path.exists(result_path):
@@ -2179,10 +2151,10 @@ def generate_urdf_for_mesh(
 ):
     """
     Generate URDF file for either single mesh or articulated files.
-    Each submesh in articulated files (glb, gltf,dae) will be extracted as a separate link.
+    Each submesh in articulated files (glb, gltf) will be extracted as a separate link.
 
     Args:
-        asset_path: Path to the input mesh file (.obj, .glb, .gltf, .dae)
+        asset_path: Path to the input mesh file (.obj, .glb, .gltf)
         obj_dir: Output directory
         category: Category name for the object
         mdl: Model name
@@ -2205,8 +2177,7 @@ def generate_urdf_for_mesh(
         "obj",
         "glb",
         "gltf",
-        "dae",
-    ], f"Not obj, glb, gltf, dae file, can only deal with these file types"
+    ], f"Not obj, glb, gltf file, can only deal with these file types"
 
     # Convert obj_dir to Path object
     if isinstance(obj_dir, str):
@@ -2239,7 +2210,7 @@ def generate_urdf_for_mesh(
         # Add to links dictionary as a single link named "base_link"
         links["base_link"] = {"visual_mesh": visual_mesh, "collision_meshes": collision_meshes, "transform": th.eye(4)}
 
-    elif mesh_format in ["glb", "gltf", "dae"]:
+    elif mesh_format in ["glb", "gltf"]:
         # Handle articulated files
         scene = trimesh.load(asset_path)
         # Count geometries (submeshes)
