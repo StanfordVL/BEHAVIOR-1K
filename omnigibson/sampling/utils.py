@@ -3,6 +3,7 @@ from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
 import omnigibson.lazy as lazy
 from bddl.activity import Conditions, evaluate_state
+
 # import numpy as np
 import torch as th
 import csv
@@ -50,6 +51,7 @@ if os.path.exists(CREDENTIALS):
 
         def __getattr__(self, attr):
             orig_attr = getattr(self.obj, attr)
+
             def wrapped(*args, **kwargs):
                 for _ in range(self.retries):
                     try:
@@ -59,6 +61,7 @@ if os.path.exists(CREDENTIALS):
                         print(f"Exception caught: {e}")
                         time.sleep(self.delay)
                 raise Exception(f"Failed after {self.retries} retries")
+
             return wrapped
 
     worksheet = RetryWrapper(worksheet)
@@ -75,6 +78,7 @@ SYNSET_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Synsets.csv")
 
 
 UNSUPPORTED_PREDICATES = {"broken", "assembled", "attached"}
+
 
 # CAREFUL!! Only run this ONCE before starting sampling!!!
 def write_activities_to_spreadsheet():
@@ -107,6 +111,7 @@ def get_successful_activities():
 
     return successful_activities
 
+
 def get_successful_activities_to_scenes():
     n_tasks = len(ACTIVITY_TO_ROW)
     cell_list = worksheet.range(f"A{2}:E{2 + n_tasks - 1}")
@@ -115,6 +120,7 @@ def get_successful_activities_to_scenes():
         if ".bddl" not in activity.value and str(status.value) == "1":
             activity_to_scene[activity.value] = scene.value
     return activity_to_scene
+
 
 def get_unsuccessful_activities():
     return sorted(set(ACTIVITY_TO_ROW.keys()) - get_successful_activities())
@@ -133,6 +139,7 @@ def get_worksheet_scene_row(scene_model):
 def validate_scene_can_be_sampled(scene):
     scenes_sorted = get_scenes()
     n_scenes = len(scenes_sorted)
+
     # Sanity check scene -- only scenes are allowed that whose user field is either:
     # (a) blank or (b) filled with USER
     # scene_user_list = worksheet.range(f"R{2}:S{2 + n_scenes - 1}")
@@ -146,8 +153,9 @@ def validate_scene_can_be_sampled(scene):
 
     # Assert user is None or is USER, else False
     scene_user = scene_user_mapping[scene]
-    assert scene_user is None or scene_user == USER, \
-        f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
+    assert (
+        scene_user is None or scene_user == USER
+    ), f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
 
     # Fill in this value to reserve it
     idx = scenes_sorted.index(scene)
@@ -227,6 +235,7 @@ def get_valid_tasks():
 
 
 def get_notready_synsets():
+    return set()
     notready_synsets = set()
     with open(SYNSET_INFO_FPATH) as csvfile:
         reader = csv.reader(csvfile, delimiter=",", quotechar='"')
@@ -287,9 +296,35 @@ def parse_task_mapping(fpath):
     return mapping
 
 
+def parse_task_mapping_new():
+    if os.path.exists("task_mapping.json"):
+        with open("task_mapping.json", "r") as f:
+            mapping = json.load(f)
+        return mapping
+
+    from bddl.knowledge_base import Task
+
+    tasks = Task.all_objects()
+    mapping = dict()
+    for task in tasks:
+        task_name = task.name[:-2]
+        scenes = []
+        for scene, status in task.scene_matching_dict.items():
+            if status["matched_ready"]:
+                scenes.append(scene.name)
+        mapping[task_name] = scenes
+    with open("task_mapping.json", "w") as f:
+        json.dump(mapping, f, indent=4)
+    return mapping
+
+
 def get_dns_activities():
     n_tasks = len(get_valid_tasks())
-    return {val[0] for val in worksheet.get(f"A{2}:C{2 + n_tasks - 1}") if val[-1] is not None and str(val[-1]).lower() == "dns"}
+    return {
+        val[0]
+        for val in worksheet.get(f"A{2}:C{2 + n_tasks - 1}")
+        if val[-1] is not None and str(val[-1]).lower() == "dns"
+    }
 
 
 def get_non_misc_activities():
@@ -302,9 +337,9 @@ def get_scene_compatible_activities(scene_model, mapping):
 
 
 def _validate_object_state_stability(obj_name, obj_dict, strict=False):
-    lin_vel_threshold = 0.001 if strict else 1.
+    lin_vel_threshold = 0.001 if strict else 1.0
     ang_vel_threshold = 0.005 if strict else th.pi
-    joint_vel_threshold = 0.01 if strict else 1.
+    joint_vel_threshold = 0.01 if strict else 1.0
     # Check close to zero root link velocity
     for key, atol in zip(("lin_vel", "ang_vel"), (lin_vel_threshold, ang_vel_threshold)):
         val = obj_dict["root_link"].get(key, 0.0)
@@ -378,6 +413,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     og.sim.stop()
     og.clear()
 
+
 def validate_task(task, task_scene_dict, default_scene_dict):
     assert og.sim.is_playing()
 
@@ -393,6 +429,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
 
     # 1. Sanity check all object poses wrt their original pre-loaded poses
     print(f"Step 1: Checking loaded task environment...")
+
     def _validate_identical_object_kinematic_state(obj_name, default_obj_dict, obj_dict, check_vel=True):
         # Check root link state
         for key, val in default_obj_dict["root_link"].items():
@@ -400,7 +437,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
             if not check_vel and "vel" in key:
                 continue
             obj_val = obj_dict["root_link"][key]
-            atol = 1. if "vel" in key else 0.05
+            atol = 1.0 if "vel" in key else 0.05
             # # TODO: Update ori value to be larger tolerance
             # tol = 0.15 if "ori" in key else 0.05
             # If particle positions are being checked, only check the min / max
@@ -410,10 +447,16 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     particle_positions = th.tensor(val)
                     current_particle_positions = th.tensor(obj_val)
                     pos_min, pos_max = th.min(particle_positions, dim=0), th.max(particle_positions, dim=0)
-                    curr_pos_min, curr_pos_max = th.min(current_particle_positions, dim=0), th.max(current_particle_positions, dim=0)
+                    curr_pos_min, curr_pos_max = (
+                        th.min(current_particle_positions, dim=0),
+                        th.max(current_particle_positions, dim=0),
+                    )
                     for name, pos, curr_pos in zip(("min", "max"), (pos_min, pos_max), (curr_pos_min, curr_pos_max)):
                         if not th.all(th.isclose(pos, curr_pos, atol=0.05)).item():
-                            return False, f"Got mismatch in cloth {obj_name} particle positions range: {name} min {pos_min} max {pos_max} vs. min {curr_pos_min} max {curr_pos_max}"
+                            return (
+                                False,
+                                f"Got mismatch in cloth {obj_name} particle positions range: {name} min {pos_min} max {pos_max} vs. min {curr_pos_min} max {curr_pos_max}",
+                            )
                 else:
                     continue
             else:
@@ -422,7 +465,10 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     obj_val = th.norm(T.quat2axisangle(T.quat_distance(val, obj_val)))
                     val = 0.0
                 if not th.all(th.isclose(th.tensor(val), th.tensor(obj_val), atol=atol, rtol=0.0)).item():
-                    return False, f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
+                    return (
+                        False,
+                        f"{obj_name} root link mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}",
+                    )
 
         # Check any non-robot joint values
         # This is because the controller can cause the robot to drift over time
@@ -434,7 +480,10 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     obj_val = obj_dict[f"joint_{key}"]
                     atol = 1.0 if key == "vel" else 0.05
                     if not th.all(th.isclose(th.tensor(val), th.tensor(obj_val), atol=atol, rtol=0.0)).item():
-                        return False, f"{obj_name} joint mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}"
+                        return (
+                            False,
+                            f"{obj_name} joint mismatch in {key}: default_obj_dict has: {val}, obj_dict has: {obj_val}",
+                        )
 
         # If all passes, return True
         return True, None
@@ -442,9 +491,14 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     task_state_t0 = og.sim.dump_state(serialized=False)[0]
     for obj_name, obj_info in task_scene_dict["state"]["object_registry"].items():
         current_obj_info = task_state_t0["object_registry"][obj_name]
-        valid_obj, err_msg = _validate_identical_object_kinematic_state(obj_name, obj_info, current_obj_info, check_vel=True)
+        valid_obj, err_msg = _validate_identical_object_kinematic_state(
+            obj_name, obj_info, current_obj_info, check_vel=True
+        )
         if not valid_obj:
-            return False, f"Failed validation step 1: Task scene json and loaded task environment do not have similar kinematic states. Specific error: {err_msg}"
+            return (
+                False,
+                f"Failed validation step 1: Task scene json and loaded task environment do not have similar kinematic states. Specific error: {err_msg}",
+            )
 
     # We should never use this after
     task_scene_dict = None
@@ -459,15 +513,23 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         if obj_name in active_obj_names:
             continue
         obj_info = task_state_t0["object_registry"][obj_name]
-        valid_obj, err_msg = _validate_identical_object_kinematic_state(obj_name, default_obj_info, obj_info, check_vel=True)
+        valid_obj, err_msg = _validate_identical_object_kinematic_state(
+            obj_name, default_obj_info, obj_info, check_vel=True
+        )
         if not valid_obj:
-            return False, f"Failed validation step 2: stable scene state and task scene state do not have similar kinematic states for non-task-relevant objects. Specific error: {err_msg}"
+            return (
+                False,
+                f"Failed validation step 2: stable scene state and task scene state do not have similar kinematic states for non-task-relevant objects. Specific error: {err_msg}",
+            )
 
     # Sanity check for zero velocities for all objects
     for obj_name, obj_info in task_state_t0["object_registry"].items():
         valid_obj, err_msg = _validate_object_state_stability(obj_name, obj_info, strict=False)
         if not valid_obj:
-            return False, f"Failed validation step 2: task scene state does not have close to zero velocities. Specific error: {err_msg}"
+            return (
+                False,
+                f"Failed validation step 2: task scene state does not have close to zero velocities. Specific error: {err_msg}",
+            )
 
     # Need to enable transition rules before running step 3 and 4
     original_transition_rule_flag = gm.ENABLE_TRANSITION_RULES
@@ -481,26 +543,47 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # Take a single physics step
     og.sim.step()
     task_state_t1 = og.sim.dump_state(serialized=False)[0]
+
     def _validate_scene_stability(task, task_state, current_state, check_particle_positions=True):
-        def _validate_particle_system_consistency(system_name, system_state, current_system_state, check_particle_positions=True):
+        def _validate_particle_system_consistency(
+            system_name, system_state, current_system_state, check_particle_positions=True
+        ):
             is_micro_physical = issubclass(og.sim.scenes[0].get_system(system_name), MicroPhysicalParticleSystem)
             n_particles_key = "instancer_particle_counts" if is_micro_physical else "n_particles"
             if not th.all(th.isclose(system_state[n_particles_key], current_system_state[n_particles_key])).item():
-                return False, f"Got inconsistent number of system {system_name} particles: {system_state['n_particles']} vs. {current_system_state['n_particles']}"
+                return (
+                    False,
+                    f"Got inconsistent number of system {system_name} particles: {system_state['n_particles']} vs. {current_system_state['n_particles']}",
+                )
             # Validate that no particles went flying -- maximum ranges of positions should be roughly close
             n_particles = th.sum(system_state[n_particles_key]).item()
             if n_particles > 0 and check_particle_positions:
                 if is_micro_physical:
-                    particle_positions = th.concatenate([inst_state["particle_positions"] for inst_state in system_state["particle_states"].values()], dim=0)
-                    current_particle_positions = th.concatenate([inst_state["particle_positions"] for inst_state in current_system_state["particle_states"].values()], dim=0)
+                    particle_positions = th.concatenate(
+                        [inst_state["particle_positions"] for inst_state in system_state["particle_states"].values()],
+                        dim=0,
+                    )
+                    current_particle_positions = th.concatenate(
+                        [
+                            inst_state["particle_positions"]
+                            for inst_state in current_system_state["particle_states"].values()
+                        ],
+                        dim=0,
+                    )
                 else:
                     particle_positions = th.tensor(system_state["positions"])
                     current_particle_positions = th.tensor(current_system_state["positions"])
                 pos_min, pos_max = th.min(particle_positions, dim=0), th.max(particle_positions, dim=0)
-                curr_pos_min, curr_pos_max = th.min(current_particle_positions, dim=0), th.max(current_particle_positions, dim=0)
+                curr_pos_min, curr_pos_max = (
+                    th.min(current_particle_positions, dim=0),
+                    th.max(current_particle_positions, dim=0),
+                )
                 for name, pos, curr_pos in zip(("min", "max"), (pos_min, pos_max), (curr_pos_min, curr_pos_max)):
                     if not th.all(th.isclose(pos, curr_pos, atol=0.05)).item():
-                        return False, f"Got mismatch in system {system_name} particle positions range: {name} {pos} vs. {curr_pos}"
+                        return (
+                            False,
+                            f"Got mismatch in system {system_name} particle positions range: {name} {pos} vs. {curr_pos}",
+                        )
 
             return True, None
 
@@ -513,13 +596,17 @@ def validate_task(task, task_scene_dict, default_scene_dict):
 
         for obj_name, obj_info in task_state["object_registry"].items():
             current_obj_info = current_state["object_registry"][obj_name]
-            valid_obj, err_msg = _validate_identical_object_kinematic_state(obj_name, obj_info, current_obj_info, check_vel=True)
+            valid_obj, err_msg = _validate_identical_object_kinematic_state(
+                obj_name, obj_info, current_obj_info, check_vel=True
+            )
             if not valid_obj:
                 return False, f"task state and current state do not have similar kinematic states: {err_msg}"
 
         # Sanity check consistent particle systems
         task_systems = {system_name for system_name in task_state["system_registry"].keys() if system_name != "cloth"}
-        curr_systems = {system_name for system_name in current_state["system_registry"].keys() if system_name != "cloth"}
+        curr_systems = {
+            system_name for system_name in current_state["system_registry"].keys() if system_name != "cloth"
+        }
         mismatched_systems = set.union(task_systems, curr_systems) - set.intersection(task_systems, curr_systems)
         if len(mismatched_systems) > 0:
             return False, f"Got mismatch in active systems: {mismatched_systems}"
@@ -527,7 +614,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         for system_name in task_systems:
             system_state = task_state["system_registry"][system_name]
             curr_system_state = current_state["system_registry"][system_name]
-            valid_system, err_msg = _validate_particle_system_consistency(system_name, system_state, curr_system_state, check_particle_positions=check_particle_positions)
+            valid_system, err_msg = _validate_particle_system_consistency(
+                system_name, system_state, curr_system_state, check_particle_positions=check_particle_positions
+            )
             if not valid_system:
                 return False, f"Particle systems do not have consistent state. Specific error: {err_msg}"
 
@@ -539,7 +628,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         return True, None
 
     # Sanity check scene
-    valid_scene, err_msg = _validate_scene_stability(task=task, task_state=task_state_t0, current_state=task_state_t1, check_particle_positions=True)
+    valid_scene, err_msg = _validate_scene_stability(
+        task=task, task_state=task_state_t0, current_state=task_state_t1, check_particle_positions=True
+    )
     if not valid_scene:
         with gm.unlocked():
             gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag
@@ -558,7 +649,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # Don't check particle positions since some particles may be falling
     # TODO: Tighten this constraint once we figure out a way to stably sample particles
     task_state_t11 = og.sim.dump_state(serialized=False)[0]
-    valid_scene, err_msg = _validate_scene_stability(task=task, task_state=task_state_t0, current_state=task_state_t11, check_particle_positions=False)
+    valid_scene, err_msg = _validate_scene_stability(
+        task=task, task_state=task_state_t0, current_state=task_state_t11, check_particle_positions=False
+    )
     if not valid_scene:
         with gm.unlocked():
             gm.ENABLE_TRANSITION_RULES = original_transition_rule_flag

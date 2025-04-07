@@ -91,6 +91,12 @@ GOOD_BBOXES = {
     "tupperware": {
         "mkstwr": [0.33, 0.33, 0.21],
     },
+    "copper_wire": {
+        "nzafel": [0.1762, 0.17655, 0.0631],
+    },
+    "backpack": {
+        "gvbiwl": [0.7397, 0.6109, 0.6019],
+    },
 }
 
 BAD_CLOTH_MODELS = {
@@ -1409,12 +1415,18 @@ class BDDLSampler:
 
                     # Filter based on white / blacklist
                     if synset_whitelist is not None:
-                        model_choices = model_choices.intersection(set(synset_whitelist[category])) \
-                            if category in synset_whitelist else set()
+                        model_choices = (
+                            model_choices.intersection(set(synset_whitelist[category]))
+                            if category in synset_whitelist
+                            else set()
+                        )
 
                     if synset_blacklist is not None:
-                        model_choices = model_choices - set(synset_whitelist[category]) \
-                            if category in synset_blacklist else model_choices
+                        model_choices = (
+                            model_choices - set(synset_whitelist[category])
+                            if category in synset_blacklist
+                            else model_choices
+                        )
 
                     # Filter by category
                     if len(model_choices) > 0:
