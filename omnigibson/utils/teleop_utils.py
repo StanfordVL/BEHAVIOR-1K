@@ -176,8 +176,6 @@ class OVXRSystem(TeleopSystem):
             self.set_anchor_with_prim(self.align_anchor_to)
         self.raw_data = {}
         self.old_raw_data = {}
-        # enable xr extension
-        lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.xr.profile.vr")
         # run super method
         super().__init__(teleop_config, robot, show_control_marker)
         # get xr core and profile
