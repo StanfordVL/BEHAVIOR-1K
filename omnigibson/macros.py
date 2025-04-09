@@ -144,7 +144,7 @@ gm.DEFAULT_PHYSICS_FREQ = 120
 gm.AG_CLOTH = False
 
 # Forced light intensity for all DatasetObjects. None if the USD-provided intensities should be respected.
-gm.FORCE_LIGHT_INTENSITY = 150000
+gm.FORCE_LIGHT_INTENSITY = 10000
 
 # Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
 gm.FORCE_ROUGHNESS = 0.7

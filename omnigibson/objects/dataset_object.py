@@ -208,6 +208,7 @@ class DatasetObject(USDObject):
             def recursive_light_update(child_prim):
                 if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
                     child_prim.GetAttribute("inputs:intensity").Set(gm.FORCE_LIGHT_INTENSITY)
+                    child_prim.GetAttribute("inputs:normalize").Set(True)
 
                 for child_child_prim in child_prim.GetChildren():
                     recursive_light_update(child_child_prim)
