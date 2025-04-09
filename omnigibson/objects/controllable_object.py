@@ -461,6 +461,14 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
     @property
+    def _is_controllable(self) -> bool:
+        """
+        Returns:
+            bool: Whether this object is controllable or not
+        """
+        return True
+
+    @property
     def control_enabled(self):
         return self._control_enabled
 

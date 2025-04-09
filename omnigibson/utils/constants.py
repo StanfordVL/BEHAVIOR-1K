@@ -56,13 +56,12 @@ STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "drivew
 # Ground categories / prim names used for filtering collisions, e.g.: during motion planning
 GROUND_CATEGORIES = frozenset({"floors", "lawn", "driveway", "carpet"})
 
-# Joint friction magic values to assign to objects based on their category
-DEFAULT_JOINT_FRICTION = 10.0
-SPECIAL_JOINT_FRICTIONS = {
-    "oven": 30.0,
-    "dishwasher": 30.0,
-    "toilet": 3.0,
-}
+# Joint friction magic values
+DEFAULT_PRISMATIC_JOINT_FRICTION = 0.3
+DEFAULT_REVOLUTE_JOINT_FRICTION = 0.1
+
+# Joint damping value
+DEFAULT_JOINT_DAMPING = 5.0
 
 
 class PrimType(IntEnum):

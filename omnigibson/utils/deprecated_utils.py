@@ -445,9 +445,11 @@ class ArticulationView(_ArticulationView):
             )
             self._physics_view.set_dof_positions(new_dof_pos, indices)
 
-            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # THIS IS THE FIX:
+            #   FIX V1: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            #   FIX V2: DECOUPLE INSTANTANEOUS POSITION FROM TARGETS
             # self._physics_view.set_dof_position_targets(new_dof_pos, indices)
-            self.set_joint_position_targets(positions, indices, joint_indices)
+            # self.set_joint_position_targets(positions, indices, joint_indices)
         else:
             carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
 
@@ -511,9 +513,11 @@ class ArticulationView(_ArticulationView):
             )
             self._physics_view.set_dof_velocities(new_dof_vel, indices)
 
-            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # THIS IS THE FIX:
+            #   FIX V1: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            #   FIX V2: DECOUPLE INSTANTANEOUS VELOCITY FROM TARGETS
             # self._physics_view.set_dof_velocity_targets(new_dof_vel, indices)
-            self.set_joint_velocity_targets(velocities, indices, joint_indices)
+            # self.set_joint_velocity_targets(velocities, indices, joint_indices)
         else:
             carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
         return

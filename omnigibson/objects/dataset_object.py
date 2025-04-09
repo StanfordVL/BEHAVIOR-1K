@@ -11,7 +11,13 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
-from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
+from omnigibson.utils.constants import (
+    DEFAULT_PRISMATIC_JOINT_FRICTION,
+    DEFAULT_REVOLUTE_JOINT_FRICTION,
+    DEFAULT_JOINT_DAMPING,
+    JointType,
+    PrimType,
+)
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -222,11 +228,12 @@ class DatasetObject(USDObject):
             material.reflection_roughness_texture_influence = 0.0
             material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
-        # Set the joint frictions based on category
-        friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
+        # Set the joint frictions based on joint type
         for joint in self._joints.values():
-            if joint.joint_type != JointType.JOINT_FIXED:
-                joint.friction = friction
+            if joint.joint_type == JointType.JOINT_PRISMATIC:
+                joint.friction = DEFAULT_PRISMATIC_JOINT_FRICTION
+            elif joint.joint_type == JointType.JOINT_REVOLUTE:
+                joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
     def _post_load(self):
         # If manual bounding box is specified, scale based on ratio between that and the native bbox
@@ -270,6 +277,27 @@ class DatasetObject(USDObject):
                 if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
                     link.mass = 0.0
                     link.density = density
+
+            # For all joints under dataset objects,
+            # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
+            # 2. we set non-zero damping to simulate dynamic friction:
+            #       the friction coefficient only accounts for static friction
+            from omnigibson.utils.asset_conversion_utils import find_all_prim_children_with_type
+
+            prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
+            revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
+            for prismatic_joint in prismatic_joints:
+                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_JOINT_DAMPING)
+                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+            for revolute_joint in revolute_joints:
+                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_JOINT_DAMPING)
+                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
             self.root_link.mass = density * self.root_link.volume
