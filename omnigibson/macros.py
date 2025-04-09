@@ -16,12 +16,14 @@ class MacroDict(Dict):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self["_read"] = set()
-        object.__setattr__(self, '__locked', True)  # disallow value updates after key is read
+        object.__setattr__(self, "__locked", True)  # disallow value updates after key is read
 
     def __setattr__(self, name, value):
         if name in self.get("_read", set()) and self.is_locked:
-            raise AttributeError(f"Cannot set attribute {name} in MacroDict, it has already been used. "
-                                 f"If knowingly overwriting value, set value within context `with unlocked()`")
+            raise AttributeError(
+                f"Cannot set attribute {name} in MacroDict, it has already been used. "
+                f"If knowingly overwriting value, set value within context `with unlocked()`"
+            )
         # Use the super's setattr for setting attributes, but handle _read directly to avoid recursion.
         if name == "_read":
             self[name] = value
@@ -43,13 +45,13 @@ class MacroDict(Dict):
         """
         Returns True if the config is locked (no value updates allowed after initial read).
         """
-        return object.__getattribute__(self, '__locked')
+        return object.__getattribute__(self, "__locked")
 
     def lock(self):
         """
         Lock the config. Afterward, key values cannot be updated after initial read
         """
-        object.__setattr__(self, '__locked', True)
+        object.__setattr__(self, "__locked", True)
 
         for k in self:
             if isinstance(self[k], MacroDict):
@@ -59,7 +61,7 @@ class MacroDict(Dict):
         """
         Unlock the config. Afterward, key values can be updated even after initial read
         """
-        object.__setattr__(self, '__locked', False)
+        object.__setattr__(self, "__locked", False)
 
         for k in self:
             if isinstance(self[k], MacroDict):
