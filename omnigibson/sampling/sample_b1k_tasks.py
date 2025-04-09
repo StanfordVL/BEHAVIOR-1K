@@ -26,37 +26,67 @@ import numpy as np
 import random
 
 
+TASK_CUSTOM_LISTS = {
+    ("picking_up_trash", "Rs_int"): {
+        "whitelist": {
+            "pad.n.01": {
+                "sticky_note": ["tghqep"],
+            }
+        },
+        "blacklist": None,
+    },
+    ("packing_recreational_vehicle_for_trip", "Merom_0_garden"): {
+        "whitelist": {
+            "wicker_basket.n.01": {
+                "wicker_basket": ["tsjvyu"],
+            }
+        },
+        "blacklist": None,
+    },
+}
+
+
 # TODO:
 # 1. Set boundingCube approximation earlier (maybe right after importing the scene objects). Otherwise after loading the robot, we will elapse one physics step
 # 2. Enable transition rule and refresh all rules before online validation
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--scene_model", type=str, default=None,
-                    help="Scene model to sample tasks in")
-parser.add_argument("--activities", type=str, default=None,
-                    help="Activity/ie(s) to be sampled, if specified. This should be a comma-delimited list of desired activities. Otherwise, will try to sample all tasks in this scene")
-parser.add_argument("--start_at", type=str, default=None,
-                    help="If specified, activity to start at, ignoring all previous")
-parser.add_argument("--thread_id", type=str, default=None,
-                    help="If specified, ID to assign to the thread when tracking in_progress")
-parser.add_argument("--randomize", action="store_true",
-                    help="If set, will randomize order of activities.")
-parser.add_argument("--overwrite_existing", action="store_true",
-                    help="If set, will overwrite any existing tasks that are found. Otherwise, will skip.")
-parser.add_argument("--offline", action="store_true",
-                    help="If set, will sample offline, and will not sync / check with google sheets")
-parser.add_argument("--ignore_in_progress", action="store_true",
-                    help="If set and --offline is False, will in progress flag")
+parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")
+parser.add_argument(
+    "--activities",
+    type=str,
+    default=None,
+    help="Activity/ie(s) to be sampled, if specified. This should be a comma-delimited list of desired activities. Otherwise, will try to sample all tasks in this scene",
+)
+parser.add_argument(
+    "--start_at", type=str, default=None, help="If specified, activity to start at, ignoring all previous"
+)
+parser.add_argument(
+    "--thread_id", type=str, default=None, help="If specified, ID to assign to the thread when tracking in_progress"
+)
+parser.add_argument("--randomize", action="store_true", help="If set, will randomize order of activities.")
+parser.add_argument(
+    "--overwrite_existing",
+    action="store_true",
+    help="If set, will overwrite any existing tasks that are found. Otherwise, will skip.",
+)
+parser.add_argument(
+    "--offline", action="store_true", help="If set, will sample offline, and will not sync / check with google sheets"
+)
+parser.add_argument(
+    "--ignore_in_progress", action="store_true", help="If set and --offline is False, will in progress flag"
+)
 
 gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_TRANSITION_RULES = False               # Must be False! We permute this later
+gm.ENABLE_TRANSITION_RULES = False  # Must be False! We permute this later
 
 macros.systems.micro_particle_system.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = 0.5
 
 # macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
+
 
 def main(random_selection=False, headless=False, short_exec=False):
     args = parser.parse_args()
@@ -67,7 +97,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     # 2. environment level variables
     if args.scene_model is None:
         # This MUST be specified
-        assert os.environ.get("SAMPLING_SCENE_MODEL"), "scene model MUST be specified, either as a command-line arg or as an environment variable!"
+        assert os.environ.get(
+            "SAMPLING_SCENE_MODEL"
+        ), "scene model MUST be specified, either as a command-line arg or as an environment variable!"
         args.scene_model = os.environ["SAMPLING_SCENE_MODEL"]
     if args.activities is None and os.environ.get("SAMPLING_ACTIVITIES"):
         args.activities = os.environ["SAMPLING_ACTIVITIES"]
@@ -140,9 +172,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     valid_tasks = get_valid_tasks()
-    mapping = parse_task_mapping(fpath=TASK_INFO_FPATH)
-    activities = get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping) \
-        if args.activities is None else args.activities.split(",")
+    # mapping = parse_task_mapping(fpath=TASK_INFO_FPATH)
+    mapping = parse_task_mapping_new()
+    activities = (
+        get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping)
+        if args.activities is None
+        else args.activities.split(",")
+    )
 
     # if we're not offline, only keep the failure cases
     if not args.offline:
@@ -198,7 +234,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Get info from spreadsheet
             row = ACTIVITY_TO_ROW[activity]
 
-            in_progress, success, validated, scene_id, user, reason, exception, misc = worksheet.get(f"B{row}:I{row}")[0]
+            in_progress, success, validated, scene_id, user, reason, exception, misc = worksheet.get(f"B{row}:I{row}")[
+                0
+            ]
 
             # If we manually do not want to sample the task (DO NOT SAMPLE == "DNS", skip)
             if success.lower() == "dns":
@@ -225,13 +263,25 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Skip any with unsupported predicates, but still record the reason why we can't sample
         conditions = Conditions(activity, 0, simulator_name="omnigibson")
-        all_predicates = set(get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions))
+        all_predicates = set(
+            get_predicates(conditions.parsed_initial_conditions) + get_predicates(conditions.parsed_goal_conditions)
+        )
         unsupported_predicates = set.intersection(all_predicates, UNSUPPORTED_PREDICATES)
         if len(unsupported_predicates) > 0:
             should_sample = False
             reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
         env.task_config["activity_name"] = activity
+        activity_scene_combo = (activity, args.scene_model)
+        if activity_scene_combo in TASK_CUSTOM_LISTS:
+            whitelist = TASK_CUSTOM_LISTS[activity_scene_combo]["whitelist"]
+            blacklist = TASK_CUSTOM_LISTS[activity_scene_combo]["blacklist"]
+        else:
+            whitelist, blacklist = None, None
+        env.task_config["sampling_whitelist"] = whitelist
+        env.task_config["sampling_blacklist"] = blacklist
+        print("white_list", whitelist)
+        print("black_list", blacklist)
         scene_instance = BehaviorTask.get_cached_activity_scene_filename(
             scene_model=args.scene_model,
             activity_name=activity,
@@ -317,8 +367,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 already_succeeded = worksheet.get(f"C{row}")
                 if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
                     cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list,
-                                         ("", int(success), "", args.scene_model, USER, reason, "")):
+                    for cell, val in zip(cell_list, ("", int(success), "", args.scene_model, USER, reason, "")):
                         cell.value = val
                     worksheet.update_cells(cell_list)
 
@@ -354,8 +403,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
                     # Clear the in_progress reservation and note the exception
                     cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list,
-                                         ("", 0, "", args.scene_model, USER, reason, traceback_str)):
+                    for cell, val in zip(cell_list, ("", 0, "", args.scene_model, USER, reason, traceback_str)):
                         cell.value = val
                     worksheet.update_cells(cell_list)
 
