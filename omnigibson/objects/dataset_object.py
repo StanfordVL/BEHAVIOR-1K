@@ -14,7 +14,8 @@ from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_
 from omnigibson.utils.constants import (
     DEFAULT_PRISMATIC_JOINT_FRICTION,
     DEFAULT_REVOLUTE_JOINT_FRICTION,
-    DEFAULT_JOINT_DAMPING,
+    DEFAULT_PRISMATIC_JOINT_DAMPING,
+    DEFAULT_REVOLUTE_JOINT_DAMPING,
     JointType,
     PrimType,
 )
@@ -288,13 +289,13 @@ class DatasetObject(USDObject):
             revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
             for prismatic_joint in prismatic_joints:
                 prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
-                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_JOINT_DAMPING)
+                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
                 prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
                 prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
                 prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
             for revolute_joint in revolute_joints:
                 revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
-                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_JOINT_DAMPING)
+                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
                 revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
                 revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
                 revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)

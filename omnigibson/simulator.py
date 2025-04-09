@@ -646,7 +646,7 @@ def _launch_simulator(*args, **kwargs):
                 name="skybox",
                 category="background",
                 light_type="Dome",
-                intensity=1500,
+                intensity=2500,
                 fixed_base=True,
             )
             self._skybox.load(None)
