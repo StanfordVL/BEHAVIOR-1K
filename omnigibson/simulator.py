@@ -225,6 +225,15 @@ def _launch_app():
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
 
+    # Let the hotkeys propagate.
+    app.update()
+
+    # Disable all hotkeys for now. These are not exactly helpful and they cause collisions with
+    # the OmniGibson-provided hotkeys.
+    hotkey_registry = lazy.omni.kit.hotkeys.core.get_hotkey_registry()
+    for hotkey in list(hotkey_registry.get_all_hotkeys()):
+        hotkey_registry.deregister_hotkey(hotkey)
+
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
     shutdown_stream.create_subscription_to_pop(og.cleanup, name="og_cleanup", order=0)
@@ -480,18 +489,11 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            if gm.ENABLE_HQ_RENDERING:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)  # "Auto"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
-            else:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
+            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
