@@ -43,7 +43,7 @@ def create_physx_particle_system(
     """
     # TODO: Add sanity check to make sure GPU dynamics are enabled
     # Create particle system
-    stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     particle_system = lazy.pxr.PhysxSchema.PhysxParticleSystem.Define(stage, prim_path)
     particle_system.CreateSimulationOwnerRel().SetTargets([physics_scene_path])
 
@@ -150,7 +150,7 @@ def create_physx_particleset_pointinstancer(
     """
     stage = og.sim.stage
     n_particles = len(positions)
-    particle_system = lazy.omni.isaac.core.utils.prims.get_prim_at_path(physx_particle_system_path)
+    particle_system = lazy.isaacsim.core.utils.prims.get_prim_at_path(physx_particle_system_path)
 
     # Create point instancer scope
     prim_path = f"{particle_system_path}/{name}"
@@ -177,7 +177,7 @@ def create_physx_particleset_pointinstancer(
     for i, original_path in enumerate(prototype_prim_paths):
         prototype_prim_path = f"{prim_path}/prototype{i}"
         lazy.omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
-        prototype_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prototype_prim_path)
+        prototype_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prototype_prim_path)
         # Make sure this prim is invisible if we're using isosurface, and vice versa.
         imageable = lazy.pxr.UsdGeom.Imageable(prototype_prim)
         if is_isosurface:

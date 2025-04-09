@@ -28,7 +28,12 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
+from omnigibson.utils.usd_utils import (
+    PoseAPI,
+    mesh_prim_to_trimesh_mesh,
+    sample_mesh_keypoints,
+    delete_or_deactivate_prim,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -415,7 +420,7 @@ class ClothPrim(GeomPrim):
         plane_prims = []
         plane_motions = []
         for i, pc in enumerate(plane_centers):
-            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path=f"/World/plane_{i}",
                 name=f"plane_{i}",
                 z_position=0,
@@ -486,7 +491,7 @@ class ClothPrim(GeomPrim):
 
         # Remove the planes
         for plane_prim in plane_prims:
-            lazy.omni.isaac.core.utils.prims.delete_prim(plane_prim.prim_path)
+            delete_or_deactivate_prim(plane_prim.prim_path)
 
     def get_available_configurations(self):
         """

@@ -473,10 +473,8 @@ class MicroParticleSystem(BaseSystem):
         super().initialize(scene)
 
         # Run sanity checks
-        if not gm.USE_GPU_DYNAMICS or gm.ENABLE_FLATCACHE:
-            raise ValueError(
-                f"Failed to initialize {self.name} system. Please set gm.USE_GPU_DYNAMICS=True and gm.ENABLE_FLATCACHE=False."
-            )
+        if not gm.USE_GPU_DYNAMICS:
+            raise ValueError(f"Failed to initialize {self.name} system. Please set gm.USE_GPU_DYNAMICS=True.")
 
         self.system_prim = self._create_particle_system()
         # Get material
@@ -492,8 +490,6 @@ class MicroParticleSystem(BaseSystem):
         lazy.omni.physx.scripts.particleUtils.add_pbd_particle_material(
             og.sim.stage, self.mat_path, **self._pbd_material_kwargs
         )
-        # Force populate inputs and outputs of the shader
-        self._material.shader_force_populate()
         # Potentially modify the material
         self._customize_particle_material() if self._customize_particle_material is not None else None
 
@@ -954,8 +950,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             )
 
         # Update semantics
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
-            prim=lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
+            prim=lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path),
             semantic_label=self.name,
             type_label="class",
         )
@@ -1463,7 +1459,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         prototype = VisualGeomPrim(relative_prim_path=relative_prototype_prim_path, name=f"{self.name}_prototype0")
         prototype.load(self._scene)
         prototype.visible = False
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
             semantic_label=self.name,
             type_label="class",
@@ -1585,7 +1581,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype.load(self._scene)
         prototype.scale *= self.max_scale
         prototype.visible = False
-        lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+        lazy.isaacsim.core.utils.semantics.add_update_semantics(
             prim=prototype.prim,
             semantic_label=self.name,
             type_label="class",

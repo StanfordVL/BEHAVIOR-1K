@@ -218,10 +218,8 @@ class JointPrim(BasePrim):
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
         if og.sim.is_playing() and self.initialized:
-            assert (
-                self._articulation_view_direct.is_physics_handle_valid()
-                and self._articulation_view_direct._physics_view.check()
-            ), "Articulation view must be valid if physics is running!"
+            if not self._articulation_view_direct.is_physics_handle_valid():
+                og.sim.update_handles()
 
         return self._articulation_view_direct
 
@@ -248,7 +246,7 @@ class JointPrim(BasePrim):
             body0 (str): Absolute prim path to the body prim to set as this joint's parent link.
         """
         # Make sure prim path is valid
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body0), f"Invalid body0 path specified: {body0}"
         self._prim.GetRelationship("physics:body0").SetTargets([lazy.pxr.Sdf.Path(body0)])
         self._body0 = None
 
@@ -275,7 +273,7 @@ class JointPrim(BasePrim):
             body1 (str): Absolute prim path to the body prim to set as this joint's child link.
         """
         # Make sure prim path is valid
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         self._prim.GetRelationship("physics:body1").SetTargets([lazy.pxr.Sdf.Path(body1)])
         self._body1 = None
 

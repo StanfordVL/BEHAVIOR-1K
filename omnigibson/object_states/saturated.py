@@ -77,9 +77,9 @@ class ModifiedParticles(RelativeObjectState):
                     state_flat,
                     th.cat(
                         [
-                            (
-                                self.obj.scene.get_system(system_name, force_init=False).uuid,
-                                state[system_name],
+                            th.tensor(
+                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
+                                dtype=th.float32,
                             )
                             for system_name in system_names
                         ]

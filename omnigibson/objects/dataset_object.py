@@ -8,6 +8,7 @@ import torch as th
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
 from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
@@ -85,7 +86,7 @@ class DatasetObject(USDObject):
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
                 "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
@@ -115,7 +116,8 @@ class DatasetObject(USDObject):
         load_config["bounding_box"] = bounding_box
         load_config["dataset_type"] = dataset_type
         # All DatasetObjects should have xform properties pre-loaded
-        load_config["xform_props_pre_loaded"] = True
+        # TODO: enable this after next dataset release
+        load_config["xform_props_pre_loaded"] = False
 
         # Infer the correct usd path to use
         if model is None:
@@ -214,12 +216,10 @@ class DatasetObject(USDObject):
 
         # Apply any forced roughness updates
         for material in self.materials:
-            if (
-                "reflection_roughness_texture_influence" in material.shader_input_names
-                and "reflection_roughness_constant" in material.shader_input_names
-            ):
-                material.reflection_roughness_texture_influence = 0.0
-                material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
+            if material.is_glass:
+                continue
+            material.reflection_roughness_texture_influence = 0.0
+            material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
         # Set the joint frictions based on category
         friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
@@ -266,7 +266,7 @@ class DatasetObject(USDObject):
         if self._prim_type == PrimType.RIGID:
             for link in self._links.values():
                 # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
-                if link.has_collision_meshes:
+                if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
                     link.mass = 0.0
                     link.density = density
 
@@ -451,10 +451,10 @@ class DatasetObject(USDObject):
                     if parent_name in scales and child_name not in scales:
                         scale_in_parent_lf = scales[parent_name]
                         # The location of the joint frame is scaled using the scale in the parent frame
-                        quat0 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                        quat0 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
                             prim.GetAttribute("physics:localRot0").Get()
                         )[[1, 2, 3, 0]]
-                        quat1 = lazy.omni.isaac.core.utils.rotations.gf_quat_to_np_array(
+                        quat1 = lazy.isaacsim.core.utils.rotations.gf_quat_to_np_array(
                             prim.GetAttribute("physics:localRot1").Get()
                         )[[1, 2, 3, 0]]
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation

@@ -84,7 +84,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             self_collisions (bool): Whether to enable self collisions for this object
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
                 "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
@@ -477,10 +477,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # One final plot show so all the figures get rendered
         plt.show()
-
-    def update_handles(self):
-        # Call super first
-        super().update_handles()
 
     def remove(self):
         """

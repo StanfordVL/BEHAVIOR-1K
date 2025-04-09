@@ -50,7 +50,7 @@ setup(
         "lxml>=5.2.2",
         "numba>=0.59.1",
         "cffi>=1.16.0",
-        "pillow~=10.2.0",
+        "pillow~=11.0.0",
     ],
     extras_require={
         "dev": [
@@ -65,7 +65,7 @@ setup(
             "mkdocstrings[python]",
             "mkdocs-section-index",
             "mkdocs-literate-nav",
-            "telemoma~=0.1.2",
+            "telemoma~=0.2.0",
         ],
         "primitives": [
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",

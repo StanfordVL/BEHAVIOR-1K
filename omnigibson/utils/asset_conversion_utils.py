@@ -326,7 +326,7 @@ def _rename_prim(prim, name):
     path_from = prim.GetPrimPath().pathString
     path_to = f"{'/'.join(path_from.split('/')[:-1])}/{name}"
     lazy.omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
-    return lazy.omni.isaac.core.utils.prims.get_prim_at_path(path_to)
+    return lazy.isaacsim.core.utils.prims.get_prim_at_path(path_to)
 
 
 def _get_visual_objs_from_urdf(urdf_path):
@@ -394,7 +394,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             looks_prim = prim
         elif prim.GetPrimTypeInfo().GetTypeName() == "Xform":
             looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
-            looks_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(looks_prim_path)
+            looks_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(looks_prim_path)
         if not looks_prim:
             continue
         for subprim in looks_prim.GetChildren():
@@ -478,7 +478,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             mtl_name="OmniPBR",
             mtl_created_list=mtl_created_list,
         )
-        mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+        mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
@@ -520,7 +520,7 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                     mesh_name = "a_" + mesh_name[1:]
                 mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
         for mesh_prim_path, mtl_name in mesh_mtl_infos:
-            visual_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            visual_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
             assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
             # Bind the created link material to the visual prim
             log.debug(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
@@ -698,7 +698,7 @@ def _generate_meshes_for_primitive_meta_links(stage, obj_model, link_name, meta_
 
             _add_xform_properties(prim=prim)
             # Make sure mesh_prim has XForm properties
-            xform_prim = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
+            xform_prim = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=prim_path)
 
             # Get the mesh/light pose in the parent link frame
             mesh_in_parent_link_pos, mesh_in_parent_link_orn = (
@@ -820,10 +820,10 @@ def _process_glass_link(prim):
 
     assert glass_prim_paths
 
-    stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     root_path = stage.GetDefaultPrim().GetPath().pathString
     glass_mtl_prim_path = f"{root_path}/Looks/OmniGlass"
-    if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(glass_mtl_prim_path):
+    if not lazy.isaacsim.core.utils.prims.get_prim_at_path(glass_mtl_prim_path):
         mtl_created = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
@@ -865,8 +865,8 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     log.debug("Loading", usd_path, "for metadata import.")
 
     # Load model
-    lazy.omni.isaac.core.utils.stage.open_stage(usd_path)
-    stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+    lazy.isaacsim.core.utils.stage.open_stage(usd_path)
+    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     prim = stage.GetDefaultPrim()
 
     data = dict()
@@ -971,9 +971,9 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     # Add material channels
     # log.debug(f"prim children: {prim.GetChildren()}")
     # looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
-    # looks_prim = prim.GetChildren()[0] #lazy.omni.isaac.core.utils.prims.get_prim_at_path(looks_prim_path)
+    # looks_prim = prim.GetChildren()[0] #lazy.isaacsim.core.utils.prims.get_prim_at_path(looks_prim_path)
     # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
-    # mat_prim = looks_prim.GetChildren()[0] #lazy.omni.isaac.core.utils.prims.get_prim_at_path(mat_prim_path)
+    # mat_prim = looks_prim.GetChildren()[0] #lazy.isaacsim.core.utils.prims.get_prim_at_path(mat_prim_path)
     # log.debug(f"looks children: {looks_prim.GetChildren()}")
     # log.debug(f"mat prim: {mat_prim}")
     if import_render_channels:

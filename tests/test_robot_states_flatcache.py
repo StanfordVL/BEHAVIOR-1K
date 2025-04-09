@@ -86,7 +86,7 @@ def camera_pose_test(flatcache):
     old_camera_local_pose = vision_sensor.get_position_orientation(frame="parent")
     vision_sensor.set_position_orientation(position=[10, 10, 10], orientation=[0, 0, 0, 1], frame="parent")
     new_camera_world_pose = vision_sensor.get_position_orientation()
-    camera_parent_prim = lazy.omni.isaac.core.utils.prims.get_prim_parent(vision_sensor.prim)
+    camera_parent_prim = lazy.isaacsim.core.utils.prims.get_prim_parent(vision_sensor.prim)
     camera_parent_path = str(camera_parent_prim.GetPath())
     camera_parent_world_transform = PoseAPI.get_world_pose_with_scale(camera_parent_path)
     expected_new_camera_world_pos, expected_new_camera_world_ori = mat2pose(

@@ -101,13 +101,13 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
 
         # See if the mesh exists at the latest dataset's target location
         mesh_prim_path = f"{self.link.prim_path}/visuals/mesh_0"
-        pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+        pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
 
         # If not, see if it exists in the legacy format's location
         # TODO: Remove this after new dataset release
         if not pre_existing_mesh:
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
-            pre_existing_mesh = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mesh_prim_path)
+            pre_existing_mesh = lazy.isaacsim.core.utils.prims.get_prim_at_path(mesh_prim_path)
 
         # Create a primitive mesh neither option exists
         if not pre_existing_mesh:
@@ -122,7 +122,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             )
         else:
             # Infer radius from mesh if not specified as an input
-            lazy.omni.isaac.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
+            lazy.isaacsim.core.utils.bounds.recompute_extents(prim=pre_existing_mesh)
             self.scale = vtarray_to_torch(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim

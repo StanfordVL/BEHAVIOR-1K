@@ -35,6 +35,7 @@ from omnigibson.utils.usd_utils import (
     create_joint,
     create_primitive_mesh,
     absolute_prim_path_to_scene_relative,
+    delete_or_deactivate_prim,
 )
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -126,7 +127,7 @@ class ManipulationRobot(BaseRobot):
             self_collisions (bool): Whether to enable self collisions for this object
             link_physics_materials (None or dict): If specified, dictionary mapping link name to kwargs used to generate
                 a specific physical material for that link's collision meshes, where the kwargs are arguments directly
-                passed into the omni.isaac.core.materials.PhysicsMaterial constructor, e.g.: "static_friction",
+                passed into the isaacsim.core.api.materials.physics_material.PhysicsMaterial constructor, e.g.: "static_friction",
                 "dynamic_friction", and "restitution"
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
@@ -612,7 +613,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        delete_or_deactivate_prim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
@@ -1098,7 +1099,7 @@ class ManipulationRobot(BaseRobot):
 
         Returns:
             None or 2-tuple: If a valid assisted-grasp object is found, returns the corresponding
-                (object, object_link) (i.e.: (BaseObject, RigidPrim)) pair to the contacted in-hand object.
+                (object, object_link) (i.e.: (BaseObject, RigidDynamicPrim)) pair to the contacted in-hand object.
                 Otherwise, returns None
         """
         arm = self.default_arm if arm == "default" else arm
@@ -1455,7 +1456,7 @@ class ManipulationRobot(BaseRobot):
 
         Args:
             ag_obj (BaseObject): Object targeted for an assisted grasp
-            ag_link (RigidPrim): Link of the object to be grasped
+            ag_link (RigidDynamicPrim): Link of the object to be grasped
 
         Returns:
             (None or str): If obj can be grasped, returns the joint type to use for assisted grasping.
@@ -1484,7 +1485,7 @@ class ManipulationRobot(BaseRobot):
         Args:
             arm (str): specific arm to establish grasp.
                 Default is "default" which corresponds to the first entry in self.arm_names
-            ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidPrim)).
+            ag_data (None or 2-tuple): if specified, assisted-grasp object, link tuple (i.e. :(BaseObject, RigidDynamicPrim)).
                 Otherwise, does a no-op
             contact_pos (None or th.tensor): if specified, contact position to use for grasp.
         """
@@ -1640,7 +1641,7 @@ class ManipulationRobot(BaseRobot):
         """
         Same as _calculate_in_hand_object_rigid, except for cloth. Only one should be used at any given time.
 
-        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidPrim, th.Tensor) tuple or
+        Calculates which object to assisted-grasp for arm @arm. Returns an (BaseObject, RigidDynamicPrim, th.Tensor) tuple or
         None if no valid AG-enabled object can be found.
 
         1) Check if the gripper is closed enough
@@ -1656,7 +1657,7 @@ class ManipulationRobot(BaseRobot):
         Returns:
             None or 3-tuple: If a valid assisted-grasp object is found,
                 returns the corresponding (object, object_link, attachment_point_position), i.e.
-                ((BaseObject, RigidPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
+                ((BaseObject, RigidDynamicPrim, th.Tensor)) to the contacted in-hand object. Otherwise, returns None
         """
         # TODO (eric): Assume joint_pos = 0 means fully closed
         GRIPPER_FINGER_CLOSE_THRESHOLD = 0.03

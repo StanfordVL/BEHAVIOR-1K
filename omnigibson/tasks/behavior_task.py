@@ -383,7 +383,14 @@ class BehaviorTask(BaseTask):
                 )
                 name = inst_to_name[obj_inst]
                 is_system = name in env.scene.available_systems.keys()
-                entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
+                # TODO: If we load a robot with a different set of configs, we will not be able to match with the
+                # original object_scope. This is a temporary fix to handle this case. A proper fix involves
+                # storing the robot (potentially only base pose) in the task metadata instead of as a regular object
+                if "agent.n." in obj_inst:
+                    idx = int(obj_inst.split("_")[-1].lstrip("0")) - 1
+                    entity = env.robots[idx]
+                else:
+                    entity = env.scene.get_system(name) if is_system else env.scene.object_registry("name", name)
             self.object_scope[obj_inst] = BDDLEntity(
                 bddl_inst=obj_inst,
                 entity=entity,

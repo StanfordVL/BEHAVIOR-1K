@@ -14,7 +14,7 @@ from omnigibson.object_states.object_state_base import BooleanStateMixin, Relati
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint, delete_or_deactivate_prim
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -96,7 +96,7 @@ class AttachedTo(
         # Reference to the parent object (DatasetObject)
         self.parent = None
 
-        # Reference to the female meta link of the parent object (RigidPrim)
+        # Reference to the female meta link of the parent object (RigidDynamicPrim)
         self.parent_link = None
 
         # Mapping from the female meta link names of self.obj to their children (Dict[str, Optional[DatasetObject] = None])
@@ -206,8 +206,8 @@ class AttachedTo(
 
         Returns:
             2-tuple:
-                - RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
-                - RigidPrim or None: the corresponding link of @other
+                - RigidDynamicPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
+                - RigidDynamicPrim or None: the corresponding link of @other
         """
         if pos_thresh is None:
             pos_thresh = m.DEFAULT_POSITION_THRESHOLD
@@ -274,8 +274,8 @@ class AttachedTo(
 
          Args:
             other (DatasetObject): parent object to attach to.
-            child_link (RigidPrim): male meta link of @self.obj.
-            parent_link (RigidPrim): female meta link of @other.
+            child_link (RigidDynamicPrim): male meta link of @self.obj.
+            parent_link (RigidDynamicPrim): female meta link of @other.
             joint_type (JointType): joint type of the attachment, {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}
             can_joint_break (bool): whether the joint can break or not.
         """
@@ -389,7 +389,7 @@ class AttachedTo(
         """
         if self.parent_link is not None:
             # Remove the attachment joint prim from the stage
-            og.sim.stage.RemovePrim(self.attachment_joint_prim_path)
+            delete_or_deactivate_prim(self.attachment_joint_prim_path)
 
             # Remove child reference from the parent object
             self.parent.states[AttachedTo].children[self.parent_link.body_name] = None
