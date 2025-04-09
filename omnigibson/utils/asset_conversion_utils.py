@@ -52,8 +52,7 @@ _MTL_MAP_TYPE_MAPPINGS = {
     "map_pm": "metalness",
     "map_tf": "opacity",
     "map_ke": "emission",
-    "map_ks": "ao",
-    "map_": "metalness",
+    "map_ks": "reflectivity",
 }
 
 _SPLIT_COLLISION_MESHES = False
@@ -76,6 +75,12 @@ _ALLOWED_META_TYPES = {
     "container": "primitive",
     "collision": "convexmesh",
     "lights": "light",
+}
+
+_OPACITY_CATEGORIES = {"tree", "low_resolution_tree", "bush"}
+
+_VISUAL_ONLY_CATEGORIES = {
+    "carpet",
 }
 
 
@@ -477,6 +482,9 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
+            # Do opacity only for bushes and trees
+            if mat_type == "opacity" and obj_category not in _OPACITY_CATEGORIES:
+                continue
             render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
                 render_channel_fcn(mat, mat_file)
@@ -1633,6 +1641,7 @@ def _get_objects_config_from_element(element, model_pose_info):
                 log.debug(name)
                 assert name in model_pose_info, f"Did not find {name} in current model pose info!"
                 model_pose_info[name]["cfg"]["category"] = ele.get("category")
+                model_pose_info[name]["cfg"]["visual_only"] = ele.get("category") in _VISUAL_ONLY_CATEGORIES
                 model_pose_info[name]["cfg"]["model"] = ele.get("model")
                 model_pose_info[name]["cfg"]["bounding_box"] = (
                     _space_string_to_tensor(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
