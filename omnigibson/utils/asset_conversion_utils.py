@@ -18,9 +18,6 @@ import pymeshlab
 import torch as th
 import trimesh
 
-# import pyassimp
-import numpy as np
-
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
@@ -31,7 +28,7 @@ from omnigibson.scenes import Scene
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
 from omnigibson.utils.usd_utils import create_primitive_mesh
-from omnigibson.utils.python_utils import assert_valid_key
+# from omnigibson.utils.python_utils import assert_valid_key
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -2182,7 +2179,7 @@ def generate_urdf_for_mesh(
         "obj",
         "glb",
         "gltf",
-    ], f"Not obj, glb, gltf file, can only deal with these file types"
+    ], "Not obj, glb, gltf file, can only deal with these file types"
 
     # Convert obj_dir to Path object
     if isinstance(obj_dir, str):
@@ -2369,7 +2366,7 @@ def generate_urdf_for_mesh(
                 )
 
             else:
-                click.echo(f"Size is reasonable, no scaling")
+                click.echo("Size is reasonable, no scaling")
 
         else:
             click.echo("Warning: No links found in the file!")
@@ -2540,7 +2537,7 @@ def generate_urdf_for_mesh(
         visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
         visual_mesh_xml.attrib = {
             "filename": os.path.join("shape", "visual", link_info["visual_filename"]).replace("\\", "/"),
-            "scale": f"1 1 1",  # Using 1.0 scale since transform already applied
+            "scale": "1 1 1",  # Using 1.0 scale since transform already applied
         }
 
         # Add collision geometries

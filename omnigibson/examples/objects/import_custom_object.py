@@ -5,12 +5,10 @@ Improved version that can import obj file and articulated file (glb, gltf).
 
 from typing import Literal
 import click
-import trimesh
 import sys
 import shutil
 import select
 import tempfile
-import time
 import omnigibson as og
 
 from omnigibson.utils.asset_conversion_utils import (
@@ -107,7 +105,7 @@ def import_custom_object(
             # Clean up temp directories before exiting
             for tmp_dir in temp_dirs:
                 shutil.rmtree(tmp_dir)
-            click.echo(f"Error during URDF generation")
+            click.echo("Error during URDF generation")
             raise click.Abort()
     else:
         urdf_path = asset_path

@@ -2,7 +2,9 @@
 Subprocess to run coacd to prevent the generate_collision_meshes() in asset_conversion_utils.py from crashing
 """
 
-import pickle, coacd, sys
+import pickle
+import coacd
+import sys
 
 try:
     with open(sys.argv[1], "rb") as f:
