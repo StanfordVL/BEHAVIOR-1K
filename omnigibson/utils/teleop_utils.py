@@ -31,6 +31,7 @@ log = create_module_logger(module_name=__name__)
 
 m = create_module_macros(module_path=__file__)
 m.movement_speed = 0.5  # the speed of the robot base movement
+m.rotation_speed = 0.1
 
 
 @dataclass
@@ -71,6 +72,7 @@ class TeleopSystem(TeleopPolicy):
         self.robot_arms = None if not self.robot else ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         # robot parameters
         self.movement_speed = m.movement_speed
+        self.rotation_speed = m.rotation_speed
         self.show_control_marker = show_control_marker
 
     def get_obs(self) -> TeleopObservation:
@@ -173,6 +175,7 @@ class OVXRSystem(TeleopSystem):
         if align_to_prim:
             self.set_anchor_with_prim(self.align_anchor_to)
         self.raw_data = {}
+        self.old_raw_data = {}
         # run super method
         super().__init__(teleop_config, robot, show_control_marker)
         # get xr core and profile
@@ -183,6 +186,11 @@ class OVXRSystem(TeleopSystem):
         lazy.carb.settings.get_settings().set(
             "/defaults/xr/profile/" + self.xr_core.get_current_profile_name() + "/controllers/visible",
             self.show_control_marker,
+        )
+        # set override leveled basis to be true (if this is false, headset would not track anchor pitch orientation)
+        allow_roll = False if align_anchor_to == "touchpad" else True
+        lazy.carb.settings.get_settings().set(
+            self.vr_profile.get_persistent_path() + "overrideLeveledBasis", allow_roll
         )
         # set anchor mode to be custom anchor
         lazy.carb.settings.get_settings().set(
@@ -221,6 +229,7 @@ class OVXRSystem(TeleopSystem):
         # we want to further slow down the movement speed if we are using touchpad movement
         if self.align_anchor_to == "touchpad":
             self.movement_speed *= 0.1
+            self.rotation_speed *= 0.3
 
         self.head_canonical_transformation = None
         KeyboardEventHandler.add_keyboard_callback(
@@ -346,6 +355,7 @@ class OVXRSystem(TeleopSystem):
         """
         super().reset()
         self.raw_data = {}
+        self.old_raw_data = {}
         self.teleop_action.is_valid = {"left": False, "right": False, "head": False}
         self.teleop_action.reset = {"left": False, "right": False}
         self.teleop_action.head = th.zeros(6)
@@ -406,10 +416,21 @@ class OVXRSystem(TeleopSystem):
         Steps the VR system and update self.teleop_action
         """
         # update raw data
+        self.old_raw_data = self.raw_data
+        self.raw_data = {}
         if not optimized_for_tour:
             self._update_devices()
             self._update_device_transforms()
         self._update_button_data()
+
+        # Fire the button callbacks
+        # self.raw_data["button_data"]["left"]["press"]["y"]
+        for controller_name, controller_button_data in self.raw_data["button_data"].items():
+            for button_name, button_pressed in controller_button_data["press"].items():
+                if button_pressed and not self.old_raw_data["button_data"][controller_name]["press"][button_name]:
+                    print(f"Button {button_name} pressed on controller {controller_name}")
+                    KeyboardEventHandler.xr_callback(controller_name, button_name)
+
         # Update teleop data based on controller input
         if self.eef_tracking_mode == "controller":
             # update eef related info
@@ -457,7 +478,7 @@ class OVXRSystem(TeleopSystem):
                 continue
             if controller_name == "right" and "right" in self.raw_data["button_data"]:
                 thumbstick = self.raw_data["button_data"][controller_name]["thumbstick"]
-                self.teleop_action.base[2] = -thumbstick["x"] * self.movement_speed
+                self.teleop_action.base[2] = -thumbstick["x"] * self.rotation_speed
                 self.teleop_action.torso = -thumbstick["y"] * self.movement_speed
             elif controller_name == "left" and "left" in self.raw_data["button_data"]:
                 thumbstick = self.raw_data["button_data"][controller_name]["thumbstick"]
