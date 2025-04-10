@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
@@ -924,7 +924,7 @@ class CuRoboMotionGenerator:
 
         attached_info = []
         for ee_link_name, obj in attached_obj.items():
-            assert isinstance(obj, RigidPrim), "attached_object should be a RigidPrim object"
+            assert isinstance(obj, RigidDynamicPrim), "attached_object should be a RigidDynamicPrim object"
             obj_paths = [geom.prim_path for geom in obj.collision_meshes.values()]
             assert len(obj_paths) <= 32, f"Expected obj_paths to be at most 32, got: {len(obj_paths)}"
 

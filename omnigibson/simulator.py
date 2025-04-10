@@ -68,8 +68,7 @@ m.SCENE_MARGIN = 10.0
 m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 m.KIT_FILES = {
-    (4, 0, 0): "omnigibson_4_0_0.kit",
-    (4, 1, 0): "omnigibson_4_1_0.kit",
+    (4, 5, 0): "omnigibson_4_5_0.kit",
 }
 
 
@@ -143,22 +142,18 @@ def _launch_app():
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
-        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
+        app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
-    assert lazy.omni.isaac.core.utils.stage.close_stage()
+    assert lazy.isaacsim.core.utils.stage.close_stage()
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
     logging.getLogger().setLevel(logging.WARNING)
 
-    # Enable additional extensions we need
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.flowusd")
-    lazy.omni.isaac.core.utils.extensions.enable_extension("omni.particle.system.bundle")
-
     # Additional import for windows
     if os.name == "nt":
-        lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.window.viewport")
+        lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.window.viewport")
 
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
@@ -177,13 +172,13 @@ def _launch_app():
         if gm.REMOTE_STREAMING == "native":
             # Enable Native Livestream extension
             # Default App: Streaming Client from the Omniverse Launcher
-            lazy.omni.isaac.core.utils.extensions.enable_extension("omni.kit.livestream.native")
+            lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.livestream.native")
             print(f"Now streaming on {ip} via Omniverse Streaming Client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
-            lazy.omni.isaac.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
+            lazy.isaacsim.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
             raise ValueError(
@@ -218,6 +213,7 @@ def _launch_app():
                 "Flow",
                 "Semantics Schema Editor",
                 "VR",
+                "Isaac Sim Assets [Beta]",
             ]
         )
 
@@ -228,6 +224,15 @@ def _launch_app():
             app.update()
 
     lazy.omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
+
+    # Let the hotkeys propagate.
+    app.update()
+
+    # Disable all hotkeys for now. These are not exactly helpful and they cause collisions with
+    # the OmniGibson-provided hotkeys.
+    hotkey_registry = lazy.omni.kit.hotkeys.core.get_hotkey_registry()
+    for hotkey in list(hotkey_registry.get_all_hotkeys()):
+        hotkey_registry.deregister_hotkey(hotkey)
 
     # TODO: Automated cleanup in callback doesn't work for some reason. Need to investigate.
     shutdown_stream = lazy.omni.kit.app.get_app().get_shutdown_event_stream()
@@ -250,7 +255,7 @@ def _launch_simulator(*args, **kwargs):
     if not og.app:
         og.app = _launch_app()
 
-    class Simulator(lazy.omni.isaac.core.simulation_context.SimulationContext, Serializable):
+    class Simulator(lazy.isaacsim.core.api.SimulationContext, Serializable):
         """
         Simulator class for directly interfacing with the physx physics engine.
 
@@ -284,7 +289,7 @@ def _launch_simulator(*args, **kwargs):
             device=None,
         ):
             assert (
-                lazy.omni.isaac.core.utils.stage.get_current_stage() is None
+                lazy.isaacsim.core.utils.stage.get_current_stage() is None
             ), "Stage should not exist when creating a new Simulator instance"
 
             # Here we assign self as the Simulator instance and as og.sim, because certain functions
@@ -306,6 +311,7 @@ def _launch_simulator(*args, **kwargs):
             self._viewer_camera = None
             self._camera_mover = None
             self._render_on_step = True
+            self.currently_stepping = False
 
             self._floor_plane = None
             self._skybox = None
@@ -418,7 +424,7 @@ def _launch_simulator(*args, **kwargs):
                 self.viewer_height = viewer_height
 
             # Acquire contact sensor interface
-            self._contact_sensor = lazy.omni.isaac.sensor._sensor.acquire_contact_sensor_interface()
+            self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()
 
         def _set_viewer_camera(self, relative_prim_path="/viewer_camera", viewport_name="Viewport"):
             """
@@ -481,25 +487,18 @@ def _launch_simulator(*args, **kwargs):
             self._physics_context.set_gpu_max_rigid_patch_count(gm.GPU_MAX_RIGID_PATCH_COUNT)
 
         def _set_renderer_settings(self):
-            if gm.ENABLE_HQ_RENDERING:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 3)  # "Auto"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", False)
-            else:
-                lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", False)
-                lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
-                lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", False)
-                lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)
+            lazy.carb.settings.get_settings().set_int("/rtx/post/dlss/execMode", 0)  # "Performance"
+            lazy.carb.settings.get_settings().set_bool("/rtx/ambientOcclusion/enabled", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
-            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", False)
+            lazy.carb.settings.get_settings().set_bool("/physics/updateParticlesToUsd", True)
             lazy.carb.settings.get_settings().set_bool("/physics/updateVelocitiesToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateForceSensorsToUsd", False)
             lazy.carb.settings.get_settings().set_bool("/physics/updateResidualsToUsd", False)
@@ -606,7 +605,7 @@ def _launch_simulator(*args, **kwargs):
             if self._floor_plane is not None:
                 return
             ground_plane_relative_path = "/ground_plane"
-            plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
+            plane = lazy.isaacsim.core.api.objects.ground_plane.GroundPlane(
                 prim_path="/World" + ground_plane_relative_path,
                 name="ground_plane",
                 z_position=0,
@@ -628,7 +627,7 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane.load(None)
 
             # Assign floors category to the floor plane
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=self._floor_plane.prim,
                 semantic_label="floors",
                 type_label="class",
@@ -661,28 +660,28 @@ def _launch_simulator(*args, **kwargs):
             """
             return self._sim_step_dt
 
-        def set_sim_step_dt(self, sim_step_dt):
+        def set_simulation_dt(self, physics_dt=None, rendering_dt=None, sim_step_dt=None):
             """
-            Sets the internal simulation step timestep size
+            Unified method to set simulation timestep parameters. Any of the parameters can be None to keep the current
 
             Args:
-                sim_step_dt (float): Timestep size to apply
+                physics_dt (float, optional): Physics simulation timestep
+                rendering_dt (float, optional): Rendering timestep
+                sim_step_dt (float, optional): Internal simulation step timestep
+                    If None, will default to the current value
             """
-            # Sanity check this new dt with respect to the rendering dt
-            rendering_dt = self.get_rendering_dt()
-            self._validate_dts(self.get_physics_dt(), rendering_dt, sim_step_dt)
-
-            self._sim_step_dt = sim_step_dt
-            self._n_steps_per_loop = int(sim_step_dt // rendering_dt)
-
-        def set_simulation_dt(self, physics_dt=None, rendering_dt=None):
-            # Call super first
             super().set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            current_physics_dt = self.get_physics_dt()
+            current_rendering_dt = self.get_rendering_dt()
 
-            # Sanity check all new dts
-            rendering_dt = self.get_rendering_dt()
-            physics_dt = self.get_physics_dt()
-            self._validate_dts(physics_dt, rendering_dt, self._sim_step_dt)
+            if sim_step_dt is not None:
+                self._validate_dts(current_physics_dt, current_rendering_dt, sim_step_dt)
+
+                # Update sim_step_dt and recalculate steps per loop
+                self._sim_step_dt = sim_step_dt
+                self._n_steps_per_loop = int(sim_step_dt // current_rendering_dt)
+            else:
+                self._validate_dts(current_physics_dt, current_rendering_dt, self._sim_step_dt)
 
         def set_lighting_mode(self, mode):
             """
@@ -738,6 +737,8 @@ def _launch_simulator(*args, **kwargs):
             self.stop()
             log.info(f"Imported scene {scene.idx}.")
 
+        # TODO: Remove this context manager and call _post_import_object directly since the objects
+        # are already known when this is called.
         @contextlib.contextmanager
         def adding_objects(self, objs):
             """
@@ -748,12 +749,29 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[BaseObject]): list of objects to add
             """
-            # Immediately yield
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            if self.is_playing() and SimulationManager._physics_sim_view:
+                # Certain operations during object loading invalidate the physics simulation view.
+                # Since this view is required later if initialized, we preemptively invalidate
+                # and de-initialize it to avoid conflicts.
+                SimulationManager._physics_sim_view.invalidate()
+                SimulationManager._physics_sim_view = None
+
             yield
 
             # Run all post-processing on all newly added objects
             for obj in objs:
                 self._post_import_object(obj=obj)
+
+            if self.is_playing():
+                # The objects have been added to the USD stage but PhysX hasn't been synchronized yet.
+                # We must flush USD changes to PhysX before updating handles to avoid errors like
+                # "Provided pattern list did not match any rigid bodies".
+                # The order of operations should strictly be:
+                #   1. Flush USD changes to PhysX
+                #   2. Update handles to reinitialize physics view
+                SimulationManager._physx_sim_interface.flush_changes()
+                self.update_handles()
 
         def _post_import_object(self, obj):
             """
@@ -899,18 +917,28 @@ def _launch_simulator(*args, **kwargs):
             # During rendering, the Fabric API is updated, so we can mark it as clean
             PoseAPI.mark_valid()
 
+        def _refresh_physics_sim_view(self):
+            SimulationManager = lazy.isaacsim.core.simulation_manager.SimulationManager
+            IsaacEvents = lazy.isaacsim.core.simulation_manager.IsaacEvents
+
+            SimulationManager._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(
+                SimulationManager._backend
+            )
+            SimulationManager._physics_sim_view.set_subspace_roots("/")
+            SimulationManager._message_bus.dispatch(IsaacEvents.SIMULATION_VIEW_CREATED.value, payload={})
+            SimulationManager._message_bus.dispatch(IsaacEvents.PHYSICS_READY.value, payload={})
+
         def update_handles(self):
             # Handles are only relevant when physx is running
             if not self.is_playing():
                 return
 
-            # First, refresh the physics sim view
-            self._physics_sim_view = lazy.omni.physics.tensors.create_simulation_view(self.backend)
-            self._physics_sim_view.set_subspace_roots("/")
+            # Refresh the sim view
+            self._refresh_physics_sim_view()
 
             # Then update the handles for all objects
             for scene in self.scenes:
-                if scene is not None and scene.initialized:
+                if scene is not None:
                     for obj in scene.objects:
                         # Only need to update if object is already initialized as well
                         if obj.initialized:
@@ -931,9 +959,6 @@ def _launch_simulator(*args, **kwargs):
             # If we don't have a valid scene, immediately return
             if len(self.scenes) == 0:
                 return
-
-            # Update omni
-            self._omni_update_step()
 
             # If we're playing we, also run additional logic
             if self.is_playing():
@@ -996,14 +1021,6 @@ def _launch_simulator(*args, **kwargs):
                     for scene in self.scenes:
                         scene.transition_rule_api.step()
 
-        def _omni_update_step(self):
-            """
-            Step any omni-related things
-            """
-            # Clear the bounding box and contact caches so that they get updated during the next time they're called
-            RigidContactAPI.clear()
-            GripperRigidContactAPI.clear()
-
         def play(self):
             if not self.is_playing():
                 # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
@@ -1039,15 +1056,20 @@ def _launch_simulator(*args, **kwargs):
                     # We also need to take an additional sim step to make sure simulator is functioning properly.
                     # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
                     # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
-                    if len(self.scenes) > 0 and all([scene.initialized for scene in self.scenes]):
-                        for scene in self.scenes:
-                            for robot in scene.robots:
-                                if robot.initialized:
-                                    robot.update_controller_mode()
+                    for scene in self.scenes:
+                        for robot in scene.robots:
+                            if robot.initialized:
+                                robot.update_controller_mode()
+                                # TODO: Typically, robots should be initialized on the first play() call
+                                # Problem: In multi-environment setups, import_scene() for subsequent environments
+                                # calls play()+stop(), which prematurely triggers initialization before all environments
+                                # are loaded. This is a temporary workaround.
+                                robot.reset()
+                                robot.keep_still()
 
-                            # Also refresh any transition rules that became stale while sim was stopped
-                            if gm.ENABLE_TRANSITION_RULES:
-                                scene.transition_rule_api.refresh_all_rules()
+                        # Also refresh any transition rules that became stale while sim was stopped
+                        if gm.ENABLE_TRANSITION_RULES:
+                            scene.transition_rule_api.refresh_all_rules()
 
                 # Additionally run non physics things
                 self._non_physics_step()
@@ -1121,23 +1143,34 @@ def _launch_simulator(*args, **kwargs):
             """
             self._physics_context._step(current_time=self.current_time)
 
-            # Update all APIs
-            self._omni_update_step()
-            PoseAPI.invalidate()
-
         def _on_pre_physics_step(self):
-            # Run the controller step on every controllable object
-            for scene in self.scenes:
-                for obj in scene.objects:
-                    if isinstance(obj, ControllableObject):
-                        obj.step()
+            # Make it possible to identify that we are currently within a step
+            self.currently_stepping = True
 
-            # Flush the controls from the ControllableObjectViewAPI
-            ControllableObjectViewAPI.flush_control()
+            # Invalidate various APIs so that any reads from them will be updated
+            PoseAPI.invalidate()
+            RigidContactAPI.clear()
+            GripperRigidContactAPI.clear()
+
+            # Only do this if we're not in the warmup phase
+            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                # Run the controller step on every controllable object
+                for scene in self.scenes:
+                    for obj in scene.objects:
+                        if isinstance(obj, ControllableObject):
+                            obj.step()
+
+                # Flush the controls from the ControllableObjectViewAPI
+                ControllableObjectViewAPI.flush_control()
 
         def _on_post_physics_step(self):
-            # Run the post physics update for backend view
-            ControllableObjectViewAPI.post_physics_step()
+            # Only do this if we're not in the warmup phase
+            if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
+                # Run the post physics update for backend view
+                ControllableObjectViewAPI.post_physics_step()
+
+            # Record that we are done with the step context.
+            self.currently_stepping = False
 
         def _on_contact(self, contact_headers, contact_data):
             """
@@ -1279,20 +1312,18 @@ def _launch_simulator(*args, **kwargs):
                 self.play()
 
         @contextlib.contextmanager
-        def slowed(self, dt):
+        def slowed(self, slow_dt=1e-6):
             """
             A context scope for making the simulator simulation dt slowed, e.g.: for taking micro-steps for propagating
             instantaneous kinematics with minimal impact on physics propagation.
 
-            NOTE: This will set both the physics dt and rendering dt to the same value during this scope.
-
             Upon leaving the scope, the prior simulator state is restored.
             """
             # Set dt, yield, then restore the original dt
-            physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
-            self.set_simulation_dt(physics_dt=dt, rendering_dt=dt)
+            physics_dt, rendering_dt, sim_step_dt = self.get_physics_dt(), self.get_rendering_dt(), self._sim_step_dt
+            self.set_simulation_dt(physics_dt=slow_dt, rendering_dt=slow_dt, sim_step_dt=slow_dt)
             yield
-            self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+            self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt, sim_step_dt=sim_step_dt)
 
         def add_callback_on_play(self, name, callback):
             """
@@ -1476,7 +1507,7 @@ def _launch_simulator(*args, **kwargs):
             Returns:
                 Usd.Prim: Prim at /World
             """
-            return lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path="/World")
+            return lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path="/World")
 
         @property
         def floor_plane(self):
@@ -1733,9 +1764,9 @@ def _launch_simulator(*args, **kwargs):
         def device(self):
             """
             Returns:
-                device (None or str): Device used in simulation backend
+                str: Device used in simulation backend
             """
-            return self._device
+            return lazy.isaacsim.core.simulation_manager.SimulationManager.get_physics_sim_device()
 
         @device.setter
         def device(self, device):
@@ -1743,12 +1774,9 @@ def _launch_simulator(*args, **kwargs):
             Sets the device used for sim backend
 
             Args:
-                device (None or str): Device to set for the simulation backend
+                str: Device to set for the simulation backend
             """
-            self._device = device
-            if self._device is not None and "cuda" in self._device:
-                device_id = self._settings.get_as_int("/physics/cudaDevice")
-                self._device = f"cuda:{device_id}"
+            lazy.isaacsim.core.simulation_manager.SimulationManager.set_physics_sim_device(device)
 
         @property
         def initial_physics_dt(self):

@@ -139,7 +139,7 @@ class ScanSensor(BaseSensor):
         super()._initialize()
 
         # Initialize lidar sensor interface
-        self._rs = lazy.omni.isaac.range_sensor._range_sensor.acquire_lidar_sensor_interface()
+        self._rs = lazy.isaacsim.sensors.physx._range_sensor.acquire_lidar_sensor_interface()
 
     @property
     def _obs_space_mapping(self):

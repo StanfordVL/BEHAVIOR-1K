@@ -5,7 +5,7 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
@@ -14,7 +14,6 @@ from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import (
-    FlatcacheAPI,
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
 )
@@ -77,7 +76,6 @@ class MacroParticleSystem(BaseSystem):
         self._particle_template = particle_template
 
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
-        self.particle_object.material.shader_force_populate(render=True)
         self.process_particle_object()
 
     @property
@@ -287,6 +285,8 @@ class MacroParticleSystem(BaseSystem):
         for scale in scales:
             self.add_particle(relative_prim_path=f"{self.relative_prim_path}/particles", scale=scale)
 
+        og.sim.update_handles()
+
         # Set the tfs
         self.set_particles_position_orientation(positions=positions, orientations=orientations)
 
@@ -455,14 +455,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=self.particle_object.prim_path,
                 path_to=prim_path,
             )
-            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,
                 type_label="class",
@@ -539,10 +539,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         scales = self.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
 
         bbox_extents_local = [(self.particle_object.aabb_extent * scale).tolist() for scale in scales]
-
-        # If we're using flatcache, we need to update the object's pose on the USD manually
-        if gm.ENABLE_FLATCACHE:
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=obj)
 
         # Generate particles
         z_up = th.zeros((3, 1))
@@ -1206,16 +1202,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
         # reference the pre-existing one
         prim_path = scene_relative_prim_path_to_absolute(self.scene, relative_prim_path)
-        if not lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path):
+        if not lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path):
             lazy.omni.kit.commands.execute(
                 "CopyPrim",
                 path_from=self.particle_object.prim_path,
                 path_to=prim_path,
             )
             # Apply RigidBodyAPI to it so it is subject to physics
-            prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path)
+            prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
-            lazy.omni.isaac.core.utils.semantics.add_update_semantics(
+            lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,
                 type_label="class",

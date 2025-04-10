@@ -384,14 +384,14 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
         parent_link_prim = None
     else:
         parent_path = f"{root_prim_path}/{parent_link_name}"
-        assert lazy.omni.isaac.core.utils.prims.is_prim_path_valid(
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(
             parent_path
         ), f"Could not find parent link within robot with name {parent_link_name}!"
-        parent_link_prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(parent_path)
+        parent_link_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(parent_path)
 
     # If parent link is defined, link prim should NOT exist (this should be a new link)
     link_prim_path = f"{root_prim_path}/{link_name}"
-    link_prim_exists = lazy.omni.isaac.core.utils.prims.is_prim_path_valid(link_prim_path)
+    link_prim_exists = lazy.isaacsim.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
         assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
         # Manually create a new prim (specified offset)
@@ -399,7 +399,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
             stage=stage,
             link_prim_path=link_prim_path,
         )
-        link_prim_xform = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
+        link_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=link_prim_path)
 
         # Create fixed joint to connect the two together
         create_joint(
@@ -413,7 +413,7 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
         # Set child prim to the appropriate local pose -- this should be the parent local pose transformed by
         # the additional offset
-        parent_prim_xform = lazy.omni.isaac.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
+        parent_prim_xform = lazy.isaacsim.core.prims.xform_prim.XFormPrim(prim_path=parent_path)
         parent_pos, parent_quat = parent_prim_xform.get_local_pose()
         parent_quat = parent_quat[[1, 2, 3, 0]]
         parent_pose = T.pose2mat((th.tensor(parent_pos), th.tensor(parent_quat)))
@@ -728,9 +728,14 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
         assert joint_prim is not None, f"Could not find joint prim with name {joint_name}!"
         return joint_prim.GetAttribute("physics:upperLimit").Get()
 
+    # The original format from Lula is a list of dicts, so we need to convert to a single dict
+    if isinstance(curobo_cfg.collision_spheres, list):
+        collision_spheres = {k: v for c in curobo_cfg.collision_spheres for k, v in c.to_dict().items()}
+    else:
+        collision_spheres = curobo_cfg.collision_spheres.to_dict()
+
     # Generate list of collision link names -- this is simply the list of all link names from the
     # collision spheres specification
-    collision_spheres = curobo_cfg.collision_spheres.to_dict()
     all_collision_link_names = list(collision_spheres.keys())
 
     joint_prims = find_all_joints(robot_prim, only_articulated=True)
@@ -833,7 +838,7 @@ def create_curobo_cfgs(robot_prim, robot_urdf_path, curobo_cfg, root_link, save_
     "--config",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
-    help="Absolute path to robot URDF file to import",
+    help="Absolute path to robot config yaml file to import",
 )
 def import_custom_robot(config):
     # Load config
@@ -857,7 +862,7 @@ def import_custom_robot(config):
     )
 
     # Get current stage
-    stage = lazy.omni.isaac.core.utils.stage.get_current_stage()
+    stage = lazy.isaacsim.core.utils.stage.get_current_stage()
 
     # Add visual spheres, cameras, and lidars
     if cfg.eef_vis_links:
@@ -917,10 +922,8 @@ def import_custom_robot(config):
     #   - all of the root link's descendant links (all links except self)
 
     # Compute AABB
-    bbox_cache = lazy.omni.isaac.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
-    aabb = lazy.omni.isaac.core.utils.bounds.compute_aabb(
-        bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString
-    )
+    bbox_cache = lazy.isaacsim.core.utils.bounds.create_bbox_cache(use_extents_hint=False)
+    aabb = lazy.isaacsim.core.utils.bounds.compute_aabb(bbox_cache=bbox_cache, prim_path=prim.GetPrimPath().pathString)
     z_offset = aabb[2]
 
     # Update the root link's CoM

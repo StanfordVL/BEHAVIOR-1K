@@ -4,7 +4,11 @@ from abc import ABC
 import omnigibson.lazy as lazy
 from omnigibson.utils.python_utils import Recreatable, Serializable
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import delete_or_deactivate_prim, scene_relative_prim_path_to_absolute
+from omnigibson.utils.usd_utils import (
+    delete_or_deactivate_prim,
+    scene_relative_prim_path_to_absolute,
+    get_sdf_value_type_name,
+)
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -100,10 +104,10 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._scene_assigned = True
 
         # Then check if the prim is already loaded
-        if lazy.omni.isaac.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
+        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
             # TODO(parallel-hang): make this more descriptive
             log.debug(f"prim {self.name} already exists, skipping load")
-            self._prim = lazy.omni.isaac.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+            self._prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
         else:
             # If not, we'll load it.
             self._prim = self._load()
@@ -226,7 +230,19 @@ class BasePrim(Serializable, Recreatable, ABC):
         Returns:
             bool: True is the current prim path corresponds to a valid prim in stage. False otherwise.
         """
-        return lazy.omni.isaac.core.utils.prims.is_prim_path_valid(self.prim_path)
+        return lazy.isaacsim.core.utils.prims.is_prim_path_valid(self.prim_path)
+
+    def is_attribute_valid(self, attr):
+        """
+        Check if the attribute is valid for this prim.
+
+        Args:
+            attr (str): Attribute to check
+
+        Returns:
+            bool: True if the attribute is valid for this prim. False otherwise.
+        """
+        return self._prim.GetAttribute(attr).IsValid()
 
     def get_attribute(self, attr):
         """
@@ -246,6 +262,16 @@ class BasePrim(Serializable, Recreatable, ABC):
             val (any): Value to set for the attribute. This should be the valid type for that attribute.
         """
         self._prim.GetAttribute(attr).Set(val)
+
+    def create_attribute(self, attr, val):
+        """
+        Create a new attribute for this prim. Should be a valid attribute under self._prim.GetAttributes()
+
+        Args:
+            attr (str): Attribute to create
+            val (any): Value to set for the attribute. This should be the valid type for that attribute.
+        """
+        self._prim.CreateAttribute(attr, get_sdf_value_type_name(val))
 
     def get_property(self, prop):
         """

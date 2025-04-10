@@ -64,7 +64,6 @@ class XFormPrim(BasePrim):
         # Make sure all xforms have pose and scaling info
         # These only need to be done if we are creating this prim from scratch.
         # Pre-created OG objects' prims always have these things set up ahead of time.
-        # TODO: This is disabled because it does not work as intended. In the future, fix this for speed
         if not self._xform_props_pre_loaded:
             self._set_xform_properties()
 
@@ -234,7 +233,7 @@ class XFormPrim(BasePrim):
             # Ideally we should call usdrt's set local pose directly, but there is no such API.
             # The only available API is SetLocalXformFromUsd, so we update USD first, and then sync to fabric.
             xformable_prim = lazy.usdrt.Rt.Xformable(
-                lazy.omni.isaac.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
+                lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
             )
             assert (
                 not xformable_prim.HasWorldXform()
@@ -265,7 +264,7 @@ class XFormPrim(BasePrim):
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
             return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
         else:
-            position, orientation = lazy.omni.isaac.core.utils.xforms.get_local_pose(self.prim_path)
+            position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
             return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
 
     def set_position(self, position):
@@ -360,6 +359,25 @@ class XFormPrim(BasePrim):
             'set_local_pose is deprecated and will be removed in a future release. Use set_position_orientation(position=position, orientation=orientation, frame="parent") instead'
         )
         return self.set_position_orientation(position, orientation, frame="parent")
+
+    @property
+    def aabb(self):
+        aabb_min, aabb_max = lazy.omni.usd.get_context().compute_path_world_bounding_box(self.prim_path)
+        logger.warning(
+            "Computing AABB of an XFormPrim using the USD context is slow and unreliable, especially when Flatcache is enabled. "
+            "This is provided as a convenience for USD editing use cases and should generally not be used for physical objects."
+        )
+        return th.tensor(aabb_min), th.tensor(aabb_max)
+
+    @property
+    def aabb_center(self):
+        min_corner, max_corner = self.aabb
+        return (min_corner + max_corner) / 2
+
+    @property
+    def aabb_extent(self):
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
 
     def get_world_scale(self):
         """
