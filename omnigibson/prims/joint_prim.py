@@ -113,7 +113,7 @@ class JointPrim(BasePrim):
         super()._post_load()
 
         # Check whether this joint is driven or not
-        self._driven = self._prim.HasAPI(lazy.pxr.UsdPhysics.DriveAPI)
+        self._driven = self._prim.HasAPI(lazy.pxr.UsdPhysics.DriveAPI) and self._load_config.get("driven", False)
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
@@ -776,7 +776,7 @@ class JointPrim(BasePrim):
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         assert self.articulated, "Can only set position for articulated joints!"
         if drive:
-            assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
+            assert self.driven, "Can only use set_pos with drive=True if this joint is driven!"
             assert (
                 self._control_type == ControlType.POSITION
             ), "Trying to set joint position target, but control type is not position!"
@@ -797,9 +797,17 @@ class JointPrim(BasePrim):
             pos = self._denormalize_pos(pos)
 
         # Set the DOF(s) in this joint
-        if drive:
-            self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+                PoseAPI.invalidate()
         else:
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous position
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             PoseAPI.invalidate()
 
@@ -819,7 +827,7 @@ class JointPrim(BasePrim):
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
-            assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
+            assert self.driven, "Can only use set_vel with drive=True if this joint is driven!"
             assert (
                 self._control_type == ControlType.VELOCITY
             ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
@@ -840,9 +848,16 @@ class JointPrim(BasePrim):
             vel = self._denormalize_vel(vel)
 
         # Set the DOF(s) in this joint
-        if drive:
-            self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
         else:
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous velocity
             self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
 
     def set_effort(self, effort, normalized=False):
