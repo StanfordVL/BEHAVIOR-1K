@@ -461,9 +461,13 @@ class VisualGeomPrim(GeomPrim):
         super()._post_load()
 
         # TODO: tmp fix for visible metalinks
-        if "togglebutton" in self.name:
-            # Make sure togglebutton mesh is visible
-            self.purpose = "default"
+        if "meta" in self.name:
+            if "togglebutton" in self.name:
+                # Make sure togglebutton mesh is visible
+                self.purpose = "default"
+            elif any([metalink in self.name for metalink in ["particlesource", "particlesink", "fillable"]]):
+                # Make sure particlesource, particlesink and fillable meshes are not visible
+                self.purpose = "guide"
 
 
 class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):

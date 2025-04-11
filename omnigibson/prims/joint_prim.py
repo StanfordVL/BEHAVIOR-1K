@@ -797,14 +797,17 @@ class JointPrim(BasePrim):
             pos = self._denormalize_pos(pos)
 
         # Set the DOF(s) in this joint
-        if self.driven and drive:
-            self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
-        elif self.driven and not drive:
-            self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
-            self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
-            PoseAPI.invalidate()
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+                PoseAPI.invalidate()
         else:
-            # If we're not driven, set instantaneous position
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous position
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             PoseAPI.invalidate()
 
@@ -845,13 +848,16 @@ class JointPrim(BasePrim):
             vel = self._denormalize_vel(vel)
 
         # Set the DOF(s) in this joint
-        if self.driven and drive:
-            self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
-        elif self.driven and not drive:
-            self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
-            self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
         else:
-            # If we're not driven, set instantaneous velocity
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous velocity
             self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
 
     def set_effort(self, effort, normalized=False):

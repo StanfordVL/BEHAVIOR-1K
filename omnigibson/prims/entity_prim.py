@@ -288,7 +288,7 @@ class EntityPrim(XFormPrim):
                         joint = JointPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
-                            load_config={"driven": self._is_controllable},
+                            load_config={"driven": self.is_driven},
                             articulation_view=self._articulation_view_direct,
                         )
                         joint.load(self.scene)
@@ -367,10 +367,10 @@ class EntityPrim(XFormPrim):
             joint.upper_limit = joint.upper_limit * scale_along_axis
 
     @property
-    def _is_controllable(self) -> bool:
+    def is_driven(self) -> bool:
         """
         Returns:
-            bool: Whether this object is controllable or not
+            bool: Whether this object is actively controlled/driven or not
         """
         return False
 

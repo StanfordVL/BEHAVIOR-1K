@@ -461,10 +461,10 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
     @property
-    def _is_controllable(self) -> bool:
+    def is_driven(self) -> bool:
         """
         Returns:
-            bool: Whether this object is controllable or not
+            bool: Whether this object is actively controlled/driven or not
         """
         return True
 

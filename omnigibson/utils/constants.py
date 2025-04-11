@@ -58,7 +58,7 @@ GROUND_CATEGORIES = frozenset({"floors", "lawn", "driveway", "carpet"})
 
 # Joint friction magic values
 DEFAULT_PRISMATIC_JOINT_FRICTION = 0.3
-DEFAULT_REVOLUTE_JOINT_FRICTION = 0.05
+DEFAULT_REVOLUTE_JOINT_FRICTION = 0.3
 
 # Joint damping value
 DEFAULT_PRISMATIC_JOINT_DAMPING = 5.0
