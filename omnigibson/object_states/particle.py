@@ -16,7 +16,5 @@ class ParticleRequirement(BaseObjectRequirement):
 
     @classmethod
     def is_compatible_asset(cls, prim, **kwargs):
-        if not gm.USE_GPU_DYNAMICS:
-            return False, "Particle systems are not enabled when GPU dynamics is off."
-
+        # No actual requirement on the asset side.
         return True, None
