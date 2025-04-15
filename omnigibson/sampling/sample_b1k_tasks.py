@@ -43,6 +43,14 @@ TASK_CUSTOM_LISTS = {
         },
         "blacklist": None,
     },
+    ("datagen_tidy_table", "house_single_floor"): {
+        "whitelist": {
+            "countertop.n.01": {
+                "bar": ["udatjt"],
+            }
+        },
+        "blacklist": None,
+    },
 }
 
 
@@ -157,7 +165,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             "type": "InteractiveTraversableScene",
             "scene_file": default_scene_fpath,
             "scene_model": args.scene_model,
-            "seg_map_resolution": 1.0,
+            "seg_map_resolution": 0.1,
         },
         "robots": [
             {

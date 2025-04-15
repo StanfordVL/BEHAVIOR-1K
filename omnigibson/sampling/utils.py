@@ -548,15 +548,21 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         def _validate_particle_system_consistency(
             system_name, system_state, current_system_state, check_particle_positions=True
         ):
-            is_micro_physical = issubclass(og.sim.scenes[0].get_system(system_name), MicroPhysicalParticleSystem)
+            is_micro_physical = isinstance(og.sim.scenes[0].get_system(system_name), MicroPhysicalParticleSystem)
             n_particles_key = "instancer_particle_counts" if is_micro_physical else "n_particles"
-            if not th.all(th.isclose(system_state[n_particles_key], current_system_state[n_particles_key])).item():
+            if (
+                is_micro_physical
+                and not th.all(th.isclose(system_state[n_particles_key], current_system_state[n_particles_key])).item()
+            ) or (not is_micro_physical and system_state[n_particles_key] != current_system_state[n_particles_key]):
                 return (
                     False,
-                    f"Got inconsistent number of system {system_name} particles: {system_state['n_particles']} vs. {current_system_state['n_particles']}",
+                    f"Got inconsistent number of system {system_name} particles: {system_state[n_particles_key]} vs. {current_system_state[n_particles_key]}",
                 )
+
             # Validate that no particles went flying -- maximum ranges of positions should be roughly close
-            n_particles = th.sum(system_state[n_particles_key]).item()
+            n_particles = (
+                th.sum(system_state[n_particles_key]).item() if is_micro_physical else system_state[n_particles_key]
+            )
             if n_particles > 0 and check_particle_positions:
                 if is_micro_physical:
                     particle_positions = th.concatenate(
@@ -573,10 +579,10 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 else:
                     particle_positions = th.tensor(system_state["positions"])
                     current_particle_positions = th.tensor(current_system_state["positions"])
-                pos_min, pos_max = th.min(particle_positions, dim=0), th.max(particle_positions, dim=0)
+                pos_min, pos_max = th.min(particle_positions, dim=0).values, th.max(particle_positions, dim=0).values
                 curr_pos_min, curr_pos_max = (
-                    th.min(current_particle_positions, dim=0),
-                    th.max(current_particle_positions, dim=0),
+                    th.min(current_particle_positions, dim=0).values,
+                    th.max(current_particle_positions, dim=0).values,
                 )
                 for name, pos, curr_pos in zip(("min", "max"), (pos_min, pos_max), (curr_pos_min, curr_pos_max)):
                     if not th.all(th.isclose(pos, curr_pos, atol=0.05)).item():
