@@ -20,7 +20,7 @@ class SegmentationMap(BaseMap):
     def __init__(
         self,
         scene_dir,
-        map_resolution=1.0,
+        map_resolution=0.1,
         floor_heights=(0.0,),
     ):
         """
@@ -31,7 +31,7 @@ class SegmentationMap(BaseMap):
         """
         # Store internal values
         self.scene_dir = scene_dir
-        self.map_default_resolution = 1.0  # Default floor plan images are in meters
+        self.map_default_resolution = 0.01  # Default floor plan images are in meters
         self.floor_heights = floor_heights
 
         # Other values that will be loaded at runtime
