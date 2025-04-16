@@ -261,5 +261,7 @@ class A1(ManipulationRobot):
         if self.end_effector == "gripper":
             for gripper_link_name in self._finger_link_names:
                 gripper_link = self.links[gripper_link_name]
-                assert set(gripper_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+                assert set(gripper_link.collision_meshes) == {
+                    "collisions"
+                }, "Gripper link should only have 1 collision!"
                 gripper_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
