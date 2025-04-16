@@ -72,20 +72,12 @@ class ModifiedParticles(RelativeObjectState):
         state_flat = th.tensor([state["n_systems"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
-            state_flat = th.cat(
-                [
-                    state_flat,
-                    th.cat(
-                        [
-                            th.tensor(
-                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
-                                dtype=th.float32,
-                            )
-                            for system_name in system_names
-                        ]
-                    ),
-                ]
-            )
+            system_uuid = [
+                (self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name])
+                for system_name in system_names
+            ]
+            system_uuid = th.tensor(system_uuid, dtype=th.float32).view(-1)
+            state_flat = th.cat([state_flat, system_uuid])
         return state_flat
 
     def deserialize(self, state):
@@ -232,20 +224,12 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[2:]
-            state_flat = th.cat(
-                [
-                    state_flat,
-                    th.cat(
-                        [
-                            th.tensor(
-                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
-                                dtype=th.float32,
-                            )
-                            for system_name in system_names
-                        ]
-                    ),
-                ]
-            )
+            system_uuid = [
+                (self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name])
+                for system_name in system_names
+            ]
+            system_uuid = th.tensor(system_uuid, dtype=th.float32).view(-1)
+            state_flat = th.cat([state_flat, system_uuid])
         return state_flat
 
     def deserialize(self, state):
