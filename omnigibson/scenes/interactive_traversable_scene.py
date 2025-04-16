@@ -34,7 +34,7 @@ class InteractiveTraversableScene(TraversableScene):
         load_room_types=None,
         load_room_instances=None,
         load_task_relevant_only=False,
-        seg_map_resolution=1.0,
+        seg_map_resolution=0.1,
         include_robots=True,
     ):
         """
