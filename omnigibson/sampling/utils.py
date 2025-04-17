@@ -361,6 +361,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": scene_model,
+            # "load_object_categories": ["floors"],
         },
     }
 

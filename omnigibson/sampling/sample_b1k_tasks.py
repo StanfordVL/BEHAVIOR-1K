@@ -102,6 +102,17 @@ TASK_CUSTOM_LISTS = {
         },
         "blacklist": None,
     },
+    ("datagen_pick", "Rs_int"): {
+        "whitelist": {
+            "breakfast_table.n.01": {
+                "breakfast_table": ["bhszwe"],
+            },
+            "coffee_cup.n.01": {
+                "coffee_cup": ["dkxddg"],
+            },
+        },
+        "blacklist": None,
+    },
 }
 
 
@@ -217,6 +228,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             "scene_file": default_scene_fpath,
             "scene_model": args.scene_model,
             "seg_map_resolution": 0.1,
+            # "load_object_categories": ["floors"],
         },
         "robots": [
             {
