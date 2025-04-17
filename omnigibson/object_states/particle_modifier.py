@@ -484,14 +484,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._check_overlap = check_overlap
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
-        for system_name in self.conditions.keys():
-            system = self.obj.scene.get_system(system_name, force_init=False)
-            limit = (
-                self.visual_particle_modification_limit
-                if self.obj.scene.is_visual_particle_system(system_name=system.name)
-                else self.physical_particle_modification_limit
-            )
-            self.obj.states[Saturated].set_limit(system=system, limit=limit)
+        self.obj.states[Saturated].set_visual_particle_limit(self.visual_particle_modification_limit)
+        self.obj.states[Saturated].set_physical_particle_limit(self.physical_particle_modification_limit)
 
     def _generate_condition(self, condition_type, value):
         """
