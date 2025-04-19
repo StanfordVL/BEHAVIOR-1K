@@ -24,7 +24,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
             # Treat particles as cubes
             particle_volume = (system.particle_radius * 2) ** 3
             n_particles = self.obj.states[ContainedParticles].get_value(system).n_in_volume
-            prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
+            prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].link.volume
             # If greater than threshold, then the volume is filled
             # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
             # This has to do with numpy, see https://stackoverflow.com/questions/58408054/typeerror-object-of-type-bool-is-not-json-serializable

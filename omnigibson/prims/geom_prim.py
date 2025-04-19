@@ -4,13 +4,20 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.utils.geometry_utils import (
+    check_points_in_cone,
+    check_points_in_convex_hull_mesh,
+    check_points_in_cube,
+    check_points_in_cylinder,
+    check_points_in_sphere,
+)
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_mesh_to_trimesh_mesh, mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -159,6 +166,64 @@ class GeomPrim(XFormPrim):
             str: the type of the geom prim, one of {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
         """
         return self._prim.GetPrimTypeInfo().GetTypeName()
+
+    @cached_property
+    def mesh_face_centroids(self):
+        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(
+            self.prim, include_normals=False, include_texcoord=False
+        ).convex_hull
+        assert trimesh_mesh.is_convex, f"Trying to get mesh face centroids for a non-convex mesh {self.prim_path}"
+        return th.tensor(trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1), dtype=th.float32)
+
+    @cached_property
+    def mesh_face_normals(self):
+        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(
+            self.prim, include_normals=False, include_texcoord=False
+        ).convex_hull
+        assert trimesh_mesh.is_convex, f"Trying to get mesh face normals for a non-convex mesh {self.prim_path}"
+        return th.tensor(trimesh_mesh.face_normals, dtype=th.float32)
+
+    def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
+        mesh_type = self.prim.GetTypeName()
+        if mesh_type == "Mesh":
+            return check_points_in_convex_hull_mesh(
+                mesh_face_centroids=self.mesh_face_centroids,
+                mesh_face_normals=self.mesh_face_normals,
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif mesh_type == "Sphere":
+            return check_points_in_sphere(
+                size=self.get_attribute("radius"),
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif mesh_type == "Cylinder":
+            return check_points_in_cylinder(
+                size=[self.get_attribute("radius"), self.get_attribute("height")],
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif mesh_type == "Cone":
+            return check_points_in_cone(
+                size=[self.get_attribute("radius"), self.get_attribute("height")],
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif mesh_type == "Cube":
+            return check_points_in_cube(
+                size=self.get_attribute("size"),
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        else:
+            raise ValueError(f"Cannot check in volume for mesh of type: {mesh_type}")
+
+    def check_points_in_volume(self, particle_positions_world):
+        # Move particles into local frame
+        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+
+        # transform self.points into world frame
+        particle_positions_world_homogeneous = th.cat(
+            (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
+        )
+        particle_positions_local = (particle_positions_world_homogeneous @ world_pose_w_scale.T)[:, :3]
+        return self.check_local_points_in_volume(particle_positions_local)
 
     @property
     def points_in_parent_frame(self):

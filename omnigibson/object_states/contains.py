@@ -6,7 +6,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
@@ -32,8 +31,6 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
     def __init__(self, obj):
         super().__init__(obj)
-        self.check_in_volume = None  # Function to check whether particles are in volume for this container
-        self._volume = None  # Volume of this container
         self._compute_info = None  # Intermediate computation information to store
 
     @classproperty
@@ -82,7 +79,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
         # Only calculate if we have valid positions
         if len(checked_positions) > 0:
-            particles_in_volume = self.check_in_volume(checked_positions)
+            particles_in_volume = self.link.check_points_in_volume(checked_positions)
             n_particles_in_volume = particles_in_volume.sum()
 
         return ContainedParticlesData(n_particles_in_volume, raw_positions, particles_in_volume)
@@ -90,22 +87,6 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
-
-        # Generate volume checker function for this object
-        self.check_in_volume, calculate_volume = generate_points_in_volume_checker_function(
-            obj=self.obj, volume_link=self.link
-        )
-
-        # Calculate volume
-        self._volume = calculate_volume()
-
-    @property
-    def volume(self):
-        """
-        Returns:
-            float: Total volume for this container
-        """
-        return self._volume
 
 
 class Contains(RelativeObjectState, BooleanStateMixin):

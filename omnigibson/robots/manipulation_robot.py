@@ -26,7 +26,6 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
@@ -193,8 +192,6 @@ class ManipulationRobot(BaseRobot):
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
         self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
         self._ag_release_counter = {arm: None for arm in self.arm_names}
-        self._ag_check_in_volume = {arm: None for arm in self.arm_names}
-        self._ag_calculate_volume = {arm: None for arm in self.arm_names}
 
         # Call super() method
         super().__init__(
@@ -260,14 +257,6 @@ class ManipulationRobot(BaseRobot):
             self._infer_finger_properties()
         except AssertionError as e:
             log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
-
-        if gm.AG_CLOTH:
-            for arm in self.arm_names:
-                self._ag_check_in_volume[arm], self._ag_calculate_volume[arm] = (
-                    generate_points_in_volume_checker_function(
-                        obj=self, volume_link=self.eef_links[arm], mesh_name_prefixes="container"
-                    )
-                )
 
     def _infer_finger_properties(self):
         """
@@ -1674,7 +1663,7 @@ class ManipulationRobot(BaseRobot):
         # Returns the first cloth that overlaps with the "ghost" box volume
         for cloth_obj in cloth_objs:
             attachment_point_pos = cloth_obj.links["attachment_point"].get_position_orientation()[0]
-            particles_in_volume = self._ag_check_in_volume[arm]([attachment_point_pos])
+            particles_in_volume = self.eef_links[arm].check_points_in_volume([attachment_point_pos])
             if particles_in_volume.sum() > 0:
                 return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos
 

@@ -7,7 +7,6 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.asset_utils import get_all_system_categories
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import Serializable, get_uuid
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
@@ -851,14 +850,6 @@ class PhysicalParticleSystem(BaseSystem):
         # Run sanity checks
         assert self.initialized, "Must initialize system before generating particle instancers!"
 
-        # Generate a checker function to see if particles are within the link's volumes
-        check_in_volume, _ = generate_points_in_volume_checker_function(
-            obj=obj,
-            volume_link=link,
-            use_visual_meshes=use_visual_meshes,
-            mesh_name_prefixes=mesh_name_prefixes,
-        )
-
         # Grab the link's AABB (or fallback to obj AABB if link does not have a valid AABB),
         # and generate a grid of points based on the sampling distance
         try:
@@ -882,7 +873,15 @@ class PhysicalParticleSystem(BaseSystem):
         # Generate 3D-rectangular grid of points
         particle_positions = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
-        particle_positions = particle_positions[th.where(check_in_volume(particle_positions))[0]]
+        particle_positions = particle_positions[
+            th.where(
+                link.check_points_in_volume(
+                    particle_positions_world=particle_positions,
+                    use_visual_meshes=use_visual_meshes,
+                    mesh_name_prefixes=mesh_name_prefixes,
+                )
+            )[0]
+        ]
 
         # Also prune any that in contact with anything if requested
         if check_contact:

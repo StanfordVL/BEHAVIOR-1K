@@ -22,7 +22,6 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
-    generate_points_in_volume_checker_function,
     get_particle_positions_from_frame,
     get_particle_positions_in_frame,
 )
@@ -440,7 +439,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             )
 
             # Generate the function for checking whether points are within the projection mesh
-            self._check_in_mesh, _ = generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
+            self._check_in_mesh = self.link.check_points_in_volume
 
             # Store the projection mesh's IDs
             projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
