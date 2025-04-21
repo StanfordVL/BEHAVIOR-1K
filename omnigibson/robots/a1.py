@@ -43,7 +43,7 @@ class A1(ManipulationRobot):
         finger_static_friction=None,
         finger_dynamic_friction=None,
         # Unique to A1
-        end_effector="gripper",
+        end_effector="inspire",
         **kwargs,
     ):
         """
@@ -106,7 +106,6 @@ class A1(ManipulationRobot):
         """
         # store end effector information
         self.end_effector = end_effector
-        self._model_name = f"a1_{end_effector}"
         if end_effector == "inspire":
             self._eef_link_names = "palm_lower"
             # thumb.proximal, ..., thumb.tip, ..., ring.tip
@@ -180,11 +179,6 @@ class A1(ManipulationRobot):
         )
 
     @property
-    def model_name(self):
-        # Override based on specified A1 variant
-        return self._model_name
-
-    @property
     def discrete_action_list(self):
         raise NotImplementedError()
 
@@ -228,11 +222,19 @@ class A1(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.usd")
+        if self.end_effector == "inspire":
+            return os.path.join(gm.ASSET_PATH, "models/a1/usd/a1_inspire.usda")
+        return super().usd_path
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.urdf")
+        assert self.end_effector == "gripper", "A1 only supports URDF for gripper end effector"
+        return super().urdf_path
+
+    @property
+    def curobot_path(self):
+        assert self.end_effector == "gripper", "A1 only supports URDF for gripper end effector"
+        return super().curobo_path
 
     @property
     def teleop_rotation_offset(self):
@@ -254,14 +256,3 @@ class A1(ManipulationRobot):
         else:
             pairs = [["gripper1", "gripper2"]]
         return pairs
-
-    def _post_load(self):
-        super()._post_load()
-        # We need to manually set the collision approximation for the gripper links to convexDecomposition for A1 with gripper as EEF
-        if self.end_effector == "gripper":
-            for gripper_link_name in self._finger_link_names:
-                gripper_link = self.links[gripper_link_name]
-                assert set(gripper_link.collision_meshes) == {
-                    "collisions"
-                }, "Gripper link should only have 1 collision!"
-                gripper_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
