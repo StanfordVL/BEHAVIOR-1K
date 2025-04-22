@@ -43,7 +43,7 @@ class A1(ManipulationRobot):
         finger_static_friction=None,
         finger_dynamic_friction=None,
         # Unique to A1
-        end_effector="inspire",
+        end_effector="gripper",
         **kwargs,
     ):
         """
