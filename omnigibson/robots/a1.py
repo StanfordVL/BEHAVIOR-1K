@@ -133,7 +133,7 @@ class A1(ManipulationRobot):
             self._finger_link_names = ["gripper1", "gripper2"]
             self._finger_joint_names = ["gripper_joint1", "gripper_joint2"]
             self._default_robot_model_joint_pos = th.cat(
-                [th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571]), th.zeros(2)]
+                [th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, 0.0]), th.zeros(2)]
             )
             self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
             self._ag_start_points = [
