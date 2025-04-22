@@ -451,7 +451,7 @@ class CollisionGeomPrim(GeomPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lazy.isaacsim.core.materials.PhysicsMaterial(prim_path=path)
+                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
 
 
