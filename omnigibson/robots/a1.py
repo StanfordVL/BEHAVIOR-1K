@@ -42,7 +42,8 @@ class A1(ManipulationRobot):
         grasping_mode="physical",
         finger_static_friction=None,
         finger_dynamic_friction=None,
-        end_effector="inspire",
+        # Unique to A1
+        end_effector="gripper",
         **kwargs,
     ):
         """
@@ -99,12 +100,12 @@ class A1(ManipulationRobot):
             finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
                 Note: If specified, this will override any ways that are found within @link_physics_materials for any
                 robot finger gripper links
+            end_effector (str): The end effector type to use. Currently only "gripper" and "inspire" is supported.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # store end effector information
         self.end_effector = end_effector
-        self._model_name = f"a1_{end_effector}"
         if end_effector == "inspire":
             self._eef_link_names = "palm_lower"
             # thumb.proximal, ..., thumb.tip, ..., ring.tip
@@ -126,6 +127,22 @@ class A1(ManipulationRobot):
                 GraspingPoint(link_name="link32", position=th.tensor([0.006, 0.045, 0.003])),
                 GraspingPoint(link_name="link42", position=th.tensor([0.006, 0.04, 0.003])),
                 GraspingPoint(link_name="link52", position=th.tensor([0.006, 0.04, 0.003])),
+            ]
+        elif end_effector == "gripper":
+            self._eef_link_names = "eef_link"
+            self._finger_link_names = ["gripper1", "gripper2"]
+            self._finger_joint_names = ["gripper_joint1", "gripper_joint2"]
+            self._default_robot_model_joint_pos = th.cat(
+                [th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, 0.0]), th.zeros(2)]
+            )
+            self._teleop_rotation_offset = th.tensor([0, 0, 0.707, 0.707])
+            self._ag_start_points = [
+                GraspingPoint(link_name="gripper1", position=th.tensor([0.065, -0.014, 0.0115])),
+                GraspingPoint(link_name="gripper1", position=th.tensor([0.015, -0.014, 0.0115])),
+            ]
+            self._ag_end_points = [
+                GraspingPoint(link_name="gripper2", position=th.tensor([0.065, -0.014, 0.0115])),
+                GraspingPoint(link_name="gripper2", position=th.tensor([0.015, -0.014, 0.0115])),
             ]
         else:
             raise ValueError(f"End effector {end_effector} not supported for A1")
@@ -160,11 +177,6 @@ class A1(ManipulationRobot):
             ),  # gripper grasps in the opposite direction
             **kwargs,
         )
-
-    @property
-    def model_name(self):
-        # Override based on specified A1 variant
-        return self._model_name
 
     @property
     def discrete_action_list(self):
@@ -210,15 +222,19 @@ class A1(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.usd")
+        if self.end_effector == "inspire":
+            return os.path.join(gm.ASSET_PATH, "models/a1/usd/a1_inspire.usda")
+        return super().usd_path
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}.urdf")
+        assert self.end_effector == "gripper", "A1 only supports URDF for gripper end effector"
+        return super().urdf_path
 
     @property
-    def eef_usd_path(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, f"models/a1/{self.model_name}_eef.usd")}
+    def curobot_path(self):
+        assert self.end_effector == "gripper", "A1 only supports URDF for gripper end effector"
+        return super().curobo_path
 
     @property
     def teleop_rotation_offset(self):
@@ -234,8 +250,9 @@ class A1(ManipulationRobot):
 
     @property
     def disabled_collision_pairs(self):
-        # some dexhand has self collisions that needs to be filtered out
-        pairs = [["base_link", "connector"]]
+        # Some self collisions that needs to be filtered out
         if self.end_effector == "inspire":
-            pairs.append(["base_link", "link12"])
+            pairs = [["base_link", "connector"], ["base_link", "link12"]]
+        else:
+            pairs = [["gripper1", "gripper2"]]
         return pairs
