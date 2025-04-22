@@ -45,14 +45,16 @@ _OBJECT_STATE_TEXTURES = {
     "toggledon",
 }
 
+USE_VRAY_MATERIAL = True
+
 _MTL_MAP_TYPE_MAPPINGS = {
-    "map_kd": "albedo",
+    "map_Kd": "diffuse",
     "map_bump": "normal",
-    "map_pr": "roughness",
-    "map_pm": "metalness",
-    "map_tf": "opacity",
-    "map_ke": "emission",
-    "map_ks": "reflectivity",
+    "map_Pm": "metalness",
+    # "map_Pr": "glossiness",
+    # "map_Tf": "refraction",
+    # "map_Ks": "reflection",
+    # No map_Ns (IOR) in OmniPBR.
 }
 
 _SPLIT_COLLISION_MESHES = False
@@ -235,7 +237,7 @@ def _split_all_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="
     return urdf_out_path
 
 
-def _set_mtl_albedo(mtl_prim, texture):
+def _set_mtl_diffuse(mtl_prim, texture):
     mtl = "diffuse_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -246,28 +248,6 @@ def _set_mtl_albedo(mtl_prim, texture):
 def _set_mtl_normal(mtl_prim, texture):
     mtl = "normalmap_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_mtl_ao(mtl_prim, texture):
-    mtl = "ao_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_mtl_roughness(mtl_prim, texture):
-    mtl = "reflectionroughness_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(
-        mtl_prim,
-        "reflection_roughness_texture_influence",
-        1.0,
-        lazy.pxr.Sdf.ValueTypeNames.Float,
-    )
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
@@ -298,15 +278,6 @@ def _set_mtl_opacity(mtl_prim, texture):
     # leaves most objects entirely transparent, so we try to avoid that here.
     lazy.omni.usd.create_material_input(mtl_prim, "opacity_threshold", 0.1, lazy.pxr.Sdf.ValueTypeNames.Float)
 
-    # Verify it was set
-    shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
-    log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
-
-
-def _set_mtl_emission(mtl_prim, texture):
-    mtl = "emissive_color_texture"
-    lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
-    lazy.omni.usd.create_material_input(mtl_prim, "enable_emission", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
     # Verify it was set
     shade = lazy.omni.usd.get_shader_from_material(mtl_prim)
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
@@ -451,26 +422,43 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
                                 map_path_relative_to_usd_dir = os.path.relpath(map_path_absolute, usd_dir)
                                 print("USD path is ", usd_dir)
                                 print("Material path relative to USD is", map_path_relative_to_usd_dir)
-                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = (
-                                    map_path_relative_to_usd_dir
-                                )
+                                mtl_infos[mtl_name][_MTL_MAP_TYPE_MAPPINGS[map_type]] = map_path_relative_to_usd_dir
 
                     print("Found material file:", mtl_name, mtl_infos[mtl_name])
 
-    # Next, for each material information, we create a new material
+    # Next, for each material information, we create a new OmniPBR material
     shaders = OrderedDict()  # maps mtl name to shader prim
     rendering_channel_mappings = {
-        "diffuse": _set_mtl_albedo,
-        "albedo": _set_mtl_albedo,
+        "diffuse": _set_mtl_diffuse,
         "normal": _set_mtl_normal,
-        "ao": _set_mtl_ao,
-        "roughness": _set_mtl_roughness,
         "metalness": _set_mtl_metalness,
-        "opacity": _set_mtl_opacity,
-        "emission": _set_mtl_emission,
     }
     for mtl_name, mtl_info in mtl_infos.items():
-        # Create the new material
+        # Create the Vray material MDL file
+        vray_material_template_fn = pathlib.Path(__file__).parent / "vray_template.mdl"
+        vray_material_template = vray_material_template_fn.read_text()
+        vray_material_name = mtl_name + "_vray"
+        vray_material_variables = {"material_name": mtl_name}
+        vray_material_variables.update(mtl_info)
+        vray_material_definition = vray_material_template.format(**vray_material_variables)
+        vray_material_output_path = (
+            pathlib.Path(dataset_root) / "objects" / obj_category / obj_model / "material" / f"{vray_material_name}.mdl"
+        )
+        vray_material_output_path.write_text(vray_material_definition)
+
+        # Create the USD material from the Vray material
+        mtl_created_list = []
+        lazy.omni.kit.commands.execute(
+            "CreateAndBindMdlMaterialFromLibrary",
+            mdl_name=str(vray_material_output_path),
+            mtl_name=vray_material_name,
+            mtl_created_list=mtl_created_list,
+        )
+        vray_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+        log.debug(f"Created material {vray_material_name}:", vray_mat)
+
+        # Create the OmniPBR material
+        pbr_material_name = mtl_name + "_pbr"
         mtl_created_list = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
@@ -478,25 +466,26 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             mtl_name="OmniPBR",
             mtl_created_list=mtl_created_list,
         )
-        mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
+        pbr_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
 
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
-            # Do opacity only for bushes and trees
-            if mat_type == "opacity" and obj_category not in _OPACITY_CATEGORIES:
-                continue
+            # Use the alpha of the diffuse texture for opacity for trees etc.
+            if mat_type == "diffuse" and obj_category in _OPACITY_CATEGORIES:
+                _set_mtl_opacity(pbr_mat, mat_file)
             render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
-                render_channel_fcn(mat, mat_file)
+                render_channel_fcn(pbr_mat, mat_file)
             else:
                 # Warn user that we didn't find the correct rendering channel
                 log.debug(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
 
         # Rename material
-        mat = _rename_prim(prim=mat, name=mtl_name)
-        shade = lazy.pxr.UsdShade.Material(mat)
+        pbr_mat = _rename_prim(prim=pbr_mat, name=pbr_material_name)
+        selected_mat = vray_mat if USE_VRAY_MATERIAL else pbr_mat
+        shade = lazy.pxr.UsdShade.Material(selected_mat)
         shaders[mtl_name] = shade
-        log.debug(f"Created material {mtl_name}:", mtl_created_list[0])
+        log.debug(f"Created material {pbr_material_name}:", pbr_mat)
 
     # Bind each (visual) mesh to its appropriate material in the object
     # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
