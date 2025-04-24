@@ -9,6 +9,7 @@ import numpy as np
 import torch as th
 import trimesh
 from numba import jit, prange
+from typing import Tuple
 
 import omnigibson as og
 import omnigibson.lazy as lazy
@@ -2034,7 +2035,7 @@ def _compute_relative_poses_torch(
     idx: int,
     n_links: int,
     all_tfs: th.Tensor,
-    base_pose: th.Tensor,
+    base_pose: Tuple[th.Tensor, th.Tensor],
 ):
     tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
     # base vel is the final -1 index
