@@ -34,6 +34,7 @@ from omnigibson.utils.python_utils import (
     create_object_from_init_info,
     get_uuid,
     recursively_convert_to_torch,
+    torch_compile,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -761,6 +762,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self._pose_inv
 
+    @torch_compile
     def convert_world_pose_to_scene_relative(self, position, orientation):
         """
         Convert a world pose to a scene-relative pose.

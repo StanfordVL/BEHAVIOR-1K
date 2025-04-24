@@ -167,7 +167,7 @@ class InteractiveTraversableScene(TraversableScene):
     def _should_load_object(self, obj_info, task_metadata):
         name = obj_info["args"]["name"]
         category = obj_info["args"].get("category", "object")
-        in_rooms = obj_info["args"].get("in_rooms", None)
+        in_rooms = obj_info["args"].get("in_rooms", [])
 
         if isinstance(in_rooms, str):
             assert "," not in in_rooms
