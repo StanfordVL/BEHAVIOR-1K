@@ -1571,7 +1571,7 @@ def _launch_simulator(*args, **kwargs):
                     # Synchronize systems -- we need to check for pruning currently-existing systems,
                     # as well as creating any non-existing systems
                     current_systems = set(scene.active_systems.keys())
-                    load_systems = set(scene_info["state"]["system_registry"].keys())
+                    load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
                     systems_to_remove = current_systems - load_systems
                     systems_to_add = load_systems - current_systems
                     for name in systems_to_remove:

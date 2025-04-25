@@ -89,8 +89,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._use_skybox = use_skybox
         self._transition_rule_api = None
         self._available_systems = None
-        self._pose = None
-        self._pose_inv = None
+        self._pose_info = None
         self._updated_state_objects = None
 
         # Call super init
@@ -110,8 +109,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             else:
                 scene_info = self.scene_file
             init_info = scene_info["objects_info"]["init_info"]
-            self._init_state = scene_info["state"]["object_registry"]
-            self._init_systems = list(scene_info["state"]["system_registry"].keys())
+            # TODO: Remove this backwards-compatibility once newer RC is released
+            self._init_state = scene_info["state"]["registry"]["object_registry"] if "registry" in scene_info["state"] else scene_info["state"]["object_registry"]
+            self._init_systems = list(scene_info["state"]["registry"]["system_registry"].keys()) if "registry" in scene_info["state"] else list(scene_info["state"]["system_registry"].keys())
             task_metadata = (
                 scene_info["metadata"]["task"] if "metadata" in scene_info and "task" in scene_info["metadata"] else {}
             )
@@ -447,9 +447,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             self._load_metadata_from_scene_file()
 
         # Cache this scene's pose
-        self._pose = T.pose2mat(self._scene_prim.get_position_orientation())
-        assert self._pose is not None
-        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
+        pos_ori = self._scene_prim.get_position_orientation()
+        pose = T.pose2mat(pos_ori)
+        self._pose_info = {
+            "pos_ori": pos_ori,
+            "pose": T.pose2mat(pos_ori),
+            "pose_inv": th.linalg.inv_ex(pose).inverse,
+        }
 
         if gm.ENABLE_TRANSITION_RULES:
             assert gm.ENABLE_OBJECT_STATES, "Transition rules require object states to be enabled!"
@@ -689,7 +693,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 - th.Tensor: (3,) position of the scene
                 - th.Tensor: (4,) orientation of the scene
         """
-        return self._scene_prim.get_position_orientation()
+        return self._pose_info["pos_ori"]
 
     def set_position_orientation(self, position=None, orientation=None):
         """
@@ -701,9 +705,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
         # Update the cached pose and inverse pose
-        self._pose = T.pose2mat(self.get_position_orientation())
-        assert self._pose is not None
-        self._pose_inv = th.linalg.inv_ex(self._pose).inverse
+        pos_ori = self._scene_prim.get_position_orientation()
+        pose = T.pose2mat(pos_ori)
+        self._pose_info = {
+            "pos_ori": pos_ori,
+            "pose": T.pose2mat(pos_ori),
+            "pose_inv": th.linalg.inv_ex(pose).inverse,
+        }
 
     @property
     def prim_path(self):
@@ -750,7 +758,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global pose
         """
-        return self._pose
+        return self._pose_info["pose"]
 
     @property
     def pose_inv(self):
@@ -758,7 +766,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             th.Tensor: (4,4) homogeneous transformation matrix representing this scene's global inverse pose
         """
-        return self._pose_inv
+        return self._pose_info["pose_inv"]
 
     def convert_world_pose_to_scene_relative(self, position, orientation):
         """
@@ -939,19 +947,34 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
     def _dump_state(self):
         # Default state for the scene is from the registry alone
-        return self._registry.dump_state(serialized=False)
+        pos, ori = self.get_position_orientation()
+        return {
+            "pos": pos,
+            "ori": ori,
+            "registry": self._registry.dump_state(serialized=False),
+        }
 
     def _load_state(self, state):
-        # Default state for the scene is from the registry alone
-        self._registry.load_state(state=state, serialized=False)
+        # Load scene state, then registry
+        # TODO: Remove backwards compatible check once new scene RC is updated
+        if "pos" in state:
+            self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            self._registry.load_state(state=state["registry"], serialized=False)
+        else:
+            self._registry.load_state(state=state, serialized=False)
 
     def serialize(self, state):
-        # Default state for the scene is from the registry alone
-        return self._registry.serialize(state=state)
+        return th.cat([state["pos"], state["ori"], self._registry.serialize(state=state["registry"])])
 
     def deserialize(self, state):
-        # Default state for the scene is from the registry alone
-        return self._registry.deserialize(state=state)
+        state_dict ={
+            "pos": state[:3],
+            "ori": state[3:7],
+        }
+        idx = 7
+        registry_dict, registry_idx = self._registry.deserialize(state=state[idx:])
+        state_dict["registry"] = registry_dict
+        return state_dict, idx + registry_idx
 
     @classproperty
     def _cls_registry(cls):
