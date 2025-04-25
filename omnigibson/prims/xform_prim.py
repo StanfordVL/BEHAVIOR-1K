@@ -479,21 +479,12 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        if self.scene is None:
-            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
-            pos, ori = self.get_position_orientation()
-        else:
-            pos, ori = self.get_position_orientation(frame="scene")
-
+        pos, ori = self.get_position_orientation()
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
         pos, orn = state["pos"], state["ori"]
-        if self.scene is None:
-            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
-            self.set_position_orientation(pos, orn)
-        else:
-            self.set_position_orientation(pos, orn, frame="scene")
+        self.set_position_orientation(pos, orn)
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"]])
