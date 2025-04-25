@@ -358,8 +358,10 @@ class DataCollectionWrapper(DataWrapper):
         called, it will rollback to this cached checkpoint state
         """
         # Save the current full state and corresponding step idx
+        self.disable_dump_filters()
         self.checkpoint_state = og.sim.save(json_paths=None, as_dict=True)[0]
         self.checkpoint_step_idx = len(self.current_traj_history)
+        self.enable_dump_filters()
 
     def rollback_to_checkpoint(self):
         """
@@ -372,6 +374,9 @@ class DataCollectionWrapper(DataWrapper):
         else:
             # Restore to checkpoint
             og.sim.restore(scene_files=[self.checkpoint_state])
+
+            # Configure the simulator to optimize for data collection
+            self._optimize_sim_for_data_collection(viewport_camera_path=og.sim.viewer_camera.active_camera_path)
 
             # Prune all data stored at the current checkpoint step and beyond
             n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
@@ -434,7 +439,19 @@ class DataCollectionWrapper(DataWrapper):
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
+        self.enable_dump_filters()
+
+    def enable_dump_filters(self):
+        """
+        Enables dump filters for optimized per-step state caching
+        """
         self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
+
+    def disable_dump_filters(self):
+        """
+        Disables dump filters for full state caching
+        """
+        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: True)
 
     def reset(self):
         # Call super first
@@ -649,6 +666,9 @@ class DataPlaybackWrapper(DataWrapper):
                 robot_cfg["sensor_config"] = robot_sensor_config
         if external_sensors_config is not None:
             config["env"]["external_sensors"] = external_sensors_config
+
+        # Make sure task includes task observations
+        config["task"]["include_obs"] = True
 
         # Load env
         env = og.Environment(configs=config)

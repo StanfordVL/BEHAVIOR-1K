@@ -25,9 +25,10 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             specific to the task class. Default is None, which corresponds to a default config being usd. Note that
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
+        include_obs (bool): Whether to include observations or not for this task
     """
 
-    def __init__(self, termination_config=None, reward_config=None):
+    def __init__(self, termination_config=None, reward_config=None, include_obs=True):
         # Make sure configs are dictionaries
         termination_config = dict() if termination_config is None else termination_config
         reward_config = dict() if reward_config is None else reward_config
@@ -58,6 +59,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._success = None
         self._info = None
         self._low_dim_obs_dim = None
+        self._include_obs = include_obs
 
         # Run super init
         super().__init__()
@@ -328,6 +330,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
     def get_obs(self, env, flatten_low_dim=True):
         # Args: env (Environment): environment instance
         # Args: flatten_low_dim (bool): Whether to flatten low-dimensional observations
+
+        if not self._include_obs:
+            return dict()
 
         # Grab obs internally
         low_dim_obs, obs = self._get_obs(env=env)

@@ -67,6 +67,7 @@ class BehaviorTask(BaseTask):
             specific to the task class. Default is None, which corresponds to a default config being usd. Note that
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
+        include_obs (bool): Whether to include observations or not for this task
     """
 
     def __init__(
@@ -81,6 +82,7 @@ class BehaviorTask(BaseTask):
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
+        include_obs=True,
     ):
         # Make sure object states are enabled
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
@@ -132,7 +134,7 @@ class BehaviorTask(BaseTask):
         self.activity_natural_language_goal_conditions = None  # str
 
         # Run super init
-        super().__init__(termination_config=termination_config, reward_config=reward_config)
+        super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
 
     @classmethod
     def get_cached_activity_scene_filename(
