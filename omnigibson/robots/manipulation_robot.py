@@ -1188,31 +1188,33 @@ class ManipulationRobot(BaseRobot):
         # (per arm appendage)
         # Since we'll be calculating the cartesian cross product between start and end points, we stack the start points
         # by the number of end points and repeat the individual elements of the end points by the number of start points
-        startpoints = []
-        endpoints = []
+        n_start_points = len(self.assisted_grasp_start_points[arm])
+        n_end_points = len(self.assisted_grasp_end_points[arm])
+        start_and_end_points = th.zeros(n_start_points + n_end_points, 3)
+        link_positions = th.zeros(n_start_points + n_end_points, 3)
+        link_quats = th.zeros(n_start_points + n_end_points, 4)
+        idx = 0
         for grasp_start_point in self.assisted_grasp_start_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_start_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to startpoints
-            start_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_start_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            startpoints.append(start_point)
-        # Repeat for end points
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_start_point.position
+            idx += 1
+
         for grasp_end_point in self.assisted_grasp_end_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_end_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to endpoints
-            end_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_end_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            endpoints.append(end_point)
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_end_point.position
+            idx += 1
+
+        # Transform start / end points into world frame (batched call for efficiency sake)
+        start_and_end_points = link_positions + (T.quat2mat(link_quats) @ start_and_end_points.unsqueeze(-1)).squeeze(-1)
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
-        n_startpoints, n_endpoints = len(startpoints), len(endpoints)
-        raycast_startpoints = startpoints * n_endpoints
-        raycast_endpoints = []
-        for endpoint in endpoints:
-            raycast_endpoints += [endpoint] * n_startpoints
+        raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
+        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
         ray_data = set()
         # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
