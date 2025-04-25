@@ -380,6 +380,8 @@ def create_stable_scene_json(scene_model, record_feedback=False):
 
     # Sanity check for zero velocities for all objects
     stable_state = og.sim.dump_state()[0]
+    if "registry" in stable_state:
+        stable_state = stable_state["registry"]
     invalid_msgs = []
     for obj_name, obj_info in stable_state["object_registry"].items():
         valid_obj, err_msg = _validate_object_state_stability(obj_name, obj_info, strict=False)
@@ -490,7 +492,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         return True, None
 
     task_state_t0 = og.sim.dump_state(serialized=False)[0]
-    for obj_name, obj_info in task_scene_dict["state"]["object_registry"].items():
+    if "registry" in task_state_t0:
+        task_state_t0 = task_state_t0["registry"]
+    for obj_name, obj_info in task_scene_dict["state"]["registry"]["object_registry"].items():
         current_obj_info = task_state_t0["object_registry"][obj_name]
         valid_obj, err_msg = _validate_identical_object_kinematic_state(
             obj_name, obj_info, current_obj_info, check_vel=True
@@ -509,7 +513,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     print(f"Step 2: Checking poses and joint states for non-task-relevant objects and velocities for all objects...")
 
     # Sanity check all non-task-relevant object poses
-    for obj_name, default_obj_info in default_scene_dict["state"]["object_registry"].items():
+    for obj_name, default_obj_info in default_scene_dict["state"]["registry"]["object_registry"].items():
         # Skip any active objects since they may have changed
         if obj_name in active_obj_names:
             continue
@@ -544,6 +548,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # Take a single physics step
     og.sim.step()
     task_state_t1 = og.sim.dump_state(serialized=False)[0]
+    if "registry" in task_state_t1:
+        task_state_t1 = task_state_t1["registry"]
 
     def _validate_scene_stability(task, task_state, current_state, check_particle_positions=True):
         def _validate_particle_system_consistency(
@@ -656,6 +662,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # Don't check particle positions since some particles may be falling
     # TODO: Tighten this constraint once we figure out a way to stably sample particles
     task_state_t11 = og.sim.dump_state(serialized=False)[0]
+    if "registry" in task_state_t11:
+        task_state_t11 = task_state_t11["registry"]
     valid_scene, err_msg = _validate_scene_stability(
         task=task, task_state=task_state_t0, current_state=task_state_t11, check_particle_positions=False
     )
