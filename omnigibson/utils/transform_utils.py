@@ -769,7 +769,7 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
 
 
 @torch_compile
-def pose_inv(pose_mat):
+def pose_inv(pose_mat: torch.Tensor) -> torch.Tensor:
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
     frame B in frame A. The inverse is the pose of frame A in frame B.

@@ -4,6 +4,7 @@ import math
 import os
 import re
 from collections.abc import Iterable
+from typing import Tuple
 
 import numpy as np
 import torch as th
@@ -2034,7 +2035,7 @@ def _compute_relative_poses_torch(
     idx: int,
     n_links: int,
     all_tfs: th.Tensor,
-    base_pose: th.Tensor,
+    base_pose: Tuple[th.Tensor, th.Tensor],
 ):
     tfs = th.zeros((n_links, 4, 4), dtype=th.float32)
     # base vel is the final -1 index
