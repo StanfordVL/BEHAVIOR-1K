@@ -5,22 +5,11 @@ mdl 1.6;
 
 // Import
 import ::anno::*;
-import ::base::transform_coordinate;
-import ::base::rotation_translation_scale;
-import ::base::file_texture;
-import ::base::mono_mode;
-import ::base::texture_coordinate_info;
 import ::base::texture_return;
-import ::state::normal;
-import ::state::texture_coordinate;
-import ::state::texture_tangent_u;
-import ::state::texture_tangent_v;
-import ::tex::gamma_mode;
-import ::tex::wrap_mode;
-import ::ad_3dsmax_materials::*;
-import ::ad_3dsmax_maps::*;
-import ::vray_materials::*;
-import ::vray_maps::*;
+import .::vray_maps::VRayBitmap;
+import .::vray_maps::VRayBitmap_bump;
+import .::vray_maps::vray_mono_output;
+import .::vray_materials::VRayMtl;
 
 export material OmniGibsonVRayMtl(
 	uniform texture_2d diffuse_texture = texture_2d() [[
@@ -55,239 +44,32 @@ export material OmniGibsonVRayMtl(
 [[
     anno::display_name("OmniGibsonVRayMtl")
 ]]
-= ::vray_materials::VRayMtl(
-    Diffuse : ::vray_maps::VRayBitmap(
-        filename : diffuse_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+= .::vray_materials::VRayMtl(
+    Diffuse : .::vray_maps::VRayBitmap(
+        filename : diffuse_texture
     ).tint,
-    diffuse_roughness : 0.0f,
-    Reflection : ::vray_maps::VRayBitmap(
-        filename : reflection_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+    Reflection : .::vray_maps::VRayBitmap(
+        filename : reflection_texture
     ).tint,
-    reflection_glossiness : ::vray_maps::VRayBitmap(
-        filename : glossiness_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+    reflection_glossiness : .::vray_maps::VRayBitmap(
+        filename : glossiness_texture
     ).mono,
     reflection_fresnel : true,
-    reflection_ior : ::vray_maps::VRayBitmap(
-        filename : reflection_ior_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+    reflection_ior : .::vray_maps::VRayBitmap(
+        filename : reflection_ior_texture
     ).mono,
     reflection_lockIOR : false,
-    invert_reflection_ior : false,
-    reflection_metalness : ::vray_maps::VRayBitmap(
-        filename : metalness_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+    reflection_metalness : .::vray_maps::VRayBitmap(
+        filename : metalness_texture
     ).mono,
-    Refraction : ::vray_maps::VRayBitmap(
-        filename : refraction_texture,
-        crop_enable : false,
-        crop_u : 0.0f,
-        crop_w : 1.0f,
-        crop_v : 0.0f,
-        crop_h : 1.0f,
-        multiplier : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f
+    Refraction : .::vray_maps::VRayBitmap(
+        filename : refraction_texture
     ).tint,
-    refraction_glossiness : 1.0f,
-    refraction_ior : 1.6f,
-    invert_refraction_ior : false,
-    refraction_dispersion_on : false,
-    refraction_dispersion : 50.0f,
-    refraction_fogColor : color(1.0,1.0,1.0),
-    refraction_fogBias : 0.0f,
-    refraction_fogMult : 1.0f,
-    translucency_on : ::vray_materials::translucency_none,
-    translucency_scatterCoeff : 0.0f,
-    translucency_fbCoeff : 1.0f,
-    translucency_color : color(1.0,1.0,1.0),
-    self_illumination : color(0.0,0.0,0.0),
-    self_illumination_multiplier : 1.0f,
-    coat_amount : 0.0f,
-    coat_color : color(1.0,1.0,1.0),
-    coat_glossiness : 1.0f,
-    coat_ior : 1.6f,
-    invert_coat_ior : false,
-    coat_bump_lock : false,
-    sheen_color : color(0.0,0.0,0.0),
-    sheen_glossiness : 0.8f,
-    brdf_type : ::vray_materials::brdf_ggx,
-    brdf_useRoughness : ::vray_materials::brdf_glossiness,
-    anisotropy : 0.0f,
-    anisotropy_rotation : 0.0f,
-    anisotropy_channel : 1,
-    texmap_bump : ::ad_3dsmax_maps::ad_3dsmax_bitmap_bump(
-        filename : normal_texture,
-        cliph : 1.0f,
-        clipu : 0.0f,
-        clipv : 0.0f,
-        clipw : 1.0f,
-        mapChannel : 1,
-        U_angle : 0.0f,
-        U_Mirror : false,
-        U_Offset : 0.0f,
-        U_Tile : true,
-        U_Tiling : 1.0f,
-        UVW_Type : 0,
-        V_angle : 0.0f,
-        V_Mirror : false,
-        V_Offset : 0.0f,
-        V_Tile : true,
-        V_Tiling : 1.0f,
-        W_angle : 0.0f,
-        alphaFromRGB : false,
-        bump_amount : 1.0f,
-        clamp : false,
-        invert : false,
-        output_amount : 1.0f,
-        rgb_level : 1.0f,
-        rgb_offset : 0.0f,
-        factor : 0.9f
+    texmap_bump : .::vray_maps::VRayBitmap_bump(
+        filename : normal_texture
     ),
-    texmap_opacity : 1.0f
+    texmap_opacity : .::vray_maps::VRayBitmap(
+        filename : diffuse_texture,
+        mono_output: .::vray_maps::mono_output_alpha
+    ).mono
 );
