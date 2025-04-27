@@ -51,10 +51,10 @@ _MTL_MAP_TYPE_MAPPINGS = {
     "map_Kd": "diffuse",
     "map_bump": "normal",
     "map_Pm": "metalness",
-    # "map_Pr": "glossiness",
-    # "map_Tf": "refraction",
-    # "map_Ks": "reflection",
-    # No map_Ns (IOR) in OmniPBR.
+    "map_Pr": "glossiness",
+    "map_Tf": "refraction",
+    "map_Ks": "reflection",
+    "map_Ns": "reflection_ior",
 }
 
 _SPLIT_COLLISION_MESHES = False
@@ -237,7 +237,7 @@ def _split_all_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="
     return urdf_out_path
 
 
-def _set_mtl_diffuse(mtl_prim, texture):
+def _set_omnipbr_mtl_diffuse(mtl_prim, texture):
     mtl = "diffuse_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -245,7 +245,7 @@ def _set_mtl_diffuse(mtl_prim, texture):
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def _set_mtl_normal(mtl_prim, texture):
+def _set_omnipbr_mtl_normal(mtl_prim, texture):
     mtl = "normalmap_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     # Verify it was set
@@ -253,7 +253,7 @@ def _set_mtl_normal(mtl_prim, texture):
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def _set_mtl_metalness(mtl_prim, texture):
+def _set_omnipbr_mtl_metalness(mtl_prim, texture):
     mtl = "metallic_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "metallic_texture_influence", 1.0, lazy.pxr.Sdf.ValueTypeNames.Float)
@@ -262,7 +262,7 @@ def _set_mtl_metalness(mtl_prim, texture):
     log.debug(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
 
 
-def _set_mtl_opacity(mtl_prim, texture):
+def _set_omnipbr_mtl_opacity(mtl_prim, texture):
     mtl = "opacity_texture"
     lazy.omni.usd.create_material_input(mtl_prim, mtl, texture, lazy.pxr.Sdf.ValueTypeNames.Asset)
     lazy.omni.usd.create_material_input(mtl_prim, "enable_opacity", True, lazy.pxr.Sdf.ValueTypeNames.Bool)
@@ -428,34 +428,16 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
 
     # Next, for each material information, we create a new OmniPBR material
     shaders = OrderedDict()  # maps mtl name to shader prim
-    rendering_channel_mappings = {
-        "diffuse": _set_mtl_diffuse,
-        "normal": _set_mtl_normal,
-        "metalness": _set_mtl_metalness,
-    }
     for mtl_name, mtl_info in mtl_infos.items():
-        # Create the Vray material MDL file
-        vray_material_template_fn = pathlib.Path(__file__).parent / "vray_template.mdl"
-        vray_material_template = vray_material_template_fn.read_text()
-        vray_material_name = mtl_name + "_vray"
-        vray_material_variables = {"material_name": mtl_name}
-        vray_material_variables.update(mtl_info)
-        vray_material_definition = vray_material_template.format(**vray_material_variables)
-        vray_material_output_path = (
-            pathlib.Path(dataset_root) / "objects" / obj_category / obj_model / "material" / f"{vray_material_name}.mdl"
-        )
-        vray_material_output_path.write_text(vray_material_definition)
-
-        # Create the USD material from the Vray material
+        # Create the Vray material
         mtl_created_list = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name=str(vray_material_output_path),
-            mtl_name=vray_material_name,
+            mdl_name="omnigibson_vray_mtl.mdl",
+            mtl_name="OmniGibsonVRayMtl",
             mtl_created_list=mtl_created_list,
         )
         vray_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-        log.debug(f"Created material {vray_material_name}:", vray_mat)
 
         # Create the OmniPBR material
         pbr_material_name = mtl_name + "_pbr"
@@ -467,12 +449,23 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
             mtl_created_list=mtl_created_list,
         )
         pbr_mat = lazy.omni.isaac.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-
+        rendering_channel_mappings = {
+            "diffuse": _set_omnipbr_mtl_diffuse,
+            "normal": _set_omnipbr_mtl_normal,
+            "metalness": _set_omnipbr_mtl_metalness,
+        }
         # Apply all rendering channels for this material
         for mat_type, mat_file in mtl_info.items():
+            # First assign the Vray material channels. These are simple - all the channels
+            # are just named x_texture for channel x.
+            lazy.omni.usd.create_material_input(
+                vray_mat, f"{mat_type}_texture", mat_file, lazy.pxr.Sdf.ValueTypeNames.Asset
+            )
+
+            # Do the OmniPBR material next
             # Use the alpha of the diffuse texture for opacity for trees etc.
             if mat_type == "diffuse" and obj_category in _OPACITY_CATEGORIES:
-                _set_mtl_opacity(pbr_mat, mat_file)
+                _set_omnipbr_mtl_opacity(pbr_mat, mat_file)
             render_channel_fcn = rendering_channel_mappings.get(mat_type, None)
             if render_channel_fcn is not None:
                 render_channel_fcn(pbr_mat, mat_file)
