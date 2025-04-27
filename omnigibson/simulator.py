@@ -139,6 +139,9 @@ def _launch_app():
     except Exception as e:
         raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
 
+    # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
+    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):
@@ -1602,7 +1605,7 @@ def _launch_simulator(*args, **kwargs):
                     # Synchronize systems -- we need to check for pruning currently-existing systems,
                     # as well as creating any non-existing systems
                     current_systems = set(scene.active_systems.keys())
-                    load_systems = set(scene_info["state"]["system_registry"].keys())
+                    load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
                     systems_to_remove = current_systems - load_systems
                     systems_to_add = load_systems - current_systems
                     for name in systems_to_remove:

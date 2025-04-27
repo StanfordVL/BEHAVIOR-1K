@@ -796,7 +796,12 @@ def recursively_convert_to_torch(state):
         if isinstance(value, dict):
             state[key] = recursively_convert_to_torch(value)
         elif isinstance(value, list):
-            state[key] = th.tensor(value, dtype=th.float32)
+            # Convert to torch tensor if all elements are numeric and have consistent shapes
+            try:
+                state[key] = th.tensor(value, dtype=th.float32)
+            except:
+                pass
+
     return state
 
 
