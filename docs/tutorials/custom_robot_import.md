@@ -423,10 +423,6 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
      
         We offer a more in-depth description of a couple of more advanced properties for ManipulationRobots below:
 
-        - `eef_usd_path`: if you want to teleoperate the robot using I/O devices other than keyboard, this usd path is needed to load the visualizer for the robot eef that would be used as a visual aid when teleoperating. To get such file, duplicate the robot USD file, and remove every prim except the robot end effector. You can then put the file path in the `eef_usd_path` attribute. Here is an example of the Franka Panda end effector USD:
-
-         ![Franka Panda EEF](../assets/tutorials/franka_panda_eef.png)
-
         - `assisted_grasp_start_points`, `assisted_grasp_end_points`: you need to implement this if you want to use sticky grasp/assisted grasp on the new robot.
     
             These points are `omnigibson.robots.manipulation_robot.GraspingPoint` that is defined by the end effector link name and the relative position of the point w.r.t. to the pose of the link. Basically when the gripper receives a close command and OmniGibson tries to perform assisted grasping, it will cast rays from every start point to every end point, and if there is one object that is hit by any rays, then we consider the object is grasped by the robot. 

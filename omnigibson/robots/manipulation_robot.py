@@ -1827,14 +1827,6 @@ class ManipulationRobot(BaseRobot):
         return classes
 
     @property
-    def eef_usd_path(self):
-        """
-        Returns:
-            dict(str, str): dict mapping arm name to the path to the eef usd file
-        """
-        raise NotImplementedError
-
-    @property
     def teleop_rotation_offset(self):
         """
         Rotational offset that will be applied for teleoperation

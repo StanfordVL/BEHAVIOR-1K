@@ -10,6 +10,7 @@ import numpy as np
 import torch as th
 import trimesh
 from numba import jit, prange
+from typing import Tuple
 
 import omnigibson as og
 import omnigibson.lazy as lazy
