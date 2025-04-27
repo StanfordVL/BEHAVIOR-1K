@@ -110,8 +110,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_info = self.scene_file
             init_info = scene_info["objects_info"]["init_info"]
             # TODO: Remove this backwards-compatibility once newer RC is released
-            self._init_state = scene_info["state"]["registry"]["object_registry"] if "registry" in scene_info["state"] else scene_info["state"]["object_registry"]
-            self._init_systems = list(scene_info["state"]["registry"]["system_registry"].keys()) if "registry" in scene_info["state"] else list(scene_info["state"]["system_registry"].keys())
+            self._init_state = (
+                scene_info["state"]["registry"]["object_registry"]
+                if "registry" in scene_info["state"]
+                else scene_info["state"]["object_registry"]
+            )
+            self._init_systems = (
+                list(scene_info["state"]["registry"]["system_registry"].keys())
+                if "registry" in scene_info["state"]
+                else list(scene_info["state"]["system_registry"].keys())
+            )
             task_metadata = (
                 scene_info["metadata"]["task"] if "metadata" in scene_info and "task" in scene_info["metadata"] else {}
             )
@@ -967,7 +975,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return th.cat([state["pos"], state["ori"], self._registry.serialize(state=state["registry"])])
 
     def deserialize(self, state):
-        state_dict ={
+        state_dict = {
             "pos": state[:3],
             "ori": state[3:7],
         }
