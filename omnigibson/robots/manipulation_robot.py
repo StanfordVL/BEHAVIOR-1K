@@ -1211,7 +1211,9 @@ class ManipulationRobot(BaseRobot):
             idx += 1
 
         # Transform start / end points into world frame (batched call for efficiency sake)
-        start_and_end_points = link_positions + (T.quat2mat(link_quats) @ start_and_end_points.unsqueeze(-1)).squeeze(-1)
+        start_and_end_points = link_positions + (T.quat2mat(link_quats) @ start_and_end_points.unsqueeze(-1)).squeeze(
+            -1
+        )
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
         raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
         raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
@@ -1823,14 +1825,6 @@ class ManipulationRobot(BaseRobot):
         classes = super()._do_not_register_classes
         classes.add("ManipulationRobot")
         return classes
-
-    @property
-    def eef_usd_path(self):
-        """
-        Returns:
-            dict(str, str): dict mapping arm name to the path to the eef usd file
-        """
-        raise NotImplementedError
 
     @property
     def teleop_rotation_offset(self):

@@ -15,6 +15,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
+from omnigibson.utils.render_utils import force_pbr_material_for_link
 from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
@@ -255,6 +256,10 @@ class EntityPrim(XFormPrim):
                 link_cls = RigidKinematicPrim if is_kinematic else RigidDynamicPrim
             else:  # link_type == PrimType.CLOTH
                 link_cls = ClothPrim
+
+            # Apply the V-Ray to PBR material change if request by the macro
+            if gm.USE_PBR_MATERIALS:
+                force_pbr_material_for_link(self._prim, link_name)
 
             # Create and load the link
             self._links[link_name] = link_cls(
@@ -1676,7 +1681,7 @@ class EntityPrim(XFormPrim):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
         root_link_state, idx = self.root_link.deserialize(state=state[1:])
-        idx += 1            # Incremented 1 from is_asleep value
+        idx += 1  # Incremented 1 from is_asleep value
         state_dict = dict(is_asleep=is_asleep, root_link=root_link_state)
         if self.n_joints > 0:
             for jnt_state in ("pos", "vel"):

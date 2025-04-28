@@ -212,6 +212,9 @@ gm.AG_CLOTH = False
 # Forced light intensity for all DatasetObjects. None if the USD-provided intensities should be respected.
 gm.FORCE_LIGHT_INTENSITY = 10000
 
+# Whether to default the dataset objects to use the shipped V-Ray or OmniPBR materials
+gm.USE_PBR_MATERIALS = True
+
 # Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
 gm.FORCE_ROUGHNESS = 0.7
 

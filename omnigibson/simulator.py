@@ -139,6 +139,9 @@ def _launch_app():
     except Exception as e:
         raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
 
+    # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
+    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+
     launch_context = nullcontext if gm.DEBUG else suppress_omni_log
 
     with launch_context(None):

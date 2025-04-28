@@ -1,0 +1,983 @@
+// Copyright 2023 NVIDIA Corporation. All rights reserved.
+//
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto.  Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+mdl 1.8;
+
+import ::anno::*;
+import ::base::*;
+import ::math::*;
+import ::state::*;
+import ::tex::*;
+
+export using ::base import texture_return;
+
+// Returns the normal n in tangent space, given n is in internal space.
+float3 transform_internal_to_tangent(float3 n)
+{
+    return
+        n.x * float3(state::texture_tangent_u(0).x, state::texture_tangent_v(0).x, state::normal().x) +
+        n.y * float3(state::texture_tangent_u(0).y, state::texture_tangent_v(0).y, state::normal().y) +
+        n.z * float3(state::texture_tangent_u(0).z, state::texture_tangent_v(0).z, state::normal().z);
+}
+
+// 3dsmax Bitmap Transformation Matrix
+uniform float4x4 max_rotation_translation_scale
+(
+    uniform float3 rotation = float3(0.)
+        [[ anno::description("Rotation applied to every UVW coordinate") ]],
+    uniform float3 translation = float3(0.)
+        [[ anno::description("Offset applied to every UVW coordinate") ]],
+    uniform float3 scaling = float3(1.)
+        [[ anno::description("Scale applied to every UVW coordinate") ]],
+    uniform bool u_mirror = false
+        [[ anno::description("Mirror repeat has twice the number of textures in the same space") ]],
+    uniform bool v_mirror = false
+        [[ anno::description("Mirror repeat has twice the number of textures in the same space") ]]
+)
+[[
+        anno::description("Construct transformation matrix from Euler rotation, translation and scale")
+]]
+{
+    float4x4 scale =
+        float4x4(u_mirror?scaling.x*2.:scaling.x         , 0.         , 0. , 0.,
+                 0.                , v_mirror?scaling.y*2.:scaling.y  , 0. , 0.,
+                 0.                , 0.                , scaling.z         , 0.,
+                 u_mirror?1.:.5    , v_mirror?1.:.5    , .5                , 1.);
+
+    float4x4 translate =
+        float4x4(1.                , 0.                , 0.                , 0.,
+                 0.                , 1.                , 0.                , 0.,
+                 0.                , 0.                , 1.                , 0.,
+                 -0.5-translation.x, -0.5-translation.y, -0.5-translation.z, 1.);
+
+
+    // Euler rotation matrix  xyz order
+    float3 s = math::sin(rotation);
+    float3 c = math::cos(rotation);
+    float4x4 rotate =
+        float4x4(  c.y*c.z               , c.y*s.z               ,  -s.y   , 0.0,
+                   -c.x*s.z + s.x*s.y*c.z, c.x*c.z + s.x*s.y*s.z , s.x*c.y , 0.0,
+                   s.x*s.z + c.x*s.y*c.z , -s.x*c.z + c.x*s.y*s.z, c.x*c.y , 0.0,
+                   0.                    , 0.                    , 0.      , 1.);
+    return    scale *rotate*translate;
+}
+
+export enum vray_color_mode
+[[
+    anno::hidden()
+]]
+{
+    mode_color,
+    mode_temperature
+};
+
+export enum vray_color_primaries
+[[
+    anno::hidden()
+]]
+{
+    primaries_none,
+    primaries_sRGB,
+    primaries_ACEScg
+};
+
+export enum vray_bitmap_primaries
+[[
+    anno::hidden()
+]]
+{
+    bm_primaries_default,
+    bm_primaries_sRGB,
+    bm_primaries_ACEScg,
+    bm_primaries_raw
+};
+
+export enum vray_rgb_output
+[[
+    anno::hidden()
+]]
+{
+    rgb_output_rgb_color,
+    rgb_output_alpha_as_grey,
+    rgb_output_intensity_as_grey
+};
+
+export enum vray_mono_output
+[[
+    anno::hidden()
+]]
+{
+    mono_output_rgb_intensity,
+    mono_output_alpha
+};
+
+export enum vray_alpha_source
+[[
+    anno::hidden()
+]]
+{
+    alpha_source_image_alpha,
+    alpha_source_intensity,
+    alpha_source_opaque
+};
+
+// VRayBitmap map
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayBitmap
+(
+    // UVW Coordinates
+    uniform int mapChannel=1
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("Map channel")
+    ]],
+    uniform float U_Offset = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Offset")
+    ]],
+    uniform float V_Offset = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Offset")
+    ]],
+    uniform float U_Tiling = 1.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Tiling")
+    ]],
+    uniform float V_Tiling = 1.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Tiling")
+    ]],
+    uniform bool U_Tile=true //it is actually an error if both mirror and tile are true
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Tile")
+    ]],
+    uniform bool U_Mirror=false
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Mirror")
+    ]],
+    uniform bool V_Tile=true
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Tile")
+    ]],
+    uniform bool V_Mirror=false
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Mirror")
+    ]],
+    uniform float U_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Angle")
+    ]],
+    uniform float V_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Angle")
+    ]],
+    uniform float W_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("W Angle")
+    ]],
+    uniform int UVW_Type = 0 //enum?
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("UVW Type"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+
+    // Bitmap
+    uniform texture_2d filename = texture_2d()
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Bitmap")
+    ]],
+    uniform float multiplier = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Overall multiplier")
+    ]],
+    uniform vray_rgb_output rgb_output = rgb_output_rgb_color
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("RGB output")
+    ]],
+    uniform vray_mono_output mono_output = mono_output_rgb_intensity
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Mono output")
+    ]],
+    uniform vray_alpha_source alpha_source = alpha_source_image_alpha
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Alpha source")
+    ]],
+    uniform vray_bitmap_primaries rgb_primaries = bm_primaries_raw
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("RGB primaries"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform bool crop_enable = false
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Crop")
+    ]],
+    uniform float crop_u = 0.f //u+w and v+h are always <=1.0
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("U Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_w = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("W Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_v = 0.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("V Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_h = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("H Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+
+    // Output
+    uniform float bump_amount = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Bump amount"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform bool clamp = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Clamp"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform bool invert = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Invert")
+    ]],
+    uniform bool alphaFromRGB = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Alpha from RGB intensity"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform float output_amount = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Output amount")
+    ]],
+    uniform float rgb_level = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("RGB level")
+    ]],
+    uniform float rgb_offset = 0.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("RGB Offset")
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Bitmap"),
+    anno::description("VRay-MDL Bitmap")
+]]
+{
+    uniform float clip_u = crop_enable ? crop_u : 0.f;
+    uniform float clip_w = crop_enable ? crop_w : 1.f;
+    uniform float clip_v = crop_enable ? crop_v : 0.f;
+    uniform float clip_h = crop_enable ? crop_h : 1.f;
+
+    texture_return bitmap_sample = base::file_texture
+    (
+        texture     : filename,
+        mono_source : (alpha_source == alpha_source_image_alpha) ? base::mono_alpha : base::mono_average,
+        crop_u      : float2(clip_u, clip_w + clip_u),
+        crop_v      : float2(1.f - clip_v - clip_h, 1.f - clip_v),
+        uvw         : base::transform_coordinate
+        (
+            transform   : max_rotation_translation_scale
+            (
+                scaling     : float3(U_Tiling, V_Tiling, 1.f),
+                rotation    : float3(U_angle, V_angle, W_angle)/180.f*math::PI ,
+                translation : float3(U_Offset, V_Offset, 0.f), u_mirror : U_Mirror, v_mirror : V_Mirror
+            ),
+            coordinate  : base::coordinate_source(texture_space: mapChannel-1)
+        ),
+        wrap_u      : U_Tile ? tex::wrap_repeat : U_Mirror ? tex::wrap_mirrored_repeat : tex::wrap_clip,
+        wrap_v      : V_Tile ? tex::wrap_repeat : V_Mirror ? tex::wrap_mirrored_repeat : tex::wrap_clip
+    );
+
+    bitmap_sample.tint = invert ?
+        bitmap_sample.tint * (-rgb_level * output_amount * multiplier ) + (1.f - rgb_offset) :
+        bitmap_sample.tint * (rgb_level * output_amount * multiplier) + rgb_offset;
+
+    float alpha = (alpha_source != alpha_source_opaque) ? bitmap_sample.mono : 1.f;
+    bitmap_sample.tint = bitmap_sample.tint*alpha;
+
+    // determinate mono output
+    if(mono_output == mono_output_alpha)
+        bitmap_sample.mono = alpha;
+    else
+        bitmap_sample.mono = math::average(bitmap_sample.tint);
+
+    // determinate rgb output
+    if(rgb_output == rgb_output_alpha_as_grey)
+        bitmap_sample.tint = color(alpha);
+    else if(rgb_output == rgb_output_intensity_as_grey)
+        bitmap_sample.tint = color(math::average(bitmap_sample.tint));
+
+    return bitmap_sample;
+}
+// VRayBitmap Map for Bump
+export float3
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayBitmap_bump
+(
+    // UVW Coordinates
+    uniform int mapChannel=1
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("Map channel")
+    ]],
+    uniform bool U_Tile=true
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Tile")
+    ]],
+    uniform bool U_Mirror=false
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Mirror")
+    ]],
+    uniform bool V_Tile=true
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Tile")
+    ]],
+    uniform bool V_Mirror=false
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Mirror")
+    ]],
+    uniform float U_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Angle")
+    ]],
+    uniform float V_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Angle")
+    ]],
+    uniform float W_angle = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("W Angle")
+    ]],
+    uniform float U_Offset = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Offset")
+    ]],
+    uniform float V_Offset = 0.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Offset")
+    ]],
+    uniform float U_Tiling = 1.f
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("U Tiling")
+    ]],
+    uniform float V_Tiling = 1.
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("V Tiling")
+    ]],
+    uniform int UVW_Type = 0 //enum?
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("UVW Type"),
+        anno::unused()
+    ]],
+
+    // Bitmap
+    uniform texture_2d filename = texture_2d()
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Bitmap")
+    ]],
+    uniform bool crop_enable = false
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Crop")
+    ]],
+    uniform float crop_u = 0.f //u+w and v+h are always <=1.0
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("U Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_w = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("W Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_v = 0.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("V Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float crop_h = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("H Crop"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float factor = 1.f
+    [[
+        anno::in_group("Bitmap parameters"),
+        anno::display_name("Bump amount")
+    ]],
+
+    // Output
+    uniform float bump_amount = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Bump output")
+    ]],
+    uniform bool clamp = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Clamp"),
+        anno::unused()
+    ]],
+    uniform bool invert = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Invert")
+    ]],
+    uniform bool alphaFromRGB = false
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Alpha from RGB intensity"),
+        anno::unused()
+    ]],
+    uniform float output_amount = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("Output amount"),
+        anno::unused()
+    ]],
+    uniform float rgb_level = 1.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("RGB level"),
+        anno::unused()
+    ]],
+    uniform float rgb_offset = 0.f
+    [[
+        anno::in_group("Output"),
+        anno::display_name("RGB Offset"),
+        anno::unused()
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Bitmap Bump"),
+    anno::description("VRay-MDL Bitmap for bump")
+]]
+{
+    uniform float clip_u = crop_enable ? crop_u : 0.f;
+    uniform float clip_w = crop_enable ? crop_w : 1.f;
+    uniform float clip_v = crop_enable ? crop_v : 0.f;
+    uniform float clip_h = crop_enable ? crop_h : 1.f;
+
+    return base::file_bump_texture
+    (
+        texture : filename,
+        crop_u  : float2(clip_u, clip_w + clip_u),
+        crop_v  : float2(1.f - clip_v - clip_h, 1.f - clip_v),
+        uvw     : base::transform_coordinate
+        (
+            transform   : max_rotation_translation_scale
+            (
+                scaling     : float3(U_Tiling, V_Tiling, 1.f),
+                rotation    : float3(U_angle, V_angle,W_angle)/(180.*math::PI),
+                translation : float3(U_Offset, V_Offset, 0.f), u_mirror : U_Mirror, v_mirror : V_Mirror
+            ),
+            coordinate  : base::coordinate_source(texture_space: mapChannel - 1)
+        ),
+        wrap_u  : U_Tile ? tex::wrap_repeat : U_Mirror ? tex::wrap_mirrored_repeat : tex::wrap_clip,
+        wrap_v  : V_Tile ? tex::wrap_repeat : V_Mirror ? tex::wrap_mirrored_repeat : tex::wrap_clip,
+        factor  : invert ? -10.f*factor*bump_amount : 10.f*factor*bump_amount
+    );
+}
+
+// VRayBump2Normal Map for Bump
+export enum vray_bump2normal_mode
+[[
+    anno::hidden()
+]]
+{
+    b2n_tangent_space,
+    b2n_local_XYZ,
+    b2n_screen_space,
+    b2n_world_space
+};
+
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayBump2Normal
+(
+    float3 bump_map = state::normal()
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Bump map")
+    ]],
+    uniform float bump_map_mult = 100.f
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Bump map multiplier"),
+        anno::hard_range(0.f, 100.f)
+    ]],
+    uniform vray_bump2normal_mode mode = b2n_tangent_space
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Mode"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform int map_channel=1
+    [[
+        anno::in_group("Coordinates"),
+        anno::display_name("Map channel"),
+        anno::unused(),
+        anno::hidden()
+    ]]    
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Bump to Normal"),
+    anno::description("VRay-MDL Bump to Normal")
+]]
+{
+    texture_return normal_tex;
+    
+    float3 normal_tangent_space = 
+        transform_internal_to_tangent(math::normalize(state::normal() + (bump_map - state::normal())*(bump_map_mult*0.01f)));
+
+    normal_tex.tint = color( (normal_tangent_space + float3(1.f))*0.5f );
+    normal_tex.mono = 1.f;
+    return normal_tex;
+}
+
+// VRayColor Map
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayColor
+(
+    uniform vray_color_mode color_mode = mode_color
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Color mode")
+    ]],
+    uniform float temperature = 6500.f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Temperature"),
+        anno::hard_range(350.f, 1000000000.f)
+    ]],
+    uniform float red = 0.5f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Red"),
+        anno::soft_range(0.f, 1.f)
+    ]],
+    uniform float green = 0.5f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Green"),
+        anno::soft_range(0.f, 1.f)
+    ]],
+    uniform float blue = 0.5f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Blue"),
+        anno::soft_range(0.f, 1.f)
+    ]],
+    uniform float rgb_multiplier = 1.f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("RGB Multiplier")
+    ]],
+    uniform float alpha = 1.f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Alpha"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float color_gamma = 1.0f
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("Color gamma"),
+        anno::hard_range(0.05f, 20.f)
+    ]],
+    uniform vray_color_primaries rgb_primaries = primaries_none
+    [[
+        anno::in_group("VRayColor Parameters"),
+        anno::display_name("RGB primaries"),
+        anno::unused(),
+        anno::hidden()
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Color"),
+    anno::description("VRay-MDL Color")
+]]
+{
+    float3 rgb(red, green, blue);
+
+    // using temperature?. Then convert from Kelvin to RGB
+    if(color_mode == mode_temperature)
+    {
+        float k = temperature*0.01f;
+
+        // red
+        if (temperature < 6600.f)
+        {
+            rgb.x = 1.f;
+        }
+        else
+        {
+            float r = k - 55.f;
+            r = (351.9769f + 0.1142f * r - 40.2537f * math::log(r))/255.f;
+            rgb.x = math::clamp(r, 0.f, 1.f);
+        }
+
+        // green
+        if (temperature < 6600.f)
+        {
+            float g = k - 2.f;
+            g = (-155.2549f - 0.4460f * g + 104.4922f * math::log(g))/255.f;
+            rgb.y = math::clamp(g, 0.f, 1.f);
+
+        }
+        else
+        {
+            float g = k - 50.f;
+            g = (325.4494f + 0.0794f * g - 28.0853f * math::log(g))/255.f;
+            rgb.y = math::clamp(g, 0.f, 1.f);
+        }
+
+        // blue
+        if (temperature >= 6600.f)
+        {
+            rgb.z = 1.f;
+        }
+        else if (temperature <= 2000.f)
+        {
+            rgb.z = 0.f;
+        }
+        else
+        {
+            float b = k - 10.f;
+            b = (-254.7694f + 0.8274f * blue + 115.6799f * math::log(b))/255.f;
+            rgb.z = math::clamp(b, 0.f, 1.f);
+        }
+    }
+
+    // apply gamma
+    if(color_gamma != 1.f)
+        rgb = math::pow(rgb, 1.f/color_gamma);
+
+    // apply multiplier
+    rgb *= rgb_multiplier;
+
+    // fix ranges and return
+    rgb = math::clamp(rgb, 0.f, 1.f);
+    return texture_return(color(rgb), alpha);
+}
+
+// VRayColor Map for Bump
+export float3
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayColor_bump
+(
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Color Bump"),
+    anno::description("VRay-MDL Color for bump")
+]]
+{
+    return state::normal();
+}
+
+// VRayColor2Bump Map for Bump
+export float3
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayColor2Bump_bump
+(
+    float3 map = state::normal()
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Bump map")
+    ]],
+    uniform float height = 2.0f
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Height"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform float bump_delta_scale = 1.0f
+    [[
+        anno::in_group("Parameters"),
+        anno::display_name("Bump delta scale"),
+        anno::unused(),
+        anno::hidden(),
+        anno::hard_range(0.f, 1.f)
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Color to Bump"),
+    anno::description("VRay-MDL Color to Bump")
+]]
+{
+    return map;
+}
+
+// VRay Dirt Map
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayDirt
+(
+    float radius = 10.f
+    [[
+        anno::in_group("VRayDirt Parameters"),
+        anno::display_name("Radius"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    color occluded_color = color(0.f)
+    [[
+        anno::in_group("VRayDirt Parameters"),
+        anno::display_name("Occluded color"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    color unoccluded_color = color(1.f)
+    [[
+        anno::in_group("VRayDirt Parameters"),
+        anno::display_name("Unoccluded color")
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Dirt"),
+    anno::description("VRay-MDL Dirt")
+]]
+{
+    return texture_return(unoccluded_color, 1.f);
+}
+
+// VRay Edges Tex Map
+export texture_return
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayEdgesTex
+(
+    color edges_color = color(1.f)
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Color")
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("EdgesTex"),
+    anno::description("VRay-MDL EdgesTex")
+]]
+{
+    return texture_return(edges_color, 1.f);
+}
+
+// VRay Edges Tex Map for bump
+export float3
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayEdgesTex_bump
+(
+    color edges_color = color(1.f)
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Color"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    uniform float radius = 0.1f
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Radius"),
+        anno::hard_range(0.f, 100.f)
+
+    ]],
+    uniform bool same_object_only = true
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Consider same object only")
+    ]],
+    uniform int corners_mode = 0
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Corners"),
+        anno::unused(),
+        anno::hidden()
+    ]],
+    float multiplier = 1.f
+    [[
+        anno::in_group("VRayEdgesTex params"),
+        anno::display_name("Multiplier"),
+        anno::unused(),
+        anno::hidden()
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("EdgesTex Bump"),
+    anno::description("VRay-MDL EdgesTex for bump")
+]]
+{
+    return state::rounded_corner_normal(radius*state::meters_per_scene_unit(), !same_object_only);
+}
+
+// VRay Normap Map for bump
+export float3
+[[ anno::node_output_port_default(anno::node_port_value_and_fields)]]
+VRayNormalMap_bump
+(
+    texture_return normal_map = texture_return()
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Normal map")
+    ]],
+    float3 bump_map = state::normal()
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Bump map")
+    ]],
+    uniform float normal_amount = 1.f
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Normal amount"),
+        anno::hard_range(-1000.f, 1000.f)
+    ]],
+    uniform float bump_amount = 1.f
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Bump amount"),
+        anno::hard_range(-1000.f, 1000.f)
+    ]],
+    uniform bool flip_red = false
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Flip red")
+    ]],
+    uniform bool flip_green = false
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Flip green")
+    ]],
+    uniform bool swap_rg = false
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Swap red and green")
+    ]],
+    uniform int map_channel = 1
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Map channel"),
+        anno::hidden(),
+        anno::unused()
+    ]],
+    uniform float map_rotation = 0.f
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Map rotation"),
+        anno::hard_range(0.f, 360.f),
+        anno::hidden(),
+        anno::unused()
+    ]],
+    uniform float normal_map_amount = 1.0f
+    [[
+        anno::in_group("VRayNormalMap Parameters"),
+        anno::display_name("Map amount"),
+        anno::hard_range(-10.f, 10.f)
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation"),
+    anno::display_name("Normal Map"),
+    anno::description("VRay-MDL Normal Map for bump")
+]]
+{
+    float3 tangent_space_normal = float3(normal_map.tint);
+
+    if(flip_red)
+        tangent_space_normal.x = 1.f - tangent_space_normal.x;
+
+    if(flip_green)
+        tangent_space_normal.y = 1.f - tangent_space_normal.y;
+
+    if(swap_rg)
+    {
+        float tmp = tangent_space_normal.x;
+        tangent_space_normal.x = tangent_space_normal.y;
+        tangent_space_normal.y = tmp;
+    }
+
+    float normal_factor = normal_amount*(normal_map_amount);
+    tangent_space_normal = (tangent_space_normal - float3(0.5f))*(2.f*normal_factor);
+
+    float3 mapped_normal = math::normalize(
+        state::texture_tangent_u(0) * tangent_space_normal.x +
+        state::texture_tangent_v(0) * tangent_space_normal.y +
+        state::normal() * (tangent_space_normal.z + (1.f - normal_factor)));
+
+    float3 bumped_normal = math::normalize(math::lerp(state::normal(), bump_map, bump_amount*normal_map_amount));
+
+    return math::normalize(mapped_normal + bumped_normal);
+}
