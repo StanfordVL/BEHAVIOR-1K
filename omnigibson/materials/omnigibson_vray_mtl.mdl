@@ -67,9 +67,5 @@ export material OmniGibsonVRayMtl(
     ).tint,
     texmap_bump : vray_maps::VRayBitmap_bump(
         filename : normal_texture
-    ),
-    texmap_opacity : vray_maps::VRayBitmap(
-        filename : diffuse_texture,
-        mono_output: vray_maps::mono_output_alpha
-    ).mono
+    )
 );

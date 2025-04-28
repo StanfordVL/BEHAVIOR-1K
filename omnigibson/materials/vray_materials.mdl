@@ -1479,15 +1479,7 @@ export material VRayMtl(
             ),
             normal  : texmap_bump
         );
-        
-    // transmission
-    bsdf glossy_transmission_bsdf = 
-        df::simple_glossy_bsdf(
-            mode: df::scatter_transmit,
-            tint: color(1.f),
-            roughness_u: refraction_roughness
-        );
-        
+
     // reflection    
     bsdf glossy_reflection_bsdf =
         df::simple_glossy_bsdf(
@@ -1516,37 +1508,10 @@ export material VRayMtl(
                 (
                     weight  : reflection_metalness,
                     layer   : diffuse_glossy_reflection_bsdf,
-                    base    :
-                        df::color_weighted_layer
-                        (
-                            weight  : Refraction,
-                            layer   : glossy_transmission_bsdf,
-                            base    : diffuse_bsdf,
-                            normal  : texmap_bump
-                        ),
+                    base    : diffuse_bsdf,
                     normal  : texmap_bump
                 ),
             normal              : texmap_bump
-        );
-    
-    // coat
-    bsdf coat_bsdf =
-        df::fresnel_layer
-        (
-            ior     : invert_coat_ior ? 1.f/(coat_ior + 0.01f) : coat_ior,
-            weight  : coat_amount,
-            layer   : df::simple_glossy_bsdf
-            (
-                tint        : color(1.f),
-                roughness_u : math::pow((1.f - coat_glossiness), 2.f),
-                mode        : df::scatter_reflect
-            ),
-            base    : df::tint
-            (
-                tint    : math::lerp(color(1.f), coat_color, coat_amount),
-                base    : surface_bsdf
-            ),
-            normal  : coat_bump_lock ? texmap_bump : texmap_coat_bump
         );
             
 } 
@@ -1556,7 +1521,7 @@ in material
         thin_walled : thin_walled,
         surface     : material_surface
         (
-            scattering  : coat_bsdf, 
+            scattering  : surface_bsdf, 
             emission    : material_emission
             (
                 emission  : df::diffuse_edf(),
