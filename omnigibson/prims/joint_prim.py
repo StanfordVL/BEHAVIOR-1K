@@ -188,19 +188,24 @@ class JointPrim(BasePrim):
         """
         # Sanity check inputs
         assert_valid_key(key=control_type, valid_keys=ControlType.VALID_TYPES, name="control type")
-        if control_type == ControlType.POSITION:
-            assert kp is not None, "kp gain must be specified for setting POSITION control!"
-            if kd is None:
-                # kd could have bene optionally set, if not, then set 0 as default
-                kd = 0.0
-        elif control_type == ControlType.VELOCITY:
-            assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
-            assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
-            kp = 0.0
-        else:  # Efforts (or NONE -- equivalent)
-            assert kp is None, "kp gain must not be specified for setting EFFORT control!"
-            assert kd is None, "kd gain must not be specified for setting EFFORT control!"
+        if self.is_mimic_joint:
+            assert kp is None, "kp gain must not be specified for setting mimic joint control!"
+            assert kd is None, "kd gain must not be specified for setting mimic joint control!"
             kp, kd = 0.0, 0.0
+        else:
+            if control_type == ControlType.POSITION:
+                assert kp is not None, "kp gain must be specified for setting POSITION control!"
+                if kd is None:
+                    # kd could have been optionally set, if not, then set 0 as default
+                    kd = 0.0
+            elif control_type == ControlType.VELOCITY:
+                assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
+                assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
+                kp = 0.0
+            else:  # Efforts (or NONE -- equivalent)
+                assert kp is None, "kp gain must not be specified for setting EFFORT control!"
+                assert kd is None, "kd gain must not be specified for setting EFFORT control!"
+                kp, kd = 0.0, 0.0
 
         # Set values
         kps = th.full((1, self._n_dof), kp)
@@ -939,3 +944,11 @@ class JointPrim(BasePrim):
             ),
             4 * self.n_dof,
         )
+
+    @property
+    def is_mimic_joint(self):
+        """
+        Returns:
+            bool: True if this joint is a mimic joint, else False
+        """
+        return self.prim.HasAPI(lazy.pxr.PhysxSchema.PhysxMimicJointAPI)
