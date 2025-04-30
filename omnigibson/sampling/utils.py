@@ -559,7 +559,12 @@ def validate_task(task, task_scene_dict, default_scene_dict):
             n_particles_key = "instancer_particle_counts" if is_micro_physical else "n_particles"
             if (
                 is_micro_physical
-                and not th.all(th.isclose(system_state[n_particles_key], current_system_state[n_particles_key])).item()
+                and not (
+                    th.isclose(
+                        th.tensor(system_state[n_particles_key]),
+                        th.tensor(current_system_state[n_particles_key]),
+                    ).all()
+                )
             ) or (not is_micro_physical and system_state[n_particles_key] != current_system_state[n_particles_key]):
                 return (
                     False,
@@ -568,7 +573,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
 
             # Validate that no particles went flying -- maximum ranges of positions should be roughly close
             n_particles = (
-                th.sum(system_state[n_particles_key]).item() if is_micro_physical else system_state[n_particles_key]
+                th.tensor(system_state[n_particles_key]).sum().item()
+                if is_micro_physical
+                else system_state[n_particles_key]
             )
             if n_particles > 0 and check_particle_positions:
                 if is_micro_physical:

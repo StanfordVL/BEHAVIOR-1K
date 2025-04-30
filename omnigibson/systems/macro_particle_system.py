@@ -27,6 +27,7 @@ m = create_module_macros(module_path=__file__)
 m.MIN_PARTICLE_RADIUS = (
     0.01  # Minimum particle radius for physical macro particles -- this reduces the chance of omni physx crashing
 )
+m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY = None  # If set, the maximum density for macro particle systems
 
 
 class MacroParticleSystem(BaseSystem):
@@ -1175,7 +1176,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         self._create_particle_template_fcn = create_particle_template
 
-        self._particle_density = particle_density
+        self._particle_density = (
+            particle_density
+            if m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY is None
+            else min(particle_density, m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY)
+        )
 
         # Physics rigid body view for keeping track of all particles' state
         self.particles_view = None
@@ -1211,6 +1216,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
+            mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
+            mass_api.GetDensityAttr().Set(self.particle_density)
             lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,

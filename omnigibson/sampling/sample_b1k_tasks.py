@@ -148,13 +148,13 @@ parser.add_argument(
 )
 
 gm.HEADLESS = False
-gm.USE_GPU_DYNAMICS = False
+gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
 gm.ENABLE_TRANSITION_RULES = False  # Must be False! We permute this later
 
 macros.systems.micro_particle_system.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = 0.5
-
+macros.systems.macro_particle_system.MACRO_PARTICLE_SYSTEM_MAX_DENSITY = 200.0
 # macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
 
 
