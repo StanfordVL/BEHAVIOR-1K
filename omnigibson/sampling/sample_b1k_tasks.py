@@ -24,6 +24,7 @@ from bddl.activity import Conditions, evaluate_state
 from utils import *
 import numpy as np
 import random
+import logging
 
 
 # TASK_CUSTOM_LISTS = {
@@ -164,6 +165,10 @@ gm.ENABLE_TRANSITION_RULES = False  # Must be False! We permute this later
 macros.systems.micro_particle_system.MICRO_PARTICLE_SYSTEM_MAX_VELOCITY = 0.5
 macros.systems.macro_particle_system.MACRO_PARTICLE_SYSTEM_MAX_DENSITY = 200.0
 # macros.prims.entity_prim.DEFAULT_SLEEP_THRESHOLD = 0.0
+macros.utils.object_state_utils.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 5
+macros.utils.object_state_utils.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 5
+
+logging.getLogger().setLevel(logging.INFO)
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -274,6 +279,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         gm.ENABLE_TRANSITION_RULES = False
     if gm.HEADLESS:
         hide_all_lights()
+    else:
+        og.sim.enable_viewer_camera_teleoperation()
 
     # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_state().
     # We need to set all velocities to zero after this. Otherwise, the visual only objects will drift.

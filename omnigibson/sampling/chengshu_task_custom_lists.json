@@ -4,7 +4,7 @@
             "whitelist": {
                 "carton.n.02": {
                     "carton": {
-                        "libote": null
+                        "libote": [0.5891, 0.5913, 0.2780]
                     }
                 }
             },

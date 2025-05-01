@@ -517,6 +517,9 @@ def validate_task(task, task_scene_dict, default_scene_dict):
         # Skip any active objects since they may have changed
         if obj_name in active_obj_names:
             continue
+        # HACK: need to skip objects in default scene when partial loading during sampling
+        if obj_name not in task_state_t0["object_registry"]:
+            continue
         obj_info = task_state_t0["object_registry"][obj_name]
         valid_obj, err_msg = _validate_identical_object_kinematic_state(
             obj_name, default_obj_info, obj_info, check_vel=True

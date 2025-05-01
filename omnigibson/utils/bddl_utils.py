@@ -1571,6 +1571,15 @@ class BDDLSampler:
                             num_trials = 1
                             for _ in range(num_trials):
                                 success = condition.sample(binary_state=positive, **kwargs)
+                                log_msg = " ".join(
+                                    [
+                                        "initial final kinematic condition sampling",
+                                        condition.STATE_NAME,
+                                        str(condition.body),
+                                        str(success),
+                                    ]
+                                )
+                                log.info(log_msg)
                                 if success:
                                     # Update state
                                     state = og.sim.dump_state(serialized=False)
