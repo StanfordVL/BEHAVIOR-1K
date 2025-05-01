@@ -1444,7 +1444,9 @@ class BDDLSampler:
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
 
-                obj_kwargs["bounding_box"] = synset_whitelist.get(category, dict()).get(model, None)
+                obj_kwargs["bounding_box"] = (
+                    synset_whitelist.get(category, dict()).get(model, None) if synset_whitelist else None
+                )
 
                 # create the object
                 simulator_obj = DatasetObject(
