@@ -572,7 +572,7 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
             init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
         ]
         raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1 :]
-        init_cond_offset += len(extra_instances)
+        init_cond_offset += len(extra_instances) - 1
 
     # Return the compiled processed BDDL as a single string
     return "".join(raw_bddl)
