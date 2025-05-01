@@ -307,10 +307,11 @@ class ControllableObject(BaseObject):
                 assert dof.item() in unused_dofs
                 unused_dofs.remove(dof.item())
                 control_type = controller.control_type
-                self._joints[self.dof_names_ordered[dof]].set_control_type(
+                dof_joint = self._joints[self.dof_names_ordered[dof]]
+                dof_joint.set_control_type(
                     control_type=control_type,
-                    kp=None if controller.isaac_kp is None else controller.isaac_kp[i],
-                    kd=None if controller.isaac_kd is None else controller.isaac_kd[i],
+                    kp=None if controller.isaac_kp is None or dof_joint.is_mimic_joint else controller.isaac_kp[i],
+                    kd=None if controller.isaac_kd is None or dof_joint.is_mimic_joint else controller.isaac_kd[i],
                 )
 
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
