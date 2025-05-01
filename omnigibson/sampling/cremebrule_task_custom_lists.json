@@ -2,11 +2,6 @@
     "cook_eggplant": {
         "house_single_floor": {
             "whitelist": {
-                "agent.n.01": {
-                    "agent": {
-                        "__TODO__MODEL__": null
-                    }
-                },
                 "chopping_board.n.01": {
                     "chopping_board": {
                         "__TODO__MODEL__": null
@@ -17,18 +12,8 @@
                         "__TODO__MODEL__": null
                     }
                 },
-                "countertop.n.01": {
-                    "countertop": {
-                        "__TODO__MODEL__": null
-                    }
-                },
                 "eggplant.n.01": {
                     "eggplant": {
-                        "__TODO__MODEL__": null
-                    }
-                },
-                "electric_refrigerator.n.01": {
-                    "electric_refrigerator": {
                         "__TODO__MODEL__": null
                     }
                 },
@@ -42,18 +27,8 @@
                         "__TODO__MODEL__": null
                     }
                 },
-                "floor.n.01": {
-                    "floor": {
-                        "__TODO__MODEL__": null
-                    }
-                },
                 "half__eggplant.n.01": {
                     "half__eggplant": {
-                        "__TODO__MODEL__": null
-                    }
-                },
-                "oven.n.01": {
-                    "oven": {
                         "__TODO__MODEL__": null
                     }
                 },

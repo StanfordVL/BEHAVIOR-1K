@@ -2,11 +2,14 @@ from bddl.activity import (
     Conditions,
     get_object_scope,
 )
+from bddl.object_taxonomy import ObjectTaxonomy
 import json
 import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--activity", type=str, required=True)
+
+ot = ObjectTaxonomy()
 
 def print_task_custom_list_template(activity_name):
     activity_conditions = Conditions(
@@ -17,6 +20,10 @@ def print_task_custom_list_template(activity_name):
     )
     obj_scope = get_object_scope(activity_conditions)
     synsets = {"_".join(synset_inst.split("_")[:-1]) for synset_inst in obj_scope.keys()}
+    synsets.remove("agent.n.01")
+    for synset in tuple(synsets):
+        if "sceneObject" in ot.get_abilities(synset):
+            synsets.remove(synset)
     task_custom_template = {
         activity_name: {
             "house_single_floor": {

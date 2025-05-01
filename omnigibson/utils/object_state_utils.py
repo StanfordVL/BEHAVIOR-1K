@@ -8,8 +8,7 @@ from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
-from omnigibson.utils.constants import GROUND_CATEGORIES
-from omnigibson.utils.constants import PrimType
+from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint
 
 # Create settings for this module
