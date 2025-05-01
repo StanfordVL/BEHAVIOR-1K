@@ -26,95 +26,97 @@ import numpy as np
 import random
 
 
-TASK_CUSTOM_LISTS = {
-    ("picking_up_trash", "Rs_int"): {
-        "whitelist": {
-            "pad.n.01": {
-                "sticky_note": ["tghqep"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("packing_recreational_vehicle_for_trip", "Merom_0_garden"): {
-        "whitelist": {
-            "wicker_basket.n.01": {
-                "wicker_basket": ["tsjvyu"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("datagen_tidy_table", "house_single_floor"): {
-        "whitelist": {
-            "countertop.n.01": {
-                "bar": ["udatjt"],
-            },
-            "teacup.n.02": {
-                "teacup": ["kccqwj"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("datagen_cook_brussels_sprouts", "house_single_floor"): {
-        "whitelist": {
-            "countertop.n.01": {
-                "bar": ["udatjt"],
-            },
-            "burner.n.02": {
-                "burner": ["mjvqii"],
-            },
-            "brussels_sprouts.n.01": {
-                "brussels_sprouts": ["hkwyzk"],
-            },
-            "stockpot.n.01": {
-                "stockpot": ["grrcna"],
-            },
-            "tupperware.n.01": {
-                "tupperware": ["mkstwr"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("datagen_wash_dishes", "house_single_floor"): {
-        "whitelist": {
-            "countertop.n.01": {
-                "bar": ["gjeoer"],
-            },
-            "frying_pan.n.01": {
-                "frying_pan": ["jpzusm"],
-            },
-            "scrub_brush.n.01": {
-                "scrub_brush": ["hsejyi"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("datagen_dishes_away", "house_single_floor"): {
-        "whitelist": {
-            "countertop.n.01": {
-                "bar": ["gjeoer"],
-            },
-            "plate.n.04": {
-                "plate": ["akfjxx"],
-            },
-            "shelf.n.01": {
-                "shelf": ["pfusrd"],
-            },
-        },
-        "blacklist": None,
-    },
-    ("datagen_pick", "Rs_int"): {
-        "whitelist": {
-            "breakfast_table.n.01": {
-                "breakfast_table": ["bhszwe"],
-            },
-            "coffee_cup.n.01": {
-                "coffee_cup": ["dkxddg"],
-            },
-        },
-        "blacklist": None,
-    },
-}
+# TASK_CUSTOM_LISTS = {
+#     ("picking_up_trash", "Rs_int"): {
+#         "whitelist": {
+#             "pad.n.01": {
+#                 "sticky_note": ["tghqep"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("packing_recreational_vehicle_for_trip", "Merom_0_garden"): {
+#         "whitelist": {
+#             "wicker_basket.n.01": {
+#                 "wicker_basket": ["tsjvyu"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("datagen_tidy_table", "house_single_floor"): {
+#         "whitelist": {
+#             "countertop.n.01": {
+#                 "bar": ["udatjt"],
+#             },
+#             "teacup.n.02": {
+#                 "teacup": ["kccqwj"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("datagen_cook_brussels_sprouts", "house_single_floor"): {
+#         "whitelist": {
+#             "countertop.n.01": {
+#                 "bar": ["udatjt"],
+#             },
+#             "burner.n.02": {
+#                 "burner": ["mjvqii"],
+#             },
+#             "brussels_sprouts.n.01": {
+#                 "brussels_sprouts": ["hkwyzk"],
+#             },
+#             "stockpot.n.01": {
+#                 "stockpot": ["grrcna"],
+#             },
+#             "tupperware.n.01": {
+#                 "tupperware": ["mkstwr"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("datagen_wash_dishes", "house_single_floor"): {
+#         "whitelist": {
+#             "countertop.n.01": {
+#                 "bar": ["gjeoer"],
+#             },
+#             "frying_pan.n.01": {
+#                 "frying_pan": ["jpzusm"],
+#             },
+#             "scrub_brush.n.01": {
+#                 "scrub_brush": ["hsejyi"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("datagen_dishes_away", "house_single_floor"): {
+#         "whitelist": {
+#             "countertop.n.01": {
+#                 "bar": ["gjeoer"],
+#             },
+#             "plate.n.04": {
+#                 "plate": ["akfjxx"],
+#             },
+#             "shelf.n.01": {
+#                 "shelf": ["pfusrd"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+#     ("datagen_pick", "Rs_int"): {
+#         "whitelist": {
+#             "breakfast_table.n.01": {
+#                 "breakfast_table": ["bhszwe"],
+#             },
+#             "coffee_cup.n.01": {
+#                 "coffee_cup": ["dkxddg"],
+#             },
+#         },
+#         "blacklist": None,
+#     },
+# }
 
+with open("chengshu_task_custom_lists.json", "r") as f:
+    TASK_CUSTOM_LISTS = json.load(f)
 
 # TODO:
 # 1. Set boundingCube approximation earlier (maybe right after importing the scene objects). Otherwise after loading the robot, we will elapse one physics step
@@ -127,6 +129,12 @@ parser.add_argument(
     type=str,
     default=None,
     help="Activity/ie(s) to be sampled, if specified. This should be a comma-delimited list of desired activities. Otherwise, will try to sample all tasks in this scene",
+)
+parser.add_argument(
+    "--room_types",
+    type=str,
+    default=None,
+    help="room types to be loaded, if specified. This should be a comma-delimited list of desired room types. Otherwise, will try to load all room types in this scene",
 )
 parser.add_argument(
     "--start_at", type=str, default=None, help="If specified, activity to start at, ignoring all previous"
@@ -241,6 +249,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             },
         ],
     }
+    if args.room_types is not None:
+        cfg["scene"]["load_room_types"] = args.room_types.split(",")
 
     valid_tasks = get_valid_tasks()
     # mapping = parse_task_mapping(fpath=TASK_INFO_FPATH)
@@ -343,10 +353,13 @@ def main(random_selection=False, headless=False, short_exec=False):
             reason = f"Unsupported predicate(s): {unsupported_predicates}"
 
         env.task_config["activity_name"] = activity
-        activity_scene_combo = (activity, args.scene_model)
-        if activity_scene_combo in TASK_CUSTOM_LISTS:
-            whitelist = TASK_CUSTOM_LISTS[activity_scene_combo]["whitelist"]
-            blacklist = TASK_CUSTOM_LISTS[activity_scene_combo]["blacklist"]
+        # activity_scene_combo = (activity, args.scene_model)
+        # if activity_scene_combo in TASK_CUSTOM_LISTS:
+        #     whitelist = TASK_CUSTOM_LISTS[activity_scene_combo]["whitelist"]
+        #     blacklist = TASK_CUSTOM_LISTS[activity_scene_combo]["blacklist"]
+        if activity in TASK_CUSTOM_LISTS and args.scene_model in TASK_CUSTOM_LISTS[activity]:
+            whitelist = TASK_CUSTOM_LISTS[activity][args.scene_model]["whitelist"]
+            blacklist = TASK_CUSTOM_LISTS[activity][args.scene_model]["blacklist"]
         else:
             whitelist, blacklist = None, None
         env.task_config["sampling_whitelist"] = whitelist
@@ -414,11 +427,14 @@ def main(random_selection=False, headless=False, short_exec=False):
                     if not validated:
                         success = False
                         feedback = error_msg
+                        print("validation failed")
                         breakpoint()
 
                 if success:
                     env.scene.load_state(task_final_state)
                     env.scene.update_initial_state(task_final_state)
+                    print("sampling suceed")
+                    breakpoint()
                     env.task.save_task(override=True)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
                     reason = ""

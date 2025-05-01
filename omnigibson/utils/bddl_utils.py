@@ -39,87 +39,87 @@ m.MIN_DYNAMIC_SCALE = 0.5
 m.DYNAMIC_SCALE_INCREMENT = 0.1
 
 GOOD_MODELS = {
-    "jar": {"kijnrj"},
-    "carton": {"causya", "msfzpz", "sxlklf"},
-    "hamper": {"drgdfh", "hlgjme", "iofciz", "pdzaca", "ssfvij"},
-    "hanging_plant": set(),
-    "hardback": {"esxakn"},
-    "notebook": {"hwhisw"},
-    "paperback": {"okcflv"},
-    "plant_pot": {"ihnfbi", "vhglly", "ygrtaz"},
-    "pot_plant": {"cvthyv", "dbjcic", "cecdwu"},
-    "recycling_bin": {"nuoypc"},
-    "tray": {"gsxbym", "huwhjg", "txcjux", "uekqey", "yqtlhy"},
+    # "jar": {"kijnrj"},
+    # "carton": {"causya", "msfzpz", "sxlklf"},
+    # "hamper": {"drgdfh", "hlgjme", "iofciz", "pdzaca", "ssfvij"},
+    # "hanging_plant": set(),
+    # "hardback": {"esxakn"},
+    # "notebook": {"hwhisw"},
+    # "paperback": {"okcflv"},
+    # "plant_pot": {"ihnfbi", "vhglly", "ygrtaz"},
+    # "pot_plant": {"cvthyv", "dbjcic", "cecdwu"},
+    # "recycling_bin": {"nuoypc"},
+    # "tray": {"gsxbym", "huwhjg", "txcjux", "uekqey", "yqtlhy"},
 }
 
 GOOD_BBOXES = {
-    "basil": {
-        "dkuhvb": [0.07286304, 0.0545199, 0.03108144],
-    },
-    "basil_jar": {
-        "swytaw": [0.22969539, 0.19492961, 0.30791675],
-    },
-    "bicycle_chain": {
-        "czrssf": [0.242, 0.012, 0.021],
-    },
-    "clam": {
-        "ihhbfj": [0.078, 0.081, 0.034],
-    },
-    "envelope": {
-        "urcigc": [0.004, 0.06535058, 0.10321216],
-    },
-    "mail": {
-        "azunex": [0.19989018, 0.005, 0.12992871],
-        "gvivdi": [0.28932137, 0.005, 0.17610794],
-        "mbbwhn": [0.27069291, 0.005, 0.13114884],
-        "ojkepk": [0.19092424, 0.005, 0.13252979],
-        "qpwlor": [0.22472473, 0.005, 0.18983322],
-    },
-    "pill_bottle": {
-        "csvdbe": [0.078, 0.078, 0.109],
-        "wsasmm": [0.078, 0.078, 0.109],
-    },
-    "plant_pot": {
-        "ihnfbi": [0.24578613, 0.2457865, 0.18862737],
-    },
-    "razor": {
-        "jocsgp": [0.046, 0.063, 0.204],
-    },
-    "recycling_bin": {
-        "nuoypc": [0.69529409, 0.80712041, 1.07168694],
-    },
-    "tupperware": {
-        "mkstwr": [0.33, 0.33, 0.21],
-    },
-    "copper_wire": {
-        "nzafel": [0.1762, 0.17655, 0.0631],
-    },
-    "backpack": {
-        "gvbiwl": [0.7397, 0.6109, 0.6019],
-    },
+    # "basil": {
+    #     "dkuhvb": [0.07286304, 0.0545199, 0.03108144],
+    # },
+    # "basil_jar": {
+    #     "swytaw": [0.22969539, 0.19492961, 0.30791675],
+    # },
+    # "bicycle_chain": {
+    #     "czrssf": [0.242, 0.012, 0.021],
+    # },
+    # "clam": {
+    #     "ihhbfj": [0.078, 0.081, 0.034],
+    # },
+    # "envelope": {
+    #     "urcigc": [0.004, 0.06535058, 0.10321216],
+    # },
+    # "mail": {
+    #     "azunex": [0.19989018, 0.005, 0.12992871],
+    #     "gvivdi": [0.28932137, 0.005, 0.17610794],
+    #     "mbbwhn": [0.27069291, 0.005, 0.13114884],
+    #     "ojkepk": [0.19092424, 0.005, 0.13252979],
+    #     "qpwlor": [0.22472473, 0.005, 0.18983322],
+    # },
+    # "pill_bottle": {
+    #     "csvdbe": [0.078, 0.078, 0.109],
+    #     "wsasmm": [0.078, 0.078, 0.109],
+    # },
+    # "plant_pot": {
+    #     "ihnfbi": [0.24578613, 0.2457865, 0.18862737],
+    # },
+    # "razor": {
+    #     "jocsgp": [0.046, 0.063, 0.204],
+    # },
+    # "recycling_bin": {
+    #     "nuoypc": [0.69529409, 0.80712041, 1.07168694],
+    # },
+    # "tupperware": {
+    #     "mkstwr": [0.33, 0.33, 0.21],
+    # },
+    # "copper_wire": {
+    #     "nzafel": [0.1762, 0.17655, 0.0631],
+    # },
+    # "backpack": {
+    #     "gvbiwl": [0.7397, 0.6109, 0.6019],
+    # },
 }
 
 BAD_CLOTH_MODELS = {
-    "bandana": {"wbhliu"},
-    "curtain": {"ohvomi", "shbakk"},
-    "cardigan": {"itrkhr"},
-    "sweatshirt": {"nowqqh"},
-    "jeans": {"nmvvil", "pvzxyp"},
-    "pajamas": {"rcgdde"},
-    "polo_shirt": {"vqbvph"},
-    "vest": {"girtqm"},  # bddl NOT FIXED
-    "onesie": {"pbytey"},
-    "dishtowel": {"ltydgg"},
-    "dress": {"gtghon"},
-    "hammock": {"aiftuk", "fglfga", "klhkgd", "lqweda", "qewdqa"},
-    "jacket": {"kiiium", "nogevo", "remcyk"},
-    "quilt": {"mksdlu", "prhems"},
-    "pennant": {"tfnwti"},
-    "pillowcase": {"dtoahb", "yakvci"},
-    "rubber_glove": {"leuiso"},
-    "scarf": {"kclcrj"},
-    "sock": {"vpafgj"},
-    "tank_top": {"fzldgi"},
+    # "bandana": {"wbhliu"},
+    # "curtain": {"ohvomi", "shbakk"},
+    # "cardigan": {"itrkhr"},
+    # "sweatshirt": {"nowqqh"},
+    # "jeans": {"nmvvil", "pvzxyp"},
+    # "pajamas": {"rcgdde"},
+    # "polo_shirt": {"vqbvph"},
+    # "vest": {"girtqm"},  # bddl NOT FIXED
+    # "onesie": {"pbytey"},
+    # "dishtowel": {"ltydgg"},
+    # "dress": {"gtghon"},
+    # "hammock": {"aiftuk", "fglfga", "klhkgd", "lqweda", "qewdqa"},
+    # "jacket": {"kiiium", "nogevo", "remcyk"},
+    # "quilt": {"mksdlu", "prhems"},
+    # "pennant": {"tfnwti"},
+    # "pillowcase": {"dtoahb", "yakvci"},
+    # "rubber_glove": {"leuiso"},
+    # "scarf": {"kclcrj"},
+    # "sock": {"vpafgj"},
+    # "tank_top": {"fzldgi"},
 }
 
 
@@ -1078,13 +1078,15 @@ class BDDLSampler:
                 # Filter based on white / blacklist
                 if synset_whitelist is not None:
                     valid_models = {
-                        cat: models.intersection(set(synset_whitelist[cat])) if cat in synset_whitelist else set()
+                        cat: models.intersection(set(synset_whitelist[cat].keys()))
+                        if cat in synset_whitelist
+                        else set()
                         for cat, models in valid_models.items()
                     }
 
                 if synset_blacklist is not None:
                     valid_models = {
-                        cat: models - set(synset_whitelist[cat]) if cat in synset_blacklist else models
+                        cat: models - set(synset_blacklist[cat].keys()) if cat in synset_blacklist else models
                         for cat, models in valid_models.items()
                     }
 
@@ -1416,14 +1418,14 @@ class BDDLSampler:
                     # Filter based on white / blacklist
                     if synset_whitelist is not None:
                         model_choices = (
-                            model_choices.intersection(set(synset_whitelist[category]))
+                            model_choices.intersection(set(synset_whitelist[category].keys()))
                             if category in synset_whitelist
                             else set()
                         )
 
                     if synset_blacklist is not None:
                         model_choices = (
-                            model_choices - set(synset_whitelist[category])
+                            model_choices - set(synset_blacklist[category].keys())
                             if category in synset_blacklist
                             else model_choices
                         )
@@ -1442,7 +1444,7 @@ class BDDLSampler:
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
 
-                obj_kwargs["bounding_box"] = GOOD_BBOXES.get(category, dict()).get(model, None)
+                obj_kwargs["bounding_box"] = synset_whitelist.get(category, dict()).get(model, None)
 
                 # create the object
                 simulator_obj = DatasetObject(

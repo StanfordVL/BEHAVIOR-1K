@@ -1,0 +1,14 @@
+{
+    "putting_away_toys": {
+        "house_single_floor": {
+            "whitelist": {
+                "carton.n.02": {
+                    "carton": {
+                        "libote": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    }
+}
