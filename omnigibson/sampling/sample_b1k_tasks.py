@@ -373,6 +373,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.task_config["sampling_blacklist"] = blacklist
         print("white_list", whitelist)
         print("black_list", blacklist)
+        assert whitelist is not None, "whitelist should not be None for manual sampling"
         scene_instance = BehaviorTask.get_cached_activity_scene_filename(
             scene_model=args.scene_model,
             activity_name=activity,
