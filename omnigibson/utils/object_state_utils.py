@@ -8,6 +8,7 @@ from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
+from omnigibson.utils.constants import GROUND_CATEGORIES
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint
 
@@ -181,6 +182,14 @@ def sample_kinematics(
             diff = old_pos - parallel_bbox_center
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
+
+            # If sampling onTop ground category, we need to check if the sampled position is traversable
+            if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+                trav_map = objB.scene.trav_map
+                eroded_trav_map = trav_map._erode_trav_map(trav_map.floor_map[0], robot=objB.scene.robots[0])
+                xy_map = trav_map.world_to_map(pos[:2])
+                if not (eroded_trav_map[xy_map[0], xy_map[1]] == 255):
+                    pos = None
 
         if pos is None:
             success = False
