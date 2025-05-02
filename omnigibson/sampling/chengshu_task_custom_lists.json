@@ -210,7 +210,7 @@
                 },
                 "broom.n.01": {
                     "broom": {
-                        "tpyvbt": null
+                        "tpyvbt": [1.08, 0.36, 0.12]
                     }
                 },
                 "dustpan.n.02": {
@@ -221,6 +221,37 @@
                 "ashcan.n.01": {
                     "trash_can": {
                         "eahqyq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "carrying_in_groceries": {
+        "room_types": [
+            "garden",
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "beefsteak_tomato.n.01": {
+                    "beefsteak_tomato": {
+                        "altlfz": null
+                    }
+                },
+                "carton__of__milk.n.01": {
+                    "carton_of_milk": {
+                        "xmugpm": null
+                    }
+                },
+                "pack__of__bread.n.01": {
+                    "pack_of_bread": {
+                        "fckfij": null
+                    }
+                },
+                "sack.n.01": {
+                    "paper_bag": {
+                        "bzsxgw": [0.21, 0.435, 0.765]
                     }
                 }
             },
