@@ -157,7 +157,7 @@ parser.add_argument(
 )
 
 gm.HEADLESS = False
-gm.USE_GPU_DYNAMICS = True
+gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
 gm.ENABLE_TRANSITION_RULES = False  # Must be False! We permute this later
