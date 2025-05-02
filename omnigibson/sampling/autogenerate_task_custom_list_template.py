@@ -1,10 +1,14 @@
 from bddl.activity import (
     Conditions,
     get_object_scope,
+    get_initial_conditions,
 )
 from bddl.object_taxonomy import ObjectTaxonomy
 import json
 import argparse
+from omnigibson.utils.bddl_utils import (
+    OmniGibsonBDDLBackend,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--activity", type=str, required=True)
@@ -19,11 +23,18 @@ def print_task_custom_list_template(activity_name):
         predefined_problem=None,
     )
     obj_scope = get_object_scope(activity_conditions)
-    synsets = {"_".join(synset_inst.split("_")[:-1]) for synset_inst in obj_scope.keys()}
-    synsets.remove("agent.n.01")
-    for synset in tuple(synsets):
-        if "sceneObject" in ot.get_abilities(synset):
-            synsets.remove(synset)
+    backend = OmniGibsonBDDLBackend()
+    init_conds = get_initial_conditions(activity_conditions, backend, obj_scope)
+    synsets = set()
+    for init_cond in init_conds:
+        body = init_cond.body
+        if len(body) == 3:
+            synset = "_".join(body[1].split("_")[:-1])
+            if "sceneObject" in ot.get_abilities(synset):
+                continue
+            if "agent" in synset:
+                continue
+            synsets.add(synset)
     task_custom_template = {
         activity_name: {
             "house_single_floor": {
