@@ -56,6 +56,7 @@ m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 1.0
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
+m.GRASP_WINDOW = 3.0  # grasp window in seconds
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
 AG_MODES = {
@@ -193,6 +194,7 @@ class ManipulationRobot(BaseRobot):
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
         self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
         self._ag_release_counter = {arm: None for arm in self.arm_names}
+        self._ag_grasp_counter = {arm: None for arm in self.arm_names}
         self._ag_check_in_volume = {arm: None for arm in self.arm_names}
         self._ag_calculate_volume = {arm: None for arm in self.arm_names}
 
@@ -1604,7 +1606,28 @@ class ManipulationRobot(BaseRobot):
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
             elif applying_grasp:
-                self._establish_grasp(arm=arm, ag_data=self._calculate_in_hand_object(arm=arm))
+                current_ag_data = self._calculate_in_hand_object(arm=arm)
+                if self._ag_grasp_counter[arm] is not None:
+                    # We're in a grasp window already
+                    if current_ag_data is None:
+                        # Lost contact with object, reset window
+                        self._ag_grasp_counter[arm] = None
+                    else:
+                        self._ag_grasp_counter[arm] += 1
+
+                        # Check if window is complete
+                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
+                        if time_in_grasp >= m.GRASP_WINDOW:
+                            # Establish grasp with the LATEST ag_data
+                            self._establish_grasp(arm=arm, ag_data=current_ag_data)
+                            # Reset the grasp window tracking
+                            self._ag_grasp_counter[arm] = None
+                elif current_ag_data is not None:
+                    # Start tracking a new potential grasp
+                    self._ag_grasp_counter[arm] = 0
+            else:
+                # Not trying to grasp, reset any pending grasp window
+                self._ag_grasp_counter[arm] = None
 
     def _update_constraint_cloth(self, arm="default"):
         """
