@@ -440,12 +440,13 @@ def main(random_selection=False, headless=False, short_exec=False):
                         success = False
                         feedback = error_msg
                         print("validation failed")
+                        print(f"REASON: {feedback}")
                         breakpoint()
 
                 if success:
                     env.scene.load_state(task_final_state)
                     env.scene.update_initial_state(task_final_state)
-                    print("sampling suceed")
+                    print("sampling succeed")
                     breakpoint()
                     env.task.save_task(override=True)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
