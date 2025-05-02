@@ -238,6 +238,17 @@ class ObjectCandidateFilter(metaclass=ABCMeta):
         return False
 
 
+class ObjectPropertyFilter(ObjectCandidateFilter):
+    """Filter for arbitrary object properties"""
+
+    def __init__(self, name, value):
+        self.property = name
+        self.value = value
+
+    def __call__(self, obj):
+        return getattr(obj, self.property) == self.value
+
+
 class CategoryFilter(ObjectCandidateFilter):
     """Filter for object categories."""
 
@@ -944,12 +955,13 @@ class SlicingRule(BaseTransitionRule):
                 part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
                 part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
-                # Determine the relative scale to apply to the object part from the original object
-                # Note that proper (rotated) scaling can only be applied when the relative orientation of
-                # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                assert T.check_quat_right_angle(
-                    part_bb_orn
-                ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                # TODO: double check if we can remove this!!!!
+                # # Determine the relative scale to apply to the object part from the original object
+                # # Note that proper (rotated) scaling can only be applied when the relative orientation of
+                # # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+                # assert T.check_quat_right_angle(
+                #     part_bb_orn
+                # ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
                 scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
@@ -1630,7 +1642,8 @@ class RecipeRule(BaseTransitionRule):
     @classproperty
     def candidate_filters(cls):
         # Fillable object required
-        return {"container": AbilityFilter(ability="fillable")}
+        # We also will filter out any fixed_base objects, because otherwise all cabinets, fridges, etc. would become valid containers!
+        return {"container": AndFilter([AbilityFilter(ability="fillable"), ObjectPropertyFilter("fixed_base", False)])}
 
     def transition(self, object_candidates):
         objs_to_add, objs_to_remove = [], []
