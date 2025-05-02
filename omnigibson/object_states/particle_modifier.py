@@ -56,7 +56,7 @@ m.VISUAL_PARTICLES_APPLICATION_LIMIT = 1000000
 m.PHYSICAL_PARTICLES_APPLICATION_LIMIT = 1000000
 
 # Saturation thresholds -- maximum number of particles that can be removed ("absorbed") by a ParticleRemover
-m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
+m.VISUAL_PARTICLES_REMOVAL_LIMIT = 200
 m.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 400
 
 # Fallback particle visualization radius for visualizing projected visual particles
