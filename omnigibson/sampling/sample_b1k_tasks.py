@@ -256,6 +256,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
     if args.room_types is not None:
         cfg["scene"]["load_room_types"] = args.room_types.split(",")
+    else:
+        activities = args.activities.split(",")
+        assert len(activities) == 1
+        cfg["scene"]["load_room_types"] = TASK_CUSTOM_LISTS[activities[0]]["room_types"]
 
     valid_tasks = get_valid_tasks()
     # mapping = parse_task_mapping(fpath=TASK_INFO_FPATH)

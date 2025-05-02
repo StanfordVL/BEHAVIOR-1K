@@ -1,40 +1,38 @@
 {
     "cook_eggplant": {
+        "room_types": [
+            "kitchen"
+        ],
         "house_single_floor": {
             "whitelist": {
                 "chopping_board.n.01": {
-                    "chopping_board": {
-                        "__TODO__MODEL__": null
+                    "cutting_board": {
+                        "tcdrzs": null
                     }
                 },
                 "cookie_sheet.n.01": {
-                    "cookie_sheet": {
-                        "__TODO__MODEL__": null
+                    "baking_sheet": {
+                        "yhurut": null
                     }
                 },
                 "eggplant.n.01": {
                     "eggplant": {
-                        "__TODO__MODEL__": null
+                        "gfytkk": null
                     }
                 },
                 "feta.n.01": {
                     "feta": {
-                        "__TODO__MODEL__": null
+                        "gkaitc": null
                     }
                 },
                 "feta__box.n.01": {
                     "feta__box": {
-                        "__TODO__MODEL__": null
-                    }
-                },
-                "half__eggplant.n.01": {
-                    "half__eggplant": {
-                        "__TODO__MODEL__": null
+                        "qxnzpx": null
                     }
                 },
                 "parer.n.02": {
                     "parer": {
-                        "__TODO__MODEL__": null
+                        "lwpdhi": null
                     }
                 }
             },

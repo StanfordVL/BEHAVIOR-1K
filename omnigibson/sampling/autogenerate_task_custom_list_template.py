@@ -1,14 +1,7 @@
-from bddl.activity import (
-    Conditions,
-    get_object_scope,
-    get_initial_conditions,
-)
+from bddl.activity import Conditions
 from bddl.object_taxonomy import ObjectTaxonomy
 import json
 import argparse
-from omnigibson.utils.bddl_utils import (
-    OmniGibsonBDDLBackend,
-)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--activity", type=str, required=True)
@@ -22,14 +15,14 @@ def print_task_custom_list_template(activity_name):
         simulator_name="omnigibson",
         predefined_problem=None,
     )
-    obj_scope = get_object_scope(activity_conditions)
-    backend = OmniGibsonBDDLBackend()
-    init_conds = get_initial_conditions(activity_conditions, backend, obj_scope)
+    init_conds = activity_conditions.parsed_initial_conditions
     synsets = set()
+    room_types = set()
     for init_cond in init_conds:
-        body = init_cond.body
-        if len(body) == 3:
-            synset = "_".join(body[1].split("_")[:-1])
+        if len(init_cond) == 3:
+            if "inroom" == init_cond[0]:
+                room_types.add(init_cond[2])
+            synset = "_".join(init_cond[1].split("_")[:-1])
             if "sceneObject" in ot.get_abilities(synset):
                 continue
             if "agent" in synset:
@@ -37,6 +30,7 @@ def print_task_custom_list_template(activity_name):
             synsets.add(synset)
     task_custom_template = {
         activity_name: {
+            "room_types": list(room_types),
             "house_single_floor": {
                 "whitelist": {synset: {synset.split(".")[0]: {"__TODO__MODEL__": None}} for synset in sorted(synsets)},
                 "blacklist": {}
