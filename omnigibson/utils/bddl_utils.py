@@ -164,11 +164,17 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_NAME = None
 
     def _evaluate(self, entity1, entity2, **kwargs):
-        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else False
+        return (
+            entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs)
+            if (entity2.exists and entity2.initialized)
+            else False
+        )
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
         return (
-            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
+            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs)
+            if (entity2.exists and entity2.initialized)
+            else None
         )
 
 
@@ -663,7 +669,9 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else False
         """
-        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists else False
+        return (
+            self.wrapped_obj.states[state].get_value(*args, **kwargs) if (self.exists and self.initialized) else False
+        )
 
     def set_state(self, state, *args, **kwargs):
         """
@@ -677,7 +685,9 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
         """
-        assert self.exists, f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
+        assert (
+            self.exists and self.initialized
+        ), f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist or is not initialized!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
 

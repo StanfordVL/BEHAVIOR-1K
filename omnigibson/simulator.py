@@ -842,7 +842,7 @@ def _launch_simulator(*args, **kwargs):
                 self._pre_remove_object(obj)
                 # Prune from the state if recorded
                 if playing:
-                    obj_registry = state[obj.scene.idx]["object_registry"]
+                    obj_registry = state[obj.scene.idx]["registry"]["object_registry"]
                     if (
                         obj.name in obj_registry
                     ):  # a particle system template object might not exist in the registry when it's empty

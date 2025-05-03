@@ -31,7 +31,7 @@ def print_task_custom_list_template(activity_name):
     task_custom_template = {
         activity_name: {
             "room_types": list(room_types),
-            "house_single_floor": {
+            "__TODO__SCENE__": {
                 "whitelist": {synset: {synset.split(".")[0]: {"__TODO__MODEL__": None}} for synset in sorted(synsets)},
                 "blacklist": {}
             }

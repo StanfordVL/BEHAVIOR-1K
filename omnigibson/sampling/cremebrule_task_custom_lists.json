@@ -22,11 +22,11 @@
                 },
                 "feta.n.01": {
                     "feta": {
-                        "gkaitc": null
+                        "gkaitc": [0.09, 0.055, 0.05]
                     }
                 },
                 "feta__box.n.01": {
-                    "feta__box": {
+                    "feta_box": {
                         "qxnzpx": null
                     }
                 },
@@ -38,5 +38,132 @@
             },
             "blacklist": {}
         }
+    },
+    "chopping_wood": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "ax.n.01": {
+                    "axe": {
+                        "plqyos": null
+                    }
+                },
+                "chopping_block.n.01": {
+                    "chopping_block": {
+                        "ekowsj": null
+                    }
+                },
+                "log.n.01": {
+                    "log": {
+                        "pepele": null
+                    }
+                },
+                "lawn.n.01": {
+                    "lawn": {
+                        "tiqndr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "slicing_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "beet.n.02": {
+                    "beet": {
+                        "wantjv": null
+                    }
+                },
+                "bell_pepper.n.02": {
+                    "bell_pepper": {
+                        "wszvwc": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "zucchini.n.02": {
+                    "zucchini": {
+                        "udvfaz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "chop_an_onion": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "mixing_bowl.n.01": {
+                    "mixing_bowl": {
+                        "bsgybx": null
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "installing_alarms": {
+        "room_types": [
+            "dining_room",
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "alarm.n.02": {
+                    "fire_alarm": {
+                        "dkwmmf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "turning_on_radio": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "radio_receiver.n.01": {
+                    "radio": {
+                        "wxnicr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
+
 }
