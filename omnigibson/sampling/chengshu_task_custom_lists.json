@@ -257,5 +257,40 @@
             },
             "blacklist": {}
         }
+    },
+    "setting_mousetraps": {
+        "room_types": [
+            "bathroom"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "mousetrap.n.01": {
+                    "mousetrap": {
+                        "mwfwsv": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "hiding_Easter_eggs": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "easter_egg.n.01": {
+                    "easter_egg": {
+                        "rxwfse": null
+                    }
+                },
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "drxfmr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }

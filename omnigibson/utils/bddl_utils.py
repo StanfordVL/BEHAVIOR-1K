@@ -492,6 +492,8 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
     # Manually parse BDDL to hot-swap wildcard scene objects
     swap_info = dict()
     in_goal = False
+    start_init_idx = None
+    end_init_idx = None
     for idx, line in enumerate(raw_bddl):
         if "*" in line:
             # Make sure we're not in the goal conditions -- we ONLY expect the wildcard to be
@@ -549,36 +551,55 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 swap_info[wildcard_instance]["room"] = room
                 swap_info[wildcard_instance]["init_cond_idx"] = idx
 
-    # Now, infer how to convert the wildcard information given the number of valid objects in the current scene
-    # NOTE: For now, we only support room instance 0
-    init_cond_offset = 0
-    for wildcard_instance, info in swap_info.items():
-        valid_objs = set()
-        for category in info["categories"]:
-            valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
-        in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_0")
-        valid_objs = valid_objs.intersection(in_room_objs)
-        n_valid_objects = len(valid_objs)
+        elif ":init" in line:
+            start_init_idx = idx
+        elif ":goal" in line:
+            end_init_idx = idx
 
-        # Make sure we have the minimum number of objects requested
-        n_min_instances = info["n_minimum_instances"]
-        synset = info["synset"]
-        assert (
-            n_valid_objects >= n_min_instances
-        ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+    raw_bddl_init_cond_lines = deepcopy(raw_bddl[start_init_idx:end_init_idx])
+    new_init_cond_lines = []
+    for line in raw_bddl_init_cond_lines:
+        if "*" in line:
+            # parse line to get the space-delimited token that includes the star
+            tokens = line.split(" ")
+            wildcard_instance = None
+            for token in tokens:
+                if "*" in token:
+                    wildcard_instance = token
+                    break
+            assert wildcard_instance is not None, f"Expected to find wildcard synset in line: {line}"
+            # Search for swap info and hot swap in condition
+            info = swap_info[wildcard_instance]
+            # Make sure we have the minimum number of objects requested
+            n_min_instances = info["n_minimum_instances"]
+            synset = info["synset"]
 
-        # Hot swap this information into the BDDL
-        extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
-        extra_instances_str = " ".join(extra_instances)
-        obj_scope_idx = info["object_scope_idx"]
-        init_cond_idx = info["init_cond_idx"] + init_cond_offset
-        raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
-        init_cond_line = raw_bddl[init_cond_idx]
-        extra_cond_lines = [
-            init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
-        ]
-        raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1 :]
-        init_cond_offset += len(extra_instances) - 1
+            valid_objs = set()
+            for category in info["categories"]:
+                valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
+            in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_0")
+            valid_objs = valid_objs.intersection(in_room_objs)
+            n_valid_objects = len(valid_objs)
+
+            assert (
+                n_valid_objects >= n_min_instances
+            ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+
+            # Hot swap this information into the BDDL
+            extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
+            extra_instances_str = " ".join(extra_instances)
+            obj_scope_idx = info["object_scope_idx"]
+            init_cond_idx = info["init_cond_idx"]
+            raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
+            init_cond_line = raw_bddl[init_cond_idx]
+            extra_cond_lines = [
+                init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
+            ]
+            new_init_cond_lines = new_init_cond_lines + extra_cond_lines
+        else:
+            new_init_cond_lines.append(line)
+
+    raw_bddl = raw_bddl[:start_init_idx] + new_init_cond_lines + raw_bddl[end_init_idx:]
 
     # Return the compiled processed BDDL as a single string
     return "".join(raw_bddl)
