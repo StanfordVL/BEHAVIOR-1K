@@ -1194,7 +1194,7 @@ class BDDLSampler:
                                     str(success),
                                 ]
                             )
-                            log.info(log_msg)
+                            log.warning(log_msg)
 
                             # Record the result for the child object
                             assert (
@@ -1579,7 +1579,7 @@ class BDDLSampler:
                                         str(success),
                                     ]
                                 )
-                                log.info(log_msg)
+                                log.warning(log_msg)
                                 if success:
                                     # Update state
                                     state = og.sim.dump_state(serialized=False)

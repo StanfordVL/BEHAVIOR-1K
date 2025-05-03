@@ -211,16 +211,21 @@ def sample_kinematics(
 
     # If we didn't succeed, try last-ditch effort
     if not success and predicate in {"onTop", "inside"}:
-        og.sim.step_physics()
-        # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
-        # until it settles
-        aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
-        aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-        bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
-        desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
-        desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
-        pos = desired_bbox_pos + bbox_to_obj
-        success = True
+        # Do not use last-ditch effort for onTop ground categories because it will
+        # break the traversability constraint (see above)
+        if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+            pass
+        else:
+            og.sim.step_physics()
+            # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
+            # until it settles
+            aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
+            aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
+            bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
+            desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
+            desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
+            pos = desired_bbox_pos + bbox_to_obj
+            success = True
 
     if success and not skip_falling:
         objA.set_position_orientation(position=pos, orientation=orientation)
