@@ -497,6 +497,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.log.error(traceback_str)
             og.log.error(f"\n\nCaught exception sampling activity {activity} in scene {args.scene_model}:\n\n{e}\n\n")
 
+            print("exception")
+            breakpoint()
+
             if not args.offline:
                 # Check if another thread succeeded already
                 already_succeeded = worksheet.get(f"C{row}")
