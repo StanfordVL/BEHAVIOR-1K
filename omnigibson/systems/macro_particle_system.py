@@ -1280,14 +1280,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super().remove_particle_by_name(name=name)
 
         # Refresh particles view
-        self.refresh_particles_view()
+        if og.sim.is_playing():
+            self.refresh_particles_view()
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
-        self.refresh_particles_view()
+        if og.sim.is_playing():
+            self.refresh_particles_view()
 
         return particle
 
