@@ -2,7 +2,7 @@ from omnigibson.robots import REGISTERED_ROBOTS
 import numpy as np
 
 
-def merge_scene_files(scene_a, scene_b, keep_robot_from=None):
+def merge_scene_files(scene_a, scene_b, keep_robot_from="b"):
     """
     Merge two scene files, keeping the robot from the specified scene
     and merging all other objects.
