@@ -1,5 +1,6 @@
 import os
 import random
+import re
 from collections import defaultdict
 from copy import deepcopy
 
@@ -1318,13 +1319,14 @@ class BDDLSampler:
             # Help function to check if a child object can attach to a parent object
             def can_attach(child_attachment_links, parent_attachment_links):
                 for child_link_name in child_attachment_links:
-                    child_category = child_link_name.split("_")[1]
+                    child_category = re.search(r"attachment_(.+?)_\d+_link$", child_link_name).group(1)
                     if child_category.endswith("F"):
                         continue
                     assert child_category.endswith("M")
-                    parent_category = child_category[:-1] + "F"
+                    target_parent_category = child_category[:-1] + "F"
                     for parent_link_name in parent_attachment_links:
-                        if parent_category in parent_link_name:
+                        parent_category = re.search(r"attachment_(.+?)_\d+_link$", parent_link_name).group(1)
+                        if parent_category == target_parent_category:
                             return True
                 return False
 

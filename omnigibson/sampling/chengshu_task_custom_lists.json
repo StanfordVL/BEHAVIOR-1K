@@ -292,5 +292,108 @@
             },
             "blacklist": {}
         }
+    },
+    "sorting_mail": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "envelope.n.01": {
+                    "envelope": {
+                        "urcigc": null
+                    }
+                },
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "ukamcl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "rearranging_kitchen_furniture": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "food_processor.n.01": {
+                    "food_processor": {
+                        "gamkbo": null
+                    }
+                },
+                "french_press.n.01": {
+                    "french_press": {
+                        "zidmyo": null
+                    }
+                },
+                "toaster.n.02": {
+                    "toaster": {
+                        "kjwqav": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_up_Christmas_decorations_inside": {
+        "room_types": [
+            "living_room",
+            "dining_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bow.n.08": {
+                    "bow": {
+                        "fhchql": null
+                    }
+                },
+                "candle.n.01": {
+                    "dip_candle": {
+                        "poexjo": null,
+                        "mxjejs": null
+                    }
+                },
+                "carton.n.02": {
+                    "carton": {
+                        "hhlmbi": [0.66, 0.66, 0.42]
+                    }
+                },
+                "christmas_tree.n.05": {
+                    "christmas_tree": {
+                        "eadukw": null
+                    }
+                },
+                "gift_box.n.01": {
+                    "gift_box": {
+                        "mfalrc": null,
+                        "pnprrx": null
+                    }
+                },
+                "wreath.n.01": {
+                    "wreath": {
+                        "rkrxno": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "hanging_pictures": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "photograph.n.01": {
+                    "picture": {
+                        "pblkaf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
