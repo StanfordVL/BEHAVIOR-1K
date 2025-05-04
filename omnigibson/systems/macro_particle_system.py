@@ -113,8 +113,9 @@ class MacroParticleSystem(BaseSystem):
 
     def remove_all_particles(self):
         # Use list explicitly to prevent mid-loop mutation of dict
-        for particle_name in tuple(self.particles.keys()):
-            self.remove_particle_by_name(name=particle_name)
+        if self.particles is not None:
+            for particle_name in tuple(self.particles.keys()):
+                self.remove_particle_by_name(name=particle_name)
 
     def reset(self):
         # Call super first
