@@ -387,9 +387,9 @@
         ],
         "house_double_floor_lower": {
             "whitelist": {
-                "photograph.n.01": {
-                    "picture": {
-                        "pblkaf": null
+                "poster.n.01": {
+                    "poster": {
+                        "dsrcyt": null
                     }
                 }
             },
