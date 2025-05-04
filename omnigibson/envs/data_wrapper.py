@@ -15,6 +15,7 @@ from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
+from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -593,6 +594,7 @@ class DataPlaybackWrapper(DataWrapper):
         only_successes=False,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
+        full_scene_file=None,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -629,6 +631,9 @@ class DataPlaybackWrapper(DataWrapper):
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
+            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
+                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
+                full scene file.
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -647,8 +652,16 @@ class DataPlaybackWrapper(DataWrapper):
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
 
-        # Set scene file and disable online object sampling if BehaviorTask is being used
+        # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
         config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        if full_scene_file:
+            with open(full_scene_file, "r") as json_file:
+                full_scene_json = json.load(json_file)
+            config["scene"]["scene_file"] = merge_scene_files(
+                scene_a=full_scene_json, scene_b=config["scene"]["scene_file"], keep_robot_from="b"
+            )
+
+        # Set scene file and disable online object sampling if BehaviorTask is being used
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
 
@@ -689,6 +702,7 @@ class DataPlaybackWrapper(DataWrapper):
             n_render_iterations=n_render_iterations,
             overwrite=overwrite,
             only_successes=only_successes,
+            full_scene_file=full_scene_file,
         )
 
     def __init__(
@@ -699,6 +713,7 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
+        full_scene_file=None,
     ):
         """
         Args:
@@ -710,6 +725,9 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
+                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
+                full scene file.
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -717,6 +735,10 @@ class DataPlaybackWrapper(DataWrapper):
         # Store scene file so we can restore the data upon each episode reset
         self.input_hdf5 = h5py.File(input_path, "r")
         self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        if full_scene_file:
+            with open(full_scene_file, "r") as json_file:
+                full_scene_json = json.load(json_file)
+            self.scene_file = merge_scene_files(scene_a=full_scene_json, scene_b=self.scene_file, keep_robot_from="b")
 
         # Store additional variables
         self.n_render_iterations = n_render_iterations
