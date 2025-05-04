@@ -1,6 +1,7 @@
 import math
 
 import torch as th
+import cv2
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -10,6 +11,7 @@ from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
 from omnigibson.utils.ui_utils import debug_breakpoint
+from omnigibson.utils.constants import JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -128,6 +130,18 @@ def sample_kinematics(
     # Save the state of the simulator
     state = og.sim.dump_state()
 
+    trav_map = objB.scene.trav_map
+    trav_map_floor_map = trav_map.floor_map[0]
+    eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=objB.scene.robots[0])
+
+    # Hardcoding R1 robot arm length for now
+    arm_length_xy = 0.8
+    eef_z_max = 2.0
+    arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
+    reachability_map = th.tensor(
+        cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
+    )
+
     # Attempt sampling
     for i in range(max_trials):
         pos = None
@@ -182,13 +196,22 @@ def sample_kinematics(
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
-            # If sampling onTop ground category, we need to check if the sampled position is traversable
-            if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
-                trav_map = objB.scene.trav_map
-                eroded_trav_map = trav_map._erode_trav_map(trav_map.floor_map[0], robot=objB.scene.robots[0])
-                xy_map = trav_map.world_to_map(pos[:2])
-                if not (eroded_trav_map[xy_map[0], xy_map[1]] == 255):
+            xy_map = trav_map.world_to_map(pos[:2])
+            if pos[2] > eef_z_max:
+                # We need to check if the sampled position is above the maximum z of the arm
+                pos = None
+            elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+                # If sampling onTop an objB of ground category, we need to check if
+                # the sampled position of objA is traversable
+                if eroded_trav_map[xy_map[0], xy_map[1]] != 255:
                     pos = None
+            else:
+                has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
+                if not has_prismatic_joint:
+                    # If sampling onTop/inside/under an objB with no prismatic joints, we need to check if
+                    # the sampled position of objA is reachable
+                    if reachability_map[xy_map[0], xy_map[1]] != 255:
+                        pos = None
 
         if pos is None:
             success = False

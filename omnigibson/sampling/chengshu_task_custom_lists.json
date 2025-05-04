@@ -150,12 +150,12 @@
             "whitelist": {
                 "plate.n.04": {
                     "plate": {
-                        "itoeew": null
+                        "itoeew": [0.357, 0.357, 0.021]
                     }
                 },
                 "pizza.n.01": {
                     "pizza": {
-                        "vyfhkm": null
+                        "vyfhkm": [0.329, 0.329, 0.014]
                     }
                 },
                 "bowl.n.01": {
