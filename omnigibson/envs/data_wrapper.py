@@ -796,15 +796,21 @@ class DataPlaybackWrapper(DataWrapper):
         traj_grp = data_grp[f"demo_{episode_id}"]
 
         # Grab episode data
-        transitions = json.loads(traj_grp.attrs["transitions"])
-        traj_grp = h5py_group_to_torch(traj_grp)
-        init_metadata = traj_grp["init_metadata"]
-        action = traj_grp["action"]
-        state = traj_grp["state"]
-        state_size = traj_grp["state_size"]
-        reward = traj_grp["reward"]
-        terminated = traj_grp["terminated"]
-        truncated = traj_grp["truncated"]
+        # Skip early if found malformed data
+        try:
+            transitions = json.loads(traj_grp.attrs["transitions"])
+            traj_grp = h5py_group_to_torch(traj_grp)
+            init_metadata = traj_grp["init_metadata"]
+            action = traj_grp["action"]
+            state = traj_grp["state"]
+            state_size = traj_grp["state_size"]
+            reward = traj_grp["reward"]
+            terminated = traj_grp["terminated"]
+            truncated = traj_grp["truncated"]
+        except KeyError as e:
+            print(f"Got error when trying to load episode {episode_id}:")
+            print(f"Error: {str(e)}")
+            return
 
         # Reset environment
         og.sim.restore(scene_files=[self.scene_file])

@@ -43,6 +43,10 @@ class R1Pro(R1):
         return {arm: [f"{arm}_arm_joint{i}" for i in range(1, 8)] for arm in self.arm_names}
 
     @cached_property
+    def gripper_link_names(self):
+        return {arm: [f"{arm}_gripper_link", f"{arm}_realsense_link"] for arm in self.arm_names}
+
+    @cached_property
     def finger_link_names(self):
         return {arm: [f"{arm}_gripper_finger_link{i}" for i in range(1, 3)] for arm in self.arm_names}
 

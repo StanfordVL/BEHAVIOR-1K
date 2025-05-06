@@ -804,6 +804,19 @@ class ManipulationRobot(BaseRobot):
 
     @cached_property
     @abstractmethod
+    def gripper_link_names(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to array of link names corresponding to
+                this robot's gripper. Should be mutual exclusive from self.arm_link_names and self.finger_link_names!
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding idxs.
+        """
+        raise NotImplementedError
+
+    @cached_property
+    @abstractmethod
     def finger_link_names(self):
         """
         Returns:
@@ -871,6 +884,15 @@ class ManipulationRobot(BaseRobot):
                 points from the left finger to the right finger, and the x-axis inferred programmatically
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
+
+    @cached_property
+    def gripper_links(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to robot links corresponding to
+                that arm's gripper links
+        """
+        return {arm: [self._links[link] for link in self.gripper_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
     def finger_links(self):
