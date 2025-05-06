@@ -468,7 +468,14 @@ class VisualGeomPrim(GeomPrim):
             elif any(
                 [
                     metalink in self.name
-                    for metalink in ["particlesource", "particlesink", "fillable", "particleremover", "particleapplier"]
+                    for metalink in [
+                        "particlesource",
+                        "particlesink",
+                        "fillable",
+                        "particleremover",
+                        "particleapplier",
+                        "slicer",
+                    ]
                 ]
             ):
                 # Make sure particlesource, particlesink and fillable meshes are not visible
