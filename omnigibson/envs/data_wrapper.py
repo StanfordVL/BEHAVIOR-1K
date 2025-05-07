@@ -446,7 +446,7 @@ class DataCollectionWrapper(DataWrapper):
         """
         Enables dump filters for optimized per-step state caching
         """
-        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
+        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active and obj.initialized)
 
     def disable_dump_filters(self):
         """
@@ -845,13 +845,13 @@ class DataPlaybackWrapper(DataWrapper):
                     scene.get_system(add_sys_name, force_init=True)
                 for remove_sys_name in cur_transitions["systems"]["remove"]:
                     scene.clear_system(remove_sys_name)
+                for remove_obj_name in cur_transitions["objects"]["remove"]:
+                    obj = scene.object_registry("name", remove_obj_name)
+                    scene.remove_object(obj)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
-                for remove_obj_name in cur_transitions["objects"]["remove"]:
-                    obj = scene.object_registry("name", remove_obj_name)
-                    scene.remove_object(obj)
                 # Step physics to initialize any new objects
                 og.sim.step()
 
