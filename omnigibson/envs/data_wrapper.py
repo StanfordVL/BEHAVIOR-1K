@@ -595,6 +595,10 @@ class DataPlaybackWrapper(DataWrapper):
         include_env_wrapper=False,
         additional_wrapper_configs=None,
         full_scene_file=None,
+        include_task=True,
+        include_task_obs=True,
+        include_robot_control=True,
+        include_contacts=True,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -631,9 +635,15 @@ class DataPlaybackWrapper(DataWrapper):
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
-            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
-                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
+            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection
+                the scene file stored may be partial, and will be used to fill in the missing scene objects from the
                 full scene file.
+            include_task (bool): Whether to include the original task or not. If False, will use a DummyTask instead
+            include_task_obs (bool): Whether to include task observations or not. If False, will not include task obs
+            include_robot_control (bool): Whether or not to include robot control. If False, will set all
+                robot.control_enabled=False
+            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
+                objects to be visual_only
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -661,6 +671,13 @@ class DataPlaybackWrapper(DataWrapper):
                 scene_a=full_scene_json, scene_b=config["scene"]["scene_file"], keep_robot_from="b"
             )
 
+        # Use dummy task if not loading task
+        if not include_task:
+            config["task"] = {"type": "DummyTask"}
+
+        # Maybe include task observations
+        config["task"]["include_obs"] = include_task_obs
+
         # Set scene file and disable online object sampling if BehaviorTask is being used
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
@@ -680,11 +697,17 @@ class DataPlaybackWrapper(DataWrapper):
         if external_sensors_config is not None:
             config["env"]["external_sensors"] = external_sensors_config
 
-        # Make sure task includes task observations
-        config["task"]["include_obs"] = True
-
         # Load env
         env = og.Environment(configs=config)
+
+        if not include_contacts:
+            with og.sim.stopped():
+                for obj in env.scene.objects:
+                    obj.visual_only = True
+
+        # If not controlling robots, disable for all robots
+        for robot in env.robots:
+            robot.control_enabled = include_robot_control
 
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
