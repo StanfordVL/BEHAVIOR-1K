@@ -2161,7 +2161,7 @@ class MixingToolRule(RecipeRule):
 
     @classproperty
     def use_garbage_fallback_recipe(cls):
-        return True
+        return False
 
 
 class CookingRule(RecipeRule):
