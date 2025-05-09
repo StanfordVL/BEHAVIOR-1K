@@ -30,7 +30,7 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, overwrite=True, only_successes=True):
+    def __init__(self, env, output_path, overwrite=True, only_successes=True, flush_every_n_traj=10):
         """
         Args:
             env (Environment): The environment to wrap
@@ -38,6 +38,7 @@ class DataWrapper(EnvironmentWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
         """
         # Make sure the wrapped environment inherits correct omnigibson format
         assert isinstance(
@@ -50,6 +51,7 @@ class DataWrapper(EnvironmentWrapper):
         self.traj_count = 0
         self.step_count = 0
         self.only_successes = only_successes
+        self.flush_every_n_traj = flush_every_n_traj
         self.current_obs = None
 
         self.current_traj_history = []
@@ -229,6 +231,10 @@ class DataWrapper(EnvironmentWrapper):
             traj_grp_name = f"demo_{self.traj_count}"
             self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
+
+            # Potentially write to disk
+            if self.traj_count % self.flush_every_n_traj == 0:
+                self.flush_current_file()
         else:
             # Remove this demo
             self.step_count -= len(self.current_traj_history)
@@ -289,6 +295,7 @@ class DataCollectionWrapper(DataWrapper):
         viewport_camera_path="/World/viewer_camera",
         overwrite=True,
         only_successes=True,
+        flush_every_n_traj=10,
         use_vr=False,
         obj_attr_keys=None,
     ):
@@ -301,6 +308,7 @@ class DataCollectionWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
             use_vr (bool): Whether to use VR headset for data collection
             obj_attr_keys (None or list of str): If set, a list of object attributes that should be
                 cached at the beginning of every episode, e.g.: "scale", "visible", etc. This is useful
@@ -348,6 +356,7 @@ class DataCollectionWrapper(DataWrapper):
             output_path=output_path,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
         )
 
         # Configure the simulator to optimize for data collection
@@ -592,6 +601,7 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
+        flush_every_n_traj=10,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
         full_scene_file=None,
@@ -632,6 +642,7 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
@@ -725,6 +736,7 @@ class DataPlaybackWrapper(DataWrapper):
             n_render_iterations=n_render_iterations,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
             full_scene_file=full_scene_file,
         )
 
@@ -736,6 +748,7 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
+        flush_every_n_traj=10,
         full_scene_file=None,
     ):
         """
@@ -748,6 +761,7 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
@@ -772,6 +786,7 @@ class DataPlaybackWrapper(DataWrapper):
             output_path=output_path,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
         )
 
     def _process_obs(self, obs, info):
