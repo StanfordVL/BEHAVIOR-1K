@@ -849,6 +849,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             orientation (th.Tensor): (4,) orientation of the scene
         """
         self._scene_prim.set_position_orientation(position=position, orientation=orientation)
+        # Need to update sim here -- this is because downstream setters called immediately may not be respected,
+        # e.g. during load_state() call when specific objects have just been added to the simulator in this scene
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         # Update the cached pose and inverse pose
         pos_ori = self._scene_prim.get_position_orientation()
         pose = T.pose2mat(pos_ori)
