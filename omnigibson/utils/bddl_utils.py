@@ -819,7 +819,7 @@ class BDDLSampler:
                 log.error(error_msg)
                 return False, error_msg
 
-            self._env.scene.update_initial_state()
+            self._env.scene.update_initial_file()
 
         return True, None
 

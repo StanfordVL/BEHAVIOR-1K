@@ -443,7 +443,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.scene.reset()
 
         # Save the state for objects from load_robots / load_objects / load_task
-        self.scene.update_initial_state()
+        self.scene.update_initial_file()
 
         # Load the obs / action spaces
         self.load_observation_space()

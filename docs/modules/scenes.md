@@ -49,7 +49,7 @@ The scene keeps track of and organizes all imported objects via its owned `scene
 
 Similarly, systems can be queried via `scene.system_registry`.
 
-In addition, a scene can always be reset by calling `reset()`. The scene's initial state is cached when the scene is first imported, but can manually be updated by calling `scene.update_initial_state(state)`, where `state` can either be a desired state (output of `og.sim.dump_state()`) or `None`, corresponding to the current sim state.
+In addition, a scene can always be reset by calling `reset()`. The scene's initial state is cached when the scene is first imported, but can manually be updated by calling `scene.update_initial_file(scene_file)`, where `scene_file` can either be a desired file (output of `scene.save()`) or `None`, corresponding to the current scene file.
 
 ## Types
 **`OmniGibson`** currently supports two types of scenes. The basic scene class `Scene` implements a minimal scene setup, which can optionally include a skybox and / or ground plane. The second scene class `InteractiveTraversableScene` represents a pre-cached, curated scene exclusively populated with fully-interactive objects from the BEHAVIOR-1K dataset. This scene type additionally includes traversability and semantic maps of the scene floorplan. For a breakdown of all the available scenes and the corresponding objects included in each scene, please refer our [Knowledgebase Dashboard](https://behavior.stanford.edu/knowledgebase/). Below, we provide brief snapshots of each of our 50 BEHAVIOR-1K scenes:

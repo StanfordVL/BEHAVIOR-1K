@@ -4,6 +4,7 @@ import os
 import shutil
 import tempfile
 from abc import ABC
+from pathlib import Path
 
 import torch as th
 
@@ -81,7 +82,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._initialized = False  # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self._scene_prim = None
-        self._initial_state = None
+        self._initial_file = None
         self._objects_info = None  # Information associated with this scene
         self._idx = None
         self._use_floor_plane = use_floor_plane
@@ -517,7 +518,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Store initial state, which may be loaded from a scene file if specified
         if self.scene_file is None:
-            init_state = self.dump_state(serialized=False)
+            scene_info = self.save(as_dict=True)
         else:
             if isinstance(self.scene_file, str):
                 with open(self.scene_file, "r") as f:
@@ -527,7 +528,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             init_state = scene_info["state"]
             init_state = recursively_convert_to_torch(init_state)
             self.load_state(init_state, serialized=False)
-        self._initial_state = init_state
+        self._initial_file = scene_info
 
     def _create_registry(self):
         """
@@ -694,9 +695,139 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
 
         # Reset the states of all objects (including robots), including (non-)kinematic states and internal variables.
-        assert self._initial_state is not None
-        self.load_state(self._initial_state)
+        # This also forces the scene to align with the correct set of initial objects / systems, in case any
+        # were removed / added during runtime
+        assert self._initial_file is not None
+        self.restore(scene_file=self._initial_file)
         og.sim.step_physics()
+
+    def save(self, json_path=None, as_dict=False):
+        """
+        Saves the current scene environment to @json_path.
+
+        Args:
+            json_path (None or str): Full path of JSON file to save (should end with .json), which will
+                contain information to recreate the current scene, if specified. If None, will return the raw JSON
+                string instead.
+            as_dict (bool): If set and @json_path is None, will return the saved environment as a dictionary instead
+                of encoded json strings
+
+        Returns:
+            None or str or dict: If @json_path is None, returns dumped json string (or dict if @as_dict is set).
+                Else, None
+        """
+        # Make sure the sim is not stopped, since we need to grab joint states
+        assert not og.sim.is_stopped(), "Simulator cannot be stopped when saving scene!"
+
+        if json_path is not None:
+            if not json_path.endswith(".json"):
+                log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
+                return
+
+        # Update scene info
+        self.update_objects_info()
+
+        # Dump saved current state and also scene init info
+        scene_info = {
+            "metadata": self._scene_prim.prim.GetCustomData(),
+            "state": self.dump_state(serialized=False),
+            "init_info": self.get_init_info(),
+            "objects_info": self.get_objects_info(),
+        }
+
+        # Write this to the json file
+        if json_path is None:
+            return scene_info if as_dict else json.dumps(scene_info, cls=TorchEncoder, indent=4)
+
+        else:
+            Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
+            with open(json_path, "w+") as f:
+                json.dump(scene_info, f, cls=TorchEncoder, indent=4)
+
+            log.info(f"Scene {self.idx} saved to {json_path}.")
+
+    def restore(self, scene_file):
+        """
+        Restores this scene given @scene_file
+
+        Args:
+            scene_file (str or dict): Full path of either JSON file or loaded scene file to load, which contains
+                information to recreate a scene. Should be the output of self.save()
+        """
+        # Make sure the sim is not stopped, since we need to grab joint states
+        assert not og.sim.is_stopped(), "Simulator cannot be stopped when restoring scene!"
+
+        if isinstance(scene_file, str):
+            if not scene_file.endswith(".json"):
+                log.error(f"You have to define the full json_path to load from. Got: {scene_file}")
+                return
+
+            # Load the info from the json
+            with open(scene_file, "r") as f:
+                scene_info = json.load(f)
+        else:
+            scene_info = scene_file
+        init_info = scene_info["init_info"]
+        # The saved state are lists, convert them to torch tensors
+        state = recursively_convert_to_torch(scene_info["state"])
+
+        # Make sure the class type is the same
+        if self.__class__.__name__ != init_info["class_name"]:
+            log.error(
+                f"Got mismatch in scene type: current is type {self.__class__.__name__}, trying to load type {init_info['class_name']}"
+            )
+
+        # Synchronize systems -- we need to check for pruning currently-existing systems,
+        # as well as creating any non-existing systems
+        current_systems = set(self.active_systems.keys())
+        load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
+        systems_to_remove = current_systems - load_systems
+        systems_to_add = load_systems - current_systems
+        for name in systems_to_remove:
+            self.clear_system(name)
+        for name in systems_to_add:
+            self.get_system(name, force_init=True)
+
+        current_obj_names = set(self.object_registry.get_dict("name").keys())
+        load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
+
+        objs_to_remove = current_obj_names - load_obj_names
+        objs_to_add = load_obj_names - current_obj_names
+
+        # Delete any extra objects that currently exist in the scene stage
+        objects_to_remove = [
+            self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove
+        ]
+        og.sim.batch_remove_objects(objects_to_remove)
+
+        # Add any extra objects that do not currently exist in the scene stage
+        objects_to_add = [
+            create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
+            for obj_to_add in objs_to_add
+        ]
+        og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
+
+        # Load state
+        self.load_state(state, serialized=False)
+
+    def write_metadata(self, key, data):
+        """
+        Writes metadata @data to the current global metadata dict using key @key
+
+        Args:
+            key (str): Keyword entry in the global metadata dictionary to use
+            data (dict): Data to write to @key in the global metadata dictionary
+        """
+        self._scene_prim.prim.SetCustomDataByKey(key, data)
+
+    def get_metadata(self, key):
+        """
+        Grabs metadata from the current global metadata dict using key @key
+
+        Args:
+            key (str): Keyword entry in the global metadata dictionary to use
+        """
+        return self._scene_prim.prim.GetCustomDataByKey(key)
 
     def get_position_orientation(self):
         """
@@ -922,15 +1053,26 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return 0.0
 
-    def update_initial_state(self, state=None):
+    def update_initial_file(self, scene_file=None):
         """
-        Updates the initial state for this scene (which the scene will get reset to upon calling reset())
+        Updates the initial scene file for this scene (which the scene will get reset to upon calling reset())
 
         Args:
-            state (None or dict): If specified, the state to set internally. Otherwise, will set the initial state to
-                be the current state
+            scene_file (None or str or dict): If specified, the state to set internally. Can be a full path to the scene
+                file or the already-loaded dictionary equivalent. This should be the output of self.save(). Otherwise,
+                will set the initial file to be the current scene file that will be cached immediately
         """
-        self._initial_state = self.dump_state(serialized=False) if state is None else state
+        if scene_file is None:
+            scene_file = self.save(as_dict=True)
+        else:
+            if isinstance(scene_file, str):
+                with open(scene_file, "r") as f:
+                    scene_file = json.load(f)
+            else:
+                assert isinstance(scene_file, dict), f"Expected scene_file to be a dictionary, but got: {type(scene_file)}"
+
+        scene_file["state"] = recursively_convert_to_torch(scene_file["state"])
+        self._initial_file = scene_file
 
     def update_objects_info(self):
         """

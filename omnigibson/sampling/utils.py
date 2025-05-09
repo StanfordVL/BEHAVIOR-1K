@@ -402,7 +402,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
 
     for obj in env.scene.objects:
         obj.keep_still()
-    env.scene.update_initial_state()
+    env.scene.update_initial_file()
 
     # Save this as a stable file
     path = os.path.join(gm.DATASET_PATH, "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json")

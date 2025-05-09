@@ -125,7 +125,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Because the controllers have been updated, we need to update the initial state so the correct controller state
     # is preserved
-    env.scene.update_initial_state()
+    env.scene.update_initial_file()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(

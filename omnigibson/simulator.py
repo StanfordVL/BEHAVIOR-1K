@@ -1528,25 +1528,6 @@ def _launch_simulator(*args, **kwargs):
         def get_callbacks_on_system_clear(self):
             return self._callbacks_on_system_clear
 
-        def write_metadata(self, key, data):
-            """
-            Writes metadata @data to the current global metadata dict using key @key
-
-            Args:
-                key (str): Keyword entry in the global metadata dictionary to use
-                data (dict): Data to write to @key in the global metadata dictionary
-            """
-            self.world_prim.SetCustomDataByKey(key, data)
-
-        def get_metadata(self, key):
-            """
-            Grabs metadata from the current global metadata dict using key @key
-
-            Args:
-                key (str): Keyword entry in the global metadata dictionary to use
-            """
-            return self.world_prim.GetCustomDataByKey(key)
-
         def restore(self, scene_files):
             """
             Restore simulation environments from @json_paths.
@@ -1566,26 +1547,26 @@ def _launch_simulator(*args, **kwargs):
                 )
                 return
 
-            # Parse each json path individually
-            states = []
-            self.stop()
-            for i, scene_file in enumerate(scene_files):
-                if isinstance(scene_file, str):
-                    if not scene_file.endswith(".json"):
-                        log.error(f"You have to define the full json_path to load from. Got: {scene_file}")
-                        return
+            # Handle loading scenes differently depending on whether we're loading from scratch or not
+            if load_from_scratch:
+                states = []
+                self.stop()
+                for i, scene_file in enumerate(scene_files):
+                    # Directly create and load the scene object
+                    if isinstance(scene_file, str):
+                        if not scene_file.endswith(".json"):
+                            log.error(f"You have to define the full json_path to load from. Got: {scene_file}")
+                            return
 
-                    # Load the info from the json
-                    with open(scene_file, "r") as f:
-                        scene_info = json.load(f)
-                else:
-                    scene_info = scene_file
-                init_info = scene_info["init_info"]
-                # The saved state are lists, convert them to torch tensors
-                state = recursively_convert_to_torch(scene_info["state"])
-                states.append(state)
-
-                if load_from_scratch:
+                        # Load the info from the json
+                        with open(scene_file, "r") as f:
+                            scene_info = json.load(f)
+                    else:
+                        scene_info = scene_file
+                    init_info = scene_info["init_info"]
+                    # The saved state are lists, convert them to torch tensors
+                    state = recursively_convert_to_torch(scene_info["state"])
+                    states.append(state)
                     # Override the init info with our json path
                     init_info["args"]["scene_file"] = scene_file
 
@@ -1595,49 +1576,13 @@ def _launch_simulator(*args, **kwargs):
                     # Recreate and import the saved scene
                     recreated_scene = create_object_from_init_info(init_info)
                     self.import_scene(scene=recreated_scene)
+                self.play()
+                for i, state in enumerate(states):
+                    self.scenes[i].load_state(state, serialized=False)
 
-                else:
-                    scene = self.scenes[i]
-                    # Make sure the class type is the same
-                    if scene.__class__.__name__ != init_info["class_name"]:
-                        log.error(
-                            f"Got mismatch in scene type: current is type {scene.__class__.__name__}, trying to load type {init_info['class_name']}"
-                        )
-
-                    # Synchronize systems -- we need to check for pruning currently-existing systems,
-                    # as well as creating any non-existing systems
-                    current_systems = set(scene.active_systems.keys())
-                    load_systems = set(scene_info["state"]["registry"]["system_registry"].keys())
-                    systems_to_remove = current_systems - load_systems
-                    systems_to_add = load_systems - current_systems
-                    for name in systems_to_remove:
-                        scene.clear_system(name)
-                    for name in systems_to_add:
-                        scene.get_system(name, force_init=True)
-
-                    current_obj_names = set(scene.object_registry.get_dict("name").keys())
-                    load_obj_names = set(scene_info["objects_info"]["init_info"].keys())
-
-                    objs_to_remove = current_obj_names - load_obj_names
-                    objs_to_add = load_obj_names - current_obj_names
-
-                    # Delete any extra objects that currently exist in the scene stage
-                    objects_to_remove = [
-                        scene.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove
-                    ]
-                    og.sim.batch_remove_objects(objects_to_remove)
-
-                    # Add any extra objects that do not currently exist in the scene stage
-                    objects_to_add = [
-                        create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
-                        for obj_to_add in objs_to_add
-                    ]
-                    og.sim.batch_add_objects(objects_to_add, scenes=[scene] * len(objects_to_add))
-
-            # Start the simulation and restore the dynamic state of the scene
-            self.play()
-            for i, state in enumerate(states):
-                self.scenes[i].load_state(state, serialized=False)
+            else:
+                for scene, scene_file in zip(self.scenes, scene_files):
+                    scene.restore(scene_file=scene_file)
 
             log.info("The saved simulation environment loaded.")
 
@@ -1656,9 +1601,6 @@ def _launch_simulator(*args, **kwargs):
                 None or list of str or list of dict: If @json_paths is None, returns list of dumped json strings (or
                     list of dict if @as_dict is set). Else, None
             """
-            # Make sure the sim is not stopped, since we need to grab joint states
-            assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
-
             # Make sure there are no objects in the initialization queue, if not, terminate early and notify user
             # Also run other sanity checks before saving
             if len(self._objects_to_initialize) > 0:
@@ -1673,9 +1615,6 @@ def _launch_simulator(*args, **kwargs):
                         f"You must define a list of .json paths, one for each scene. Number of scenes: {len(self.scenes)}"
                     )
                     return
-                if not all([json_path.endswith(".json") for json_path in json_paths]):
-                    log.error(f"You have to define the full json_path to save the scene to. Got: {json_paths}")
-                    return
 
             if not json_paths:
                 json_paths = [None] * len(self.scenes)
@@ -1685,31 +1624,9 @@ def _launch_simulator(*args, **kwargs):
             # Update scene info
             jsons = []
             for scene, json_path in zip(self.scenes, json_paths):
-                scene.update_objects_info()
+                jsons.append(scene.save(json_path=json_path, as_dict=as_dict))
 
-                # Dump saved current state and also scene init info
-                scene_info = {
-                    "metadata": self.world_prim.GetCustomData(),
-                    "state": scene.dump_state(serialized=False),
-                    "init_info": scene.get_init_info(),
-                    "objects_info": scene.get_objects_info(),
-                }
-
-                # Write this to the json file
-                if json_path is None:
-                    jsons.append(scene_info if as_dict else json.dumps(scene_info, cls=TorchEncoder, indent=4))
-
-                else:
-                    Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
-                    with open(json_path, "w+") as f:
-                        json.dump(scene_info, f, cls=TorchEncoder, indent=4)
-
-                    log.info(f"Scene {scene.idx} saved.")
-
-            if jsons:
-                return jsons
-
-            return None
+            return None if jsons[0] is None else jsons
 
         def _partial_clear(self):
             """Partial clear clearing all components owned by the Simulator. Rest is completed in og.clear."""
