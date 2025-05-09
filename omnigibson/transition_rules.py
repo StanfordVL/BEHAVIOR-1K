@@ -62,12 +62,11 @@ TransitionResults = namedtuple("TransitionResults", ["add", "remove"], defaults=
 
 # Mapping from transition rule json files to rule classe names
 _JSON_FILES_TO_RULES = {
-    # TODO: temporarily disable recipe rules
-    # "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
-    # "mixing_stick.json": ["MixingToolRule"],
-    # "single_toggleable_machine.json": ["ToggleableMachineRule"],
-    # "substance_cooking.json": ["CookingPhysicalParticleRule"],
-    # "substance_watercooking.json": ["CookingPhysicalParticleRule"],
+    "heat_cook.json": ["CookingObjectRule", "CookingSystemRule"],
+    "mixing_stick.json": ["MixingToolRule"],
+    "single_toggleable_machine.json": ["ToggleableMachineRule"],
+    "substance_cooking.json": ["CookingPhysicalParticleRule"],
+    "substance_watercooking.json": ["CookingPhysicalParticleRule"],
     "washer.json": ["WasherRule"],
 }
 # Global dicts that will contain mappings
@@ -1981,13 +1980,6 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         return TransitionResults(add=[], remove=[])
 
-    @classproperty
-    def _do_not_register_classes(cls):
-        # TODO: Temporarily skip all recipe rules during data collection
-        classes = super()._do_not_register_classes
-        classes.add("CookingPhysicalParticleRule")
-        return classes
-
 
 class ToggleableMachineRule(RecipeRule):
     """
@@ -2088,13 +2080,6 @@ class ToggleableMachineRule(RecipeRule):
     def use_garbage_fallback_recipe(cls):
         return True
 
-    @classproperty
-    def _do_not_register_classes(cls):
-        # TODO: Temporarily skip all recipe rules during data collection
-        classes = super()._do_not_register_classes
-        classes.add("ToggleableMachineRule")
-        return classes
-
 
 class MixingToolRule(RecipeRule):
     """
@@ -2177,13 +2162,6 @@ class MixingToolRule(RecipeRule):
     @classproperty
     def use_garbage_fallback_recipe(cls):
         return False
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # TODO: Temporarily skip all recipe rules during data collection
-        classes = super()._do_not_register_classes
-        classes.add("MixingToolRule")
-        return classes
 
 
 class CookingRule(RecipeRule):
@@ -2490,13 +2468,6 @@ class CookingObjectRule(CookingRule):
     def is_multi_instance(cls):
         return True
 
-    @classproperty
-    def _do_not_register_classes(cls):
-        # TODO: Temporarily skip all recipe rules during data collection
-        classes = super()._do_not_register_classes
-        classes.add("CookingObjectRule")
-        return classes
-
 
 class CookingSystemRule(CookingRule):
     """
@@ -2564,13 +2535,6 @@ class CookingSystemRule(CookingRule):
     @classproperty
     def ignore_nonrecipe_objects(cls):
         return False
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # TODO: Temporarily skip all recipe rules during data collection
-        classes = super()._do_not_register_classes
-        classes.add("CookingSystemRule")
-        return classes
 
 
 def import_recipes():
