@@ -49,7 +49,7 @@ AbilityDependencies = namedtuple("AbilityDependencies", ("states", "requirements
 _ABILITY_DEPENDENCIES = {
     "robot": AbilityDependencies(states=[IsGrasping, ObjectsInFOVOfRobot], requirements=[]),
     "attachable": AbilityDependencies(states=[AttachedTo], requirements=[]),
-    "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[ParticleRequirement]),
+    "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[]),
     "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[]),
     "particleSource": AbilityDependencies(states=[ParticleSource], requirements=[ParticleRequirement]),
     "particleSink": AbilityDependencies(states=[ParticleSink], requirements=[ParticleRequirement]),

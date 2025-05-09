@@ -7,7 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm, macros
+from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -31,7 +31,6 @@ from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import (
-    FlatcacheAPI,
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
     delete_or_deactivate_prim,
@@ -650,17 +649,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         return all(condition(self.obj) for condition in self.conditions[system_name])
 
     def _update(self):
-        # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
-        # so the corresponding visualization and overlap meshes are updated properly
-        # This is expensive, so only do it if the object is not a fixed object and we have an active projection
-        if (
-            self.method == ParticleModifyMethod.PROJECTION
-            and gm.ENABLE_FLATCACHE
-            and not self.obj.fixed_base
-            and self.projection_is_active
-        ):
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
-
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0:
             # Iterate over all systems to check
@@ -1317,9 +1305,9 @@ class ParticleApplier(ParticleModifier):
                 # Generate particles for this group
                 system.generate_group_particles(
                     group=group,
-                    positions=th.tensor(particle_info["positions"]),
-                    orientations=th.tensor(particle_info["orientations"]),
-                    scales=th.tensor(particles_info[group]["scales"]),
+                    positions=th.stack(particle_info["positions"], dim=0),
+                    orientations=th.stack(particle_info["orientations"], dim=0),
+                    scales=th.stack(particles_info[group]["scales"], dim=0),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
@@ -1525,10 +1513,6 @@ class ParticleApplier(ParticleModifier):
         compatible, reason = super().is_compatible(obj, **kwargs)
         if not compatible:
             return compatible, reason
-
-        # Check whether GPU dynamics are enabled (necessary for this object state)
-        if not gm.USE_GPU_DYNAMICS:
-            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
 
         return True, None
 
