@@ -405,15 +405,15 @@ def _launch_simulator(*args, **kwargs):
                     state.global_initialize()
 
             # Now start rebuilding everything
-            # Create collision group for fixed base objects' non root links, root links, and building structures
-            CollisionAPI.create_collision_group(col_group="fixed_base_nonroot_links", filter_self_collisions=False)
             # Disable collision between root links of fixed base objects
             CollisionAPI.create_collision_group(col_group="fixed_base_root_links", filter_self_collisions=True)
+            # Create collision group for sliding_doors
+            CollisionAPI.create_collision_group(col_group="sliding_doors", filter_self_collisions=True)
             # Disable collision between building structures
             CollisionAPI.create_collision_group(col_group="structures", filter_self_collisions=True)
-            # Disable collision between building structures and fixed base objects
-            CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_nonroot_links")
             CollisionAPI.add_group_filter(col_group="structures", filter_group="fixed_base_root_links")
+            # Disable collision between building structures and sliding doors
+            CollisionAPI.add_group_filter(col_group="structures", filter_group="sliding_doors")
 
             # Store stage ID
             self._stage_id = lazy.pxr.UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()

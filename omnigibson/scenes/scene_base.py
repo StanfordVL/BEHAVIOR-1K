@@ -650,12 +650,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                         CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
                     else:
                         for link in obj.links.values():
-                            CollisionAPI.add_to_collision_group(
-                                col_group=(
-                                    "fixed_base_root_links"  # if link == obj.root_link else "fixed_base_nonroot_links"
-                                ),
-                                prim_path=link.prim_path,
-                            )
+                            if link == obj.root_link:
+                                CollisionAPI.add_to_collision_group(
+                                    col_group=("fixed_base_root_links"),
+                                    prim_path=link.prim_path,
+                                )
+                            elif obj.category == "sliding_door":
+                                CollisionAPI.add_to_collision_group(
+                                    col_group=("sliding_doors"),
+                                    prim_path=link.prim_path,
+                                )
 
                 # Add this object to our registry based on its type, if we want to register it
                 self.object_registry.add(obj)
