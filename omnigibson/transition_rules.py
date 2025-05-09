@@ -136,6 +136,10 @@ class TransitionRuleAPI:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
         """
         for rule in rules:
+            # Skip if rule is not enabled
+            if not rule.ENABLED:
+                continue
+
             # Check if rule is still valid, if so, update its entry
             object_candidates = self.get_rule_candidates(rule=rule, objects=self.scene.objects)
 
@@ -606,6 +610,8 @@ class BaseTransitionRule(Registerable):
     """
     Defines a set of categories of objects and how to transition their states.
     """
+
+    ENABLED = True
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
