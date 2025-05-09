@@ -801,6 +801,8 @@ class BDDLSampler:
         """
         # Auto-initialize all sampleable objects
         with og.sim.playing():
+            # Update the scene to include the latest robots / objects
+            self._env.scene.update_initial_file()
             self._env.scene.reset()
 
             error_msg = self._sample_initial_conditions()

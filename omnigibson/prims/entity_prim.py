@@ -1355,7 +1355,7 @@ class EntityPrim(XFormPrim):
             bool: whether this entity is asleep or not
         """
         # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
-        if self.kinematic_only:
+        if self.kinematic_only or self.prim_type != PrimType.RIGID:
             return False
         else:
             return (

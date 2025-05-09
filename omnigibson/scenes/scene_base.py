@@ -401,7 +401,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
-            og.sim.write_metadata(key=key, data=data)
+            self.write_metadata(key=key, data=data)
 
     def _should_load_object(self, obj_info, task_metadata):
         """
@@ -517,9 +517,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._initialized = True
 
         # Store initial state, which may be loaded from a scene file if specified
-        if self.scene_file is None:
-            scene_info = self.save(as_dict=True)
-        else:
+        if self.scene_file is not None:
             if isinstance(self.scene_file, str):
                 with open(self.scene_file, "r") as f:
                     scene_info = json.load(f)
@@ -528,7 +526,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             init_state = scene_info["state"]
             init_state = recursively_convert_to_torch(init_state)
             self.load_state(init_state, serialized=False)
-        self._initial_file = scene_info
+        self._initial_file = self.save(as_dict=True)
 
     def _create_registry(self):
         """
@@ -746,13 +744,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
             log.info(f"Scene {self.idx} saved to {json_path}.")
 
-    def restore(self, scene_file):
+    def restore(self, scene_file, update_initial_file=False):
         """
         Restores this scene given @scene_file
 
         Args:
             scene_file (str or dict): Full path of either JSON file or loaded scene file to load, which contains
                 information to recreate a scene. Should be the output of self.save()
+            update_initial_file (bool): Whether to update this scene's initial file or not
         """
         # Make sure the sim is not stopped, since we need to grab joint states
         assert not og.sim.is_stopped(), "Simulator cannot be stopped when restoring scene!"
@@ -809,6 +808,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Load state
         self.load_state(state, serialized=False)
+
+        if update_initial_file:
+            self.update_initial_file(scene_file=scene_file)
 
     def write_metadata(self, key, data):
         """
