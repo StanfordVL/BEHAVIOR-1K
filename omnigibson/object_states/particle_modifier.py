@@ -7,7 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, macros
+from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -448,7 +448,17 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                if gm.ENABLE_FLATCACHE:
+                    # When flatcache is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
+                    aabb = self.link.visual_aabb
+                    og.sim.psqi.overlap_box(
+                        halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
+                        pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                        rot=[0, 0, 0, 1.0],
+                        reportFn=overlap_callback,
+                    )
+                else:
+                    og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
