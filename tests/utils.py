@@ -26,7 +26,7 @@ def og_test(func):
         try:
             func(env)
         finally:
-            og.sim.step()   # Make sure any objects that need to be initialized are initialized
+            og.sim.step()  # Make sure any objects that need to be initialized are initialized
             env.scene.reset()
 
     return wrapper

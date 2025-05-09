@@ -794,9 +794,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         objs_to_add = load_obj_names - current_obj_names
 
         # Delete any extra objects that currently exist in the scene stage
-        objects_to_remove = [
-            self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove
-        ]
+        objects_to_remove = [self.object_registry("name", obj_to_remove) for obj_to_remove in objs_to_remove]
         og.sim.batch_remove_objects(objects_to_remove)
 
         # Add any extra objects that do not currently exist in the scene stage
@@ -1074,7 +1072,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 with open(scene_file, "r") as f:
                     scene_file = json.load(f)
             else:
-                assert isinstance(scene_file, dict), f"Expected scene_file to be a dictionary, but got: {type(scene_file)}"
+                assert isinstance(
+                    scene_file, dict
+                ), f"Expected scene_file to be a dictionary, but got: {type(scene_file)}"
 
         scene_file["state"] = recursively_convert_to_torch(scene_file["state"])
         self._initial_file = scene_file
