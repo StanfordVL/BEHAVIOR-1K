@@ -25,7 +25,7 @@ from omnigibson.systems.system_base import (
 )
 from omnigibson.transition_rules import TransitionRuleAPI
 from omnigibson.utils.config_utils import TorchEncoder
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
     Recreatable,
     Registerable,
@@ -645,21 +645,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
                 # We do this by adding the object to our tracked collision groups
                 if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY and not obj.visual_only:
-                    # TODO: Remove structure hotfix once asset collision meshes are fixed!!
-                    if obj.category in STRUCTURE_CATEGORIES:
-                        CollisionAPI.add_to_collision_group(col_group="structures", prim_path=obj.prim_path)
-                    else:
-                        for link in obj.links.values():
-                            if link == obj.root_link:
-                                CollisionAPI.add_to_collision_group(
-                                    col_group=("fixed_base_root_links"),
-                                    prim_path=link.prim_path,
-                                )
-                            elif obj.category == "sliding_door":
-                                CollisionAPI.add_to_collision_group(
-                                    col_group=("sliding_doors"),
-                                    prim_path=link.prim_path,
-                                )
+                    obj_fixed_links = obj.get_fixed_link_names_in_subtree()
+                    for link_name, link in obj.links.items():
+                        if link_name in obj_fixed_links:
+                            CollisionAPI.add_to_collision_group(
+                                col_group=("fixed_base_fixed_links"),
+                                prim_path=link.prim_path,
+                            )
+                        elif obj.category in STRUCTURAL_DOOR_CATEGORIES:
+                            CollisionAPI.add_to_collision_group(
+                                col_group=("structural_doors"),
+                                prim_path=link.prim_path,
+                            )
 
                 # Add this object to our registry based on its type, if we want to register it
                 self.object_registry.add(obj)

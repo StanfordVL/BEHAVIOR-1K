@@ -56,6 +56,9 @@ STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "drivew
 # Ground categories / prim names used for filtering collisions, e.g.: during motion planning
 GROUND_CATEGORIES = frozenset({"floors", "lawn", "driveway", "carpet"})
 
+# Structural door categories used for filtering collisions with structure categories
+STRUCTURAL_DOOR_CATEGORIES = frozenset({"sliding_door", "garage_door"})
+
 # Joint friction magic values
 DEFAULT_PRISMATIC_JOINT_FRICTION = 0.3
 DEFAULT_REVOLUTE_JOINT_FRICTION = 0.3

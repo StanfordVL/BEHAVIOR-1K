@@ -595,6 +595,18 @@ class EntityPrim(XFormPrim):
     def articulation_tree(self):
         return self._articulation_tree
 
+    def get_fixed_link_names_in_subtree(self, subtree_root_link_name=None):
+        """
+        Find all the links that are fixed to a given search subtree root link.
+
+        If the subtree root link name is not provided, the object's root link will be used.
+        """
+        if subtree_root_link_name is None:
+            subtree_root_link_name = self.root_link_name
+        is_edge_fixed = lambda f, t: self.articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
+        only_fixed_joints = nx.subgraph_view(self.articulation_tree, filter_edge=is_edge_fixed)
+        return nx.descendants(only_fixed_joints, subtree_root_link_name) | {subtree_root_link_name}
+
     @property
     def materials(self):
         """
