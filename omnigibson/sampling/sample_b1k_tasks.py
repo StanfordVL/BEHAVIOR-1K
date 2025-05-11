@@ -448,7 +448,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     env.scene.update_initial_file()
                     print("sampling succeed")
                     breakpoint()
-                    env.task.save_task(override=True)
+                    env.task.save_task(env=env, override=True)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
                     reason = ""
                 else:

@@ -553,11 +553,12 @@ class BehaviorTask(BaseTask):
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
-    def save_task(self, path=None, override=False):
+    def save_task(self, env, path=None, override=False):
         """
         Writes the current scene configuration to a .json file
 
         Args:
+            env (og.Environment): OmniGibson active environment
             path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
                 <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
@@ -576,7 +577,7 @@ class BehaviorTask(BaseTask):
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
         # Write metadata and then save
-        self.write_task_metadata()
+        self.write_task_metadata(env)
         og.sim.save(json_paths=[path])
 
     @property
