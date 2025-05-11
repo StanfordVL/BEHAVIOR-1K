@@ -64,8 +64,8 @@ class DataWrapper(EnvironmentWrapper):
         else:
             data_grp = self.hdf5_file["data"]
         if overwrite or "config" not in set(data_grp.attrs.keys()):
-            env.task.write_task_metadata()
-            scene_file = og.sim.save()[0]
+            env.task.write_task_metadata(env)
+            scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)
             self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
@@ -369,7 +369,7 @@ class DataCollectionWrapper(DataWrapper):
         """
         # Save the current full state and corresponding step idx
         self.disable_dump_filters()
-        self.checkpoint_state = og.sim.save(json_paths=None, as_dict=True)[0]
+        self.checkpoint_state = self.scene.save(json_path=None, as_dict=True)
         self.checkpoint_step_idx = len(self.current_traj_history)
         self.enable_dump_filters()
 
@@ -383,7 +383,7 @@ class DataCollectionWrapper(DataWrapper):
 
         else:
             # Restore to checkpoint
-            og.sim.restore(scene_files=[self.checkpoint_state])
+            self.scene.restore(self.checkpoint_state)
 
             # Configure the simulator to optimize for data collection
             self._optimize_sim_for_data_collection(viewport_camera_path=og.sim.viewer_camera.active_camera_path)
@@ -850,8 +850,8 @@ class DataPlaybackWrapper(DataWrapper):
             print(f"Error: {str(e)}")
             return
 
-        # Reset environment
-        og.sim.restore(scene_files=[self.scene_file])
+        # Reset environment and update this to be the new initial state
+        self.scene.restore(self.scene_file, update_initial_file=True)
 
         # Reset object attributes from the stored metadata
         with og.sim.stopped():

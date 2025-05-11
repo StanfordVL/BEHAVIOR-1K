@@ -387,7 +387,7 @@ class BehaviorTask(BaseTask):
             env (Environment): Current active environment instance
         """
         # Load task metadata
-        inst_to_name = self.load_task_metadata()["inst_to_name"]
+        inst_to_name = self.load_task_metadata(env=env)["inst_to_name"]
 
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:

@@ -156,9 +156,8 @@ class PointNavigationTask(BaseTask):
 
         # Auto-initialize all markers
         og.sim.play()
-        env.scene.reset()
         self._reset_agent(env=env)
-        env.scene.update_initial_state()
+        env.scene.update_initial_file()
         og.sim.stop()
 
     def _load_visualization_markers(self, env):

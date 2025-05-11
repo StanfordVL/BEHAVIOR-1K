@@ -23,7 +23,13 @@ class GraspTask(BaseTask):
     """
 
     def __init__(
-        self, obj_name, termination_config=None, reward_config=None, include_obs=True, precached_reset_pose_path=None, objects_config=None
+        self,
+        obj_name,
+        termination_config=None,
+        reward_config=None,
+        include_obs=True,
+        precached_reset_pose_path=None,
+        objects_config=None,
     ):
         self.obj_name = obj_name
         self._primitive_controller = None

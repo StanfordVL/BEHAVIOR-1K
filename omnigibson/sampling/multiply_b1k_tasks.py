@@ -143,7 +143,7 @@ def main():
                 continue
 
             env.scene.load_state(task_final_state)
-            env.scene.update_initial_state(task_final_state)
+            env.scene.update_initial_file()
             print(f"instance {activity_instance_id} trial {i} succeeded.")
 
             env.task.activity_instance_id = activity_instance_id

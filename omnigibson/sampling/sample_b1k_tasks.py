@@ -286,14 +286,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         og.sim.enable_viewer_camera_teleoperation()
 
-    # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_state().
+    # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_file().
     # We need to set all velocities to zero after this. Otherwise, the visual only objects will drift.
     for obj in env.scene.objects:
         obj.keep_still()
-    env.scene.update_initial_state()
+    env.scene.update_initial_file()
 
     # Store the initial state -- this is the safeguard to reset to!
-    scene_initial_state = copy.deepcopy(env.scene._initial_state)
+    scene_initial_file = copy.deepcopy(env.scene._initial_file)
     og.sim.stop()
 
     n_scene_objects = len(env.scene.objects)
@@ -445,7 +445,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
                 if success:
                     env.scene.load_state(task_final_state)
-                    env.scene.update_initial_state(task_final_state)
+                    env.scene.update_initial_file()
                     print("sampling succeed")
                     breakpoint()
                     env.task.save_task(override=True)
@@ -490,7 +490,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 og.sim.step()
 
                 # Update the scene initial state to the original state
-                env.scene.update_initial_state(scene_initial_state)
+                env.scene.update_initial_file(scene_initial_file)
 
         except Exception as e:
             traceback_str = f"{traceback.format_exc()}"
@@ -528,14 +528,14 @@ def main(random_selection=False, headless=False, short_exec=False):
             if gm.HEADLESS:
                 hide_all_lights()
 
-            # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_state().
+            # After we load the robot, we do self.scene.reset() (one physics step) and then self.scene.update_initial_file().
             # We need to set all velocities to zero after this. Otherwise, the visual only objects will drift.
             for obj in env.scene.objects:
                 obj.keep_still()
-            env.scene.update_initial_state()
+            env.scene.update_initial_file()
 
             # Store the initial state -- this is the safeguard to reset to!
-            scene_initial_state = copy.deepcopy(env.scene._initial_state)
+            scene_initial_file = copy.deepcopy(env.scene._initial_file)
             og.sim.stop()
 
             n_scene_objects = len(env.scene.objects)

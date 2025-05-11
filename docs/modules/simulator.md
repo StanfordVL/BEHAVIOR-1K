@@ -26,7 +26,7 @@ The simulator can be manually stepped, with or without physics / rendering (`sim
 
 ??? warning annotate "Cycling the sim can cause unexpected behavior"
 
-    If the simulator is playing and then suddenly stopped, all objects are immediately teleported back to their "canonical poses" -- i.e.: the corresponding global poses that were set _before_ the sim started playing. Thus, if `og.sim.play()` is immediately called after, the objects will _not_ teleport back to their respective pre-stopped poses. You can think of the canonical poses as a sort of "initial states", and we recommend explicitly setting a desired initial sim state configuration via `scene.update_initial_state()` and then calling `scene.reset()` after `og.sim.play()`.
+    If the simulator is playing and then suddenly stopped, all objects are immediately teleported back to their "canonical poses" -- i.e.: the corresponding global poses that were set _before_ the sim started playing. Thus, if `og.sim.play()` is immediately called after, the objects will _not_ teleport back to their respective pre-stopped poses. You can think of the canonical poses as a sort of "initial states", and we recommend explicitly setting a desired initial sim scene file configuration via `scene.update_initial_file()` and then calling `scene.reset()` after `og.sim.play()`.
 
 #### Modifying Physics
 If necessary, low-level physics behavior can also be set as well, via the physics interface (`sim.pi`), physics simulation interface (`sim.psi`), physics scene query interface (`sim.psqi`), and physics context (`sim.get_physics_context()`). The simulation timesteps can also be directly set via `sim.set_simulation_dt(...)`.

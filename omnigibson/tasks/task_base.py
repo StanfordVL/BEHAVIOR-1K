@@ -144,22 +144,28 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Default is empty dictionary
         return dict()
 
-    def write_task_metadata(self):
+    def write_task_metadata(self, env):
         """
         Store any relevant task metadata that should be written when the simulation state is saved
+
+        Args:
+            env (Environment): environment instance
         """
         # Write to sim
-        og.sim.write_metadata(key="task", data=self.task_metadata)
+        env.scene.write_metadata(key="task", data=self.task_metadata)
 
-    def load_task_metadata(self):
+    def load_task_metadata(self, env):
         """
         Load relevant task metadata stored in the simulator
+
+        Args:
+            env (Environment): environment instance
 
         Returns:
             dict: Relevant metadata for the ucrrent task
         """
         # Load from sim
-        return og.sim.get_metadata(key="task")
+        return env.scene.get_metadata(key="task")
 
     @abstractmethod
     def _create_termination_conditions(self):
