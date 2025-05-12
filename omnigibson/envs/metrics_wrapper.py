@@ -78,6 +78,10 @@ class EnvMetric:
             dict: Any relevant aggregated metric information
         """
         if env.scene in self.state:
+            episode_info = self.state[env.scene]
+            if episode_info == {}:
+                print("No episode information tracked, skipping metric aggregation!")
+                return dict()
             return self._compute_episode_metrics(env=env, episode_info=self.state[env.scene])
         else:
             print("Environment not yet tracked, skipping metric aggregation!")
