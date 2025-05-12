@@ -371,8 +371,9 @@ class MultiFingerGripperController(GripperController):
         # Run super first
         super()._load_state(state=state)
 
-        # Also load velocity filter state
-        self._vel_filter.load_state(state["vel_filter"], serialized=False)
+        # Also load velocity filter state if we've set a goal
+        if self._goal is not None:
+            self._vel_filter.load_state(state["vel_filter"], serialized=False)
 
     def serialize(self, state):
         # Run super first

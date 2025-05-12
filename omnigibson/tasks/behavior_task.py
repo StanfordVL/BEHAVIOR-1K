@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 
 import torch as th
 from bddl.activity import (
@@ -30,6 +32,7 @@ from omnigibson.utils.bddl_utils import (
     get_processed_bddl,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -553,7 +556,7 @@ class BehaviorTask(BaseTask):
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
-    def save_task(self, env, path=None, override=False):
+    def save_task(self, env, path=None, override=False, task_relevant_only=False, suffix=None):
         """
         Writes the current scene configuration to a .json file
 
@@ -562,6 +565,10 @@ class BehaviorTask(BaseTask):
             path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
                 <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
+            task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
+                call dump_state() on all the BDDL instances in self.object_scope, else will save the entire sim state
+                via env.scene.save()
+            suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
         if path is None:
             assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
@@ -572,13 +579,25 @@ class BehaviorTask(BaseTask):
                 activity_instance_id=self.activity_instance_id,
             )
             path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
-
+        if task_relevant_only:
+            path = path.replace(".json", f"-tro_state.json")
+        if suffix is not None:
+            path = path.replace(".json", f"-{suffix}.json")
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
-        # Write metadata and then save
-        self.write_task_metadata(env)
-        og.sim.save(json_paths=[path])
+
+        # Save based on whether we're only storing task-relevant object scope states or not
+        if task_relevant_only:
+            task_relevant_state_dict = {bddl_name: bddl_inst.dump_state(serialized=False)
+                                        for bddl_name, bddl_inst in env.task.object_scope.items()}
+            Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
+            with open(path, "w+") as f:
+                json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
+        else:
+            # Write metadata and then save
+            self.write_task_metadata(env)
+            env.scene.save(json_path=path)
 
     @property
     def name(self):

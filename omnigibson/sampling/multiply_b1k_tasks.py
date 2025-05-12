@@ -52,6 +52,14 @@ parser.add_argument(
     default=100,
     help="Instance ID to end (inclusive)",
 )
+parser.add_argument(
+    "--partial_save",
+    action="store_true",
+    help="Whether to only the task-relevant object scope states instead of the entire scene json",
+)
+
+with open("task_custom_lists.json", "r") as f:
+    TASK_CUSTOM_LISTS = json.load(f)
 
 gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
@@ -79,6 +87,7 @@ def main():
             "type": "InteractiveTraversableScene",
             "scene_model": args.scene_model,
             "seg_map_resolution": 0.1,
+            "load_room_types": TASK_CUSTOM_LISTS[args.activity]["room_types"],
         },
         "robots": [
             {
@@ -147,7 +156,7 @@ def main():
             print(f"instance {activity_instance_id} trial {i} succeeded.")
 
             env.task.activity_instance_id = activity_instance_id
-            env.task.save_task(override=True)
+            env.task.save_task(env=env, override=True, task_relevant_only=args.partial_save)
             print(f"instance {activity_instance_id} trial {i} saved")
             break
 

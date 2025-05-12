@@ -156,7 +156,7 @@ parser.add_argument(
     "--ignore_in_progress", action="store_true", help="If set and --offline is False, will in progress flag"
 )
 
-gm.HEADLESS = False
+#gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True
@@ -254,6 +254,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             },
         ],
     }
+
+    # Currently our sampling script always samples partial rooms so we specify there to delineate between full
+    # scene templates
+    task_suffix = "partial_rooms"
     if args.room_types is not None:
         cfg["scene"]["load_room_types"] = args.room_types.split(",")
     else:
@@ -448,7 +452,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     env.scene.update_initial_file()
                     print("sampling succeed")
                     breakpoint()
-                    env.task.save_task(env=env, override=True)
+                    env.task.save_task(env=env, override=True, task_relevant_only=False, suffix=task_suffix)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
                     reason = ""
                 else:
