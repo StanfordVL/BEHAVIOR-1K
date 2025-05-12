@@ -12,7 +12,7 @@ import torch as th
 from omnigibson import app, launch
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.scenes.scene_base import Scene
-from omnigibson.utils.asset_utils import get_og_assets_version
+from omnigibson.utils.asset_utils import get_og_dataset_version
 
 # Params to be set as needed.
 MAX_NUM_OBJS = 400  # Maximum no. of objects to add.
@@ -40,8 +40,8 @@ def _get_position(obj_idx, is_random=False):
 
 
 def benchmark_scene(sim):
-    assets_version = get_og_assets_version()
-    print("assets_version", assets_version)
+    assets_version = get_og_dataset_version()
+    print("dataset version", assets_version)
 
     scene = Scene()
     sim.import_scene(scene)

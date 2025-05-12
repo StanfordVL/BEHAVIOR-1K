@@ -1,3 +1,4 @@
+import hashlib
 import os
 import tempfile
 
@@ -5,7 +6,12 @@ import omnigibson as og
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import add_asset_to_stage
+
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class USDObject(StatefulObject):
@@ -19,6 +25,7 @@ class USDObject(StatefulObject):
         name,
         usd_path,
         encrypted=False,
+        expected_file_hash=None,
         relative_prim_path=None,
         category="object",
         scale=None,
@@ -39,6 +46,7 @@ class USDObject(StatefulObject):
             name (str): Name for the object. Names need to be unique per scene
             usd_path (str): global path to the USD file to load
             encrypted (bool): whether this file is encrypted (and should therefore be decrypted) or not
+            expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             relative_prim_path (None or str): The path relative to its scene prim for this object. If not specified, it defaults to /<name>.
             category (str): Category for the object. Defaults to "object".
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
@@ -69,6 +77,7 @@ class USDObject(StatefulObject):
         """
         self._usd_path = usd_path
         self._encrypted = encrypted
+        self._expected_file_hash = expected_file_hash
         super().__init__(
             relative_prim_path=relative_prim_path,
             name=name,
@@ -119,6 +128,28 @@ class USDObject(StatefulObject):
         Load the object into pybullet and set it to the correct pose
         """
         usd_path = self._usd_path
+
+        # Hash the file to record the loaded asset's version
+        hash_md5 = hashlib.md5()
+        with open(usd_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                hash_md5.update(chunk)
+        file_hash = hash_md5.hexdigest()
+
+        # If there is a file hash already in the init info, compare against it to see if the file has changed
+        if self._expected_file_hash is not None:
+            if file_hash != self._expected_file_hash:
+                log.warn(
+                    f"Object {self.name} was expected to have USD file hash {self._expected_file_hash} but loaded with {file_hash}. The saved state might be incompatible."
+                )
+        else:
+            # If there is no expected file hash, set the expected file hash to the loaded one
+            self._expected_file_hash = file_hash
+
+            # Update the init info too so that the information gets saved with the scene.
+            # TODO: Super hacky, think of a better way to preserve this info
+            self._init_info["args"]["expected_file_hash"] = file_hash
+
         if self._encrypted:
             # Create a temporary file to store the decrytped asset, load it, and then delete it
             encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")

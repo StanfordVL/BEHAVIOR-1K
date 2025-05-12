@@ -10,6 +10,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+import omnigibson.utils.asset_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
@@ -724,6 +725,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Dump saved current state and also scene init info
         scene_info = {
+            # TODO: Use these to verify compatibility at load time.
+            "versions": {
+                "omnigibson": {
+                    "version": omnigibson.utils.asset_utils.get_omnigibson_version(),
+                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_git_hash(),
+                },
+                "bddl": {
+                    "version": omnigibson.utils.asset_utils.get_bddl_version(),
+                    "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
+                },
+                "og_dataset": {
+                    "version": omnigibson.utils.asset_utils.get_og_dataset_version(),
+                },
+                "assets": {
+                    "version": omnigibson.utils.asset_utils.get_asset_version(),
+                    "git_hash": omnigibson.utils.asset_utils.get_asset_git_hash(),
+                },
+            },
             "metadata": self._scene_prim.prim.GetCustomData(),
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),

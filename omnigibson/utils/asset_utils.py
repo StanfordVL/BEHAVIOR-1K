@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+from importlib.metadata import version
 import inspect
 import json
 import os
@@ -10,6 +11,7 @@ from copy import deepcopy
 from pathlib import Path
 from urllib.request import urlretrieve
 
+import bddl
 import progressbar
 from cryptography.fernet import Fernet
 
@@ -325,14 +327,76 @@ def get_attachment_meta_links(category, model):
         return attachment_meta_links
 
 
-def get_og_assets_version():
+def get_asset_git_hash():
     """
     Returns:
-        str: OmniGibson asset version
+        str: OmniGibson asset commit hash
     """
-    process = subprocess.Popen(["git", "-C", gm.DATASET_PATH, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE)
-    git_head_hash = str(process.communicate()[0].strip())
-    return "{}".format(git_head_hash)
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "-C", gm.ASSET_PATH, "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
+        )
+        return git_hash.decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def get_asset_version():
+    """
+    Returns:
+        str: OmniGibson assets version
+    """
+    try:
+        return (Path(gm.ASSET_PATH) / "VERSION").read_text().strip()
+    except FileNotFoundError:
+        return None
+
+
+def get_omnigibson_git_hash():
+    """
+    Returns:
+        str: OmniGibson commit hash
+    """
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "-C", Path(og.__file__).parent, "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
+        )
+        return git_hash.decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def get_omnigibson_version():
+    return og.__version__
+
+
+def get_bddl_git_hash():
+    """
+    Returns:
+        str: bddl asset commit hash
+    """
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "-C", Path(bddl.__file__).parent, "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
+        )
+        return git_hash.decode("utf-8").strip()
+    except subprocess.CalledProcessError:
+        return None
+
+
+def get_bddl_version():
+    return version("bddl")
+
+
+def get_og_dataset_version():
+    """
+    Returns:
+        str: OmniGibson dataset version
+    """
+    try:
+        return (Path(gm.DATASET_PATH) / "VERSION").read_text().strip()
+    except FileNotFoundError:
+        return None
 
 
 def get_available_g_scenes():
