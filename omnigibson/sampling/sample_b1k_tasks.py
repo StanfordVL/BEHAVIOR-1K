@@ -116,7 +116,7 @@ import logging
 #     },
 # }
 
-with open("chengshu_task_custom_lists.json", "r") as f:
+with open("task_custom_lists.json", "r") as f:
     TASK_CUSTOM_LISTS = json.load(f)
 
 # TODO:
