@@ -108,6 +108,9 @@ def main():
     }
     env = og.Environment(cfg)
 
+    # Define where to save instances
+    save_dir = os.path.join(gm.DATASET_PATH, "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{args.activity}_instances")
+
     # If we want to create a stable scene config, do that now
     default_scene_fpath = f"{gm.DATASET_PATH}/scenes/{args.scene_model}/json/{args.scene_model}_stable.json"
     # Get the default scene instance
@@ -116,8 +119,8 @@ def main():
         default_scene_dict = json.load(f)
 
     # Needed for _sample_initial_conditions_final()
-    env._task.sampler._parse_inroom_object_room_assignment()
-    env._task.sampler._build_sampling_order()
+    env.task.sampler._parse_inroom_object_room_assignment()
+    env.task.sampler._build_sampling_order()
 
     # Clear all the system particles
     for system in env.scene.active_systems.values():
@@ -156,7 +159,7 @@ def main():
             print(f"instance {activity_instance_id} trial {i} succeeded.")
 
             env.task.activity_instance_id = activity_instance_id
-            env.task.save_task(env=env, override=True, task_relevant_only=args.partial_save)
+            env.task.save_task(env=env, save_dir=save_dir, override=True, task_relevant_only=args.partial_save)
             print(f"instance {activity_instance_id} trial {i} saved")
             break
 

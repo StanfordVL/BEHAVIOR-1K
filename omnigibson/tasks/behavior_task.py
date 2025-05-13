@@ -556,13 +556,13 @@ class BehaviorTask(BaseTask):
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
-    def save_task(self, env, path=None, override=False, task_relevant_only=False, suffix=None):
+    def save_task(self, env, save_dir=None, override=False, task_relevant_only=False, suffix=None):
         """
         Writes the current scene configuration to a .json file
 
         Args:
             env (og.Environment): OmniGibson active environment
-            path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
+            save_dir (None or str): If specified, absolute fpath to the desired directory to write the .json. Default is
                 <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
             task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
@@ -570,15 +570,15 @@ class BehaviorTask(BaseTask):
                 via env.scene.save()
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
-        if path is None:
-            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
-            fname = self.get_cached_activity_scene_filename(
-                scene_model=self.scene_name,
-                activity_name=self.activity_name,
-                activity_definition_id=self.activity_definition_id,
-                activity_instance_id=self.activity_instance_id,
-            )
-            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
+        save_dir = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json") if save_dir is None else save_dir
+        assert self.scene_name is not None, "Scene name must be set in order to save task"
+        fname = self.get_cached_activity_scene_filename(
+            scene_model=self.scene_name,
+            activity_name=self.activity_name,
+            activity_definition_id=self.activity_definition_id,
+            activity_instance_id=self.activity_instance_id,
+        )
+        path = os.path.join(save_dir, f"{fname}.json")
         if task_relevant_only:
             path = path.replace(".json", f"-tro_state.json")
         if suffix is not None:
