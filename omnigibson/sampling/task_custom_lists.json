@@ -998,5 +998,55 @@
             },
             "blacklist": {}
         }
+    },
+    "clean_up_your_desk": {
+        "room_types": [
+            "childs_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "folder.n.02": {
+                    "folder": {
+                        "lktggf": null
+                    }
+                },
+                "laptop.n.01": {
+                    "laptop": {
+                        "izydvb": null
+                    }
+                },
+                "paperback_book.n.01": {
+                    "paperback_book": {
+                        "yxujzs": [0.25, 0.19, 0.03]
+                    }
+                },
+                "pen.n.01": {
+                    "pen": {
+                        "gqwdor": [0.12, 0.01, 0.01]
+                    }
+                },
+                "pencil.n.01": {
+                    "pencil": {
+                        "lamaxq": [0.12, 0.01, 0.01]
+                    }
+                },
+                "pencil_box.n.01": {
+                    "pencil_case": {
+                        "otcmih": [0.084, 0.24 , 0.084]
+                    }
+                },
+                "shears.n.01": {
+                    "shears": {
+                        "iizidc": [0.13, 0.05, 0.02]
+                    }
+                },
+                "stapler.n.01": {
+                    "stapler": {
+                        "kgnsas": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
