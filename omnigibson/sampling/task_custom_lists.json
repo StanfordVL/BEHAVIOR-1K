@@ -352,7 +352,7 @@
         "room_types": [
             "living_room"
         ],
-        "house_double_floor_lower": {
+        "house_double_floor_upper": {
             "whitelist": {
                 "mail.n.04": {
                     "mail": {
@@ -362,6 +362,11 @@
                 "newspaper.n.03": {
                     "newspaper": {
                         "ukamcl": null
+                    }
+                },
+                "table.n.02": {
+                    "desk": {
+                        "iotfzl": null
                     }
                 }
             },
@@ -914,6 +919,80 @@
                 "parer.n.02": {
                     "parer": {
                         "lwpdhi": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_in_wood": {
+        "room_types": [
+            "corridor",
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "plywood.n.01": {
+                    "plywood": {
+                        "fkmkqa": [0.07, 0.47, 0.02]
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "qadhjb": null,
+                        "xorxro": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_water": {
+        "room_types": [
+            "kitchen",
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle.n.01": {
+                    "beer_bottle": {
+                        "nigfha": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_in_kindling": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "firewood.n.01": {
+                    "firewood": {
+                        "agntyc": null,
+                        "bfalqo": null,
+                        "fpqlgh": null,
+                        "soubgn": null,
+                        "gmwelp": null
+                    }   
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_newspaper_in": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "omsont": null
                     }
                 }
             },

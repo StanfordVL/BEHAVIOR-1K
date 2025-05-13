@@ -246,9 +246,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         "robots": [
             {
                 "type": "R1Pro",
-                "obs_modalities": ["rgb"],
-                "grasping_mode": "physical",
-                "default_arm_pose": "diagonal30",
+                "obs_modalities": [],
                 "default_reset_mode": "untuck",
                 "position": np.ones(3) * -50.0,
             },
