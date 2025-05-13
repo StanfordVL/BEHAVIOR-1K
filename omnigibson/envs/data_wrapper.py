@@ -161,7 +161,7 @@ class DataWrapper(EnvironmentWrapper):
         """
         return self.env.observation_spec()
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",)):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
         """
         Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
 
@@ -172,12 +172,14 @@ class DataWrapper(EnvironmentWrapper):
             nested_keys (list of str): Name of key(s) corresponding to nested data in @traj_data. This specific data
                 is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
                 differently from the rest of the data
+            data_grp (None or h5py.Group): If specified, the h5py Group under which a new group wtih name
+                @traj_grp_name will be created. If None, will default to "data" group
 
         Returns:
             hdf5.Group: Generated hdf5 group storing the recorded trajectory data
         """
         nested_keys = set(nested_keys)
-        data_grp = self.hdf5_file.require_group("data")
+        data_grp = self.hdf5_file.require_group("data") if data_grp is None else data_grp
         traj_grp = data_grp.create_group(traj_grp_name)
         traj_grp.attrs["num_samples"] = len(traj_data)
 
@@ -222,6 +224,17 @@ class DataWrapper(EnvironmentWrapper):
         success = self.env.task.success or not self.only_successes
         return success and self.hdf5_file is not None
 
+    def postprocess_traj_group(self, traj_grp):
+        """
+        Runs any necessary postprocessing on the given trajectory group @traj_grp. This should be an
+        in-place operation!
+
+        Args:
+            traj_grp (h5py.Group): Trajectory group to postprocess
+        """
+        # Default is no-op
+        pass
+
     def flush_current_traj(self):
         """
         Flush current trajectory data
@@ -229,8 +242,9 @@ class DataWrapper(EnvironmentWrapper):
         # Only save successful demos and if actually recording
         if self.should_save_current_episode:
             traj_grp_name = f"demo_{self.traj_count}"
-            self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
+            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
+            self.postprocess_traj_group(traj_grp)
 
             # Potentially write to disk
             if self.traj_count % self.flush_every_n_traj == 0:
@@ -251,7 +265,7 @@ class DataWrapper(EnvironmentWrapper):
 
     def add_metadata(self, group, name, data):
         """
-        Adds metadata to the current HDF5 file under the "data" key
+        Adds metadata to the current HDF5 file under the @name key under @group
 
         Args:
             group (hdf5.File or hdf5.Group): HDF5 object to add an attribute to
@@ -298,6 +312,7 @@ class DataCollectionWrapper(DataWrapper):
         flush_every_n_traj=10,
         use_vr=False,
         obj_attr_keys=None,
+        keep_checkpoint_rollback_data=False,
     ):
         """
         Args:
@@ -315,6 +330,8 @@ class DataCollectionWrapper(DataWrapper):
                 for domain randomization settings where specific object attributes not directly tied to
                 the object's runtime kinematic state are being modified once at the beginning of every episode,
                 while the simulation is stopped.
+            keep_checkpoint_rollback_data (bool): Whether to record any trajectory data pruned from rolling back to a
+                previous checkpoint
         """
         # Store additional variables needed for optimized data collection
 
@@ -332,6 +349,9 @@ class DataCollectionWrapper(DataWrapper):
         # Cached state to rollback to if requested
         self.checkpoint_state = None
         self.checkpoint_step_idx = None
+
+        # Info for keeping checkpoint rollback data
+        self.checkpoint_rollback_trajs = dict() if keep_checkpoint_rollback_data else None
 
         self._is_recording = True
         self.use_vr = use_vr
@@ -379,6 +399,7 @@ class DataCollectionWrapper(DataWrapper):
         is found, this results in reset() being called
         """
         if self.checkpoint_state is None:
+            print("No checkpoint found, resetting environment instead!")
             self.reset()
 
         else:
@@ -390,16 +411,52 @@ class DataCollectionWrapper(DataWrapper):
 
             # Prune all data stored at the current checkpoint step and beyond
             n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
+            pruned_traj_history = self.current_traj_history[self.checkpoint_step_idx:]
             self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
             self.step_count -= n_steps_to_remove
 
             # Also prune any transition info that occurred after the checkpoint step idx
+            pruned_transitions = dict()
             for step in tuple(self.current_transitions.keys()):
                 if step >= self.checkpoint_step_idx:
-                    self.current_transitions.pop(step)
+                    pruned_transitions[step] = self.current_transitions.pop(step)
 
             # Update environment env step count
             self.env._current_step = self.checkpoint_step_idx - 1
+
+            # Save checkpoint rollback data if requested
+            if self.checkpoint_rollback_trajs is not None:
+                step = self.env.episode_steps
+                if step not in self.checkpoint_rollback_trajs:
+                    self.checkpoint_rollback_trajs[step] = []
+                self.checkpoint_rollback_trajs[step].append({
+                    "step_data": pruned_traj_history,
+                    "transitions": pruned_transitions,
+                })
+
+    def postprocess_traj_group(self, traj_grp):
+        super().postprocess_traj_group(traj_grp=traj_grp)
+
+        # Add in transition info
+        self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
+
+        # Add initial metadata information
+        metadata_grp = traj_grp.create_group("init_metadata")
+        for name, data in self.init_metadata.items():
+            metadata_grp.create_dataset(name, data=data)
+
+        # Potentially save cached checkpoint rollback data
+        if self.checkpoint_rollback_trajs is not None and len(self.checkpoint_rollback_trajs) > 0:
+            rollback_grp = traj_grp.create_group("rollbacks")
+            for step, rollback_trajs in self.checkpoint_rollback_trajs.items():
+                for i, rollback_traj in enumerate(rollback_trajs):
+                    rollback_traj_grp = self.process_traj_to_hdf5(
+                        traj_data=rollback_traj["step_data"],
+                        traj_grp_name=f"step_{step}-{i}",
+                        nested_keys=["obs"],
+                        data_grp=rollback_grp,
+                    )
+                    self.add_metadata(group=rollback_traj_grp, name="transitions", data=rollback_traj["transitions"])
 
     @property
     def is_recording(self):
@@ -496,6 +553,8 @@ class DataCollectionWrapper(DataWrapper):
         # Clear checkpoint state
         self.checkpoint_state = None
         self.checkpoint_step_idx = None
+        if self.checkpoint_rollback_trajs is not None:
+            self.checkpoint_rollback_trajs = dict()
 
         return init_obs, init_info
 
@@ -515,7 +574,7 @@ class DataCollectionWrapper(DataWrapper):
 
         return step_data
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",)):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
@@ -524,15 +583,7 @@ class DataCollectionWrapper(DataWrapper):
             step_data["state"] = padded_state
 
         # Call super
-        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys)
-
-        # Add in transition info
-        self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
-
-        # Add initial metadata information
-        metadata_grp = traj_grp.create_group("init_metadata")
-        for name, data in self.init_metadata.items():
-            metadata_grp.create_dataset(name, data=data)
+        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys, data_grp)
 
         return traj_grp
 

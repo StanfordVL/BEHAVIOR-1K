@@ -64,6 +64,7 @@ class DatasetObject(USDObject):
         include_default_states=True,
         bounding_box=None,
         in_rooms=None,
+        expected_file_hash=None,
         **kwargs,
     ):
         """
@@ -106,6 +107,7 @@ class DatasetObject(USDObject):
                 -- not both!
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
                 a list of room type(s) or a single room type
+            expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -153,6 +155,7 @@ class DatasetObject(USDObject):
             link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
+            expected_file_hash=expected_file_hash,
             **kwargs,
         )
 
