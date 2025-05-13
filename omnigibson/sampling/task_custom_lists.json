@@ -962,5 +962,41 @@
             },
             "blacklist": {}
         }
+    },
+    "bringing_in_kindling": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "firewood.n.01": {
+                    "firewood": {
+                        "agntyc": null,
+                        "bfalqo": null,
+                        "fpqlgh": null,
+                        "soubgn": null,
+                        "gmwelp": null
+                    }   
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_newspaper_in": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "omsont": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
