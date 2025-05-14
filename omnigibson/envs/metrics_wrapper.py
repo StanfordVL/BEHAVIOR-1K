@@ -25,6 +25,22 @@ class EnvMetric:
         # Return true by default
         return True
 
+    @classmethod
+    def validate_episode(cls, episode_metrics, **kwargs):
+        """
+        Validates the given @episode_metrics from self.aggregate_results using any specific @kwargs
+
+        Args:
+            episode_metrics (dict): Metrics aggregated using self.aggregate_results
+            kwargs (Any): Any keyword arguments relevant to this specific EnvMetric
+
+        Returns:
+            dict: Keyword-mapped dictionary mapping each validation test name to {"success": bool, "feedback": str} dict
+                where "success" is True if the given @episode_metrics pass that specific test; if False, "feedback"
+                provides information as to why the test failed
+        """
+        raise NotImplementedError
+
     def step(self, env, action, obs, reward, terminated, truncated, info):
         """
         Steps this metric, updating any internal values being tracked.
