@@ -112,7 +112,7 @@ class TraversableMap(BaseMap):
         # Erode the traversability map to account for the robot's size
         if robot:
             robot_chassis_extent = robot.reset_joint_pos_aabb_extent[:2]
-            radius = th.norm(robot_chassis_extent) / 2.0
+            radius = th.norm(robot_chassis_extent) / 2.0 + 0.2
         else:
             radius = self.default_erosion_radius
         radius_pixel = int(math.ceil(radius / self.map_resolution))
