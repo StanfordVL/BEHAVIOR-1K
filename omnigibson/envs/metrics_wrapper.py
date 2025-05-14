@@ -172,9 +172,6 @@ class MetricsWrapper(EnvironmentWrapper):
 
         # Reset all owned metrics
         for name, metric in self.metrics.items():
-            episode_metrics = metric.aggregate(self)
-            for k, v in episode_metrics.items():
-                print(f"Metric [{name}]: {k}: {v}")
             metric.reset(self)
 
         return ret
