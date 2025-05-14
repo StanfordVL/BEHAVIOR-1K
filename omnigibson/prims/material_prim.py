@@ -467,6 +467,22 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="opacity_constant", val=float(constant))
 
     @property
+    def enable_opacity(self):
+        """
+        Returns:
+            bool: this material's applied enable_opacity
+        """
+        return self.get_input(inp="enable_opacity")
+
+    @enable_opacity.setter
+    def enable_opacity(self, enabled):
+        """
+        Args:
+                enabled (bool): this material's applied enable_opacity
+        """
+        self.set_input(inp="enable_opacity", val=enabled)
+
+    @property
     def diffuse_reflection_weight(self):
         """
         Returns:
