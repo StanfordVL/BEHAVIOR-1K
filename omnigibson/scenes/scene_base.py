@@ -632,10 +632,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         cxt = contextlib.nullcontext() if _batched_call else og.sim.adding_objects(objs=[obj])
         with cxt:
-            # Make sure sim is stopped for now
-            # TODO: Maybe remove this once all the mass stuff is unified / fixed
-            assert og.sim.is_stopped(), "Cannot add an object to a scene while sim is not stopped!"
-
             # Make sure all objects in this scene are uniquely named
             assert (
                 obj.name not in self.object_registry.object_names
@@ -822,12 +818,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             create_object_from_init_info(scene_info["objects_info"]["init_info"][obj_to_add])
             for obj_to_add in objs_to_add
         ]
-
-        # If we need to add / remove any objects, make sure the sim is stopped
-        # TODO: Maybe remove this once we have all the mass info updated / unified
-        if len(objects_to_add) > 0:
-            with og.sim.stopped():
-                og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
+        og.sim.batch_add_objects(objects_to_add, scenes=[self] * len(objects_to_add))
 
         # Load state
         self.load_state(state, serialized=False)
