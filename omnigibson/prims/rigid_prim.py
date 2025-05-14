@@ -209,7 +209,7 @@ class RigidPrim(XFormPrim):
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)
             com = th.sum(coms_tensor * vols_tensor, dim=0) / th.sum(vols_tensor)
-            self.set_attribute("physics:centerOfMass", lazy.pxr.Gf.Vec3f(*com.tolist()))
+            self.center_of_mass = com
 
     def enable_collisions(self):
         """

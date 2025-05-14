@@ -181,6 +181,24 @@ class RigidDynamicPrim(RigidPrim):
         return position, orientation
 
     @property
+    def center_of_mass(self):
+        """
+        Returns:
+            th.Tensor: (x,y,z) position of link CoM in the link frame
+        """
+        positions, orientations = self._rigid_prim_view.get_coms(clone=True)
+        position = positions[0][0]
+        return position
+
+    @center_of_mass.setter
+    def center_of_mass(self, com):
+        """
+        Args:
+            com (th.Tensor): (x,y,z) position of link CoM in the link frame
+        """
+        self._rigid_prim_view.set_coms(positions=com.reshape(1, 1, 3))
+
+    @property
     def mass(self):
         """
         Returns:
