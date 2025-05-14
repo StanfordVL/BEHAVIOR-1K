@@ -125,6 +125,22 @@ class RigidKinematicPrim(RigidPrim):
     # runtime type (dynamic vs. kinematic).
 
     @property
+    def center_of_mass(self):
+        """
+        Returns:
+            th.Tensor: (x,y,z) position of link CoM in the link frame
+        """
+        return th.zeros(3)
+
+    @center_of_mass.setter
+    def center_of_mass(self, com):
+        """
+        Args:
+            com (th.Tensor): (x,y,z) position of link CoM in the link frame
+        """
+        pass
+
+    @property
     def mass(self):
         """
         Returns:

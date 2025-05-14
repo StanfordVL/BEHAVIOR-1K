@@ -286,6 +286,14 @@ class DatasetObject(USDObject):
                         link.mass = 0.0
                         link.density = category_density
 
+            # If there exists a center of mass annotation, apply it now
+            if self.prim.HasAttribute("ig:centerOfMass"):
+                center_of_mass_in_object_frame = th.tensor(self.get_attribute(attr="ig:centerOfMass"))
+
+                # Here we assume that the local frame of the object is the same as the local frame of the root link. We also do NOT need to apply a scale
+                # since the center of mass is already in the local frame of the object and thus the unscaled local frame of the root link.
+                self.root_link.center_of_mass = center_of_mass_in_object_frame
+
             # For all joints under dataset objects,
             # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
             # 2. we set non-zero damping to simulate dynamic friction:
