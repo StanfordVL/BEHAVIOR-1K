@@ -218,6 +218,10 @@ gm.USE_PBR_MATERIALS = True
 # Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
 gm.FORCE_ROUGHNESS = 0.7
 
+# Whether to force the category-level mass on DatasetObjects instead of computing a per-model scaled
+# mass from the category-level density and the volume of the object.
+gm.FORCE_CATEGORY_MASS = True
+
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):

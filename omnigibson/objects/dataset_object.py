@@ -28,9 +28,6 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# A lower bound is needed in order to consistently trigger contacts
-m.MIN_OBJ_MASS = 0.4
-
 
 class DatasetType(IntEnum):
     BEHAVIOR = 0
@@ -269,18 +266,25 @@ class DatasetObject(USDObject):
         for material in self.materials:
             material.shader_update_asset_paths_with_root_path(root_path)
 
-        # Assign realistic density and mass based on average object category spec, or fall back to a default value
-        if self.avg_obj_dims is not None and self.avg_obj_dims["density"] is not None:
-            density = self.avg_obj_dims["density"]
-        else:
-            density = 1000.0
+        # Get the average mass/density for this object category
+        avg_specs = get_og_avg_category_specs()
+        assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
+        category_mass = avg_specs[self.category]["mass"]
+        category_density = avg_specs[self.category]["density"]
 
         if self._prim_type == PrimType.RIGID:
+            total_volume = sum(link.volume for link in self._links.values())
             for link in self._links.values():
                 # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
                 if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
-                    link.mass = 0.0
-                    link.density = density
+                    if gm.FORCE_CATEGORY_MASS:
+                        # Each link should get the appropriate fraction of the category mass
+                        # based on the link volume
+                        link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
+                        link.density = 0.0
+                    else:
+                        link.mass = 0.0
+                        link.density = category_density
 
             # For all joints under dataset objects,
             # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
@@ -304,7 +308,7 @@ class DatasetObject(USDObject):
                 revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
-            self.root_link.mass = density * self.root_link.volume
+            self.root_link.mass = category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
 
     def _update_texture_change(self, object_state):
         """
@@ -499,17 +503,6 @@ class DatasetObject(USDObject):
                         scales[child_name] = scale_in_child_lf
 
         return scales
-
-    @property
-    def avg_obj_dims(self):
-        """
-        Get the average object dimensions for this object, based on its category
-
-        Returns:
-            None or dict: Average object information based on its category
-        """
-        avg_specs = get_og_avg_category_specs()
-        return avg_specs.get(self.category, None)
 
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)

@@ -11,6 +11,20 @@ class EnvMetric:
     def __init__(self):
         self.state = dict()
 
+    @classmethod
+    def is_compatible(cls, env):
+        """
+        Checks if this metric class is compatible with @env
+
+        Args:
+            env (og.Environment or EnvironmentWrapper): Environment to check compatibility
+
+        Returns:
+            bool: Whether this metric is compatible or not
+        """
+        # Return true by default
+        return True
+
     def step(self, env, action, obs, reward, terminated, truncated, info):
         """
         Steps this metric, updating any internal values being tracked.
@@ -121,8 +135,10 @@ class MetricsWrapper(EnvironmentWrapper):
 
         Args:
             name (str): Name of the metric. This will be the name printed out when displaying the aggregated results
-            metric (DataMetric): Metric to add
+            metric (EnvMetric): Metric to add
         """
+        # Validate the metric is compatible, then add
+        assert metric.is_compatible(self), f"Metric {metric.__class__.__name__} is not compatible with this environment!"
         self.metrics[name] = metric
 
     def remove_metric(self, name):
