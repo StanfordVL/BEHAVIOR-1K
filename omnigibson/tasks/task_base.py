@@ -131,6 +131,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Args:
             env (Environment): environment instance
         """
+        # Reset the scene to its initial stored configuration by default
+        env.scene.reset()
+
         # Compute the low dimensional observation dimension
         obs = self.get_obs(env=env, flatten_low_dim=True)
         self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
