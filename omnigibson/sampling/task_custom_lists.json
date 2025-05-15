@@ -1048,5 +1048,87 @@
             },
             "blacklist": {}
         }
+    },
+    "collecting_childrens_toys": {
+        "room_types": [
+            "living_room",
+            "childs_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "board_game.n.01": {
+                    "board_game": {
+                        "eoywpy": null,
+                        "gcfkqa": null,
+                        "lzslbu": null
+                    }
+                },
+                "die.n.01": {
+                    "dice": {
+                        "iswudu": [0.04, 0.04, 0.04],
+                        "jommvx": [0.04, 0.04, 0.04]
+                    }
+                },
+                "teddy.n.01": {
+                    "teddy_bear": {
+                        "dgagea": null,
+                        "ecvxmu": null
+                    }
+                },
+                "train_set.n.01": {
+                    "toy_train": {
+                        "zdfhbw": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "delivering_groceries_to_doorstep": {
+        "room_types": [
+            "corridor",
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bread_slice.n.01": {
+                    "bread_slice": {
+                        "yedlgq": null
+                    }
+                },
+                "carton__of__milk.n.01": {
+                    "carton_of_milk": {
+                        "znqqft": null
+                    }
+                },
+                "sack.n.01": {
+                    "paper_bag": {
+                        "bzsxgw": [0.20, 0.30, 0.40]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "gathering_nuts": {
+        "room_types": [
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bucket.n.01": {
+                    "bucket": {
+                        "bdhvnt": null
+                    }
+                },
+                "walnut.n.01": {
+                    "walnut": {
+                        "fbswir": null,
+                        "rmwtdh": [0.6, 0.6, 0.4]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
