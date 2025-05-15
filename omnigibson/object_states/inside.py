@@ -52,7 +52,8 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             th.le(outer_object_aabb_lo, inner_object_pos).all() and th.le(inner_object_pos, outer_object_aabb_hi).all()
         ):
             return False
-        # TODO: Try something like this
+
+        # TODO: Consider using the collision boundary points.
         # points = self.obj.collision_boundary_points_world
         points = inner_object_pos.reshape(1, 3)
         in_volume = th.zeros(points.shape[0], dtype=th.bool)

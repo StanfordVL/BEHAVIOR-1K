@@ -232,7 +232,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self.method = method
         self.projection_source_sphere = None
         self.projection_mesh = None
-        self._check_in_mesh = None
         self._check_overlap = None
         self._link_prim_paths = None
         self._current_step = None
@@ -438,9 +437,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 frame="parent",
             )
 
-            # Generate the function for checking whether points are within the projection mesh
-            self._check_in_mesh = self.link.check_points_in_volume
-
             # Store the projection mesh's IDs
             projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
 
@@ -452,17 +448,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
-            # Define the function for checking whether points are within the adjacency mesh
-            def check_in_adjacency_mesh(particle_positions):
-                # Define the AABB bounds
-                lower, upper = self.link.visual_aabb
-                # Add the margin
-                lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
-
-            self._check_in_mesh = check_in_adjacency_mesh
-
             # Define the function for checking overlaps at runtime
             def check_overlap():
                 nonlocal valid_hit
@@ -491,6 +476,17 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 else self.physical_particle_modification_limit
             )
             self.obj.states[Saturated].set_limit(system=system, limit=limit)
+
+    def _check_in_mesh(self, particle_positions):
+        if self.method == ParticleModifyMethod.ADJACENCY:
+            # Define the AABB bounds
+            lower, upper = self.link.visual_aabb
+            # Add the margin
+            lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+            upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+            return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
+        else:
+            return self.link.check_points_in_volume(particle_positions)
 
     def _generate_condition(self, condition_type, value):
         """

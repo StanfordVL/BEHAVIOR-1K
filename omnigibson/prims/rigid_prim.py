@@ -550,23 +550,14 @@ class RigidPrim(XFormPrim):
         self,
         particle_positions_world,
         use_visual_meshes=True,
-        mesh_name_prefixes=None,
     ):
         """
         Args:
             particle_positions_world (th.tensor): (N, 3) array of particle positions to check
             use_visual_meshes (bool): Whether to use @volume_link's visual or collision meshes to generate points fcn
-            mesh_name_prefixes (None or str): If specified, specifies the substring that must exist in @volume_link's
-                mesh names in order for that mesh to be included in the volume checker function. If None, no filtering
-                will be used.
         """
         in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
-        # Iterate through all visual meshes and keep track of any that are prefixed with container
-        meshes_to_check = []
-        mesh_candidates = self.visual_meshes if use_visual_meshes else self.collision_meshes
-        for mesh_name, mesh in mesh_candidates.items():
-            if mesh_name_prefixes is None or mesh_name_prefixes in mesh_name:
-                meshes_to_check.append(mesh)
+        meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
         for mesh in meshes_to_check:
             in_volume |= mesh.check_points_in_volume(particle_positions_world)
         return in_volume

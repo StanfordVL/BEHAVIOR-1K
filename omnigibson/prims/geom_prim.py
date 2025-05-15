@@ -17,7 +17,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_mesh_to_trimesh_mesh, mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -169,19 +169,13 @@ class GeomPrim(XFormPrim):
 
     @cached_property
     def mesh_face_centroids(self):
-        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(
-            self.prim, include_normals=False, include_texcoord=False
-        ).convex_hull
-        assert trimesh_mesh.is_convex, f"Trying to get mesh face centroids for a non-convex mesh {self.prim_path}"
-        return th.tensor(trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1), dtype=th.float32)
+        vertices = self.points
+        face_indices = self.faces
+        return vertices[face_indices].mean(dim=1)
 
     @cached_property
     def mesh_face_normals(self):
-        trimesh_mesh = mesh_prim_mesh_to_trimesh_mesh(
-            self.prim, include_normals=False, include_texcoord=False
-        ).convex_hull
-        assert trimesh_mesh.is_convex, f"Trying to get mesh face normals for a non-convex mesh {self.prim_path}"
-        return th.tensor(trimesh_mesh.face_normals, dtype=th.float32)
+        return vtarray_to_torch(self.prim.GetAttribute("normals").Get())
 
     def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
         mesh_type = self.prim.GetTypeName()
