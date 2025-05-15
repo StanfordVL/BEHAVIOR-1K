@@ -683,9 +683,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Remove from omni stage
             obj.remove()
 
-    def reset(self):
+    def reset(self, hard=True):
         """
         Resets this scene
+
+        Args:
+            hard (bool): If set, will force the set of active objects currently in the sim to match
+                the specified objects stored in self._initial_file. Otherwise, will only load the kinematic and semantic
+                state for any objects that are currently in the sim, ignoring any additional / missing objects
         """
         # Make sure the simulator is playing
         assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
@@ -694,7 +699,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # This also forces the scene to align with the correct set of initial objects / systems, in case any
         # were removed / added during runtime
         assert self._initial_file is not None
-        self.restore(scene_file=self._initial_file)
+        if hard:
+            self.restore(scene_file=self._initial_file)
+        else:
+            self.load_state(self._initial_file["state"], serialized=False)
+
         og.sim.step_physics()
 
     def save(self, json_path=None, as_dict=False):
