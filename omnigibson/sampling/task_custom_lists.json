@@ -85,10 +85,10 @@
     },
     "carrying_in_groceries": {
         "room_types": [
-            "garden",
+            "garage",
             "kitchen"
         ],
-        "house_single_floor": {
+        "house_double_floor_lower": {
             "whitelist": {
                 "beefsteak_tomato.n.01": {
                     "beefsteak_tomato": {
@@ -1017,32 +1017,323 @@
                 },
                 "paperback_book.n.01": {
                     "paperback_book": {
-                        "yxujzs": [0.25, 0.19, 0.03]
+                        "yxujzs": [0.25, 0.19, 0.02]
                     }
                 },
                 "pen.n.01": {
                     "pen": {
-                        "gqwdor": [0.12, 0.01, 0.01]
+                        "gqwdor": [0.15, 0.015, 0.015]
                     }
                 },
                 "pencil.n.01": {
                     "pencil": {
-                        "lamaxq": [0.12, 0.01, 0.01]
+                        "lamaxq": [0.13, 0.015, 0.015]
                     }
                 },
                 "pencil_box.n.01": {
                     "pencil_case": {
-                        "otcmih": [0.084, 0.24 , 0.084]
-                    }
-                },
-                "shears.n.01": {
-                    "shears": {
-                        "iizidc": [0.13, 0.05, 0.02]
+                        "otcmih": [0.105, 0.3  , 0.105]
                     }
                 },
                 "stapler.n.01": {
                     "stapler": {
-                        "kgnsas": null
+                        "kgnsas": [0.18, 0.04, 0.1]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "moving_boxes_to_storage": {
+        "room_types": [
+            "living_room",
+            "garage"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "storage_container.n.01": {
+                    "storage_box": {
+                        "izcglf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "outfit_a_basic_toolbox": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "allen_wrench.n.01": {
+                    "allen_wrench": {
+                        "neqlcn": [0.3 , 0.06, 0.02]
+                    }
+                },
+                "drill.n.01": {
+                    "drill": {
+                        "nzgmza": null
+                    }
+                },
+                "flashlight.n.01": {
+                    "flashlight": {
+                        "jtrbkc": null
+                    }
+                },
+                "pliers.n.01": {
+                    "plier": {
+                        "zwzncq": [0.3 , 0.08, 0.02]
+                    }
+                },
+                "screwdriver.n.01": {
+                    "screwdriver": {
+                        "irtslw": null
+                    }
+                },
+                "toolbox.n.01": {
+                    "toolbox": {
+                        "redmtl": null
+                    }
+                },
+                "tabletop.n.01": {
+                    "countertop": {
+                        "fjkase": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "re_shelving_library_books": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "okcflv": null,
+                        "acbrnv": null,
+                        "dichmv": null,
+                        "mekfxk": null,
+                        "wfjsog": null,
+                        "rdqqum": null,
+                        "eaktib": null,
+                        "hrxujh": null
+                    }
+                }
+            },
+            "blacklist": {
+                "table.n.02": {
+                    "coffee_table": {
+                        "osroux": null
+                    }
+                }
+            }
+        }
+    },
+    "putting_dishes_away_after_cleaning": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "plate.n.04": {
+                    "plate": {
+                        "luhkiz": null,
+                        "ntedfx": null,
+                        "pkkgzc": null,
+                        "lkomhp": null,
+                        "xfjmld": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "dispose_of_a_pizza_box": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "ashcan.n.01": {
+                    "trash_can": {
+                        "cdzyew": [0.58, 0.48, 0.78]
+                    }
+                },
+                "half__pizza.n.01": {
+                    "half_pizza": {
+                        "frlqiv": [0.235, 0.12 , 0.02]
+                    }
+                },
+                "pizza_box.n.01": {
+                    "pizza_box": {
+                        "hvaucj": [0.39, 0.40, 0.05]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "preparing_lunch_box": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle__of__tea.n.01": {
+                    "bottle_of_tea": {
+                        "iladfg": null
+                    }
+                },
+                "chocolate_chip_cookie.n.01": {
+                    "chocolate_chip_cookie": {
+                        "xprsse": [0.13, 0.13, 0.04]
+                    }
+                },
+                "chopping_board.n.01": {
+                    "chopping_board": {
+                        "afwefw": [0.5 , 0.74, 0.04]
+                    }
+                },
+                "club_sandwich.n.01": {
+                    "club_sandwich": {
+                        "ablfyd": [0.1575, 0.15  , 0.06]
+                    }
+                },
+                "half__apple.n.01": {
+                    "half_apple": {
+                        "qusmpx": null
+                    }
+                },
+                "packing_box.n.02": {
+                    "packing_box": {
+                        "cjhskr": [0.228, 0.282, 0.132]
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelker": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "loading_the_car": {
+        "room_types": [
+            "living_room",
+            "garage"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "container.n.01": {
+                    "toy_box": {
+                        "uvhflb": [0.3 , 0.45, 0.15]
+                    }
+                },
+                "digital_camera.n.01": {
+                    "digital_camera": {
+                        "wbzzjl": null
+                    }
+                },
+                "tennis_racket.n.01": {
+                    "tennis_racket": {
+                        "rmvafy": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "carrying_out_garden_furniture": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "barrow.n.03": {
+                    "wheelbarrow": {
+                        "msaevo": null
+                    }
+                },
+                "lawn_chair.n.01": {
+                    "garden_chair": {
+                        "cottya": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "tidying_bedroom": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "dmqfqx": null
+                    }
+                },
+                "sandal.n.01": {
+                    "sandal": {
+                        "tkfdsk": null,
+                        "txkidl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "set_up_a_coffee_station_in_your_kitchen": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle__of__coffee.n.01": {
+                    "bottle_of_coffee": {
+                        "zywanc": [0.078, 0.078, 0.168]
+                    }
+                },
+                "coffee_cup.n.01": {
+                    "coffee_cup": {
+                        "nbhcgu": null
+                    }
+                },
+                "coffee_maker.n.01": {
+                    "coffee_maker": {
+                        "fwlabx": null
+                    }
+                },
+                "electric_kettle.n.01": {
+                    "electric_kettle": {
+                        "hkdsla": null
+                    }
+                },
+                "paper_coffee_filter.n.01": {
+                    "paper_coffee_filter": {
+                        "kizndy": null
+                    }
+                },
+                "saucer.n.02": {
+                    "saucer": {
+                        "vghfkh": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                },
+                "shelf.n.01": {
+                    "shelf": {
+                        "pfusrd": null
                     }
                 }
             },
