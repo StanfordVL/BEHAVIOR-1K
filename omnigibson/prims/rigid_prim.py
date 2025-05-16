@@ -554,11 +554,13 @@ class RigidPrim(XFormPrim):
         """
         Args:
             particle_positions_world (th.tensor): (N, 3) array of particle positions to check
-            use_visual_meshes (bool): Whether to use @volume_link's visual or collision meshes to generate points fcn
+            use_visual_meshes (bool): Whether to use @volume_link's visual or collision meshes to generate points fcn.
+                In either case, this assumes the given meshes are convex hulls. For visual meshes, we enforce this
+                constraint by explicitly converting them into convex hulls
         """
         in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
         meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
-        for mesh in meshes_to_check:
+        for mesh in meshes_to_check.values():
             in_volume |= mesh.check_points_in_volume(particle_positions_world)
         return in_volume
 

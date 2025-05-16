@@ -42,6 +42,8 @@ class GeomPrim(XFormPrim):
         name,
         load_config=None,
     ):
+        self._mesh_type = None
+
         # Run super method
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -52,6 +54,10 @@ class GeomPrim(XFormPrim):
     def _load(self):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
+
+    def _post_load(self):
+        super()._post_load()
+        self._mesh_type = self.prim.GetTypeName()
 
     @property
     def purpose(self):
@@ -155,7 +161,7 @@ class GeomPrim(XFormPrim):
             for j in range(count - 2):
                 faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
             i += count
-        faces = th.tensor(faces, dtype=th.float32)
+        faces = th.tensor(faces, dtype=th.int)
 
         return faces
 
@@ -169,54 +175,68 @@ class GeomPrim(XFormPrim):
 
     @cached_property
     def mesh_face_centroids(self):
-        vertices = self.points
-        face_indices = self.faces
-        return vertices[face_indices].mean(dim=1)
+        return self.points[self.faces].mean(dim=1)
 
     @cached_property
     def mesh_face_normals(self):
-        return vtarray_to_torch(self.prim.GetAttribute("normals").Get())
+        # Get the vertices for each triangle
+        vertices = self.points[self.faces]  # Shape: (N_triangles, 3, 3)
+
+        # Compute two edges of each triangle
+        edge1 = vertices[:, 1] - vertices[:, 0]  # Shape: (N_triangles, 3)
+        edge2 = vertices[:, 2] - vertices[:, 0]  # Shape: (N_triangles, 3)
+
+        # Compute the cross product of the two edges to get the normal vector
+        face_normals = th.cross(edge1, edge2, dim=1)  # Shape: (N_triangles, 3)
+
+        # Normalize the normal vectors
+        face_normals_norm = th.norm(face_normals, dim=1, keepdim=True)
+
+        # Handle potential division by zero for degenerate faces
+        epsilon = 1e-8
+        face_normals_norm = th.clamp(face_normals_norm, min=epsilon)
+
+        face_normals = face_normals / face_normals_norm
+
+        return face_normals
 
     def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
-        mesh_type = self.prim.GetTypeName()
-        if mesh_type == "Mesh":
+        if self._mesh_type == "Mesh":
             return check_points_in_convex_hull_mesh(
                 mesh_face_centroids=self.mesh_face_centroids,
                 mesh_face_normals=self.mesh_face_normals,
                 particle_positions=particle_positions_in_mesh_frame,
             )
-        elif mesh_type == "Sphere":
+        elif self._mesh_type == "Sphere":
             return check_points_in_sphere(
                 size=self.get_attribute("radius"),
                 particle_positions=particle_positions_in_mesh_frame,
             )
-        elif mesh_type == "Cylinder":
+        elif self._mesh_type == "Cylinder":
             return check_points_in_cylinder(
                 size=[self.get_attribute("radius"), self.get_attribute("height")],
                 particle_positions=particle_positions_in_mesh_frame,
             )
-        elif mesh_type == "Cone":
+        elif self._mesh_type == "Cone":
             return check_points_in_cone(
                 size=[self.get_attribute("radius"), self.get_attribute("height")],
                 particle_positions=particle_positions_in_mesh_frame,
             )
-        elif mesh_type == "Cube":
+        elif self._mesh_type == "Cube":
             return check_points_in_cube(
                 size=self.get_attribute("size"),
                 particle_positions=particle_positions_in_mesh_frame,
             )
         else:
-            raise ValueError(f"Cannot check in volume for mesh of type: {mesh_type}")
+            raise ValueError(f"Cannot check in volume for mesh of type: {self._mesh_type}")
 
     def check_points_in_volume(self, particle_positions_world):
         # Move particles into local frame
         world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
-
-        # transform self.points into world frame
         particle_positions_world_homogeneous = th.cat(
             (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
         )
-        particle_positions_local = (particle_positions_world_homogeneous @ world_pose_w_scale.T)[:, :3]
+        particle_positions_local = (particle_positions_world_homogeneous @ T.pose_inv(world_pose_w_scale).T)[:, :3]
         return self.check_local_points_in_volume(particle_positions_local)
 
     @property
