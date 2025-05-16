@@ -589,8 +589,10 @@ class BehaviorTask(BaseTask):
 
         # Save based on whether we're only storing task-relevant object scope states or not
         if task_relevant_only:
-            task_relevant_state_dict = {bddl_name: bddl_inst.dump_state(serialized=False)
-                                        for bddl_name, bddl_inst in env.task.object_scope.items()}
+            task_relevant_state_dict = {
+                bddl_name: bddl_inst.dump_state(serialized=False)
+                for bddl_name, bddl_inst in env.task.object_scope.items()
+            }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
             with open(path, "w+") as f:
                 json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
