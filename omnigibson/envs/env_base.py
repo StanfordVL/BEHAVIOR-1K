@@ -439,11 +439,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Run any additional task post-loading behavior
         self.task.post_play_load(env=self)
 
-        # Reset the scene first to potentially recover the state after load_task (e.g. BehaviorTask sampling)
-        self.scene.reset()
-
         # Save the state for objects from load_robots / load_objects / load_task
-        self.scene.update_initial_state()
+        self.scene.update_initial_file()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -680,7 +677,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             og.sim.step()
 
             # Grab and return observations
-            obs, _ = self.get_obs()
+            obs, info = self.get_obs()
 
             if self._loaded:
                 # Sanity check to make sure received observations match expected observation space
@@ -719,7 +716,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
                     raise ValueError("Observation space does not match returned observations!")
 
-            return obs, {}
+            return obs, {"obs_info": info}
 
     @property
     def episode_steps(self):

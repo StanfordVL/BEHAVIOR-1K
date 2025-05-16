@@ -21,24 +21,51 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Ask the user whether they want online object sampling or not
-    sampling_options = {
-        False: "Use a pre-sampled cached BEHAVIOR activity scene",
-        True: "Sample the BEHAVIOR activity in an online fashion",
-    }
-    should_sample = choose_from_options(
-        options=sampling_options, name="online object sampling", random_selection=random_selection
-    )
+    # sampling_options = {
+    #     False: "Use a pre-sampled cached BEHAVIOR activity scene",
+    #     True: "Sample the BEHAVIOR activity in an online fashion",
+    # }
+    # should_sample = choose_from_options(
+    #     options=sampling_options, name="online object sampling", random_selection=random_selection
+    # )
+    # should_sample = False
 
     # Load the pre-selected configuration and set the online_sampling flag
-    config_filename = os.path.join(og.example_config_path, "fetch_behavior.yaml")
-    cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-    cfg["task"]["online_object_sampling"] = should_sample
+    # config_filename = os.path.join(og.example_config_path, "fetch_behavior.yaml")
+    # cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    # cfg["task"]["online_object_sampling"] = should_sample
+
+    activity_name = "datagen_pick"
+    cfg = {
+        # Use default frequency
+        "env": {
+            "action_frequency": 30,
+            "physics_frequency": 120,
+        },
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+        },
+        # "robots": [
+        #     {
+        #         "type": "R1",
+        #         "obs_modalities": ["rgb"],
+        #         "grasping_mode": "physical",
+        #         "default_arm_pose": "diagonal30",
+        #         "default_reset_mode": "untuck",
+        #         "position": np.ones(3) * -50.0,
+        #     },
+        # ],
+        "task": {"type": "BehaviorTask", "activity_name": activity_name, "online_object_sampling": False},
+    }
 
     # Load the environment
     env = og.Environment(configs=cfg)
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
+
+    breakpoint()
 
     # Run a simple loop and reset periodically
     max_iterations = 10 if not short_exec else 1

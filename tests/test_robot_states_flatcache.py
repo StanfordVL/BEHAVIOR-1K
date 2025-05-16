@@ -184,7 +184,7 @@ def test_robot_load_drive():
                 f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
             }
             robot.reload_controllers(controller_config=controller_config)
-            env.scene.update_initial_state()
+            env.scene.update_initial_file()
 
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 

@@ -40,6 +40,9 @@ class KinematicsMixin(BaseObjectState):
         # Cache is valid if and only if all of our cached objects have not changed
         t = self._cache[get_value_args]["t"]
         for obj, info in self._cache[get_value_args]["info"].items():
+            # If the object is asleep, assume this object hasn't changed, so continue
+            if obj.is_asleep:
+                continue
             if isinstance(obj, StatefulObject):
                 # If pose has changed, return False
                 if obj.states[Pose].has_changed(get_value_args=(), value=info["p"], info={}, t=t):

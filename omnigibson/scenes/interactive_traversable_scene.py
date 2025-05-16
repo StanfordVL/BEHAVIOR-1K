@@ -5,7 +5,7 @@ from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.robots.robot_base import REGISTERED_ROBOTS
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_og_scene_path
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -54,7 +54,7 @@ class InteractiveTraversableScene(TraversableScene):
             load_room_types (None or list): only load objects in these room types into the scene
             load_room_instances (None or list): if specified, only load objects in these room instances into the scene
             load_task_relevant_only (bool): Whether only task relevant objects (and building structure) should be loaded
-            seg_map_resolution (float): room segmentation map resolution
+            seg_map_resolution (float): room segmentation map resolution (m)
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
 
@@ -167,7 +167,7 @@ class InteractiveTraversableScene(TraversableScene):
     def _should_load_object(self, obj_info, task_metadata):
         name = obj_info["args"]["name"]
         category = obj_info["args"].get("category", "object")
-        in_rooms = obj_info["args"].get("in_rooms", None)
+        in_rooms = obj_info["args"].get("in_rooms", [])
 
         if isinstance(in_rooms, str):
             assert "," not in in_rooms
@@ -196,8 +196,11 @@ class InteractiveTraversableScene(TraversableScene):
         # Check whether this is an agent and we allow agents
         agent_ok = self.include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
+        # HACK: always load building structure
+        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
+
         # We only load this model if all the above conditions are met
-        return not_blacklisted and whitelisted and valid_room and agent_ok
+        return is_building_structure or (not_blacklisted and whitelisted and valid_room and agent_ok)
 
     @property
     def seg_map(self):

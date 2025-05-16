@@ -62,6 +62,7 @@ class PointNavigationTask(BaseTask):
             specific to the task class. Default is None, which corresponds to a default config being usd. Note that
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
+        include_obs (bool): Whether to include observations or not for this task
     """
 
     def __init__(
@@ -83,6 +84,7 @@ class PointNavigationTask(BaseTask):
         reward_type="l2",
         termination_config=None,
         reward_config=None,
+        include_obs=True,
     ):
         # Store inputs
         self._robot_idn = robot_idn
@@ -114,7 +116,7 @@ class PointNavigationTask(BaseTask):
         self._geodesic_dist = None
 
         # Run super
-        super().__init__(termination_config=termination_config, reward_config=reward_config)
+        super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with MaxCollision, Timeout, Falling, and PointGoal
@@ -154,9 +156,8 @@ class PointNavigationTask(BaseTask):
 
         # Auto-initialize all markers
         og.sim.play()
-        env.scene.reset()
         self._reset_agent(env=env)
-        env.scene.update_initial_state()
+        env.scene.update_initial_file()
         og.sim.stop()
 
     def _load_visualization_markers(self, env):

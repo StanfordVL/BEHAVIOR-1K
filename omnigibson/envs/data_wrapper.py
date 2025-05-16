@@ -15,6 +15,7 @@ from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
+from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -29,7 +30,7 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, overwrite=True, only_successes=True):
+    def __init__(self, env, output_path, overwrite=True, only_successes=True, flush_every_n_traj=10):
         """
         Args:
             env (Environment): The environment to wrap
@@ -37,6 +38,7 @@ class DataWrapper(EnvironmentWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
         """
         # Make sure the wrapped environment inherits correct omnigibson format
         assert isinstance(
@@ -49,6 +51,7 @@ class DataWrapper(EnvironmentWrapper):
         self.traj_count = 0
         self.step_count = 0
         self.only_successes = only_successes
+        self.flush_every_n_traj = flush_every_n_traj
         self.current_obs = None
 
         self.current_traj_history = []
@@ -61,8 +64,8 @@ class DataWrapper(EnvironmentWrapper):
         else:
             data_grp = self.hdf5_file["data"]
         if overwrite or "config" not in set(data_grp.attrs.keys()):
-            env.task.write_task_metadata()
-            scene_file = og.sim.save()[0]
+            env.task.write_task_metadata(env)
+            scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)
             self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
@@ -158,7 +161,7 @@ class DataWrapper(EnvironmentWrapper):
         """
         return self.env.observation_spec()
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",)):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
         """
         Processes trajectory data @traj_data and stores them as a new group under @traj_grp_name.
 
@@ -169,12 +172,14 @@ class DataWrapper(EnvironmentWrapper):
             nested_keys (list of str): Name of key(s) corresponding to nested data in @traj_data. This specific data
                 is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
                 differently from the rest of the data
+            data_grp (None or h5py.Group): If specified, the h5py Group under which a new group wtih name
+                @traj_grp_name will be created. If None, will default to "data" group
 
         Returns:
             hdf5.Group: Generated hdf5 group storing the recorded trajectory data
         """
         nested_keys = set(nested_keys)
-        data_grp = self.hdf5_file.require_group("data")
+        data_grp = self.hdf5_file.require_group("data") if data_grp is None else data_grp
         traj_grp = data_grp.create_group(traj_grp_name)
         traj_grp.attrs["num_samples"] = len(traj_data)
 
@@ -219,6 +224,17 @@ class DataWrapper(EnvironmentWrapper):
         success = self.env.task.success or not self.only_successes
         return success and self.hdf5_file is not None
 
+    def postprocess_traj_group(self, traj_grp):
+        """
+        Runs any necessary postprocessing on the given trajectory group @traj_grp. This should be an
+        in-place operation!
+
+        Args:
+            traj_grp (h5py.Group): Trajectory group to postprocess
+        """
+        # Default is no-op
+        pass
+
     def flush_current_traj(self):
         """
         Flush current trajectory data
@@ -226,8 +242,13 @@ class DataWrapper(EnvironmentWrapper):
         # Only save successful demos and if actually recording
         if self.should_save_current_episode:
             traj_grp_name = f"demo_{self.traj_count}"
-            self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
+            traj_grp = self.process_traj_to_hdf5(self.current_traj_history, traj_grp_name, nested_keys=["obs"])
             self.traj_count += 1
+            self.postprocess_traj_group(traj_grp)
+
+            # Potentially write to disk
+            if self.traj_count % self.flush_every_n_traj == 0:
+                self.flush_current_file()
         else:
             # Remove this demo
             self.step_count -= len(self.current_traj_history)
@@ -244,7 +265,7 @@ class DataWrapper(EnvironmentWrapper):
 
     def add_metadata(self, group, name, data):
         """
-        Adds metadata to the current HDF5 file under the "data" key
+        Adds metadata to the current HDF5 file under the @name key under @group
 
         Args:
             group (hdf5.File or hdf5.Group): HDF5 object to add an attribute to
@@ -288,8 +309,10 @@ class DataCollectionWrapper(DataWrapper):
         viewport_camera_path="/World/viewer_camera",
         overwrite=True,
         only_successes=True,
+        flush_every_n_traj=10,
         use_vr=False,
         obj_attr_keys=None,
+        keep_checkpoint_rollback_data=False,
     ):
         """
         Args:
@@ -300,12 +323,15 @@ class DataCollectionWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
             use_vr (bool): Whether to use VR headset for data collection
             obj_attr_keys (None or list of str): If set, a list of object attributes that should be
                 cached at the beginning of every episode, e.g.: "scale", "visible", etc. This is useful
                 for domain randomization settings where specific object attributes not directly tied to
                 the object's runtime kinematic state are being modified once at the beginning of every episode,
                 while the simulation is stopped.
+            keep_checkpoint_rollback_data (bool): Whether to record any trajectory data pruned from rolling back to a
+                previous checkpoint
         """
         # Store additional variables needed for optimized data collection
 
@@ -323,6 +349,9 @@ class DataCollectionWrapper(DataWrapper):
         # Cached state to rollback to if requested
         self.checkpoint_state = None
         self.checkpoint_step_idx = None
+
+        # Info for keeping checkpoint rollback data
+        self.checkpoint_rollback_trajs = dict() if keep_checkpoint_rollback_data else None
 
         self._is_recording = True
         self.use_vr = use_vr
@@ -347,6 +376,7 @@ class DataCollectionWrapper(DataWrapper):
             output_path=output_path,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
         )
 
         # Configure the simulator to optimize for data collection
@@ -358,8 +388,10 @@ class DataCollectionWrapper(DataWrapper):
         called, it will rollback to this cached checkpoint state
         """
         # Save the current full state and corresponding step idx
-        self.checkpoint_state = og.sim.save(json_paths=None, as_dict=True)[0]
+        self.disable_dump_filters()
+        self.checkpoint_state = self.scene.save(json_path=None, as_dict=True)
         self.checkpoint_step_idx = len(self.current_traj_history)
+        self.enable_dump_filters()
 
     def rollback_to_checkpoint(self):
         """
@@ -367,24 +399,64 @@ class DataCollectionWrapper(DataWrapper):
         is found, this results in reset() being called
         """
         if self.checkpoint_state is None:
+            print("No checkpoint found, resetting environment instead!")
             self.reset()
 
         else:
             # Restore to checkpoint
-            og.sim.restore(scene_files=[self.checkpoint_state])
+            self.scene.restore(self.checkpoint_state)
+
+            # Configure the simulator to optimize for data collection
+            self._optimize_sim_for_data_collection(viewport_camera_path=og.sim.viewer_camera.active_camera_path)
 
             # Prune all data stored at the current checkpoint step and beyond
             n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
+            pruned_traj_history = self.current_traj_history[self.checkpoint_step_idx:]
             self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
             self.step_count -= n_steps_to_remove
 
             # Also prune any transition info that occurred after the checkpoint step idx
+            pruned_transitions = dict()
             for step in tuple(self.current_transitions.keys()):
                 if step >= self.checkpoint_step_idx:
-                    self.current_transitions.pop(step)
+                    pruned_transitions[step] = self.current_transitions.pop(step)
 
             # Update environment env step count
             self.env._current_step = self.checkpoint_step_idx - 1
+
+            # Save checkpoint rollback data if requested
+            if self.checkpoint_rollback_trajs is not None:
+                step = self.env.episode_steps
+                if step not in self.checkpoint_rollback_trajs:
+                    self.checkpoint_rollback_trajs[step] = []
+                self.checkpoint_rollback_trajs[step].append({
+                    "step_data": pruned_traj_history,
+                    "transitions": pruned_transitions,
+                })
+
+    def postprocess_traj_group(self, traj_grp):
+        super().postprocess_traj_group(traj_grp=traj_grp)
+
+        # Add in transition info
+        self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
+
+        # Add initial metadata information
+        metadata_grp = traj_grp.create_group("init_metadata")
+        for name, data in self.init_metadata.items():
+            metadata_grp.create_dataset(name, data=data)
+
+        # Potentially save cached checkpoint rollback data
+        if self.checkpoint_rollback_trajs is not None and len(self.checkpoint_rollback_trajs) > 0:
+            rollback_grp = traj_grp.create_group("rollbacks")
+            for step, rollback_trajs in self.checkpoint_rollback_trajs.items():
+                for i, rollback_traj in enumerate(rollback_trajs):
+                    rollback_traj_grp = self.process_traj_to_hdf5(
+                        traj_data=rollback_traj["step_data"],
+                        traj_grp_name=f"step_{step}-{i}",
+                        nested_keys=["obs"],
+                        data_grp=rollback_grp,
+                    )
+                    self.add_metadata(group=rollback_traj_grp, name="transitions", data=rollback_traj["transitions"])
 
     @property
     def is_recording(self):
@@ -434,7 +506,19 @@ class DataCollectionWrapper(DataWrapper):
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
-        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active)
+        self.enable_dump_filters()
+
+    def enable_dump_filters(self):
+        """
+        Enables dump filters for optimized per-step state caching
+        """
+        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: obj.is_active and obj.initialized)
+
+    def disable_dump_filters(self):
+        """
+        Disables dump filters for full state caching
+        """
+        self.env.scene.object_registry.set_dump_filter(dump_filter=lambda obj: True)
 
     def reset(self):
         # Call super first
@@ -469,6 +553,8 @@ class DataCollectionWrapper(DataWrapper):
         # Clear checkpoint state
         self.checkpoint_state = None
         self.checkpoint_step_idx = None
+        if self.checkpoint_rollback_trajs is not None:
+            self.checkpoint_rollback_trajs = dict()
 
         return init_obs, init_info
 
@@ -488,7 +574,7 @@ class DataCollectionWrapper(DataWrapper):
 
         return step_data
 
-    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",)):
+    def process_traj_to_hdf5(self, traj_data, traj_grp_name, nested_keys=("obs",), data_grp=None):
         # First pad all state values to be the same max (uniform) size
         for step_data in traj_data:
             state = step_data["state"]
@@ -497,15 +583,7 @@ class DataCollectionWrapper(DataWrapper):
             step_data["state"] = padded_state
 
         # Call super
-        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys)
-
-        # Add in transition info
-        self.add_metadata(group=traj_grp, name="transitions", data=self.current_transitions)
-
-        # Add initial metadata information
-        metadata_grp = traj_grp.create_group("init_metadata")
-        for name, data in self.init_metadata.items():
-            metadata_grp.create_dataset(name, data=data)
+        traj_grp = super().process_traj_to_hdf5(traj_data, traj_grp_name, nested_keys, data_grp)
 
         return traj_grp
 
@@ -574,8 +652,14 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
+        flush_every_n_traj=10,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
+        full_scene_file=None,
+        include_task=True,
+        include_task_obs=True,
+        include_robot_control=True,
+        include_contacts=True,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -609,9 +693,19 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
+            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection
+                the scene file stored may be partial, and will be used to fill in the missing scene objects from the
+                full scene file.
+            include_task (bool): Whether to include the original task or not. If False, will use a DummyTask instead
+            include_task_obs (bool): Whether to include task observations or not. If False, will not include task obs
+            include_robot_control (bool): Whether or not to include robot control. If False, will set all
+                robot.control_enabled=False
+            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
+                objects to be visual_only
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -630,8 +724,23 @@ class DataPlaybackWrapper(DataWrapper):
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
 
-        # Set scene file and disable online object sampling if BehaviorTask is being used
+        # Set the scene file either to the one stored in the hdf5 or the hot swap scene file
         config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
+        if full_scene_file:
+            with open(full_scene_file, "r") as json_file:
+                full_scene_json = json.load(json_file)
+            config["scene"]["scene_file"] = merge_scene_files(
+                scene_a=full_scene_json, scene_b=config["scene"]["scene_file"], keep_robot_from="b"
+            )
+
+        # Use dummy task if not loading task
+        if not include_task:
+            config["task"] = {"type": "DummyTask"}
+
+        # Maybe include task observations
+        config["task"]["include_obs"] = include_task_obs
+
+        # Set scene file and disable online object sampling if BehaviorTask is being used
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
 
@@ -653,6 +762,15 @@ class DataPlaybackWrapper(DataWrapper):
         # Load env
         env = og.Environment(configs=config)
 
+        if not include_contacts:
+            with og.sim.stopped():
+                for obj in env.scene.objects:
+                    obj.visual_only = True
+
+        # If not controlling robots, disable for all robots
+        for robot in env.robots:
+            robot.control_enabled = include_robot_control
+
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
@@ -669,6 +787,8 @@ class DataPlaybackWrapper(DataWrapper):
             n_render_iterations=n_render_iterations,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
+            full_scene_file=full_scene_file,
         )
 
     def __init__(
@@ -679,6 +799,8 @@ class DataPlaybackWrapper(DataWrapper):
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
+        flush_every_n_traj=10,
+        full_scene_file=None,
     ):
         """
         Args:
@@ -690,6 +812,10 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
+            flush_every_n_traj (int): How often to flush (write) current data to file
+            full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
+                the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
+                full scene file.
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -697,6 +823,10 @@ class DataPlaybackWrapper(DataWrapper):
         # Store scene file so we can restore the data upon each episode reset
         self.input_hdf5 = h5py.File(input_path, "r")
         self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        if full_scene_file:
+            with open(full_scene_file, "r") as json_file:
+                full_scene_json = json.load(json_file)
+            self.scene_file = merge_scene_files(scene_a=full_scene_json, scene_b=self.scene_file, keep_robot_from="b")
 
         # Store additional variables
         self.n_render_iterations = n_render_iterations
@@ -707,6 +837,7 @@ class DataPlaybackWrapper(DataWrapper):
             output_path=output_path,
             overwrite=overwrite,
             only_successes=only_successes,
+            flush_every_n_traj=flush_every_n_traj,
         )
 
     def _process_obs(self, obs, info):
@@ -730,7 +861,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writer=None, video_rgb_key=None):
+    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_rgb_keys=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -738,27 +869,40 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
-            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
-            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
-                If @video_writer is specified, this must also be specified!
+            video_writers (None or list of imageio.Writer): If specified, writer objects that RGB frames will be written to
+            video_rgb_keys (None or list of str): If specified, observation keys representing the RGB frames to write to video.
+                If @video_writers is specified, this must also be specified!
         """
+        # Validate video_writers and video_rgb_keys
+        if video_writers is not None:
+            assert video_rgb_keys is not None, "If video_writers is specified, video_rgb_keys must also be specified!"
+            assert len(video_writers) == len(
+                video_rgb_keys
+            ), "video_writers and video_rgb_keys must have the same length!"
+
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
 
         # Grab episode data
-        transitions = json.loads(traj_grp.attrs["transitions"])
-        traj_grp = h5py_group_to_torch(traj_grp)
-        init_metadata = traj_grp["init_metadata"]
-        action = traj_grp["action"]
-        state = traj_grp["state"]
-        state_size = traj_grp["state_size"]
-        reward = traj_grp["reward"]
-        terminated = traj_grp["terminated"]
-        truncated = traj_grp["truncated"]
+        # Skip early if found malformed data
+        try:
+            transitions = json.loads(traj_grp.attrs["transitions"])
+            traj_grp = h5py_group_to_torch(traj_grp)
+            init_metadata = traj_grp["init_metadata"]
+            action = traj_grp["action"]
+            state = traj_grp["state"]
+            state_size = traj_grp["state_size"]
+            reward = traj_grp["reward"]
+            terminated = traj_grp["terminated"]
+            truncated = traj_grp["truncated"]
+        except KeyError as e:
+            print(f"Got error when trying to load episode {episode_id}:")
+            print(f"Error: {str(e)}")
+            return
 
-        # Reset environment
-        og.sim.restore(scene_files=[self.scene_file])
+        # Reset environment and update this to be the new initial state
+        self.scene.restore(self.scene_file, update_initial_file=True)
 
         # Reset object attributes from the stored metadata
         with og.sim.stopped():
@@ -790,13 +934,13 @@ class DataPlaybackWrapper(DataWrapper):
                     scene.get_system(add_sys_name, force_init=True)
                 for remove_sys_name in cur_transitions["systems"]["remove"]:
                     scene.clear_system(remove_sys_name)
+                for remove_obj_name in cur_transitions["objects"]["remove"]:
+                    obj = scene.object_registry("name", remove_obj_name)
+                    scene.remove_object(obj)
                 for j, add_obj_info in enumerate(cur_transitions["objects"]["add"]):
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
-                for remove_obj_name in cur_transitions["objects"]["remove"]:
-                    obj = scene.object_registry("name", remove_obj_name)
-                    scene.remove_object(obj)
                 # Step physics to initialize any new objects
                 og.sim.step()
 
@@ -818,31 +962,32 @@ class DataPlaybackWrapper(DataWrapper):
                 self.current_traj_history.append(step_data)
 
             # If writing to video, write desired frame
-            if video_writer is not None:
-                assert_valid_key(video_rgb_key, self.current_obs.keys(), "video_rgb_key")
-                video_writer.append_data(self.current_obs[video_rgb_key][:, :, :3].numpy())
+            if video_writers is not None:
+                for writer, rgb_key in zip(video_writers, video_rgb_keys):
+                    assert_valid_key(rgb_key, self.current_obs.keys(), "video_rgb_key")
+                    writer.append_data(self.current_obs[rgb_key][:, :, :3].numpy())
 
             self.step_count += 1
 
         if record_data:
             self.flush_current_traj()
 
-    def playback_dataset(self, record_data=False, video_writer=None, video_rgb_key=None):
+    def playback_dataset(self, record_data=False, video_writers=None, video_rgb_keys=None):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record_data (bool): Whether to record data during playback or not
-            video_writer (None or imageio.Writer): If specified, writer object that RGB frames will be written to
-            video_rgb_key (None or str): If specified, observation key representing the RGB frames to write to video.
+            video_writers (None or list of imageio.Writer): If specified, writer object that RGB frames will be written to
+            video_rgb_keys (None or list of str): If specified, observation key representing the RGB frames to write to video.
                 If @video_writer is specified, this must also be specified!
         """
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
             self.playback_episode(
                 episode_id=episode_id,
                 record_data=record_data,
-                video_writer=video_writer,
-                video_rgb_key=video_rgb_key,
+                video_writers=video_writers,
+                video_rgb_keys=video_rgb_keys,
             )
 
     def create_video_writer(self, fpath, fps=30):

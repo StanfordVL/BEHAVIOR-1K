@@ -188,7 +188,7 @@ def test_arm_control():
             controller.reset()
 
     # Update initial state (robot should be stable and still)
-    env.scene.update_initial_state()
+    env.scene.update_initial_file()
 
     env.scene.reset()
 
@@ -215,7 +215,7 @@ def test_arm_control():
             }
 
             # Load the initial state without stepping physics
-            env.scene.load_state(env.scene._initial_state)
+            env.scene.load_state(env.scene._initial_file["state"])
 
             for i, robot in enumerate(env.robots):
                 controller_config = {f"arm_{arm}": {"name": controller, **controller_kwargs} for arm in robot.arm_names}
@@ -276,7 +276,7 @@ def test_arm_control():
             # Update the state (e.g. goal, which is None) of the new controllers to the initial state
             # This step is crucial because if env.reset() is called directly, we will load the state of the old controllers and step physics,
             # which causes can cause errors because the goal is obsolete.
-            env.scene.update_initial_state()
+            env.scene.update_initial_file()
 
             # For each action set, reset the scene, then run actions and see if arm moves in expected way
             for action_name, action in actions.items():

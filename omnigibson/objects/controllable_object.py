@@ -5,7 +5,6 @@ from functools import cached_property
 from typing import Literal
 
 import gymnasium as gym
-import networkx as nx
 import torch as th
 
 import omnigibson as og
@@ -14,7 +13,7 @@ from omnigibson.controllers.controller_base import ControlType
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.backend_utils import _compute_backend as cb
-from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import CachedFunctions, assert_valid_key, merge_nested_dicts
 from omnigibson.utils.ui_utils import create_module_logger
@@ -210,14 +209,7 @@ class ControllableObject(BaseObject):
         # are typically where most of the downward force on the robot is applied. Disabling gravity
         # for these links would result in the robot floating in the air easily. Also note that here
         # we use the base link footprint which takes into account the presence of virtual joints.
-
-        # Find all the links that are accessible from the base link footprint via a chain of fixed
-        # joints. We will disable gravity for all links that are not in this set.
-        articulation_tree = self.articulation_tree
-        base_footprint = self.base_footprint_link_name
-        is_edge_fixed = lambda f, t: articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
-        only_fixed_joints = nx.subgraph_view(articulation_tree, filter_edge=is_edge_fixed)
-        fixed_link_names = nx.descendants(only_fixed_joints, base_footprint) | {base_footprint}
+        fixed_link_names = self.get_fixed_link_names_in_subtree(self.base_footprint_link_name)
 
         # Find the links that are NOT fixed.
         other_link_names = set(self.links.keys()) - fixed_link_names
@@ -307,10 +299,11 @@ class ControllableObject(BaseObject):
                 assert dof.item() in unused_dofs
                 unused_dofs.remove(dof.item())
                 control_type = controller.control_type
-                self._joints[self.dof_names_ordered[dof]].set_control_type(
+                dof_joint = self._joints[self.dof_names_ordered[dof]]
+                dof_joint.set_control_type(
                     control_type=control_type,
-                    kp=None if controller.isaac_kp is None else controller.isaac_kp[i],
-                    kd=None if controller.isaac_kd is None else controller.isaac_kd[i],
+                    kp=None if controller.isaac_kp is None or dof_joint.is_mimic_joint else controller.isaac_kp[i],
+                    kd=None if controller.isaac_kd is None or dof_joint.is_mimic_joint else controller.isaac_kd[i],
                 )
 
         # For all remaining DOFs not controlled, we assume these are free DOFs (e.g.: virtual joints representing free
@@ -459,6 +452,14 @@ class ControllableObject(BaseObject):
             )
             # Update idx
             idx += controller.command_dim
+
+    @property
+    def is_driven(self) -> bool:
+        """
+        Returns:
+            bool: Whether this object is actively controlled/driven or not
+        """
+        return True
 
     @property
     def control_enabled(self):

@@ -91,6 +91,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Values to be created at runtime
         self._highlight_cached_values = None
         self._highlighted = None
+        self._highlight_color = m.HIGHLIGHT_RGB
+        self._highlight_intensity = m.HIGHLIGHT_INTENSITY
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
@@ -374,14 +376,30 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 }
             material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
             material.emissive_color = (
-                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
+                self._highlight_color if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
             )
             material.emissive_intensity = (
-                m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
+                self._highlight_intensity if enabled else self._highlight_cached_values[material]["emissive_intensity"]
             )
 
         # Update internal value
         self._highlighted = enabled
+
+    def set_highlight_properties(self, color=m.HIGHLIGHT_RGB, intensity=m.HIGHLIGHT_INTENSITY):
+        """
+        Sets the highlight properties for this object
+
+        Args:
+            color (3-array): RGB color for the highlight
+            intensity (float): Intensity for the highlight
+        """
+        self._highlight_color = color
+        self._highlight_intensity = intensity
+
+        # Update the highlight properties if the object is currently highlighted
+        if self._highlighted:
+            self.highlighted = False
+            self.highlighted = True
 
     def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False):
         """

@@ -55,6 +55,7 @@ m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 1.0
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
+m.GRASP_WINDOW = 3.0  # grasp window in seconds
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
 AG_MODES = {
@@ -192,6 +193,7 @@ class ManipulationRobot(BaseRobot):
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
         self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
         self._ag_release_counter = {arm: None for arm in self.arm_names}
+        self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
         # Call super() method
         super().__init__(
@@ -791,6 +793,19 @@ class ManipulationRobot(BaseRobot):
 
     @cached_property
     @abstractmethod
+    def gripper_link_names(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to array of link names corresponding to
+                this robot's gripper. Should be mutual exclusive from self.arm_link_names and self.finger_link_names!
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding idxs.
+        """
+        raise NotImplementedError
+
+    @cached_property
+    @abstractmethod
     def finger_link_names(self):
         """
         Returns:
@@ -858,6 +873,15 @@ class ManipulationRobot(BaseRobot):
                 points from the left finger to the right finger, and the x-axis inferred programmatically
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
+
+    @cached_property
+    def gripper_links(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to robot links corresponding to
+                that arm's gripper links
+        """
+        return {arm: [self._links[link] for link in self.gripper_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
     def finger_links(self):
@@ -1177,31 +1201,35 @@ class ManipulationRobot(BaseRobot):
         # (per arm appendage)
         # Since we'll be calculating the cartesian cross product between start and end points, we stack the start points
         # by the number of end points and repeat the individual elements of the end points by the number of start points
-        startpoints = []
-        endpoints = []
+        n_start_points = len(self.assisted_grasp_start_points[arm])
+        n_end_points = len(self.assisted_grasp_end_points[arm])
+        start_and_end_points = th.zeros(n_start_points + n_end_points, 3)
+        link_positions = th.zeros(n_start_points + n_end_points, 3)
+        link_quats = th.zeros(n_start_points + n_end_points, 4)
+        idx = 0
         for grasp_start_point in self.assisted_grasp_start_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_start_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to startpoints
-            start_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_start_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            startpoints.append(start_point)
-        # Repeat for end points
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_start_point.position
+            idx += 1
+
         for grasp_end_point in self.assisted_grasp_end_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_end_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to endpoints
-            end_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_end_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            endpoints.append(end_point)
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_end_point.position
+            idx += 1
+
+        # Transform start / end points into world frame (batched call for efficiency sake)
+        start_and_end_points = link_positions + (T.quat2mat(link_quats) @ start_and_end_points.unsqueeze(-1)).squeeze(
+            -1
+        )
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
-        n_startpoints, n_endpoints = len(startpoints), len(endpoints)
-        raycast_startpoints = startpoints * n_endpoints
-        raycast_endpoints = []
-        for endpoint in endpoints:
-            raycast_endpoints += [endpoint] * n_startpoints
+        raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
+        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
         ray_data = set()
         # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
@@ -1564,21 +1592,17 @@ class ManipulationRobot(BaseRobot):
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             control = cb.to_torch(controller.control)
-            threshold = th.mean(
-                th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
-                dim=0,
-            )
             if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
-                    th.any(control < threshold)
+                    th.any(control < self.joint_upper_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
-                    th.any(control > threshold)
+                    th.any(control > self.joint_lower_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control > 0)
                 )
@@ -1593,7 +1617,28 @@ class ManipulationRobot(BaseRobot):
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
             elif applying_grasp:
-                self._establish_grasp(arm=arm, ag_data=self._calculate_in_hand_object(arm=arm))
+                current_ag_data = self._calculate_in_hand_object(arm=arm)
+                if self._ag_grasp_counter[arm] is not None:
+                    # We're in a grasp window already
+                    if current_ag_data is None:
+                        # Lost contact with object, reset window
+                        self._ag_grasp_counter[arm] = None
+                    else:
+                        self._ag_grasp_counter[arm] += 1
+
+                        # Check if window is complete
+                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
+                        if time_in_grasp >= m.GRASP_WINDOW:
+                            # Establish grasp with the LATEST ag_data
+                            self._establish_grasp(arm=arm, ag_data=current_ag_data)
+                            # Reset the grasp window tracking
+                            self._ag_grasp_counter[arm] = None
+                elif current_ag_data is not None:
+                    # Start tracking a new potential grasp
+                    self._ag_grasp_counter[arm] = 0
+            else:
+                # Not trying to grasp, reset any pending grasp window
+                self._ag_grasp_counter[arm] = None
 
     def _update_constraint_cloth(self, arm="default"):
         """
@@ -1814,14 +1859,6 @@ class ManipulationRobot(BaseRobot):
         classes = super()._do_not_register_classes
         classes.add("ManipulationRobot")
         return classes
-
-    @property
-    def eef_usd_path(self):
-        """
-        Returns:
-            dict(str, str): dict mapping arm name to the path to the eef usd file
-        """
-        raise NotImplementedError
 
     @property
     def teleop_rotation_offset(self):

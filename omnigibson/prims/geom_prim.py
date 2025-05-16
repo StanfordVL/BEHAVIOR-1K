@@ -510,12 +510,35 @@ class CollisionGeomPrim(GeomPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lazy.isaacsim.core.materials.PhysicsMaterial(prim_path=path)
+                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
 
 
 class VisualGeomPrim(GeomPrim):
-    pass
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # TODO: tmp fix for visible metalinks
+        if "meta" in self.name:
+            if "togglebutton" in self.name:
+                # Make sure togglebutton mesh is visible
+                self.purpose = "default"
+            elif any(
+                [
+                    metalink in self.name
+                    for metalink in [
+                        "particlesource",
+                        "particlesink",
+                        "fillable",
+                        "particleremover",
+                        "particleapplier",
+                        "slicer",
+                    ]
+                ]
+            ):
+                # Make sure particlesource, particlesink and fillable meshes are not visible
+                self.purpose = "guide"
 
 
 class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):

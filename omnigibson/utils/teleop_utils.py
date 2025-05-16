@@ -424,10 +424,11 @@ class OVXRSystem(TeleopSystem):
         self._update_button_data()
 
         # Fire the button callbacks
-        # self.raw_data["button_data"]["left"]["press"]["y"]
-        for controller_name, controller_button_data in self.raw_data["button_data"].items():
-            for button_name, button_pressed in controller_button_data["press"].items():
-                if button_pressed and not self.old_raw_data["button_data"][controller_name]["press"][button_name]:
+        for controller_name, controller_button_datas in self.raw_data["button_data"].items():
+            for button_name, button_data in controller_button_datas.items():
+                print(button_data)
+                button_pressed = button_data["click"]
+                if button_pressed and not self.old_raw_data["button_data"][controller_name][button_name]["click"]:
                     print(f"Button {button_name} pressed on controller {controller_name}")
                     KeyboardEventHandler.xr_callback(controller_name, button_name)
 

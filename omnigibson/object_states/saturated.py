@@ -72,20 +72,12 @@ class ModifiedParticles(RelativeObjectState):
         state_flat = th.tensor([state["n_systems"]], dtype=th.float32)
         if state["n_systems"] > 0:
             system_names = tuple(state.keys())[1:]
-            state_flat = th.cat(
-                [
-                    state_flat,
-                    th.cat(
-                        [
-                            th.tensor(
-                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
-                                dtype=th.float32,
-                            )
-                            for system_name in system_names
-                        ]
-                    ),
-                ]
-            )
+            system_uuid = [
+                (self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name])
+                for system_name in system_names
+            ]
+            system_uuid = th.tensor(system_uuid, dtype=th.float32).view(-1)
+            state_flat = th.cat([state_flat, system_uuid])
         return state_flat
 
     def deserialize(self, state):
@@ -105,12 +97,13 @@ class ModifiedParticles(RelativeObjectState):
 
 
 class Saturated(RelativeObjectState, BooleanStateMixin):
-    def __init__(self, obj, default_limit=None):
+    def __init__(self, obj):
         # Run super first
         super().__init__(obj=obj)
 
         # Limits
-        self._default_limit = default_limit if default_limit is not None else m.DEFAULT_SATURATION_LIMIT
+        self._default_visual_particle_limit = m.DEFAULT_SATURATION_LIMIT
+        self._default_physical_particle_limit = m.DEFAULT_SATURATION_LIMIT
         self._limits = None
 
     def _initialize(self):
@@ -118,6 +111,24 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
 
         # Set internal variables
         self._limits = dict()
+
+    def set_visual_particle_limit(self, limit):
+        """
+        Sets the default visual particle limit
+
+        Args:
+            limit (int): Number of particles representing limit for the visual particle system
+        """
+        self._default_visual_particle_limit = limit
+
+    def set_physical_particle_limit(self, limit):
+        """
+        Sets the default physical particle limit
+
+        Args:
+            limit (int): Number of particles representing limit for the physical particle system
+        """
+        self._default_physical_particle_limit = limit
 
     @property
     def limits(self):
@@ -137,7 +148,15 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         Returns:
             init: Number of particles representing limit for the given @system
         """
-        return self._limits.get(system.name, self._default_limit)
+        # If system is in the (whitelist) limits, return that limit
+        if system.name in self._limits:
+            return self._limits[system.name]
+        # Otherwise, return the default limit
+        return (
+            self._default_visual_particle_limit
+            if self.obj.scene.is_visual_particle_system(system_name=system.name)
+            else self._default_physical_particle_limit
+        )
 
     def set_limit(self, system, limit):
         """
@@ -209,11 +228,16 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
 
     @property
     def state_size(self):
-        # Limit per entry * 2 (UUID, value) + default limit + n limits
-        return len(self._limits) * 2 + 2
+        # n whitelist limits + default visual particle limit + default physical particle limit
+        # + limit per whitelist entry * 2 (UUID, value)
+        return 3 + len(self._limits) * 2
 
     def _dump_state(self):
-        state = dict(n_systems=len(self._limits), default_limit=self._default_limit)
+        state = dict(
+            n_systems=len(self._limits),
+            default_visual_particle_limit=self._default_visual_particle_limit,
+            default_physical_particle_limit=self._default_physical_particle_limit,
+        )
         for system_name, limit in self._limits.items():
             state[system_name] = limit
         return state
@@ -223,35 +247,40 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         for k, v in state.items():
             if k == "n_systems":
                 continue
-            elif k == "default_limit":
-                self._default_limit = v
+            elif k == "default_visual_particle_limit":
+                self._default_visual_particle_limit = v
+            elif k == "default_physical_particle_limit":
+                self._default_physical_particle_limit = v
             else:
                 self._limits[k] = v
 
     def serialize(self, state):
-        state_flat = th.tensor([state["n_systems"], state["default_limit"]], dtype=th.float32)
+        state_flat = th.tensor(
+            [
+                state["n_systems"],
+                state["default_visual_particle_limit"],
+                state["default_physical_particle_limit"],
+            ],
+            dtype=th.float32,
+        )
         if state["n_systems"] > 0:
-            system_names = tuple(state.keys())[2:]
-            state_flat = th.cat(
-                [
-                    state_flat,
-                    th.cat(
-                        [
-                            th.tensor(
-                                [self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name]],
-                                dtype=th.float32,
-                            )
-                            for system_name in system_names
-                        ]
-                    ),
-                ]
-            )
+            system_names = tuple(state.keys())[3:]
+            whitelist_limits = [
+                (self.obj.scene.get_system(system_name, force_init=False).uuid, state[system_name])
+                for system_name in system_names
+            ]
+            whitelist_limits = th.tensor(whitelist_limits, dtype=th.float32).view(-1)
+            state_flat = th.cat([state_flat, whitelist_limits])
         return state_flat
 
     def deserialize(self, state):
         n_systems = int(state[0])
-        state_dict = dict(n_systems=n_systems, default_limit=int(state[1]))
-        state_shaped = state[2 : 2 + n_systems * 2].reshape(-1, 2)
+        state_dict = dict(
+            n_systems=n_systems,
+            default_visual_particle_limit=int(state[1]),
+            default_physical_particle_limit=int(state[2]),
+        )
+        state_shaped = state[3 : 3 + n_systems * 2].reshape(-1, 2)
         system_names = []
         for uuid, val in state_shaped:
             system_name = UUID_TO_SYSTEM_NAME[int(uuid)]
@@ -261,4 +290,4 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         # Sync systems so that state size sanity check succeeds
         self._sync_systems(system_names=system_names)
 
-        return state_dict, 2 + n_systems * 2
+        return state_dict, 3 + n_systems * 2

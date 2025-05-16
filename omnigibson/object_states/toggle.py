@@ -136,7 +136,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker.visible = True
 
         # Store the projection mesh's IDs
-        projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
+        # projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
 
         # Define function for checking overlap
         valid_hit = False
@@ -154,10 +154,16 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         def check_overlap():
             nonlocal valid_hit
             valid_hit = False
-            if self.visual_marker.prim.GetTypeName() == "Mesh":
-                og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
-            else:
-                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+            # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
+            og.sim.psqi.overlap_sphere(
+                radius=th.min(self.visual_marker.extent * self.scale).item(),
+                pos=self.visual_marker.get_position_orientation()[0].tolist(),
+                reportFn=overlap_callback,
+            )
+            # if self.visual_marker.prim.GetTypeName() == "Mesh":
+            #     og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
+            # else:
+            #     og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
             return valid_hit
 
         self._check_overlap = check_overlap

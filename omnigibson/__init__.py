@@ -28,7 +28,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
 # Always enable nest_asyncio because MaterialPrim calls asyncio.run()
 nest_asyncio.apply()
 
-__version__ = "1.1.1"
+__version__ = "1.2.0-alpha"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 

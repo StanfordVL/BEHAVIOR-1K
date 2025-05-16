@@ -12,7 +12,7 @@ from omnigibson.utils.usd_utils import RigidContactAPI
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
-m.REACTIVATION_DELAY = 0.5  # number of seconds to wait before reactivating the slicer
+m.REACTIVATION_DELAY = 2.0  # number of seconds to wait before reactivating the slicer
 
 
 class SlicerActive(TensorizedValueState, BooleanStateMixin):

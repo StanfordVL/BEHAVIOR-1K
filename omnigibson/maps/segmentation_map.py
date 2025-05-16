@@ -26,12 +26,12 @@ class SegmentationMap(BaseMap):
         """
         Args:
             scene_dir (str): path to the scene directory from which segmentation info will be extracted
-            map_resolution (float): map resolution
+            map_resolution (float): map resolution (m)
             floor_heights (list of float): heights of the floors for this segmentation map
         """
         # Store internal values
         self.scene_dir = scene_dir
-        self.map_default_resolution = 0.01
+        self.map_default_resolution = 0.01  # Default floor plan images are in meters
         self.floor_heights = floor_heights
 
         # Other values that will be loaded at runtime
@@ -71,10 +71,11 @@ class SegmentationMap(BaseMap):
         unique_ins_ids = th.unique(img_ins)
         unique_ins_ids = torch_delete(unique_ins_ids, 0)
         for ins_id in unique_ins_ids:
+            ins_id = ins_id.item()
             # find one pixel for each ins id
             x, y = th.where(img_ins == ins_id)
             # retrieve the correspounding sem id
-            sem_id = img_sem[x[0], y[0]]
+            sem_id = img_sem[x[0], y[0]].item()
             if sem_id not in sem_id_to_ins_id:
                 sem_id_to_ins_id[sem_id] = []
             sem_id_to_ins_id[sem_id].append(ins_id)
@@ -88,7 +89,7 @@ class SegmentationMap(BaseMap):
             for i, ins_id in enumerate(ins_ids):
                 # valid class start from 1
                 ins_name = "{}_{}".format(sem_name, i)
-                room_ins_name_to_ins_id[ins_name] = ins_id.item()
+                room_ins_name_to_ins_id[ins_name] = ins_id
                 if sem_name not in room_sem_name_to_ins_name:
                     room_sem_name_to_ins_name[sem_name] = []
                 room_sem_name_to_ins_name[sem_name].append(ins_name)

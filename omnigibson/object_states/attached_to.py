@@ -26,7 +26,7 @@ m = create_module_macros(module_path=__file__)
 m.ATTACHMENT_META_LINK_TYPE = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
-m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([5.0])).item()  # 5 degrees
+m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([10.0])).item()  # 10 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
 m.DEFAULT_BREAK_FORCE = 1000  # Newton
 m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
@@ -100,7 +100,11 @@ class AttachedTo(
         self.parent_link = None
 
         # Mapping from the female meta link names of self.obj to their children (Dict[str, Optional[DatasetObject] = None])
-        self.children = {link_name: None for link_name in self.links if link_name.split("_")[1].endswith("F")}
+        self.children = {
+            link_name: None
+            for link_name, link in self.links.items()
+            if link.is_meta_link and link.meta_link_id.endswith("F")
+        }
 
         # Cache of parent link candidates for other objects (Dict[DatasetObject, Dict[str, str]])
         # @other -> (the male meta link names of @self.obj -> the correspounding female meta link names of @other))
@@ -245,17 +249,15 @@ class AttachedTo(
         """
         if AttachedTo not in other.states:
             return None
-
         if other not in self.parent_link_candidates:
             parent_link_names = defaultdict(set)
             for child_link_name, child_link in self.links.items():
-                child_category = child_link_name.split("_")[1]
-                if child_category.endswith("F"):
+                if child_link.meta_link_id.endswith("F"):
                     continue
-                assert child_category.endswith("M")
-                parent_category = child_category[:-1] + "F"
+                assert child_link.meta_link_id.endswith("M")
+                parent_meta_link_id = child_link.meta_link_id[:-1] + "F"
                 for parent_link_name, parent_link in other.states[AttachedTo].links.items():
-                    if parent_category in parent_link_name:
+                    if parent_link.meta_link_id == parent_meta_link_id:
                         parent_link_names[child_link_name].add(parent_link_name)
             self.parent_link_candidates[other] = parent_link_names
 

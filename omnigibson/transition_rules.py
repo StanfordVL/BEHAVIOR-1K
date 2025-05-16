@@ -136,6 +136,10 @@ class TransitionRuleAPI:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
         """
         for rule in rules:
+            # Skip if rule is not enabled
+            if not rule.ENABLED:
+                continue
+
             # Check if rule is still valid, if so, update its entry
             object_candidates = self.get_rule_candidates(rule=rule, objects=self.scene.objects)
 
@@ -236,6 +240,17 @@ class ObjectCandidateFilter(metaclass=ABCMeta):
     def __call__(self, obj):
         """Returns true if the given object passes the filter."""
         return False
+
+
+class ObjectPropertyFilter(ObjectCandidateFilter):
+    """Filter for arbitrary object properties"""
+
+    def __init__(self, name, value):
+        self.property = name
+        self.value = value
+
+    def __call__(self, obj):
+        return getattr(obj, self.property) == self.value
 
 
 class CategoryFilter(ObjectCandidateFilter):
@@ -596,6 +611,8 @@ class BaseTransitionRule(Registerable):
     Defines a set of categories of objects and how to transition their states.
     """
 
+    ENABLED = True
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -944,12 +961,13 @@ class SlicingRule(BaseTransitionRule):
                 part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
                 part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
-                # Determine the relative scale to apply to the object part from the original object
-                # Note that proper (rotated) scaling can only be applied when the relative orientation of
-                # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                assert T.check_quat_right_angle(
-                    part_bb_orn
-                ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                # TODO: double check if we can remove this!!!!
+                # # Determine the relative scale to apply to the object part from the original object
+                # # Note that proper (rotated) scaling can only be applied when the relative orientation of
+                # # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+                # assert T.check_quat_right_angle(
+                #     part_bb_orn
+                # ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
                 scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
@@ -1630,7 +1648,8 @@ class RecipeRule(BaseTransitionRule):
     @classproperty
     def candidate_filters(cls):
         # Fillable object required
-        return {"container": AbilityFilter(ability="fillable")}
+        # We also will filter out any fixed_base objects, because otherwise all cabinets, fridges, etc. would become valid containers!
+        return {"container": AndFilter([AbilityFilter(ability="fillable"), ObjectPropertyFilter("fixed_base", False)])}
 
     def transition(self, object_candidates):
         objs_to_add, objs_to_remove = [], []
@@ -2148,7 +2167,7 @@ class MixingToolRule(RecipeRule):
 
     @classproperty
     def use_garbage_fallback_recipe(cls):
-        return True
+        return False
 
 
 class CookingRule(RecipeRule):

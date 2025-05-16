@@ -7,7 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm, macros
+from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -30,7 +30,6 @@ from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import (
-    FlatcacheAPI,
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
     delete_or_deactivate_prim,
@@ -55,7 +54,7 @@ m.VISUAL_PARTICLES_APPLICATION_LIMIT = 1000000
 m.PHYSICAL_PARTICLES_APPLICATION_LIMIT = 1000000
 
 # Saturation thresholds -- maximum number of particles that can be removed ("absorbed") by a ParticleRemover
-m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
+m.VISUAL_PARTICLES_REMOVAL_LIMIT = 200
 m.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 400
 
 # Fallback particle visualization radius for visualizing projected visual particles
@@ -444,7 +443,17 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                if gm.ENABLE_FLATCACHE:
+                    # When flatcache is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
+                    aabb = self.link.visual_aabb
+                    og.sim.psqi.overlap_box(
+                        halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
+                        pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                        rot=[0, 0, 0, 1.0],
+                        reportFn=overlap_callback,
+                    )
+                else:
+                    og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
@@ -468,14 +477,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._check_overlap = check_overlap
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
-        for system_name in self.conditions.keys():
-            system = self.obj.scene.get_system(system_name, force_init=False)
-            limit = (
-                self.visual_particle_modification_limit
-                if self.obj.scene.is_visual_particle_system(system_name=system.name)
-                else self.physical_particle_modification_limit
-            )
-            self.obj.states[Saturated].set_limit(system=system, limit=limit)
+        self.obj.states[Saturated].set_visual_particle_limit(self.visual_particle_modification_limit)
+        self.obj.states[Saturated].set_physical_particle_limit(self.physical_particle_modification_limit)
 
     def _check_in_mesh(self, particle_positions):
         if self.method == ParticleModifyMethod.ADJACENCY:
@@ -651,17 +654,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         return all(condition(self.obj) for condition in self.conditions[system_name])
 
     def _update(self):
-        # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
-        # so the corresponding visualization and overlap meshes are updated properly
-        # This is expensive, so only do it if the object is not a fixed object and we have an active projection
-        if (
-            self.method == ParticleModifyMethod.PROJECTION
-            and gm.ENABLE_FLATCACHE
-            and not self.obj.fixed_base
-            and self.projection_is_active
-        ):
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
-
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0:
             # Iterate over all systems to check
@@ -1318,9 +1310,9 @@ class ParticleApplier(ParticleModifier):
                 # Generate particles for this group
                 system.generate_group_particles(
                     group=group,
-                    positions=th.tensor(particle_info["positions"]),
-                    orientations=th.tensor(particle_info["orientations"]),
-                    scales=th.tensor(particles_info[group]["scales"]),
+                    positions=th.stack(particle_info["positions"], dim=0),
+                    orientations=th.stack(particle_info["orientations"], dim=0),
+                    scales=th.stack(particles_info[group]["scales"], dim=0),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
@@ -1526,10 +1518,6 @@ class ParticleApplier(ParticleModifier):
         compatible, reason = super().is_compatible(obj, **kwargs)
         if not compatible:
             return compatible, reason
-
-        # Check whether GPU dynamics are enabled (necessary for this object state)
-        if not gm.USE_GPU_DYNAMICS:
-            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
 
         return True, None
 

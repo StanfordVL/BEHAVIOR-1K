@@ -15,6 +15,7 @@ from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.prims.rigid_kinematic_prim import RigidKinematicPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import JointAxis, JointType, PrimType
+from omnigibson.utils.render_utils import force_pbr_material_for_link
 from omnigibson.utils.usd_utils import PoseAPI, absolute_prim_path_to_scene_relative
 
 # Create settings for this module
@@ -256,6 +257,10 @@ class EntityPrim(XFormPrim):
             else:  # link_type == PrimType.CLOTH
                 link_cls = ClothPrim
 
+            # Apply the V-Ray to PBR material change if request by the macro
+            if gm.USE_PBR_MATERIALS:
+                force_pbr_material_for_link(self._prim, link_name)
+
             # Create and load the link
             self._links[link_name] = link_cls(
                 relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim.GetPrimPath().__str__()),
@@ -288,6 +293,7 @@ class EntityPrim(XFormPrim):
                         joint = JointPrim(
                             relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, joint_path),
                             name=f"{self._name}:joint_{joint_name}",
+                            load_config={"driven": self.is_driven},
                             articulation_view=self._articulation_view_direct,
                         )
                         joint.load(self.scene)
@@ -364,6 +370,14 @@ class EntityPrim(XFormPrim):
 
             joint.lower_limit = joint.lower_limit * scale_along_axis
             joint.upper_limit = joint.upper_limit * scale_along_axis
+
+    @property
+    def is_driven(self) -> bool:
+        """
+        Returns:
+            bool: Whether this object is actively controlled/driven or not
+        """
+        return False
 
     @property
     def _articulation_view(self):
@@ -580,6 +594,18 @@ class EntityPrim(XFormPrim):
     @property
     def articulation_tree(self):
         return self._articulation_tree
+
+    def get_fixed_link_names_in_subtree(self, subtree_root_link_name=None):
+        """
+        Find all the links that are fixed to a given search subtree root link.
+
+        If the subtree root link name is not provided, the object's root link will be used.
+        """
+        if subtree_root_link_name is None:
+            subtree_root_link_name = self.root_link_name
+        is_edge_fixed = lambda f, t: self.articulation_tree[f][t]["joint_type"] == JointType.JOINT_FIXED
+        only_fixed_joints = nx.subgraph_view(self.articulation_tree, filter_edge=is_edge_fixed)
+        return nx.descendants(only_fixed_joints, subtree_root_link_name) | {subtree_root_link_name}
 
     @property
     def materials(self):
@@ -1341,7 +1367,7 @@ class EntityPrim(XFormPrim):
             bool: whether this entity is asleep or not
         """
         # If we're kinematic only, immediately return False since it doesn't follow the sleep / wake paradigm
-        if self.kinematic_only:
+        if self.kinematic_only or self.prim_type != PrimType.RIGID:
             return False
         else:
             return (
@@ -1617,7 +1643,7 @@ class EntityPrim(XFormPrim):
 
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
-        state = dict(root_link=self.root_link._dump_state())
+        state = dict(is_asleep=self.is_asleep, root_link=self.root_link._dump_state())
         if self.n_joints > 0:
             state["joint_pos"] = self.get_joint_positions()
             state["joint_vel"] = self.get_joint_velocities()
@@ -1645,13 +1671,14 @@ class EntityPrim(XFormPrim):
             self.set_joint_positions(state["joint_pos"])
             self.set_joint_velocities(state["joint_vel"])
 
-        # Make sure this object is awake
-        self.wake()
+        # Make sure this object is awake if it was not asleep during setting
+        # TODO: Remove backwards compatibility once we re-sample scenes
+        self.sleep() if state.get("is_asleep", False) else self.wake()
 
     def serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
         # adding them to the a flattened array
-        state_flat = [self.root_link.serialize(state=state["root_link"])]
+        state_flat = [th.tensor([state["is_asleep"]], dtype=th.int), self.root_link.serialize(state=state["root_link"])]
         if self.n_joints > 0:
             state_flat += [
                 state["joint_pos"],
@@ -1661,10 +1688,13 @@ class EntityPrim(XFormPrim):
         return th.cat(state_flat)
 
     def deserialize(self, state):
+        # Get sleep state first
+        is_asleep = bool(state[0].item())
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
-        root_link_state, idx = self.root_link.deserialize(state=state)
-        state_dict = dict(root_link=root_link_state)
+        root_link_state, idx = self.root_link.deserialize(state=state[1:])
+        idx += 1  # Incremented 1 from is_asleep value
+        state_dict = dict(is_asleep=is_asleep, root_link=root_link_state)
         if self.n_joints > 0:
             for jnt_state in ("pos", "vel"):
                 state_dict[f"joint_{jnt_state}"] = state[idx : idx + self.n_joints]

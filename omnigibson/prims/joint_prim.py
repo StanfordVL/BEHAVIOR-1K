@@ -113,7 +113,7 @@ class JointPrim(BasePrim):
         super()._post_load()
 
         # Check whether this joint is driven or not
-        self._driven = self._prim.HasAPI(lazy.pxr.UsdPhysics.DriveAPI)
+        self._driven = self._prim.HasAPI(lazy.pxr.UsdPhysics.DriveAPI) and self._load_config.get("driven", False)
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
@@ -188,19 +188,24 @@ class JointPrim(BasePrim):
         """
         # Sanity check inputs
         assert_valid_key(key=control_type, valid_keys=ControlType.VALID_TYPES, name="control type")
-        if control_type == ControlType.POSITION:
-            assert kp is not None, "kp gain must be specified for setting POSITION control!"
-            if kd is None:
-                # kd could have bene optionally set, if not, then set 0 as default
-                kd = 0.0
-        elif control_type == ControlType.VELOCITY:
-            assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
-            assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
-            kp = 0.0
-        else:  # Efforts (or NONE -- equivalent)
-            assert kp is None, "kp gain must not be specified for setting EFFORT control!"
-            assert kd is None, "kd gain must not be specified for setting EFFORT control!"
+        if self.is_mimic_joint:
+            assert kp is None, "kp gain must not be specified for setting mimic joint control!"
+            assert kd is None, "kd gain must not be specified for setting mimic joint control!"
             kp, kd = 0.0, 0.0
+        else:
+            if control_type == ControlType.POSITION:
+                assert kp is not None, "kp gain must be specified for setting POSITION control!"
+                if kd is None:
+                    # kd could have been optionally set, if not, then set 0 as default
+                    kd = 0.0
+            elif control_type == ControlType.VELOCITY:
+                assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
+                assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
+                kp = 0.0
+            else:  # Efforts (or NONE -- equivalent)
+                assert kp is None, "kp gain must not be specified for setting EFFORT control!"
+                assert kd is None, "kd gain must not be specified for setting EFFORT control!"
+                kp, kd = 0.0, 0.0
 
         # Set values
         kps = th.full((1, self._n_dof), kp)
@@ -776,7 +781,7 @@ class JointPrim(BasePrim):
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         assert self.articulated, "Can only set position for articulated joints!"
         if drive:
-            assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
+            assert self.driven, "Can only use set_pos with drive=True if this joint is driven!"
             assert (
                 self._control_type == ControlType.POSITION
             ), "Trying to set joint position target, but control type is not position!"
@@ -797,9 +802,17 @@ class JointPrim(BasePrim):
             pos = self._denormalize_pos(pos)
 
         # Set the DOF(s) in this joint
-        if drive:
-            self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_position_targets(positions=pos, joint_indices=self.dof_indices)
+                PoseAPI.invalidate()
         else:
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous position
             self._articulation_view.set_joint_positions(positions=pos, joint_indices=self.dof_indices)
             PoseAPI.invalidate()
 
@@ -819,7 +832,7 @@ class JointPrim(BasePrim):
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
-            assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
+            assert self.driven, "Can only use set_vel with drive=True if this joint is driven!"
             assert (
                 self._control_type == ControlType.VELOCITY
             ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
@@ -840,9 +853,16 @@ class JointPrim(BasePrim):
             vel = self._denormalize_vel(vel)
 
         # Set the DOF(s) in this joint
-        if drive:
-            self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+        if self.driven:
+            # Any controllable objects, e.g. a robot
+            if drive:
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
+            else:
+                self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
+                self._articulation_view.set_joint_velocity_targets(velocities=vel, joint_indices=self.dof_indices)
         else:
+            # Any other objects, e.g. furniture with passive joints
+            # In this case, since we're not actively driven, just set instantaneous velocity
             self._articulation_view.set_joint_velocities(velocities=vel, joint_indices=self.dof_indices)
 
     def set_effort(self, effort, normalized=False):
@@ -924,3 +944,11 @@ class JointPrim(BasePrim):
             ),
             4 * self.n_dof,
         )
+
+    @property
+    def is_mimic_joint(self):
+        """
+        Returns:
+            bool: True if this joint is a mimic joint, else False
+        """
+        return self.prim.HasAPI(lazy.pxr.PhysxSchema.PhysxMimicJointAPI)

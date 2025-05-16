@@ -271,7 +271,7 @@ def test_curobo():
         for _ in range(5):
             og.sim.step()
 
-        env.scene.update_initial_state()
+        env.scene.update_initial_file()
         env.scene.reset()
 
         # Create CuRobo instance

@@ -25,7 +25,7 @@ scene:
   load_room_types: null
   load_room_instances: null
   load_task_relevant_only: false
-  seg_map_resolution: 0.1
+  seg_map_resolution: 1.0
   scene_source: OG
   include_robots: false
 

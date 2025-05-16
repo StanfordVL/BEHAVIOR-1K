@@ -305,28 +305,13 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="diffuse_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
 
     @property
-    def albedo_desaturation(self):
-        """
-        Returns:
-            float: this material's applied albedo_desaturation
-        """
-        return self.get_input(inp="albedo_desaturation")
-
-    @albedo_desaturation.setter
-    def albedo_desaturation(self, desaturation):
-        """
-        Args:
-             desaturation (float): this material's applied albedo_desaturation
-        """
-        self.set_input(inp="albedo_desaturation", val=desaturation)
-
-    @property
     def albedo_add(self):
         """
         Returns:
             float: this material's applied albedo_add
         """
-        return self.get_input(inp="albedo_add")
+        # TODO: Implement this with the V-Ray material
+        return 0.0  # self.get_input(inp="albedo_add")
 
     @albedo_add.setter
     def albedo_add(self, add):
@@ -334,23 +319,9 @@ class MaterialPrim(BasePrim):
         Args:
              add (float): this material's applied albedo_add
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="albedo_add", val=add)
-
-    @property
-    def albedo_brightness(self):
-        """
-        Returns:
-            float: this material's applied albedo_brightness
-        """
-        return self.get_input(inp="albedo_brightness")
-
-    @albedo_brightness.setter
-    def albedo_brightness(self, brightness):
-        """
-        Args:
-             brightness (float): this material's applied albedo_brightness
-        """
-        self.set_input(inp="albedo_brightness", val=brightness)
 
     @property
     def diffuse_tint(self):
@@ -358,6 +329,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) diffuse_tint
         """
+        # TODO: Implement this with the V-Ray material
+        return th.zeros(3)
         diffuse_tint = self.get_input(inp="diffuse_tint")
         return th.tensor(diffuse_tint, dtype=th.float32) if diffuse_tint is not None else None
 
@@ -367,6 +340,8 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied (R,G,B) diffuse_tint
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
@@ -375,6 +350,8 @@ class MaterialPrim(BasePrim):
         Returns:
             float: this material's applied reflection_roughness_constant
         """
+        # TODO: Implement this with the V-Ray material
+        return 0.0
         return self.get_input(inp="reflection_roughness_constant")
 
     @reflection_roughness_constant.setter
@@ -383,6 +360,8 @@ class MaterialPrim(BasePrim):
         Args:
              roughness (float): this material's applied reflection_roughness_constant
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="reflection_roughness_constant", val=roughness)
 
     @property
@@ -391,6 +370,8 @@ class MaterialPrim(BasePrim):
         Returns:
             float: this material's applied reflection_roughness_texture_influence
         """
+        # TODO: Implement this with the V-Ray material
+        return 0.0
         return self.get_input(inp="reflection_roughness_texture_influence")
 
     @reflection_roughness_texture_influence.setter
@@ -399,159 +380,9 @@ class MaterialPrim(BasePrim):
         Args:
              prop (float): this material's applied reflection_roughness_texture_influence proportion
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="reflection_roughness_texture_influence", val=prop)
-
-    @property
-    def reflectionroughness_texture(self):
-        """
-        Returns:
-            None or str: this material's applied reflectionroughness_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="reflectionroughness_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @reflectionroughness_texture.setter
-    def reflectionroughness_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied reflectionroughness_texture fpath
-        """
-        self.set_input(inp="reflectionroughness_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def metallic_constant(self):
-        """
-        Returns:
-            float: this material's applied metallic_constant
-        """
-        return self.get_input(inp="metallic_constant")
-
-    @metallic_constant.setter
-    def metallic_constant(self, constant):
-        """
-        Args:
-             constant (float): this material's applied metallic_constant
-        """
-        self.set_input(inp="metallic_constant", val=constant)
-
-    @property
-    def metallic_texture_influence(self):
-        """
-        Returns:
-            float: this material's applied metallic_texture_influence
-        """
-        return self.get_input(inp="metallic_texture_influence")
-
-    @metallic_texture_influence.setter
-    def metallic_texture_influence(self, prop):
-        """
-        Args:
-             prop (float): this material's applied metallic_texture_influence
-        """
-        self.set_input(inp="metallic_texture_influence", val=prop)
-
-    @property
-    def metallic_texture(self):
-        """
-        Returns:
-            None or str: this material's applied metallic_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="metallic_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @metallic_texture.setter
-    def metallic_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied metallic_texture fpath
-        """
-        self.set_input(inp="metallic_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def specular_level(self):
-        """
-        Returns:
-            float: this material's applied specular_level
-        """
-        return self.get_input(inp="specular_level")
-
-    @specular_level.setter
-    def specular_level(self, level):
-        """
-        Args:
-             level (float): this material's applied specular_level
-        """
-        self.set_input(inp="specular_level", val=level)
-
-    @property
-    def enable_ORM_texture(self):
-        """
-        Returns:
-            bool: this material's applied enable_ORM_texture
-        """
-        return self.get_input(inp="enable_ORM_texture")
-
-    @enable_ORM_texture.setter
-    def enable_ORM_texture(self, enabled):
-        """
-        Args:
-             enabled (bool): this material's applied enable_ORM_texture
-        """
-        self.set_input(inp="enable_ORM_texture", val=enabled)
-
-    @property
-    def ORM_texture(self):
-        """
-        Returns:
-            None or str: this material's applied ORM_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="ORM_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @ORM_texture.setter
-    def ORM_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied ORM_texture fpath
-        """
-        self.set_input(inp="ORM_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def ao_to_diffuse(self):
-        """
-        Returns:
-            float: this material's applied ao_to_diffuse
-        """
-        return self.get_input(inp="ao_to_diffuse")
-
-    @ao_to_diffuse.setter
-    def ao_to_diffuse(self, val):
-        """
-        Args:
-             val (float): this material's applied ao_to_diffuse
-        """
-        self.set_input(inp="ao_to_diffuse", val=val)
-
-    @property
-    def ao_texture(self):
-        """
-        Returns:
-            None or str: this material's applied ao_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="ao_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @ao_texture.setter
-    def ao_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied ao_texture fpath
-        """
-        self.set_input(inp="ao_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
 
     @property
     def enable_emission(self):
@@ -559,6 +390,8 @@ class MaterialPrim(BasePrim):
         Returns:
             bool: this material's applied enable_emission
         """
+        # TODO: Implement this with the V-Ray material
+        return False
         return self.get_input(inp="enable_emission")
 
     @enable_emission.setter
@@ -567,6 +400,8 @@ class MaterialPrim(BasePrim):
         Args:
              enabled (bool): this material's applied enable_emission
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="enable_emission", val=enabled)
 
     @property
@@ -575,6 +410,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's applied (R,G,B) emissive_color
         """
+        # TODO: Implement this with the V-Ray material
+        return th.zeros(3)
         color = self.get_input(inp="emissive_color")
         return th.tensor(color, dtype=th.float32) if color is not None else None
 
@@ -584,43 +421,9 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's applied emissive_color
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="emissive_color", val=lazy.pxr.Gf.Vec3f(*color))
-
-    @property
-    def emissive_color_texture(self):
-        """
-        Returns:
-            None or str: this material's applied emissive_color_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="emissive_color_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @emissive_color_texture.setter
-    def emissive_color_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied emissive_color_texture fpath
-        """
-        self.set_input(inp="emissive_color_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def emissive_mask_texture(self):
-        """
-        Returns:
-            None or str: this material's applied emissive_mask_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="emissive_mask_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @emissive_mask_texture.setter
-    def emissive_mask_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied emissive_mask_texture fpath
-        """
-        self.set_input(inp="emissive_mask_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
 
     @property
     def emissive_intensity(self):
@@ -628,6 +431,8 @@ class MaterialPrim(BasePrim):
         Returns:
             float: this material's applied emissive_intensity
         """
+        # TODO: Implement this with the V-Ray material
+        return 0.0
         return self.get_input(inp="emissive_intensity")
 
     @emissive_intensity.setter
@@ -636,7 +441,30 @@ class MaterialPrim(BasePrim):
         Args:
              intensity (float): this material's applied emissive_intensity
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="emissive_intensity", val=intensity)
+
+    @property
+    def opacity_constant(self):
+        """
+        Returns:
+            float: this material's applied opacity_constant
+        """
+        # TODO: Implement this with the V-Ray material
+        return 1.0
+        return self.get_input(inp="opacity_constant")
+
+    @opacity_constant.setter
+    def opacity_constant(self, constant):
+        """
+        Args:
+             constant (float): this material's applied opacity_constant
+        """
+        # TODO: Implement this with the V-Ray material
+        return
+        # TODO: another instance of missing config type checking
+        self.set_input(inp="opacity_constant", val=float(constant))
 
     @property
     def enable_opacity(self):
@@ -650,354 +478,9 @@ class MaterialPrim(BasePrim):
     def enable_opacity(self, enabled):
         """
         Args:
-             enabled (bool): this material's applied enable_opacity
+                enabled (bool): this material's applied enable_opacity
         """
         self.set_input(inp="enable_opacity", val=enabled)
-
-    @property
-    def enable_opacity_texture(self):
-        """
-        Returns:
-            bool: this material's applied enable_opacity_texture
-        """
-        return self.get_input(inp="enable_opacity_texture")
-
-    @enable_opacity_texture.setter
-    def enable_opacity_texture(self, enabled):
-        """
-        Args:
-             enabled (bool): this material's applied enable_opacity_texture
-        """
-        self.set_input(inp="enable_opacity_texture", val=enabled)
-
-    @property
-    def opacity_constant(self):
-        """
-        Returns:
-            float: this material's applied opacity_constant
-        """
-        return self.get_input(inp="opacity_constant")
-
-    @opacity_constant.setter
-    def opacity_constant(self, constant):
-        """
-        Args:
-             constant (float): this material's applied opacity_constant
-        """
-        # TODO: another instance of missing config type checking
-        self.set_input(inp="opacity_constant", val=float(constant))
-
-    @property
-    def opacity_texture(self):
-        """
-        Returns:
-            None or str: this material's applied opacity_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="opacity_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @opacity_texture.setter
-    def opacity_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied opacity_texture fpath
-        """
-        self.set_input(inp="opacity_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def opacity_mode(self):
-        """
-        Returns:
-            int: this material's applied opacity_mode
-        """
-        return self.get_input(inp="opacity_mode")
-
-    @opacity_mode.setter
-    def opacity_mode(self, mode):
-        """
-        Args:
-             mode (int): this material's applied opacity_mode
-        """
-        self.set_input(inp="opacity_mode", val=mode)
-
-    @property
-    def opacity_threshold(self):
-        """
-        Returns:
-            float: this material's applied opacity_threshold
-        """
-        return self.get_input(inp="opacity_threshold")
-
-    @opacity_threshold.setter
-    def opacity_threshold(self, threshold):
-        """
-        Args:
-             threshold (float): this material's applied opacity_threshold
-        """
-        self.set_input(inp="opacity_threshold", val=threshold)
-
-    @property
-    def bump_factor(self):
-        """
-        Returns:
-            float: this material's applied bump_factor
-        """
-        return self.get_input(inp="bump_factor")
-
-    @bump_factor.setter
-    def bump_factor(self, factor):
-        """
-        Args:
-             factor (float): this material's applied bump_factor
-        """
-        self.set_input(inp="bump_factor", val=factor)
-
-    @property
-    def normalmap_texture(self):
-        """
-        Returns:
-            None or str: this material's applied normalmap_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="normalmap_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @normalmap_texture.setter
-    def normalmap_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied normalmap_texture fpath
-        """
-        self.set_input(inp="normalmap_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def detail_bump_factor(self):
-        """
-        Returns:
-            float: this material's applied detail_bump_factor
-        """
-        return self.get_input(inp="detail_bump_factor")
-
-    @detail_bump_factor.setter
-    def detail_bump_factor(self, factor):
-        """
-        Args:
-             factor (float): this material's applied detail_bump_factor
-        """
-        self.set_input(inp="detail_bump_factor", val=factor)
-
-    @property
-    def detail_normalmap_texture(self):
-        """
-        Returns:
-            None or str: this material's applied detail_normalmap_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="detail_normalmap_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @detail_normalmap_texture.setter
-    def detail_normalmap_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied detail_normalmap_texture fpath
-        """
-        self.set_input(inp="detail_normalmap_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def flip_tangent_u(self):
-        """
-        Returns:
-            bool: this material's applied flip_tangent_u
-        """
-        return self.get_input(inp="flip_tangent_u")
-
-    @flip_tangent_u.setter
-    def flip_tangent_u(self, flipped):
-        """
-        Args:
-             flipped (bool): this material's applied flip_tangent_u
-        """
-        self.set_input(inp="flip_tangent_u", val=flipped)
-
-    @property
-    def flip_tangent_v(self):
-        """
-        Returns:
-            bool: this material's applied flip_tangent_v
-        """
-        return self.get_input(inp="flip_tangent_v")
-
-    @flip_tangent_v.setter
-    def flip_tangent_v(self, flipped):
-        """
-        Args:
-             flipped (bool): this material's applied flip_tangent_v
-        """
-        self.set_input(inp="flip_tangent_v", val=flipped)
-
-    @property
-    def project_uvw(self):
-        """
-        Returns:
-            bool: this material's applied project_uvw
-        """
-        return self.get_input(inp="project_uvw")
-
-    @project_uvw.setter
-    def project_uvw(self, projected):
-        """
-        Args:
-             projected (bool): this material's applied project_uvw
-        """
-        self.set_input(inp="project_uvw", val=projected)
-
-    @property
-    def world_or_object(self):
-        """
-        Returns:
-            bool: this material's applied world_or_object
-        """
-        return self.get_input(inp="world_or_object")
-
-    @world_or_object.setter
-    def world_or_object(self, val):
-        """
-        Args:
-             val (bool): this material's applied world_or_object
-        """
-        self.set_input(inp="world_or_object", val=val)
-
-    @property
-    def uv_space_index(self):
-        """
-        Returns:
-            int: this material's applied uv_space_index
-        """
-        return self.get_input(inp="uv_space_index")
-
-    @uv_space_index.setter
-    def uv_space_index(self, index):
-        """
-        Args:
-             index (int): this material's applied uv_space_index
-        """
-        self.set_input(inp="uv_space_index", val=index)
-
-    @property
-    def texture_translate(self):
-        """
-        Returns:
-            2-array: this material's applied texture_translate
-        """
-        return th.tensor(self.get_input(inp="texture_translate"))
-
-    @texture_translate.setter
-    def texture_translate(self, translate):
-        """
-        Args:
-             translate (2-array): this material's applied (x,y) texture_translate
-        """
-        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
-
-    @property
-    def texture_rotate(self):
-        """
-        Returns:
-            float: this material's applied texture_rotate
-        """
-        return self.get_input(inp="texture_rotate")
-
-    @texture_rotate.setter
-    def texture_rotate(self, rotate):
-        """
-        Args:
-             rotate (float): this material's applied texture_rotate
-        """
-        self.set_input(inp="texture_rotate", val=rotate)
-
-    @property
-    def texture_scale(self):
-        """
-        Returns:
-            2-array: this material's applied texture_scale
-        """
-        return th.tensor(self.get_input(inp="texture_scale"))
-
-    @texture_scale.setter
-    def texture_scale(self, scale):
-        """
-        Args:
-             scale (2-array): this material's applied (x,y) texture_scale
-        """
-        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
-
-    @property
-    def detail_texture_translate(self):
-        """
-        Returns:
-            2-array: this material's applied detail_texture_translate
-        """
-        detail_texture_translate = self.get_input(inp="detail_texture_translate")
-        return th.tensor(detail_texture_translate, dtype=th.float32) if detail_texture_translate is not None else None
-
-    @detail_texture_translate.setter
-    def detail_texture_translate(self, translate):
-        """
-        Args:
-             translate (2-array): this material's applied detail_texture_translate
-        """
-        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
-
-    @property
-    def detail_texture_rotate(self):
-        """
-        Returns:
-            float: this material's applied detail_texture_rotate
-        """
-        return self.get_input(inp="detail_texture_rotate")
-
-    @detail_texture_rotate.setter
-    def detail_texture_rotate(self, rotate):
-        """
-        Args:
-             rotate (float): this material's applied detail_texture_rotate
-        """
-        self.set_input(inp="detail_texture_rotate", val=rotate)
-
-    @property
-    def detail_texture_scale(self):
-        """
-        Returns:
-            2-array: this material's applied detail_texture_scale
-        """
-        detail_texture_scale = self.get_input(inp="detail_texture_scale")
-        return th.tensor(detail_texture_scale, dtype=th.float32) if detail_texture_scale is not None else None
-
-    @detail_texture_scale.setter
-    def detail_texture_scale(self, scale):
-        """
-        Args:
-             scale (2-array): this material's applied detail_texture_scale
-        """
-        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
-
-    @property
-    def exclude_from_white_mode(self):
-        """
-        Returns:
-            bool: this material's applied excludeFromWhiteMode
-        """
-        return self.get_input(inp="excludeFromWhiteMode")
-
-    @exclude_from_white_mode.setter
-    def exclude_from_white_mode(self, exclude):
-        """
-        Args:
-             exclude (bool): this material's applied excludeFromWhiteMode
-        """
-        self.set_input(inp="excludeFromWhiteMode", val=exclude)
 
     @property
     def diffuse_reflection_weight(self):
@@ -1005,6 +488,8 @@ class MaterialPrim(BasePrim):
         Returns:
             float: this material's applied diffuse_reflection_weight
         """
+        # TODO: Implement this with the V-Ray material
+        return 0.0
         return self.get_input(inp="diffuse_reflection_weight")
 
     @diffuse_reflection_weight.setter
@@ -1013,6 +498,8 @@ class MaterialPrim(BasePrim):
         Args:
              weight (float): this material's applied diffuse_reflection_weight
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="diffuse_reflection_weight", val=weight)
 
     @property
@@ -1021,6 +508,8 @@ class MaterialPrim(BasePrim):
         Returns:
             bool: this material's applied enable_specular_transmission
         """
+        # TODO: Implement this with the V-Ray material
+        return False
         return self.get_input(inp="enable_specular_transmission")
 
     @enable_specular_transmission.setter
@@ -1029,6 +518,8 @@ class MaterialPrim(BasePrim):
         Args:
              enabled (bool): this material's applied enable_specular_transmission
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="enable_specular_transmission", val=enabled)
 
     @property
@@ -1037,6 +528,8 @@ class MaterialPrim(BasePrim):
         Returns:
             float: this material's applied specular_transmission_weight
         """
+        # TODO: Implement this with the V-Ray material
+        return 0.0
         return self.get_input(inp="specular_transmission_weight")
 
     @specular_transmission_weight.setter
@@ -1045,6 +538,8 @@ class MaterialPrim(BasePrim):
         Args:
              weight (float): this material's applied specular_transmission_weight
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="specular_transmission_weight", val=weight)
 
     @property
@@ -1053,6 +548,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's diffuse_reflection_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return th.zeros(3)
         diffuse_reflection_color = self.get_input(inp="diffuse_reflection_color")
         return th.tensor(diffuse_reflection_color, dtype=th.float32) if diffuse_reflection_color is not None else None
 
@@ -1062,24 +559,9 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's diffuse_reflection_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="diffuse_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
-
-    @property
-    def specular_reflection_color(self):
-        """
-        Returns:
-            3-array: this material's specular_reflection_color in (R,G,B)
-        """
-        specular_reflection_color = self.get_input(inp="specular_reflection_color")
-        return th.tensor(specular_reflection_color, dtype=th.float32) if specular_reflection_color is not None else None
-
-    @specular_reflection_color.setter
-    def specular_reflection_color(self, color):
-        """
-        Args:
-             color (3-array): this material's specular_reflection_color in (R,G,B)
-        """
-        self.set_input(inp="specular_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
     def specular_transmission_color(self):
@@ -1087,6 +569,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return th.zeros(3)
         specular_transmission_color = self.get_input(inp="specular_transmission_color")
         return (
             th.tensor(specular_transmission_color, dtype=th.float32)
@@ -1100,6 +584,8 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="specular_transmission_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
@@ -1108,6 +594,8 @@ class MaterialPrim(BasePrim):
         Returns:
             3-array: this material's specular_transmission_scattering_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return th.zeros(3)
         specular_transmission_scattering_color = self.get_input(inp="specular_transmission_scattering_color")
         return (
             th.tensor(specular_transmission_scattering_color, dtype=th.float32)
@@ -1121,39 +609,9 @@ class MaterialPrim(BasePrim):
         Args:
              color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
         """
+        # TODO: Implement this with the V-Ray material
+        return
         self.set_input(inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*color))
-
-    @property
-    def specular_reflection_ior_preset(self):
-        """
-        Returns:
-            int: this material's specular_reflection_ior_preset (int corresponding to enum)
-        """
-        return self.get_input(inp="specular_reflection_ior_preset")
-
-    @specular_reflection_ior_preset.setter
-    def specular_reflection_ior_preset(self, preset):
-        """
-        Args:
-             preset (int): this material's specular_reflection_ior_preset (int corresponding to enum)
-        """
-        self.set_input(inp="specular_reflection_ior_preset", val=preset)
-
-    @property
-    def enable_diffuse_transmission(self):
-        """
-        Returns:
-            float: this material's applied enable_diffuse_transmission
-        """
-        return self.get_input(inp="enable_diffuse_transmission")
-
-    @enable_diffuse_transmission.setter
-    def enable_diffuse_transmission(self, val):
-        """
-        Args:
-             val (bool): this material's applied enable_diffuse_transmission
-        """
-        self.set_input(inp="enable_diffuse_transmission", val=val)
 
     @property
     def glass_color(self):
