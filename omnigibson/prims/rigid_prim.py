@@ -1,5 +1,6 @@
 from functools import cached_property
 import re
+import math
 
 import torch as th
 from scipy.spatial import ConvexHull
@@ -544,3 +545,44 @@ class RigidPrim(XFormPrim):
         # Check using the old format.
         # TODO: Remove this after the next dataset release
         return int(m.LEGACY_META_LINK_PATTERN.fullmatch(self.name).group(3))
+
+    def check_points_in_volume(
+        self,
+        particle_positions_world,
+        use_visual_meshes=True,
+    ):
+        """
+        Args:
+            particle_positions_world (th.tensor): (N, 3) array of particle positions to check
+            use_visual_meshes (bool): Whether to use @volume_link's visual or collision meshes to generate points fcn.
+                In either case, this assumes the given meshes are convex hulls. For visual meshes, we enforce this
+                constraint by explicitly converting them into convex hulls
+        """
+        in_volume = th.zeros(particle_positions_world.shape[0], dtype=th.bool)
+        meshes_to_check = self.visual_meshes if use_visual_meshes else self.collision_meshes
+        for mesh in meshes_to_check.values():
+            in_volume |= mesh.check_points_in_volume(particle_positions_world)
+        return in_volume
+
+    @cached_property
+    def world_volume(self, precision=1e-5):
+        # We use monte-carlo sampling to approximate the voluem up to @precision
+        # NOTE: precision defines the RELATIVE precision of the volume computation -- i.e.: the relative error with
+        # respect to the volume link's global AABB
+
+        # Convert precision to minimum number of particles to sample
+        min_n_particles = int(math.ceil(1.0 / precision))
+
+        # Determine equally-spaced sampling distance to achieve this minimum particle count
+        aabb_volume = th.prod(self.visual_aabb_extent)
+        sampling_distance = th.pow(aabb_volume / min_n_particles, 1 / 3.0)
+        low, high = self.aabb
+        n_particles_per_axis = ((high - low) / sampling_distance).int() + 1
+        assert th.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
+        # 1e-10 is added because the extent might be an exact multiple of particle radius
+        arrs = [th.arange(l, h, sampling_distance) for l, h, n in zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
+        points = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
+
+        # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
+        return aabb_volume * th.mean(self.check_points_in_volume(points).float())

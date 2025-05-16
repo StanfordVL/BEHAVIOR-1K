@@ -154,7 +154,9 @@ class MetricsWrapper(EnvironmentWrapper):
             metric (EnvMetric): Metric to add
         """
         # Validate the metric is compatible, then add
-        assert metric.is_compatible(self), f"Metric {metric.__class__.__name__} is not compatible with this environment!"
+        assert metric.is_compatible(
+            self
+        ), f"Metric {metric.__class__.__name__} is not compatible with this environment!"
         self.metrics[name] = metric
 
     def remove_metric(self, name):

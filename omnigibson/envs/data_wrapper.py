@@ -411,7 +411,7 @@ class DataCollectionWrapper(DataWrapper):
 
             # Prune all data stored at the current checkpoint step and beyond
             n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
-            pruned_traj_history = self.current_traj_history[self.checkpoint_step_idx:]
+            pruned_traj_history = self.current_traj_history[self.checkpoint_step_idx :]
             self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
             self.step_count -= n_steps_to_remove
 
@@ -429,10 +429,12 @@ class DataCollectionWrapper(DataWrapper):
                 step = self.env.episode_steps
                 if step not in self.checkpoint_rollback_trajs:
                     self.checkpoint_rollback_trajs[step] = []
-                self.checkpoint_rollback_trajs[step].append({
-                    "step_data": pruned_traj_history,
-                    "transitions": pruned_transitions,
-                })
+                self.checkpoint_rollback_trajs[step].append(
+                    {
+                        "step_data": pruned_traj_history,
+                        "transitions": pruned_transitions,
+                    }
+                )
 
     def postprocess_traj_group(self, traj_grp):
         super().postprocess_traj_group(traj_grp=traj_grp)

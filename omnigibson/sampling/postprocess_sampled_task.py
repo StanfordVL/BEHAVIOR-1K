@@ -20,6 +20,7 @@ parser.add_argument(
     help="Whether to forcibly overwrite any pre-existing files",
 )
 
+
 def main():
     args = parser.parse_args()
     task_name = BehaviorTask.get_cached_activity_scene_filename(
@@ -41,6 +42,7 @@ def main():
         raise ValueError(f"args.overwrite=False and file already exists at: {out_path}!")
     with open(out_path, "w+") as f:
         json.dump(sampled_scene_full_dict, f, indent=4)
+
 
 if __name__ == "__main__":
     main()

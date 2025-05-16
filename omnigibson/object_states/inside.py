@@ -1,8 +1,8 @@
 import torch as th
 
 import omnigibson as og
+from omnigibson.macros import macros
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
@@ -14,7 +14,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.update({AABB, HorizontalAdjacency, VerticalAdjacency})
+        deps.update({AABB})
         return deps
 
     def _set_value(self, other, new_value, reset_before_sampling=False):
@@ -53,36 +53,12 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         ):
             return False
 
-        # Our definition of inside: an object A is inside an object B if there
-        # exists a 3-D coordinate space in which object B can be found on both
-        # sides of object A in at least 2 out of 3 of the coordinate axes. To
-        # check this, we sample a bunch of coordinate systems (for the sake of
-        # simplicity, all have their 3rd axes aligned with the Z axis but the
-        # 1st and 2nd axes are free.
-        vertical_adjacency = self.obj.states[VerticalAdjacency].get_value()
-        horizontal_adjacency = self.obj.states[HorizontalAdjacency].get_value()
+        # TODO: Consider using the collision boundary points.
+        # points = self.obj.collision_boundary_points_world
+        points = inner_object_pos.reshape(1, 3)
+        in_volume = th.zeros(points.shape[0], dtype=th.bool)
+        for link in other.links.values():
+            if link.is_meta_link and link.meta_link_type == macros.object_states.contains.CONTAINER_META_LINK_TYPE:
+                in_volume |= link.check_points_in_volume(points)
 
-        # First, check if the body can be found on both sides in Z
-        on_both_sides_Z = (
-            other in vertical_adjacency.negative_neighbors and other in vertical_adjacency.positive_neighbors
-        )
-        if on_both_sides_Z:
-            # If the object is on both sides of Z, we already found 1 axis, so just
-            # find another axis where the object is on both sides.
-            on_both_sides_in_any_axis = any(
-                other in adjacency_list.positive_neighbors and other in adjacency_list.negative_neighbors
-                for adjacency_list in flatten_planes(horizontal_adjacency)
-            )
-            return on_both_sides_in_any_axis
-
-        # If the object was not on both sides of Z, then we need to look at each
-        # plane and try to find one where the object is on both sides of both
-        # axes in that plane.
-        on_both_sides_of_both_axes_in_any_plane = any(
-            other in adjacency_list_by_axis[0].positive_neighbors
-            and other in adjacency_list_by_axis[0].negative_neighbors
-            and other in adjacency_list_by_axis[1].positive_neighbors
-            and other in adjacency_list_by_axis[1].negative_neighbors
-            for adjacency_list_by_axis in horizontal_adjacency
-        )
-        return on_both_sides_of_both_axes_in_any_plane
+        return th.any(in_volume).item()

@@ -109,7 +109,9 @@ def main():
     env = og.Environment(cfg)
 
     # Define where to save instances
-    save_dir = os.path.join(gm.DATASET_PATH, "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{args.activity}_instances")
+    save_dir = os.path.join(
+        gm.DATASET_PATH, "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{args.activity}_instances"
+    )
 
     # If we want to create a stable scene config, do that now
     default_scene_fpath = f"{gm.DATASET_PATH}/scenes/{args.scene_model}/json/{args.scene_model}_stable.json"
