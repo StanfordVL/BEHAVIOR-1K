@@ -156,7 +156,7 @@ parser.add_argument(
     "--ignore_in_progress", action="store_true", help="If set and --offline is False, will in progress flag"
 )
 
-#gm.HEADLESS = False
+# gm.HEADLESS = False
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 gm.ENABLE_OBJECT_STATES = True

@@ -132,6 +132,7 @@ def sample_kinematics(
 
     # Avoid circular import
     from omnigibson.scenes.traversable_scene import TraversableScene
+
     using_trav_map = isinstance(objB.scene, TraversableScene)
     if using_trav_map:
         trav_map = objB.scene.trav_map
