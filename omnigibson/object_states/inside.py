@@ -3,7 +3,6 @@ import torch as th
 import omnigibson as og
 from omnigibson.macros import macros
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency
 from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
@@ -15,7 +14,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()
-        deps.update({AABB, HorizontalAdjacency, VerticalAdjacency})
+        deps.update({AABB})
         return deps
 
     def _set_value(self, other, new_value, reset_before_sampling=False):
