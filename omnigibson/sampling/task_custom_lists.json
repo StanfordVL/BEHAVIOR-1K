@@ -1130,5 +1130,75 @@
             },
             "blacklist": {}
         }
+    },
+    "put_togethera_basic_pruning_kit": {
+        "room_types": [
+            "garage"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "pruner.n.02": {
+                    "pruner": {
+                        "lucqrs": null
+                    }
+                },
+                "shears.n.01": {
+                    "shears": {
+                        "iizidc": null
+                    }
+                },
+                "toolbox.n.01": {
+                    "toolbox": {
+                        "redmtl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "sorting_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "artichoke.n.02": {
+                    "artichoke": {
+                        "tfclmg": null
+                    }
+                },
+                "bok_choy.n.02": {
+                    "bok_choy": {
+                        "bbvcji": null
+                    }
+                },
+                "chard.n.02": {
+                    "chard": {
+                        "linuaq": null
+                    }
+                },
+                "leek.n.02": {
+                    "leek": {
+                        "fyihsq": null
+                    }
+                },
+                "mixing_bowl.n.01": {
+                    "mixing_bowl": {
+                        "bsgybx": null
+                    }
+                },
+                "sweet_corn.n.02": {
+                    "sweet_corn": {
+                        "qtesku": null
+                    }
+                },
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "jqfftz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
