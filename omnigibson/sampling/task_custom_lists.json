@@ -1144,7 +1144,7 @@
                 },
                 "shears.n.01": {
                     "shears": {
-                        "iizidc": null
+                        "iizidc": [0.208, 0.08, 0.02]
                     }
                 },
                 "toolbox.n.01": {
