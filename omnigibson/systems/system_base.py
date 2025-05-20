@@ -878,7 +878,6 @@ class PhysicalParticleSystem(BaseSystem):
                 link.check_points_in_volume(
                     particle_positions_world=particle_positions,
                     use_visual_meshes=use_visual_meshes,
-                    mesh_name_prefixes=mesh_name_prefixes,
                 )
             )[0]
         ]
