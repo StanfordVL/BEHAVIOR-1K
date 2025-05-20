@@ -236,7 +236,7 @@ class GeomPrim(XFormPrim):
         particle_positions_world_homogeneous = th.cat(
             (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
         )
-        particle_positions_local = (particle_positions_world_homogeneous @ T.pose_inv(world_pose_w_scale).T)[:, :3]
+        particle_positions_local = (particle_positions_world_homogeneous @ th.linalg.inv(world_pose_w_scale).T)[:, :3]
         return self.check_local_points_in_volume(particle_positions_local)
 
     @property
