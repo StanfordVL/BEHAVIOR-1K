@@ -197,7 +197,15 @@ def get_states_by_dependency_order(states=None):
     Returns:
         list: all states in topological order of dependency
     """
-    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
+    return list(
+        reversed(
+            list(
+                nx.algorithms.lexicographical_topological_sort(
+                    get_state_dependency_graph(states), key=lambda n: n.__name__
+                )
+            )
+        )
+    )
 
 
 # Define all meta links
