@@ -270,7 +270,7 @@ class DataWrapper(EnvironmentWrapper):
         Args:
             group (hdf5.File or hdf5.Group): HDF5 object to add an attribute to
             name (str): Name to assign to the data
-            data (str or dict): Data to add. Note that this only supports relatively primitive data types --
+            data (Any): Data to add. Note that this only supports relatively primitive data types --
                 if the data is a dictionary it will be converted into a string-json format using TorchEncoder
         """
         group.attrs[name] = json.dumps(data, cls=TorchEncoder) if isinstance(data, dict) else data
@@ -347,8 +347,8 @@ class DataCollectionWrapper(DataWrapper):
         self.current_transitions = dict()
 
         # Cached state to rollback to if requested
-        self.checkpoint_state = None
-        self.checkpoint_step_idx = None
+        self.checkpoint_states = []
+        self.checkpoint_step_idxs = []
 
         # Info for keeping checkpoint rollback data
         self.checkpoint_rollback_trajs = dict() if keep_checkpoint_rollback_data else None
@@ -389,40 +389,44 @@ class DataCollectionWrapper(DataWrapper):
         """
         # Save the current full state and corresponding step idx
         self.disable_dump_filters()
-        self.checkpoint_state = self.scene.save(json_path=None, as_dict=True)
-        self.checkpoint_step_idx = len(self.current_traj_history)
+        self.checkpoint_states.append(self.scene.save(json_path=None, as_dict=True))
+        self.checkpoint_step_idxs.append(len(self.current_traj_history))
         self.enable_dump_filters()
 
-    def rollback_to_checkpoint(self):
+    def rollback_to_checkpoint(self, index=-1):
         """
-        Rolls back the current state to the checkpoint stored in @self.checkpoint_state. If no checkpoint
+        Rolls back the current state to the checkpoint stored in @self.checkpoint_states. If no checkpoint
         is found, this results in reset() being called
+
+        Args:
+            index (int): Index of the checkpoint to rollback to. Any checkpoints after this point will be discarded
         """
-        if self.checkpoint_state is None:
+        if len(self.checkpoint_states) == 0:
             print("No checkpoint found, resetting environment instead!")
             self.reset()
 
         else:
             # Restore to checkpoint
-            self.scene.restore(self.checkpoint_state)
+            self.scene.restore(self.checkpoint_states[index])
 
             # Configure the simulator to optimize for data collection
             self._optimize_sim_for_data_collection(viewport_camera_path=og.sim.viewer_camera.active_camera_path)
 
             # Prune all data stored at the current checkpoint step and beyond
-            n_steps_to_remove = len(self.current_traj_history) - self.checkpoint_step_idx
-            pruned_traj_history = self.current_traj_history[self.checkpoint_step_idx :]
-            self.current_traj_history = self.current_traj_history[: self.checkpoint_step_idx]
+            checkpoint_step_idx = self.checkpoint_step_idxs[index]
+            n_steps_to_remove = len(self.current_traj_history) - checkpoint_step_idx
+            pruned_traj_history = self.current_traj_history[checkpoint_step_idx:]
+            self.current_traj_history = self.current_traj_history[:checkpoint_step_idx]
             self.step_count -= n_steps_to_remove
 
             # Also prune any transition info that occurred after the checkpoint step idx
             pruned_transitions = dict()
             for step in tuple(self.current_transitions.keys()):
-                if step >= self.checkpoint_step_idx:
+                if step >= checkpoint_step_idx:
                     pruned_transitions[step] = self.current_transitions.pop(step)
 
             # Update environment env step count
-            self.env._current_step = self.checkpoint_step_idx - 1
+            self.env._current_step = checkpoint_step_idx - 1
 
             # Save checkpoint rollback data if requested
             if self.checkpoint_rollback_trajs is not None:
@@ -435,6 +439,11 @@ class DataCollectionWrapper(DataWrapper):
                         "transitions": pruned_transitions,
                     }
                 )
+
+            # Prune any values after the checkpoint index
+            if index != -1:
+                self.checkpoint_states = self.checkpoint_states[:index+1]
+                self.checkpoint_step_idxs = self.checkpoint_step_idxs[:index+1]
 
     def postprocess_traj_group(self, traj_grp):
         super().postprocess_traj_group(traj_grp=traj_grp)
@@ -552,9 +561,9 @@ class DataCollectionWrapper(DataWrapper):
             for key, vals in metadata.items()
         }
 
-        # Clear checkpoint state
-        self.checkpoint_state = None
-        self.checkpoint_step_idx = None
+        # Clear checkpoint states
+        self.checkpoint_states = []
+        self.checkpoint_step_idxs = []
         if self.checkpoint_rollback_trajs is not None:
             self.checkpoint_rollback_trajs = dict()
 
@@ -616,9 +625,9 @@ class DataCollectionWrapper(DataWrapper):
         # if we rollback the state -- i.e.: the state will be rolled back to just BEFORE this transition was executed,
         # and will therefore not be tracked properly in subsequent states during playback. So we assert that the current
         # idx is NOT the current checkpoint idx
-        if self.checkpoint_step_idx is not None:
+        if len(self.checkpoint_step_idxs) > 0:
             assert (
-                self.checkpoint_step_idx - 1 != self.env.episode_steps
+                self.checkpoint_step_idxs[-1] - 1 != self.env.episode_steps
             ), "A checkpoint was just updated. Any subsequent transitions at this immediate timestep will not be replayed properly!"
 
         if self.env.episode_steps not in self.current_transitions:
