@@ -429,8 +429,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load the scene, robots, and task
         self._load_scene()
-        self._load_robots()
         self._load_objects()
+        self._load_robots()
         self._load_task()
         self._load_external_sensors()
 
