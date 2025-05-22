@@ -1507,7 +1507,13 @@
                         "wfjsog": null,
                         "rdqqum": null,
                         "eaktib": null,
-                        "hrxujh": null
+                        "hrxujh": null,
+                        "xkjctf": null,
+                        "yomcyv": null,
+                        "poanfs": null,
+                        "tvydcv": null,
+                        "znlewl": null,
+                        "wiydxy": null
                     }
                 },
                 "box.n.01": {
@@ -1581,6 +1587,117 @@
                 "countertop.n.01": {
                     "countertop": {
                         "kelzer": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "storing_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bag__of__chips.n.01": {
+                    "bag_of_chips": {
+                        "bryahw": null
+                    }
+                },
+                "bottle__of__olive_oil.n.01": {
+                    "bottle_of_olive_oil": {
+                        "ajswsh": null
+                    }
+                },
+                "box__of__oatmeal.n.01": {
+                    "box_of_oatmeal": {
+                        "zkggxm": null
+                    }
+                },
+                "jar__of__sugar.n.01": {
+                    "jar_of_sugar": {
+                        "pnbbfb": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "getting_organized_for_work": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "computer.n.01": {
+                    "desktop_computer": {
+                        "eantds": null
+                    }
+                },
+                "monitor.n.04": {
+                    "monitor": {
+                        "qvpbge": null
+                    }
+                },
+                "folder.n.02": {
+                    "folder": {
+                        "guhatz": null
+                    }
+                },
+                "keyboard.n.01": {
+                    "keyboard": {
+                        "injrgc": null
+                    }
+                },
+                "mouse.n.04": {
+                    "mouse": {
+                        "oydobn": [0.09, 0.06, 0.03]
+                    }
+                },
+                "notebook.n.01": {
+                    "notebook": {
+                        "eijrqw": null
+                    }
+                },
+                "pen.n.01": {
+                    "pen": {
+                        "enfumt": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "setting_the_table": {
+        "room_types": [
+            "dining_room",
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "hotdog.n.02": {
+                    "hotdog": {
+                        "lsajfg": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "spppps": null
+                    }
+                },
+                "table_knife.n.01": {
+                    "table_knife": {
+                        "jxdfyy": null
+                    }
+                },
+                "tablefork.n.01": {
+                    "tablefork": {
+                        "hktwlm": null
+                    }
+                },
+                "cabinet.n.01": {
+                    "bottom_cabinet_no_top": {
+                        "rkgjer": null
                     }
                 }
             },
