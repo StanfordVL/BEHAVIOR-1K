@@ -322,7 +322,7 @@ def get_attachment_meta_links(category, model):
         attachment_meta_links = []
         for child in prim.GetChildren():
             if child.GetTypeName() == "Xform":
-                if AttachedTo.meta_link_type in child.GetName():
+                if any(meta_link_type in child.GetName() for meta_link_type in AttachedTo.meta_link_types):
                     attachment_meta_links.append(child.GetName())
         return attachment_meta_links
 

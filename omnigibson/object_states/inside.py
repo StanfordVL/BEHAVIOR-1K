@@ -58,7 +58,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         points = inner_object_pos.reshape(1, 3)
         in_volume = th.zeros(points.shape[0], dtype=th.bool)
         for link in other.links.values():
-            if link.is_meta_link and link.meta_link_type == macros.object_states.contains.CONTAINER_META_LINK_TYPE:
+            if link.is_meta_link and link.meta_link_type in macros.object_states.contains.CONTAINER_META_LINK_TYPES:
                 in_volume |= link.check_points_in_volume(points)
 
         return th.any(in_volume).item()

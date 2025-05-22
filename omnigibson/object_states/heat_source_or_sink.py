@@ -116,8 +116,8 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         return True, None
 
     @classproperty
-    def meta_link_type(cls):
-        return m.HEATSOURCE_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.HEATSOURCE_META_LINK_TYPE]
 
     @classmethod
     def requires_meta_link(cls, **kwargs):

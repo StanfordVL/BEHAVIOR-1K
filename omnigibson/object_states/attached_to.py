@@ -76,12 +76,12 @@ class AttachedTo(
         og.sim.remove_callback_on_stop(name=f"{self.obj.name}_detach")
 
     @classproperty
-    def meta_link_type(cls):
+    def meta_link_types(cls):
         """
         Returns:
-            str: Unique keyword that defines the meta link associated with this object state
+            list of str: Unique keywords that define the meta links associated with this object state
         """
-        return m.ATTACHMENT_META_LINK_TYPE
+        return [m.ATTACHMENT_META_LINK_TYPE]
 
     @classmethod
     def get_dependencies(cls):

@@ -131,8 +131,8 @@ class ParticleSource(ParticleApplier):
         return False
 
     @classproperty
-    def meta_link_type(cls):
-        return m.SOURCE_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.SOURCE_META_LINK_TYPE]
 
     @property
     def n_steps_per_modification(self):
@@ -240,8 +240,8 @@ class ParticleSink(ParticleRemover):
         return True
 
     @classproperty
-    def meta_link_type(cls):
-        return m.SINK_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.SINK_META_LINK_TYPE]
 
     @property
     def n_steps_per_modification(self):

@@ -25,14 +25,14 @@ class LinkBasedStateMixin(BaseObjectState):
         # Check whether this state requires meta link
         if not cls.requires_meta_link(**kwargs):
             return True, None
-        meta_link_type = cls.meta_link_type
+        meta_link_types = cls.meta_link_types
         for link in obj.links.values():
-            if link.is_meta_link and link.meta_link_type == meta_link_type:
+            if link.is_meta_link and link.meta_link_type in meta_link_types:
                 return True, None
 
         return (
             False,
-            f"LinkBasedStateMixin {cls.__name__} requires meta link with type {cls.meta_link_type} "
+            f"LinkBasedStateMixin {cls.__name__} requires meta link with type {cls.meta_link_types} "
             f"for obj {obj.name} but none was found! To get valid compatible object models, please use "
             f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
         )
@@ -47,29 +47,29 @@ class LinkBasedStateMixin(BaseObjectState):
         # Check whether this state requires meta link
         if not cls.requires_meta_link(**kwargs):
             return True, None
-        meta_link_type = cls.meta_link_type
+        meta_link_types = cls.meta_link_types
         for child in prim.GetChildren():
             if child.GetTypeName() == "Xform":
                 # With the new format, we can know for sure by checking the meta link type
                 if (
                     child.HasAttribute("ig:metaLinkType")
-                    and child.GetAttribute("ig:metaLinkType").Get() == meta_link_type
+                    and child.GetAttribute("ig:metaLinkType").Get() in meta_link_types
                 ):
                     return True, None
 
                 # Until the next dataset release, also accept the old format
                 # TODO: Remove this block after the next dataset release
-                if meta_link_type in child.GetName():
+                if any(meta_link_type in child.GetName() for meta_link_type in meta_link_types):
                     return True, None
         return (
             False,
-            f"LinkBasedStateMixin {cls.__name__} requires meta link with prefix {cls.meta_link_type} "
+            f"LinkBasedStateMixin {cls.__name__} requires meta link with prefix {cls.meta_link_types} "
             f"for asset prim {prim.GetName()} but none was found! To get valid compatible object models, "
             f"please use omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)",
         )
 
     @classproperty
-    def meta_link_type(cls):
+    def meta_link_types(cls):
         """
         Returns:
             str: Unique keyword that defines the meta link associated with this object state
@@ -118,7 +118,7 @@ class LinkBasedStateMixin(BaseObjectState):
 
         # TODO: Extend logic to account for multiple instances of the same meta link? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
-            is_appropriate_meta_link = link.is_meta_link and link.meta_link_type == self.meta_link_type
+            is_appropriate_meta_link = link.is_meta_link and link.meta_link_type in self.meta_link_types
             # TODO: Remove support for this default meta link logic after the next dataset release
             is_default_link = self._default_link is not None and link.name == self._default_link.name
             if is_appropriate_meta_link or is_default_link:

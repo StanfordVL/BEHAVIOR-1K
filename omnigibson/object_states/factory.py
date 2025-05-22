@@ -213,6 +213,7 @@ META_LINK_TYPES = set()
 for state in get_states_by_dependency_order():
     if issubclass(state, LinkBasedStateMixin):
         try:
-            META_LINK_TYPES.add(state.meta_link_type)
+            for meta_link_type in state.meta_link_types:
+                META_LINK_TYPES.add(meta_link_type)
         except NotImplementedError:
             pass

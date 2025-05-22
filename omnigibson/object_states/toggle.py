@@ -78,8 +78,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                         cls._finger_contact_objs.add(obj)
 
     @classproperty
-    def meta_link_type(cls):
-        return m.TOGGLE_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.TOGGLE_META_LINK_TYPE]
 
     def _get_value(self):
         return self.value

@@ -11,7 +11,7 @@ from omnigibson.utils.python_utils import classproperty
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.CONTAINER_META_LINK_TYPE = "fillable"
+m.CONTAINER_META_LINK_TYPES = ["fillable", "openfillable"]
 m.VISUAL_PARTICLE_OFFSET = 0.01  # Offset to visual particles' poses when checking overlaps with container volume
 
 
@@ -34,8 +34,8 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         self._compute_info = None  # Intermediate computation information to store
 
     @classproperty
-    def meta_link_type(cls):
-        return m.CONTAINER_META_LINK_TYPE
+    def meta_link_types(cls):
+        return m.CONTAINER_META_LINK_TYPES
 
     def _get_value(self, system):
         """

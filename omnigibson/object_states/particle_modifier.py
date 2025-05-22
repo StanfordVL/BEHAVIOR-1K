@@ -926,8 +926,8 @@ class ParticleRemover(ParticleModifier):
         return False
 
     @classproperty
-    def meta_link_type(cls):
-        return m.REMOVAL_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.REMOVAL_META_LINK_TYPE]
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
@@ -1504,8 +1504,8 @@ class ParticleApplier(ParticleModifier):
         return self._projection_is_active
 
     @classproperty
-    def meta_link_type(cls):
-        return m.APPLICATION_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.APPLICATION_META_LINK_TYPE]
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
