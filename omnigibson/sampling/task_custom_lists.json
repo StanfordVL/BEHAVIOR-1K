@@ -1491,5 +1491,32 @@
             },
             "blacklist": {}
         }
+    },
+    "boxing_books_up_for_storage": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "okcflv": null,
+                        "acbrnv": null,
+                        "dichmv": null,
+                        "mekfxk": null,
+                        "wfjsog": null,
+                        "rdqqum": null,
+                        "eaktib": null,
+                        "hrxujh": null
+                    }
+                },
+                "box.n.01": {
+                    "storage_box": {
+                        "bwbpvg": [0.36 , 0.375, 0.09 ]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
