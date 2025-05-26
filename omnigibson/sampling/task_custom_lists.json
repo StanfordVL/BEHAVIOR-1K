@@ -305,7 +305,7 @@
                 },
                 "butter_cookie.n.01": {
                     "butter_cookie": {
-                        "kukrla": [0.1, 0.1, 0.02]
+                        "kukrla": [0.08, 0.08, 0.02]
                     }
                 },
                 "swiss_cheese.n.01": {
@@ -1463,9 +1463,9 @@
                         "bbvcji": null
                     }
                 },
-                "chard.n.02": {
-                    "chard": {
-                        "linuaq": null
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
                     }
                 },
                 "leek.n.02": {
@@ -1475,7 +1475,7 @@
                 },
                 "mixing_bowl.n.01": {
                     "mixing_bowl": {
-                        "bsgybx": null
+                        "bsgybx": [0.48, 0.42, 0.22]
                     }
                 },
                 "sweet_corn.n.02": {
@@ -1486,6 +1486,11 @@
                 "wicker_basket.n.01": {
                     "wicker_basket": {
                         "jqfftz": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
                     }
                 }
             },
@@ -1518,7 +1523,7 @@
                 },
                 "box.n.01": {
                     "storage_box": {
-                        "bwbpvg": [0.36 , 0.375, 0.09 ]
+                        "bwbpvg": [0.48, 0.5 , 0.12]
                     }
                 }
             },
@@ -1618,6 +1623,11 @@
                     "jar_of_sugar": {
                         "pnbbfb": null
                     }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
                 }
             },
             "blacklist": {}
@@ -1670,14 +1680,13 @@
     },
     "setting_the_table": {
         "room_types": [
-            "dining_room",
             "kitchen"
         ],
-        "house_single_floor": {
+        "house_double_floor_lower": {
             "whitelist": {
-                "hotdog.n.02": {
-                    "hotdog": {
-                        "lsajfg": null
+                "cupcake.n.01": {
+                    "cupcake": {
+                        "mbhweg": null
                     }
                 },
                 "plate.n.04": {
@@ -1693,11 +1702,6 @@
                 "tablefork.n.01": {
                     "tablefork": {
                         "hktwlm": null
-                    }
-                },
-                "cabinet.n.01": {
-                    "bottom_cabinet_no_top": {
-                        "rkgjer": null
                     }
                 }
             },
