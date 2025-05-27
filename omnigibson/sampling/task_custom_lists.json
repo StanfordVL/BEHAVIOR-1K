@@ -1453,9 +1453,9 @@
         ],
         "house_single_floor": {
             "whitelist": {
-                "artichoke.n.02": {
-                    "artichoke": {
-                        "tfclmg": null
+                "broccoli.n.02": {
+                    "broccoli": {
+                        "wsxavx": [0.09, 0.09, 0.06]
                     }
                 },
                 "bok_choy.n.02": {
@@ -1680,9 +1680,10 @@
     },
     "setting_the_table": {
         "room_types": [
-            "kitchen"
+            "kitchen",
+            "dining_room"
         ],
-        "house_double_floor_lower": {
+        "house_single_floor": {
             "whitelist": {
                 "cupcake.n.01": {
                     "cupcake": {
