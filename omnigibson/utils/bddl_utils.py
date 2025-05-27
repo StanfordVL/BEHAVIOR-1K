@@ -578,13 +578,16 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
             valid_objs = set()
             for category in info["categories"]:
                 valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
-            in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_0")
-            valid_objs = valid_objs.intersection(in_room_objs)
-            n_valid_objects = len(valid_objs)
+            # TODO: This is a temporary fix before we properly implement room instance handling for wildcards
+            n_valid_objects = 0
+            for i in range(11):  # Check room instances 0 through 10
+                in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_{i}")
+                if in_room_objs is not None:
+                    n_valid_objects = max(n_valid_objects, len(valid_objs.intersection(in_room_objs)))
 
             assert (
                 n_valid_objects >= n_min_instances
-            ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+            ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in rooms of type {info['room']}!"
 
             # Hot swap this information into the BDDL
             extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
