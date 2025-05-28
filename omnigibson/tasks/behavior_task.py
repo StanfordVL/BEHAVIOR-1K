@@ -591,7 +591,7 @@ class BehaviorTask(BaseTask):
         if task_relevant_only:
             task_relevant_state_dict = {
                 bddl_name: bddl_inst.dump_state(serialized=False)
-                for bddl_name, bddl_inst in env.task.object_scope.items()
+                for bddl_name, bddl_inst in env.task.object_scope.items() if bddl_inst.exists
             }
             Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
             with open(path, "w+") as f:
