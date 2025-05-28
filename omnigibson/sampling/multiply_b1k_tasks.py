@@ -133,7 +133,7 @@ def main():
     # Store the state without any particles
     initial_state = og.sim.dump_state()
 
-    num_trials = 10
+    num_trials = 30
     for activity_instance_id in range(args.start_idx, args.end_idx + 1):
         for i in range(num_trials):
             og.sim.load_state(initial_state)
