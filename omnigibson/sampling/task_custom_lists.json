@@ -508,7 +508,7 @@
                 },
                 "chili.n.02": {
                     "chili": {
-                        "xhbpqh": [0.08, 0.04, 0.02]
+                        "xhbpqh": [0.10, 0.05, 0.03]
                     }
                 },
                 "chopping_board.n.01": {
@@ -1703,6 +1703,251 @@
                 "tablefork.n.01": {
                     "tablefork": {
                         "hktwlm": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "wash_dog_toys": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "softball.n.01": {
+                    "softball": {
+                        "erhbze": null
+                    }
+                },
+                "teddy.n.01": {
+                    "teddy_bear": {
+                        "mvwvlv": null
+                    }
+                },
+                "tennis_ball.n.01": {
+                    "tennis_ball": {
+                        "rgekxe": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "wash_a_baseball_cap": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "baseball_cap.n.01": {
+                    "baseball_cap": {
+                        "ogptul": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_boxing_gloves": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "boxing_glove.n.01": {
+                    "boxing_gloves": {
+                        "jlfuaf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "make_pizza": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "fqqbop": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "chopping_board": {
+                        "cptayn": null
+                    }
+                },
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": [0.30, 0.50, 0.025]
+                    }
+                },
+                "mushroom.n.05": {
+                    "mushroom": {
+                        "zlukhz": null
+                    }
+                },
+                "pepperoni.n.01": {
+                    "pepperoni": {
+                        "xcurfr": [0.03, 0.03, 0.005]
+                    }
+                },
+                "pizza_dough.n.01": {
+                    "pizza_dough": {
+                        "jguwbv": [0.16, 0.16, 0.01]
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "eozsdg": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "make_microwave_popcorn": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "popcorn__bag.n.01": {
+                    "popcorn_bag": {
+                        "hdcpqg": [0.2025, 0.2775, 0.18]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "scrubbing_bathroom_floor": {
+        "room_types": [
+            "bathroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_felt_pool_table_top": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                },
+                "pool_table.n.01": {
+                    "pool_table": {
+                        "atjfhn": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_rug": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "rug.n.01": {
+                    "carpet": {
+                        "sehjcp": null
+                    }
+                },
+                "vacuum.n.04": {
+                    "vacuum": {
+                        "bdmsbr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_patio": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "broom.n.01": {
+                    "broom": {
+                        "tpyvbt": [0.81, 0.27, 0.06]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "attach_a_camera_to_a_tripod": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "camera_tripod.n.01": {
+                    "camera_tripod": {
+                        "hnpofr": null
+                    }
+                },
+                "digital_camera.n.01": {
+                    "digital_camera": {
+                        "zcnxuz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_on_license_plates": {
+        "room_types": [
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "license_plate.n.01": {
+                    "license_plate": {
+                        "nuqnlr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "installing_a_fence": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "spray_paint__can.n.01": {
+                    "spray_paint_can": {
+                        "pgbbbb": null
                     }
                 }
             },
