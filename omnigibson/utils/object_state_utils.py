@@ -97,6 +97,7 @@ def sample_kinematics(
     max_trials=None,
     z_offset=0.05,
     skip_falling=False,
+    use_last_ditch_effort=True,
 ):
     """
     Samples the given @predicate kinematic state for @objA with respect to @objB
@@ -110,6 +111,8 @@ def sample_kinematics(
         max_trials (int): Number of attempts for sampling
         z_offset (float): Z-offset to apply to the sampled pose
         skip_falling (bool): Whether to let @objA fall after its position is sampled or not
+        use_last_ditch_effort (bool): Whether to use last-ditch effort to sample the kinematics if the first
+            sampling attempt fails. This will place @objA at the center of @objB's AABB, offset in z direction such
 
     Returns:
         bool: True if successfully sampled, else False
@@ -141,7 +144,7 @@ def sample_kinematics(
 
         # Hardcoding R1 robot arm length for now
         arm_length_xy = 0.8
-        eef_z_max = 2.0
+        eef_z_max = 1.7
         arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
         reachability_map = th.tensor(
             cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
@@ -238,8 +241,8 @@ def sample_kinematics(
         else:
             og.sim.load_state(state)
 
-    # If we didn't succeed, try last-ditch effort
-    if not success and predicate in {"onTop", "inside"}:
+    # If we didn't succeed, optionally try last-ditch effort
+    if not success and use_last_ditch_effort and predicate in {"onTop", "inside"}:
         # Do not use last-ditch effort for onTop ground categories because it will
         # break the traversability constraint (see above)
         if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
