@@ -17,7 +17,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -232,7 +232,7 @@ class GeomPrim(XFormPrim):
 
     def check_points_in_volume(self, particle_positions_world):
         # Move particles into local frame
-        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+        world_pose_w_scale = self.scaled_transform
         particle_positions_world_homogeneous = th.cat(
             (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
         )
@@ -253,7 +253,7 @@ class GeomPrim(XFormPrim):
 
     @property
     def aabb(self):
-        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+        world_pose_w_scale = self.scaled_transform
 
         # transform self.points into world frame
         points = self.points
