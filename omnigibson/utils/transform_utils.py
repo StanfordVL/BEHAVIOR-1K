@@ -410,6 +410,8 @@ def mat2quat(rmat: torch.Tensor) -> torch.Tensor:
     Returns:
         torch.Tensor: (4,) or (..., 4) (x,y,z,w) float quaternion angles
     """
+    assert torch.allclose(torch.linalg.det(rmat), torch.tensor(1.0)), "Rotation matrix must not be scaled"
+
     # Check if input is a single matrix or a batch
     is_single = rmat.dim() == 2
     if is_single:
@@ -487,6 +489,49 @@ def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
 
 
 @torch_compile
+def decompose_mat(hmat):
+    M = torch.as_tensor(hmat, dtype=torch.float64).T
+    if abs(M[3, 3]) < torch.eps:
+        raise ValueError("M[3, 3] is zero")
+    M /= M[3, 3]
+    P = M.copy()
+    P[:, 3] = 0.0, 0.0, 0.0, 1.0
+    assert torch.linalg.det(P).item() > 0, "Matrix is singular"
+
+    scale = torch.zeros((3,))
+    shear = torch.zeros((3,))
+
+    assert torch.allclose(M[:3, 3], 0), "Matrix should not have a perspective component"
+
+    translate = M[3, :3].copy()
+    M[3, :3] = 0.0
+
+    row = M[:3, :3].copy()
+    scale[0] = torch.linalg.norm(row[0])
+    row[0] /= scale[0]
+    shear[0] = torch.dot(row[0], row[1])
+    row[1] -= row[0] * shear[0]
+    scale[1] = torch.linalg.norm(row[1])
+    row[1] /= scale[1]
+    shear[0] /= scale[1]
+    shear[1] = torch.dot(row[0], row[2])
+    row[2] -= row[0] * shear[1]
+    shear[2] = torch.dot(row[1], row[2])
+    row[2] -= row[1] * shear[2]
+    scale[2] = torch.linalg.norm(row[2])
+    row[2] /= scale[2]
+    shear[1:] /= scale[2]
+
+    if torch.dot(row[0], torch.cross(row[1], row[2])) < 0:
+        scale *= -1
+        row *= -1
+
+    quat = mat2quat(row.T[None, :3, :3])[0]
+
+    return scale, shear, quat, translate
+
+
+@torch_compile
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -499,13 +544,8 @@ def mat2pose(hmat):
             - (torch.tensor) (x,y,z) position array in cartesian coordinates
             - (torch.tensor) (x,y,z,w) orientation array in quaternion form
     """
-    hmat = hmat.reshape(-1, 4, 4)
-    assert torch.allclose(hmat[:, :3, :3].det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
-    pos = hmat[:, :3, 3]
-    orn = mat2quat(hmat[:, :3, :3])
-    pos = pos.squeeze(0)
-    orn = orn.squeeze(0)
-    return pos, orn
+    _, _, quat, translate = decompose_mat(hmat)
+    return translate, quat
 
 
 @torch_compile
@@ -640,6 +680,7 @@ def mat2euler(rmat):
         torch.tensor: (r,p,y) converted euler angles in radian vec3 float
     """
     M = torch.as_tensor(rmat, dtype=torch.float32)[:3, :3]
+    assert torch.allclose(rmat.det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
 
     # Convert rotation matrix to quaternion
     # Note: You'll need to implement mat2quat function
@@ -1465,6 +1506,7 @@ def mat2euler_intrinsic(rmat):
         torch.array: (r,p,y) converted intrinsic euler angles in radian vec3 float
     """
     # Check for gimbal lock (pitch = +-90 degrees)
+    assert torch.allclose(rmat.det(), torch.tensor(1.0)), "Rotation matrix must not be scaled"
     if abs(rmat[0, 2]) != 1:
         # General case
         pitch = torch.arcsin(rmat[0, 2])
