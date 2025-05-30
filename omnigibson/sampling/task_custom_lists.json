@@ -1953,5 +1953,30 @@
             },
             "blacklist": {}
         }
+    },
+    "setting_the_fire": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "cigar_lighter.n.01": {
+                    "lighter": {
+                        "zsxfjz": null
+                    }
+                },
+                "firewood.n.01": {
+                    "firewood": {
+                        "agntyc": null
+                    }
+                },
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "omsont": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }

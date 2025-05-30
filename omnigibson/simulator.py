@@ -45,7 +45,6 @@ from omnigibson.utils.ui_utils import (
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
-    FlatcacheAPI,
     GripperRigidContactAPI,
     PoseAPI,
     RigidContactAPI,
@@ -1086,10 +1085,6 @@ def _launch_simulator(*args, **kwargs):
         def stop(self):
             if not self.is_stopped():
                 super().stop()
-
-            # If we're using flatcache, we also need to reset its API
-            if gm.ENABLE_FLATCACHE:
-                FlatcacheAPI.reset()
 
             # Run all callbacks
             for callback in self._callbacks_on_stop.values():

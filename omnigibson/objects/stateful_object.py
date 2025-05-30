@@ -24,10 +24,13 @@ from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative
+import omnigibson.utils.transform_utils as T
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -344,11 +347,20 @@ class StatefulObject(BaseObject):
             raise ValueError("Currently, only EmitterTypes FIRE and STEAM are supported!")
 
         # Define prim paths.
-        # The flow system is created under the root link so that it automatically updates its pose as the object moves
-        flowEmitter_prim_path = f"{link.prim_path}/{emitter_config['name']}"
-        flowSimulate_prim_path = f"{link.prim_path}/flowSimulate"
-        flowOffscreen_prim_path = f"{link.prim_path}/flowOffscreen"
-        flowRender_prim_path = f"{link.prim_path}/flowRender"
+        # The flow system is created under the root link (under a dummy mesh) so that it automatically updates its pose
+        # as the object moves. We put it under a dummy mesh so as not to force write synchronization to the actual
+        # physx-tracked links (required when using Fabric), which causes physics issues
+        dummy_mesh_path = f"{link.prim_path}/emitter"
+        dummy_mesh = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
+        relative_dummy_mesh_path = absolute_prim_path_to_scene_relative(self._scene, dummy_mesh_path)
+        mesh = VisualGeomPrim(relative_prim_path=relative_dummy_mesh_path, name=f"{self.name}_emitter")
+        mesh.load(self._scene)
+        mesh.visible = False
+
+        flowEmitter_prim_path = f"{mesh.prim_path}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{mesh.prim_path}/flowSimulate"
+        flowOffscreen_prim_path = f"{mesh.prim_path}/flowOffscreen"
+        flowRender_prim_path = f"{mesh.prim_path}/flowRender"
 
         # Define prims.
         stage = og.sim.stage
@@ -362,7 +374,12 @@ class StatefulObject(BaseObject):
         rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
         colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
-        self._emitters[emitter_type] = emitter
+        self._emitters[emitter_type] = {
+            "emitter": emitter,
+            "mesh": mesh,
+            "link": link,
+            "canonical_pose": mesh.get_position_orientation(),
+        }
 
         layer_number = LAYER_REGISTRY()
 
@@ -375,8 +392,10 @@ class StatefulObject(BaseObject):
         )
         emitter.CreateAttribute("coupleRateVelocity", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(2.0)
         emitter.CreateAttribute("velocity", lazy.pxr.Sdf.ValueTypeNames.Float3, False).Set((0, 0, 0))
+        emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
         emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
+        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1 / og.sim.get_sim_step_dt())
         offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
@@ -434,8 +453,35 @@ class StatefulObject(BaseObject):
         """
         if emitter_type not in self._emitters:
             return
-        if value != self._emitters[emitter_type].GetAttribute("enabled").Get():
-            self._emitters[emitter_type].GetAttribute("enabled").Set(value)
+        # If we're running flatcache and the value is active, we need to manually update the pose in the USD
+        # to ensure the rendering is updated properly at the correct pose
+        if gm.ENABLE_FLATCACHE and value:
+            self._sync_emitter_mesh_on_usd(emitter_type=emitter_type)
+        if value != self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Get():
+            self._emitters[emitter_type]["emitter"].GetAttribute("enabled").Set(value)
+
+    def _sync_emitter_mesh_on_usd(self, emitter_type):
+        """
+        Synchronizes the emitter's pose corresponding to @emitter_type on the USD
+
+        Args:
+            emitter_type (EmitterType): Emitter to synchronize
+        """
+        emitter_info = self._emitters[emitter_type]
+        mesh = emitter_info["mesh"]
+        link_pose = emitter_info["link"].get_position_orientation()
+        position, orientation = T.relative_pose_transform(*link_pose, *emitter_info["canonical_pose"])
+
+        # Actually set the local pose now.
+        position = lazy.pxr.Gf.Vec3d(*position.tolist())
+        mesh.set_attribute("xformOp:translate", position)
+        orientation = orientation[[3, 0, 1, 2]].tolist()
+        xform_op = mesh.prim.GetAttribute("xformOp:orient")
+        if xform_op.GetTypeName() == "quatf":
+            rotq = lazy.pxr.Gf.Quatf(*orientation)
+        else:
+            rotq = lazy.pxr.Gf.Quatd(*orientation)
+        xform_op.Set(rotq)
 
     def get_textures(self):
         """
