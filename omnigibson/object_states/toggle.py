@@ -35,7 +35,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker = None
 
         if requires_closed:
-            assert Open in self.obj.states
+            assert Open in obj.states
         self.requires_closed = requires_closed
 
         # We also generate the function for checking overlaps at runtime
