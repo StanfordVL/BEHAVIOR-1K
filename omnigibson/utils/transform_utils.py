@@ -488,50 +488,82 @@ def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
     return mat2quat(rmat)
 
 
-@torch_compile
+@torch.compile
 def decompose_mat(hmat):
-    M = torch.as_tensor(hmat, dtype=torch.float64).T
-    if abs(M[3, 3]) < torch.eps:
-        raise ValueError("M[3, 3] is zero")
-    M /= M[3, 3]
-    P = M.copy()
-    P[:, 3] = 0.0, 0.0, 0.0, 1.0
-    assert torch.linalg.det(P).item() > 0, "Matrix is singular"
+    """Batched decompose_mat function - assumes input is already batched
 
-    scale = torch.zeros((3,))
-    shear = torch.zeros((3,))
+    Args:
+        hmat: (B, 4, 4) batch of homogeneous matrices
 
-    assert torch.allclose(M[:3, 3], 0), "Matrix should not have a perspective component"
+    Returns:
+        scale: (B, 3) scale factors
+        shear: (B, 3) shear factors
+        quat: (B, 4) quaternions
+        translate: (B, 3) translations
+    """
+    batch_size = hmat.shape[0]
+    M = torch.as_tensor(hmat, dtype=torch.float32).transpose(-2, -1)  # (B, 4, 4) transposed
 
-    translate = M[3, :3].copy()
-    M[3, :3] = 0.0
+    # Check M[3, 3] for all batch items
+    diag_vals = M[:, 3, 3]  # (B,)
+    if torch.any(torch.abs(diag_vals) < EPS):
+        raise ValueError("Some M[3, 3] values are zero")
 
-    row = M[:3, :3].copy()
-    scale[0] = torch.linalg.norm(row[0])
-    row[0] /= scale[0]
-    shear[0] = torch.dot(row[0], row[1])
-    row[1] -= row[0] * shear[0]
-    scale[1] = torch.linalg.norm(row[1])
-    row[1] /= scale[1]
-    shear[0] /= scale[1]
-    shear[1] = torch.dot(row[0], row[2])
-    row[2] -= row[0] * shear[1]
-    shear[2] = torch.dot(row[1], row[2])
-    row[2] -= row[1] * shear[2]
-    scale[2] = torch.linalg.norm(row[2])
-    row[2] /= scale[2]
-    shear[1:] /= scale[2]
+    M = M / diag_vals.unsqueeze(-1).unsqueeze(-1)  # (B, 4, 4)
+    P = M.clone()
+    P[:, :, 3] = torch.tensor([0.0, 0.0, 0.0, 1.0], device=hmat.device, dtype=hmat.dtype).expand(batch_size, 4)
 
-    if torch.dot(row[0], torch.cross(row[1], row[2])) < 0:
-        scale *= -1
-        row *= -1
+    det_P = torch.linalg.det(P[:, :3, :3])  # (B,)
+    if torch.any(torch.abs(det_P) < EPS):
+        raise ValueError("Some matrices are singular and cannot be decomposed")
 
-    quat = mat2quat(row.T[None, :3, :3])[0]
+    if not torch.allclose(M[:, :3, 3], torch.tensor(0.0, device=hmat.device, dtype=hmat.dtype)):
+        raise ValueError("Some matrices have perspective components")
+
+    scale = torch.zeros((batch_size, 3), device=hmat.device, dtype=hmat.dtype)
+    shear = torch.zeros((batch_size, 3), device=hmat.device, dtype=hmat.dtype)
+
+    translate = M[:, 3, :3].clone()  # (B, 3)
+    M[:, 3, :3] = 0.0
+
+    row = M[:, :3, :3].clone()  # (B, 3, 3)
+
+    # Scale and orthogonalize rows
+    scale[:, 0] = torch.linalg.norm(row[:, 0], dim=-1)  # (B,)
+    row[:, 0] = row[:, 0] / scale[:, 0].unsqueeze(-1)  # (B, 3)
+
+    shear[:, 0] = torch.sum(row[:, 0] * row[:, 1], dim=-1)  # (B,)
+    row[:, 1] = row[:, 1] - row[:, 0] * shear[:, 0].unsqueeze(-1)  # (B, 3)
+
+    scale[:, 1] = torch.linalg.norm(row[:, 1], dim=-1)  # (B,)
+    row[:, 1] = row[:, 1] / scale[:, 1].unsqueeze(-1)  # (B, 3)
+    shear[:, 0] = shear[:, 0] / scale[:, 1]
+
+    shear[:, 1] = torch.sum(row[:, 0] * row[:, 2], dim=-1)  # (B,)
+    row[:, 2] = row[:, 2] - row[:, 0] * shear[:, 1].unsqueeze(-1)  # (B, 3)
+
+    shear[:, 2] = torch.sum(row[:, 1] * row[:, 2], dim=-1)  # (B,)
+    row[:, 2] = row[:, 2] - row[:, 1] * shear[:, 2].unsqueeze(-1)  # (B, 3)
+
+    scale[:, 2] = torch.linalg.norm(row[:, 2], dim=-1)  # (B,)
+    row[:, 2] = row[:, 2] / scale[:, 2].unsqueeze(-1)  # (B, 3)
+    shear[:, 1:] = shear[:, 1:] / scale[:, 2].unsqueeze(-1)
+
+    # Check orientation
+    cross_product = torch.cross(row[:, 1], row[:, 2], dim=-1)  # (B, 3)
+    dot_product = torch.sum(row[:, 0] * cross_product, dim=-1)  # (B,)
+    neg_mask = dot_product < 0  # (B,)
+
+    scale = torch.where(neg_mask.unsqueeze(-1), -scale, scale)  # (B, 3)
+    row = torch.where(neg_mask.unsqueeze(-1).unsqueeze(-1), -row, row)  # (B, 3, 3)
+
+    # Convert to quaternions - assuming mat2quat can handle batched input
+    quat = mat2quat(row.transpose(-2, -1))  # (B, 4)
 
     return scale, shear, quat, translate
 
 
-@torch_compile
+@torch.compile
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -541,8 +573,27 @@ def mat2pose(hmat):
 
     Returns:
         2-tuple:
-            - (torch.tensor) (x,y,z) position array in cartesian coordinates
-            - (torch.tensor) (x,y,z,w) orientation array in quaternion form
+            - (torch.tensor) (3,) position array in cartesian coordinates
+            - (torch.tensor) (4,) orientation array in quaternion form
+    """
+    # Add batch dimension, process, then squeeze
+    hmat_batched = hmat.unsqueeze(0)  # (1, 4, 4)
+    _, _, quat, translate = decompose_mat(hmat_batched)
+    return translate.squeeze(0), quat.squeeze(0)
+
+
+@torch.compile
+def mat2pose_batched(hmat):
+    """
+    Converts batched homogeneous 4x4 matrices into poses.
+
+    Args:
+        hmat (torch.tensor): (B, 4, 4) batch of homogeneous matrices
+
+    Returns:
+        2-tuple:
+            - (torch.tensor) (B, 3) position arrays in cartesian coordinates
+            - (torch.tensor) (B, 4) orientation arrays in quaternion form
     """
     _, _, quat, translate = decompose_mat(hmat)
     return translate, quat

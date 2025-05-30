@@ -680,7 +680,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if local:
             poses = th.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
-                poses[i] = T.pose2mat(self.particles[name].get_position_orientation(frame="parent"))
+                poses[i] = self._particles_local_mat[name]
         else:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
@@ -695,12 +695,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
+                        link_tfs[obj] = obj.scaled_transform
                     link = obj
                 else:
                     link = self._particles_info[name]["link"]
                     if link not in link_tfs:
-                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                        link_tfs[link] = link.scaled_transform
+
                 link_tfs_batch[i] = link_tfs[link]
                 particle_local_poses_batch[i] = self._particles_local_mat[name]
 
@@ -708,7 +709,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             poses = link_tfs_batch @ particle_local_poses_batch
 
         # Decompose back into positions and orientations
-        return poses[:, :3, 3], T.mat2quat(poses[:, :3, :3])
+        return T.mat2pose_batched(poses)
 
     def get_particles_position_orientation(self):
         return self._compute_batch_particles_position_orientation(particles=self.particles, local=False)
@@ -729,11 +730,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         local_mat = self._particles_local_mat[name]
-        link_tf = (
-            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
-            if is_cloth
-            else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
-        )
+        # link_tf = (
+        #     T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
+        #     if is_cloth
+        #     else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
+        # )
+
+        link_tf = parent_obj.scaled_transform if is_cloth else self._particles_info[name]["link"].scaled_transform
 
         # Multiply the local pose by the link's global transform, then return as pos, quat tuple
         return T.mat2pose(link_tf @ local_mat)
