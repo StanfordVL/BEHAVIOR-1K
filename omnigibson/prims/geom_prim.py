@@ -1,12 +1,12 @@
 from functools import cached_property
 
+from scipy.spatial import Delaunay
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.utils.geometry_utils import (
     check_points_in_cone,
-    check_points_in_convex_hull_mesh,
     check_points_in_cube,
     check_points_in_cylinder,
     check_points_in_sphere,
@@ -165,6 +165,10 @@ class GeomPrim(XFormPrim):
 
         return faces
 
+    @cached_property
+    def delaunay_triangulation(self):
+        return Delaunay(self.points.numpy())
+
     @property
     def geom_type(self):
         """
@@ -202,11 +206,7 @@ class GeomPrim(XFormPrim):
 
     def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
         if self._mesh_type == "Mesh":
-            return check_points_in_convex_hull_mesh(
-                mesh_face_centroids=self.mesh_face_centroids,
-                mesh_face_normals=self.mesh_face_normals,
-                particle_positions=particle_positions_in_mesh_frame,
-            )
+            return th.as_tensor(self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.numpy())) >= 0
         elif self._mesh_type == "Sphere":
             return check_points_in_sphere(
                 size=self.get_attribute("radius"),
