@@ -18,6 +18,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
+from omnigibson.systems.macro_particle_system import MacroParticleSystem
 from omnigibson.systems.system_base import (
     BaseSystem,
     PhysicalParticleSystem,
@@ -355,8 +356,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Create desired systems
         for system_name in self._init_systems:
-            if gm.USE_GPU_DYNAMICS:
-                self.get_system(system_name)
+            system = self.get_system(system_name, force_init=False)
+            if gm.USE_GPU_DYNAMICS or isinstance(system, MacroParticleSystem):
+                self.get_system(system_name, force_init=True)
             else:
                 log.warning(f"System {system_name} is not supported without GPU dynamics! Skipping...")
 
@@ -1146,8 +1148,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
+            # for system_name in state["registry"]["system_registry"].keys():
+            #     self.get_system(system_name, force_init=True)
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
+            # for system_name in state["system_registry"].keys():
+            #     self.get_system(system_name, force_init=True)
             self._registry.load_state(state=state, serialized=False)
 
     def serialize(self, state):
