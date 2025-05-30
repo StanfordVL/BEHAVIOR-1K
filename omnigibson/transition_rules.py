@@ -12,6 +12,7 @@ import networkx as nx
 import torch as th
 
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import (
@@ -807,7 +808,7 @@ class WasherDryerRule(BaseTransitionRule):
         """
         del object_candidates
         obj_positions = global_info["obj_positions"]
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
+        in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions)
 
         in_volume_objs = [obj for obj, is_in_volume in zip(self.scene.objects, in_volume) if is_in_volume]
         # Remove the container itself
@@ -857,7 +858,6 @@ class WasherRule(WasherDryerRule):
         }
 
     def transition(self, object_candidates):
-        water = self.scene.get_system("water")
         global_info = self._compute_global_rule_info()
         for washer in object_candidates["washer"]:
             # Remove the systems if the conditions are met
@@ -881,19 +881,26 @@ class WasherRule(WasherDryerRule):
                     if any(washer.states[Contains].get_value(solvent) for solvent in solvents):
                         systems_to_remove.append(system)
 
-            for system in systems_to_remove:
-                washer.states[Contains].set_value(system, False)
-
-            # Make the objects wet
             container_info = self._compute_container_info(
                 object_candidates=object_candidates, container=washer, global_info=global_info
             )
             in_volume_objs = container_info["in_volume_objs"]
+            # Remove visual particle systems from the washer
             for obj in in_volume_objs:
-                if Saturated in obj.states:
-                    obj.states[Saturated].set_value(water, True)
-                else:
-                    obj.states[Covered].set_value(water, True)
+                for system in systems_to_remove:
+                    obj.states[Covered].set_value(system, False)
+            # Remove all contained systems from the washer
+            for system in systems_to_remove:
+                washer.states[Contains].set_value(system, False)
+
+            if gm.USE_GPU_DYNAMICS:
+                # Make the objects wet
+                water = self.scene.get_system("water", force_init=True)
+                for obj in in_volume_objs:
+                    if Saturated in obj.states:
+                        obj.states[Saturated].set_value(water, True)
+                    else:
+                        obj.states[Covered].set_value(water, True)
 
         return TransitionResults(add=[], remove=[])
 
