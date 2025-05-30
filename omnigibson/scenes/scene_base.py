@@ -1148,12 +1148,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # TODO: Remove backwards compatible check once new scene RC is updated
         if "pos" in state:
             self.set_position_orientation(position=state["pos"], orientation=state["ori"])
-            # for system_name in state["registry"]["system_registry"].keys():
-            #     self.get_system(system_name, force_init=True)
             self._registry.load_state(state=state["registry"], serialized=False)
         else:
-            # for system_name in state["system_registry"].keys():
-            #     self.get_system(system_name, force_init=True)
             self._registry.load_state(state=state, serialized=False)
 
     def serialize(self, state):
