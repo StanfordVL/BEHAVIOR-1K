@@ -7,7 +7,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
-from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import torch_delete
@@ -789,12 +788,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
+                        link_tfs[obj] = obj.scaled_transform
                     link_tf = link_tfs[obj]
                 else:
                     link = self._particles_info[name]["link"]
                     if link not in link_tfs:
-                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                        link_tfs[link] = link.scaled_transform
                     link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
@@ -802,7 +801,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_local_poses_batch = th.linalg.solve(link_tfs_batch, particle_local_poses_batch)
 
         for i, name in enumerate(particles):
-            self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i], ignore_scale=local)
+            self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i])
 
     def set_particles_position_orientation(self, positions=None, orientations=None):
         return self._modify_batch_particles_position_orientation(
@@ -841,14 +840,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # First, get global pose, scale it by the parent link's scale, and then convert into a matrix
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
-        link_tf = (
-            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
-            if is_cloth
-            else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
-        )
+        link_tf = parent_obj.scaled_transform if is_cloth else self._particles_info[name]["link"].scaled_transform
         local_mat = th.linalg.inv_ex(link_tf).inverse @ global_mat
 
-        self._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=False)
+        self._modify_particle_local_mat(name=name, mat=local_mat)
 
     def set_particle_local_pose(self, idx, position=None, orientation=None):
         if position is None or orientation is None:
@@ -864,7 +859,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         local_mat[-1, -1] = 1.0
         local_mat[:3, 3] = position
         local_mat[:3, :3] = T.quat2mat(orientation)
-        self._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=True)
+        self._modify_particle_local_mat(name=name, mat=local_mat)
 
     def _is_cloth_obj(self, obj):
         """
@@ -878,40 +873,30 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         return obj.prim_type == PrimType.CLOTH
 
-    def _compute_particle_local_mat(self, name, ignore_scale=False):
+    def _compute_particle_local_mat(self, name):
         """
         Computes particle @name's local transform as a homogeneous 4x4 matrix
 
         Args:
             name (str): Name of the particle to compute local transform matrix for
-            ignore_scale (bool): Whether to ignore the parent_link scale when computing the local transform
 
         Returns:
             th.tensor: (4, 4) homogeneous transform matrix
         """
         particle = self.particles[name]
-        parent_obj = self._particles_info[name]["obj"]
-        is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = particle.get_position_orientation(frame="parent")
-        local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
 
-    def _modify_particle_local_mat(self, name, mat, ignore_scale=False):
+    def _modify_particle_local_mat(self, name, mat):
         """
         Sets particle @name's local transform as a homogeneous 4x4 matrix
 
         Args:
             name (str): Name of the particle to compute local transform matrix for
             mat (n-array): (4, 4) homogeneous transform matrix
-            ignore_scale (bool): Whether to ignore the parent_link scale when setting the local transform
         """
         particle = self.particles[name]
-        parent_obj = self._particles_info[name]["obj"]
-        is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = T.mat2pose(mat)
-        local_pos = local_pos if ignore_scale else local_pos / scale
         particle.set_position_orientation(position=local_pos, orientation=local_quat, frame="parent")
 
         # Store updated value
@@ -964,8 +949,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             if self.num_group_particles(group=name) != info["n_particles"]:
                 log.debug(f"Got mismatch in particle group {name} when syncing, " f"deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
-                groups_to_delete.add(name)
-                groups_to_create.add(name)
+                groups_to_delete.append(name)
+                groups_to_create.append(name)
 
         # Delete any groups we no longer want
         for name in groups_to_delete:
