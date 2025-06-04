@@ -26,10 +26,10 @@ m = create_module_macros(module_path=__file__)
 m.ATTACHMENT_META_LINK_TYPE = "attachment"
 
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
-m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([10.0])).item()  # 10 degrees
+m.DEFAULT_ORIENTATION_THRESHOLD = th.deg2rad(th.tensor([15.0])).item()  # 15 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
-m.DEFAULT_BREAK_FORCE = 1000  # Newton
-m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
+m.DEFAULT_BREAK_FORCE = 5000  # Newton
+m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
 
 
 # TODO: Make AttachedTo into a global state that manages all the attachments in the scene.
