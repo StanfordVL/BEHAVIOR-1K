@@ -71,6 +71,10 @@ setup(
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",
             "ompl @ https://storage.googleapis.com/gibson_scenes/ompl-1.6.0-cp310-cp310-manylinux_2_28_x86_64.whl",
         ],
+        "learning": [
+            "open3d",
+            "fpsample"
+        ]
     },
     tests_require=[],
     python_requires=">=3",
