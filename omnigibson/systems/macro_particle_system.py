@@ -951,10 +951,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         }
 
         current_group_names = self.groups
-        desired_group_names = set(obj.name for obj in group_objects)
-        groups_to_delete = current_group_names - desired_group_names
-        groups_to_create = desired_group_names - current_group_names
-        common_groups = current_group_names.intersection(desired_group_names)
+        # Preserve original order by using list comprehension instead of set
+        desired_group_names_ordered = [obj.name for obj in group_objects]
+        desired_group_names_set = set(desired_group_names_ordered)
+        groups_to_delete = [name for name in current_group_names if name not in desired_group_names_set]
+        groups_to_create = [name for name in desired_group_names_ordered if name not in current_group_names]
+        common_groups = [name for name in desired_group_names_ordered if name in current_group_names]
 
         # Sanity check the common groups, we will recreate any where there is a mismatch
         for name in common_groups:
