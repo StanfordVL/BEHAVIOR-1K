@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH --job-name="generate_data"
+#SBATCH --account=vision
+#SBATCH --partition=svl
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:titanrtx:1
+#SBATCH --mem=60G
+#SBATCH --cpus-per-task=8
+#SBATCH --time=0-2:00:00
+#SBATCH --output=outputs/sc/process_data_%j.out
+#SBATCH --error=outputs/sc/process_data_%j.err
+
+# list out some useful information
+echo "SLURM_JOBID="$SLURM_JOBID
+echo "SLURM_JOB_NAME="$SLURM_JOB_NAME
+echo "SLURM_JOB_NODELIST"=$SLURM_JOB_NODELIST
+echo "SLURM_NNODES"=$SLURM_NNODES
+echo "SLURMTMPDIR="$SLURMTMPDIR
+echo "working directory = "$SLURM_SUBMIT_DIR
+
+source /vision/u/wsai/miniconda3/bin/activate omnigibson
+
+OMNIGIBSON_HEADLESS=1 python scripts/replay_obs.py --files "$1/raw/$2"
+
+echo "Job finished."
+exit 0

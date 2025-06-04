@@ -1,0 +1,121 @@
+# @package _global_
+
+env: omnigibson
+policy_name: wbvima
+
+# ====== Base Config ======
+wandb_group: wbvima
+
+
+# ====== DP specific ======
+num_latest_obs: 2
+action_prediction_horizon: 8
+lr: 7e-4
+use_cosine_lr: true
+lr_warmup_steps: 1000
+lr_cosine_steps: 300000
+lr_cosine_min: 5e-6
+lr_layer_decay: 1.0
+wd: 0.1
+
+action_keys: ["mobile_base", "torso", "left_arm", "left_gripper", "right_arm", "right_gripper"]
+action_key_dims:
+  mobile_base: 3
+  torso: 4
+  left_arm: 7
+  left_gripper: 1
+  right_arm: 7
+  right_gripper: 1
+
+
+# ------ module ------
+module:
+  _target_: omnigibson.learning.policies.WBVIMA
+  policy:
+    _target_: brs_algo.learning.policy.WBVIMAPolicy
+    prop_dim: 25
+    prop_keys: ["odom/base_velocity", "qpos/torso", "qpos/left_arm", "qpos/left_gripper", "qpos/right_arm", "qpos/right_gripper"]
+    num_latest_obs: ${num_latest_obs}
+    use_modality_type_tokens: false
+    prop_mlp_hidden_depth: 2
+    prop_mlp_hidden_dim: 256
+    pointnet_n_coordinates: 3
+    pointnet_n_color: 3
+    pointnet_hidden_depth: 2
+    pointnet_hidden_dim: 256
+    action_keys: ${action_keys}
+    action_key_dims: ${action_key_dims}
+    # ====== Transformer ======
+    xf_n_embd: 256
+    xf_n_layer: 2
+    xf_n_head: 8
+    xf_dropout_rate: 0.1
+    xf_use_geglu: true
+    # ====== Action Decoding ======
+    learnable_action_readout_token: false
+    action_dim: 23
+    action_prediction_horizon: ${action_prediction_horizon}
+    diffusion_step_embed_dim: 128
+    unet_down_dims: [64,128]
+    unet_kernel_size: 5
+    unet_n_groups: 8
+    unet_cond_predict_scale: true
+    # ====== diffusion ======
+    noise_scheduler:
+      _target_: diffusers.schedulers.scheduling_ddim.DDIMScheduler
+      num_train_timesteps: 100
+      beta_start: 0.0001
+      beta_end: 0.02
+      # beta_schedule is important
+      # this is the best we found
+      beta_schedule: squaredcos_cap_v2
+      clip_sample: True
+      set_alpha_to_one: True
+      steps_offset: 0
+      prediction_type: epsilon # or sample
+    noise_scheduler_step_kwargs: null
+    num_denoise_steps_per_inference: 16
+  action_prediction_horizon: ${action_prediction_horizon}
+  loss_on_latest_obs_only: false
+  lr: ${lr}
+  use_cosine_lr: ${use_cosine_lr}
+  lr_warmup_steps: ${lr_warmup_steps}
+  lr_cosine_steps: ${lr_cosine_steps}
+  lr_cosine_min: ${lr_cosine_min}
+  lr_layer_decay: ${lr_layer_decay}
+  weight_decay: ${wd}
+  action_keys: ${action_keys}
+  eval:
+    eval_on_validation: true
+    env: ${env}
+    task: ${task}
+    robot: ${robot}
+
+
+data_module:
+  _target_: omnigibson.learning.datas.BehaviorDataModule
+  obs_window_size: ${num_latest_obs}
+  action_prediction_horizon: ${action_prediction_horizon}
+
+robot:
+  type: R1Pro
+  controllers:
+    - arm_left: 
+      name: JointController
+      motor_type: position
+      use_delta_commands: false
+    - arm_right:
+      name: JointController
+      motor_type: position
+      use_delta_commands: false
+    - gripper_left:
+      name: MultiFingerGripperController
+    - gripper_right:
+      name: MultiFingerGripperController
+    - base:
+      name: HolonomicBaseJointController
+      motor_type: velocity
+    - trunk:
+      name: JointController
+      motor_type: position
+      use_delta_commands: false

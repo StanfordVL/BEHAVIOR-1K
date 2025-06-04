@@ -1,0 +1,29 @@
+# @package _global_
+
+env: omnigibson
+policy_name: dummy 
+module:
+  _target_: omnigibson.learning.policies.DummyPolicy
+
+robot:
+  type: R1Pro
+  controllers:
+    - arm_left: 
+      name: JointController
+      motor_type: position
+      use_delta_commands: false
+    - arm_right:
+      name: JointController
+      motor_type: position
+      use_delta_commands: false
+    - gripper_left:
+      name: MultiFingerGripperController
+    - gripper_right:
+      name: MultiFingerGripperController
+    - base:
+      name: HolonomicBaseJointController
+      motor_type: velocity
+    - trunk:
+      name: JointController
+      motor_type: position
+      use_delta_commands: false

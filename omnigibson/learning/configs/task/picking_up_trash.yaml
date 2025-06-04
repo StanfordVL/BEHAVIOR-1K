@@ -1,0 +1,4 @@
+# @package _global_
+
+task:
+  name: picking_up_trash
