@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name="generate_data"
+#SBATCH --job-name="process_data"
 #SBATCH --account=vision
 #SBATCH --partition=svl
 #SBATCH --nodes=1
@@ -18,9 +18,16 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
+mkdir -p /vision/u/wsai/OmniGibson/outputs/sc
 source /vision/u/wsai/miniconda3/bin/activate omnigibson
 
-OMNIGIBSON_HEADLESS=1 python scripts/replay_obs.py --files "$1/raw/$2"
+echo "File to process: $1/raw/$2"
+
+echo "Running replay_obs.py on $1/raw/$2"
+OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2"
+
+echo "Replay observation script finished! Now converting rgbd to pcd."
+OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/rgbd_to_pcd.py --files "$1/rgbd/$2"
 
 echo "Job finished."
 exit 0

@@ -109,8 +109,6 @@ def replay_hdf5_file(hdf_input_path, write_video=False):
             video_writers.append(env.create_video_writer(fpath=f"{video_dir}/{camera_name}.mp4"))
             video_keys.append(camera_name)
 
-    breakpoint()
-
     # Playback the dataset with all video writers
     # We avoid calling playback_dataset and call playback_episode individually in order to manually
     # aggregate per-episode metrics
