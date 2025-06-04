@@ -38,6 +38,7 @@ from omnigibson.utils.python_utils import Registerable, classproperty, torch_del
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
+from omnigibson.systems.system_base import VisualParticleSystem
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -885,13 +886,13 @@ class WasherRule(WasherDryerRule):
                 object_candidates=object_candidates, container=washer, global_info=global_info
             )
             in_volume_objs = container_info["in_volume_objs"]
-            # Remove visual particle systems from the washer
-            for obj in in_volume_objs:
-                for system in systems_to_remove:
-                    obj.states[Covered].set_value(system, False)
-            # Remove all contained systems from the washer
             for system in systems_to_remove:
-                washer.states[Contains].set_value(system, False)
+                if isinstance(system, VisualParticleSystem):
+                    # If the system is a visual particle system, remove it from the objects in the washer
+                    for obj in in_volume_objs:
+                        obj.states[Covered].set_value(system, False)
+                else:
+                    washer.states[Contains].set_value(system, False)
 
             if gm.USE_GPU_DYNAMICS:
                 # Make the objects wet
