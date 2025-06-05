@@ -8,7 +8,7 @@ wandb_group: wbvima
 
 
 # ====== DP specific ======
-num_latest_obs: 2
+obs_window_size: 2
 action_prediction_horizon: 8
 lr: 7e-4
 use_cosine_lr: true
@@ -35,7 +35,7 @@ module:
     _target_: brs_algo.learning.policy.WBVIMAPolicy
     prop_dim: 25
     prop_keys: ["odom/base_velocity", "qpos/torso", "qpos/left_arm", "qpos/left_gripper", "qpos/right_arm", "qpos/right_gripper"]
-    num_latest_obs: ${num_latest_obs}
+    num_latest_obs: ${obs_window_size}
     use_modality_type_tokens: false
     prop_mlp_hidden_depth: 2
     prop_mlp_hidden_dim: 256
@@ -75,6 +75,7 @@ module:
       prediction_type: epsilon # or sample
     noise_scheduler_step_kwargs: null
     num_denoise_steps_per_inference: 16
+  obs_window_size: ${obs_window_size}
   action_prediction_horizon: ${action_prediction_horizon}
   loss_on_latest_obs_only: false
   lr: ${lr}
@@ -94,7 +95,7 @@ module:
 
 data_module:
   _target_: omnigibson.learning.datas.BehaviorDataModule
-  obs_window_size: ${num_latest_obs}
+  obs_window_size: ${obs_window_size}
   action_prediction_horizon: ${action_prediction_horizon}
 
 robot:
@@ -112,9 +113,6 @@ robot:
       name: MultiFingerGripperController
     - gripper_right:
       name: MultiFingerGripperController
-    - base:
-      name: HolonomicBaseJointController
-      motor_type: velocity
     - trunk:
       name: JointController
       motor_type: position

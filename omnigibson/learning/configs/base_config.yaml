@@ -14,7 +14,7 @@ policy_name: ???  # filled by policy
 # ====== main cfg ======
 seed: -1
 gpus: 1
-bs: 256
+bs: 16
 vbs: ${bs}
 data_dir: ???
 eval_interval: 10
@@ -37,6 +37,7 @@ data_module:
   val_split_ratio: 0.1
   seed: ${seed}
   dataloader_num_workers: 4
+  max_num_demos: null 
 
 trainer:
   accelerator: "gpu"

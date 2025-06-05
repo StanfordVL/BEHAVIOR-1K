@@ -4,10 +4,16 @@ import logging
 import omnigibson as og
 import sys
 import traceback
-import gello.robots.sim_robot.og_teleop_utils as utils
+import torch as th
+from gello.robots.sim_robot.og_teleop_utils import load_available_tasks
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
+from omnigibson.learning.utils.eval_utils import (
+    generate_basic_environment_config,
+    generate_robot_config,
+    flatten_obs_dict,
+)
 from omnigibson.macros import gm
 from omnigibson.robots import BaseRobot
 from pathlib import Path
@@ -53,14 +59,14 @@ class Evaluator:
         """
         # Load config file
         if self.env_type == "omnigibson":
-            available_tasks = utils.load_available_tasks()
+            available_tasks = load_available_tasks()
             task_name = self.cfg.task.name
             assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
             task_cfg = available_tasks[task_name][0]
             robot_cls = self.cfg.robot.type
             assert robot_cls in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_cls}"
-            cfg = utils.generate_basic_environment_config(task_name, task_cfg)
-            cfg["robots"] = [utils.generate_robot_config(task_name, task_cfg)]
+            cfg = generate_basic_environment_config(task_name, task_cfg)
+            cfg["robots"] = [generate_robot_config(task_name, task_cfg)]
             env = og.Environment(configs=cfg)
         else:
             raise ValueError(f"Invalid environment type {self.env_type}")
@@ -68,7 +74,7 @@ class Evaluator:
 
     def load_robot(self) -> BaseRobot:
         if self.env_type == "omnigibson":
-            robot = self.env.scene.object_registry("name", "robot")
+            robot = self.env.scene.object_registry("name", "robot_r1")
         else:
             raise ValueError(f"Invalid environment type {self.env_type}")
         return robot
@@ -82,13 +88,34 @@ class Evaluator:
         """
         Single step of the task
         """
-        self.robot_action = self.policy.forward(obs=self.obs)
+        self.robot_action = self.policy.forward(obs={"obs": self._preprocess_obs(self.obs)})
         self.obs, _, terminated, truncated, info = self.env.step(self.robot_action)
+        # process obs
         if terminated:
             self.n_trials += 1
             if info["done"]["success"]:
                 self.n_success_trials += 1
         return terminated, truncated
+
+    def _preprocess_obs(self, obs: dict) -> dict:
+        """
+        Preprocess the observation dictionary before passing it to the policy.
+        """
+        obs = flatten_obs_dict(obs)
+        base_link_pose = th.concatenate(self.robot.get_position_orientation())
+        left_cam_pose = th.concatenate(
+            self.robot.sensors["robot_r1:left_realsense_link:Camera:0"].get_position_orientation()
+        )
+        right_cam_pose = th.concatenate(
+            self.robot.sensors["robot_r1:right_realsense_link:Camera:0"].get_position_orientation()
+        )
+        external_cam_pose = th.concatenate(self.env.external_sensors["external_sensor0"].get_position_orientation())
+        # store the poses to obs
+        obs["robot_r1::robot_base_link_pose"] = base_link_pose
+        obs["robot_r1::left_cam_pose"] = left_cam_pose
+        obs["robot_r1::right_cam_pose"] = right_cam_pose
+        obs["robot_r1::external_cam_pose"] = external_cam_pose
+        return obs
 
     def reset(self) -> None:
         self.obs = self.env.reset()[0]

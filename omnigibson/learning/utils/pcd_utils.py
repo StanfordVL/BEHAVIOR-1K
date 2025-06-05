@@ -60,8 +60,9 @@ def depth_to_pcd(
     pc = depth.reshape(-1, 1) * (uv.reshape(-1, 3) @ Kinv.T)
     pc = pc.reshape(h, w, 3)
     pc = np.concatenate([pc.reshape(-1, 3), np.ones((h * w, 1))], axis=-1)  # shape (H*W, 4)
-
-    world_to_robot_tf = T.pose2mat((th.from_numpy(base_link_pose[:3]), th.from_numpy(base_link_pose[3:]))).numpy()
+    if isinstance(base_link_pose, np.ndarray):
+        base_link_pose = th.from_numpy(base_link_pose)
+    world_to_robot_tf = T.pose2mat((base_link_pose[:3], base_link_pose[3:])).numpy()
     robot_to_world_tf = np.linalg.inv(world_to_robot_tf)
     pc = (pc @ world_to_cam_tf.T @ robot_to_world_tf.T)[:, :3].reshape(h, w, 3)
 
@@ -97,24 +98,42 @@ def process_fused_point_cloud(obs, pcd_num_points: int = 4096) -> np.ndarray:
     left_depth = obs["robot_r1::robot_r1:left_realsense_link:Camera:0::depth_linear"][:]
     right_depth = obs["robot_r1::robot_r1:right_realsense_link:Camera:0::depth_linear"][:]
     external_depth = obs["external::external_sensor0::depth_linear"][:]
-    data_size = base_link_pose.shape[0]
-
-    fused_pcd = np.zeros((data_size, pcd_num_points, 6), dtype=np.float32)  # Initialize empty point cloud
-    for i in tqdm(range(data_size)):
+    data_size = base_link_pose.shape[0] if len(base_link_pose.shape) > 1 else 1
+    if data_size == 1:
         # Left point cloud
-        left_pcd = depth_to_pcd(left_depth[i], left_cam_pose[i], base_link_pose[i], K=WRIST_INTRINSICS)
-        left_rgb_pcd = np.concatenate([left_rgb[i] / 255.0, left_pcd], axis=-1).reshape(-1, 6)
+        left_pcd = depth_to_pcd(left_depth, left_cam_pose, base_link_pose, K=WRIST_INTRINSICS)
+        left_rgb_pcd = np.concatenate([left_rgb / 255.0, left_pcd], axis=-1).reshape(-1, 6)
 
         # Right point cloud
-        right_pcd = depth_to_pcd(right_depth[i], right_cam_pose[i], base_link_pose[i], K=WRIST_INTRINSICS)
-        right_rgb_pcd = np.concatenate([right_rgb[i] / 255.0, right_pcd], axis=-1).reshape(-1, 6)
+        right_pcd = depth_to_pcd(right_depth, right_cam_pose, base_link_pose, K=WRIST_INTRINSICS)
+        right_rgb_pcd = np.concatenate([right_rgb / 255.0, right_pcd], axis=-1).reshape(-1, 6)
 
         # External camera point cloud
-        external_pcd = depth_to_pcd(external_depth[i], external_cam_pose[i], base_link_pose[i], K=EXTERNAL_INTRINSICS)
-        external_rgb_pcd = np.concatenate([external_rgb[i] / 255.0, external_pcd], axis=-1).reshape(-1, 6)
+        external_pcd = depth_to_pcd(external_depth, external_cam_pose, base_link_pose, K=EXTERNAL_INTRINSICS)
+        external_rgb_pcd = np.concatenate([external_rgb / 255.0, external_pcd], axis=-1).reshape(-1, 6)
 
         # Fuse all point clouds and downsample
         fused_pcd_all = np.concatenate([left_rgb_pcd, right_rgb_pcd, external_rgb_pcd], axis=0)
-        fused_pcd[i] = downsample_pcd(fused_pcd_all, pcd_num_points)
+        fused_pcd = downsample_pcd(fused_pcd_all, pcd_num_points).astype(np.float32)
+    else:
+        fused_pcd = np.zeros((data_size, pcd_num_points, 6), dtype=np.float32)  # Initialize empty point cloud
+        for i in tqdm(range(data_size)):
+            # Left point cloud
+            left_pcd = depth_to_pcd(left_depth[i], left_cam_pose[i], base_link_pose[i], K=WRIST_INTRINSICS)
+            left_rgb_pcd = np.concatenate([left_rgb[i] / 255.0, left_pcd], axis=-1).reshape(-1, 6)
+
+            # Right point cloud
+            right_pcd = depth_to_pcd(right_depth[i], right_cam_pose[i], base_link_pose[i], K=WRIST_INTRINSICS)
+            right_rgb_pcd = np.concatenate([right_rgb[i] / 255.0, right_pcd], axis=-1).reshape(-1, 6)
+
+            # External camera point cloud
+            external_pcd = depth_to_pcd(
+                external_depth[i], external_cam_pose[i], base_link_pose[i], K=EXTERNAL_INTRINSICS
+            )
+            external_rgb_pcd = np.concatenate([external_rgb[i] / 255.0, external_pcd], axis=-1).reshape(-1, 6)
+
+            # Fuse all point clouds and downsample
+            fused_pcd_all = np.concatenate([left_rgb_pcd, right_rgb_pcd, external_rgb_pcd], axis=0)
+            fused_pcd[i] = downsample_pcd(fused_pcd_all, pcd_num_points)
 
     return fused_pcd
