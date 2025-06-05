@@ -13,8 +13,9 @@ policy_name: ???  # filled by policy
 
 # ====== main cfg ======
 seed: -1
-gpus: 1
-bs: 16
+gpus: 8
+num_nodes: 2
+bs: 256
 vbs: ${bs}
 data_dir: ???
 eval_interval: 10
@@ -42,7 +43,9 @@ data_module:
 trainer:
   accelerator: "gpu"
   devices: ${gpus}
+  num_nodes: ${num_nodes}
   precision: 32
+  strategy: ddp
   benchmark: true  # enables cudnn.benchmark
   accumulate_grad_batches: 1
   num_sanity_val_steps: 1
