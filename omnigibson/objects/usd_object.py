@@ -152,6 +152,17 @@ class USDObject(StatefulObject):
 
         return prim
 
+    def _post_load(self):
+        super()._post_load()
+
+        if self._encrypted:
+            # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
+            # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
+            # original USD folder, i.e. <category>/<model>/usd.
+            root_path = os.path.dirname(self._usd_path)
+            for material in self.materials:
+                material.shader_update_asset_paths_with_root_path(root_path)
+
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs
         return self.__class__(

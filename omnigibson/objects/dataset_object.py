@@ -259,13 +259,6 @@ class DatasetObject(USDObject):
         # Run super last
         super()._post_load()
 
-        # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
-        # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
-        # original USD folder, i.e. <category>/<model>/usd.
-        root_path = os.path.dirname(self._usd_path)
-        for material in self.materials:
-            material.shader_update_asset_paths_with_root_path(root_path)
-
         # Get the average mass/density for this object category
         avg_specs = get_og_avg_category_specs()
         assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
