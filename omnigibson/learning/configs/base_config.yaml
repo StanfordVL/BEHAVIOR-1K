@@ -13,8 +13,8 @@ policy_name: ???  # filled by policy
 
 # ====== main cfg ======
 seed: -1
-gpus: 8
-num_nodes: 2
+gpus: 1
+num_nodes: 1
 bs: 256
 vbs: ${bs}
 data_dir: ???

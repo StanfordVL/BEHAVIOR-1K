@@ -87,7 +87,7 @@ module:
   weight_decay: ${wd}
   action_keys: ${action_keys}
   eval:
-    eval_on_validation: true
+    eval_on_validation: false
     env: ${env}
     task: ${task}
     robot: ${robot}

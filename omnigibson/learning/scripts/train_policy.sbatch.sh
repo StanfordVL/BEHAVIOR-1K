@@ -1,16 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name="train_xattn"
+#SBATCH --job-name="train_policy"
 #SBATCH --account=viscam
 #SBATCH --partition=viscam
 #SBATCH --exclude=viscam1
-#SBATCH --nodes=2
-#SBATCH --gres=gpu:3090:8
-#SBATCH --ntasks-per-node=4
-#SBATCH --mem=64G
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:a5000:1
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem=240G
 #SBATCH --cpus-per-task=12
 #SBATCH --time=1-00:00:00
-#SBATCH --output=outputs/sc/train_xattn_%j.out
-#SBATCH --error=outputs/sc/train_xattn_%j.err
+#SBATCH --output=outputs/sc/train_policy_%j.out
+#SBATCH --error=outputs/sc/train_policy_%j.err
 # notifications for job done & fail
 ##SBATCH --mail-type=END,FAIL
 ##SBATCH --mail-user=wsai@stanford.edu

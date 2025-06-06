@@ -257,6 +257,7 @@ def generate_robot_config(task_name=None, task_cfg=None):
         "controller_config": controller_config,
         "self_collisions": True,
         "obs_modalities": ["proprio", "rgb", "depth_linear"],
+        "proprio_obs": list(PROPRIOCEPTION_INDICES[ROBOT_TYPE].keys()),
         "position": [0.0, 0.0, 0.0],
         "orientation": [0.0, 0.0, 0.0, 1.0],
         "grasping_mode": "assisted",
