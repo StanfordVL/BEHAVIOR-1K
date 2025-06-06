@@ -1,4 +1,3 @@
-import argparse
 import hydra
 import logging
 import omnigibson as og
@@ -9,6 +8,7 @@ from gello.robots.sim_robot.og_teleop_utils import load_available_tasks
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
+from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
     generate_basic_environment_config,
     generate_robot_config,
@@ -80,8 +80,8 @@ class Evaluator:
         return robot
 
     def load_policy(self) -> Any:
-        if "policy" in self.cfg:
-            return instantiate(self.cfg.policy)
+        if "module" in self.cfg:
+            return instantiate(self.cfg.module)
         return None
 
     def step(self) -> Tuple[bool, bool]:
@@ -148,13 +148,10 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    # parse args
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", "--config", type=str, required=True, help="Config name")
-    args, _ = parser.parse_known_args()
+    register_omegaconf_resolvers()
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
-        config = hydra.compose(args.config)
+        config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
 
     OmegaConf.resolve(config)
     with Evaluator(config) as evaluator:

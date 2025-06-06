@@ -442,8 +442,8 @@ class DataCollectionWrapper(DataWrapper):
 
             # Prune any values after the checkpoint index
             if index != -1:
-                self.checkpoint_states = self.checkpoint_states[:index+1]
-                self.checkpoint_step_idxs = self.checkpoint_step_idxs[:index+1]
+                self.checkpoint_states = self.checkpoint_states[: index + 1]
+                self.checkpoint_step_idxs = self.checkpoint_step_idxs[: index + 1]
 
     def postprocess_traj_group(self, traj_grp):
         super().postprocess_traj_group(traj_grp=traj_grp)
@@ -656,6 +656,7 @@ class DataPlaybackWrapper(DataWrapper):
         input_path,
         output_path,
         robot_obs_modalities=tuple(),
+        robot_proprio_keys=None,
         robot_sensor_config=None,
         external_sensors_config=None,
         include_sensor_names=None,
@@ -682,6 +683,7 @@ class DataPlaybackWrapper(DataWrapper):
                 the replayed data
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
                 the robot_cfg (`obs_modalities` kwarg) when spawning the robot
+            robot_proprio_keys (None or list of str): If specified, a list of proprioception keys to use for the robot.
             robot_sensor_config (None or dict): If specified, the sensor configuration to use for the robot. See the
                 example sensor_config in fetch_behavior.yaml env config. This can be used to specify relevant sensor
                 params, such as image_height and image_width
@@ -764,7 +766,8 @@ class DataPlaybackWrapper(DataWrapper):
             robot_cfg["obs_modalities"] = list(robot_obs_modalities)
             robot_cfg["include_sensor_names"] = include_sensor_names
             robot_cfg["exclude_sensor_names"] = exclude_sensor_names
-
+            if robot_proprio_keys is not None:
+                robot_cfg["proprio_obs"] = robot_proprio_keys
             if robot_sensor_config is not None:
                 robot_cfg["sensor_config"] = robot_sensor_config
         if external_sensors_config is not None:

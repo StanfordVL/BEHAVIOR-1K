@@ -79,3 +79,5 @@ resume:
   ckpt_path: null
   full_state: false  # if true, resume all states including optimizer, amp, lightning callbacks
   strict: true
+
+eval: ???

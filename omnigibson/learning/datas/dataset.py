@@ -7,25 +7,6 @@ from torch.utils.data import Dataset
 from omnigibson.learning.utils.array_tensor_utils import any_concat, any_ones_like, any_slice, any_stack, get_batch_size
 from typing import Optional
 
-# Action indices
-ACTION_QPOS_INDICES = {
-    "mobile_base": np.s_[0:3],
-    "torso": np.s_[3:7],
-    "left_arm": np.s_[7:14],
-    "left_gripper": np.s_[14:15],
-    "right_arm": np.s_[15:22],
-    "right_gripper": np.s_[22:23],
-}
-# Proprioception indices
-PROPRIO_QPOS_INDICES = {
-    "torso": np.s_[6:10],
-    "left_arm": np.s_[10:24:2],
-    "right_arm": np.s_[11:24:2],
-    "left_gripper": np.s_[24:26],
-    "right_gripper": np.s_[26:28],
-}
-PROPRIO_BASED_VEL_INDICES = np.s_[-3:]
-
 
 class BehaviorDataset(Dataset):
     torso_joint_high = np.array([1.8326, 2.5307, 1.8326, 3.0543])

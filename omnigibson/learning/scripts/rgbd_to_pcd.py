@@ -8,6 +8,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Convert RGBD data to PCD format.")
     parser.add_argument("-f", "--files", type=str, help="Path to the input RGBD data file.")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing PCD files if they exist.")
     args = parser.parse_args()
 
     assert os.path.isfile(args.files), f"Input file {args.files} does not exist."
@@ -19,6 +20,15 @@ if __name__ == "__main__":
     with h5py.File(args.files, "r") as in_f:
         # extract the file name without the directory and extension
         file_name = os.path.basename(args.files)
+        # remove the current file if overwrite is set and the file already exists
+        if os.path.exists(os.path.join(output_dir, file_name)):
+            if args.overwrite:
+                os.remove(os.path.join(output_dir, file_name))
+            else:
+                raise FileExistsError(
+                    f"Output file {os.path.join(output_dir, file_name)} already exists. "
+                    "Use --overwrite to overwrite it."
+                )
         # create a new hdf5 file to store the point cloud data
         with h5py.File(os.path.join(output_dir, file_name), "w") as out_f:
             for demo_name in in_f["data"]:

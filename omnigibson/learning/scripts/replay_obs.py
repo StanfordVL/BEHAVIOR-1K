@@ -4,6 +4,7 @@ import os
 import sys
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
 from omnigibson.macros import gm
 
 
@@ -86,6 +87,7 @@ def replay_hdf5_file(hdf_input_path, write_video=False):
         input_path=hdf_input_path,
         output_path=hdf_output_path,
         robot_obs_modalities=["rgb", "depth_linear", "proprio"],
+        robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         robot_sensor_config=robot_sensor_config,
         external_sensors_config=external_sensors_config,
         n_render_iterations=1,

@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 from collections import deque, defaultdict
 from hydra.utils import instantiate
-from omnigibson.learning.datas.dataset import ACTION_QPOS_INDICES, PROPRIO_BASED_VEL_INDICES, PROPRIO_QPOS_INDICES
+from omnigibson.learning.utils.eval_utils import ACTION_QPOS_INDICES, PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat, any_slice, get_batch_size
 from omnigibson.learning.utils.pcd_utils import process_fused_point_cloud
@@ -211,15 +211,16 @@ class WBVIMA(BasePolicy):
                 "rgb": fused_pcd[..., :3],
                 "xyz": fused_pcd[..., 3:],
             },
-            "qpos": {key: proprio[..., PROPRIO_QPOS_INDICES[key]] for key in PROPRIO_QPOS_INDICES},
-            "odom": {"base_velocity": proprio[..., PROPRIO_BASED_VEL_INDICES]},
+            "qpos": {key: proprio[..., PROPRIO_QPOS_INDICES["R1Pro"][key]] for key in PROPRIO_QPOS_INDICES["R1Pro"]},
+            "odom": {"base_velocity": proprio[..., PROPRIOCEPTION_INDICES["R1Pro"]["base_qvel"]]},
         }
         if extract_action:
             # extract action from data_batch
             data.update(
                 {
                     "action": {
-                        key: data_batch["action_chunks"][..., ACTION_QPOS_INDICES[key]] for key in ACTION_QPOS_INDICES
+                        key: data_batch["action_chunks"][..., ACTION_QPOS_INDICES["R1Pro"][key]]
+                        for key in ACTION_QPOS_INDICES["R1Pro"]
                     },
                     "pad_mask": data_batch["action_chunk_masks"],
                 }

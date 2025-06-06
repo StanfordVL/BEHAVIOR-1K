@@ -117,3 +117,6 @@ robot:
       name: JointController
       motor_type: position
       use_delta_commands: false
+
+eval:
+  ckpt_path: null  # will be filled by the trainer

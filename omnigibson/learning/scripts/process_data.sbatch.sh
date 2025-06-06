@@ -27,7 +27,7 @@ echo "Running replay_obs.py on $1/raw/$2"
 OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2"
 
 echo "Replay observation script finished! Now converting rgbd to pcd."
-OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/rgbd_to_pcd.py --files "$1/rgbd/$2"
+OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/rgbd_to_pcd.py -o --files "$1/rgbd/$2"
 
 echo "Job finished."
 exit 0
