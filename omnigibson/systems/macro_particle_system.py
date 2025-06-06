@@ -799,6 +799,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             # particle_local_poses_batch = th.linalg.inv_ex(link_tfs_batch).inverse @ particle_local_poses_batch
             particle_local_poses_batch = th.linalg.solve(link_tfs_batch, particle_local_poses_batch)
+            # Make sure this is a valid homogeneous matrix (lower-left three elements all 0)
+            particle_local_poses_batch[:, 3, :3] = 0.0
 
         for i, name in enumerate(particles):
             self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i])

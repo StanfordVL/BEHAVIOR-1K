@@ -541,9 +541,39 @@
                         "qnroki": null
                     }
                 },
-                "lawn.n.01": {
-                    "lawn": {
-                        "tiqndr": null
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
+                },
+                "pot_plant.n.01": {
+                    "pot_plant": {
+                        "arwvvc": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "spraying_fruit_trees": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "pesticide__atomizer.n.01": {
+                    "pesticide_atomizer": {
+                        "eisckl": null
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
+                },
+                "tree.n.01": {
+                    "tree": {
+                        "dyymaq": null
                     }
                 }
             },

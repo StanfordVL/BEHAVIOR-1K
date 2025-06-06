@@ -36,3 +36,4 @@ python ${DIR}/postprocess_sampled_task.py --overwrite --scene_model house_double
 python ${DIR}/postprocess_sampled_task.py --overwrite --scene_model house_single_floor --activity thawing_frozen_food
 python ${DIR}/postprocess_sampled_task.py --overwrite --scene_model house_double_floor_lower --activity turning_on_radio
 python ${DIR}/postprocess_sampled_task.py --overwrite --scene_model house_single_floor --activity put_togethera_basic_pruning_kit
+python ${DIR}/postprocess_sampled_task.py --overwrite --scene_model house_double_floor_lower --activity spraying_fruit_trees

@@ -21,5 +21,6 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 #python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_single_floor --activities cook_cabbage
 #python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_single_floor --activities picking_up_toys
 #python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_single_floor --activities put_together_a_basic_pruning_kit
-python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_double_floor_lower --activities setting_the_fire
+#python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_double_floor_lower --activities setting_the_fire
+python ${DIR}/sample_b1k_tasks.py --offline --scene_model house_double_floor_lower --activities spraying_fruit_trees
 

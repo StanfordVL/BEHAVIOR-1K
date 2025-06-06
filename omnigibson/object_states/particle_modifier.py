@@ -70,6 +70,9 @@ m.PROJECTION_VISUALIZATION_SPEED = 2.0
 m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 1e6
 m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
 
+# Whether to visualize direction vector for particle applier
+m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR = True
+
 
 def create_projection_visualization(
     scene,
@@ -379,6 +382,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 for shape_attr, default_val in shape_defaults.items():
                     if shape_attr in property_names:
                         mesh.GetAttribute(shape_attr).Set(default_val)
+
             else:
                 # Potentially populate projection mesh params if the prim exists
                 mesh_type = pre_existing_mesh.GetTypeName()
@@ -455,6 +459,39 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 else:
                     og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
+
+            # Define direction indicator if requested
+            if m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR:
+                indicator_mesh_path = f"{mesh_prim_path}_direction_indicator"
+                indicator_mesh_prim = (
+                    getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
+                    .Define(og.sim.stage, indicator_mesh_path)
+                    .GetPrim()
+                )
+                property_names = set(indicator_mesh_prim.GetPropertyNames())
+                for shape_attr, default_val in shape_defaults.items():
+                    if shape_attr in property_names:
+                        indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
+                indicator_mesh = VisualGeomPrim(
+                    relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, indicator_mesh_path),
+                    name=f"{name_prefix}_projection_mesh_direction_indicator",
+                )
+                indicator_mesh.load(self.obj.scene)
+                indicator_mesh.initialize()
+                indicator_mesh.visible = True
+                # Scale is 10% of the full scale
+                indicator_mesh_rel_scale = 0.1
+                indicator_mesh.scale = self._projection_mesh_params["extents"] * indicator_mesh_rel_scale
+                indicator_z_offset = (
+                    0.0
+                    if self._projection_mesh_params["type"] == "Sphere"
+                    else self._projection_mesh_params["extents"][2] * indicator_mesh_rel_scale / 2
+                )
+                indicator_mesh.set_position_orientation(
+                    position=th.tensor([0, 0, -indicator_z_offset]),
+                    orientation=T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32)),
+                    frame="parent",
+                )
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
             # Define the function for checking overlaps at runtime
