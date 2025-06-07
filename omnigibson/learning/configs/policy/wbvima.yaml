@@ -5,7 +5,15 @@ policy_name: wbvima
 
 # ====== Base Config ======
 wandb_group: wbvima
+run_name: "${policy_name}\
+  _${task.name}\
+  _lr${scientific:${lr},1}\
+  _wd${scientific:${wd}}\
+  _b${bs}"
 
+# ====== Eval Config ======
+eval:
+  ckpt_path: null  # if null, will use the latest checkpoint
 
 # ====== DP specific ======
 obs_window_size: 2
@@ -88,9 +96,6 @@ module:
   action_keys: ${action_keys}
   eval:
     eval_on_validation: false
-    env: ${env}
-    task: ${task}
-    robot: ${robot}
 
 
 data_module:
@@ -117,6 +122,3 @@ robot:
       name: JointController
       motor_type: position
       use_delta_commands: false
-
-eval:
-  ckpt_path: null  # will be filled by the trainer

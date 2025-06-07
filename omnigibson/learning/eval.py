@@ -10,10 +10,12 @@ from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
+    SUPPORTED_ROBOTS,
     generate_basic_environment_config,
     generate_robot_config,
     flatten_obs_dict,
 )
+from omnigibson.learning.utils.training_utils import load_torch
 from omnigibson.macros import gm
 from omnigibson.robots import BaseRobot
 from pathlib import Path
@@ -25,7 +27,6 @@ from typing import Any, Tuple
 gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
-SUPPORTED_ROBOTS = ["R1Pro"]
 
 # create module logger
 logger = logging.getLogger("evaluator")
@@ -81,7 +82,16 @@ class Evaluator:
 
     def load_policy(self) -> Any:
         if "module" in self.cfg:
-            return instantiate(self.cfg.module)
+            policy = instantiate(self.cfg.module, _recursive_=False)
+            if self.cfg.eval.ckpt_path is not None:
+                policy.load_state_dict(load_torch(self.cfg.eval.ckpt_path)["state_dict"], strict=self.cfg.eval.strict)
+            policy.eval()
+            logger.info("")
+            logger.info("=" * 50)
+            logger.info(f"Loaded policy: {policy.__class__.__name__}")
+            logger.info("=" * 50)
+            logger.info("")
+            return policy
         return None
 
     def step(self) -> Tuple[bool, bool]:

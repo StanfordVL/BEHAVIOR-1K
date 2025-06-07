@@ -3,11 +3,7 @@ defaults:
   - policy: ???
   - task: ???
 
-run_name: "${policy_name}\
-  _${task.name}\
-  _lr${scientific:${lr},1}\
-  _wd${scientific:${wd}}\
-  _b${bs}"
+run_name: "${policy_name}_${task.name}"
 exp_root_dir: .
 policy_name: ???  # filled by policy
 
@@ -29,6 +25,11 @@ wandb_run_name: ${run_name}
 # ------ module ------
 module:
   _target_: ???  # filled by policy
+  eval:
+    eval_on_validation: false
+    env: ${env}
+    task: ${task}
+    robot: ${robot}
 
 data_module:
   _target_: ???
@@ -80,4 +81,7 @@ resume:
   full_state: false  # if true, resume all states including optimizer, amp, lightning callbacks
   strict: true
 
-eval: ???
+# ------------- Evaluation ---------------------
+eval: 
+  ckpt_path: null  # if null, will use the latest checkpoint
+  strict: true

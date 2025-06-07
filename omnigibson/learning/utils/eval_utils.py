@@ -2,7 +2,9 @@ import numpy as np
 import torch as th
 from collections import OrderedDict
 
+
 # Robot parameters
+SUPPORTED_ROBOTS = ["R1Pro"]
 ROBOT_TYPE = "R1Pro"  # This should always be our robot generally since GELLO is designed for this specific robot
 ROBOT_NAME = "robot_r1"
 RESOLUTION = [240, 240]  # Resolution for RGB and depth images
@@ -303,3 +305,14 @@ def flatten_obs_dict(obs: dict, parent_key: str = "") -> dict:
         else:
             processed_obs[new_key] = value
     return processed_obs
+
+
+def find_start_point(base_vel):
+    """
+    Find the first point where the base velocity is non-zero.
+    This is used to skip the initial part of the dataset where the robot is not moving.
+    """
+    start_idx = np.where(np.linalg.norm(base_vel, axis=-1) > 1e-5)[0]
+    if len(start_idx) == 0:
+        return 0
+    return min(start_idx[0], 500)  # Limit to the first 100 points to avoid long initial periods
