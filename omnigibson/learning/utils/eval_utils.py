@@ -5,7 +5,9 @@ from collections import OrderedDict
 
 # Robot parameters
 SUPPORTED_ROBOTS = ["R1Pro"]
-ROBOT_TYPE = "R1Pro"  # This should always be our robot generally since GELLO is designed for this specific robot
+DEFAULT_ROBOT_TYPE = (
+    "R1Pro"  # This should always be our robot generally since GELLO is designed for this specific robot
+)
 ROBOT_NAME = "robot_r1"
 RESOLUTION = [240, 240]  # Resolution for RGB and depth images
 
@@ -84,57 +86,59 @@ PROPRIO_QPOS_INDICES = {
 }
 
 # Controller configuration for R1 robot
-R1_CONTROLLER_CONFIG = {
-    "arm_left": {
-        "name": "JointController",
-        "motor_type": "position",
-        "pos_kp": 150,
-        "command_input_limits": None,
-        "command_output_limits": None,
-        "use_impedances": False,
-        "use_delta_commands": False,
-    },
-    "arm_right": {
-        "name": "JointController",
-        "motor_type": "position",
-        "pos_kp": 150,
-        "command_input_limits": None,
-        "command_output_limits": None,
-        "use_impedances": False,
-        "use_delta_commands": False,
-    },
-    "gripper_left": {
-        "name": "MultiFingerGripperController",
-        "mode": "smooth",
-        "command_input_limits": "default",
-        "command_output_limits": "default",
-    },
-    "gripper_right": {
-        "name": "MultiFingerGripperController",
-        "mode": "smooth",
-        "command_input_limits": "default",
-        "command_output_limits": "default",
-    },
-    "base": {
-        "name": "HolonomicBaseJointController",
-        "motor_type": "velocity",
-        "vel_kp": 150,
-        "command_input_limits": [-th.ones(3), th.ones(3)],
-        "command_output_limits": [-th.tensor([0.75, 0.75, 1.0]), th.tensor([0.75, 0.75, 1.0])],
-        "use_impedances": False,
-    },
-    "trunk": {
-        "name": "JointController",
-        "motor_type": "position",
-        "pos_kp": 150,
-        "command_input_limits": None,
-        "command_output_limits": None,
-        "use_impedances": False,
-        "use_delta_commands": False,
-    },
-    "camera": {
-        "name": "NullJointController",
-    },
+DEFAULT_CONTROLLER_CONFIG = {
+    "R1Pro": {
+        "arm_left": {
+            "name": "JointController",
+            "motor_type": "position",
+            "pos_kp": 150,
+            "command_input_limits": None,
+            "command_output_limits": None,
+            "use_impedances": False,
+            "use_delta_commands": False,
+        },
+        "arm_right": {
+            "name": "JointController",
+            "motor_type": "position",
+            "pos_kp": 150,
+            "command_input_limits": None,
+            "command_output_limits": None,
+            "use_impedances": False,
+            "use_delta_commands": False,
+        },
+        "gripper_left": {
+            "name": "MultiFingerGripperController",
+            "mode": "smooth",
+            "command_input_limits": "default",
+            "command_output_limits": "default",
+        },
+        "gripper_right": {
+            "name": "MultiFingerGripperController",
+            "mode": "smooth",
+            "command_input_limits": "default",
+            "command_output_limits": "default",
+        },
+        "base": {
+            "name": "HolonomicBaseJointController",
+            "motor_type": "velocity",
+            "vel_kp": 150,
+            "command_input_limits": [-th.ones(3), th.ones(3)],
+            "command_output_limits": [-th.tensor([0.75, 0.75, 1.0]), th.tensor([0.75, 0.75, 1.0])],
+            "use_impedances": False,
+        },
+        "trunk": {
+            "name": "JointController",
+            "motor_type": "position",
+            "pos_kp": 150,
+            "command_input_limits": None,
+            "command_output_limits": None,
+            "use_impedances": False,
+            "use_delta_commands": False,
+        },
+        "camera": {
+            "name": "NullJointController",
+        },
+    }
 }
 
 
@@ -179,13 +183,14 @@ def get_camera_config(name, relative_prim_path, position, orientation, resolutio
     }
 
 
-def generate_basic_environment_config(task_name=None, task_cfg=None):
+def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=DEFAULT_ROBOT_TYPE):
     """
     Generate a basic environment configuration
 
     Args:
         task_name (str): Name of the task (optional)
         task_cfg: Dictionary of task config (optional)
+        robot_type (str): Type of the robot, default is DEFAULT_ROBOT_TYPE
 
     Returns:
         dict: Environment configuration
@@ -198,7 +203,7 @@ def generate_basic_environment_config(task_name=None, task_cfg=None):
             "external_sensors": [
                 get_camera_config(
                     name="external_sensor0",
-                    relative_prim_path=f"/controllable__{ROBOT_TYPE.lower()}__{ROBOT_NAME}/base_link/external_sensor0",
+                    relative_prim_path=f"/controllable__{robot_type.lower()}__{ROBOT_NAME}/base_link/external_sensor0",
                     position=EXTERNAL_CAMERA_CONFIGS["external_sensor0"]["position"],
                     orientation=EXTERNAL_CAMERA_CONFIGS["external_sensor0"]["orientation"],
                     resolution=RESOLUTION,
@@ -238,28 +243,33 @@ def generate_basic_environment_config(task_name=None, task_cfg=None):
     return cfg
 
 
-def generate_robot_config(task_name=None, task_cfg=None):
+def generate_robot_config(
+    task_name=None, task_cfg=None, robot_type: str = DEFAULT_ROBOT_TYPE, overwrite_controller_cfg=None
+):
     """
     Generate robot configuration
 
     Args:
         task_name: Name of the task (optional)
         task_cfg: Dictionary of task config (optional)
+        robot_type (str): Type of the robot, default is DEFAULT_ROBOT_TYPE
+        overwrite_controller_cfg: Controller configuration (optional)
 
     Returns:
         dict: Robot configuration
     """
     # Create a copy of the controller config to avoid modifying the original
-    controller_config = {k: v.copy() for k, v in R1_CONTROLLER_CONFIG.items()}
-
+    controller_config = {k: v.copy() for k, v in DEFAULT_CONTROLLER_CONFIG[robot_type].items()}
+    if overwrite_controller_cfg is not None:
+        controller_config.update(overwrite_controller_cfg)
     robot_config = {
-        "type": ROBOT_TYPE,
+        "type": robot_type,
         "name": ROBOT_NAME,
         "action_normalize": False,
         "controller_config": controller_config,
         "self_collisions": True,
         "obs_modalities": ["proprio", "rgb", "depth_linear"],
-        "proprio_obs": list(PROPRIOCEPTION_INDICES[ROBOT_TYPE].keys()),
+        "proprio_obs": list(PROPRIOCEPTION_INDICES[robot_type].keys()),
         "position": [0.0, 0.0, 0.0],
         "orientation": [0.0, 0.0, 0.0, 1.0],
         "grasping_mode": "assisted",

@@ -5,7 +5,7 @@ import sys
 import traceback
 import torch as th
 from gello.robots.sim_robot.og_teleop_utils import load_available_tasks
-from hydra.utils import instantiate
+from hydra.utils import call
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
@@ -15,7 +15,6 @@ from omnigibson.learning.utils.eval_utils import (
     generate_robot_config,
     flatten_obs_dict,
 )
-from omnigibson.learning.utils.training_utils import load_torch
 from omnigibson.macros import gm
 from omnigibson.robots import BaseRobot
 from pathlib import Path
@@ -64,10 +63,18 @@ class Evaluator:
             task_name = self.cfg.task.name
             assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
             task_cfg = available_tasks[task_name][0]
-            robot_cls = self.cfg.robot.type
-            assert robot_cls in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_cls}"
-            cfg = generate_basic_environment_config(task_name, task_cfg)
-            cfg["robots"] = [generate_robot_config(task_name, task_cfg)]
+            robot_type = self.cfg.robot.type
+            robot_controller_cfg = self.cfg.robot.controllers
+            assert robot_type in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_type}"
+            cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg, robot_type=robot_type)
+            cfg["robots"] = [
+                generate_robot_config(
+                    task_name=task_name,
+                    task_cfg=task_cfg,
+                    robot_type=robot_type,
+                    overwrite_controller_cfg=robot_controller_cfg,
+                )
+            ]
             env = og.Environment(configs=cfg)
         else:
             raise ValueError(f"Invalid environment type {self.env_type}")
@@ -81,18 +88,14 @@ class Evaluator:
         return robot
 
     def load_policy(self) -> Any:
-        if "module" in self.cfg:
-            policy = instantiate(self.cfg.module, _recursive_=False)
-            if self.cfg.eval.ckpt_path is not None:
-                policy.load_state_dict(load_torch(self.cfg.eval.ckpt_path)["state_dict"], strict=self.cfg.eval.strict)
-            policy.eval()
-            logger.info("")
-            logger.info("=" * 50)
-            logger.info(f"Loaded policy: {policy.__class__.__name__}")
-            logger.info("=" * 50)
-            logger.info("")
-            return policy
-        return None
+        policy = call(self.cfg.eval)
+        policy.eval()
+        logger.info("")
+        logger.info("=" * 50)
+        logger.info(f"Loaded policy: {policy.__class__.__name__}")
+        logger.info("=" * 50)
+        logger.info("")
+        return policy
 
     def step(self) -> Tuple[bool, bool]:
         """

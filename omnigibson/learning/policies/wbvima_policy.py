@@ -1,8 +1,3 @@
-try:
-    from brs_algo.optim import CosineScheduleFunction
-except ImportError:
-    raise ImportError("Please install brs_algo to run WB-VIMA")
-
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -19,10 +14,12 @@ from typing import Any, List, Optional
 
 
 class WBVIMA(BasePolicy):
+    """
+    WB-VIMA policy from Jiang et al. https://arxiv.org/abs/2503.05652
+    """
+
     def __init__(
         self,
-        # ====== Base class ======
-        eval: DictConfig,
         # ====== policy model ======
         policy: DictConfig,
         action_prediction_horizon: int,
@@ -37,8 +34,11 @@ class WBVIMA(BasePolicy):
         weight_decay: float = 0.0,
         action_keys: List[str] = list(),
         loss_on_latest_obs_only: bool = False,
+        # ====== other args for base class ======
+        *args,
+        **kwargs,
     ) -> None:
-        super().__init__(eval=eval)
+        super().__init__(*args, **kwargs)
         self.policy = instantiate(policy)
         self._action_keys = action_keys
         self.action_prediction_horizon = action_prediction_horizon
@@ -55,6 +55,13 @@ class WBVIMA(BasePolicy):
         self._obs_history = deque(maxlen=obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
+
+    @classmethod
+    def load(cls, *args, **kwargs) -> "BasePolicy":
+        """
+        Load the policy (e.g. from a checkpoint given a file path).
+        """
+        return super().load_from_checkpoint(checkpoint_path=kwargs["ckpt_path"], strict=kwargs.get("strict", True))
 
     def forward(self, obs: dict, *args, **kwargs) -> torch.Tensor:
         obs = self.process_data(data_batch=obs, extract_action=False)
@@ -185,6 +192,8 @@ class WBVIMA(BasePolicy):
                 warmup_epochs=self.lr_warmup_steps,
                 steps_per_epoch=1,
             )
+            from brs_algo.optim import CosineScheduleFunction
+
             scheduler = torch.optim.lr_scheduler.LambdaLR(
                 optimizer=optimizer,
                 lr_lambda=CosineScheduleFunction(**scheduler_kwargs),

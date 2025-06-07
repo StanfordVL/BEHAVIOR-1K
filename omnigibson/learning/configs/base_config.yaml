@@ -82,6 +82,4 @@ resume:
   strict: true
 
 # ------------- Evaluation ---------------------
-eval: 
-  ckpt_path: null  # if null, will use the latest checkpoint
-  strict: true
+eval: ??? # filled by policy

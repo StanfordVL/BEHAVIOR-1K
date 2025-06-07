@@ -1,12 +1,12 @@
 # @package _global_
 
 env: omnigibson
-policy_name: dummy 
+policy_name: openvla 
 module:
-  _target_: omnigibson.learning.policies.DummyPolicy
+  _target_: omnigibson.learning.policies.OpenVLA
 
 eval:
-  _target_: omnigibson.learning.policies.DummyPolicy.load
+  _target_: omnigibson.learning.policies.OpenVLA.load
 
 robot:
   type: R1Pro

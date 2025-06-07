@@ -3,17 +3,11 @@
 env: omnigibson
 policy_name: wbvima
 
-# ====== Base Config ======
-wandb_group: wbvima
-run_name: "${policy_name}\
-  _${task.name}\
-  _lr${scientific:${lr},1}\
-  _wd${scientific:${wd}}\
-  _b${bs}"
-
 # ====== Eval Config ======
 eval:
-  ckpt_path: null  # if null, will use the latest checkpoint
+  _target_: omnigibson.learning.policies.WBVIMA.load
+  ckpt_path: null  
+  stict: False
 
 # ====== DP specific ======
 obs_window_size: 2
@@ -35,8 +29,7 @@ action_key_dims:
   right_arm: 7
   right_gripper: 1
 
-
-# ------ module ------
+# ====== module ======
 module:
   _target_: omnigibson.learning.policies.WBVIMA
   policy:
@@ -97,6 +90,13 @@ module:
   eval:
     eval_on_validation: false
 
+# ====== Train Config ======
+wandb_group: wbvima
+run_name: "${policy_name}\
+  _${task.name}\
+  _lr${scientific:${lr},1}\
+  _wd${scientific:${wd}}\
+  _b${bs}"
 
 data_module:
   _target_: omnigibson.learning.datas.BehaviorDataModule
@@ -106,19 +106,3 @@ data_module:
 robot:
   type: R1Pro
   controllers:
-    - arm_left: 
-      name: JointController
-      motor_type: position
-      use_delta_commands: false
-    - arm_right:
-      name: JointController
-      motor_type: position
-      use_delta_commands: false
-    - gripper_left:
-      name: MultiFingerGripperController
-    - gripper_right:
-      name: MultiFingerGripperController
-    - trunk:
-      name: JointController
-      motor_type: position
-      use_delta_commands: false

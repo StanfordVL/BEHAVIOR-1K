@@ -10,11 +10,19 @@ class DummyPolicy(BasePolicy):
     Dummy policy that always outputs zero delta action
     """
 
-    def __init__(self, action_dim: int = 23, *args, **kwargs) -> None:
+    def __init__(self, action_dim: int = 21, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         # setup a dummy parameter to avoid errors in the optimizer
         self.dummy_param = nn.Parameter(torch.zeros(1))
         self.action_dim = action_dim
+
+    @classmethod
+    def load(cls, *args, **kwargs) -> "BasePolicy":
+        """
+        Load the dummy policy (not applicable for this policy).
+        For this policy, it simply returns an instance of DummyPolicy.
+        """
+        return cls(*args, **kwargs)
 
     def forward(self, obs: dict, *args, **kwargs) -> torch.Tensor:
         """

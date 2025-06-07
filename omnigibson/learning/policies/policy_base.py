@@ -1,11 +1,15 @@
 import omnigibson as og
+import logging
 import torch
 from abc import ABC, abstractmethod
 from omnigibson.learning.eval import Evaluator
-from typing import Any
+from typing import Any, Optional
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities.types import OptimizerLRScheduler
+
+
+logger = logging.getLogger("BasePolicy")
 
 
 class BasePolicy(LightningModule, ABC):
@@ -13,12 +17,22 @@ class BasePolicy(LightningModule, ABC):
     Base class for policies that is used for training and rollout
     """
 
-    def __init__(self, eval: DictConfig, *args, **kwargs) -> None:
+    def __init__(self, eval: Optional[DictConfig] = None, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         # require evaluator for online testing
         self.eval_config = eval
-        OmegaConf.resolve(self.eval_config)
+        if self.eval_config is not None:
+            OmegaConf.resolve(self.eval_config)
+        else:
+            logger.warning("No evaluation config provided, online evaluation will not be performed during testing.")
         self.evaluator = None
+
+    @classmethod
+    def load(cls, *args, **kwargs) -> "BasePolicy":
+        """
+        Load the policy (e.g. from a checkpoint given a file path).
+        """
+        raise NotImplementedError
 
     @abstractmethod
     def forward(self, obs: dict, *args, **kwargs) -> torch.Tensor:
@@ -113,11 +127,11 @@ class BasePolicy(LightningModule, ABC):
         og.shutdown()
 
     def on_validation_start(self):
-        if self.eval_config.eval_on_validation:
+        if self.eval_config is not None and self.eval_config.eval_on_validation:
             self.on_test_start()
 
     def on_validation_end(self):
-        if self.eval_config.eval_on_validation and not self.trainer.sanity_checking:
+        if self.eval_config is not None and self.eval_config.eval_on_validation and not self.trainer.sanity_checking:
             self.test_step(None, None)
 
     def create_evaluator(self):
@@ -126,6 +140,7 @@ class BasePolicy(LightningModule, ABC):
         This will be used to spawn the OmniGibson environments for online evaluation in self.imitation_evaluation_step()
         """
         # update parameters with policy cfg file
+        assert self.eval_config is not None, "eval_config must be provided to create evaluator!"
         evaluator = Evaluator(self.eval_config)
         # set the policy for the evaluator
         evaluator.policy = self
