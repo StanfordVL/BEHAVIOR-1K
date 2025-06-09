@@ -25,7 +25,6 @@ from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import EmitterType, PrimType
 from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
 from omnigibson.utils.ui_utils import create_module_logger
@@ -297,10 +296,6 @@ class StatefulObject(BaseObject):
         Args:
             emitter_type (EmitterType): Emitter to create
         """
-        # Make sure that flow setting is enabled.
-        renderer_setting = RendererSettings()
-        renderer_setting.common_settings.flow_settings.enable()
-
         # Specify emitter config.
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
@@ -351,7 +346,7 @@ class StatefulObject(BaseObject):
         # as the object moves. We put it under a dummy mesh so as not to force write synchronization to the actual
         # physx-tracked links (required when using Fabric), which causes physics issues
         dummy_mesh_path = f"{link.prim_path}/emitter"
-        dummy_mesh = lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
+        lazy.pxr.UsdGeom.Sphere.Define(og.sim.stage, dummy_mesh_path)
         relative_dummy_mesh_path = absolute_prim_path_to_scene_relative(self._scene, dummy_mesh_path)
         mesh = VisualGeomPrim(relative_prim_path=relative_dummy_mesh_path, name=f"{self.name}_emitter")
         mesh.load(self._scene)
@@ -395,7 +390,9 @@ class StatefulObject(BaseObject):
         emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
         emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1 / og.sim.get_sim_step_dt())
+        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            1 / og.sim.get_sim_step_dt()
+        )
         offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
@@ -557,16 +554,11 @@ class StatefulObject(BaseObject):
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
-        if material.is_glass:
-            if not th.allclose(material.glass_color, diffuse_tint):
-                material.glass_color = diffuse_tint
+        if material.albedo_add != albedo_add:
+            material.albedo_add = albedo_add
 
-        else:
-            if material.albedo_add != albedo_add:
-                material.albedo_add = albedo_add
-
-            if not th.allclose(material.diffuse_tint, diffuse_tint):
-                material.diffuse_tint = diffuse_tint
+        if not th.allclose(material.diffuse_tint, diffuse_tint):
+            material.diffuse_tint = diffuse_tint
 
     def remove(self):
         # Run super
