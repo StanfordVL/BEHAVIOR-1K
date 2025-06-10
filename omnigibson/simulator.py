@@ -28,7 +28,6 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
-from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
@@ -495,6 +494,7 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
             lazy.carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
+            lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
 
             # Below settings are for improving performance: we use the USD / Fabric only for poses.
             lazy.carb.settings.get_settings().set_bool("/physics/updateToUsd", not gm.ENABLE_FLATCACHE)
