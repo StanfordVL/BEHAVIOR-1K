@@ -5,8 +5,6 @@ import shutil
 import signal
 import tempfile
 
-import nest_asyncio
-
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.envs import Environment, VectorEnvironment
 from omnigibson.macros import gm
@@ -24,9 +22,6 @@ log = logging.getLogger(__name__)
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
-
-# Always enable nest_asyncio because MaterialPrim calls asyncio.run()
-nest_asyncio.apply()
 
 __version__ = "1.2.0-alpha"
 
