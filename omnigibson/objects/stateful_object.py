@@ -480,15 +480,6 @@ class StatefulObject(BaseObject):
             rotq = lazy.pxr.Gf.Quatd(*orientation)
         xform_op.Set(rotq)
 
-    def get_textures(self):
-        """
-        Gets prim's texture files.
-
-        Returns:
-            list of str: List of texture file paths
-        """
-        return [material.diffuse_texture for material in self.materials if material.diffuse_texture is not None]
-
     def update_visuals(self):
         """
         Update the prim's visuals (texture change, steam/fire effects, etc).
@@ -528,24 +519,13 @@ class StatefulObject(BaseObject):
         """
         Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
         to match the frozen state. If object_state is None, update the diffuse color to the default value. It modifies
-        the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
-
-        Args:
-            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
-        """
-        for material in self.materials:
-            self._update_albedo_value(object_state, material)
-
-    @staticmethod
-    def _update_albedo_value(object_state, material):
-        """
-        Update the albedo value based on the given object_state. The final albedo value is
+        the current albedo map by adding and scaling the values. The final albedo value is
         albedo_value = diffuse_tint * (albedo_value + albedo_add)
 
         Args:
             object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
-            material (MaterialPrim): the material to use to update the albedo value
         """
+        # Compute the add and tint values
         if object_state is None:
             # This restore the albedo map to its original value
             albedo_add = 0.0
@@ -554,11 +534,13 @@ class StatefulObject(BaseObject):
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
-        if material.albedo_add != albedo_add:
-            material.albedo_add = albedo_add
+        # Apply the add and tint values
+        for material in self.materials:
+            if material.albedo_add != albedo_add:
+                material.albedo_add = albedo_add
 
-        if not th.allclose(material.diffuse_tint, diffuse_tint):
-            material.diffuse_tint = diffuse_tint
+            if not th.allclose(material.diffuse_tint, diffuse_tint):
+                material.diffuse_tint = diffuse_tint
 
     def remove(self):
         # Run super

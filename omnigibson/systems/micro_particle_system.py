@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.prims.material_prim import MaterialPrim, OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.numpy_utils import vtarray_to_torch
@@ -560,14 +560,10 @@ class MicroParticleSystem(BaseSystem):
             MaterialPrim: The material to apply to all particles
         """
         # Default is PBR material
-        return MaterialPrim.get_material(
+        return OmniPBRMaterialPrim.get_material(
             scene=self.scene,
             prim_path=self.mat_path,
             name=self.mat_name,
-            load_config={
-                "mdl_name": "OmniPBR.mdl",
-                "mtl_name": "OmniPBR",
-            },
         )
 
     def _customize_particle_material(self):
@@ -1401,6 +1397,11 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Run super first
         super().initialize(scene)
 
+        # Assert that the material is an OmniSurface material.
+        assert isinstance(
+            self._material, OmniSurfaceMaterialPrim
+        ), "FluidSystem material must be an instance of MaterialPrim"
+
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         self._material.bind(self.system_prim_path)
         for prototype in self.particle_prototypes:
@@ -1414,21 +1415,7 @@ class FluidSystem(MicroPhysicalParticleSystem):
         apply_mat_physics(p=self._material.prim)
 
         # Compute the overall color of the fluid system
-        base_color_weight = self._material.diffuse_reflection_weight
-        transmission_weight = self._material.enable_specular_transmission * self._material.specular_transmission_weight
-        total_weight = base_color_weight + transmission_weight
-        if total_weight == 0.0:
-            # If the fluid doesn't have any color, we add a "blue" tint by default
-            color = th.tensor([0.0, 0.0, 1.0])
-        else:
-            base_color_weight /= total_weight
-            transmission_weight /= total_weight
-            # Weighted sum of base color and transmission color
-            color = base_color_weight * self._material.diffuse_reflection_color + transmission_weight * (
-                0.5 * self._material.specular_transmission_color
-                + 0.5 * self._material.specular_transmission_scattering_color
-            )
-        self._color = color
+        self._color = self._material.average_diffuse_color
 
         # Set custom isosurface rendering settings if we are using high-quality rendering
         if gm.ENABLE_HQ_RENDERING:
@@ -1477,13 +1464,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
                 "mtl_name": f"OmniSurface{'' if self._material_mtl_name is None else ('_' + self._material_mtl_name)}",
             },
         )
-
-
-def customize_particle_material_factory(attr, value):
-    def func(mat):
-        setattr(mat, attr, th.tensor(value))
-
-    return func
 
 
 class GranularSystem(MicroPhysicalParticleSystem):
