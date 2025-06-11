@@ -170,7 +170,7 @@ class XFormPrim(BasePrim):
             bool: True if there is a visual material bound to this prim. False otherwise
         """
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return material_path != ""
+        return material_path != "" and lazy.isaacsim.core.utils.prims.is_prim_path_valid(material_path)
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
