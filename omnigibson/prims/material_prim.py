@@ -1,6 +1,7 @@
 import os
 
 import cv2
+from omnigibson.utils.ui_utils import create_module_logger
 import torch as th
 
 import omnigibson as og
@@ -9,6 +10,9 @@ import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, get_sdf_value_type_name
+
+
+log = create_module_logger(module_name=__name__)
 
 
 class MaterialPrim(BasePrim):
@@ -36,16 +40,16 @@ class MaterialPrim(BasePrim):
     MATERIALS = dict()
 
     @classmethod
-    def get_material(cls, scene, name, prim_path, load_config=None):
+    def get_material(cls, scene, name, prim_path, **kwargs):
         """
         Get a material prim from the persistent dictionary of materials, or create a new one if it doesn't exist.
 
         Args:
+            scene (Scene): Scene to which this material belongs.
             name (str): Name for the object.
             prim_path (str): prim path of the MaterialPrim.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists.
+            **kwargs: Additional keyword arguments to pass to the MaterialPrim or subclass constructor.
+
         Returns:
             MaterialPrim: Material prim at the specified path
         """
@@ -54,27 +58,64 @@ class MaterialPrim(BasePrim):
             return MaterialPrim.MATERIALS[prim_path]
 
         # Otherwise, create a new one and return it
-        material_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-        if material_prim is not None:
+        material_class = cls
+        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
             # If the prim already exists, infer its type.
+            material_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             shader_prim = lazy.omni.usd.get_shader_from_material(material_prim)
             assert shader_prim is not None, (
                 f"Material prim at {prim_path} exists, but does not have a shader associated with it! "
                 f"Please make sure the material is created correctly."
             )
-            asset_path = shader_prim.GetSourceAsset("mdl").path
-            asset_sub_identifier = shader_prim.GetSourceAssetSubIdentifier("mdl")
 
-            # Walk through all of MaterialPrim's subclasses to find if any of them has a matching material name
-            _ = (asset_path, asset_sub_identifier)
+            # If we are able to obtain the asset path and sub-identifier, we can determine the material class.
+            mdl_asset = shader_prim.GetSourceAsset("mdl")
+            if mdl_asset is not None:
+                asset_path = mdl_asset.path
+                asset_sub_identifier = shader_prim.GetSourceAssetSubIdentifier("mdl")
+
+                if cls == MaterialPrim:
+                    # If this function is getting called on MaterialPrim, then we try to pick a compatible subclass.
+                    compatible_classes = [
+                        subclass
+                        for subclass in MaterialPrim.__subclasses__()
+                        if subclass.supports_material(asset_path, asset_sub_identifier)
+                    ]
+                    assert len(compatible_classes) <= 1, (
+                        "Found multiple compatible material prim classes for "
+                        f"material at {prim_path} with asset path {asset_path} and sub-identifier {asset_sub_identifier}: "
+                        f"{compatible_classes}"
+                    )
+                    if len(compatible_classes) == 1:
+                        # Use the only found compatible class
+                        material_class = compatible_classes[0]
+                    else:
+                        # Fall back to MaterialPrim
+                        log.warning(
+                            f"No compatible material prim class found for material at {prim_path} with "
+                            f"asset path {asset_path} and sub-identifier {asset_sub_identifier}. "
+                            f"Using MaterialPrim as a fallback."
+                        )
+                else:
+                    # If this function is called on a subclass of MaterialPrim, then we check if the subclass supports the material.
+                    assert material_class.supports_material(asset_path, asset_sub_identifier), (
+                        f"MaterialPrim subclass {material_class.__name__} does not support material at {prim_path} "
+                        f"with asset path {asset_path} and sub-identifier {asset_sub_identifier}!"
+                    )
+            else:
+                # If the material prim exists, but does not have a shader file we can recognize.
+                log.warning(
+                    f"Material prim at {prim_path} exists, but does not have a known shader file associated with it! "
+                    f"Using MaterialPrim as a fallback. If this is not intended, please make sure the material is created correctly."
+                )
 
         relative_prim_path = absolute_prim_path_to_scene_relative(scene, prim_path)
-        new_material = cls(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+        new_material = material_class(relative_prim_path=relative_prim_path, name=name, **kwargs)
         new_material.load(scene)
         assert (
             new_material.prim_path == prim_path
         ), f"Material prim path {new_material.prim_path} does not match {prim_path}"
-        cls.MATERIALS[prim_path] = new_material
+        MaterialPrim.MATERIALS[prim_path] = new_material
         return new_material
 
     def __init__(
@@ -97,6 +138,20 @@ class MaterialPrim(BasePrim):
             load_config=load_config,
         )
 
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        """
+        Checks if this material prim supports the given asset path and sub-identifier.
+
+        Args:
+            asset_path (str): The asset path of the MDL file.
+            asset_sub_identifier (str): The sub-identifier of the MDL file.
+
+        Returns:
+            bool: True if this material prim supports the given asset path and sub-identifier, False otherwise.
+        """
+        raise NotImplementedError(f"MaterialPrim subclass {cls.__name__} does not implement supports_material method!")
+
     @property
     def mdl_name(self):
         """
@@ -108,7 +163,7 @@ class MaterialPrim(BasePrim):
         assert "mdl_name" in self._load_config, (
             f"MaterialPrim at {self.prim_path} does not have a 'mdl_name' in its load_config! "
             f"Please specify it in the load_config dictionary or use one of the subclasses that "
-            f"already define it (e.g. OmniPBRMaterialPrim, VRayMaterialPrim, OmniGlassMaterialPrim)"
+            f"already define it (e.g. OmniPBRMaterialPrim, VRayMaterialPrim, OmniGlassMaterialPrim, OmniSurfaceMaterialPrim)"
         )
         return self._load_config["mdl_name"]
 
@@ -365,6 +420,10 @@ class OmniPBRMaterialPrim(MaterialPrim):
     A MaterialPrim that uses the OmniPBR material preset.
     """
 
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "OmniPBR.mdl" and asset_sub_identifier == "OmniPBR"
+
     @property
     def mdl_name(self):
         return "OmniPBR.mdl"
@@ -452,7 +511,7 @@ class OmniPBRMaterialPrim(MaterialPrim):
     @property
     def average_diffuse_color(self):
         diffuse_texture = self.diffuse_texture
-        return cv2.imread(diffuse_texture).mean() if diffuse_texture else self.diffuse_color_constant
+        return cv2.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else self.diffuse_color_constant
 
     def enable_highlight(self, highlight_color, highlight_intensity):
         """
@@ -468,7 +527,7 @@ class OmniPBRMaterialPrim(MaterialPrim):
         self.set_input(inp="emissive_intensity", val=highlight_intensity)
 
     def disable_highlight(self):
-        return self.set_input(inp="enable_emission", val=False)
+        self.set_input(inp="enable_emission", val=False)
 
 
 class VRayMaterialPrim(MaterialPrim):
@@ -476,9 +535,13 @@ class VRayMaterialPrim(MaterialPrim):
     A MaterialPrim that uses the V-Ray material preset.
     """
 
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "omnigibson_vray_mtl.mdl" and asset_sub_identifier == "OmniGibsonVRayMtl"
+
     @property
     def mdl_name(self):
-        return ("omnigibson_vray_mtl.mdl",)
+        return "omnigibson_vray_mtl.mdl"
 
     @property
     def mtl_name(self):
@@ -498,13 +561,33 @@ class VRayMaterialPrim(MaterialPrim):
         Returns:
             3-array: this material's average diffuse color.
         """
-        return cv2.imread(self.diffuse_texture).mean()
+        return cv2.imread(self.diffuse_texture).mean(axis=(0, 1))
+
+    def enable_highlight(self, highlight_color, highlight_intensity):
+        """
+        Enables highlight for this material with the specified color and intensity.
+
+        Args:
+            highlight_color (3-array): Color of the highlight in (R,G,B)
+            highlight_intensity (float): Intensity of the highlight
+        """
+        # Set emissive properties to enable highlight
+        self.set_input(inp="emission_color", val=lazy.pxr.Gf.Vec3f(*highlight_color))
+        self.set_input(inp="emission_intensity", val=highlight_intensity)
+
+    def disable_highlight(self):
+        self.set_input(inp="emission_color", val=lazy.pxr.Gf.Vec3f(0, 0, 0))
+        self.set_input(inp="emission_intensity", val=0.0)
 
 
 class OmniGlassMaterialPrim(MaterialPrim):
     """
     A MaterialPrim that uses the OmniGlass material preset.
     """
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "OmniGlass.mdl" and asset_sub_identifier == "OmniGlass"
 
     @property
     def mdl_name(self):
@@ -545,13 +628,32 @@ class OmniSurfaceMaterialPrim(MaterialPrim):
     A MaterialPrim that uses the OmniSurface material preset.
     """
 
+    def __init__(self, relative_prim_path, name, preset_name, load_config=None):
+        """
+        Args:
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
+            name (str): Name for the object. Names need to be unique per scene.
+            preset_name (str): Name of the preset to use for this material. If None, defaults to "OmniSurface".
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+                @relative_prim_path -- it will be ignored if it already exists.
+        """
+        self.preset_name = preset_name
+        super().__init__(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return (asset_path == "OmniSurface.mdl" and asset_sub_identifier == "OmniSurface") or (
+            asset_path == "OmniSurfacePresets.mdl" and asset_sub_identifier.startswith("OmniSurface_")
+        )
+
     @property
     def mdl_name(self):
-        return "OmniSurface.mdl"
+        return "OmniSurfacePresets.mdl" if self.preset_name else "OmniSurface.mdl"
 
     @property
     def mtl_name(self):
-        return "OmniSurface"
+        return f"OmniSurface_{self.preset_name}" if self.preset_name else "OmniSurface"
 
     @property
     def diffuse_reflection_weight(self):

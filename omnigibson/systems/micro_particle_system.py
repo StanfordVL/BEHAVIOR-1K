@@ -7,7 +7,7 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from omnigibson.prims.material_prim import MaterialPrim, OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
+from omnigibson.prims.material_prim import OmniPBRMaterialPrim, OmniSurfaceMaterialPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem
 from omnigibson.utils.numpy_utils import vtarray_to_torch
@@ -1455,14 +1455,8 @@ class FluidSystem(MicroPhysicalParticleSystem):
 
     def _get_particle_material_template(self):
         # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
-        return MaterialPrim.get_material(
-            scene=self.scene,
-            prim_path=self.mat_path,
-            name=self.mat_name,
-            load_config={
-                "mdl_name": f"OmniSurface{'' if self._material_mtl_name is None else 'Presets'}.mdl",
-                "mtl_name": f"OmniSurface{'' if self._material_mtl_name is None else ('_' + self._material_mtl_name)}",
-            },
+        return OmniSurfaceMaterialPrim.get_material(
+            scene=self.scene, prim_path=self.mat_path, name=self.mat_name, preset_name=self._material_mtl_name
         )
 
 
