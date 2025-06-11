@@ -30,7 +30,8 @@ export material OmniGibsonVRayMtl(
 	]],
 	uniform texture_2d refraction_texture = texture_2d() [[
 		anno::display_name("Refraction Map"),
-        anno::in_group("Maps")
+        anno::in_group("Maps"),
+        anno::unused()
 	]],
 	uniform texture_2d reflection_texture = texture_2d() [[
 		anno::display_name("Reflection Map"),
@@ -39,7 +40,17 @@ export material OmniGibsonVRayMtl(
 	uniform texture_2d reflection_ior_texture = texture_2d() [[
 		anno::display_name("Fresnel Reflection IOR Map"),
         anno::in_group("Maps")
-	]]
+	]],
+    color emission_color = color(1.f)
+    [[
+        anno::in_group("Emission"),
+        anno::display_name("Emission Color")
+    ]],
+    uniform float emission_intensity = 0.f
+    [[
+        anno::in_group("Emission"),
+        anno::display_name("Emission Intensity")
+    ]]
 ) 
 [[
     anno::display_name("OmniGibsonVRayMtl")
@@ -54,18 +65,18 @@ export material OmniGibsonVRayMtl(
     reflection_glossiness : vray_maps::VRayBitmap(
         filename : glossiness_texture
     ).mono,
-    reflection_fresnel : true,
     reflection_ior : vray_maps::VRayBitmap(
         filename : reflection_ior_texture
     ).mono,
-    reflection_lockIOR : false,
     reflection_metalness : vray_maps::VRayBitmap(
         filename : metalness_texture
     ).mono,
-    Refraction : vray_maps::VRayBitmap(
-        filename : refraction_texture
-    ).tint,
+    // Refraction : vray_maps::VRayBitmap(
+    //     filename : refraction_texture
+    // ).tint,
     texmap_bump : vray_maps::VRayBitmap_bump(
         filename : normal_texture
-    )
+    ),
+    self_illumination : emission_color,
+    self_illumination_multiplier : emission_intensity
 );

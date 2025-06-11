@@ -442,8 +442,8 @@ class DataCollectionWrapper(DataWrapper):
 
             # Prune any values after the checkpoint index
             if index != -1:
-                self.checkpoint_states = self.checkpoint_states[:index+1]
-                self.checkpoint_step_idxs = self.checkpoint_step_idxs[:index+1]
+                self.checkpoint_states = self.checkpoint_states[: index + 1]
+                self.checkpoint_step_idxs = self.checkpoint_step_idxs[: index + 1]
 
     def postprocess_traj_group(self, traj_grp):
         super().postprocess_traj_group(traj_grp=traj_grp)

@@ -222,13 +222,6 @@ class DatasetObject(USDObject):
 
             recursive_light_update(self._prim)
 
-        # Apply any forced roughness updates
-        for material in self.materials:
-            if material.is_glass:
-                continue
-            material.reflection_roughness_texture_influence = 0.0
-            material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
-
         # Set the joint frictions based on joint type
         for joint in self._joints.values():
             if joint.joint_type == JointType.JOINT_PRISMATIC:
@@ -310,46 +303,6 @@ class DatasetObject(USDObject):
 
         elif self._prim_type == PrimType.CLOTH:
             self.root_link.mass = category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
-
-    def _update_texture_change(self, object_state):
-        """
-        Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
-        to match the frozen state. If object_state is None, update the diffuse color to the default value. It attempts
-        to load the cached texture map named DIFFUSE/albedo_[STATE_NAME].png. If the cached texture map does not exist,
-        it modifies the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
-
-        Args:
-            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
-        """
-        # TODO: uncomment these once our dataset has the object state-conditioned texture maps
-        # DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
-        # state_name = object_state.__class__.__name__ if object_state is not None else None
-        for material in self.materials:
-            # texture_path = material.diffuse_texture
-            # assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
-            #
-            # # Get updated texture file path for state.
-            # texture_path_split = texture_path.split("/")
-            # filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
-            # assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
-            #
-            # filename_split = filename[:-4].split("_")
-            # # Check all three file names for backward compatibility.
-            # if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
-            #     filename_split.pop()
-            # target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            # target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
-            #
-            # if os.path.exists(target_texture_path):
-            #     # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
-            #     self._update_albedo_value(None, material)
-            #     if material.diffuse_texture != target_texture_path:
-            #         material.diffuse_texture = target_texture_path
-            # else:
-            #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
-            #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
-
-            self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """

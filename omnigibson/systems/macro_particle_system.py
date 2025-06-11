@@ -1,4 +1,3 @@
-import cv2
 import torch as th
 import trimesh
 
@@ -204,15 +203,7 @@ class MacroParticleSystem(BaseSystem):
         # Update color if the particle object has any material
         color = th.ones(3)
         if self.particle_object.has_material():
-            if self.particle_object.material.is_glass:
-                color = self.particle_object.material.glass_color
-            else:
-                diffuse_texture = self.particle_object.material.diffuse_texture
-                color = (
-                    cv2.imread(diffuse_texture).mean()
-                    if diffuse_texture
-                    else self.particle_object.material.diffuse_color_constant
-                )
+            color = self.particle_object.material.average_diffuse_color
         self._color = color
 
     def add_particle(self, relative_prim_path, scale, idn=None):
