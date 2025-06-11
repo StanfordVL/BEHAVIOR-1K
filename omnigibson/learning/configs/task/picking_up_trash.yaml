@@ -2,3 +2,4 @@
 
 task:
   name: picking_up_trash
+  instance_id: 0
