@@ -6,7 +6,7 @@ defaults:
 run_name: "${policy_name}_${task.name}"
 exp_root_dir: .
 policy_name: ???  # filled by policy
-
+headless: true
 # ====== main cfg ======
 seed: -1
 gpus: 1
@@ -83,3 +83,4 @@ resume:
 
 # ------------- Evaluation ---------------------
 eval: ??? # filled by policy
+log_path: ???

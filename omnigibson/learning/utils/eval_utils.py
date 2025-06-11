@@ -233,7 +233,8 @@ def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=
             "debug_object_sampling": False,
             "highlight_task_relevant_objects": False,
             "termination_config": {
-                "max_steps": 50000,
+                # "max_steps": 50000,
+                "max_steps": 5000,
             },
             "reward_config": {
                 "r_potential": 1.0,
