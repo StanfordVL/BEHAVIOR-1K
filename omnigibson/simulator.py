@@ -980,6 +980,7 @@ def _launch_simulator(*args, **kwargs):
                             self._objects_require_contact_callback = True
                         if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
                             self._objects_require_joint_break_callback = True
+                        obj.keep_still()
 
                     self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
