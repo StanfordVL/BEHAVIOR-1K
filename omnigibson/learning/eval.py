@@ -42,7 +42,7 @@ def load_openpi_model():
 
     # need to launch the openpi server first
     openpi_policy = OpenPIWrapper(
-        host="10.79.12.231",
+        host="10.79.12.59",
         port=8000,
         text_prompt="pick up the trash",
         control_mode="receeding_temporal"
@@ -246,8 +246,8 @@ if __name__ == "__main__":
     gm.HEADLESS = True
 
     
-    video_path = Path(config.log_path)/"eval_video.mp4"
-    video_path.parent.mkdir(parents=True, exist_ok=True)
+    video_path = Path(config.log_path)
+    video_path.mkdir(parents=True, exist_ok=True)
             
     OmegaConf.resolve(config)
 
@@ -259,8 +259,12 @@ if __name__ == "__main__":
  
         for idx in instances_to_run:
             load_task_instance_for_env(evaluator.env, idx)
-            for _ in range(episodes_per_instance):
+            for epi in range(episodes_per_instance):
+                for _ in range(20):
+                    og.sim.step()
+                assert len(evaluator.obs_buffer) == 0, "Observation buffer should be empty at the start of each episode."
                 done = False
+                video_name = str(video_path) + f'/video_{idx}_{epi}.mp4'
                 while not done:
                     terminated, truncated = evaluator.step()
                     if terminated or truncated:
@@ -269,11 +273,11 @@ if __name__ == "__main__":
                     if evaluator.env._current_step % 1000 == 0:
                         logger.info(f"Current step: {evaluator.env._current_step}")
                         mediapy.write_video(
-                            str(video_path),
+                            video_name,
                             torch.stack(evaluator.obs_buffer).cpu().numpy()[...,:3],
                             fps=30,
                         )
-                        logger.info(f"Saved video to {video_path}")
+                        logger.info(f"Saved video to {video_name}")
 
                 logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
@@ -282,12 +286,12 @@ if __name__ == "__main__":
                 
                 if len(evaluator.obs_buffer) > 0:
                     mediapy.write_video(
-                        str(video_path),
+                        video_name,
                         torch.stack(evaluator.obs_buffer).cpu().numpy()[...,:3],
                         fps=30,
                     )
                     evaluator.obs_buffer = []
-                    logger.info(f"Saved video to {video_path}")
+                    logger.info(f"Saved video to {video_name}")
                 else:
                     logger.warning("No observations were recorded.")
                     
