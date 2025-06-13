@@ -1,3 +1,5 @@
+import os
+import json
 import hydra
 import logging
 import omnigibson as og
@@ -17,6 +19,8 @@ from omnigibson.learning.utils.eval_utils import (
 )
 from omnigibson.macros import gm
 from omnigibson.robots import BaseRobot
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
 from typing import Any, Tuple
@@ -30,6 +34,42 @@ gm.ENABLE_TRANSITION_RULES = True
 # create module logger
 logger = logging.getLogger("evaluator")
 logger.setLevel(20)  # info
+
+
+def load_task_instance_for_env(env, instance_id: int) -> None:
+    scene_model = env.task.scene_name
+    tro_filename = env.task.get_cached_activity_scene_filename(
+        scene_model=scene_model,
+        activity_name=env.task.activity_name,
+        activity_definition_id=env.task.activity_definition_id,
+        activity_instance_id=instance_id,
+    )
+    tro_file_path = f"{gm.DATASET_PATH}/scenes/{scene_model}/json/{scene_model}_task_{env.task.activity_name}_instances/{tro_filename}-tro_state.json"
+    assert os.path.exists(
+        tro_file_path
+    ), f"Could not find TRO file at {tro_file_path}, did you run ./populate_behavior_tasks.sh?"
+    with open(tro_file_path, "r") as f:
+        tro_state = recursively_convert_to_torch(json.load(f))
+    env.scene.reset()
+    for bddl_name, obj_state in tro_state.items():
+        if "agent" in bddl_name:
+            # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
+            # for orientation
+            robot_pos = obj_state["joint_pos"][:3] + obj_state["root_link"]["pos"]
+            robot_quat = T.euler2quat(th.tensor([0, 0, obj_state["joint_pos"][5]]))
+            env.task.object_scope[bddl_name].set_position_orientation(robot_pos, robot_quat)
+        else:
+            env.task.object_scope[bddl_name].load_state(obj_state, serialized=False)
+
+    # Try to ensure that all task-relevant objects are stable
+    # They should already be stable from the sampled instance, but there is some issue where loading the state
+    # causes some jitter (maybe for small mass / thin objects?)
+    for _ in range(25):
+        og.sim.step_physics()
+        for entity in env.task.object_scope.values():
+            if not entity.is_system and entity.exists:
+                entity.keep_still()
+    env.scene.update_initial_file()
 
 
 class Evaluator:
@@ -62,6 +102,7 @@ class Evaluator:
             available_tasks = load_available_tasks()
             task_name = self.cfg.task.name
             assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
+            # Load the seed instance by default
             task_cfg = available_tasks[task_name][0]
             robot_type = self.cfg.robot.type
             robot_controller_cfg = self.cfg.robot.controllers
@@ -167,11 +208,18 @@ if __name__ == "__main__":
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
 
     OmegaConf.resolve(config)
+
+    instances_to_run = config.task.train_indices if config.task.train else config.task.test_indices
+    episodes_per_instance = config.task.episodes_per_instance
+
     with Evaluator(config) as evaluator:
-        done = False
-        while not done:
-            terminated, truncated = evaluator.step()
-            if terminated:
+        for idx in instances_to_run:
+            load_task_instance_for_env(evaluator.env, idx)
+            for _ in range(episodes_per_instance):
+                done = False
+                while not done:
+                    terminated, truncated = evaluator.step()
+                    if terminated or truncated:
+                        done = True
+                # Reset environment to the current task instance
                 evaluator.env.reset()
-            if truncated:
-                done = True
