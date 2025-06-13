@@ -420,7 +420,8 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
     )
     bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True)
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
-    half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
+    half_extent = bbox_bf_extent / 2
+    half_extent_with_offset = half_extent + aabb_offset
 
     start_points = th.zeros((num_samples, max_sampling_attempts, 3))
     end_points = th.zeros((num_samples, max_sampling_attempts, 3))
@@ -440,9 +441,7 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
         # Try each sampled position in the AABB.
         for j, (axis, is_top, start_point) in enumerate(samples):
             # Compute the ray's destination using the sampling & AABB information.
-            end_point = compute_ray_destination(
-                axis, is_top, start_point, -half_extent_with_offset, half_extent_with_offset
-            )
+            end_point = compute_ray_destination(axis, is_top, start_point, -half_extent, half_extent)
             start_points[i][j] = start_point
             end_points[i][j] = end_point
 
