@@ -395,7 +395,9 @@ class StatefulObject(BaseObject):
         emitter.CreateAttribute("physicsVelocityScale", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1.0)
         emitter.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         simulate.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
-        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(1 / og.sim.get_sim_step_dt())
+        simulate.CreateAttribute("stepsPerSecond", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
+            1 / og.sim.get_sim_step_dt()
+        )
         offscreen.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         renderer.CreateAttribute("layer", lazy.pxr.Sdf.ValueTypeNames.Int, False).Set(layer_number)
         advection.CreateAttribute("buoyancyPerTemp", lazy.pxr.Sdf.ValueTypeNames.Float, False).Set(
