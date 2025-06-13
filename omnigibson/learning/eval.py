@@ -260,8 +260,9 @@ if __name__ == "__main__":
         for idx in instances_to_run:
             load_task_instance_for_env(evaluator.env, idx)
             for epi in range(episodes_per_instance):
-                for _ in range(20):
-                    og.sim.step()
+                for _ in range(10):
+                    og.sim.render()
+                evaluator.reset()
                 assert len(evaluator.obs_buffer) == 0, "Observation buffer should be empty at the start of each episode."
                 done = False
                 video_name = str(video_path) + f'/video_{idx}_{epi}.mp4'
@@ -295,6 +296,5 @@ if __name__ == "__main__":
                 else:
                     logger.warning("No observations were recorded.")
                     
-                # Reset environment to the current task instance
-                evaluator.env.reset()
+               
                 
