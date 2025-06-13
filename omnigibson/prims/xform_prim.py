@@ -46,6 +46,7 @@ class XFormPrim(BasePrim):
         # Other values that will be filled in at runtime
         self._material = None
         self.original_scale = None
+        self._cached_scale = None
 
         # Run super method
         super().__init__(
@@ -409,6 +410,8 @@ class XFormPrim(BasePrim):
         Returns:
             th.tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
+        if self._cached_scale is not None:
+            return self._cached_scale
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
         return th.tensor(scale)
@@ -429,6 +432,8 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # Invalidate the cached scale
+        self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
