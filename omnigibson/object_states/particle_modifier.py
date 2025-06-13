@@ -61,7 +61,7 @@ m.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 400
 m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS = 0.01
 
 # The margin (> 0) to add to the remover area's AABB when detecting overlaps with other objects
-m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
+m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.02
 
 # Settings for determining how the projection particles are visualized as they're projected
 m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
