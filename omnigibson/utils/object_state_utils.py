@@ -145,6 +145,7 @@ def sample_kinematics(
         # Hardcoding R1 robot arm length for now
         arm_length_xy = 0.8
         eef_z_max = 1.7
+        eef_z_min = 0.3
         arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
         reachability_map = th.tensor(
             cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
@@ -208,6 +209,9 @@ def sample_kinematics(
                 xy_map = trav_map.world_to_map(pos[:2])
                 if pos[2] > eef_z_max:
                     # We need to check if the sampled position is above the maximum z of the arm
+                    pos = None
+                elif pos[2] < eef_z_min and predicate == "inside":
+                    # If sampling inside an object, we need to check if the sampled position is above the minimum z of the arm
                     pos = None
                 elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:
                     # If sampling onTop an objB of ground category, we need to check if
