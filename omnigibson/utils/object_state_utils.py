@@ -98,6 +98,7 @@ def sample_kinematics(
     z_offset=0.05,
     skip_falling=False,
     use_last_ditch_effort=True,
+    use_trav_map=True,
 ):
     """
     Samples the given @predicate kinematic state for @objA with respect to @objB
@@ -113,10 +114,17 @@ def sample_kinematics(
         skip_falling (bool): Whether to let @objA fall after its position is sampled or not
         use_last_ditch_effort (bool): Whether to use last-ditch effort to sample the kinematics if the first
             sampling attempt fails. This will place @objA at the center of @objB's AABB, offset in z direction such
+        use_trav_map (bool): Whether to use the traversability map of the scene to check if the sampled position is traversable.
 
     Returns:
         bool: True if successfully sampled, else False
     """
+    if use_trav_map:
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
+        assert isinstance(
+            objB.scene, TraversableScene
+        ), f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (
@@ -133,11 +141,7 @@ def sample_kinematics(
     # Save the state of the simulator
     state = og.sim.dump_state()
 
-    # Avoid circular import
-    from omnigibson.scenes.traversable_scene import TraversableScene
-
-    using_trav_map = isinstance(objB.scene, TraversableScene)
-    if using_trav_map:
+    if use_trav_map:
         trav_map = objB.scene.trav_map
         trav_map_floor_map = trav_map.floor_map[0]
         eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=objB.scene.robots[0])
@@ -205,7 +209,7 @@ def sample_kinematics(
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
-            if using_trav_map:
+            if use_trav_map:
                 xy_map = trav_map.world_to_map(pos[:2])
                 if pos[2] > eef_z_max:
                     # We need to check if the sampled position is above the maximum z of the arm
