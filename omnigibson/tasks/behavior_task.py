@@ -17,6 +17,7 @@ from bddl.activity import (
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.scenes.scene_base import Scene
@@ -237,6 +238,14 @@ class BehaviorTask(BaseTask):
 
         og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
         og.sim.add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
+
+    def reset(self, env):
+        super().reset(env)
+
+        # Force wake objects
+        for obj in self.object_scope.values():
+            if isinstance(obj, DatasetObject):
+                obj.wake()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -580,7 +589,7 @@ class BehaviorTask(BaseTask):
         )
         path = os.path.join(save_dir, f"{fname}.json")
         if task_relevant_only:
-            path = path.replace(".json", f"-tro_state.json")
+            path = path.replace(".json", "-tro_state.json")
         if suffix is not None:
             path = path.replace(".json", f"-{suffix}.json")
         if os.path.exists(path) and not override:
