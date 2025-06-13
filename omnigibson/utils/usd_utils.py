@@ -1,6 +1,5 @@
 import collections
 import itertools
-import math
 import os
 import re
 from collections.abc import Iterable
@@ -10,19 +9,17 @@ import numpy as np
 import torch as th
 import trimesh
 from numba import jit, prange
-from typing import Tuple
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
-from omnigibson.macros import gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
 from omnigibson.utils.numpy_utils import vtarray_to_torch
-from omnigibson.utils.python_utils import assert_valid_key, torch_compile, classproperty
+from omnigibson.utils.python_utils import assert_valid_key, torch_compile
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
@@ -1897,6 +1894,20 @@ def delete_or_deactivate_prim(prim_path):
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True
+
+
+def activate_prim_and_children(prim_path):
+    """
+    Recursively activates the prim at @prim_path and all of its children.
+
+    Args:
+        prim_path (str): Path to the prim to activate
+    """
+    current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+    current_prim.SetActive(True)
+    # Use GetAllChildren to also find those that are inactive
+    for child in current_prim.GetAllChildren():
+        activate_prim_and_children(child.GetPath().pathString)
 
 
 def get_sdf_value_type_name(val):

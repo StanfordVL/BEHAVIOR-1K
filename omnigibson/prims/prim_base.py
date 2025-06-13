@@ -8,6 +8,7 @@ from omnigibson.utils.usd_utils import (
     delete_or_deactivate_prim,
     scene_relative_prim_path_to_absolute,
     get_sdf_value_type_name,
+    activate_prim_and_children,
 )
 
 # Create module logger
@@ -103,13 +104,22 @@ class BasePrim(Serializable, Recreatable, ABC):
         self._scene = scene
         self._scene_assigned = True
 
-        # Then check if the prim is already loaded
+        # Check if the prim path exists in the stage
         if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path=self.prim_path):
-            # TODO(parallel-hang): make this more descriptive
-            log.debug(f"prim {self.name} already exists, skipping load")
-            self._prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+            existing_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=self.prim_path)
+
+            # Note: A prim path can be valid but the prim itself may be inactive.
+            # This commonly occurs after transition rules when scene prims get deleted -
+            # the prim paths remain valid but the prims become inactive.
+            # In such cases, we need to activate the prim to make it usable again.
+            if not existing_prim.IsActive():
+                log.debug(f"Prim '{self.name}' exists but is inactive/invalid, activating it")
+                # Recursively find all prims under it, even those that are deactivated
+                activate_prim_and_children(self.prim_path)
+            self._prim = existing_prim
         else:
-            # If not, we'll load it.
+            # Prim path doesn't exist - load it for the first time
+            log.debug(f"Prim '{self.name}' doesn't exist, loading")
             self._prim = self._load()
 
         # Mark the prim as loaded.
