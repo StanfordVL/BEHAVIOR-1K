@@ -1614,7 +1614,7 @@ class RecipeRule(BaseTransitionRule):
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | th.tensor(
+        in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions) | th.tensor(
             [obj.states[OnTop].get_value(container) for obj in self._objects]
         )
 
@@ -1647,6 +1647,8 @@ class RecipeRule(BaseTransitionRule):
         # Finally, compute relevant objects and category mapping based on relevant categories
         i = 0
         for category, objects in objects_by_category.items():
+            # Exclude fixed base objects for performance
+            objects = [obj for obj in objects if not obj.fixed_base]
             self._category_idxs[category] = i + th.arange(len(objects))
             self._objects += list(objects)
             for obj in objects:
@@ -1984,8 +1986,16 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         # Generate cooked particles
         cooked_system = self.scene.get_system(recipe["output_systems"][0])
+        pre_gen_count = cooked_system.n_particles
         particle_positions = contained_particles_state.positions[in_volume_idx]
         cooked_system.generate_particles(positions=particle_positions)
+
+        # Stabilize generated particles
+        new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
+        lin_vel, ang_vel = cooked_system.get_particles_velocities()
+        lin_vel[new_particle_indices] = 0
+        ang_vel[new_particle_indices] = 0
+        cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)
 
         # Remove water if the cooking requires water
         if len(recipe["input_systems"]) > 1:
