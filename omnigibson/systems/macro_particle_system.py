@@ -27,6 +27,10 @@ m.MIN_PARTICLE_RADIUS = (
 )
 m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY = None  # If set, the maximum density for macro particle systems
 
+m.MACRO_PHYSICAL_STATIC_FRICTION = 1.0
+m.MACRO_PHYSICAL_DYNAMIC_FRICTION = 0.8
+m.MACRO_PHYSICAL_RESTITUTION = 0.0
+
 
 class MacroParticleSystem(BaseSystem):
     """
@@ -1173,12 +1177,24 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_radius = None
         self._particle_offset = None
 
+        # Physics material
+        self.particle_physics_material = None
+
     def initialize(self, scene):
         # Run super method first
         super().initialize(scene)
 
         # Create the particles head prim -- this is merely a scope prim
         og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
+
+        # Physics material to apply to the particles
+        self.particle_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(
+            prim_path=f"{self.prim_path}/material",
+            name=f"{self.name}_physics_material",
+            static_friction=m.MACRO_PHYSICAL_STATIC_FRICTION,
+            dynamic_friction=m.MACRO_PHYSICAL_DYNAMIC_FRICTION,
+            restitution=m.MACRO_PHYSICAL_RESTITUTION,
+        )
 
         # A new view needs to be created every time once sim is playing, so we add a callback now
         og.sim.add_callback_on_play(name=f"{self.name}_particles_view", callback=self.refresh_particles_view)
@@ -1209,6 +1225,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             )
         result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
+        result.apply_physics_material(self.particle_physics_material)
         return result
 
     def process_particle_object(self):
