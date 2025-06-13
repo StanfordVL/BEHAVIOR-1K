@@ -380,20 +380,19 @@
         ],
         "house_single_floor": {
             "whitelist": {
-                "bow.n.08": {
-                    "bow": {
-                        "fhchql": [0.08, 0.08, 0.02]
+                "candy_cane.n.01": {
+                    "candy_cane": {
+                        "qfomjj": [0.12 , 0.045, 0.015]
                     }
                 },
-                "candle.n.01": {
-                    "dip_candle": {
-                        "poexjo": null,
-                        "mxjejs": null
+                "pillar_candle.n.01": {
+                    "pillar_candle": {
+                        "cxswbc": [0.05, 0.05, 0.07]
                     }
                 },
-                "toy_box.n.01": {
-                    "toy_box": {
-                        "aviadj": null
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "dgkhyn": null
                     }
                 },
                 "christmas_tree.n.05": {
@@ -423,7 +422,7 @@
             "whitelist": {
                 "poster.n.01": {
                     "poster": {
-                        "dsrcyt": null
+                        "dsrcyt": [0.01, 0.31 , 0.445]
                     }
                 }
             },
@@ -446,9 +445,9 @@
                         "dcleem": null
                     }
                 },
-                "spatula.n.01": {
-                    "spatula": {
-                        "vnymjm": null
+                "soup_ladle.n.01": {
+                    "soup_ladle": {
+                        "cfzneb": null
                     }
                 }
             },
@@ -463,17 +462,17 @@
             "whitelist": {
                 "carving_knife.n.01": {
                     "carving_knife": {
-                        "awvoox": null
+                        "usqmjc": null
                     }
                 },
                 "chopping_board.n.01": {
                     "cutting_board": {
-                        "tcdrzs": null
+                        "aibvew": [0.3, 0.2, 0.02]
                     }
                 },
-                "hinged_jar.n.01": {
-                    "hinged_jar": {
-                        "vzwhbg": null
+                "bowl.n.01": {
+                    "bowl": {
+                        "belcml": [0.255, 0.255, 0.15]
                     }
                 },
                 "pineapple.n.02": {
@@ -483,12 +482,17 @@
                 },
                 "steak.n.01": {
                     "steak": {
-                        "ppykkp": null
+                        "ppykkp": [0.10, 0.15, 0.05]
                     }
                 },
-                "spatula.n.01": {
-                    "spatula": {
-                        "vnymjm": null
+                "cabinet.n.01": {
+                    "bottom_cabinet": {
+                        "fancyy": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
                     }
                 }
             },
@@ -508,7 +512,7 @@
                 },
                 "chili.n.02": {
                     "chili": {
-                        "xhbpqh": [0.10, 0.05, 0.03]
+                        "xhbpqh": [0.12, 0.06, 0.04]
                     }
                 },
                 "chopping_board.n.01": {
@@ -521,9 +525,19 @@
                         "cprjvq": null
                     }
                 },
+                "plate.n.04": {
+                    "plate": {
+                        "zpddxu": null
+                    }
+                },
                 "head_cabbage.n.02": {
                     "head_cabbage": {
                         "tqohvs": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelker": null
                     }
                 }
             },
@@ -591,9 +605,9 @@
                         "eclhdh": null
                     }
                 },
-                "griddle.n.01": {
-                    "griddle_pan": {
-                        "ryvqep": null
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "mhndon": null
                     }
                 },
                 "tray.n.01": {
@@ -833,17 +847,22 @@
                 },
                 "chopping_board.n.01": {
                     "cutting_board": {
-                        "aibvew": null
+                        "aibvew": [0.3, 0.2 , 0.02]
                     }
                 },
-                "mixing_bowl.n.01": {
-                    "mixing_bowl": {
-                        "bsgybx": [0.192, 0.168, 0.088]
+                "bowl.n.01": {
+                    "bowl": {
+                        "aspeds": [0.225, 0.225, 0.075]
                     }
                 },
                 "vidalia_onion.n.01": {
                     "vidalia_onion": {
                         "buyxll": null
+                    }
+                },
+                "countertop.n.01": {
+                    "bar": {
+                        "egwapq": null
                     }
                 }
             },
@@ -880,6 +899,11 @@
                     "zucchini": {
                         "udvfaz": null
                     }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
                 }
             },
             "blacklist": {}
@@ -903,7 +927,7 @@
                 },
                 "log.n.01": {
                     "log": {
-                        "pepele": null
+                        "pepele": [0.3, 0.1, 0.1]
                     }
                 },
                 "driveway.n.01": {
@@ -1515,7 +1539,7 @@
                 },
                 "wicker_basket.n.01": {
                     "wicker_basket": {
-                        "jqfftz": null
+                        "dgkhyn": null
                     }
                 },
                 "countertop.n.01": {
@@ -1547,8 +1571,7 @@
                         "yomcyv": null,
                         "poanfs": null,
                         "tvydcv": null,
-                        "znlewl": null,
-                        "wiydxy": null
+                        "znlewl": null
                     }
                 },
                 "box.n.01": {
@@ -1787,7 +1810,12 @@
             "whitelist": {
                 "boxing_glove.n.01": {
                     "boxing_gloves": {
-                        "jlfuaf": null
+                        "jlfuaf": [0.259, 0.175, 0.126]
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "sjxber": null
                     }
                 }
             },
@@ -1807,12 +1835,12 @@
                 },
                 "chopping_board.n.01": {
                     "chopping_board": {
-                        "cptayn": null
+                        "sygezm": [0.22, 0.33, 0.015]
                     }
                 },
                 "cookie_sheet.n.01": {
                     "baking_sheet": {
-                        "yhurut": [0.30, 0.50, 0.025]
+                        "yhurut": [0.27, 0.30, 0.03]
                     }
                 },
                 "mushroom.n.05": {
@@ -1827,17 +1855,17 @@
                 },
                 "pizza_dough.n.01": {
                     "pizza_dough": {
-                        "jguwbv": [0.16, 0.16, 0.01]
-                    }
-                },
-                "plate.n.04": {
-                    "plate": {
-                        "eozsdg": null
+                        "jguwbv": [0.23, 0.23, 0.005]
                     }
                 },
                 "tupperware.n.01": {
                     "tupperware": {
                         "mkstwr": null
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "szgdpc": null
                     }
                 },
                 "vidalia_onion.n.01": {
@@ -1929,6 +1957,11 @@
                     "broom": {
                         "tpyvbt": [0.81, 0.27, 0.06]
                     }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
                 }
             },
             "blacklist": {}
@@ -2003,6 +2036,51 @@
                 "newspaper.n.03": {
                     "newspaper": {
                         "omsont": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_gas_logs": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "log.n.01": {
+                    "log": {
+                        "pepele": [0.3, 0.1, 0.1]
+                    }
+                },
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": [0.195, 0.06 , 0.03]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_trumpet": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "cornet.n.01": {
+                    "trumpet": {
+                        "bafgow": null
+                    }
+                },
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                },
+                "desk.n.01": {
+                    "desk": {
+                        "aduafr": null
                     }
                 }
             },
