@@ -1561,7 +1561,7 @@ class BDDLSampler:
         if not goal_condition_success:
             return error_msg
 
-    def _sample_initial_conditions_final(self):
+    def _sample_initial_conditions_final(self, dynamic_scale=False):
         """
         Sample final initial conditions
 
@@ -1641,21 +1641,22 @@ class BDDLSampler:
                             ):
                                 break
 
-                            # If any scales are equal or less than the lower threshold, terminate immediately
-                            new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
-                            if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
-                                break
+                            if dynamic_scale:
+                                # If any scales are equal or less than the lower threshold, terminate immediately
+                                new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
+                                if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                                    break
 
-                            # Re-scale and re-attempt
-                            # Re-scaling is not respected unless sim cycle occurs
-                            og.sim.stop()
-                            entity.scale = new_scale
-                            log.info(
-                                f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}"
-                            )
-                            og.sim.play()
-                            og.sim.load_state(state, serialized=False)
-                            og.sim.step_physics()
+                                # Re-scale and re-attempt
+                                # Re-scaling is not respected unless sim cycle occurs
+                                og.sim.stop()
+                                entity.scale = new_scale
+                                log.info(
+                                    f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}"
+                                )
+                                og.sim.play()
+                                og.sim.load_state(state, serialized=False)
+                                og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
                             self._env.scene.object_registry.update(keys=["in_rooms"])
