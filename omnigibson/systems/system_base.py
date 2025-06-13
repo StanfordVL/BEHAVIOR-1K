@@ -863,7 +863,7 @@ class PhysicalParticleSystem(BaseSystem):
 
         # This guarantees that h - self.particle_radius > l + self.particle_radius
         assert th.all(
-            extent > 2 * self.particle_radius
+            extent >= 2 * self.particle_radius
         ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
 
         arrs = [
