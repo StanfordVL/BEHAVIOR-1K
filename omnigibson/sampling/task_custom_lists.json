@@ -1529,7 +1529,7 @@
                 },
                 "mixing_bowl.n.01": {
                     "mixing_bowl": {
-                        "bsgybx": [0.48, 0.42, 0.22]
+                        "bsgybx": [0.36 , 0.315, 0.165]
                     }
                 },
                 "sweet_corn.n.02": {
@@ -1539,7 +1539,7 @@
                 },
                 "wicker_basket.n.01": {
                     "wicker_basket": {
-                        "dgkhyn": null
+                        "dgkhyn": [0.3, 0.45, 0.19]
                     }
                 },
                 "countertop.n.01": {
