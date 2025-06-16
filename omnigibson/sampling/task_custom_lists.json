@@ -467,7 +467,7 @@
                 },
                 "chopping_board.n.01": {
                     "cutting_board": {
-                        "aibvew": [0.3, 0.2, 0.02]
+                        "aibvew": [0.35, 0.25, 0.02]
                     }
                 },
                 "bowl.n.01": {
@@ -482,7 +482,7 @@
                 },
                 "steak.n.01": {
                     "steak": {
-                        "ppykkp": [0.10, 0.15, 0.05]
+                        "ppykkp": [0.13, 0.19, 0.05]
                     }
                 },
                 "cabinet.n.01": {
@@ -512,7 +512,7 @@
                 },
                 "chili.n.02": {
                     "chili": {
-                        "xhbpqh": [0.12, 0.06, 0.04]
+                        "xhbpqh": 6.0
                     }
                 },
                 "chopping_board.n.01": {
