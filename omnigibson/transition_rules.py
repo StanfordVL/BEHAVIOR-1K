@@ -969,16 +969,18 @@ class SlicingRule(BaseTransitionRule):
                 part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
                 part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
-                # TODO: double check if we can remove this!!!!
-                # # Determine the relative scale to apply to the object part from the original object
-                # # Note that proper (rotated) scaling can only be applied when the relative orientation of
-                # # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                # assert T.check_quat_right_angle(
-                #     part_bb_orn
-                # ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
-
                 # Scale the offset accordingly.
-                scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
+                # If the scale of the sliceable object is uniform, we can just take its scale
+                if th.all(sliceable_obj.scale == sliceable_obj.scale[0]):
+                    scale = sliceable_obj.scale
+                else:
+                    # Determine the relative scale to apply to the object part from the original object
+                    # Note that proper (rotated) scaling can only be applied when the relative orientation of
+                    # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+                    assert T.check_quat_right_angle(
+                        part_bb_orn
+                    ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                    scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
                 # Calculate global part bounding box pose.
                 part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
