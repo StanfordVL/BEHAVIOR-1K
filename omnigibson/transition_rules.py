@@ -1785,6 +1785,15 @@ class RecipeRule(BaseTransitionRule):
 
         volume += sum(obj.volume for obj in objs_to_remove)
 
+        # Compute full AABB containing all objects in objs_to_remove
+        full_aabb = None
+        if objs_to_remove:
+            aabbs = [obj.aabb for obj in objs_to_remove]
+            full_aabb = (
+                th.min(th.stack([aabb[0] for aabb in aabbs]), dim=0).values,
+                th.max(th.stack([aabb[1] for aabb in aabbs]), dim=0).values,
+            )
+
         # Define callback for spawning new objects inside container
         def _spawn_object_in_container(obj):
             # For simplicity sake, sample only OnTop
@@ -1814,11 +1823,28 @@ class RecipeRule(BaseTransitionRule):
             n_category_objs = len(container.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
+            bounding_box_size = None
+            if full_aabb is not None and n_instances > 0:
+                # Compute the 3D bounding box size for the new objects
+                full_aabb_extent = full_aabb[1] - full_aabb[0]  # Get the full AABB extent
+
+                # Determine how to divide the space in the x-y plane
+                # Calculate factors for grid layout
+                n_rows = int(math.ceil(n_instances**0.5))
+                n_columns = math.ceil(n_instances / n_rows)
+
+                # Calculate the size for each instance in the x-y plane
+                bounding_box_size = th.tensor(
+                    [full_aabb_extent[0] / n_columns, full_aabb_extent[1] / n_rows, full_aabb_extent[2]],
+                    dtype=th.float32,
+                )
+
             for i in range(n_instances):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
                     category=category,
                     model=random.choice(models),
+                    bounding_box=bounding_box_size,
                 )
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,
