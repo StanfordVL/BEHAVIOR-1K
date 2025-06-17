@@ -1482,9 +1482,16 @@ class BDDLSampler:
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
 
-                obj_kwargs["bounding_box"] = (
-                    synset_whitelist.get(category, dict()).get(model, None) if synset_whitelist else None
-                )
+                size = synset_whitelist.get(category, dict()).get(model, None) if synset_whitelist else None
+
+                # if size is one dimension, this is a scale; if it's three dimensions, this is a bounding box
+                if size is not None:
+                    if isinstance(size, (int, float)):
+                        obj_kwargs["scale"] = th.tensor(size, dtype=th.float32)
+                    elif isinstance(size, list) and len(size) == 3:
+                        obj_kwargs["bounding_box"] = th.tensor(size, dtype=th.float32)
+                    else:
+                        return f"Invalid size for object {obj_inst} with model {model} in category {category}: {size}"
 
                 # create the object
                 simulator_obj = DatasetObject(
