@@ -1617,10 +1617,9 @@
     },
     "clearing_food_from_table_into_fridge": {
         "room_types": [
-            "dining_room",
             "kitchen"
         ],
-        "house_single_floor": {
+        "house_double_floor_lower": {
             "whitelist": {
                 "half__chicken.n.01": {
                     "half_chicken": {
@@ -1643,8 +1642,8 @@
                     }
                 },
                 "countertop.n.01": {
-                    "countertop": {
-                        "kelzer": null
+                    "bar": {
+                        "egwapq": null
                     }
                 }
             },
