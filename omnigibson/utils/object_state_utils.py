@@ -10,11 +10,13 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
-from omnigibson.utils.ui_utils import debug_breakpoint
+from omnigibson.utils.ui_utils import debug_breakpoint, create_module_logger
 from omnigibson.utils.constants import JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
+
+log = create_module_logger(module_name=__name__)
 
 m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 10
@@ -122,9 +124,11 @@ def sample_kinematics(
     if use_trav_map:
         from omnigibson.scenes.traversable_scene import TraversableScene
 
-        assert isinstance(
-            objB.scene, TraversableScene
-        ), f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
+        if not isinstance(objB.scene, TraversableScene):
+            log.warning(
+                f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
+            )
+            use_trav_map = False
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (

@@ -39,6 +39,7 @@ from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
 from omnigibson.systems.system_base import VisualParticleSystem
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -920,17 +921,18 @@ class DryerRule(WasherDryerRule):
         }
 
     def transition(self, object_candidates):
-        water = self.scene.get_system("water")
-        global_info = self._compute_global_rule_info()
-        for dryer in object_candidates["dryer"]:
-            container_info = self._compute_container_info(
-                object_candidates=object_candidates, container=dryer, global_info=global_info
-            )
-            in_volume_objs = container_info["in_volume_objs"]
-            for obj in in_volume_objs:
-                if Saturated in obj.states:
-                    obj.states[Saturated].set_value(water, False)
-            dryer.states[Contains].set_value(water, False)
+        water = self.scene.get_system("water", force_init=False)
+        if water.initialized:
+            global_info = self._compute_global_rule_info()
+            for dryer in object_candidates["dryer"]:
+                container_info = self._compute_container_info(
+                    object_candidates=object_candidates, container=dryer, global_info=global_info
+                )
+                in_volume_objs = container_info["in_volume_objs"]
+                for obj in in_volume_objs:
+                    if Saturated in obj.states:
+                        obj.states[Saturated].set_value(water, False)
+                dryer.states[Contains].set_value(water, False)
 
         return TransitionResults(add=[], remove=[])
 
@@ -2019,11 +2021,12 @@ class CookingPhysicalParticleRule(RecipeRule):
         cooked_system.generate_particles(positions=particle_positions)
 
         # Stabilize generated particles
-        new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
-        lin_vel, ang_vel = cooked_system.get_particles_velocities()
-        lin_vel[new_particle_indices] = 0
-        ang_vel[new_particle_indices] = 0
-        cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)
+        if isinstance(cooked_system, MacroPhysicalParticleSystem):
+            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
+            lin_vel, ang_vel = cooked_system.get_particles_velocities()
+            lin_vel[new_particle_indices] = 0
+            ang_vel[new_particle_indices] = 0
+            cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)
 
         # Remove water if the cooking requires water
         if len(recipe["input_systems"]) > 1:
@@ -2104,6 +2107,7 @@ class ToggleableMachineRule(RecipeRule):
                 NotFilter(CategoryFilter("washer")),
                 NotFilter(CategoryFilter("clothes_dryer")),
                 NotFilter(CategoryFilter("hot_tub")),
+                NotFilter(CategoryFilter("oven")),
             ]
         )
         return candidate_filters
@@ -2213,7 +2217,7 @@ class MixingToolRule(RecipeRule):
 
     @classproperty
     def use_garbage_fallback_recipe(cls):
-        return False
+        return True
 
 
 class CookingRule(RecipeRule):

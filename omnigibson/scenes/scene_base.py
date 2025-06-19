@@ -528,6 +528,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 scene_info = self.scene_file
             init_state = scene_info["state"]
             init_state = recursively_convert_to_torch(init_state)
+            # In VectorEnvironment, the scene pose loaded from the file should be updated
+            init_state["pos"], init_state["ori"] = self._pose_info["pos_ori"]
+            for obj_name, obj_info in init_state["registry"]["object_registry"].items():
+                # Convert the pose to be in the scene's coordinate frame
+                pos, ori = obj_info["root_link"]["pos"], obj_info["root_link"]["ori"]
+                # apply scene pose to all objects in this scene
+                obj_info["root_link"]["pos"], obj_info["root_link"]["ori"] = T.pose_transform(
+                    *T.mat2pose(self.pose), pos, ori
+                )
+            # TODO: also handle system registry here
             self.load_state(init_state, serialized=False)
         self._initial_file = self.save(as_dict=True)
 
