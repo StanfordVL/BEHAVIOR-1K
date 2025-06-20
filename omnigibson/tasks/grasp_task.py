@@ -76,7 +76,8 @@ class GraspTask(BaseTask):
 
     def _reset_agent(self, env):
         robot = env.robots[0]
-        robot.release_grasp_immediately()
+        for arm in robot.arm_names:
+            robot.release_grasp_immediately(arm=arm)
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.

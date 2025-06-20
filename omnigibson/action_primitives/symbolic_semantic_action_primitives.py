@@ -195,7 +195,8 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
                 "Cannot release an object if you're not already holding an object",
             )
 
-        self.robot.release_grasp_immediately()
+        for arm in self.robot.arm_names:
+            self.robot.release_grasp_immediately(arm=arm)
         yield from self._settle_robot()
 
     def _toggle(self, obj, value):

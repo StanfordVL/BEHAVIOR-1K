@@ -610,20 +610,19 @@ class ManipulationRobot(BaseRobot):
         self._ag_freeze_gripper[arm] = False
         self._ag_release_counter[arm] = 0
 
-    def release_grasp_immediately(self):
+    def release_grasp_immediately(self, arm="default"):
         """
-        Magic action to release this robot's grasp for all arms at once.
+        Magic action to release this robot's grasp for one arm.
         As opposed to @_release_grasp, this method would bypass the release window mechanism and immediately release.
         """
-        for arm in self.arm_names:
-            if self._ag_obj_constraints[arm] is not None:
-                self._release_grasp(arm=arm)
-                self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
-                self._handle_release_window(arm=arm)
-                assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
-                # TODO: Verify not needed!
-                # for finger_link in self.finger_links[arm]:
-                #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
+        if self._ag_obj_constraints[arm] is not None:
+            self._release_grasp(arm=arm)
+            self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
+            self._handle_release_window(arm=arm)
+            assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
+            # TODO: Verify not needed!
+            # for finger_link in self.finger_links[arm]:
+            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
@@ -1804,9 +1803,6 @@ class ManipulationRobot(BaseRobot):
         return state
 
     def _load_state(self, state):
-        # If there is an existing AG object, remove it
-        self.release_grasp_immediately()
-
         super()._load_state(state=state)
 
         # No additional loading needed if we're using physical grasping
@@ -1816,14 +1812,37 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         # TODO: currently does not take care of cloth objects
         # TODO: add unit tests
-        if "ag_obj_constraint_params" not in state:
-            return
-        for arm in state["ag_obj_constraint_params"].keys():
-            if len(state["ag_obj_constraint_params"][arm]) > 0:
-                data = state["ag_obj_constraint_params"][arm]
-                obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
-                link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                contact_pos_global = data["contact_pos"]
+        for arm in self.arm_names:
+            current_ag_constraint = self._ag_obj_constraint_params[arm]
+            has_current_constraint = len(current_ag_constraint) > 0
+
+            loaded_ag_constraint = {}
+            has_loaded_constraint = False
+            if "ag_obj_constraint_params" in state:
+                loaded_ag_constraint = state["ag_obj_constraint_params"][arm]
+                has_loaded_constraint = len(loaded_ag_constraint) > 0
+
+            # Release existing grasp if needed
+            should_release = False
+            if has_current_constraint:
+                if not has_loaded_constraint:
+                    should_release = True
+                else:
+                    # Check if constraints are different
+                    are_equal = current_ag_constraint.keys() == loaded_ag_constraint.keys() and all(
+                        th.equal(v1, v2) if isinstance(v1, th.Tensor) and isinstance(v2, th.Tensor) else v1 == v2
+                        for v1, v2 in zip(current_ag_constraint.values(), loaded_ag_constraint.values())
+                    )
+                    should_release = not are_equal
+
+            if should_release:
+                self.release_grasp_immediately(arm=arm)
+
+            # Establish new grasp if needed
+            if has_loaded_constraint and (not has_current_constraint or should_release):
+                obj = self.scene.object_registry("prim_path", loaded_ag_constraint["ag_obj_prim_path"])
+                link = obj.links[loaded_ag_constraint["ag_link_prim_path"].split("/")[-1]]
+                contact_pos_global = loaded_ag_constraint["contact_pos"]
                 assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene"
                 contact_pos_global, _ = self.scene.convert_scene_relative_pose_to_world(
                     contact_pos_global,
