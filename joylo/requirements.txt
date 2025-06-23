@@ -1,0 +1,23 @@
+# keep in alphabetical order
+dm_control
+Pillow
+pygame
+#pyspacemouse
+PyQt6
+pyquaternion
+#pyrealsense2
+pure-python-adb
+quaternion
+tyro
+#ur-rtde
+zmq
+#xarm
+#xarm-python-sdk
+numpy-quaternion
+termcolor
+pybullet
+dynamixel-sdk
+inputs
+joycon-python
+hid
+pyglm
