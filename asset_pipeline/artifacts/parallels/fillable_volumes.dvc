@@ -1,0 +1,6 @@
+outs:
+- md5: 03351d4e7ac341771d0a401feadf1e5b.dir
+  size: 12846689
+  nfiles: 1599
+  path: fillable_volumes
+  hash: md5

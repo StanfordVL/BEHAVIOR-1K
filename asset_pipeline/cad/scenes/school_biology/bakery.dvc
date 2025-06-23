@@ -1,0 +1,6 @@
+outs:
+- md5: 3f9a4d0ec1bb9eec3f6b34d74a67fe2e.dir
+  size: 415510165
+  nfiles: 875
+  path: bakery
+  hash: md5

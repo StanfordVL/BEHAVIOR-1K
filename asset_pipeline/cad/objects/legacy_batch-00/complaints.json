@@ -1,0 +1,2411 @@
+[
+    {
+        "object": "pop-bqretx",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1522
+    },
+    {
+        "object": "pop-bqretx",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1523
+    },
+    {
+        "object": "pop-dlqmit",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1524
+    },
+    {
+        "object": "pop-drqbiy",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1525
+    },
+    {
+        "object": "pop-drqbiy",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1526
+    },
+    {
+        "object": "pop-exapzb",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1527
+    },
+    {
+        "object": "pop-ghxeqz",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1528
+    },
+    {
+        "object": "pop-ghxeqz",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1529
+    },
+    {
+        "object": "pop-haoywb",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1530
+    },
+    {
+        "object": "pop-haoywb",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1531
+    },
+    {
+        "object": "pop-hjrwqb",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1532
+    },
+    {
+        "object": "pop-hjrwqb",
+        "complaint": "brqand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1533
+    },
+    {
+        "object": "bottle_of_pop-hjrwqb",
+        "complaint": "bad texture (text is flipped)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1534
+    },
+    {
+        "object": "pop-jnoksl",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1535
+    },
+    {
+        "object": "pop-jnoksl",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1536
+    },
+    {
+        "object": "pop-kviogj",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1537
+    },
+    {
+        "object": "pop-kviogj",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1538
+    },
+    {
+        "object": "bottle_of_pop-kviogj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1539
+    },
+    {
+        "object": "pop-mdznsn",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1540
+    },
+    {
+        "object": "pop-mdznsn",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1541
+    },
+    {
+        "object": "pop-mhzttm",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1542
+    },
+    {
+        "object": "pop-mhzttm",
+        "complaint": "brand?\\",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1543
+    },
+    {
+        "object": "pop-msmlud",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1544
+    },
+    {
+        "object": "pop-msmlud",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1545
+    },
+    {
+        "object": "pop-nepfjl",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1546
+    },
+    {
+        "object": "pop-nepfjl",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1547
+    },
+    {
+        "object": "pop-nyupqh",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1548
+    },
+    {
+        "object": "pop-nyupqh",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1549
+    },
+    {
+        "object": "pop-oeipjl",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1550
+    },
+    {
+        "object": "pop-oeipjl",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1551
+    },
+    {
+        "object": "pop-oghrnk",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1552
+    },
+    {
+        "object": "pop-oghrnk",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1553
+    },
+    {
+        "object": "pop-pfjzkn",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1554
+    },
+    {
+        "object": "pop-pfjzkn",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1555
+    },
+    {
+        "object": "pop-pvabxf",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1556
+    },
+    {
+        "object": "pop-pvabxf",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1557
+    },
+    {
+        "object": "pop-pyrics",
+        "complaint": "soda ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1558
+    },
+    {
+        "object": "pop-pyrics",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1559
+    },
+    {
+        "object": "pop-rhclfg",
+        "complaint": "soda ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1560
+    },
+    {
+        "object": "pop-rhclfg",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1561
+    },
+    {
+        "object": "pop-ribekf",
+        "complaint": "soda ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1562
+    },
+    {
+        "object": "pop-ribekf",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1563
+    },
+    {
+        "object": "pop-sevoto",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1564
+    },
+    {
+        "object": "pop-sevoto",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1565
+    },
+    {
+        "object": "pop-ubazru",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1566
+    },
+    {
+        "object": "pop-ubazru",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1567
+    },
+    {
+        "object": "pop-uwmchl",
+        "complaint": "soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1568
+    },
+    {
+        "object": "pop-uwmchl",
+        "complaint": "brand?>",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1569
+    },
+    {
+        "object": "pop-vfjhav",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1570
+    },
+    {
+        "object": "pop-vfjhav",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1571
+    },
+    {
+        "object": "pop-wmqhul",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1572
+    },
+    {
+        "object": "pop-wmqhul",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1573
+    },
+    {
+        "object": "pop-wrgmdt",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1574
+    },
+    {
+        "object": "pop-wrgmdt",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1575
+    },
+    {
+        "object": "pop-xoldze",
+        "complaint": "soda bottle ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1576
+    },
+    {
+        "object": "pop-xoldze",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1577
+    },
+    {
+        "object": "pop-zxambx",
+        "complaint": "soda bottle",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1578
+    },
+    {
+        "object": "pop-zxambx",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1579
+    },
+    {
+        "object": "bottom_cabinet-bamfsz",
+        "complaint": "no synsets",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1580
+    },
+    {
+        "object": "bottom_cabinet-bamfsz",
+        "complaint": "too big for just a cabinet",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.08m, 1.13m, 1.35m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1581
+    },
+    {
+        "object": "bottom_cabinet-bamfsz",
+        "complaint": "must have doors",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1582
+    },
+    {
+        "object": "bottom_cabinet-bycegi",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1583
+    },
+    {
+        "object": "bottom_cabinet-bycegi",
+        "complaint": "might be too tall for just a bottom cabinet, but if not a bottom cabinet it could be a reasonable size",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n54.22cm, 57.05cm, 1.88m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1584
+    },
+    {
+        "object": "bottom_cabinet-bycegi",
+        "complaint": "doors needed",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1585
+    },
+    {
+        "object": "bottom_cabinet-bycegi",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1586
+    },
+    {
+        "object": "bottom_cabinet-bycegi",
+        "complaint": "Cabinet handle not shown in cmeshes",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1587
+    },
+    {
+        "object": "bottom_cabinet-cjcyed",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1588
+    },
+    {
+        "object": "bottom_cabinet-cjcyed",
+        "complaint": "not sure why it's missing the top doors",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1589
+    },
+    {
+        "object": "bottom_cabinet-cjcyed",
+        "complaint": "needs doors",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1590
+    },
+    {
+        "object": "bottom_cabinet-cjcyed",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1591
+    },
+    {
+        "object": "bottom_cabinet-dajebq",
+        "complaint": "it's double and not bottom but no synsets anyways",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1592
+    },
+    {
+        "object": "bottom_cabinet-dajebq",
+        "complaint": "not sure",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1593
+    },
+    {
+        "object": "bottom_cabinet-dajebq",
+        "complaint": "needs doors",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1594
+    },
+    {
+        "object": "bottom_cabinet-dsbcxl",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1595
+    },
+    {
+        "object": "bottom_cabinet-dsbcxl",
+        "complaint": "needs doors",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1596
+    },
+    {
+        "object": "bottom_cabinet-dsbcxl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1597
+    },
+    {
+        "object": "bottom_cabinet-eupgpt",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1598
+    },
+    {
+        "object": "bottom_cabinet-eupgpt",
+        "complaint": "needs doors",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 1599
+    },
+    {
+        "object": "bottom_cabinet-eupgpt",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1600
+    },
+    {
+        "object": "bottom_cabinet-gcrjan",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1601
+    },
+    {
+        "object": "bottom_cabinet-getjzo",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1602
+    },
+    {
+        "object": "bottom_cabinet-getjzo",
+        "complaint": "not sure",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1603
+    },
+    {
+        "object": "bottom_cabinet-getjzo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1604
+    },
+    {
+        "object": "bottom_cabinet-getjzo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1605
+    },
+    {
+        "object": "bottom_cabinet-glefdh",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1606
+    },
+    {
+        "object": "bottom_cabinet-gvtucm",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1607
+    },
+    {
+        "object": "bottom_cabinet-gvtucm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1608
+    },
+    {
+        "object": "bottom_cabinet-gvtucm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1609
+    },
+    {
+        "object": "bottom_cabinet-gvtucm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1610
+    },
+    {
+        "object": "bottom_cabinet-gvtucm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1611
+    },
+    {
+        "object": "bottom_cabinet-hnxyev",
+        "complaint": "no synsets",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1612
+    },
+    {
+        "object": "bottom_cabinet-hnxyev",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1613
+    },
+    {
+        "object": "bottom_cabinet-hnxyev",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1614
+    },
+    {
+        "object": "bottom_cabinet-hrdeys",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1615
+    },
+    {
+        "object": "bottom_cabinet-hrdeys",
+        "complaint": "Handle not represented",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1616
+    },
+    {
+        "object": "bottom_cabinet-hrdeys",
+        "complaint": "Handle not represented",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1617
+    },
+    {
+        "object": "bottom_cabinet-ilofmb",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1618
+    },
+    {
+        "object": "bottom_cabinet-ilofmb",
+        "complaint": "might be too big depending on where it is supposed to fit",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.31m, 55.57cm, 1.52m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1619
+    },
+    {
+        "object": "bottom_cabinet-ilofmb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1620
+    },
+    {
+        "object": "bottom_cabinet-immwzb",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1621
+    },
+    {
+        "object": "bottom_cabinet-immwzb",
+        "complaint": "might be too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.08m, 1.13m, 1.35m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1622
+    },
+    {
+        "object": "bottom_cabinet-immwzb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1623
+    },
+    {
+        "object": "bottom_cabinet-immwzb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1624
+    },
+    {
+        "object": "bottom_cabinet-imyaje",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1625
+    },
+    {
+        "object": "bottom_cabinet-imyaje",
+        "complaint": "idk what bottom cabinet means but this could be a reasonable sized drawer not cabinet though so depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.68m, 46.31cm, 1.05m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1626
+    },
+    {
+        "object": "bottom_cabinet-imyaje",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1627
+    },
+    {
+        "object": "bottom_cabinet-jhymlr",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1628
+    },
+    {
+        "object": "bottom_cabinet-jhymlr",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.71m, 61.22cm, 93.47cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1629
+    },
+    {
+        "object": "bottom_cabinet-jhymlr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1630
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1631
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "the door looks weird but hard to tell since it is a moving door\\",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1632
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.40m, 65.18cm, 1.40m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1633
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1634
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1635
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1636
+    },
+    {
+        "object": "bottom_cabinet-jrhgeu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1637
+    },
+    {
+        "object": "bottom_cabinet-kdbgpm",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1638
+    },
+    {
+        "object": "bottom_cabinet-kdbgpm",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n92.21cm, 48.50cm, 1.74m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1639
+    },
+    {
+        "object": "bottom_cabinet-kdbgpm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1640
+    },
+    {
+        "object": "bottom_cabinet-kdbgpm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1641
+    },
+    {
+        "object": "bottom_cabinet-kdbgpm",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1642
+    },
+    {
+        "object": "bottom_cabinet-kenkcw",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1643
+    },
+    {
+        "object": "bottom_cabinet-kenkcw",
+        "complaint": "door looks weird but hard to tell here",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1644
+    },
+    {
+        "object": "bottom_cabinet-kenkcw",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.49m, 57.92cm, 1.24m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1645
+    },
+    {
+        "object": "bottom_cabinet-kenkcw",
+        "complaint": "can't tell which orientation is the correct one",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1646
+    },
+    {
+        "object": "bottom_cabinet-kenkcw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1647
+    },
+    {
+        "object": "bottom_cabinet-kubcdk",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1648
+    },
+    {
+        "object": "bottom_cabinet-kubcdk",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n49.77cm, 52.37cm, 1.88m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1649
+    },
+    {
+        "object": "bottom_cabinet-kubcdk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1650
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1651
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "missing top doors",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1652
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.54m, 59.31cm, 1.28m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1653
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1654
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1655
+    },
+    {
+        "object": "bottom_cabinet-kxushk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1656
+    },
+    {
+        "object": "bottom_cabinet-leizjb",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1657
+    },
+    {
+        "object": "bottom_cabinet-leizjb",
+        "complaint": "not sure looks like missing top doors",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1658
+    },
+    {
+        "object": "bottom_cabinet-leizjb",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.64m, 56.00cm, 1.17m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1659
+    },
+    {
+        "object": "bottom_cabinet-leizjb",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1660
+    },
+    {
+        "object": "bottom_cabinet-lhucjo",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1661
+    },
+    {
+        "object": "bottom_cabinet-lhucjo",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n90.86cm, 87.19cm, 1.63m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1662
+    },
+    {
+        "object": "bottom_cabinet-lhucjo",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1663
+    },
+    {
+        "object": "bottom_cabinet-lwjdmj",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1664
+    },
+    {
+        "object": "bottom_cabinet-lwjdmj",
+        "complaint": "depends on the sysnset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.09m, 50.62cm, 1.63m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1665
+    },
+    {
+        "object": "bottom_cabinet-lwjdmj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1666
+    },
+    {
+        "object": "bottom_cabinet-mbmbpa",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1667
+    },
+    {
+        "object": "bottom_cabinet-mbmbpa",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.22m, 1.29m, 1.16m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1668
+    },
+    {
+        "object": "bottom_cabinet-mbmbpa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1669
+    },
+    {
+        "object": "bottom_cabinet-mwgceh",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1670
+    },
+    {
+        "object": "bottom_cabinet-mwgceh",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n62.77cm, 66.04cm, 1.78m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1671
+    },
+    {
+        "object": "bottom_cabinet-mwgceh",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1672
+    },
+    {
+        "object": "bottom_cabinet-mxrzpj",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1673
+    },
+    {
+        "object": "bottom_cabinet-mxrzpj",
+        "complaint": "not sure it looks open",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1674
+    },
+    {
+        "object": "bottom_cabinet-mxrzpj",
+        "complaint": "depends on the sysnet",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.61m, 50.86cm, 1.15m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1675
+    },
+    {
+        "object": "bottom_cabinet-mxrzpj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1676
+    },
+    {
+        "object": "bottom_cabinet-ncbfwr",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1677
+    },
+    {
+        "object": "bottom_cabinet-ncbfwr",
+        "complaint": "not sure looks open",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1678
+    },
+    {
+        "object": "bottom_cabinet-ncbfwr",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.53m, 56.33cm, 1.27m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1679
+    },
+    {
+        "object": "bottom_cabinet-ncbfwr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1680
+    },
+    {
+        "object": "bottom_cabinet-nddvba",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1681
+    },
+    {
+        "object": "bottom_cabinet-nddvba",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.22m, 1.29m, 1.16m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1682
+    },
+    {
+        "object": "bottom_cabinet-nddvba",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1683
+    },
+    {
+        "object": "bottom_cabinet-nnvyol",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1684
+    },
+    {
+        "object": "bottom_cabinet-nnvyol",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n62.36cm, 65.61cm, 1.77m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1685
+    },
+    {
+        "object": "bottom_cabinet-nnvyol",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1686
+    },
+    {
+        "object": "bottom_cabinet-nrlayx",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1687
+    },
+    {
+        "object": "bottom_cabinet-nrlayx",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n92.24cm, 48.53cm, 1.74m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1688
+    },
+    {
+        "object": "bottom_cabinet-nrlayx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1689
+    },
+    {
+        "object": "bottom_cabinet-nyfebf",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1690
+    },
+    {
+        "object": "bottom_cabinet-nyfebf",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.11m, 58.52cm, 1.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1691
+    },
+    {
+        "object": "bottom_cabinet-nyfebf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1692
+    },
+    {
+        "object": "bottom_cabinet-ojceew",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1693
+    },
+    {
+        "object": "bottom_cabinet-ojceew",
+        "complaint": "looks like the top is open",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1694
+    },
+    {
+        "object": "bottom_cabinet-ojceew",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.39m, 62.84cm, 1.39m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1695
+    },
+    {
+        "object": "bottom_cabinet-ojceew",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1696
+    },
+    {
+        "object": "bottom_cabinet-olgoza",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1697
+    },
+    {
+        "object": "bottom_cabinet-olgoza",
+        "complaint": "looks like something is coming out the bottom",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1698
+    },
+    {
+        "object": "bottom_cabinet-olgoza",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.74m, 46.40cm, 96.82cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1699
+    },
+    {
+        "object": "bottom_cabinet-olgoza",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1700
+    },
+    {
+        "object": "bottom_cabinet-phoesw",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1701
+    },
+    {
+        "object": "bottom_cabinet-phoesw",
+        "complaint": "looks like missing top door",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1702
+    },
+    {
+        "object": "bottom_cabinet-phoesw",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.40m, 65.07cm, 1.40m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1703
+    },
+    {
+        "object": "bottom_cabinet-phoesw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1704
+    },
+    {
+        "object": "bottom_cabinet-pkdnbu",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1705
+    },
+    {
+        "object": "bottom_cabinet-pkdnbu",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.20m, 1.26m, 1.13m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1706
+    },
+    {
+        "object": "bottom_cabinet-plccav",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1707
+    },
+    {
+        "object": "bottom_cabinet-plccav",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n63.76cm, 75.00cm, 100.00cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1708
+    },
+    {
+        "object": "bottom_cabinet-plccav",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1709
+    },
+    {
+        "object": "bottom_cabinet-pllcur",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1710
+    },
+    {
+        "object": "bottom_cabinet-pllcur",
+        "complaint": "depends on synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n89.31cm, 93.96cm, 1.69m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1711
+    },
+    {
+        "object": "bottom_cabinet-pllcur",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1712
+    },
+    {
+        "object": "bottom_cabinet-pzjecb",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1713
+    },
+    {
+        "object": "bottom_cabinet-pzjecb",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n96.20cm, 50.60cm, 1.67m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1714
+    },
+    {
+        "object": "bottom_cabinet-pzjecb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1715
+    },
+    {
+        "object": "bottom_cabinet-qacthv",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1716
+    },
+    {
+        "object": "bottom_cabinet-qacthv",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.71m, 72.68cm, 87.81cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1717
+    },
+    {
+        "object": "bottom_cabinet-qacthv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 1718
+    },
+    {
+        "object": "bottom_cabinet-qkgfln",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1719
+    },
+    {
+        "object": "bottom_cabinet-qkgfln",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n54.12cm, 56.94cm, 1.87m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1720
+    },
+    {
+        "object": "bottom_cabinet-rntwkg",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1721
+    },
+    {
+        "object": "bottom_cabinet-rntwkg",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.06m, 1.12m, 1.34m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1722
+    },
+    {
+        "object": "bottom_cabinet-rntwkg",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1723
+    },
+    {
+        "object": "bottom_cabinet-rvpunw",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1724
+    },
+    {
+        "object": "bottom_cabinet-rvpunw",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n100.00cm, 57.14cm, 59.74cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1725
+    },
+    {
+        "object": "bottom_cabinet-rvpunw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1726
+    },
+    {
+        "object": "bottom_cabinet-rvunhj",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1727
+    },
+    {
+        "object": "bottom_cabinet-rvunhj",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n98.29cm, 51.71cm, 1.70m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1728
+    },
+    {
+        "object": "bottom_cabinet-rvunhj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1729
+    },
+    {
+        "object": "bottom_cabinet-ryznya",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1730
+    },
+    {
+        "object": "bottom_cabinet-ryznya",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.62m, 53.78cm, 1.16m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1731
+    },
+    {
+        "object": "bottom_cabinet-ryznya",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1732
+    },
+    {
+        "object": "bottom_cabinet-slgzfc",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1733
+    },
+    {
+        "object": "bottom_cabinet-slgzfc",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.10m, 1.16m, 1.39m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1734
+    },
+    {
+        "object": "bottom_cabinet-slgzfc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1735
+    },
+    {
+        "object": "bottom_cabinet-smujam",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1736
+    },
+    {
+        "object": "bottom_cabinet-smujam",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.00m, 52.64cm, 1.73m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1737
+    },
+    {
+        "object": "bottom_cabinet-smujam",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1738
+    },
+    {
+        "object": "bottom_cabinet-sxppcj",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1739
+    },
+    {
+        "object": "bottom_cabinet-sxppcj",
+        "complaint": "not sure the top seems like its missing a door but it could be the annotation",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1740
+    },
+    {
+        "object": "bottom_cabinet-sxppcj",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.34m, 60.07cm, 1.47m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1741
+    },
+    {
+        "object": "bottom_cabinet-sxppcj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1742
+    },
+    {
+        "object": "bottom_cabinet-tolupn",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1743
+    },
+    {
+        "object": "bottom_cabinet-tolupn",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n90.79cm, 47.76cm, 1.72m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1744
+    },
+    {
+        "object": "bottom_cabinet-tolupn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1745
+    },
+    {
+        "object": "bottom_cabinet-tolupn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1746
+    },
+    {
+        "object": "bottom_cabinet-ttmejh",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1747
+    },
+    {
+        "object": "bottom_cabinet-ttmejh",
+        "complaint": "not sure looks too dark",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1748
+    },
+    {
+        "object": "bottom_cabinet-ttmejh",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n91.17cm, 1.11m, 1.50m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1749
+    },
+    {
+        "object": "bottom_cabinet-ttmejh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1750
+    },
+    {
+        "object": "bottom_cabinet-twhums",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1751
+    },
+    {
+        "object": "bottom_cabinet-twhums",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n49.95cm, 52.55cm, 1.89m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1752
+    },
+    {
+        "object": "bottom_cabinet-twhums",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1753
+    },
+    {
+        "object": "bottom_cabinet-twhums",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1754
+    },
+    {
+        "object": "bottom_cabinet-ujniob",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1755
+    },
+    {
+        "object": "bottom_cabinet-ujniob",
+        "complaint": "not sure too dark",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1756
+    },
+    {
+        "object": "bottom_cabinet-ujniob",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.60m, 57.84cm, 1.23m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1757
+    },
+    {
+        "object": "bottom_cabinet-ujniob",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1758
+    },
+    {
+        "object": "bottom_cabinet-vceupd",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1759
+    },
+    {
+        "object": "bottom_cabinet-vceupd",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.04m, 54.78cm, 1.64m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1760
+    },
+    {
+        "object": "bottom_cabinet-vceupd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1761
+    },
+    {
+        "object": "bottom_cabinet-vespxk",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1762
+    },
+    {
+        "object": "bottom_cabinet-vespxk",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n47.62cm, 29.70cm, 100.00cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1763
+    },
+    {
+        "object": "bottom_cabinet-vespxk",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1764
+    },
+    {
+        "object": "bottom_cabinet-vespxk",
+        "complaint": "Handle not grabbable",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1765
+    },
+    {
+        "object": "bottom_cabinet-vespxk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1766
+    },
+    {
+        "object": "bottom_cabinet-wesxdp",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1767
+    },
+    {
+        "object": "bottom_cabinet-wesxdp",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n81.52cm, 85.77cm, 1.54m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1768
+    },
+    {
+        "object": "bottom_cabinet-wesxdp",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1769
+    },
+    {
+        "object": "bottom_cabinet-wesxdp",
+        "complaint": "Handle half not grabbable",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 1770
+    },
+    {
+        "object": "bottom_cabinet-xiurwn",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1771
+    },
+    {
+        "object": "bottom_cabinet-xiurwn",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.05m, 46.73cm, 1.65m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1772
+    },
+    {
+        "object": "bottom_cabinet-xiurwn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 1773
+    },
+    {
+        "object": "bottom_cabinet-xpdbgf",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1774
+    },
+    {
+        "object": "bottom_cabinet-xpdbgf",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n92.26cm, 48.53cm, 1.74m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1775
+    },
+    {
+        "object": "bottom_cabinet-xpdbgf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1776
+    },
+    {
+        "object": "bottom_cabinet-ybntlp",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1777
+    },
+    {
+        "object": "bottom_cabinet-ybntlp",
+        "complaint": "looks like doors are missing but not sure",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1778
+    },
+    {
+        "object": "bottom_cabinet-ybntlp",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.72m, 49.31cm, 1.08m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1779
+    },
+    {
+        "object": "bottom_cabinet-ybntlp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1780
+    },
+    {
+        "object": "bottom_cabinet-yohygj",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1781
+    },
+    {
+        "object": "bottom_cabinet-yohygj",
+        "complaint": "looks like missing top door or it might've been rendered with just lower door",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1782
+    },
+    {
+        "object": "bottom_cabinet-yohygj",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.54m, 58.66cm, 1.28m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1783
+    },
+    {
+        "object": "bottom_cabinet-yohygj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1784
+    },
+    {
+        "object": "bottom_cabinet-yxfueo",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1785
+    },
+    {
+        "object": "bottom_cabinet-yxfueo",
+        "complaint": "seems to be missing top door or rendered half way",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1786
+    },
+    {
+        "object": "bottom_cabinet-yxfueo",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.73m, 44.90cm, 96.21cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1787
+    },
+    {
+        "object": "bottom_cabinet-yxfueo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1788
+    },
+    {
+        "object": "bottom_cabinet-zuwvdo",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1789
+    },
+    {
+        "object": "bottom_cabinet-zuwvdo",
+        "complaint": "might be missing top door or rendered halfway",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1790
+    },
+    {
+        "object": "bottom_cabinet-zuwvdo",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.60m, 53.66cm, 1.14m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 1791
+    },
+    {
+        "object": "bottom_cabinet-zuwvdo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1792
+    },
+    {
+        "object": "apple-qusmpx",
+        "complaint": "synset needs to be half apple",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: apple.n.01\nDefinition: fruit with red or yellow or green skin and sweet to tart crisp whitish flesh\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1793
+    },
+    {
+        "object": "apple-sguztn",
+        "complaint": "synset should be half apple",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: apple.n.01\nDefinition: fruit with red or yellow or green skin and sweet to tart crisp whitish flesh\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1794
+    },
+    {
+        "object": "pop-chwjfu",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1795
+    },
+    {
+        "object": "can_of_soda-chwjfu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1796
+    },
+    {
+        "object": "pop-iloapr",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1797
+    },
+    {
+        "object": "can_of_soda-iloapr",
+        "complaint": "object tends to tip over",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1798
+    },
+    {
+        "object": "can_of_soda-iloapr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1799
+    },
+    {
+        "object": "pop-mrrozu",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1800
+    },
+    {
+        "object": "pop-mrrozu",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1801
+    },
+    {
+        "object": "can_of_soda-mrrozu",
+        "complaint": "object tends to tip over",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1802
+    },
+    {
+        "object": "can_of_soda-mrrozu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1803
+    },
+    {
+        "object": "pop-uzbpnw",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1804
+    },
+    {
+        "object": "pop-uzbpnw",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1805
+    },
+    {
+        "object": "can_of_soda-uzbpnw",
+        "complaint": "object tends to tip over",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1806
+    },
+    {
+        "object": "can_of_soda-uzbpnw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1807
+    },
+    {
+        "object": "pop-vszbvb",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1808
+    },
+    {
+        "object": "pop-vszbvb",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1809
+    },
+    {
+        "object": "can_of_soda-vszbvb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1810
+    },
+    {
+        "object": "pop-xlyult",
+        "complaint": "soda can",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dad.n.01\nDefinition: an informal term for a father; probably derived from baby talk\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1811
+    },
+    {
+        "object": "pop-xlyult",
+        "complaint": "brand?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1812
+    },
+    {
+        "object": "can_of_soda-xlyult",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1813
+    },
+    {
+        "id": 7943,
+        "object": "bottom_cabinet-jhymlr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

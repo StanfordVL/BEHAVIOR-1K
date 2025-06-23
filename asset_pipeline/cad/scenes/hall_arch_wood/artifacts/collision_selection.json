@@ -1,0 +1,23 @@
+{
+  "arched_window-kmvdjo-0": "chull",
+  "arched_window-kmvdjo-0-glass-base_link-F-lower-Tglass": "chull",
+  "ceilings-ljueem-0": "bbox",
+  "ceilings-oktrwd-0": "coacd-t_0.05-pr_100-c_32",
+  "ceilings-utgliy-0-Tglass": "chull",
+  "ceilings-xaodor-0-Tglass": "chull",
+  "ceilings-zkoute-0-Tglass": "coacd-t_0.05-pr_100-c_32",
+  "floors-hhszec-0": "bbox",
+  "floors-jeufgb-0": "bbox",
+  "pillar-xznmxo-0": "chull",
+  "pillar-zjotnf-0": "coacd-t_0.05-pr_100-c_8",
+  "walls-mafsga-0": "bbox",
+  "walls-odlitx-0": "chull",
+  "walls-oronke-0": "bbox",
+  "walls-uaszec-0": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "walls-vtplrx-0": "coacd-t_0.05-pr_100-c_32",
+  "walls-wynpvm-0": "coacd-t_0.05-pr_100-c_32",
+  "window-ijnwlp-0": "chull",
+  "window-ijnwlp-0-glass-base_link-F-lower-Tglass": "coacd-t_0.05-pr_100-c_32",
+  "window-yxclci-0": "coacd-t_0.05-pr_100-c_8",
+  "window-yxclci-0-glass-base_link-F-lower-Tglass": "coacd-t_0.05-pr_100-c_32"
+}

@@ -1,0 +1,1670 @@
+[
+    {
+        "object": "bowl-zwhewa",
+        "complaint": "maybe a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2332
+    },
+    {
+        "object": "bowl-zwhewa",
+        "complaint": "idk depends on the category",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2333
+    },
+    {
+        "object": "folderal-zwhewa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2334
+    },
+    {
+        "object": "lid-xdyddo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2335
+    },
+    {
+        "object": "pop_case-dufbnv",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2336
+    },
+    {
+        "object": "pop_case-dufbnv",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2337
+    },
+    {
+        "object": "pop_case-gwgaqb",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2338
+    },
+    {
+        "object": "pop_case-gwgaqb",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2339
+    },
+    {
+        "object": "pop_case-noiyxv",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2340
+    },
+    {
+        "object": "pop_case-noiyxv",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2341
+    },
+    {
+        "object": "pop_case-oarbks",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2342
+    },
+    {
+        "object": "pop_case-oarbks",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2343
+    },
+    {
+        "object": "pop_case-pldtgy",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2344
+    },
+    {
+        "object": "pop_case-pldtgy",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2345
+    },
+    {
+        "object": "pop_case-qcfxec",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2346
+    },
+    {
+        "object": "pop_case-qcfxec",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2347
+    },
+    {
+        "object": "pop_case-qwtbon",
+        "complaint": "box of beer ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2348
+    },
+    {
+        "object": "pop_case-qwtbon",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2349
+    },
+    {
+        "object": "pop_case-rzhvvk",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2350
+    },
+    {
+        "object": "pop_case-rzhvvk",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2351
+    },
+    {
+        "object": "pop_case-seiatm",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2352
+    },
+    {
+        "object": "pop_case-seiatm",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2353
+    },
+    {
+        "object": "pop_case-sqiatv",
+        "complaint": "box of soda",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2354
+    },
+    {
+        "object": "pop_case-sqiatv",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2355
+    },
+    {
+        "object": "pop_case-unmexe",
+        "complaint": "box of drinks",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2356
+    },
+    {
+        "object": "pop_case-unmexe",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2357
+    },
+    {
+        "object": "pop_case-zfyatg",
+        "complaint": "box of drinks",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2358
+    },
+    {
+        "object": "pop_case-zfyatg",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2359
+    },
+    {
+        "object": "pop_case-zxguap",
+        "complaint": "box of drinks",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2360
+    },
+    {
+        "object": "pop_case-zxguap",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2361
+    },
+    {
+        "object": "toilet-aapttl",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2362
+    },
+    {
+        "object": "toilet-chuack",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2363
+    },
+    {
+        "object": "toilet-jkwccu",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2364
+    },
+    {
+        "object": "toilet-kfmkbm",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2365
+    },
+    {
+        "object": "toilet-mzocsn",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2366
+    },
+    {
+        "object": "toilet-nqwekw",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2367
+    },
+    {
+        "object": "toilet-nqwekw",
+        "complaint": "missing parts",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2368
+    },
+    {
+        "object": "toilet-rqxqtd",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2369
+    },
+    {
+        "object": "toilet-sjjweo",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2370
+    },
+    {
+        "object": "toilet-vcgvfe",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2371
+    },
+    {
+        "object": "toilet-vdbmon",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2372
+    },
+    {
+        "object": "toilet-vtqdev",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2373
+    },
+    {
+        "object": "toilet-vtqdev",
+        "complaint": "missing parts",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2374
+    },
+    {
+        "object": "toilet-wkltpj",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2375
+    },
+    {
+        "object": "toilet-wkltpj",
+        "complaint": "missing parts",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2376
+    },
+    {
+        "object": "toilet-wusctd",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2377
+    },
+    {
+        "object": "toilet-wusctd",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2378
+    },
+    {
+        "object": "toilet-yxbgey",
+        "complaint": "n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: toilet.n.01\nDefinition: a room or building equipped with one or more toilets\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2379
+    },
+    {
+        "object": "trash_can-eahqyq",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2380
+    },
+    {
+        "object": "trash_can-eahqyq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2381
+    },
+    {
+        "object": "trash_can-ifzxzj",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2382
+    },
+    {
+        "object": "trash_can-wklill",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2383
+    },
+    {
+        "object": "trash_can-wklill",
+        "complaint": "joint should move more. barely moves so can't use it",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- j_link_0, PrismaticJoint\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 2384
+    },
+    {
+        "object": "trash_can-wklill",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "FILLABLE: bad joint",
+        "id": 2385
+    },
+    {
+        "object": "trash_can-wklill",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2386
+    },
+    {
+        "object": "bottom_cabinet_no_top-apjbrw",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2387
+    },
+    {
+        "object": "bottom_cabinet_no_top-apjbrw",
+        "complaint": "looks weird from this angle like there are spaces between walls, but can't move it around well to make sure",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2388
+    },
+    {
+        "object": "bottom_cabinet_no_top-apjbrw",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n41.14cm, 1.17m, 1.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2389
+    },
+    {
+        "object": "bottom_cabinet_no_top-bmsclc",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2390
+    },
+    {
+        "object": "bottom_cabinet_no_top-bmsclc",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n41.31cm, 1.20m, 1.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2391
+    },
+    {
+        "object": "bottom_cabinet_no_top-exgntg",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2392
+    },
+    {
+        "object": "bottom_cabinet_no_top-exgntg",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.39m, 78.47cm, 1.33m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2393
+    },
+    {
+        "object": "bottom_cabinet_no_top-fmelap",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2394
+    },
+    {
+        "object": "bottom_cabinet_no_top-fmelap",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.40m, 86.31cm, 1.15m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2395
+    },
+    {
+        "object": "bottom_cabinet_no_top-fmelap",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2396
+    },
+    {
+        "object": "bottom_cabinet_no_top-motill",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2397
+    },
+    {
+        "object": "bottom_cabinet_no_top-motill",
+        "complaint": "looks weird and too narrow",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2398
+    },
+    {
+        "object": "bottom_cabinet_no_top-motill",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n43.62cm, 1.25m, 1.67m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2399
+    },
+    {
+        "object": "bottom_cabinet_no_top-ozzcvs",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2400
+    },
+    {
+        "object": "bottom_cabinet_no_top-ozzcvs",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.40m, 94.04cm, 1.24m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2401
+    },
+    {
+        "object": "bottom_cabinet_no_top-pluwfl",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2402
+    },
+    {
+        "object": "bottom_cabinet_no_top-pluwfl",
+        "complaint": "too dark to tell",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2403
+    },
+    {
+        "object": "bottom_cabinet_no_top-pluwfl",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.44m, 88.62cm, 1.18m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2404
+    },
+    {
+        "object": "bottom_cabinet_no_top-pluwfl",
+        "complaint": "Handle not grabbable",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2405
+    },
+    {
+        "object": "bottom_cabinet_no_top-qohxjq",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2406
+    },
+    {
+        "object": "bottom_cabinet_no_top-qohxjq",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n91.81cm, 1.11m, 1.51m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2407
+    },
+    {
+        "object": "bottom_cabinet_no_top-qudfwe",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2408
+    },
+    {
+        "object": "bottom_cabinet_no_top-qudfwe",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.34m, 88.95cm, 1.19m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2409
+    },
+    {
+        "object": "bottom_cabinet_no_top-qudfwe",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2410
+    },
+    {
+        "object": "bottom_cabinet_no_top-spojpj",
+        "complaint": " no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2411
+    },
+    {
+        "object": "bottom_cabinet_no_top-spojpj",
+        "complaint": "too dark to tell",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2412
+    },
+    {
+        "object": "bottom_cabinet_no_top-spojpj",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.36m, 99.96cm, 1.31m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2413
+    },
+    {
+        "object": "bottom_cabinet_no_top-ufhpbn",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2414
+    },
+    {
+        "object": "bottom_cabinet_no_top-ufhpbn",
+        "complaint": "depends on the synset but looks too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n55.33cm, 1.06m, 1.59m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2415
+    },
+    {
+        "object": "bottom_cabinet_no_top-ufhpbn",
+        "complaint": "Cabinet holes are blocked",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2416
+    },
+    {
+        "object": "bottom_cabinet_no_top-ufhpbn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2417
+    },
+    {
+        "object": "bottom_cabinet_no_top-vdedzt",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2418
+    },
+    {
+        "object": "bottom_cabinet_no_top-vdedzt",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.39m, 100.00cm, 1.33m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2419
+    },
+    {
+        "object": "bottom_cabinet_no_top-vdedzt",
+        "complaint": "handles (check other side too)",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2420
+    },
+    {
+        "object": "bottom_cabinet_no_top-vzzafs",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2421
+    },
+    {
+        "object": "bottom_cabinet_no_top-vzzafs",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n79.40cm, 1.14m, 1.52m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2422
+    },
+    {
+        "object": "bottom_cabinet_no_top-vzzafs",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2423
+    },
+    {
+        "object": "bottom_cabinet_no_top-wamrju",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2424
+    },
+    {
+        "object": "bottom_cabinet_no_top-wamrju",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n75.86cm, 1.09m, 1.45m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2425
+    },
+    {
+        "object": "bottom_cabinet_no_top-wamrju",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2426
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "no synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2427
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "too dark to tell",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2428
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "depends on the synset",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n79.52cm, 1.15m, 1.44m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2429
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "Handle not grabbable",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2430
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2431
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 2432
+    },
+    {
+        "object": "bottom_cabinet_no_top-wtnrwl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2433
+    },
+    {
+        "object": "bowl-adciys",
+        "complaint": "it's an empty bowl and not a burrito bowl\\",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2434
+    },
+    {
+        "object": "bowl-adciys",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n68.18cm, 68.14cm, 26.66cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2435
+    },
+    {
+        "object": "bowl-adciys",
+        "complaint": "fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2436
+    },
+    {
+        "object": "bowl-ajzltc",
+        "complaint": "it",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2437
+    },
+    {
+        "object": "bowl-ajzltc",
+        "complaint": "it's just an empty bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2438
+    },
+    {
+        "object": "bowl-ajzltc",
+        "complaint": "could be too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n32.90cm, 29.28cm, 16.78cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2439
+    },
+    {
+        "object": "bowl-ajzltc",
+        "complaint": "fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2440
+    },
+    {
+        "object": "bowl-dalyim",
+        "complaint": "just a bowl\\",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2441
+    },
+    {
+        "object": "bowl-dalyim",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n69.96cm, 69.96cm, 14.53cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2442
+    },
+    {
+        "object": "bowl-dalyim",
+        "complaint": "maybe fillable too?",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2443
+    },
+    {
+        "object": "bowl-eipwho",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2444
+    },
+    {
+        "object": "bowl-eipwho",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n66.64cm, 66.64cm, 37.13cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2445
+    },
+    {
+        "object": "bowl-eipwho",
+        "complaint": "fillable maybe",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2446
+    },
+    {
+        "object": "bowl-fiarri",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2447
+    },
+    {
+        "object": "bowl-fiarri",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2448
+    },
+    {
+        "object": "bowl-fwdfeg",
+        "complaint": "looks like a bottomless ring",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2449
+    },
+    {
+        "object": "bowl-fwdfeg",
+        "complaint": "looks like missing bottom",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2450
+    },
+    {
+        "object": "bowl-fwdfeg",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n68.18cm, 68.18cm, 27.12cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2451
+    },
+    {
+        "object": "bowl-fwdfeg",
+        "complaint": "fillable maybe",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2452
+    },
+    {
+        "object": "bowl-jfvjep",
+        "complaint": "just abowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2453
+    },
+    {
+        "object": "bowl-jfvjep",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n67.99cm, 67.99cm, 27.49cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2454
+    },
+    {
+        "object": "bowl-jfvjep",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2455
+    },
+    {
+        "object": "bowl-kthvrl",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2456
+    },
+    {
+        "object": "bowl-kthvrl",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n64.10cm, 64.10cm, 41.15cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2457
+    },
+    {
+        "object": "bowl-kthvrl",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2458
+    },
+    {
+        "object": "bowl-mspdar",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2459
+    },
+    {
+        "object": "bowl-mspdar",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2460
+    },
+    {
+        "object": "bowl-oyidja",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2461
+    },
+    {
+        "object": "bowl-oyidja",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n69.44cm, 69.43cm, 18.90cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2462
+    },
+    {
+        "object": "bowl-oyidja",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2463
+    },
+    {
+        "object": "bowl-rlwpcd",
+        "complaint": "just a bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2464
+    },
+    {
+        "object": "bowl-rlwpcd",
+        "complaint": "fillable maybe",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2465
+    },
+    {
+        "object": "bowl-xpnlup",
+        "complaint": "looks like a bottomless bowl",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: burrito_bowl.n.01 (custom synset)\nDefinition: salad.n.01(hypernyms): food mixtures either arranged on a plate or tossed and served with a moist dressing; usually consisting of or including greens\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2466
+    },
+    {
+        "object": "bowl-xpnlup",
+        "complaint": "no bottom",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2467
+    },
+    {
+        "object": "bowl-xpnlup",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n69.20cm, 69.20cm, 20.57cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2468
+    },
+    {
+        "object": "bowl-xpnlup",
+        "complaint": "maybe fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2469
+    },
+    {
+        "object": "bean-dyjvwv",
+        "complaint": "it",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: bean.n.01\nDefinition: any of various edible seeds of plants of the family Leguminosae used for food\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2470
+    },
+    {
+        "object": "bean-dyjvwv",
+        "complaint": "it's seedpod.n.01",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: bean.n.01\nDefinition: any of various edible seeds of plants of the family Leguminosae used for food\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2471
+    },
+    {
+        "object": "bean-dyjvwv",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n25.13cm, 5.32cm, 1.79cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2472
+    },
+    {
+        "object": "green_bean-dyjvwv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2473
+    },
+    {
+        "object": "bean-lvbjws",
+        "complaint": "it's seedpod.n.01",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: bean.n.01\nDefinition: any of various edible seeds of plants of the family Leguminosae used for food\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2474
+    },
+    {
+        "object": "bean-lvbjws",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n25.01cm, 3.70cm, 1.87cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2475
+    },
+    {
+        "object": "coffee_table-aoojzy",
+        "complaint": "looks like a desk idk",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2476
+    },
+    {
+        "object": "coffee_table-aoojzy",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2477
+    },
+    {
+        "object": "coffee_table-aoojzy",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2478
+    },
+    {
+        "object": "coffee_table-aoojzy",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2479
+    },
+    {
+        "object": "coffee_table-aoojzy",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2480
+    },
+    {
+        "object": "coffee_table-fqluyq",
+        "complaint": "\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2481
+    },
+    {
+        "object": "coffee_table-gpkbiw",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2482
+    },
+    {
+        "object": "coffee_table-hmwkkt",
+        "complaint": "too tall to be coffee table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2483
+    },
+    {
+        "object": "coffee_table-hmwkkt",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2484
+    },
+    {
+        "object": "coffee_table-stocuk",
+        "complaint": "too tall to be a coffee table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2485
+    },
+    {
+        "object": "coffee_table-stocuk",
+        "complaint": "handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2486
+    },
+    {
+        "object": "coffee_table-stocuk",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2487
+    },
+    {
+        "object": "coffee_table-tzmkgq",
+        "complaint": "more like a breakfast table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2488
+    },
+    {
+        "object": "coffee_table-tzmkgq",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2489
+    },
+    {
+        "object": "coffee_table-vcgabn",
+        "complaint": "too tall to be a coffee table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2490
+    },
+    {
+        "object": "coffee_table-vcgabn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2491
+    },
+    {
+        "object": "coffee_table-vcgabn",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2492
+    },
+    {
+        "object": "coffee_table-ytlgdt",
+        "complaint": "too tall to be a coffee table ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2493
+    },
+    {
+        "object": "coffee_table-ytlgdt",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2494
+    },
+    {
+        "object": "coffee_table-zzqwse",
+        "complaint": "too tall to be a coffee table ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coffee_table.n.01\nDefinition: low table where magazines can be placed and coffee or cocktails are served\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2495
+    },
+    {
+        "object": "coffee_table-zzqwse",
+        "complaint": "looks openable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2496
+    },
+    {
+        "object": "coffee_table-zzqwse",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2497
+    },
+    {
+        "object": "trash_can-aefcem",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2498
+    },
+    {
+        "object": "trash_can-glzckq",
+        "complaint": "public_trash_can",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2499
+    },
+    {
+        "object": "trash_can-gsgutn",
+        "complaint": "public_trash_can",
+        "processed": true,
+        "new": true,
+        "type": "connectedness",
+        "additional_info": "CONNECTED: Confirm object is a single body. An object cannot contain disconnected parts.",
+        "id": 2500
+    },
+    {
+        "object": "trash_can-leazin",
+        "complaint": "public_trash_can",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2501
+    },
+    {
+        "object": "trash_can-mdojox",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2502
+    },
+    {
+        "object": "trash_can-mdojox",
+        "complaint": "dumpster_bin",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2503
+    },
+    {
+        "object": "trash_can-pdmzhv",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2504
+    },
+    {
+        "object": "trash_can-pdmzhv",
+        "complaint": "dumpster_bin",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2505
+    },
+    {
+        "object": "trash_can-rteihy",
+        "complaint": "public_trash_can",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2506
+    },
+    {
+        "object": "trash_can-xkqkbf",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2507
+    },
+    {
+        "object": "trash_can-xkqkbf",
+        "complaint": "Trash can hole is blocked",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2508
+    },
+    {
+        "object": "trash_can-xkqkbf",
+        "complaint": "public_trash_can",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2509
+    },
+    {
+        "object": "trash_can-xkqkbf",
+        "complaint": "lacks texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2510
+    },
+    {
+        "object": "trash_can-zotrbg",
+        "complaint": "trash_barrel",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: trash_can\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2511
+    },
+    {
+        "object": "trash_can-zotrbg",
+        "complaint": "lacks texture",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 2512
+    },
+    {
+        "object": "top_cabinet-dhguym",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2513
+    },
+    {
+        "object": "top_cabinet-dhguym",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2514
+    },
+    {
+        "object": "top_cabinet-dmwxyl",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2515
+    },
+    {
+        "object": "top_cabinet-eobsmt",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2516
+    },
+    {
+        "object": "top_cabinet-fqhdne",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2517
+    },
+    {
+        "object": "top_cabinet-fqitbw",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2518
+    },
+    {
+        "object": "top_cabinet-fqitbw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2519
+    },
+    {
+        "object": "top_cabinet-jvdbxh",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2520
+    },
+    {
+        "object": "top_cabinet-lsyzkh",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2521
+    },
+    {
+        "object": "top_cabinet-lsyzkh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2522
+    },
+    {
+        "object": "top_cabinet-nkrgez",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2523
+    },
+    {
+        "object": "top_cabinet-nkrgez",
+        "complaint": "looks wallmounted?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2524
+    },
+    {
+        "object": "top_cabinet-nkrgez",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2525
+    },
+    {
+        "object": "top_cabinet-oztrra",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2526
+    },
+    {
+        "object": "top_cabinet-qiausz",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2527
+    },
+    {
+        "object": "top_cabinet-qiausz",
+        "complaint": "joint limits is too small",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- j_dof_rootd_ba001_r, RevoluteJoint\n- j_dof_rootd_bb001_r, RevoluteJoint\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 2528
+    },
+    {
+        "object": "top_cabinet-tactqn",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2529
+    },
+    {
+        "object": "top_cabinet-twjqua",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2530
+    },
+    {
+        "object": "top_cabinet-yegcau",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2531
+    },
+    {
+        "object": "top_cabinet-zjtaus",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2532
+    },
+    {
+        "object": "top_cabinet-zjtaus",
+        "complaint": "handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2533
+    },
+    {
+        "object": "top_cabinet-zjtaus",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2534
+    }
+]

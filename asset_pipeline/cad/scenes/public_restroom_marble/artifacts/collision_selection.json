@@ -1,0 +1,23 @@
+{
+  "ceilings-iyouhu-0": "bbox",
+  "door-cvvumy-0-base_link": "coacd-t_0.05-pr_100-c_8",
+  "door-cvvumy-0-left_glass-left_leaf-F-lower-Tglass": "chull",
+  "door-cvvumy-0-left_leaf-base_link-R-lower": "chull",
+  "door-cvvumy-0-right_glass-right_leaf-F-lower-Tglass": "chull",
+  "door-cvvumy-0-right_leaf-base_link-R-lower": "bbox",
+  "downlight-jexffy-0": "chull",
+  "floors-sqkllg-0": "bbox",
+  "mirror-jtgjha-0": "chull",
+  "mirror-lkmqmv-0": "bbox",
+  "paper_towel_dispenser-ovwdpz-0": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "shower_stall-gqxmqf-0-base_link": "coacd-t_0.05-pr_100-c_32",
+  "shower_stall-gqxmqf-0-door-base_link-R-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "sink-kyxynl-0": "coacd-t_0.05-pr_100-c_32",
+  "toilet-obhimx-0": "coacd-t_0.05-pr_100-c_32",
+  "toilet_paper_dispenser-rlccfh-0": "chull",
+  "walls-eiepif-0": "bbox",
+  "walls-hcdfmx-0": "bbox",
+  "walls-jothjy-0": "bbox",
+  "walls-mdbihb-0": "coacd-t_0.05-pr_100-c_8",
+  "walls-ztyvde-0": "coacd-t_0.05-pr_100-c_32"
+}

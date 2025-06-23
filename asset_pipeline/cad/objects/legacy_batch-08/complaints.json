@@ -1,0 +1,1096 @@
+[
+    {
+        "object": "artichoke-tfclmg",
+        "complaint": "artichoke.n.02 is referring to the heart",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: artichoke.n.01\nDefinition: Mediterranean thistlelike plant widely cultivated for its large edible flower head\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2970
+    },
+    {
+        "object": "artichoke-tfclmg",
+        "complaint": "maybe sliceable too",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2971
+    },
+    {
+        "object": "blender-cwkvib",
+        "complaint": "it's giant so I couldn't make sure",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2972
+    },
+    {
+        "object": "blender-cwkvib",
+        "complaint": "it is giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n15.46m, 15.55m, 31.77m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2973
+    },
+    {
+        "object": "blender-eyedvd",
+        "complaint": "giant so I can't see it",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: blender.n.01\nDefinition: an electrically powered mixer with whirling blades that mix or chop or liquefy foods\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2974
+    },
+    {
+        "object": "blender-eyedvd",
+        "complaint": "giant so I can't check",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2975
+    },
+    {
+        "object": "blender-eyedvd",
+        "complaint": "giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n108.99m, 98.96m, 226.70m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2976
+    },
+    {
+        "object": "blender-eyedvd",
+        "complaint": "should have togglebutton and fillable ",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2977
+    },
+    {
+        "object": "olive_oil_bottle-cqycjk",
+        "complaint": "olive oil bottle is not connected to anything in the list of custom",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2978
+    },
+    {
+        "object": "olive_oil_bottle-luikop",
+        "complaint": "missing def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2979
+    },
+    {
+        "object": "olive_oil_bottle-luikop",
+        "complaint": "missing cap",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2980
+    },
+    {
+        "object": "olive_oil_bottle-lvsfgc",
+        "complaint": "missing def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2981
+    },
+    {
+        "object": "olive_oil_bottle-lvsfgc",
+        "complaint": "missing cap",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2982
+    },
+    {
+        "object": "bottle_of_olive_oil-lvsfgc",
+        "complaint": "lacks texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2983
+    },
+    {
+        "object": "bottle_of_olive_oil-lvsfgc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2984
+    },
+    {
+        "object": "bottle_of_wine-hnkiog",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2985
+    },
+    {
+        "object": "ink_cartridge-ltblou",
+        "complaint": "box of ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: ink_cartridge.n.01\nDefinition: a cartridge that contains ink and can be replaced\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2986
+    },
+    {
+        "object": "ink_cartridge-ltblou",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2987
+    },
+    {
+        "object": "ink_cartridge-oepuip",
+        "complaint": "box of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: ink_cartridge.n.01\nDefinition: a cartridge that contains ink and can be replaced\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2988
+    },
+    {
+        "object": "ink_cartridge-oepuip",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2989
+    },
+    {
+        "object": "ink_cartridge-oinelo",
+        "complaint": "box of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: ink_cartridge.n.01\nDefinition: a cartridge that contains ink and can be replaced\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2990
+    },
+    {
+        "object": "ink_cartridge-oinelo",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2991
+    },
+    {
+        "object": "coconut-qwriih",
+        "complaint": "it's the fruit and not the meat",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coconut.n.01\nDefinition: the edible white meat of a coconut; often shredded for use in e.g. cakes and curries\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2992
+    },
+    {
+        "object": "grandfather_clock-icznug",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2993
+    },
+    {
+        "object": "grandfather_clock-icznug",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2994
+    },
+    {
+        "object": "grandfather_clock-oskfvo",
+        "complaint": "\u001b[2~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: grandfather_clock.n.01\nDefinition: a pendulum clock enclosed in a tall narrow case\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2995
+    },
+    {
+        "object": "grape-snjrhg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2996
+    },
+    {
+        "object": "apricot-inxcvi",
+        "complaint": "wrong synset it should be the fruit and not the tree and it should be half",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: apricot.n.01\nDefinition: Asian tree having clusters of usually white blossoms and edible fruit resembling the peach\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2997
+    },
+    {
+        "object": "apricot-inxcvi",
+        "complaint": "not sure almost but would make more sense for it to be smaller ",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n5.00cm, 2.93cm, 4.75cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2998
+    },
+    {
+        "object": "half_chives-andiol",
+        "complaint": "partially black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2999
+    },
+    {
+        "object": "coconut-nnankv",
+        "complaint": "this is half of the fruit and not the meat per se so idk",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coconut.n.01\nDefinition: the edible white meat of a coconut; often shredded for use in e.g. cakes and curries\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3000
+    },
+    {
+        "object": "coconut-txtabm",
+        "complaint": "half the fruit and not just the meat",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: coconut.n.01\nDefinition: the edible white meat of a coconut; often shredded for use in e.g. cakes and curries\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3001
+    },
+    {
+        "object": "coconut-txtabm",
+        "complaint": "could be whole/part relationship with the full fruit",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- sliceable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3002
+    },
+    {
+        "object": "stand-geeldi",
+        "complaint": "it's bedstand or console table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: base.n.08\nDefinition: a support or foundation\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3003
+    },
+    {
+        "object": "stand-kanola",
+        "complaint": "nightstand or console table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: base.n.08\nDefinition: a support or foundation\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3004
+    },
+    {
+        "object": "stand-ljtrka",
+        "complaint": "console table",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: base.n.08\nDefinition: a support or foundation\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3005
+    },
+    {
+        "object": "pineapple-wfaybl",
+        "complaint": "wrong number fruit not plant",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pineapple.n.01\nDefinition: a tropical American plant bearing a large fleshy edible fruit with a terminal tuft of stiff leaves; widely cultivated in the tropics\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3006
+    },
+    {
+        "object": "radiator-wntwxx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3007
+    },
+    {
+        "object": "shower-aktzdp",
+        "complaint": "shower stall",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shower.n.01\nDefinition: a plumbing fixture that sprays water over you\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3008
+    },
+    {
+        "object": "shower_stall-aktzdp",
+        "complaint": "wall with showerhead is not in line with other space leaving a gap to outside",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 3009
+    },
+    {
+        "object": "shower-atiuco",
+        "complaint": "shower stall",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shower.n.01\nDefinition: a plumbing fixture that sprays water over you\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3010
+    },
+    {
+        "object": "shower-atiuco",
+        "complaint": "many things",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3011
+    },
+    {
+        "object": "shower-invgma",
+        "complaint": "showel stall",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shower.n.01\nDefinition: a plumbing fixture that sprays water over you\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3012
+    },
+    {
+        "object": "shower-invgma",
+        "complaint": "many things",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3013
+    },
+    {
+        "object": "vacuum-amnmmq",
+        "complaint": "wrong vacuum",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: vacuum.n.01\nDefinition: the absence of matter\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3014
+    },
+    {
+        "object": "vacuum-bdmsbr",
+        "complaint": "wrong vacuum",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: vacuum.n.01\nDefinition: the absence of matter\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3015
+    },
+    {
+        "object": "vacuum-bdmsbr",
+        "complaint": "wrong vacuum",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3016
+    },
+    {
+        "object": "vacuum-wikhik",
+        "complaint": "wrong vacuum",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: vacuum.n.01\nDefinition: the absence of matter\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3017
+    },
+    {
+        "object": "zucchini-ifvmal",
+        "complaint": "not the plant but the fuir",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: zucchini.n.01\nDefinition: marrow squash plant whose fruit are eaten when small\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3018
+    },
+    {
+        "object": "zucchini-udvfaz",
+        "complaint": "not the plant the fruit",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: zucchini.n.01\nDefinition: marrow squash plant whose fruit are eaten when small\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3019
+    },
+    {
+        "object": "carving_knife-alekva",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 3020
+    },
+    {
+        "object": "carving_knife-awvoox",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 3021
+    },
+    {
+        "object": "carving_knife-mzhpkm",
+        "complaint": "might be too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n15.49cm, 2.09cm, 5.60mm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3022
+    },
+    {
+        "object": "carving_knife-mzhpkm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 3023
+    },
+    {
+        "object": "carving_knife-mzhpkm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3024
+    },
+    {
+        "object": "carving_knife-mzhpkm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3025
+    },
+    {
+        "object": "carving_knife-mzhpkm",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 3026
+    },
+    {
+        "object": "chest-fwstpx",
+        "complaint": "wrong synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: thorax.n.02\nDefinition: the part of the human torso between the neck and the diaphragm or the corresponding part in other vertebrates\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3027
+    },
+    {
+        "object": "chest-gbdzls",
+        "complaint": "wrong synset",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: thorax.n.02\nDefinition: the part of the human torso between the neck and the diaphragm or the corresponding part in other vertebrates\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3028
+    },
+    {
+        "object": "chest-gbdzls",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n83.12cm, 1.72m, 61.44cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3029
+    },
+    {
+        "object": "chaise_longue-ajjxcd",
+        "complaint": "might be too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n33.58cm, 74.04cm, 58.20cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3030
+    },
+    {
+        "object": "chaise_longue-ajjxcd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3031
+    },
+    {
+        "object": "chaise_longue-uicxlz",
+        "complaint": "too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n45.79cm, 82.18cm, 33.87cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3032
+    },
+    {
+        "object": "chaise_longue-xmjcle",
+        "complaint": "not sure about the physics",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3033
+    },
+    {
+        "object": "chaise_longue-xmjcle",
+        "complaint": "too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n34.34cm, 71.00cm, 61.47cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3034
+    },
+    {
+        "object": "chaise_longue-xmjcle",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3035
+    },
+    {
+        "object": "chestnut-fmomat",
+        "complaint": "it's the fruit and not the wood",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: chestnut.n.01\nDefinition: wood of any of various chestnut trees of the genus Castanea\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3036
+    },
+    {
+        "object": "chestnut-fmomat",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n5.23cm, 5.24cm, 6.82cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3037
+    },
+    {
+        "object": "chestnut-fmomat",
+        "complaint": "stainable dustyable ",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- sliceable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3038
+    },
+    {
+        "object": "chives-gboofh",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3039
+    },
+    {
+        "object": "chives-vvacxt",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3040
+    },
+    {
+        "object": "chives-yifjct",
+        "complaint": "sliceable ",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3041
+    },
+    {
+        "object": "folding_chair-dqhazh",
+        "complaint": "two joints are annotated but only one moves in the category qa scripts",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- j_leg, RevoluteJoint\n- j_seat, RevoluteJoint\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 3042
+    },
+    {
+        "object": "folding_chair-dxergu",
+        "complaint": "two joints are annotated but only one moves in the category qa script",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- j_leg, RevoluteJoint\n- j_seat, RevoluteJoint\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 3043
+    },
+    {
+        "object": "folding_chair-vngcqu",
+        "complaint": "1",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: folding_chair.n.01\nDefinition: a chair that can be folded flat for storage\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3044
+    },
+    {
+        "object": "pomegranate-tbwsgm",
+        "complaint": "fruit not the tree",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pomegranate.n.01\nDefinition: shrub or small tree native to southwestern Asia having large red many-seeded fruit\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3045
+    },
+    {
+        "object": "pomegranate-vqybii",
+        "complaint": "fruit not the tree",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pomegranate.n.01\nDefinition: shrub or small tree native to southwestern Asia having large red many-seeded fruit\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3046
+    },
+    {
+        "object": "half_vidalia_onion-tnmqrt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3047
+    },
+    {
+        "object": "zucchini-dybtwb",
+        "complaint": "not the plant but the fuir",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: zucchini.n.01\nDefinition: marrow squash plant whose fruit are eaten when small\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3048
+    },
+    {
+        "object": "zucchini-dybtwb",
+        "complaint": "pattypan_squash.n.02",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: zucchini.n.02\nDefinition: small cucumber-shaped vegetable marrow; typically dark green\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3049
+    },
+    {
+        "object": "zucchini-dybtwb",
+        "complaint": "pattypan_squash",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: zucchini\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 3050
+    },
+    {
+        "object": "pomegranate-tldskr",
+        "complaint": "fruit not the tree",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pomegranate.n.01\nDefinition: shrub or small tree native to southwestern Asia having large red many-seeded fruit\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3051
+    },
+    {
+        "object": "rail_fence-iduxiv",
+        "complaint": "fence.n.01? it is not made of logs it is metal",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: rail_fence.n.01\nDefinition: a fence (usually made of split logs laid across each other at an angle)\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3052
+    },
+    {
+        "object": "rail_fence-qmsnld",
+        "complaint": "stick_fence?",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: rail_fence\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 3053
+    },
+    {
+        "object": "rail_fence-qmsnld",
+        "complaint": "no texture",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 3054
+    },
+    {
+        "object": "rail_fence-qmsnld",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3055
+    },
+    {
+        "object": "wall_mounted_tv-gffrzl",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3056
+    },
+    {
+        "object": "wall_mounted_tv-gffrzl",
+        "complaint": "\\",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3057
+    },
+    {
+        "object": "wall_mounted_tv-ggfznh",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3058
+    },
+    {
+        "object": "wall_mounted_tv-ylvjhb",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3059
+    },
+    {
+        "object": "apricot-qmwmwm",
+        "complaint": "synset should match to the fruit and not the tree",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: apricot.n.01\nDefinition: Asian tree having clusters of usually white blossoms and edible fruit resembling the peach\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3060
+    },
+    {
+        "object": "apricot-qmwmwm",
+        "complaint": "would make sense for it to be a little smaller on average",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n4.89cm, 4.74cm, 4.88cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3061
+    },
+    {
+        "object": "bucket-bdhvnt",
+        "complaint": "fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 3062
+    },
+    {
+        "object": "bucket-lsmlzi",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n70.88cm, 86.16cm, 52.12cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3063
+    },
+    {
+        "object": "bucket-lsmlzi",
+        "complaint": "fillable",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 3064
+    },
+    {
+        "object": "bucket-wlilma",
+        "complaint": "don't know if it should be basket since functionailtywise it would be different from a bucket with no holes",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: bucket.n.01\nDefinition: a roughly cylindrical vessel that is open at the top\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3065
+    },
+    {
+        "object": "bucket-wlilma",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n68.92cm, 82.96cm, 52.60cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3066
+    },
+    {
+        "object": "bulletin_board-ayaoal",
+        "complaint": "don't know if we want to separate what is on top of the board from the board",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3067
+    },
+    {
+        "object": "bulletin_board-ayaoal",
+        "complaint": "stainable ",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3068
+    },
+    {
+        "object": "bulletin_board-ayaoal",
+        "complaint": "maybe attachment",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 3069
+    },
+    {
+        "object": "bulletin_board-rjlpsy",
+        "complaint": "not correct definitions",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: bulletin_board_system.n.01\nDefinition: a computer that is running software that allows users to leave messages and access information of general interest\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3070
+    },
+    {
+        "object": "bulletin_board-rjlpsy",
+        "complaint": "stainable attachment maybe?",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3071
+    },
+    {
+        "object": "pineapple-jizmyh",
+        "complaint": "it's the fruit and not the plant wrong number",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pineapple.n.01\nDefinition: a tropical American plant bearing a large fleshy edible fruit with a terminal tuft of stiff leaves; widely cultivated in the tropics\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3072
+    },
+    {
+        "object": "half_pineapple-jizmyh",
+        "complaint": "pineapple.n.02",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: half__pineapple.n.01 (custom synset)\nDefinition: (hypernyms: edible_fruit.n.01): edible reproductive body of a seed plant especially one having sweet flesh\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3073
+    },
+    {
+        "object": "pineapple-zympwt",
+        "complaint": "fruit not the plant",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pineapple.n.01\nDefinition: a tropical American plant bearing a large fleshy edible fruit with a terminal tuft of stiff leaves; widely cultivated in the tropics\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3074
+    },
+    {
+        "object": "half_pineapple-zympwt",
+        "complaint": "pineapple.n.02",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: half__pineapple.n.01 (custom synset)\nDefinition: (hypernyms: edible_fruit.n.01): edible reproductive body of a seed plant especially one having sweet flesh\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3075
+    },
+    {
+        "object": "rubber_glove-crbvcg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3076
+    },
+    {
+        "object": "glove-hsaxtc",
+        "complaint": "two of them..there was another one with two goalkeeper gloves I missed..yikes!",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3077
+    },
+    {
+        "object": "rubber_glove-leuiso",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3078
+    },
+    {
+        "object": "rubber_glove-plffer",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3079
+    },
+    {
+        "object": "glove-rlzvry",
+        "complaint": "two",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3080
+    },
+    {
+        "object": "rubber_glove-rlzvry",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3081
+    },
+    {
+        "object": "rubber_glove-rlzvry",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3082
+    },
+    {
+        "object": "towel_rack-crivoa",
+        "complaint": "\u001b[D\u001b[D",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: towel_rack.n.01\nDefinition: a rack consisting of one or more bars on which towels can be hung\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3083
+    },
+    {
+        "object": "burner-lfyqat",
+        "complaint": "might be too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.48m, 84.62cm, 14.77cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3084
+    },
+    {
+        "object": "burner-pmntxh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_6",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 3085
+    },
+    {
+        "object": "burner-pmntxh",
+        "complaint": "might be too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.18m, 89.71cm, 15.60cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3086
+    },
+    {
+        "object": "chestnut-jvnilh",
+        "complaint": "looks like an empty nut shell ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: chestnut.n.01\nDefinition: wood of any of various chestnut trees of the genus Castanea\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3087
+    },
+    {
+        "object": "chestnut-jvnilh",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n2.67cm, 5.23cm, 6.82cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3088
+    },
+    {
+        "object": "chestnut-tfawre",
+        "complaint": "looks like an empty nut shell",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: chestnut.n.01\nDefinition: wood of any of various chestnut trees of the genus Castanea\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3089
+    },
+    {
+        "object": "chestnut-tfawre",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n2.66cm, 5.23cm, 6.80cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3090
+    },
+    {
+        "object": "chestnut-tfawre",
+        "complaint": "stainable dustyable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- sliceable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3091
+    },
+    {
+        "object": "speaker_system-lgkhqt",
+        "complaint": "missing things ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: loudspeaker.n.01\nDefinition: electro-acoustic transducer that converts electrical signals into sounds loud enough to be heard at a distance\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3092
+    },
+    {
+        "object": "speaker_system-lgkhqt",
+        "complaint": "missing things",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3093
+    },
+    {
+        "object": "loudspeaker-lgkhqt",
+        "complaint": "more like speaker_stand",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: loudspeaker.n.01\nDefinition: electro-acoustic transducer that converts electrical signals into sounds loud enough to be heard at a distance\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3094
+    },
+    {
+        "object": "loudspeaker-lgkhqt",
+        "complaint": "toggleable?",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: True\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 3095
+    },
+    {
+        "object": "loudspeaker-lgkhqt",
+        "complaint": "looks like speaker_stand",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: loudspeaker\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 3096
+    },
+    {
+        "object": "speaker_system-snbvop",
+        "complaint": "too dark",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: loudspeaker.n.01\nDefinition: electro-acoustic transducer that converts electrical signals into sounds loud enough to be heard at a distance\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3097
+    },
+    {
+        "object": "speaker_system-snbvop",
+        "complaint": "too dark",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3098
+    },
+    {
+        "object": "speaker_system-suzqfe",
+        "complaint": "too dark",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: loudspeaker.n.01\nDefinition: electro-acoustic transducer that converts electrical signals into sounds loud enough to be heard at a distance\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3099
+    },
+    {
+        "object": "speaker_system-suzqfe",
+        "complaint": "too dark",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3100
+    },
+    {
+        "object": "loudspeaker-suzqfe",
+        "complaint": "standing_loudspeaker",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: loudspeaker\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 3101
+    }
+]

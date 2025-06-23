@@ -1,0 +1,413 @@
+stages:
+  file_manifest:
+    # Generate a file manifest that can be used to diff files for PRs
+    foreach: ${combined}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/file_manifest.py'
+      deps:
+      - b1k_pipeline/max/file_manifest.py
+      - cad/${item}/processed.max
+      outs:
+      - cad/${item}/artifacts/file_manifest.json
+      - cad/${item}/artifacts/file_manifest_deep.json
+
+  combined_file_manifest:
+    # Combine the file manifest into a single file for diffing.
+    cmd: 'python -m b1k_pipeline.combined_file_manifest'
+    deps:
+    - cad/#{combined}/artifacts/file_manifest.json
+    - b1k_pipeline/combined_file_manifest.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/combined_file_manifest.json
+
+  object_list:
+    # List the objects found in the entry.
+    foreach: ${combined}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/object_list.py'
+      deps:
+      - b1k_pipeline/max/object_list.py
+      - cad/${item}/processed.max
+      outs:
+      - cad/${item}/artifacts/object_list.json
+
+  object_list_success:
+    cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/object_list.json artifacts/pipeline/object_list.success'
+    deps:
+    - cad/#{combined}/artifacts/object_list.json
+    - b1k_pipeline/check_success_aggregate.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/object_list.success
+
+  sanitycheck:
+    # Run a check to ensure .max files match expected format.
+    foreach: ${combined}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/new_sanity_check.py batch=true'
+      deps:
+      - cad/${item}/processed.max
+      - b1k_pipeline/max/new_sanity_check.py
+      - artifacts/pipeline/object_list.success
+      # - artifacts/pipeline/object_inventory.json
+      outs:
+      - cad/${item}/artifacts/sanitycheck.json
+
+  sanitycheck_success:
+    cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/sanitycheck.json artifacts/pipeline/sanitycheck.success'
+    deps:
+    - cad/#{combined}/artifacts/sanitycheck.json
+    - b1k_pipeline/check_success_aggregate.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/sanitycheck.success
+
+  check_collisions:
+    # List the objects found in the entry.
+    foreach: ${scenes}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/check_collisions.py'
+      deps:
+      - b1k_pipeline/max/check_collisions.py
+      - cad/${item}/processed.max
+      # - artifacts/pipeline/sanitycheck.success
+      outs:
+      - cad/${item}/artifacts/check_collisions.json
+
+  # check_collisions_success:
+  #   cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/check_collisions.json artifacts/pipeline/check_collisions.success scenes'
+  #   deps:
+  #   - cad/#{scenes}/artifacts/check_collisions.json
+  #   - b1k_pipeline/check_success_aggregate.py
+  #   - params.yaml
+  #   outs:
+  #   - artifacts/pipeline/check_collisions.success
+
+  check_collisions_with_clutter:
+    # List the objects found in the entry.
+    foreach: ${scenes}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/check_collisions.py clutter=true'
+      deps:
+      - b1k_pipeline/max/check_collisions.py
+      - cad/${item}/processed.max
+      # - artifacts/pipeline/sanitycheck.success
+      outs:
+      - cad/${item}/artifacts/check_collisions_with_clutter.json
+
+  # check_collisions_with_clutter_success:
+  #   cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/check_collisions_with_clutter.json artifacts/pipeline/check_collisions_with_clutter.success scenes'
+  #   deps:
+  #   - cad/#{scenes}/artifacts/check_collisions_with_clutter.json
+  #   - b1k_pipeline/check_success_aggregate.py
+  #   - params.yaml
+  #   outs:
+  #   - artifacts/pipeline/check_collisions_with_clutter.success
+
+  validate_meta_links:
+    # Validate exported scene, e.g. physics stability.
+    cmd: 'python -m b1k_pipeline.validate_meta_links'
+    deps:
+    - cad/#{combined}/artifacts/object_list.json
+    - artifacts/pipeline/object_list.success
+    - b1k_pipeline/validate_meta_links.py
+    outs:
+    - artifacts/pipeline/validate_meta_links.json
+
+  object_inventory:
+    # List all objects found in all entries, with their sources. Cross-reference bad objects w/ providers. Check provider uniqueness.
+    cmd: 'python -m b1k_pipeline.object_inventory'
+    deps:
+    - cad/#{combined}/artifacts/object_list.json
+    - artifacts/pipeline/object_list.success
+    - b1k_pipeline/object_inventory.py
+    - params.yaml
+    outs:
+    - artifacts/pipeline/object_inventory.json
+
+  object_inventory_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/object_inventory.json artifacts/pipeline/object_inventory.success'
+    deps:
+    - artifacts/pipeline/object_inventory.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/object_inventory.success
+
+  export_meshes:
+    # Export meshes from 3dsmax as obj/mtl files with baked textures.
+    foreach: ${combined}
+    do:
+      cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/export_meshes.py'
+      deps:
+      - b1k_pipeline/max/export_meshes.py
+      - artifacts/pipeline/sanitycheck.success
+      - cad/${item}/processed.max
+      outs:
+      - cad/${item}/artifacts/meshes.zip
+      - cad/${item}/artifacts/export_meshes.json
+
+  export_meshes_success:
+    cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/export_meshes.json artifacts/pipeline/export_meshes.success'
+    deps:
+    - cad/#{combined}/artifacts/export_meshes.json
+    - b1k_pipeline/check_success_aggregate.py
+    outs:
+    - artifacts/pipeline/export_meshes.success
+
+  # generate_max_object_images:
+  #   # List the objects found in the entry.
+  #   foreach: ${combined}
+  #   do:
+  #     cmd: 'python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/generate_max_object_images.py'
+  #     deps:
+  #     - b1k_pipeline/max/generate_max_object_images.py
+  #     - cad/${item}/processed.max
+  #     - artifacts/pipeline/sanitycheck.success
+  #     outs:
+  #     - cad/${item}/artifacts/generate_max_object_images.json
+  #     - cad/${item}/artifacts/max_object_images.zip
+
+  # generate_max_object_images_success:
+  #   cmd: 'python -m b1k_pipeline.check_success_aggregate artifacts/object_list.json artifacts/pipeline/generate_max_object_images.success'
+  #   deps:
+  #   - cad/#{combined}/artifacts/generate_max_object_images.json
+  #   - b1k_pipeline/check_success_aggregate.py
+  #   - params.yaml
+  #   outs:
+  #   - artifacts/pipeline/generate_max_object_images.success
+
+  # aggregate_max_object_images:
+  #   cmd: 'python -m b1k_pipeline.aggregate_max_object_images'
+  #   deps:
+  #   - b1k_pipeline/aggregate_max_object_images.py
+  #   - cad/#{combined}/artifacts/max_object_images.zip
+  #   - artifacts/pipeline/generate_max_object_images.success
+  #   outs:
+  #   - artifacts/pipeline/max_object_images.zip
+
+  export_objs_global:
+    # Process exported meshes into iGibson objects.
+    cmd: 'python -m b1k_pipeline.export_objs_global'
+    deps:
+    - cad/#{combined}/artifacts/meshes.zip
+    - cad/#{combined}/artifacts/object_list.json
+    - artifacts/pipeline/object_list.success
+    - artifacts/pipeline/object_inventory.success
+    - artifacts/pipeline/sanitycheck.success
+    - artifacts/pipeline/export_meshes.success
+    - metadata/object_renames.csv
+    # These were necessary when we were adding the mass in the URDF file which is no longer the case.
+    # - artifacts/parallels/metadata.zip
+    # - artifacts/pipeline/aggregate_metadata.success
+    - b1k_pipeline/export_objs_global.py
+    - b1k_pipeline/mesh_tree.py
+    outs:
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_objs.json
+
+  export_objs_global_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/export_objs.json artifacts/pipeline/export_objs.success'
+    deps:
+    - artifacts/pipeline/export_objs.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/export_objs.success
+     
+  combined_room_object_list:
+    # Generate a combined list of all objects found in each room across all scenes, with synset mappings.
+    cmd: 'python -m b1k_pipeline.combined_room_object_list'
+    deps:
+    - cad/#{scenes}/artifacts/object_list.json
+    - artifacts/pipeline/object_list.success
+    - b1k_pipeline/combined_room_object_list.py
+    - metadata/allowed_room_types.csv
+    - params.yaml
+    outs:
+    - artifacts/pipeline/combined_room_object_list.json
+
+  export_scenes_global:
+    # Generate scene URDF file from meshes.
+    cmd: 'python -m b1k_pipeline.export_scenes_global'
+    deps:
+    - artifacts/pipeline/export_meshes.success
+    - artifacts/pipeline/object_list.success
+    - cad/#{scenes}/artifacts/meshes.zip
+    - cad/#{scenes}/artifacts/object_list.json
+    - b1k_pipeline/export_scenes_global.py
+    - b1k_pipeline/export_objs_global.py
+    - b1k_pipeline/mesh_tree.py
+    - params.yaml
+    outs:
+    - artifacts/parallels/scenes.zip
+    - artifacts/pipeline/export_scenes.json
+
+  export_scenes_global_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/export_scenes.json artifacts/pipeline/export_scenes.success'
+    deps:
+    - artifacts/pipeline/export_scenes.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/export_scenes.success
+
+  validate_scenes:
+    # Validate exported scene, e.g. physics stability.
+    cmd: 'python -m b1k_pipeline.validate_scenes'
+    deps:
+    - artifacts/og_dataset.zip
+    - artifacts/pipeline/pack_dataset.success
+    - b1k_pipeline/validate_scenes.py
+    - b1k_pipeline/validate_scenes_process.py
+    outs:
+    - artifacts/pipeline/validate_scenes.json
+
+  # validate_scenes_success:
+  #   cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/validate_scenes.json artifacts/pipeline/validate_scenes.success'
+  #   deps:
+  #   - artifacts/pipeline/validate_scenes.json
+  #   - b1k_pipeline/check_success.py
+  #   outs:
+  #   - artifacts/pipeline/validate_scenes.success
+
+  usdify_objects:
+    cmd: 'python -m b1k_pipeline.usd_conversion.usdify_objects'
+    deps:
+    - artifacts/parallels/objects.zip
+    # - artifacts/parallels/metadata.zip
+    # - artifacts/parallels/fillable_volumes.zip
+    - artifacts/pipeline/export_objs.success
+    # - artifacts/pipeline/aggregate_metadata.success
+    - b1k_pipeline/usd_conversion/usdify_objects.py
+    - b1k_pipeline/usd_conversion/usdify_objects_process.py
+    outs:
+    - artifacts/parallels/objects_usd.zip
+    - artifacts/pipeline/usdify_objects.json
+
+  usdify_objects_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/usdify_objects.json artifacts/pipeline/usdify_objects.success'
+    deps:
+    - artifacts/pipeline/usdify_objects.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/usdify_objects.success
+
+  usdify_scenes:
+    cmd: 'python -m b1k_pipeline.usd_conversion.usdify_scenes'
+    deps:
+    - artifacts/parallels/objects_usd.zip
+    - artifacts/parallels/scenes.zip
+    - artifacts/parallels/metadata.zip
+    - artifacts/pipeline/export_objs.success
+    - artifacts/pipeline/export_scenes.success
+    - artifacts/pipeline/aggregate_metadata.success
+    - b1k_pipeline/usd_conversion/usdify_scenes.py
+    - b1k_pipeline/usd_conversion/usdify_scenes_process.py
+    - b1k_pipeline/usd_conversion/make_maps.py
+    outs:
+    - artifacts/parallels/scenes_json.zip
+    - artifacts/pipeline/usdify_scenes.success
+    - artifacts/pipeline/usdify_scenes.json
+
+  generate_systems:
+    cmd: 'python -m b1k_pipeline.generate_systems'
+    deps:
+    - artifacts/parallels/objects_usd.zip
+    - artifacts/pipeline/usdify_objects.success
+    - metadata/substance_hyperparams.csv
+    outs:
+    - artifacts/parallels/systems.zip
+    - artifacts/pipeline/generate_systems.json
+
+  generate_systems_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/generate_systems.json artifacts/pipeline/generate_systems.success'
+    deps:
+    - artifacts/pipeline/generate_systems.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/generate_systems.success
+
+  aggregate_fillable_volumes:
+    cmd: 'python -m b1k_pipeline.aggregate_fillable_volumes'
+    deps:
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_objs.success
+    - artifacts/parallels/fillable_volumes
+    - metadata/fillable_assignments.json
+    - b1k_pipeline/aggregate_fillable_volumes.py
+    outs:
+    - artifacts/parallels/fillable_volumes.zip
+
+  collision_average_volumes:
+    cmd: 'python -m b1k_pipeline.collision_average_volumes'
+    deps:
+    - b1k_pipeline/collision_average_volumes.py
+    - cad/#{combined}/artifacts/meshes.zip
+    - cad/#{combined}/artifacts/object_list.json
+    outs:
+    - artifacts/pipeline/collision_average_volumes.json
+
+  collision_average_volumes_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/collision_average_volumes.json artifacts/pipeline/collision_average_volumes.success'
+    deps:
+    - artifacts/pipeline/collision_average_volumes.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/collision_average_volumes.success
+
+  aggregate_metadata:
+    # Add metadata and compile everything in the right spot.
+    cmd: 'python -m b1k_pipeline.aggregate_metadata'
+    deps:
+    - b1k_pipeline/aggregate_metadata.py
+    - artifacts/pipeline/object_inventory.json
+    - artifacts/pipeline/object_inventory.success
+    - metadata/category_mapping.csv
+    - metadata/non_sampleable_categories.csv
+    - metadata/allowed_room_types.csv
+    - artifacts/pipeline/collision_average_volumes.json
+    - artifacts/pipeline/collision_average_volumes.success
+    outs:
+    - artifacts/parallels/metadata.zip
+    - artifacts/pipeline/aggregate_metadata.json
+
+  aggregate_metadata_success:
+    cmd: 'python -m b1k_pipeline.check_success artifacts/pipeline/aggregate_metadata.json artifacts/pipeline/aggregate_metadata.success'
+    deps:
+    - artifacts/pipeline/aggregate_metadata.json
+    - b1k_pipeline/check_success.py
+    outs:
+    - artifacts/pipeline/aggregate_metadata.success
+
+  pack_dataset:
+    # Zip the dataset.
+    cmd: 'python -m b1k_pipeline.pack_dataset'
+    deps:
+    # - artifacts/pipeline/validate_scene.success
+    - artifacts/pipeline/aggregate_metadata.success
+    - artifacts/pipeline/usdify_objects.success
+    - artifacts/pipeline/usdify_scenes.success
+    - artifacts/pipeline/generate_systems.success
+    - artifacts/parallels/metadata.zip
+    - artifacts/parallels/objects.zip
+    - artifacts/parallels/objects_usd.zip
+    - artifacts/parallels/scenes_json.zip
+    - artifacts/parallels/systems.zip
+    - VERSION
+    - b1k_pipeline/pack_dataset.py
+    outs:
+    - artifacts/og_dataset.zip
+    # - artifacts/og_dataset_demo.zip
+    - artifacts/pipeline/pack_dataset.json
+    - artifacts/pipeline/pack_dataset.success
+
+  patch_sampled:
+    cmd: b1k_pipeline/patch_sampled.sh og_dataset_demo && b1k_pipeline/patch_sampled.sh og_dataset && touch artifacts/pipeline/patch_sampled.success
+    deps:
+    - artifacts/og_dataset.zip
+    - artifacts/og_dataset_demo.zip
+    - b1k_pipeline/patch_sampled.sh
+    - sampled_tasks.zip
+    outs:
+    - artifacts/og_dataset_sampled.tar.gz
+    - artifacts/og_dataset_demo_sampled.tar.gz
+    - artifacts/pipeline/patch_sampled.success

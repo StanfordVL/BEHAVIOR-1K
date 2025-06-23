@@ -1,0 +1,5 @@
+outs:
+- md5: 719c52322a796287035c9f331a243794
+  size: 166
+  path: collision_meshes.zip
+  hash: md5

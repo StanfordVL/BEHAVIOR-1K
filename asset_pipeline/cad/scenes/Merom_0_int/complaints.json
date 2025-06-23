@@ -1,0 +1,19 @@
+[
+    {
+        "object": "walls-udirwo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 4032
+    },
+    {
+        "object": "ceilings-kqvkod",
+        "complaint": "wensi: slanted",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4033
+    }
+]

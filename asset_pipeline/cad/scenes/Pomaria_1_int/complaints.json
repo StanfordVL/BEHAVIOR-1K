@@ -1,0 +1,18 @@
+[
+    {
+        "object": "walls-bgymrg",
+        "complaint": "wensi: remove baseboard",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4083
+    },
+    {
+        "object": "ceilings-hfacms",
+        "complaint": "wensi: slightly unperpendicular corner",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4084
+    }
+]

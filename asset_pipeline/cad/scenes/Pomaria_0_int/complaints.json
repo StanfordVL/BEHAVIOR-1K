@@ -1,0 +1,10 @@
+[
+    {
+        "object": "ceilings-imtzdm",
+        "complaint": "wensi: corner not perpendicular",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4082
+    }
+]

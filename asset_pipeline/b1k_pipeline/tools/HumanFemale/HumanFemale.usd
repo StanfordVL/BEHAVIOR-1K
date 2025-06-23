@@ -1,0 +1,245 @@
+#usda 1.0
+(
+    defaultPrim = "HumanFemale_Group"
+    upAxis = "Z"
+)
+
+def SkelRoot "HumanFemale_Group" (
+    prepend apiSchemas = ["SkelBindingAPI"]
+    variants = {
+        string geometricLOD = "full"
+        string rigComplexity = "high"
+    }
+    prepend variantSets = ["geometricLOD", "rigComplexity"]
+)
+{
+    float3[] extent = [(-73.708176, -28.084373, -13.51461), (73.708176, 17.031977, 134.28993)]
+    rel skel:skeleton = </HumanFemale_Group/Rig/Skel>
+    matrix4d xformOp:transform = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    uniform token[] xformOpOrder = ["xformOp:transform"]
+
+    def Scope "Rig" (
+        kind = "component"
+        prepend references = @./assets/HumanFemale.rig.usd@
+    )
+    {
+    }
+    variantSet "geometricLOD" = {
+        "full" (
+            prepend references = @./assets/HumanFemale.full.usd@
+        ) {
+
+        }
+        "low" (
+            prepend references = @./assets/HumanFemale.low.usd@
+        ) {
+
+        }
+        "medium" (
+            prepend references = @./assets/HumanFemale.medium.usd@
+        ) {
+
+        }
+    }
+    variantSet "rigComplexity" = {
+        "faceBones" {
+            over "HumanFemale" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "HumanFemaleHair" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "KidThinButtonDown" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "KidThinLeggings" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "KidThinSkirt" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "ShoesHumanFlats" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "SocksHuman" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+            over "Rig" (
+                variants = {
+                    string rigComplexity = "faceBones"
+                }
+            )
+            {
+            }
+
+        }
+        "high" {
+            over "HumanFemale" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "HumanFemaleHair" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "KidThinButtonDown" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "KidThinLeggings" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "KidThinSkirt" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "ShoesHumanFlats" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "SocksHuman" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+            over "Rig" (
+                variants = {
+                    string rigComplexity = "high"
+                }
+            )
+            {
+            }
+
+        }
+        "reduced" {
+            over "HumanFemale" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "HumanFemaleHair" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "KidThinButtonDown" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "KidThinLeggings" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "KidThinSkirt" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "ShoesHumanFlats" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "SocksHuman" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+            over "Rig" (
+                variants = {
+                    string rigComplexity = "reduced"
+                }
+            )
+            {
+            }
+
+        }
+    }
+}
+

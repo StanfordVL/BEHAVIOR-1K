@@ -1,0 +1,17 @@
+{
+  "bottom_cabinet-songes-0-base_link": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "bottom_cabinet-songes-0-bottomdrawer-base_link-P-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "bottom_cabinet-songes-0-bottomhandle-bottomdrawer-F-lower": "coacd-t_0.05-pr_100-c_32",
+  "bottom_cabinet-songes-0-middledrawer-base_link-P-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "bottom_cabinet-songes-0-middlehandle-middledrawer-F-lower": "coacd-t_0.05-pr_100-c_32",
+  "bottom_cabinet-songes-0-topdrawer-base_link-P-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "bottom_cabinet-songes-0-tophandle-topdrawer-F-lower": "coacd-t_0.05-pr_100-c_32",
+  "bowl-ycbbwl-0": "coacd-t_0.05-pr_100-c_8",
+  "canned_food-ycbspm-0": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "mug-ycbmug-0": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h32",
+  "wardrobe-brimns-0-base_link": "coacd-t_0.05-pr_100-c_32",
+  "wardrobe-brimns-0-leftdoor-base_link-R-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "wardrobe-brimns-0-lefthandle-leftdoor-F-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "wardrobe-brimns-0-rightdoor-base_link-R-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h8",
+  "wardrobe-brimns-0-righthandle-rightdoor-F-lower": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4"
+}

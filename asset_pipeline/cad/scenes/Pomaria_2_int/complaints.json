@@ -1,0 +1,10 @@
+[
+    {
+        "object": "ceilings-carllw",
+        "complaint": "slightly unperpendicular corner",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4085
+    }
+]

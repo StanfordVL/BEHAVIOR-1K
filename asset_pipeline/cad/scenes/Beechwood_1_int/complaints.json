@@ -1,0 +1,10 @@
+[
+    {
+        "object": "ceilings-ytbprd",
+        "complaint": "ceiling",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4016
+    }
+]

@@ -1,0 +1,135 @@
+name: Compare 3ds Max File Manifests
+
+on:
+  pull_request:
+    types: [opened, synchronize] # Run on PR creation and updates
+
+# Define permissions needed for the workflow
+permissions:
+  contents: read        # To check out code
+  pull-requests: write  # To post/update the PR comment
+
+jobs:
+  diff_output:
+    runs-on: ubuntu-latest
+    env:
+      # Temporary file paths
+      DIFF_FILE: /tmp/output.diff
+
+    steps:
+      - name: Setup python
+        uses: actions/setup-python@v2
+        with:
+          python-version: "3.10"
+          architecture: x64
+
+      - name: Install DVC
+        run: pip install dvc[gs]===3.42.0 deepdiff fs numpy trimesh pyyaml
+        
+      - name: Authenticate on Google Cloud
+        uses: 'google-github-actions/auth@v1'
+        with:
+          credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+      - name: Checkout PR Branch
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Pull combined file manifest for PR branch
+        working-directory: pr
+        run: dvc pull combined_file_manifest file_manifest
+
+      # - name: Check repro output on PR branch
+      #   working-directory: pr
+      #   run: dvc repro --dry --allow-missing combined_file_manifest
+
+      # - name: Check PR branch file manifest for validity
+      #   working-directory: pr
+      #   run: python b1k_pipeline/check_dvc_stage_current.py combined_file_manifest      
+
+      - name: Checkout Base Branch (${{ github.base_ref }})
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }} # Checkout the base branch
+          path: base
+
+      - name: Pull combined file manifest for base branch
+        working-directory: base
+        run: dvc pull combined_file_manifest file_manifest
+
+      # - name: Check repro output on base branch
+      #   working-directory: base
+      #   run: dvc repro --dry --allow-missing combined_file_manifest
+
+      # - name: Check base branch file manifest for validity
+      #   working-directory: base
+      #   run: python b1k_pipeline/check_dvc_stage_current.py combined_file_manifest
+
+      - name: Generate Diff
+        id: diff_step # Give the step an ID to reference its outputs
+        run: |
+          echo "Generating diff between base and PR file manifests..."
+          # Use 'diff' command. It exits with 0 if no diff, 1 if diff, >1 if error.
+          # We use '|| true' to ensure the workflow continues even if differences are found (exit code 1).
+          # diff -u5 base/artifacts/pipeline/combined_file_manifest.json pr/artifacts/pipeline/combined_file_manifest.json > ${{ env.DIFF_FILE }} || true
+          PYTHONPATH="pr:${PYTHONPATH}" python pr/b1k_pipeline/deep_diff.py > ${{ env.DIFF_FILE }}
+
+          # Check if diff file has content
+          if [ -s "${{ env.DIFF_FILE }}" ]; then
+            echo "Differences found."
+            echo "diff_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "No differences found."
+            echo "diff_found=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 4. Output Diff to Job Summary
+      - name: Write Diff to Job Summary
+        run: |
+          echo "### 3ds Max File Manifest Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY # Newline
+          echo "Comparison of the 3ds Max file manifest between the base branch (\`${{ github.base_ref }}\`) and the PR branch (\`${{ github.head_ref }}\`)." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.diff_step.outputs.diff_found }}" == "true" ]; then
+            echo "**Result:** Differences found." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            # Limit the diff size in the summary if needed (e.g., first 100 lines)
+            # head -n 100 ${{ env.DIFF_FILE }} >> $GITHUB_STEP_SUMMARY
+            # Or display the full diff (might be large)
+            cat ${{ env.DIFF_FILE }} >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            # Optionally, mention if the diff was truncated
+            # line_count=$(wc -l < ${{ env.DIFF_FILE }})
+            # if [ $line_count -gt 100 ]; then
+            #   echo "" >> $GITHUB_STEP_SUMMARY
+            #   echo "*Note: Diff output truncated to the first 100 lines. See the full diff artifact.*" >> $GITHUB_STEP_SUMMARY
+            # fi
+          else
+            echo "**Result:** No differences found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # Optional: Upload full diff as artifact (useful if diffs can be very large)
+      - name: Upload Diff Artifact
+        if: steps.diff_step.outputs.diff_found == 'true' # Only upload if there are differences
+        uses: actions/upload-artifact@v4
+        with:
+          name: command-output-diff
+          path: ${{ env.DIFF_FILE }}
+
+      # 5. Post/Update a status comment on the PR
+      - name: Create or Update PR Comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          # Use a header to identify the comment uniqueness
+          header: command-diff-output-check
+          # Use github.server_url for GHES compatibility
+          message: |
+            📊 **3ds Max File Manifest Diff Check**
+
+            ${{ steps.diff_step.outputs.diff_found == 'true' && format('Differences found between 3ds Max file manifests in base (`{0}`) and PR (`{1}`).', github.base_ref, github.head_ref) || format('No differences found between 3ds Max file manifests in base (`{0}`) and PR (`{1}`).', github.base_ref, github.head_ref) }}
+
+            [**See details in the Job Summary →**](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            ${{ steps.diff_step.outputs.diff_found == 'true' && format('\n[Download full diff artifact]({0}/{1}/actions/runs/{2}/artifacts/{3})', github.server_url, github.repository, github.run_id, 'command-output-diff') || '' }}
