@@ -1,0 +1,53 @@
+(define (problem wash_dog_toys-0)
+    (:domain omnigibson)
+
+    (:objects
+        teddy.n.01_1 teddy.n.01_2 - teddy.n.01
+        washer.n.03_1 - washer.n.03
+        dirt.n.02_1 - dirt.n.02
+        dust.n.01_1 - dust.n.01
+        tennis_ball.n.01_1 - tennis_ball.n.01
+        debris.n.01_1 - debris.n.01
+        softball.n.01_1 - softball.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside teddy.n.01_1 cabinet.n.01_1) 
+        (covered teddy.n.01_1 dirt.n.02_1) 
+        (inside teddy.n.01_2 cabinet.n.01_1) 
+        (covered teddy.n.01_2 dust.n.01_1) 
+        (inside tennis_ball.n.01_1 cabinet.n.01_1) 
+        (covered tennis_ball.n.01_1 debris.n.01_1) 
+        (inside softball.n.01_1 cabinet.n.01_1) 
+        (covered softball.n.01_1 dirt.n.02_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?teddy.n.01 - teddy.n.01)
+                (and
+                    (not 
+                        (covered ?teddy.n.01 ?dirt.n.02_1)
+                    )
+                    (not 
+                        (covered ?teddy.n.01 ?dust.n.01_1)
+                    )
+                )
+            )
+            (not 
+                (covered ?tennis_ball.n.01_1 ?debris.n.01_1)
+            ) 
+            (not 
+                (covered ?softball.n.01_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

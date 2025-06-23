@@ -1,0 +1,28 @@
+(define (problem laying_tile_floors-0)
+    (:domain omnigibson)
+
+    (:objects
+        tile.n.01_1 tile.n.01_2 tile.n.01_3 tile.n.01_4 - tile.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tile.n.01_1 floor.n.01_1) 
+        (ontop tile.n.01_2 floor.n.01_1) 
+        (ontop tile.n.01_3 floor.n.01_1) 
+        (ontop tile.n.01_4 floor.n.01_1) 
+        (inroom floor.n.01_1 corridor) 
+        (inroom floor.n.01_2 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?tile.n.01 - tile.n.01) 
+                (ontop ?tile.n.01 ?floor.n.01_2)
+            )
+        )
+    )
+)

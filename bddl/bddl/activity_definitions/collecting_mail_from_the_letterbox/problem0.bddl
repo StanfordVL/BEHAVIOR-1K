@@ -1,0 +1,30 @@
+(define (problem collecting_mail_from_the_letterbox-0)
+    (:domain omnigibson)
+
+    (:objects
+        mailbox.n.01_1 - mailbox.n.01
+        envelope.n.01_1 - envelope.n.01
+        driveway.n.01_1 - driveway.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mailbox.n.01_1 driveway.n.01_1) 
+        (inside envelope.n.01_1 mailbox.n.01_1)
+        (inroom driveway.n.01_1 garden)
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?envelope.n.01 - envelope.n.01)
+                (ontop ?envelope.n.01 ?coffee_table.n.01_1)
+            )
+        )
+    )
+)

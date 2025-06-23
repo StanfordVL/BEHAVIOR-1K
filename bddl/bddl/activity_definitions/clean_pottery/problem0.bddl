@@ -1,0 +1,39 @@
+(define (problem clean_pottery-0)
+    (:domain omnigibson)
+
+    (:objects
+        mud.n.03_1 - mud.n.03
+        pot.n.04_1 - pot.n.04
+        vase.n.01_1 - vase.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered pot.n.04_1 mud.n.03_1)
+        (inside pot.n.04_1 cabinet.n.01_1) 
+        (covered vase.n.01_1 mud.n.03_1)
+        (inside vase.n.01_1 cabinet.n.01_1) 
+        (inside rag.n.01_1 cabinet.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom sink.n.01_1 utility_room) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?pot.n.04_1 ?mud.n.03_1)
+            )
+            (not 
+                (covered ?vase.n.01_1 ?mud.n.03_1)
+            )
+        )
+    )
+)

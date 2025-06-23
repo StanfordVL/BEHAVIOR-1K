@@ -1,0 +1,44 @@
+(define (problem putting_dirty_dishes_in_sink-0)
+    (:domain omnigibson)
+
+    (:objects
+        breadcrumb.n.01_1 - breadcrumb.n.01
+        marinara.n.01_1 - marinara.n.01
+        bowl.n.01_1 bowl.n.01_2 bowl.n.01_3 - bowl.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered bowl.n.01_1 breadcrumb.n.01_1) 
+        (covered bowl.n.01_2 breadcrumb.n.01_1) 
+        (covered bowl.n.01_3 marinara.n.01_1) 
+        (covered plate.n.04_1 breadcrumb.n.01_1) 
+        (covered plate.n.04_2 marinara.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (ontop bowl.n.01_2 countertop.n.01_1) 
+        (ontop bowl.n.01_3 countertop.n.01_1) 
+        (ontop plate.n.04_1 countertop.n.01_1) 
+        (ontop plate.n.04_2 countertop.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?bowl.n.01 - bowl.n.01) 
+                (inside ?bowl.n.01 ?sink.n.01_1)
+            ) 
+            (forall 
+                (?plate.n.04 - plate.n.04) 
+                (inside ?plate.n.04 ?sink.n.01_1)
+            ) 
+        )
+    )
+)

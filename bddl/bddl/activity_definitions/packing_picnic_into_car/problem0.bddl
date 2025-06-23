@@ -1,0 +1,73 @@
+(define (problem packing_picnic_into_car-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        driveway.n.01_1 - driveway.n.01
+        wicker_basket.n.01_1 wicker_basket.n.01_2 - wicker_basket.n.01
+        blanket.n.01_1 - blanket.n.01
+        beer_bottle.n.01_1 beer_bottle.n.01_2 - beer_bottle.n.01
+        water_bottle.n.01_1 - water_bottle.n.01
+        bottle__of__sunscreen.n.01_1 - bottle__of__sunscreen.n.01
+        cupcake.n.01_1 cupcake.n.01_2 - cupcake.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden) 
+        (ontop wicker_basket.n.01_1 driveway.n.01_1) 
+        (ontop wicker_basket.n.01_2 driveway.n.01_1) 
+        (ontop blanket.n.01_1 driveway.n.01_1) 
+        (inside beer_bottle.n.01_1 wicker_basket.n.01_1) 
+        (inside beer_bottle.n.01_2 wicker_basket.n.01_1) 
+        (inside cupcake.n.01_1 wicker_basket.n.01_1)
+        (inside cupcake.n.01_2 wicker_basket.n.01_1)
+        (inside water_bottle.n.01_1 wicker_basket.n.01_2) 
+        (inside bottle__of__sunscreen.n.01_1 wicker_basket.n.01_2) 
+        (ontop paper_towel.n.01_1 driveway.n.01_1) 
+        (inside carving_knife.n.01_1 wicker_basket.n.01_2) 
+        (inroom driveway.n.01_1 garden) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?wicker_basket.n.01 - wicker_basket.n.01) 
+                (inside ?wicker_basket.n.01 ?car.n.01_1)
+            ) 
+            (inside ?paper_towel.n.01_1 ?car.n.01_1)
+            (inside ?blanket.n.01_1 ?car.n.01_1)
+            (exists
+                (?wicker_basket.n.01 - wicker_basket.n.01)
+                (inside ?water_bottle.n.01_1 ?wicker_basket.n.01)
+            )
+            (exists
+                (?wicker_basket.n.01 - wicker_basket.n.01)
+                (inside ?bottle__of__sunscreen.n.01_1 ?wicker_basket.n.01)
+            )
+            (exists
+                (?wicker_basket.n.01 - wicker_basket.n.01)
+                (inside ?carving_knife.n.01_1 ?wicker_basket.n.01)
+            )
+            (forall
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (exists
+                    (?wicker_basket.n.01 - wicker_basket.n.01)
+                    (inside ?beer_bottle.n.01 ?wicker_basket.n.01)
+                )
+            )
+            (forall
+                (?cupcake.n.01 - cupcake.n.01)
+                (exists
+                    (?wicker_basket.n.01 - wicker_basket.n.01)
+                    (inside ?cupcake.n.01 ?wicker_basket.n.01)
+                )
+            )
+        )
+    )
+)

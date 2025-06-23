@@ -1,0 +1,42 @@
+(define (problem cook_kale-0)
+    (:domain omnigibson)
+
+    (:objects
+        kale.n.03_1 - kale.n.03
+        oven.n.01_1 - oven.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        saucepot.n.01_1 - saucepot.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside kale.n.03_1 electric_refrigerator.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop saucepot.n.01_1 countertop.n.01_1) 
+        (not 
+            (cooked kale.n.03_1)
+        ) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?kale.n.03_1 ?salt.n.02_1)
+            (cooked ?kale.n.03_1)
+            (covered ?kale.n.03_1 ?olive_oil.n.01_1)
+        )
+    )
+)

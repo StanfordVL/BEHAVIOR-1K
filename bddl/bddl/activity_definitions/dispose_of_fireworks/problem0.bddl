@@ -1,0 +1,29 @@
+(define (problem dispose_of_fireworks-0)
+    (:domain omnigibson)
+
+    (:objects
+        firework.n.01_1 firework.n.01_2 firework.n.01_3 firework.n.01_4 - firework.n.01
+        floor.n.01_1 - floor.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop firework.n.01_1 floor.n.01_1) 
+        (ontop firework.n.01_2 floor.n.01_1) 
+        (ontop firework.n.01_3 floor.n.01_1) 
+        (ontop firework.n.01_4 floor.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?firework.n.01 - firework.n.01)
+                (inside ?firework.n.01 ?ashcan.n.01_1)
+            )
+        )
+    )
+)

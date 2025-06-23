@@ -1,0 +1,53 @@
+(define (problem clearing_table_after_dinner-0)
+    (:domain omnigibson)
+
+    (:objects
+        chicken.n.01_1 - chicken.n.01
+        plate.n.04_1 - plate.n.04
+        spinach.n.02_1 - spinach.n.02
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        water.n.06_1 - water.n.06
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chicken.n.01_1 plate.n.04_1) 
+        (ontop spinach.n.02_1 plate.n.04_1) 
+        (ontop tupperware.n.01_1 breakfast_table.n.01_1)
+        (ontop tupperware.n.01_2 breakfast_table.n.01_1)
+        (ontop plate.n.04_1 breakfast_table.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 dining_room) 
+        (inroom sink.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?chicken.n.01_1 ?tupperware.n.01_1) 
+            (inside ?spinach.n.02_1 ?tupperware.n.01_1)
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?chicken.n.01_1 ?tupperware.n.01)
+            )
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?spinach.n.02_1 ?tupperware.n.01)
+            )
+            (forall
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?tupperware.n.01 ?electric_refrigerator.n.01_1)
+            )
+            (or 
+                (inside ?plate.n.04_1 ?sink.n.01_1)
+                (nextto ?plate.n.04_1 ?sink.n.01_1)
+            )
+        )
+    )
+)

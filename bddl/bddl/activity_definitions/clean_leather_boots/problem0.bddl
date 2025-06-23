@@ -1,0 +1,32 @@
+(define (problem clean_leather_boots-0)
+    (:domain omnigibson)
+
+    (:objects
+        rag.n.01_1 - rag.n.01
+        boot.n.01_1 boot.n.01_2 - boot.n.01
+        dust.n.01_1 - dust.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (ontop boot.n.01_1 floor.n.01_1) 
+        (ontop boot.n.01_2 floor.n.01_1) 
+        (covered boot.n.01_1 dust.n.01_1) 
+        (covered boot.n.01_2 dust.n.01_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?boot.n.01 - boot.n.01) 
+                (not 
+                    (covered ?boot.n.01 ?dust.n.01_1)
+                )
+            )
+        )
+    )
+)

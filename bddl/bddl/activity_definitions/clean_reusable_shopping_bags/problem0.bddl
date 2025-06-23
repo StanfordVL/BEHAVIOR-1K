@@ -1,0 +1,40 @@
+(define (problem clean_reusable_shopping_bags-0)
+    (:domain omnigibson)
+
+    (:objects
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        stain.n.01_1 - stain.n.01
+        hand_towel.n.01_1 - hand_towel.n.01
+        sack.n.01_1 sack.n.01_2 - sack.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (ontop hand_towel.n.01_1 floor.n.01_1)
+        (ontop sack.n.01_1 floor.n.01_1)
+        (ontop sack.n.01_2 floor.n.01_1)
+        (covered sack.n.01_1 stain.n.01_1)
+        (covered sack.n.01_2 stain.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sack.n.01 - sack.n.01)
+                (not
+                    (covered ?sack.n.01 ?stain.n.01_1)
+                )
+            )
+        )
+    )
+)

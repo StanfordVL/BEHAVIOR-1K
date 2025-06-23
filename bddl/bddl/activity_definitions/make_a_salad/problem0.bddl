@@ -1,0 +1,72 @@
+(define (problem make_a_salad-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 - bowl.n.01
+        countertop.n.01_1 - countertop.n.01
+        lettuce.n.03_1 - lettuce.n.03
+        diced__lettuce.n.01_1 - diced__lettuce.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        spinach.n.02_1 - spinach.n.02
+        diced__spinach.n.01_1 - diced__spinach.n.01
+        cucumber.n.02_1 - cucumber.n.02
+        diced__cucumber.n.01_1 - diced__cucumber.n.01
+        chickpea__can.n.01_1 - chickpea__can.n.01
+        chickpea.n.03_1 - chickpea.n.03
+        avocado.n.01_1 - avocado.n.01
+        diced__avocado.n.01_1 - diced__avocado.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        crouton.n.01_1 - crouton.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (inside lettuce.n.03_1 electric_refrigerator.n.01_1) 
+        (inside spinach.n.02_1 electric_refrigerator.n.01_1) 
+        (inside cucumber.n.02_1 electric_refrigerator.n.01_1) 
+        (ontop chickpea__can.n.01_1 countertop.n.01_1) 
+        (filled chickpea__can.n.01_1 chickpea.n.03_1)
+        (ontop avocado.n.01_1 bowl.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (ontop vinegar__bottle.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled tupperware.n.01_1 crouton.n.01_1)
+        (ontop tupperware.n.01_1 countertop.n.01_1)
+        (future diced__lettuce.n.01_1)
+        (future diced__spinach.n.01_1)
+        (future diced__cucumber.n.01_1)
+        (future diced__avocado.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__lettuce.n.01_1)
+            (real ?diced__spinach.n.01_1)
+            (real ?diced__cucumber.n.01_1)
+            (real ?diced__avocado.n.01_1)
+            (contains ?bowl.n.01_1 ?diced__lettuce.n.01_1)
+            (contains ?bowl.n.01_1 ?diced__spinach.n.01_1)
+            (contains ?bowl.n.01_1 ?diced__cucumber.n.01_1)
+            (contains ?bowl.n.01_1 ?diced__avocado.n.01_1)
+            (contains ?bowl.n.01_1 ?chickpea.n.03_1)
+            (contains ?bowl.n.01_1 ?salt.n.02_1)
+            (contains ?bowl.n.01_1 ?vinegar.n.01_1)
+            (contains ?bowl.n.01_1 ?crouton.n.01_1)
+        )
+    )
+)

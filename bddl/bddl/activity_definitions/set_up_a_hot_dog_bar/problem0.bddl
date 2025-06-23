@@ -1,0 +1,95 @@
+(define (problem set_up_a_hot_dog_bar-0)
+    (:domain omnigibson)
+
+    (:objects
+        tongs.n.01_1 tongs.n.01_2 - tongs.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        frankfurter_bun.n.01_1 frankfurter_bun.n.01_2 - frankfurter_bun.n.01
+        hotdog.n.02_1 hotdog.n.02_2 - hotdog.n.02
+        bottle__of__catsup.n.01_1 - bottle__of__catsup.n.01
+        bottle__of__mustard.n.01_1 - bottle__of__mustard.n.01
+        bowl.n.01_1 - bowl.n.01
+        vidalia_onion.n.01_1 vidalia_onion.n.01_2 - vidalia_onion.n.01
+        diced__vidalia_onion.n.01_1 - diced__vidalia_onion.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        sack.n.01_1 - sack.n.01
+        tablecloth.n.01_1 - tablecloth.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tongs.n.01_1 countertop.n.01_1) 
+        (ontop tongs.n.01_2 countertop.n.01_1) 
+        (inside frankfurter_bun.n.01_1 sack.n.01_1) 
+        (inside frankfurter_bun.n.01_2 sack.n.01_1) 
+        (ontop sack.n.01_1 countertop.n.01_1)
+        (inside hotdog.n.02_1 electric_refrigerator.n.01_1) 
+        (inside hotdog.n.02_2 electric_refrigerator.n.01_1) 
+        (inside bottle__of__catsup.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bottle__of__mustard.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop vidalia_onion.n.01_1 plate.n.04_3)
+        (ontop vidalia_onion.n.01_2 plate.n.04_3)
+        (ontop plate.n.04_3 countertop.n.01_1)
+        (ontop bowl.n.01_1 countertop.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (ontop tablecloth.n.01_1 countertop.n.01_1) 
+        (ontop plate.n.04_1 plate.n.04_2) 
+        (ontop plate.n.04_2 countertop.n.01_1) 
+        (future diced__vidalia_onion.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 garden) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__vidalia_onion.n.01_1)
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (forall 
+                    (?hotdog.n.02 - hotdog.n.02) 
+                    (and
+                        (ontop ?hotdog.n.02 ?plate.n.04)
+                        (not 
+                            (ontop ?frankfurter_bun.n.01_1 ?plate.n.04)
+                        )
+                    )
+                )
+            ) 
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (forall 
+                    (?frankfurter_bun.n.01 - frankfurter_bun.n.01) 
+                    (and
+                        (ontop ?frankfurter_bun.n.01 ?plate.n.04)
+                        (not 
+                            (ontop ?hotdog.n.02_1 ?plate.n.04)
+                        )
+                    )
+                )
+            ) 
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (ontop ?plate.n.04 ?coffee_table.n.01_1)
+            )
+            (forpairs 
+                (?tongs.n.01 - tongs.n.01)
+                (?plate.n.04 - plate.n.04)
+                (ontop ?tongs.n.01 ?plate.n.04)
+            )
+            (overlaid ?tablecloth.n.01_1 ?coffee_table.n.01_1) 
+            (ontop ?bottle__of__catsup.n.01_1 ?coffee_table.n.01_1)
+            (ontop ?bottle__of__mustard.n.01_1 ?coffee_table.n.01_1)
+            (filled ?bowl.n.01_1 ?diced__vidalia_onion.n.01_1)
+            (ontop ?bowl.n.01_1 ?coffee_table.n.01_1)
+        )
+    )
+)

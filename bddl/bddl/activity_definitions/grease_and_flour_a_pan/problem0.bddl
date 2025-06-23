@@ -1,0 +1,45 @@
+(define (problem grease_and_flour_a_pan-0)
+    (:domain omnigibson)
+
+    (:objects
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        sink.n.01_1 - sink.n.01
+        spatula.n.01_1 - spatula.n.01
+        tissue.n.02_1 - tissue.n.02
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        flour.n.01_1 - flour.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        oven.n.01_1 - oven.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside cookie_sheet.n.01_1 cabinet.n.01_1) 
+        (inside spatula.n.01_1 cabinet.n.01_1) 
+        (ontop tissue.n.02_1 countertop.n.01_1)
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (inside butter.n.01_1 electric_refrigerator.n.01_1) 
+        (future melted__butter.n.01_1)
+        (inside flour__sack.n.01_1 cabinet.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?melted__butter.n.01_1)
+            (covered ?cookie_sheet.n.01_1 ?melted__butter.n.01_1) 
+            (covered ?cookie_sheet.n.01_1 ?flour.n.01_1)
+        )
+    )
+)

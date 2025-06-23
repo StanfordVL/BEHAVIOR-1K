@@ -1,0 +1,56 @@
+(define (problem packing_hiking_equipment_into_car-0)
+    (:domain omnigibson)
+
+    (:objects
+     	car.n.01_1 - car.n.01
+    	floor.n.01_1 - floor.n.01
+    	backpack.n.01_1 - backpack.n.01
+    	biscuit.n.01_1 biscuit.n.01_2 - biscuit.n.01
+    	water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+    	tent.n.01_1 - tent.n.01
+    	sleeping_bag.n.01_1 - sleeping_bag.n.01
+    	lawn.n.01_1 - lawn.n.01
+    	driveway.n.01_1 - driveway.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden)
+        (ontop backpack.n.01_1 floor.n.01_1) 
+        (ontop biscuit.n.01_1 driveway.n.01_1) 
+        (ontop biscuit.n.01_2 driveway.n.01_1) 
+        (ontop water_bottle.n.01_1 floor.n.01_1) 
+        (ontop water_bottle.n.01_2 floor.n.01_1) 
+        (ontop tent.n.01_1 floor.n.01_1) 
+        (ontop sleeping_bag.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?biscuit.n.01 - biscuit.n.01)
+                (exists
+                    (?backpack.n.01 - backpack.n.01)
+                    (inside ?biscuit.n.01 ?backpack.n.01)
+                )
+            )
+            (forall
+                (?water_bottle.n.01 - water_bottle.n.01)
+                (exists
+                    (?backpack.n.01 - backpack.n.01)
+                    (inside ?water_bottle.n.01 ?backpack.n.01)
+                )
+            )
+            (forall
+                (?backpack.n.01 - backpack.n.01)
+                (inside ?backpack.n.01 ?car.n.01_1)
+            )
+            (inside ?tent.n.01_1 ?car.n.01_1)
+            (inside ?sleeping_bag.n.01_1 ?car.n.01_1)
+        )
+    )
+)

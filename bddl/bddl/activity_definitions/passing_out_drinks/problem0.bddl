@@ -1,0 +1,47 @@
+(define (problem passing_out_drinks-0)
+    (:domain omnigibson)
+
+    (:objects
+        beer.n.01_1 - beer.n.01
+        beer_bottle.n.01_1 beer_bottle.n.01_1 - beer_bottle.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        bottle__of__champagne.n.01_1 - bottle__of__champagne.n.01
+        martini.n.01_1 - martini.n.01
+        pitcher.n.02_1 - pitcher.n.02
+        wineglass.n.01_1 wineglass.n.01_1 - wineglass.n.01
+        beer_glass.n.01_1 - beer_glass.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled beer_bottle.n.01_1 beer.n.01_1)
+        (inside beer_bottle.n.01_1 cabinet.n.01_1)
+        (inside bottle__of__champagne.n.01_1 cabinet.n.01_1)
+        (filled pitcher.n.02_1 martini.n.01_1) 
+        (inside pitcher.n.02_1 cabinet.n.01_1)
+        (inside wineglass.n.01_1 cabinet.n.01_1) 
+        (inside beer_glass.n.01_1 cabinet.n.01_1)
+        (inroom floor.n.01_1 dining_room) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom cabinet.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?beer_bottle.n.01_1 ?breakfast_table.n.01_1) 
+            (filled ?beer_glass.n.01_1 ?beer.n.01_1)
+            (ontop ?beer_glass.n.01_1 ?breakfast_table.n.01_1)
+            (ontop ?bottle__of__champagne.n.01_1 ?breakfast_table.n.01_1)
+            (forall 
+                (?wineglass.n.01 - wineglass.n.01)
+                (and 
+                    (filled ?wineglass.n.01 ?martini.n.01_1)
+                    (ontop ?wineglass.n.01 ?breakfast_table.n.01_1)
+                )
+            )
+        )
+    )
+)

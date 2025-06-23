@@ -1,0 +1,40 @@
+(define (problem make_a_sugar_and_coffee_scrub-0)
+    (:domain omnigibson)
+
+    (:objects
+     	brown_sugar.n.01_1 - brown_sugar.n.01
+    	brown_sugar__sack.n.01_1 - brown_sugar__sack.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	ground_coffee.n.01_1 - ground_coffee.n.01
+    	mason_jar.n.01_1 - mason_jar.n.01
+    	coconut_oil.n.01_1 - coconut_oil.n.01
+    	coconut_oil__jar.n.01_1 - coconut_oil__jar.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        sugar_coffee_scrub.n.01_1 - sugar_coffee_scrub.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+    )
+    
+    (:init 
+        (filled brown_sugar__sack.n.01_1 brown_sugar.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1)
+        (ontop brown_sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled mason_jar.n.01_1 ground_coffee.n.01_1) 
+        (ontop mason_jar.n.01_1 countertop.n.01_1) 
+        (filled coconut_oil__jar.n.01_1 coconut_oil.n.01_1) 
+        (ontop coconut_oil__jar.n.01_1 countertop.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future sugar_coffee_scrub.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?sugar_coffee_scrub.n.01_1)
+            (contains ?electric_mixer.n.01_1 ?sugar_coffee_scrub.n.01_1)
+        )
+    )
+)

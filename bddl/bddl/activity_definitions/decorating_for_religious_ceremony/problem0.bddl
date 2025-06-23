@@ -1,0 +1,33 @@
+(define (problem decorating_for_religious_ceremony-0)
+    (:domain omnigibson)
+
+    (:objects
+        dip.n.07_1 - dip.n.07
+        coffee_table.n.01_1 - coffee_table.n.01
+        wreath.n.01_1 - wreath.n.01
+        floor.n.01_1 - floor.n.01
+        candlestick.n.01_1 - candlestick.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside dip.n.07_1 bookcase.n.01_1)
+        (ontop wreath.n.01_1 floor.n.01_1)
+        (inside candlestick.n.01_1 bookcase.n.01_1)
+        (inroom floor.n.01_1 living_room)
+        (inroom wall_nail.n.01_1 living_room)
+        (inroom coffee_table.n.01_1 living_room)
+        (inroom bookcase.n.01_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?dip.n.07_1 ?candlestick.n.01_1) 
+            (ontop ?candlestick.n.01_1 ?coffee_table.n.01_1) 
+            (attached ?wreath.n.01_1 ?wall_nail.n.01_1)
+        )
+    )
+)

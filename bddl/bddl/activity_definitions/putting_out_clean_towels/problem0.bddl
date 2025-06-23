@@ -1,0 +1,28 @@
+(define (problem putting_out_clean_towels-0)
+    (:domain omnigibson)
+
+    (:objects
+        bath_towel.n.01_1 - bath_towel.n.01
+        hand_towel.n.01_1 - hand_towel.n.01
+        floor.n.01_1 - floor.n.01
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bath_towel.n.01_1 floor.n.01_1) 
+        (ontop hand_towel.n.01_1 floor.n.01_1) 
+        (ontop wicker_basket.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (folded ?hand_towel.n.01_1)
+            (folded ?bath_towel.n.01_1)
+            (inside ?hand_towel.n.01_1 ?wicker_basket.n.01_1)
+            (inside ?bath_towel.n.01_1 ?wicker_basket.n.01_1)
+        )
+    )
+)

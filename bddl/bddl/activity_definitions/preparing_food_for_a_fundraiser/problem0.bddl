@@ -1,0 +1,67 @@
+(define (problem preparing_food_for_a_fundraiser-0)
+    (:domain omnigibson)
+
+    (:objects
+        bottle__of__hot_sauce.n.01_1 - bottle__of__hot_sauce.n.01
+        cheddar.n.02_1 cheddar.n.02_2 - cheddar.n.02
+        lasagna.n.01_1 - lasagna.n.01
+        bottle__of__soup.n.01_1 - bottle__of__soup.n.01
+        tupperware.n.01_1 tupperware.n.01_2 tupperware.n.01_3 - tupperware.n.01
+        carton.n.02_1 - carton.n.02
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        bratwurst.n.01_1 - bratwurst.n.01
+        bread_slice.n.01_1 - bread_slice.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bottle__of__hot_sauce.n.01_1 electric_refrigerator.n.01_1) 
+        (inside cheddar.n.02_1 electric_refrigerator.n.01_1) 
+        (inside cheddar.n.02_2 electric_refrigerator.n.01_1) 
+        (inside lasagna.n.01_1 electric_refrigerator.n.01_1)
+        (inside bottle__of__soup.n.01_1 cabinet.n.01_1) 
+        (inside bratwurst.n.01_1 electric_refrigerator.n.01_1)
+        (inside bread_slice.n.01_1 cabinet.n.01_1)
+        (inside tupperware.n.01_1 cabinet.n.01_2)
+        (inside tupperware.n.01_2 cabinet.n.01_2)
+        (inside tupperware.n.01_3 cabinet.n.01_2)
+        (ontop carton.n.02_1 floor.n.01_1)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom cabinet.n.01_2 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?bottle__of__hot_sauce.n.01_1 ?carton.n.02_1)
+            (inside ?bottle__of__soup.n.01_1 ?carton.n.02_1)
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (forall 
+                    (?cheddar.n.02 - cheddar.n.02)
+                    (inside ?cheddar.n.02 ?tupperware.n.01)
+                )
+            )
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?bread_slice.n.01_1 ?tupperware.n.01)
+            )
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?bratwurst.n.01_1 ?tupperware.n.01)
+            )
+            (exists 
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?lasagna.n.01_1 ?tupperware.n.01)
+            )
+            (forall
+                (?tupperware.n.01 - tupperware.n.01)
+                (inside ?tupperware.n.01 ?carton.n.02_1)
+            )
+        )
+    )
+)

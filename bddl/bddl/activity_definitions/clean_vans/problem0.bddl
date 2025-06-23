@@ -1,0 +1,44 @@
+(define (problem clean_vans-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        gym_shoe.n.01_1 gym_shoe.n.01_2 - gym_shoe.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        countertop.n.01_1 - countertop.n.01
+        sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01
+        sodium_carbonate.n.01_1 - sodium_carbonate.n.01
+        toothbrush.n.01_1 - toothbrush.n.01
+        hydrogen_peroxide.n.01_1 - hydrogen_peroxide.n.01
+        hydrogen_peroxide__bottle.n.01_1 - hydrogen_peroxide__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered gym_shoe.n.01_1 stain.n.01_1) 
+        (covered gym_shoe.n.01_2 stain.n.01_1) 
+        (ontop gym_shoe.n.01_1 newspaper.n.03_1) 
+        (ontop gym_shoe.n.01_2 newspaper.n.03_1) 
+        (ontop newspaper.n.03_1 countertop.n.01_1) 
+        (ontop sodium_carbonate__jar.n.01_1 countertop.n.01_1) 
+        (filled sodium_carbonate__jar.n.01_1 sodium_carbonate.n.01_1) 
+        (ontop toothbrush.n.01_1 countertop.n.01_1) 
+        (ontop hydrogen_peroxide__bottle.n.01_1 countertop.n.01_1)
+        (filled hydrogen_peroxide__bottle.n.01_1 hydrogen_peroxide.n.01_1) 
+        (inroom countertop.n.01_1 utility_room) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (not
+                    (covered ?gym_shoe.n.01 ?stain.n.01_1)
+                )
+            ) 
+        )
+    )
+)

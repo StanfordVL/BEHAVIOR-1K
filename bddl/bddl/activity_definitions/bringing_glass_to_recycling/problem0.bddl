@@ -1,0 +1,27 @@
+(define (problem bringing_glass_to_recycling-0)
+    (:domain omnigibson)
+
+    (:objects
+        water_glass.n.02_1 - water_glass.n.02
+        recycling_bin.n.01_1 - recycling_bin.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop water_glass.n.02_1 floor.n.01_1) 
+        (ontop recycling_bin.n.01_1 floor.n.01_2) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom floor.n.01_2 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?water_glass.n.02_1 ?recycling_bin.n.01_1)
+            (not
+                (open ?recycling_bin.n.01_1)
+            )
+        )
+    )
+)

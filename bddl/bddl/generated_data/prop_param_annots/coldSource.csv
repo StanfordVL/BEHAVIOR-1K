@@ -1,0 +1,8 @@
+synset,requires_toggled_on,requires_closed,requires_inside,temperature,heating_rate
+electric_refrigerator.n.01,0,1,1,-18,0.1
+cooler.n.01,0,0,1,4,0.1
+air_conditioner.n.01,1,0,0,16,0.1
+ice_maker.n.01,1,0,1,-8.9,0.1
+ice_pack.n.01,0,0,0,0,0.1
+deep-freeze.n.02,0,0,1,-18,0.1
+grocery_fridge.n.01,0,0,1,4,0.1

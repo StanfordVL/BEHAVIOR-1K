@@ -1,0 +1,27 @@
+(define (problem spray_stucco-0)
+    (:domain omnigibson)
+
+    (:objects
+        stucco.n.01_1 - stucco.n.01
+        sealant.n.01_1 - sealant.n.01
+        sealant__atomizer.n.01_1 - sealant__atomizer.n.01
+        floor.n.01_1 - floor.n.01
+        wall.n.01_1 - wall.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (insource sealant__atomizer.n.01_1 sealant.n.01_1) 
+        (ontop sealant__atomizer.n.01_1 floor.n.01_1) 
+        (covered wall.n.01_1 stucco.n.01_1)
+        (inroom wall.n.01_1 garden) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?wall.n.01_1 ?sealant.n.01_1)
+        )
+    )
+)

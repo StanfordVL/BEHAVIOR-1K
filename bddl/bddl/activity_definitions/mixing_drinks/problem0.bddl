@@ -1,0 +1,45 @@
+(define (problem mixing_drinks-0)
+    (:domain omnigibson)
+
+    (:objects
+        cola.n.02_1 - cola.n.02
+        vodka.n.01_1 - vodka.n.01
+        cola__bottle.n.01_1 - cola__bottle.n.01 
+        lime_juice__bottle.n.01_1 - lime_juice__bottle.n.01 
+        vodka__bottle.n.01_1 - vodka__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        lime_juice.n.01_1 - lime_juice.n.01
+        water_glass.n.02_1 water_glass.n.02_2 - water_glass.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled cola__bottle.n.01_1 cola.n.02_1)
+        (filled lime_juice__bottle.n.01_1 lime_juice.n.01_1)
+        (filled vodka__bottle.n.01_1 vodka.n.01_1)
+        (ontop cola__bottle.n.01_1 countertop.n.01_1)
+        (ontop lime_juice__bottle.n.01_1 countertop.n.01_1) 
+        (ontop vodka__bottle.n.01_1 countertop.n.01_1) 
+        (ontop water_glass.n.02_1 countertop.n.01_1) 
+        (ontop water_glass.n.02_2 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?water_glass.n.02 - water_glass.n.02)
+                (and 
+                    (filled ?water_glass.n.02 ?cola.n.02_1)
+                    (contains ?water_glass.n.02 ?lime_juice.n.01_1)
+                    (contains ?water_glass.n.02 ?vodka.n.01_1)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,32 @@
+(define (problem sweeping_steps-0)
+    (:domain omnigibson)
+
+    (:objects
+        broom.n.01_1 - broom.n.01
+        rug.n.01_1 - rug.n.01
+        floor.n.01_1 - floor.n.01
+        debris.n.01_1 - debris.n.01
+        lint.n.01_1 - lint.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop broom.n.01_1 floor.n.01_1)
+        (ontop rug.n.01_1 floor.n.01_1) 
+        (covered rug.n.01_1 debris.n.01_1)
+        (covered rug.n.01_1 lint.n.01_1) 
+        (inroom floor.n.01_1 staircase) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?rug.n.01_1 ?debris.n.01_1)
+            )
+            (not 
+                (covered ?rug.n.01_1 ?lint.n.01_1)
+            )
+        )
+    )
+)

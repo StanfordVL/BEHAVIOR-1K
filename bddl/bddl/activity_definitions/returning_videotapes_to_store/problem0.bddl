@@ -1,0 +1,32 @@
+(define (problem returning_videotapes_to_store-0)
+    (:domain omnigibson)
+
+    (:objects
+        cash_register.n.01_1 - cash_register.n.01
+        checkout.n.03_1 - checkout.n.03
+        videodisk.n.01_1 videodisk.n.01_2 videodisk.n.01_3 - videodisk.n.01
+        floor.n.01_1 - floor.n.01
+        grocery_shelf.n.01_1 - grocery_shelf.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store)
+        (ontop videodisk.n.01_1 checkout.n.03_1) 
+        (ontop videodisk.n.01_2 checkout.n.03_1) 
+        (ontop videodisk.n.01_3 checkout.n.03_1) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?videodisk.n.01 - videodisk.n.01)
+                (inside ?videodisk.n.01 ?grocery_shelf.n.01_1)
+            )
+        )
+    )
+)

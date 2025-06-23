@@ -1,0 +1,93 @@
+(define (problem make_brownies-0)
+    (:domain omnigibson)
+
+    (:objects
+        butter.n.01_1 - butter.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        raw_egg.n.01_1 - raw_egg.n.01
+        flour.n.01_1 - flour.n.01
+        salt.n.02_1 - salt.n.02
+        walnut.n.01_1 walnut.n.01_2 walnut.n.01_3 walnut.n.01_4 walnut.n.01_5 walnut.n.01_6 - walnut.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        brownie.n.03_1 brownie.n.03_2 brownie.n.03_3 brownie.n.03_4 brownie.n.03_5 brownie.n.03_6 - brownie.n.03
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 countertop.n.01_3 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        microwave.n.02_1 - microwave.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside butter.n.01_1 tupperware.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (ontop cocoa_powder__jar.n.01_1 countertop.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (ontop vanilla__bottle.n.01_1 countertop.n.01_1) 
+        (ontop raw_egg.n.01_1 plate.n.04_1)
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_2) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (inside walnut.n.01_1 plate.n.04_2)
+        (inside walnut.n.01_2 plate.n.04_2)
+        (inside walnut.n.01_3 plate.n.04_2)
+        (inside walnut.n.01_4 plate.n.04_3)
+        (inside walnut.n.01_5 plate.n.04_3)
+        (inside walnut.n.01_6 plate.n.04_3)
+        (ontop plate.n.04_2 countertop.n.01_2)
+        (ontop plate.n.04_3 countertop.n.01_2)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_2)
+        (inside plate.n.04_1 electric_refrigerator.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom microwave.n.02_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom countertop.n.01_3 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_3) 
+        (future brownie.n.03_1) 
+        (future brownie.n.03_2) 
+        (future brownie.n.03_3) 
+        (future brownie.n.03_4) 
+        (future brownie.n.03_5) 
+        (future brownie.n.03_6) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?brownie.n.03_1) 
+            (real ?brownie.n.03_2) 
+            (real ?brownie.n.03_3) 
+            (real ?brownie.n.03_4) 
+            (real ?brownie.n.03_5) 
+            (real ?brownie.n.03_6) 
+            (forall 
+                (?brownie.n.03 - brownie.n.03) 
+                (and 
+                    (ontop ?brownie.n.03 ?cookie_sheet.n.01_1) 
+                    (cooked ?brownie.n.03)
+                )
+            )
+        )
+    )
+)

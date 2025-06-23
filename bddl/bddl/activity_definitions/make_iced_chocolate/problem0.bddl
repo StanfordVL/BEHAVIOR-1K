@@ -1,0 +1,56 @@
+(define (problem make_iced_chocolate-0)
+    (:domain omnigibson)
+
+    (:objects
+        ice_cube.n.01_1 ice_cube.n.01_2 - ice_cube.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        iced_chocolate.n.01_1 - iced_chocolate.n.01
+        blender.n.01_1 - blender.n.01
+        water_glass.n.02_1 - water_glass.n.02
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        teaspoon.n.02_1 - teaspoon.n.02
+        cup.n.01_1 - cup.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside ice_cube.n.01_1 cup.n.01_1) 
+        (inside ice_cube.n.01_2 cup.n.01_1) 
+        (inside cup.n.01_1 electric_refrigerator.n.01_1) 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (inside cocoa_powder__jar.n.01_1 cabinet.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 cabinet.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_2) 
+        (ontop teaspoon.n.02_1 countertop.n.01_2) 
+        (ontop water_glass.n.02_1 countertop.n.01_2) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future iced_chocolate.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?iced_chocolate.n.01_1) 
+            (contains ?water_glass.n.02_1 ?iced_chocolate.n.01_1)
+        )
+    )
+)

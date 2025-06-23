@@ -1,0 +1,32 @@
+(define (problem assembling_furniture-0)
+    (:domain omnigibson)
+
+    (:objects
+        desk_top.n.01_1 - desk_top.n.01
+        desk_bracket.n.01_1 - desk_bracket.n.01
+        desk_leg.n.01_1 desk_leg.n.01_2 desk_leg.n.01_3 desk_leg.n.01_4 - desk_leg.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (inroom floor.n.01_1 living_room)
+        (ontop desk_top.n.01_1 floor.n.01_1)
+        (ontop desk_bracket.n.01_1 floor.n.01_1)
+        (ontop desk_leg.n.01_1 floor.n.01_1)
+        (ontop desk_leg.n.01_2 floor.n.01_1)
+        (ontop desk_leg.n.01_3 floor.n.01_1)
+        (ontop desk_leg.n.01_4 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (attached ?desk_bracket.n.01_1 ?desk_top.n.01_1)
+            (forall 
+                (?desk_leg.n.01 - desk_leg.n.01)
+                (attached ?desk_leg.n.01 ?desk_bracket.n.01_1)
+            )
+        )
+    )
+)

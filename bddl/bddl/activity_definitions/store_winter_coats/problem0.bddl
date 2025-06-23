@@ -1,0 +1,35 @@
+(define (problem store_winter_coats-0)
+    (:domain omnigibson)
+
+    (:objects
+        coat.n.01_1 coat.n.01_2 - coat.n.01
+        floor.n.01_1 - floor.n.01
+        hanger.n.02_1 hanger.n.02_2 - hanger.n.02
+        wardrobe.n.01_1 - wardrobe.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop coat.n.01_1 floor.n.01_1)
+        (ontop coat.n.01_2 floor.n.01_1)
+        (attached hanger.n.02_1 wardrobe.n.01_1) 
+        (attached hanger.n.02_2 wardrobe.n.01_1) 
+        (inroom wardrobe.n.01_1 closet) 
+        (inroom floor.n.01_1 closet) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?coat.n.01 - coat.n.01)
+                (?hanger.n.02 - hanger.n.02) 
+                (draped ?coat.n.01 ?hanger.n.02)
+            ) 
+            (forall 
+                (?hanger.n.02 - hanger.n.02) 
+                (attached ?hanger.n.02 ?wardrobe.n.01_1)
+            )
+        )
+    )
+)

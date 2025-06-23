@@ -1,0 +1,46 @@
+(define (problem putting_shoes_on_rack-0)
+    (:domain omnigibson)
+
+    (:objects
+     	gym_shoe.n.01_1 gym_shoe.n.01_2 - gym_shoe.n.01
+    	floor.n.01_1 - floor.n.01
+    	sandal.n.01_1 sandal.n.01_2 - sandal.n.01
+    	hallstand.n.01_1 - hallstand.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop gym_shoe.n.01_1 floor.n.01_1) 
+        (ontop gym_shoe.n.01_2 floor.n.01_1) 
+        (ontop sandal.n.01_1 floor.n.01_1) 
+        (ontop sandal.n.01_2 floor.n.01_1) 
+        (inroom floor.n.01_1 corridor) 
+        (inroom hallstand.n.01_1 corridor) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sandal.n.01 - sandal.n.01)
+                (and
+                    (touching ?sandal.n.01 ?hallstand.n.01_1)
+                    (not
+                        (touching ?sandal.n.01 floor.n.01_1)    
+                    )
+                )
+            )
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01)
+                (and
+                    (touching ?gym_shoe.n.01 ?hallstand.n.01_1)
+                    (not
+                        (touching ?gym_shoe.n.01 floor.n.01_1)    
+                    )
+                )
+            )
+            (nextto gym_shoe.n.01_1 gym_shoe.n.01_2)
+            (nextto sandal.n.01_1 sandal.n.01_2)
+        )
+    )
+)

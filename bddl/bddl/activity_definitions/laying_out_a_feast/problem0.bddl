@@ -1,0 +1,71 @@
+(define (problem laying_out_a_feast-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        lettuce.n.03_1 - lettuce.n.03
+        lamb.n.05_1 - lamb.n.05
+        potato.n.01_1 potato.n.01_2 - potato.n.01
+        tiramisu.n.01_1 - tiramisu.n.01
+        platter.n.01_1 platter.n.01_2 - platter.n.01
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        oven.n.01_1 - oven.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside platter.n.01_1 cabinet.n.01_1)
+        (ontop platter.n.01_2 platter.n.01_1)
+        (cooked lamb.n.05_1)
+        (not
+            (hot lamb.n.05_1)
+        )
+        (cooked potato.n.01_1)
+        (not 
+            (hot potato.n.01_1)
+        )
+        (cooked potato.n.01_2)
+        (not 
+            (hot potato.n.01_2)
+        )
+        (inside lettuce.n.03_1 bowl.n.01_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (inside lamb.n.05_1 tupperware.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (inside potato.n.01_1 tupperware.n.01_2)
+        (inside potato.n.01_2 tupperware.n.01_2)
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1)
+        (inside tiramisu.n.01_1 bowl.n.01_2) 
+        (inside bowl.n.01_2 electric_refrigerator.n.01_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom floor.n.01_2 kitchen)
+        (inroom floor.n.01_1 dining_room) 
+        (inroom oven.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?platter.n.01 - platter.n.01)
+                (ontop ?lamb.n.05_1 ?platter.n.01)
+            )
+            (exists 
+                (?platter.n.01 - platter.n.01)
+                (ontop ?potato.n.01_1 ?platter.n.01)
+            )
+            (hot ?lamb.n.05_1)
+            (hot ?potato.n.01_1)
+            (forall 
+                (?platter.n.01 - platter.n.01)
+                (ontop ?platter.n.01 ?breakfast_table.n.01_1)
+            )
+        )
+    )
+)

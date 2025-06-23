@@ -1,0 +1,40 @@
+(define (problem set_up_a_mouse_cage-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        petfood.n.01_1 - petfood.n.01
+        petfood__bag.n.01_1 - petfood__bag.n.01
+        hand_towel.n.01_1 - hand_towel.n.01
+        hamster_wheel.n.01_1 - hamster_wheel.n.01
+        water_bottle.n.01_1 - water_bottle.n.01
+        hutch.n.01_1 - hutch.n.01
+        bowl.n.01_1 - bowl.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled petfood__bag.n.01_1 petfood.n.01_1)
+        (ontop petfood__bag.n.01_1 floor.n.01_1) 
+        (ontop hand_towel.n.01_1 floor.n.01_1) 
+        (ontop hamster_wheel.n.01_1 floor.n.01_1) 
+        (ontop water_bottle.n.01_1 floor.n.01_1) 
+        (ontop hutch.n.01_1 floor.n.01_1) 
+        (ontop bowl.n.01_1 floor.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (filled ?bowl.n.01_1 ?petfood.n.01_1) 
+            (overlaid ?hand_towel.n.01_1 ?hutch.n.01_1)
+            (inside ?hamster_wheel.n.01_1 ?hutch.n.01_1) 
+            (inside ?water_bottle.n.01_1 ?hutch.n.01_1) 
+            (ontop ?hutch.n.01_1 ?coffee_table.n.01_1) 
+            (inside ?bowl.n.01_1 ?hutch.n.01_1)
+        )
+    )
+)

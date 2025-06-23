@@ -1,0 +1,27 @@
+(define (problem putting_wood_in_fireplace-0)
+    (:domain omnigibson)
+
+    (:objects
+        log.n.01_1 log.n.01_2 - log.n.01
+        driveway.n.01_1 - driveway.n.01
+        wood_fireplace.n.01_1 - wood_fireplace.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop log.n.01_1 driveway.n.01_1) 
+        (ontop log.n.01_2 driveway.n.01_1) 
+        (inroom driveway.n.01_1 garden) 
+        (inroom wood_fireplace.n.01_1 living_room) 
+        (ontop agent.n.01_1 driveway.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?log.n.01 - log.n.01) 
+                (inside ?log.n.01_1 ?wood_fireplace.n.01_1)
+            ) 
+        )
+    )
+)

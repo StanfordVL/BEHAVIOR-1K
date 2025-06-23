@@ -1,0 +1,29 @@
+(define (problem unloading_the_car-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        floor.n.01_1 - floor.n.01
+        bag.n.06_1 bag.n.06_2 - bag.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garage)
+        (inside bag.n.06_2 car.n.01_1) 
+        (inside bag.n.06_1 car.n.01_1) 
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?bag.n.06 - bag.n.06)
+                (not 
+                    (inside ?bag.n.06 ?car.n.01_1)
+                )
+            )
+        )
+    )
+)

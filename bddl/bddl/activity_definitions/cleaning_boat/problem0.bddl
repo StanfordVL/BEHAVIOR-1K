@@ -1,0 +1,43 @@
+(define (problem cleaning_boat-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        boat.n.01_1 - boat.n.01
+        floor.n.01_1 - floor.n.01
+        swab.n.02_1 - swab.n.02
+        bucket.n.01_1 - bucket.n.01
+        water.n.06_1 - water.n.06
+        detergent.n.02_1 - detergent.n.02
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        driveway.n.01_1 - driveway.n.01
+        lawn.n.01_1 - lawn.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered boat.n.01_1 stain.n.01_1)
+        (ontop boat.n.01_1 driveway.n.01_1)
+        (ontop swab.n.02_1 lawn.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (filled bucket.n.01_1 water.n.06_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?boat.n.01_1 ?stain.n.01_1)
+            ) 
+        )
+    )
+)

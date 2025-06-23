@@ -1,0 +1,30 @@
+(define (problem buy_boxes_for_packing-0)
+    (:domain omnigibson)
+
+    (:objects
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        money.n.01_1 - money.n.01
+        shopping_cart.n.01_1 - shopping_cart.n.01
+        checkout.n.03_1 - checkout.n.03
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop carton.n.02_1 floor.n.01_1) 
+        (ontop carton.n.02_2 floor.n.01_1) 
+        (inside money.n.01_1 shopping_cart.n.01_1) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (inroom shopping_cart.n.01_1 grocery_store)
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?carton.n.02_1 ?checkout.n.03_1) 
+            (ontop ?carton.n.02_2 ?checkout.n.03_1) 
+            (ontop ?money.n.01_1 ?checkout.n.03_1)
+        )
+    )
+)

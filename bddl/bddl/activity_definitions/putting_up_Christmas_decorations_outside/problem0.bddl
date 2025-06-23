@@ -1,0 +1,48 @@
+(define (problem putting_up_Christmas_decorations_outside-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn.n.01_1 - lawn.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        icicle_lights.n.01_1 - icicle_lights.n.01
+        wreath.n.01_1 - wreath.n.01
+        glass_lantern.n.01_1 glass_lantern.n.01_2 - glass_lantern.n.01
+        poinsettia.n.01_1 poinsettia.n.01_2 - poinsettia.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop icicle_lights.n.01_1 floor.n.01_1) 
+        (ontop wreath.n.01_1 floor.n.01_1) 
+        (ontop glass_lantern.n.01_1 floor.n.01_1) 
+        (ontop glass_lantern.n.01_2 floor.n.01_1) 
+        (ontop poinsettia.n.01_1 floor.n.01_1) 
+        (ontop poinsettia.n.01_2 floor.n.01_1)
+        (inroom lawn.n.01_1 garden) 
+        (inroom floor.n.01_1 garage) 
+        (inroom wall_nail.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?wall_nail.n.01 - wall_nail.n.01)
+                (attached ?icicle_lights.n.01_1 ?wall_nail.n.01)
+            )
+            (exists 
+                (?wall_nail.n.01 - wall_nail.n.01)
+                (attached ?wreath.n.01_1 ?wall_nail.n.01)
+            )
+            (forall
+                (?glass_lantern.n.01 - glass_lantern.n.01)
+                (ontop ?glass_lantern.n.01 ?lawn.n.01_1)           
+            )
+            (forall
+                (?poinsettia.n.01 - poinsettia.n.01)
+                (ontop ?poinsettia.n.01 ?lawn.n.01_1)           
+            )
+        )
+    )
+)

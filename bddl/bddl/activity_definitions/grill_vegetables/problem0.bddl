@@ -1,0 +1,69 @@
+(define (problem grill_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        marinade.n.01_1 - marinade.n.01
+        cooked__marinade.n.01_1 - cooked__marinade.n.01
+        half__beefsteak_tomato.n.01_1 half__beefsteak_tomato.n.01_2 - half__beefsteak_tomato.n.01
+        half__zucchini.n.01_1 half__zucchini.n.01_2 - half__zucchini.n.01
+        tongs.n.01_1 - tongs.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        grill.n.02_1 - grill.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bowl.n.01_2 electric_refrigerator.n.01_1) 
+        (inside tongs.n.01_1 cabinet.n.01_1)
+        (filled bowl.n.01_1 marinade.n.01_1) 
+        (filled bowl.n.01_2 marinade.n.01_1) 
+        (inside half__beefsteak_tomato.n.01_1 electric_refrigerator.n.01_1)
+        (inside half__beefsteak_tomato.n.01_2 electric_refrigerator.n.01_1)
+        (inside half__zucchini.n.01_1 electric_refrigerator.n.01_1)
+        (inside half__zucchini.n.01_2 electric_refrigerator.n.01_1)
+        (not 
+            (cooked half__beefsteak_tomato.n.01_1)
+        ) 
+        (not 
+            (cooked half__beefsteak_tomato.n.01_2)
+        )
+        (not 
+            (cooked half__zucchini.n.01_1)
+        ) 
+        (not 
+            (cooked half__zucchini.n.01_2)
+        )
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom grill.n.02_1 kitchen) 
+        (future cooked__marinade.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__marinade.n.01_1)
+            (forall 
+                (?half__beefsteak_tomato.n.01 - half__beefsteak_tomato.n.01) 
+                (and
+                    (cooked ?half__beefsteak_tomato.n.01)
+                    (covered ?half__beefsteak_tomato.n.01 ?cooked__marinade.n.01_1)
+                )
+            ) 
+            (forall 
+                (?half__zucchini.n.01 - half__zucchini.n.01) 
+                (and
+                    (cooked ?half__zucchini.n.01)
+                    (covered ?half__zucchini.n.01 ?cooked__marinade.n.01_1)
+                )
+            )
+        )
+    )
+)

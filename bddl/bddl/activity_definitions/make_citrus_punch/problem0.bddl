@@ -1,0 +1,47 @@
+(define (problem make_citrus_punch-0)
+    (:domain omnigibson)
+
+    (:objects
+        orange_juice.n.01_1 - orange_juice.n.01
+        ginger_beer.n.01_1 - ginger_beer.n.01
+        lemonade.n.01_1 - lemonade.n.01
+        pineapple_juice.n.01_1 - pineapple_juice.n.01
+        fruit_punch.n.01_1 - fruit_punch.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        pitcher.n.02_1 - pitcher.n.02
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        orange_juice__carton.n.01_1 - orange_juice__carton.n.01
+        beer_bottle.n.01_1 - beer_bottle.n.01
+        lemonade__bottle.n.01_1 - lemonade__bottle.n.01
+        pineapple_juice__carton.n.01_1 - pineapple_juice__carton.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled orange_juice__carton.n.01_1 orange_juice.n.01_1) 
+        (ontop orange_juice__carton.n.01_1 countertop.n.01_1) 
+        (filled beer_bottle.n.01_1 ginger_beer.n.01_1) 
+        (ontop beer_bottle.n.01_1 countertop.n.01_1) 
+        (filled lemonade__bottle.n.01_1 lemonade.n.01_1) 
+        (ontop lemonade__bottle.n.01_1 countertop.n.01_1)
+        (ontop wooden_spoon.n.02_1 countertop.n.01_1) 
+        (filled pineapple_juice__carton.n.01_1 pineapple_juice.n.01_1) 
+        (ontop pineapple_juice__carton.n.01_1 countertop.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (ontop pitcher.n.02_1 countertop.n.01_2) 
+        (future fruit_punch.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?fruit_punch.n.01_1) 
+            (contains ?pitcher.n.02_1 ?fruit_punch.n.01_1)
+        )
+    )
+)

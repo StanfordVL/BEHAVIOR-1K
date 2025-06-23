@@ -1,0 +1,29 @@
+(define (problem store_whole_grains-0)
+    (:domain omnigibson)
+
+    (:objects
+     	white_rice.n.01_1 - white_rice.n.01
+    	sack.n.01_1 - sack.n.01
+    	floor.n.01_1 - floor.n.01
+    	mason_jar.n.01_1 - mason_jar.n.01
+    	cabinet.n.01_1 - cabinet.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled sack.n.01_1 white_rice.n.01_1)
+        (ontop sack.n.01_1 floor.n.01_1) 
+        (inside mason_jar.n.01_1 cabinet.n.01_1) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (contains ?mason_jar.n.01_1 ?white_rice.n.01_1)
+            (inside ?mason_jar.n.01_1 ?cabinet.n.01_1) 
+            (ontop ?sack.n.01_1 ?floor.n.01_1)
+        )
+    )
+)

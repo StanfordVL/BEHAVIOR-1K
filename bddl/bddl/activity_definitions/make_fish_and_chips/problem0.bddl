@@ -1,0 +1,113 @@
+(define (problem make_fish_and_chips-0)
+    (:domain omnigibson)
+
+    (:objects
+        trout.n.01_1 - trout.n.01
+        countertop.n.01_1 - countertop.n.01
+        cooking_oil__bottle.n.01_1 - cooking_oil__bottle.n.01
+        cooking_oil.n.01_1 - cooking_oil.n.01
+        cooked__cooking_oil.n.01_1 - cooked__cooking_oil.n.01
+        french_fries.n.02_1 french_fries.n.02_10 french_fries.n.02_11 french_fries.n.02_12 french_fries.n.02_13 french_fries.n.02_14 french_fries.n.02_2 french_fries.n.02_3 french_fries.n.02_4 french_fries.n.02_5 french_fries.n.02_6 french_fries.n.02_7 french_fries.n.02_8 french_fries.n.02_9 - french_fries.n.02
+        frying_pan.n.01_1 - frying_pan.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        stove.n.01_1 - stove.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not
+            (cooked trout.n.01_1)
+        )
+        (frozen trout.n.01_1)
+        (inside trout.n.01_1 electric_refrigerator.n.01_1)
+        (not 
+            (cooked french_fries.n.02_1)
+        )
+        (not 
+            (cooked french_fries.n.02_2)
+        )
+        (not 
+            (cooked french_fries.n.02_3)
+        )
+        (not 
+            (cooked french_fries.n.02_4)
+        )
+        (not 
+            (cooked french_fries.n.02_5)
+        )
+        (not 
+            (cooked french_fries.n.02_6)
+        )
+        (not 
+            (cooked french_fries.n.02_7)
+        )
+        (not 
+            (cooked french_fries.n.02_8)
+        )
+        (not 
+            (cooked french_fries.n.02_9)
+        )
+        (not 
+            (cooked french_fries.n.02_10)
+        )
+        (not 
+            (cooked french_fries.n.02_12)
+        )
+        (not 
+            (cooked french_fries.n.02_13)
+        )
+        (not 
+            (cooked french_fries.n.02_14)
+        )
+        (inside french_fries.n.02_1 tupperware.n.01_1)
+        (inside french_fries.n.02_2 tupperware.n.01_1)
+        (inside french_fries.n.02_3 tupperware.n.01_1)
+        (inside french_fries.n.02_4 tupperware.n.01_1)
+        (inside french_fries.n.02_5 tupperware.n.01_1)
+        (inside french_fries.n.02_6 tupperware.n.01_1)
+        (inside french_fries.n.02_7 tupperware.n.01_1)
+        (inside french_fries.n.02_8 tupperware.n.01_1)
+        (inside french_fries.n.02_9 tupperware.n.01_1)
+        (inside french_fries.n.02_10 tupperware.n.01_1)
+        (inside french_fries.n.02_11 tupperware.n.01_1)
+        (inside french_fries.n.02_12 tupperware.n.01_1)
+        (inside french_fries.n.02_13 tupperware.n.01_1)
+        (inside french_fries.n.02_14 tupperware.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (filled cooking_oil__bottle.n.01_1 cooking_oil.n.01_1)
+        (ontop cooking_oil__bottle.n.01_1 countertop.n.01_1) 
+        (ontop frying_pan.n.01_1 stove.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future cooked__cooking_oil.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (or 
+                (real ?cooking_oil.n.01_1)
+                (real ?cooked__cooking_oil.n.01_1)
+            )
+            (forall 
+                (?french_fries.n.02 - french_fries.n.02)
+                (and 
+                    (or
+                        (covered ?french_fries.n.02 ?cooking_oil.n.01_1)
+                        (covered ?french_fries.n.02 ?cooked__cooking_oil.n.01_1)
+                    )
+                    (cooked ?french_fries.n.02)
+                )
+            )
+            (cooked ?trout.n.01_1)
+            (or 
+                (covered ?trout.n.01_1 ?cooking_oil.n.01_1)
+                (covered ?trout.n.01_1 ?cooked__cooking_oil.n.01_1)
+            )
+        )
+    )
+)

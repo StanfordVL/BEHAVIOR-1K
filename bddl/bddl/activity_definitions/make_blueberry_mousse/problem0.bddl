@@ -1,0 +1,63 @@
+(define (problem make_blueberry_mousse-0)
+    (:domain omnigibson)
+
+    (:objects
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        blueberry.n.02_1 - blueberry.n.02
+        stove.n.01_1 - stove.n.01
+        saucepan.n.01_1 - saucepan.n.01
+        gelatin.n.02_1 - gelatin.n.02
+        raw_egg.n.01_1 - raw_egg.n.01
+        cream_of_tartar.n.01_1 - cream_of_tartar.n.01
+        whipped_cream.n.01_1 - whipped_cream.n.01
+        blueberry_mousse.n.01_1 - blueberry_mousse.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        bowl.n.01_1 - bowl.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        gelatin__box.n.01_1 - gelatin__box.n.01
+        cream_of_tartar__shaker.n.01_1 - cream_of_tartar__shaker.n.01
+        whipped_cream__atomizer.n.01_1 - whipped_cream__atomizer.n.01
+        teaspoon.n.02_1 - teaspoon.n.02
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (inside lemon_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled tupperware.n.01_1 blueberry.n.02_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop saucepan.n.01_1 countertop.n.01_1) 
+        (inside gelatin.n.02_1 gelatin__box.n.01_1) 
+        (ontop gelatin__box.n.01_1 countertop.n.01_1) 
+        (inside raw_egg.n.01_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (insource cream_of_tartar__shaker.n.01_1 cream_of_tartar.n.01_1) 
+        (ontop cream_of_tartar__shaker.n.01_1 countertop.n.01_1) 
+        (insource whipped_cream__atomizer.n.01_1 whipped_cream.n.01_1) 
+        (inside whipped_cream__atomizer.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (ontop teaspoon.n.02_1 countertop.n.01_2) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future blueberry_mousse.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?blueberry_mousse.n.01_1) 
+            (contains ?electric_mixer.n.01_1 ?blueberry_mousse.n.01_1)
+        )
+    )
+)

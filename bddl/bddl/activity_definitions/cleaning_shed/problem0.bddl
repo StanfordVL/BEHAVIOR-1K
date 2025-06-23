@@ -1,0 +1,42 @@
+(define (problem cleaning_shed-0)
+    (:domain omnigibson)
+
+    (:objects
+        broom.n.01_1 - broom.n.01
+        floor.n.01_1 - floor.n.01
+        vacuum.n.04_1 - vacuum.n.04
+        rake.n.03_1 - rake.n.03
+        shovel.n.01_1 - shovel.n.01
+        chicken_wire.n.01_1 - chicken_wire.n.01
+        leaf_blower.n.01_1 - leaf_blower.n.01
+        trowel.n.01_1 - trowel.n.01
+        dust.n.01_1 - dust.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop broom.n.01_1 floor.n.01_1) 
+        (ontop vacuum.n.04_1 floor.n.01_1) 
+        (ontop rake.n.03_1 floor.n.01_1) 
+        (ontop shovel.n.01_1 floor.n.01_1) 
+        (ontop chicken_wire.n.01_1 floor.n.01_1) 
+        (ontop trowel.n.01_1 floor.n.01_1) 
+        (ontop leaf_blower.n.01_1 floor.n.01_1) 
+        (covered leaf_blower.n.01_1 dust.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?vacuum.n.04_1 ?floor.n.01_1) 
+            (not 
+                (covered ?leaf_blower.n.01_1 ?dust.n.01_1)
+            ) 
+            (nextto ?leaf_blower.n.01_1 ?vacuum.n.04_1) 
+            (nextto ?chicken_wire.n.01_1 ?leaf_blower.n.01_1)
+            (nextto ?broom.n.01_1 ?rake.n.03_1) 
+            (nextto ?rake.n.03_1 ?shovel.n.01_1) 
+        )
+    )
+)

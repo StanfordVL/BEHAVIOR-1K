@@ -1,0 +1,35 @@
+(define (problem spring_clean_your_skateboard-0)
+    (:domain omnigibson)
+
+    (:objects
+        acetone.n.01_1 - acetone.n.01
+        acetone__atomizer.n.01_1 - acetone__atomizer.n.01
+        bucket.n.01_1 - bucket.n.01
+        water.n.06_1 - water.n.06
+        stain.n.01_1 - stain.n.01
+        floor.n.01_1 - floor.n.01
+        skateboard.n.01_1 - skateboard.n.01
+        rag.n.01_1 - rag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (insource acetone__atomizer.n.01_1 acetone.n.01_1) 
+        (ontop acetone__atomizer.n.01_1 floor.n.01_1)
+        (filled bucket.n.01_1 water.n.06_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop skateboard.n.01_1 floor.n.01_1) 
+        (covered skateboard.n.01_1 stain.n.01_1)
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?skateboard.n.01_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

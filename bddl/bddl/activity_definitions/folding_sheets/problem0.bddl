@@ -1,0 +1,29 @@
+(define (problem folding_sheets-0)
+    (:domain omnigibson)
+
+    (:objects
+        sheet.n.03_1 sheet.n.03_2 sheet.n.03_3 sheet.n.03_4 - sheet.n.03
+        bed.n.01_1 - bed.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sheet.n.03_1 bed.n.01_1) 
+        (ontop sheet.n.03_2 bed.n.01_1) 
+        (ontop sheet.n.03_3 bed.n.01_1) 
+        (ontop sheet.n.03_4 bed.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sheet.n.03 - sheet.n.03) 
+                (folded ?sheet.n.03)
+            )
+        )
+    )
+)

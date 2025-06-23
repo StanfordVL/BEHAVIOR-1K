@@ -1,0 +1,813 @@
+[
+    {
+        "rule_name": "drip_coffee_0",
+        "input_synsets": {
+            "coffee_bean.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "machine": {
+            "coffee_maker.n.01": 1
+        },
+        "output_synsets": {
+            "drip_coffee.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "iced_cappuccino",
+        "input_synsets": {
+            "espresso.n.01": 1,
+            "cane_sugar.n.02": 1,
+            "chocolate_milk.n.01": 1,
+            "ice_cube.n.01": 3
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "iced_cappuccino.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "coffeemaker_espresso",
+        "input_synsets": {
+            "water.n.06": 1,
+            "instant_coffee.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "coffee_maker.n.01": 1
+        },
+        "output_synsets": {
+            "espresso.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "pastry_dough",
+        "input_synsets": {
+            "water.n.06": 1,
+            "butter.n.01": 1,
+            "flour.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "food_processor.n.01": 1
+        },
+        "output_synsets": {
+            "pastry.n.01": 1
+        },
+        "output_states": {
+            "pastry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "milkshake_0",
+        "input_synsets": {
+            "drip_coffee.n.01": 1,
+            "cane_sugar.n.02": 1,
+            "ice_cube.n.01": 4,
+            "scoop_of_ice_cream.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "milkshake.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "milkshake_1",
+        "input_synsets": {
+            "whole_milk.n.01": 1,
+            "chocolate_sauce.n.01": 1,
+            "scoop_of_ice_cream.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "milkshake.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "smoothie_0",
+        "input_synsets": {
+            "strawberry.n.01": 3,
+            "ice_cube.n.01": 4,
+            "lemon_juice.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "smoothie.n.02": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "chocolate_milk",
+        "input_synsets": {
+            "granulated_sugar.n.01": 1,
+            "cocoa_powder.n.01": 1,
+            "low-fat_milk.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "chocolate_milk.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "chocolate_spread",
+        "input_synsets": {
+            "butter.n.01": 1,
+            "honey.n.01": 1,
+            "cocoa_powder.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "food_processor.n.01": 1
+        },
+        "output_synsets": {
+            "chocolate_sauce.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "drip_coffee_1",
+        "input_synsets": {
+            "coffee_bean.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "machine": {
+            "coffee_maker.n.01": 1
+        },
+        "output_synsets": {
+            "drip_coffee.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "eggnog",
+        "input_synsets": {
+            "granulated_sugar.n.01": 1,
+            "nutmeg.n.02": 1,
+            "cinnamon.n.03": 1,
+            "vanilla.n.02": 1,
+            "rum.n.01": 1,
+            "whole_milk.n.01": 1,
+            "raw_egg.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "eggnog.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "fruit_punch_0",
+        "input_synsets": {
+            "diced__lemon.n.01": 1,
+            "diced__strawberry.n.01": 1,
+            "diced__orange.n.01": 1,
+            "diced__apple.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "fruit_punch.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "iced_chocolate",
+        "input_synsets": {
+            "ice_cube.n.01": 2,
+            "cocoa_powder.n.01": 1,
+            "whole_milk.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "vanilla.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "iced_chocolate.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "jerk_seasoning",
+        "input_synsets": {
+            "brown_sugar.n.01": 1,
+            "chili.n.02": 1,
+            "cayenne.n.02": 1,
+            "clove.n.03": 2
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "jerk_seasoning.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "lemon_pepper_seasoning",
+        "input_synsets": {
+            "black_pepper.n.02": 1,
+            "lemon_peel.n.01": 1,
+            "salt.n.02": 1,
+            "lemon_juice.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "lemon-pepper_seasoning.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "mustard_seasoning",
+        "input_synsets": {
+            "mustard_seed.n.01": 1,
+            "sage.n.02": 1,
+            "cumin.n.02": 1,
+            "clove.n.03": 2,
+            "rosemary.n.02": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "mustard_seasoning.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "smoothie_1",
+        "input_synsets": {
+            "raspberry.n.02": 6,
+            "strawberry.n.01": 4,
+            "lemon_juice.n.01": 1,
+            "yogurt.n.01": 1,
+            "honey.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "smoothie.n.02": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "tomato_rice",
+        "input_synsets": {
+            "white_rice.n.01": 1,
+            "diced__beefsteak_tomato.n.01": 1,
+            "diced__vidalia_onion.n.01": 1,
+            "olive_oil.n.01": 1,
+            "chicken_broth.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "crock_pot.n.01": 1
+        },
+        "output_synsets": {
+            "tomato_rice.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "waffle",
+        "input_synsets": {
+            "waffle_batter.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "waffle_iron.n.01": 1
+        },
+        "output_synsets": {
+            "waffle.n.01": 1
+        },
+        "output_states": {
+            "waffle.n.01": [
+                [
+                    "hot",
+                    true
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "fruit_punch_1",
+        "input_synsets": {
+            "diced__watermelon.n.01": 1,
+            "lemonade.n.01": 1,
+            "lemon_juice.n.01": 1,
+            "tonic.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "fruit_punch.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "sugar_syrup",
+        "input_synsets": {
+            "granulated_sugar.n.01": 1,
+            "water.n.06": 1,
+            "mint.n.04": 1
+        },
+        "input_states": null,
+        "machine": {
+            "blender.n.01": 1
+        },
+        "output_synsets": {
+            "sugar_syrup.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "sugar_cookie_dough",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "raw_egg.n.01": 2,
+            "vanilla.n.02": 1,
+            "melted__butter.n.01": 1,
+            "baking_powder.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "sugar_cookie_dough.n.01": 1
+        },
+        "output_states": {
+            "sugar_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "cheese_pastry_filling",
+        "input_synsets": {
+            "raw_egg.n.01": 1,
+            "cane_sugar.n.02": 1,
+            "lemon_juice.n.01": 1,
+            "vanilla.n.02": 1,
+            "cream_cheese.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "cheese_pastry_filling.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "sugar_coffee_scrub",
+        "input_synsets": {
+            "ground_coffee.n.01": 1,
+            "brown_sugar.n.01": 1,
+            "coconut_oil.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "sugar_coffee_scrub.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "bagel_dough",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "salt.n.02": 1,
+            "honey.n.01": 1,
+            "yeast.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "bagel_dough.n.01": 1
+        },
+        "output_states": {
+            "bagel_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "pancake_batter",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "baking_powder.n.01": 1,
+            "salt.n.02": 1,
+            "whole_milk.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "pancake_batter.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "biscuit_dough",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "baking_powder.n.01": 1,
+            "salt.n.02": 1,
+            "shortening.n.01": 1,
+            "whole_milk.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "biscuit_dough.n.01": 1
+        },
+        "output_states": {
+            "biscuit_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "blueberry_mousse",
+        "input_synsets": {
+            "blueberry_compote.n.01": 1,
+            "gelatin.n.02": 1,
+            "raw_egg.n.01": 1,
+            "cream_of_tartar.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "whipped_cream.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "blueberry_mousse.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "brownie_batter",
+        "input_synsets": {
+            "butter.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "cocoa_powder.n.01": 1,
+            "vanilla.n.02": 1,
+            "raw_egg.n.01": 1,
+            "flour.n.01": 1,
+            "salt.n.02": 1,
+            "walnut.n.01": 7
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "brownie_batter.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "cherry_filling",
+        "input_synsets": {
+            "cherry.n.03": 16,
+            "granulated_sugar.n.01": 1,
+            "cornstarch.n.01": 1,
+            "lemon_juice.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "cherry_filling.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "chocolate_cookie_dough",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "melted__butter.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "raw_egg.n.01": 2,
+            "cocoa_powder.n.01": 1,
+            "chocolate_bar.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "chocolate_cookie_dough.n.01": 1
+        },
+        "output_states": {
+            "chocolate_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "spice_cookie_dough",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "raw_egg.n.01": 2,
+            "vanilla.n.02": 1,
+            "butter.n.01": 1,
+            "baking_powder.n.01": 1,
+            "cinnamon.n.03": 1,
+            "nutmeg.n.02": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "spice_cookie_dough.n.01": 1
+        },
+        "output_states": {
+            "spice_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "heavy_cream",
+        "input_synsets": {
+            "whole_milk.n.01": 1,
+            "melted__butter.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "heavy_cream.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "edible_cookie_dough",
+        "input_synsets": {
+            "cooked__flour.n.01": 1,
+            "melted__butter.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "brown_sugar.n.01": 1,
+            "salt.n.02": 1,
+            "vanilla.n.02": 1,
+            "jimmies.n.01": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "edible_cookie_dough.n.01": 1
+        },
+        "output_states": {
+            "edible_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "muffin_batter",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "baking_powder.n.01": 1,
+            "salt.n.02": 1,
+            "raw_egg.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "whole_milk.n.01": 1,
+            "cooking_oil.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "muffin_batter.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "onion_ring_batter",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "whole_milk.n.01": 1,
+            "raw_egg.n.01": 1,
+            "cooking_oil.n.01": 1,
+            "salt.n.02": 1,
+            "onion_powder.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "onion_ring_batter.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "pizza_dough",
+        "input_synsets": {
+            "water.n.06": 1,
+            "yeast.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "flour.n.01": 1,
+            "olive_oil.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "pizza_dough.n.01": 1
+        },
+        "output_states": {
+            "pizza_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "roll_dough",
+        "input_synsets": {
+            "whole_milk.n.01": 1,
+            "yeast.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "flour.n.01": 1,
+            "butter.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "roll_dough.n.01": 1
+        },
+        "output_states": {
+            "roll_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        }
+    },
+    {
+        "rule_name": "waffle_batter",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "raw_egg.n.01": 2,
+            "vanilla.n.02": 1,
+            "melted__butter.n.01": 1,
+            "yogurt.n.01": 1,
+            "salt.n.02": 1,
+            "whole_milk.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "machine": {
+            "electric_mixer.n.01": 1
+        },
+        "output_synsets": {
+            "waffle_batter.n.01": 1
+        },
+        "output_states": null
+    }
+]

@@ -1,0 +1,116 @@
+(define (problem cook_shrimp-0)
+    (:domain omnigibson)
+
+    (:objects
+        frying_pan.n.01_1 - frying_pan.n.01
+        prawn.n.01_1 prawn.n.01_10 prawn.n.01_2 prawn.n.01_3 prawn.n.01_4 prawn.n.01_5 prawn.n.01_6 prawn.n.01_7 prawn.n.01_8 prawn.n.01_9 - prawn.n.01
+        stove.n.01_1 - stove.n.01
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 clove.n.03_4 - clove.n.03
+        tupperware.n.01_1 - tupperware.n.01
+        paprika.n.02_1 - paprika.n.02
+        paprika__shaker.n.01_1 - paprika__shaker.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        sack.n.01_1 - sack.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside prawn.n.01_1 sack.n.01_1)
+        (inside prawn.n.01_2 sack.n.01_1)
+        (inside prawn.n.01_3 sack.n.01_1)
+        (inside prawn.n.01_4 sack.n.01_1)
+        (inside prawn.n.01_5 sack.n.01_1)
+        (inside prawn.n.01_6 sack.n.01_1)
+        (inside prawn.n.01_7 sack.n.01_1)
+        (inside prawn.n.01_8 sack.n.01_1)
+        (inside prawn.n.01_9 sack.n.01_1)
+        (inside prawn.n.01_10 sack.n.01_1)
+        (frozen prawn.n.01_1)
+        (frozen prawn.n.01_2)
+        (frozen prawn.n.01_3)
+        (frozen prawn.n.01_4)
+        (frozen prawn.n.01_5)
+        (frozen prawn.n.01_6)
+        (frozen prawn.n.01_7)
+        (frozen prawn.n.01_8)
+        (frozen prawn.n.01_9)
+        (frozen prawn.n.01_10)
+        (not 
+            (cooked prawn.n.01_1)
+        ) 
+        (not 
+            (cooked prawn.n.01_2)
+        ) 
+        (not 
+            (cooked prawn.n.01_3)
+        ) 
+        (not 
+            (cooked prawn.n.01_4)
+        ) 
+        (not 
+            (cooked prawn.n.01_5)
+        ) 
+        (not 
+            (cooked prawn.n.01_6)
+        ) 
+        (not 
+            (cooked prawn.n.01_7)
+        ) 
+        (not 
+            (cooked prawn.n.01_8)
+        ) 
+        (not 
+            (cooked prawn.n.01_9)
+        ) 
+        (not 
+            (cooked prawn.n.01_10)
+        ) 
+        (inside sack.n.01_1 electric_refrigerator.n.01_1)
+        (inside frying_pan.n.01_1 cabinet.n.01_1) 
+        (inside clove.n.03_1 tupperware.n.01_1) 
+        (inside clove.n.03_2 tupperware.n.01_1) 
+        (inside clove.n.03_3 tupperware.n.01_1) 
+        (inside clove.n.03_4 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (insource paprika__shaker.n.01_1 paprika.n.02_1) 
+        (inside paprika__shaker.n.01_1 cabinet.n.01_1)
+        (future melted__butter.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (inside salt__shaker.n.01_1 cabinet.n.01_1)
+        (inside butter.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?prawn.n.01 - prawn.n.01)
+                (and 
+                    (cooked ?prawn.n.01)
+                    (covered ?prawn.n.01 ?paprika.n.02_1)
+                    (covered ?prawn.n.01 ?salt.n.02_1)
+                    (inside ?prawn.n.01 ?frying_pan.n.01_1)
+                )
+            )
+            (forall 
+                (?clove.n.03 - clove.n.03)
+                (and 
+                    (cooked ?clove.n.03)
+                    (inside ?clove.n.03 ?frying_pan.n.01_1)
+                )
+            )
+            (contains ?frying_pan.n.01_1 ?melted__butter.n.01_1)
+            (real ?melted__butter.n.01_1)
+        )
+    )
+)

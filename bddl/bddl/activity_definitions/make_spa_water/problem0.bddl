@@ -1,0 +1,49 @@
+(define (problem make_spa_water-0)
+    (:domain omnigibson)
+
+    (:objects
+        cucumber.n.02_1 - cucumber.n.02
+        diced__cucumber.n.01_1 - diced__cucumber.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        ice_cube.n.01_1 ice_cube.n.01_2 ice_cube.n.01_3 - ice_cube.n.01
+        water.n.06_1 - water.n.06
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        pitcher.n.02_1 - pitcher.n.02
+        countertop.n.01_1 - countertop.n.01
+        cup.n.01_1 - cup.n.01
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (ontop cucumber.n.02_1 countertop.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (inside ice_cube.n.01_1 cup.n.01_1) 
+        (inside ice_cube.n.01_2 cup.n.01_1) 
+        (inside ice_cube.n.01_3 cup.n.01_1) 
+        (inside cup.n.01_1 electric_refrigerator.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop pitcher.n.02_1 countertop.n.01_1) 
+        (future diced__cucumber.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__cucumber.n.01_1)
+            (filled ?pitcher.n.02_1 ?water.n.06_1) 
+            (contains ?pitcher.n.02_1 ?diced__cucumber.n.01_1) 
+            (forall 
+                (?ice_cube.n.01 - ice_cube.n.01) 
+                (inside ?ice_cube.n.01 ?pitcher.n.02_1)
+            )
+        )
+    )
+)

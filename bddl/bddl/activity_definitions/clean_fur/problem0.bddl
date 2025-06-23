@@ -1,0 +1,36 @@
+(define (problem clean_fur-0)
+    (:domain omnigibson)
+
+    (:objects
+        fur_coat.n.01_1 - fur_coat.n.01
+        stain.n.01_1 - stain.n.01
+        rag.n.01_1 rag.n.01_2 - rag.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        toilet_soap.n.01_1 - toilet_soap.n.01
+        toilet_soap__bottle.n.01_1 - toilet_soap__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop fur_coat.n.01_1 floor.n.01_1)
+        (covered fur_coat.n.01_1 stain.n.01_1)
+        (ontop rag.n.01_1 floor.n.01_1)
+        (ontop rag.n.01_2 floor.n.01_1)
+        (filled toilet_soap__bottle.n.01_1 toilet_soap.n.01_1)
+        (ontop toilet_soap__bottle.n.01_1 floor.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom sink.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?fur_coat.n.01_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

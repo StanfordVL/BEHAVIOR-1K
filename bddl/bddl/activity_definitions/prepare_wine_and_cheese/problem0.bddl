@@ -1,0 +1,96 @@
+(define (problem prepare_wine_and_cheese-0)
+    (:domain omnigibson)
+
+    (:objects
+        wine_bottle.n.01_1 wine_bottle.n.01_2 - wine_bottle.n.01
+        cheddar.n.02_1 - cheddar.n.02
+        diced__cheddar.n.01_1 - diced__cheddar.n.01
+        feta.n.01_1 - feta.n.01
+        diced__feta.n.01_1 - diced__feta.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        white_wine.n.01_1 - white_wine.n.01
+        champagne.n.01_1 - champagne.n.01
+        carafe.n.01_1 - carafe.n.01
+        pretzel.n.01_1 pretzel.n.01_2 - pretzel.n.01
+        floor.n.01_1 - floor.n.01
+        wineglass.n.01_1 wineglass.n.01_2 - wineglass.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (ontop cheddar.n.02_1 plate.n.04_1)
+        (ontop feta.n.01_1 plate.n.04_1)
+        (filled wine_bottle.n.01_1 white_wine.n.01_1)
+        (filled wine_bottle.n.01_2 champagne.n.01_1)
+        (ontop wine_bottle.n.01_1 electric_refrigerator.n.01_1)
+        (ontop wine_bottle.n.01_2 electric_refrigerator.n.01_1)
+        (ontop pretzel.n.01_1 plate.n.04_1)
+        (ontop pretzel.n.01_2 plate.n.04_2)
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (ontop plate.n.04_2 countertop.n.01_1)
+        (ontop carafe.n.01_1 countertop.n.01_1)
+        (ontop wineglass.n.01_1 countertop.n.01_1)
+        (ontop wineglass.n.01_2 countertop.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 dining_room) 
+        (future diced__feta.n.01_1)
+        (future diced__cheddar.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__cheddar.n.01_1)
+            (real ?diced__feta.n.01_1)
+            (filled ?carafe.n.01_1 ?white_wine.n.01_1)
+            (ontop ?carafe.n.01_1 ?breakfast_table.n.01_1)
+            (filled ?wine_bottle.n.01_2 ?champagne.n.01_1)
+            (ontop ?wine_bottle.n.01_2 ?breakfast_table.n.01_1)
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (and 
+                    (contains ?plate.n.04 ?diced__cheddar.n.01_1)
+                    (contains ?plate.n.04 ?diced__feta.n.01_1)
+                    (forall 
+                        (?pretzel.n.01 - pretzel.n.01)
+                        (not 
+                            (ontop ?pretzel.n.01 ?plate.n.04)
+                        )
+                    )
+                )
+            )
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (and 
+                    (forall 
+                        (?pretzel.n.01 - pretzel.n.01)
+                        (ontop ?pretzel.n.01 ?plate.n.04)
+                    )
+                    (not 
+                        (contains ?plate.n.04 ?diced__cheddar.n.01_1)
+                    )
+                    (not 
+                        (contains ?plate.n.04 ?diced__feta.n.01_1)
+                    )
+                )
+            )
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (ontop ?plate.n.04 ?breakfast_table.n.01_1)
+            )
+            (forall 
+                (?wineglass.n.01 - wineglass.n.01)
+                (ontop ?wineglass.n.01 ?breakfast_table.n.01_1)
+            )
+        )
+    )
+)

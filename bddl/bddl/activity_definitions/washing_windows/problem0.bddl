@@ -1,0 +1,42 @@
+(define (problem washing_windows-0)
+    (:domain omnigibson)
+
+    (:objects
+        squeegee.n.01_1 - squeegee.n.01
+        floor.n.01_1 - floor.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        window.n.01_1 - window.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop squeegee.n.01_1 floor.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (not 
+            (covered window.n.01_1 disinfectant.n.01_1)
+        ) 
+        (covered window.n.01_1 adhesive_material.n.01_1)
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1)
+        (ontop disinfectant__bottle.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom window.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (covered ?window.n.01_1 ?disinfectant.n.01_1) 
+            (not 
+                (covered ?window.n.01_1 ?detergent.n.02_1)
+            )
+            (not 
+                (covered ?window.n.01_1 ?adhesive_material.n.01_1)
+            )
+        )
+    )
+)

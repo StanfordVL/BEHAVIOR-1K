@@ -1,0 +1,29 @@
+(define (problem clean_a_trombone-0)
+    (:domain omnigibson)
+
+    (:objects
+        rag.n.01_1 - rag.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        debris.n.01_1 - debris.n.01
+        trombone.n.01_1 - trombone.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 coffee_table.n.01_1) 
+        (covered trombone.n.01_1 debris.n.01_1) 
+        (ontop trombone.n.01_1 coffee_table.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?trombone.n.01_1 ?debris.n.01_1)
+            ) 
+        )
+    )
+)

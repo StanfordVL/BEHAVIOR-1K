@@ -1,0 +1,35 @@
+(define (problem clean_cement-0)
+    (:domain omnigibson)
+
+    (:objects
+        driveway.n.01_1 - driveway.n.01
+        floor.n.01_1 - floor.n.01
+        dirt.n.02_1 - dirt.n.02
+        watering_can.n.01_1 - watering_can.n.01
+        scrub_brush.n.01_1 - scrub_brush.n.01
+        water.n.06_1 - water.n.06
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom driveway.n.01_1 garden) 
+        (covered driveway.n.01_1 dirt.n.02_1)
+        (ontop watering_can.n.01_1 floor.n.01_1)
+        (ontop scrub_brush.n.01_1 floor.n.01_1) 
+        (insource watering_can.n.01_1 water.n.06_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garage) 
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?driveway.n.01_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,40 @@
+(define (problem clean_a_bicycle_chain-0)
+    (:domain omnigibson)
+
+    (:objects
+        bicycle.n.01_1 - bicycle.n.01
+        floor.n.01_1 - floor.n.01
+        grease.n.01_1 - grease.n.01
+        dirt.n.02_1 - dirt.n.02
+        toothbrush.n.01_1 - toothbrush.n.01
+        glove.n.02_1 - glove.n.02
+        rag.n.01_1 - rag.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bicycle.n.01_1 floor.n.01_1) 
+        (covered bicycle.n.01_1 grease.n.01_1) 
+        (covered bicycle.n.01_1 dirt.n.02_1) 
+        (ontop toothbrush.n.01_1 floor.n.01_1) 
+        (ontop glove.n.02_1 floor.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?bicycle.n.01_1 ?grease.n.01_1)
+            )
+            (not 
+                (covered ?bicycle.n.01_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

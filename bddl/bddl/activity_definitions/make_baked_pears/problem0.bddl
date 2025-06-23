@@ -1,0 +1,73 @@
+(define (problem make_baked_pears-0)
+    (:domain omnigibson)
+
+    (:objects
+     	pear.n.01_1 pear.n.01_2 pear.n.01_3 pear.n.01_4 - pear.n.01
+        red_wine.n.01_1 - red_wine.n.01
+        cooked__red_wine.n.01_1 - cooked__red_wine.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        granulated_sugar__sack.n.01_1 - granulated_sugar__sack.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        wine_bottle.n.01_1 - wine_bottle.n.01
+    	oven.n.01_1 - oven.n.01
+        stockpot.n.01_1 - stockpot.n.01
+    	breakfast_table.n.01_1 - breakfast_table.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (cooked pear.n.01_1)
+        ) 
+        (not 
+            (cooked pear.n.01_2)
+        ) 
+        (not 
+            (cooked pear.n.01_3)
+        ) 
+        (not 
+            (cooked pear.n.01_4)
+        ) 
+        (inside pear.n.01_1 electric_refrigerator.n.01_1) 
+        (inside pear.n.01_2 electric_refrigerator.n.01_1) 
+        (inside pear.n.01_3 electric_refrigerator.n.01_1) 
+        (inside pear.n.01_4 electric_refrigerator.n.01_1) 
+        (filled wine_bottle.n.01_1 red_wine.n.01_1)
+        (inside wine_bottle.n.01_1 cabinet.n.01_1)
+        (filled granulated_sugar__sack.n.01_1 granulated_sugar.n.01_1)
+        (inside granulated_sugar__sack.n.01_1 cabinet.n.01_1)
+        (inside stockpot.n.01_1 cabinet.n.01_1)
+        (inside wooden_spoon.n.02_1 cabinet.n.01_1)
+        (inroom breakfast_table.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (future cooked__red_wine.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (or
+                (real ?cooked__red_wine.n.01_1)
+                (real ?red_wine.n.01_1)
+            )
+            (real ?granulated_sugar.n.01_1)
+            (forall 
+                (?pear.n.01 - pear.n.01)
+                (and
+                    (cooked ?pear.n.01)
+                    (covered ?pear.n.01 ?granulated_sugar.n.01_1)
+                    (or 
+                        (covered ?pear.n.01 ?cooked__red_wine.n.01_1)
+                        (covered ?pear.n.01 ?red_wine.n.01_1)
+                    )
+                )
+            )
+        )
+    )
+)

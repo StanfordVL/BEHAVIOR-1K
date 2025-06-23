@@ -1,0 +1,45 @@
+(define (problem make_chocolate_spread-0)
+    (:domain omnigibson)
+
+    (:objects
+        butter.n.01_1 - butter.n.01
+        honey.n.01_1 - honey.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        chocolate_sauce.n.01_1 - chocolate_sauce.n.01
+        food_processor.n.01_1 - food_processor.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        butter__package.n.01_1 - butter__package.n.01
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        honey__jar.n.01_1 - honey__jar.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside butter.n.01_1 butter__package.n.01_1) 
+        (filled honey__jar.n.01_1 honey.n.01_1) 
+        (ontop honey__jar.n.01_1 countertop.n.01_1) 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (ontop cocoa_powder__jar.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (ontop food_processor.n.01_1 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1) 
+        (inside butter__package.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future chocolate_sauce.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?chocolate_sauce.n.01_1) 
+            (contains ?mixing_bowl.n.01_1 ?chocolate_sauce.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,44 @@
+(define (problem make_chocolate_milk-0)
+    (:domain omnigibson)
+
+    (:objects
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        low-fat_milk.n.01_1 - low-fat_milk.n.01
+        chocolate_milk.n.01_1 - chocolate_milk.n.01
+        blender.n.01_1 - blender.n.01
+        water_glass.n.02_1 - water_glass.n.02
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        countertop.n.01_1 - countertop.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (ontop cocoa_powder__jar.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled milk__carton.n.01_1 low-fat_milk.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (ontop water_glass.n.02_1 countertop.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (future chocolate_milk.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?chocolate_milk.n.01_1) 
+            (contains ?water_glass.n.02_1 ?chocolate_milk.n.01_1)
+        )
+    )
+)

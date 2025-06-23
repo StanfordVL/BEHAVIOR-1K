@@ -1,0 +1,56 @@
+(define (problem make_a_cappuccino-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        instant_coffee.n.01_1 - instant_coffee.n.01
+        cane_sugar.n.02_1 - cane_sugar.n.02
+        whole_milk.n.01_1 - whole_milk.n.01
+        foam.n.01_1 - foam.n.01
+        coffee_maker.n.01_1 - coffee_maker.n.01
+        teacup.n.02_1 - teacup.n.02
+        cappuccino.n.01_1 - cappuccino.n.01
+        stirrer.n.02_1 - stirrer.n.02
+        instant_coffee__jar.n.01_1 - instant_coffee__jar.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        countertop.n.01_1 countertop.n.01_2 countertop.n.01_3 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        carafe.n.01_1 - carafe.n.01
+        carboy.n.01_1 - carboy.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled instant_coffee__jar.n.01_1 instant_coffee.n.01_1) 
+        (ontop instant_coffee__jar.n.01_1 countertop.n.01_1) 
+        (filled mason_jar.n.01_1 cane_sugar.n.02_1)
+        (ontop mason_jar.n.01_1 countertop.n.01_1) 
+        (filled carafe.n.01_1 whole_milk.n.01_1) 
+        (filled carboy.n.01_1 foam.n.01_1)
+        (ontop carboy.n.01_1 countertop.n.01_1)
+        (ontop coffee_maker.n.01_1 countertop.n.01_2) 
+        (ontop teacup.n.02_1 countertop.n.01_2) 
+        (ontop stirrer.n.02_1 countertop.n.01_3) 
+        (inside carafe.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom countertop.n.01_3 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (future cappuccino.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cappuccino.n.01_1) 
+            (contains ?teacup.n.02_1 ?cappuccino.n.01_1)
+        )
+    )
+)

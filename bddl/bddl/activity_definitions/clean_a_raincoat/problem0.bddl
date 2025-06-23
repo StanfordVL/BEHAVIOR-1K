@@ -1,0 +1,35 @@
+(define (problem clean_a_raincoat-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        raincoat.n.01_1 - raincoat.n.01
+        washer.n.03_1 - washer.n.03
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered raincoat.n.01_1 stain.n.01_1)
+        (ontop raincoat.n.01_1 floor.n.01_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (inside detergent__bottle.n.01_1 cabinet.n.01_1)        
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?raincoat.n.01_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

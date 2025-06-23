@@ -1,0 +1,35 @@
+(define (problem remove_sod-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn.n.01_1 - lawn.n.01
+        floor.n.01_1 - floor.n.01
+        turf.n.01_1 turf.n.01_2 turf.n.01_3 turf.n.01_4 - turf.n.01
+        barrow.n.03_1 - barrow.n.03
+        shovel.n.01_1 - shovel.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop turf.n.01_1 lawn.n.01_1) 
+        (ontop turf.n.01_2 lawn.n.01_1) 
+        (ontop turf.n.01_3 lawn.n.01_1) 
+        (ontop turf.n.01_4 lawn.n.01_1) 
+        (ontop barrow.n.03_1 lawn.n.01_1) 
+        (inside shovel.n.01_1 barrow.n.03_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?turf.n.01 - turf.n.01)
+                (not 
+                    (ontop ?turf.n.01 ?lawn.n.01_1)
+                )
+            )
+        )
+    )
+)

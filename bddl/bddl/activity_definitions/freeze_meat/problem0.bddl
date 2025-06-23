@@ -1,0 +1,58 @@
+(define (problem freeze_meat-0)
+    (:domain omnigibson)
+
+    (:objects
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        countertop.n.01_1 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        steak.n.01_1 - steak.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        chicken.n.01_1 - chicken.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside tupperware.n.01_1 cabinet.n.01_1) 
+        (inside tupperware.n.01_2 cabinet.n.01_1) 
+        (ontop steak.n.01_1 plate.n.04_1)
+        (ontop chicken.n.01_1 plate.n.04_2)
+        (cooked steak.n.01_1)
+        (cooked chicken.n.01_1)
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (ontop plate.n.04_2 countertop.n.01_1)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (exists
+                (?tupperware.n.01 - tupperware.n.01)
+                (forall
+                    (?steak.n.01 - steak.n.01)
+                    (inside ?steak.n.01 ?tupperware.n.01)
+                )
+            )
+            (exists
+                (?tupperware.n.01 - tupperware.n.01)
+                (forall
+                    (?chicken.n.01 - chicken.n.01)
+                    (inside ?chicken.n.01 ?tupperware.n.01)
+                )
+            )
+            (forall 
+                (?steak.n.01 - steak.n.01)
+                (frozen ?steak.n.01)
+            )
+            (forall 
+                (?chicken.n.01 - chicken.n.01)
+                (frozen ?chicken.n.01)
+            )
+        )
+    )
+)

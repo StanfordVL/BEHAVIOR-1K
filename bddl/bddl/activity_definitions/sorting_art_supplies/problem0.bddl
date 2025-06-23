@@ -1,0 +1,61 @@
+(define (problem sorting_art_supplies-0)
+    (:domain omnigibson)
+
+    (:objects
+        sheet.n.02_1 sheet.n.02_2 - sheet.n.02
+        carton.n.02_1 - carton.n.02
+        bottle__of__glue.n.01_1 - bottle__of__glue.n.01
+        paintbrush.n.01_1 paintbrush.n.01_2 - paintbrush.n.01
+        pencil_box.n.01_1 pencil_box.n.01_2 - pencil_box.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        marker.n.03_1 marker.n.03_2 - marker.n.03
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside sheet.n.02_1 carton.n.02_1) 
+        (inside sheet.n.02_2 carton.n.02_1) 
+        (inside bottle__of__glue.n.01_1 carton.n.02_1) 
+        (inside paintbrush.n.01_1 carton.n.02_1) 
+        (inside paintbrush.n.01_2 carton.n.02_1) 
+        (ontop pencil_box.n.01_1 coffee_table.n.01_1) 
+        (ontop pencil_box.n.01_2 coffee_table.n.01_1)
+        (inside marker.n.03_1 carton.n.02_1) 
+        (inside marker.n.03_2 carton.n.02_1) 
+        (ontop carton.n.02_1 coffee_table.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom cabinet.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sheet.n.02 - sheet.n.02)
+                (inside ?sheet.n.02 ?cabinet.n.01_1)
+            )
+            (exists 
+                (?pencil_box.n.01 - pencil_box.n.01)
+                (forall 
+                    (?paintbrush.n.01 - paintbrush.n.01)
+                    (inside ?paintbrush.n.01 ?pencil_box.n.01)
+                )   
+            )
+            (exists 
+                (?pencil_box.n.01 - pencil_box.n.01)
+                (forall 
+                    (?marker.n.03 - marker.n.03)
+                    (inside ?marker.n.03 ?pencil_box.n.01)
+                )   
+            )
+            (inside ?bottle__of__glue.n.01_1 ?cabinet.n.01_1)
+            (forall
+                (?pencil_box.n.01 - pencil_box.n.01)
+                (inside ?pencil_box.n.01 ?cabinet.n.01_1)
+            )
+        )
+    )
+)

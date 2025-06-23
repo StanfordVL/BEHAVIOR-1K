@@ -1,0 +1,25 @@
+(define (problem cover_a_flower_pot_in_fabric-0)
+    (:domain omnigibson)
+
+    (:objects
+        pot.n.04_1 - pot.n.04
+        coffee_table.n.01_1 - coffee_table.n.01
+        sheet.n.03_1 - sheet.n.03
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pot.n.04_1 coffee_table.n.01_1) 
+        (ontop sheet.n.03_1 coffee_table.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (overlaid ?sheet.n.03_1 ?pot.n.04_1) 
+        )
+    )
+)

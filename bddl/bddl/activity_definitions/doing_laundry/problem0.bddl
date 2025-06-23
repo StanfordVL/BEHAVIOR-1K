@@ -1,0 +1,65 @@
+(define (problem doing_laundry-0)
+    (:domain omnigibson)
+
+    (:objects
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        detergent.n.02_1 - detergent.n.02
+        hamper.n.02_1 - hamper.n.02
+        undergarment.n.01_1 - undergarment.n.01
+        stain.n.01_1 - stain.n.01
+        blouse.n.01_1 - blouse.n.01
+        washer.n.03_1 - washer.n.03
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        water.n.06_1 - water.n.06
+        hanger.n.02_1 hanger.n.02_2 - hanger.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop hamper.n.02_1 floor.n.01_1) 
+        (inside undergarment.n.01_1 hamper.n.02_1) 
+        (covered undergarment.n.01_1 stain.n.01_1)
+        (ontop blouse.n.01_1 floor.n.01_1)
+        (covered blouse.n.01_1 stain.n.01_1)
+        (ontop hanger.n.02_1 floor.n.01_1)
+        (ontop hanger.n.02_2 floor.n.01_1)
+        (inroom washer.n.03_1 utility_room)
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (future water.n.06_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?undergarment.n.01 - undergarment.n.01)
+                (and
+                    (not
+                        (covered ?undergarment.n.01 ?stain.n.01_1)
+                    )
+                    (not
+                        (saturated ?undergarment.n.01 ?water.n.06_1)
+                    )
+                    (folded ?undergarment.n.01)
+                )
+            )
+            (forpairs
+                (?blouse.n.01 - blouse.n.01)
+                (?hanger.n.02 - hanger.n.02)
+                (and
+                    (not
+                        (covered ?blouse.n.01 ?stain.n.01_1)
+                    )
+                    (not
+                        (saturated ?blouse.n.01 ?water.n.06_1)
+                    )
+                    (draped ?blouse.n.01 ?hanger.n.02)
+                )
+            )
+        )
+    )
+)

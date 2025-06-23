@@ -1,0 +1,31 @@
+(define (problem hanging_up_bedsheets-0)
+    (:domain omnigibson)
+
+    (:objects
+        clothesline.n.01_1 - clothesline.n.01
+        tree.n.01_1 - tree.n.01
+        sheet.n.03_1 sheet.n.03_2 - sheet.n.03
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop clothesline.n.01_1 floor.n.01_1) 
+        (ontop sheet.n.03_1 floor.n.01_1)
+        (ontop sheet.n.03_2 floor.n.01_1)
+        (ontop wicker_basket.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sheet.n.03 - sheet.n.03)
+                (draped ?sheet.n.03 ?clothesline.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,54 @@
+(define (problem buying_office_supplies-0)
+    (:domain omnigibson)
+
+    (:objects
+        checkout.n.03_1 - checkout.n.03
+        grocery_shelf.n.01_1 - grocery_shelf.n.01
+        cash_register.n.01_1 - cash_register.n.01
+        pen.n.01_1 - pen.n.01
+        pencil.n.01_1 - pencil.n.01
+        tape.n.01_1 - tape.n.01
+        eraser.n.01_1 - eraser.n.01
+        credit_card.n.01_1 - credit_card.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store) 
+        (inside pen.n.01_1 grocery_shelf.n.01_1) 
+        (inside pencil.n.01_1 grocery_shelf.n.01_1) 
+        (inside tape.n.01_1 grocery_shelf.n.01_1) 
+        (inside eraser.n.01_1 grocery_shelf.n.01_1) 
+        (ontop credit_card.n.01_1 checkout.n.03_1) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?pen.n.01 - pen.n.01) 
+                (ontop ?pen.n.01 ?checkout.n.03_1)
+            ) 
+            (forall 
+                (?pencil.n.01 - pencil.n.01) 
+                (ontop ?pencil.n.01 ?checkout.n.03_1)
+            ) 
+            (forall 
+                (?tape.n.01 - tape.n.01) 
+                (ontop ?tape.n.01 ?checkout.n.03_1)
+            ) 
+            (forall 
+                (?eraser.n.01 - eraser.n.01) 
+                (ontop ?eraser.n.01 ?checkout.n.03_1)
+            ) 
+            (forall 
+                (?credit_card.n.01 - credit_card.n.01) 
+                (ontop ?credit_card.n.01 ?checkout.n.03_1)
+            )
+        )
+    )
+)

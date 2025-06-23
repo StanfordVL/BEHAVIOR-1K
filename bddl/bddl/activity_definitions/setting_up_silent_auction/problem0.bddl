@@ -1,0 +1,64 @@
+(define (problem setting_up_silent_auction-0)
+    (:domain omnigibson)
+
+    (:objects
+        bust.n.03_1 - bust.n.03
+        table.n.02_1 - table.n.02
+        painting.n.01_1 - painting.n.01
+        portrait.n.02_1 - portrait.n.02
+        carton.n.02_1 - carton.n.02
+        clipboard.n.01_1 clipboard.n.01_2 clipboard.n.01_3 - clipboard.n.01
+        swivel_chair.n.01_1 swivel_chair.n.01_2 swivel_chair.n.01_3 swivel_chair.n.01_4 swivel_chair.n.01_5 - swivel_chair.n.01
+        card.n.04_1 card.n.04_2 card.n.04_3 card.n.04_4 card.n.04_5 - card.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bust.n.03_1 carton.n.02_1)
+        (inside painting.n.01_1 carton.n.02_1)
+        (inside portrait.n.02_1 carton.n.02_1)
+        (ontop carton.n.02_1 floor.n.01_1)
+        (inside clipboard.n.01_1 carton.n.02_1) 
+        (inside clipboard.n.01_2 carton.n.02_1) 
+        (inside clipboard.n.01_3 carton.n.02_1) 
+        (ontop card.n.04_1 table.n.02_1) 
+        (ontop card.n.04_2 table.n.02_1) 
+        (ontop card.n.04_3 table.n.02_1) 
+        (ontop card.n.04_4 table.n.02_1) 
+        (ontop card.n.04_5 table.n.02_1) 
+        (inroom table.n.02_1 shared_office) 
+        (inroom swivel_chair.n.01_1 shared_office)
+        (inroom swivel_chair.n.01_2 shared_office)
+        (inroom swivel_chair.n.01_3 shared_office)
+        (inroom swivel_chair.n.01_4 shared_office)
+        (inroom swivel_chair.n.01_5 shared_office)
+        (inroom floor.n.01_1 shared_office) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?clipboard.n.01 - clipboard.n.01) 
+                (?card.n.04 - card.n.04) 
+                (ontop ?card.n.04 ?clipboard.n.01)
+            ) 
+            (exists 
+                (?clipboard.n.01 - clipboard.n.01) 
+                (nextto ?bust.n.03_1 ?clipboard.n.01)
+            ) 
+            (exists 
+                (?clipboard.n.01 - clipboard.n.01) 
+                (nextto ?painting.n.01_1 ?clipboard.n.01)
+            ) 
+            (exists 
+                (?clipboard.n.01 - clipboard.n.01) 
+                (nextto ?portrait.n.02_1 ?clipboard.n.01)
+            ) 
+            (ontop ?bust.n.03_1 ?table.n.02_1)
+            (ontop ?painting.n.01_1 ?table.n.02_1)
+            (ontop ?portrait.n.02_1 ?table.n.02_1)
+        )
+    )
+)

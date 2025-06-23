@@ -1,0 +1,41 @@
+(define (problem preparing_clothes_for_the_next_day-0)
+    (:domain omnigibson)
+
+    (:objects
+        coat.n.01_1 - coat.n.01
+        wardrobe.n.01_1 - wardrobe.n.01
+        boot.n.01_1 boot.n.01_2 - boot.n.01
+        trouser.n.01_1 - trouser.n.01
+        cedar_chest.n.01_1 - cedar_chest.n.01
+        bed.n.01_1 - bed.n.01
+        wallet.n.01_1 - wallet.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init 
+        (inside coat.n.01_1 wardrobe.n.01_1)
+        (ontop boot.n.01_1 floor.n.01_1)
+        (ontop boot.n.01_2 floor.n.01_1)
+        (inside trouser.n.01_1 wardrobe.n.01_1)
+        (inside wallet.n.01_1 cedar_chest.n.01_1)
+        (inroom wardrobe.n.01_1 closet)
+        (ontop cedar_chest.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 closet)
+        (inroom floor.n.01_2 childs_room) 
+        (inroom bed.n.01_1 childs_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?coat.n.01_1 ?bed.n.01_1)
+            (ontop ?trouser.n.01_1 ?bed.n.01_1)
+            (forall
+                (?boot.n.01 - boot.n.01)
+                (ontop ?boot.n.01 ?floor.n.01_2)
+            )
+            (ontop ?wallet.n.01_1 ?bed.n.01_1)
+        )
+    )
+)

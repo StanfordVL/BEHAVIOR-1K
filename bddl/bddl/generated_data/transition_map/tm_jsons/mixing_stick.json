@@ -1,0 +1,186 @@
+[
+    {
+        "rule_name": "cappuccino",
+        "input_synsets": {
+            "espresso.n.01": 1,
+            "cane_sugar.n.02": 1,
+            "whole_milk.n.01": 1,
+            "foam.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "cappuccino.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "vinegar_cleaning_solution",
+        "input_synsets": {
+            "vinegar.n.01": 1,
+            "water.n.06": 1,
+            "lemon_juice.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "vinegar_cleaning_solution.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "cafe_au_lait",
+        "input_synsets": {
+            "espresso.n.01": 1,
+            "low-fat_milk.n.01": 1,
+            "sugar_syrup.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "cafe_au_lait.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "cake_mix",
+        "input_synsets": {
+            "flour.n.01": 1,
+            "baking_powder.n.01": 1,
+            "salt.n.02": 1,
+            "granulated_sugar.n.01": 1,
+            "sodium_carbonate.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "cake_mix.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "cinnamon_sugar",
+        "input_synsets": {
+            "cinnamon.n.03": 1,
+            "granulated_sugar.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "cinnamon_sugar.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "fruit_punch_2",
+        "input_synsets": {
+            "orange_juice.n.01": 1,
+            "ginger_beer.n.01": 1,
+            "lemonade.n.01": 1,
+            "pineapple_juice.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "fruit_punch.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "cream_soda",
+        "input_synsets": {
+            "soda_water.n.03": 1,
+            "heavy_cream.n.01": 1,
+            "sugar_syrup.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "cream_soda.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "green_tea",
+        "input_synsets": {
+            "water.n.06": 1,
+            "green_tea.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "tea.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "green_tea_latte",
+        "input_synsets": {
+            "low-fat_milk.n.01": 1,
+            "tea.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "green_tea_latte.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "instant_coffee",
+        "input_synsets": {
+            "instant_coffee.n.01": 1,
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "drip_coffee.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "lemon_stain_remover",
+        "input_synsets": {
+            "lemon_juice.n.01": 1,
+            "vinegar.n.01": 1,
+            "sodium_carbonate.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "lemon_stain_remover.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "lemonade",
+        "input_synsets": {
+            "water.n.06": 1,
+            "granulated_sugar.n.01": 1,
+            "lemon_juice.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "lemonade.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "limeade",
+        "input_synsets": {
+            "water.n.06": 1,
+            "granulated_sugar.n.01": 1,
+            "lime_juice.n.01": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "limeade.n.01": 1
+        },
+        "output_states": null
+    },
+    {
+        "rule_name": "pumpkin_pie_spice",
+        "input_synsets": {
+            "cinnamon.n.03": 1,
+            "ginger.n.02": 1,
+            "nutmeg.n.02": 1,
+            "allspice.n.03": 1,
+            "clove.n.04": 1
+        },
+        "input_states": null,
+        "output_synsets": {
+            "pumpkin_pie_spice.n.01": 1
+        },
+        "output_states": null
+    }
+]

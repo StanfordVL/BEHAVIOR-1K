@@ -1,0 +1,35 @@
+(define (problem dispose_of_paper-0)
+    (:domain omnigibson)
+
+    (:objects
+        recycling_bin.n.01_1 - recycling_bin.n.01
+        floor.n.01_1 - floor.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        paper.n.01_1 paper.n.01_2 - paper.n.01
+        wrapping_paper.n.01_1 - wrapping_paper.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop recycling_bin.n.01_1 floor.n.01_1) 
+        (ontop newspaper.n.03_1 coffee_table.n.01_1) 
+        (ontop wrapping_paper.n.01_1 floor.n.01_1)
+        (ontop paper.n.01_1 coffee_table.n.01_1)
+        (ontop paper.n.01_2 coffee_table.n.01_1)
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?newspaper.n.03_1 ?recycling_bin.n.01_1)
+            (inside ?wrapping_paper.n.01_1 ?recycling_bin.n.01_1)
+            (forall
+                (?paper.n.01 - paper.n.01)
+                (inside ?paper.n.01 ?recycling_bin.n.01_1)
+            )
+        )
+    )
+)

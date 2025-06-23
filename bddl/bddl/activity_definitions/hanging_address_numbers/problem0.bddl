@@ -1,0 +1,33 @@
+(define (problem hanging_address_numbers-0)
+    (:domain omnigibson)
+
+    (:objects
+        address.n.05_1 address.n.05_2 address.n.05_3 - address.n.05
+        table.n.02_1 - table.n.02
+        floor.n.01_1 - floor.n.01
+        wall_nail.n.01_1 wall_nail.n.01_2 wall_nail.n.01_3 - wall_nail.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop address.n.05_1 table.n.02_1)
+        (ontop address.n.05_2 table.n.02_1)
+        (ontop address.n.05_3 table.n.02_1)
+        (inroom floor.n.01_1 living_room)
+        (inroom wall_nail.n.01_1 garden)
+        (inroom wall_nail.n.01_2 garden)
+        (inroom wall_nail.n.01_3 garden)
+        (inroom table.n.02_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?address.n.05 - address.n.05)
+                (?wall_nail.n.01 - wall_nail.n.01)
+                (attached ?address.n.05 ?wall_nail.n.01)
+            )
+        )
+    )
+)

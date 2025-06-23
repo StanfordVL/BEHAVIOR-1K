@@ -1,0 +1,29 @@
+(define (problem spraying_for_bugs-0)
+    (:domain omnigibson)
+
+    (:objects
+        insectifuge__atomizer.n.01_1 - insectifuge__atomizer.n.01
+        insectifuge.n.01_1 - insectifuge.n.01
+        floor.n.01_1 - floor.n.01
+        pot_plant.n.01_1 pot_plant.n.01_2 - pot_plant.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop insectifuge__atomizer.n.01_1 floor.n.01_1)
+        (insource insectifuge__atomizer.n.01_1 insectifuge.n.01_1) 
+        (inroom floor.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1)
+        (ontop pot_plant.n.01_1 floor.n.01_1)
+        (ontop pot_plant.n.01_2 floor.n.01_1)
+    )
+    
+    (:goal
+        (forall
+            (?pot_plant.n.01 - pot_plant.n.01)
+            (and
+                (covered ?pot_plant.n.01 ?insectifuge.n.01_1)
+            )
+        )
+    )
+)

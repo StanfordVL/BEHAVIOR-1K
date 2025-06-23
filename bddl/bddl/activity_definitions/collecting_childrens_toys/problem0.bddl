@@ -1,0 +1,53 @@
+(define (problem collecting_childrens_toys-0)
+    (:domain omnigibson)
+
+    (:objects
+        die.n.01_1 die.n.01_2 - die.n.01
+        floor.n.01_1 - floor.n.01
+        teddy.n.01_1 teddy.n.01_2 - teddy.n.01
+        train_set.n.01_1 - train_set.n.01
+        board_game.n.01_1 board_game.n.01_2 - board_game.n.01
+        desk.n.01_1 - desk.n.01
+        bed.n.01_1 - bed.n.01
+        bookcase.n.01_1 bookcase.n.01_* - bookcase.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop die.n.01_1 bed.n.01_1) 
+        (ontop die.n.01_2 bed.n.01_1) 
+        (ontop teddy.n.01_1 floor.n.01_1) 
+        (ontop train_set.n.01_1 desk.n.01_1) 
+        (ontop teddy.n.01_2 floor.n.01_1) 
+        (ontop board_game.n.01_1 desk.n.01_1) 
+        (ontop board_game.n.01_2 bed.n.01_1) 
+        (inroom bookcase.n.01_1 childs_room) 
+        (inroom bookcase.n.01_* childs_room)
+        (inroom floor.n.01_1 childs_room) 
+        (inroom desk.n.01_1 childs_room) 
+        (inroom bed.n.01_1 childs_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?bookcase.n.01 - bookcase.n.01)
+                (and 
+                    (forall
+                        (?die.n.01 - die.n.01)
+                        (inside ?die.n.01 ?bookcase.n.01)
+                    )
+                    (forall
+                        (?teddy.n.01 - teddy.n.01)
+                        (inside ?teddy.n.01 ?bookcase.n.01)         
+                    )
+                    (forall
+                        (?board_game.n.01 - board_game.n.01)
+                        (inside ?board_game.n.01 ?bookcase.n.01)
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,60 @@
+(define (problem cleaning_glasses_off_bar-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        wineglass.n.01_1 wineglass.n.01_2 wineglass.n.01_3 - wineglass.n.01
+        gin.n.01_1 - gin.n.01
+        orange_juice.n.01_1 - orange_juice.n.01
+        red_wine.n.01_1 - red_wine.n.01
+        beer_glass.n.01_1 beer_glass.n.01_2 - beer_glass.n.01
+        beer.n.01_1 - beer.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (covered wineglass.n.01_1 stain.n.01_1) 
+        (covered wineglass.n.01_1 gin.n.01_1)
+        (covered wineglass.n.01_1 orange_juice.n.01_1)
+        (covered wineglass.n.01_2 stain.n.01_1) 
+        (covered wineglass.n.01_2 gin.n.01_1)
+        (covered wineglass.n.01_2 orange_juice.n.01_1)
+        (covered wineglass.n.01_3 stain.n.01_1)
+        (covered wineglass.n.01_3 red_wine.n.01_1)
+        (covered beer_glass.n.01_1 stain.n.01_1)
+        (covered beer_glass.n.01_2 stain.n.01_1)
+        (covered beer_glass.n.01_1 beer.n.01_1)
+        (covered beer_glass.n.01_2 beer.n.01_1)
+        (ontop wineglass.n.01_1 countertop.n.01_1)
+        (ontop wineglass.n.01_2 countertop.n.01_1) 
+        (ontop wineglass.n.01_3 countertop.n.01_1)
+        (ontop beer_glass.n.01_1 countertop.n.01_1)
+        (ontop beer_glass.n.01_2 countertop.n.01_1)
+        (inroom countertop.n.01_1 bar) 
+        (inroom sink.n.01_1 bar) 
+        (inroom floor.n.01_1 bar) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?wineglass.n.01 - wineglass.n.01) 
+                (or
+                    (inside ?wineglass.n.01 ?sink.n.01_1)
+                    (nextto ?wineglass.n.01 ?sink.n.01_1)
+                )
+            )
+            (forall 
+                (?beer_glass.n.01 - beer_glass.n.01)
+                (or
+                    (inside ?beer_glass.n.01 ?sink.n.01_1)
+                    (nextto ?beer_glass.n.01 ?sink.n.01_1)
+                )
+            )
+        )
+    )
+)

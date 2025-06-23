@@ -1,0 +1,37 @@
+(define (problem setup_a_fish_tank-0)
+    (:domain omnigibson)
+
+    (:objects
+        tank.n.02_1 - tank.n.02
+        table.n.02_1 - table.n.02
+        bucket.n.01_1 - bucket.n.01
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        water_filter.n.01_1 - water_filter.n.01
+        pebble.n.01_1 - pebble.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tank.n.02_1 table.n.02_1) 
+        (open tank.n.02_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (filled bucket.n.01_1 water.n.06_1) 
+        (ontop water_filter.n.01_1 table.n.02_1) 
+        (ontop pebble.n.01_1 table.n.02_1) 
+        (inroom table.n.02_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (open ?tank.n.02_1)
+            ) 
+            (filled ?tank.n.02_1 ?water.n.06_1) 
+            (inside ?water_filter.n.01_1 ?tank.n.02_1) 
+            (inside ?pebble.n.01_1 ?tank.n.02_1)
+        )
+    )
+)

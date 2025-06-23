@@ -1,0 +1,47 @@
+(define (problem cleaning_rainboots-0)
+    (:domain omnigibson)
+
+    (:objects
+        rubber_boot.n.01_1 rubber_boot.n.01_2 - rubber_boot.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        mud.n.03_1 - mud.n.03
+        floor.n.01_1 - floor.n.01
+        rag.n.01_1 - rag.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rubber_boot.n.01_1 floor.n.01_1) 
+        (ontop rubber_boot.n.01_2 floor.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (covered rubber_boot.n.01_1 water.n.06_1) 
+        (covered rubber_boot.n.01_2 water.n.06_1) 
+        (covered rubber_boot.n.01_1 mud.n.03_1)
+        (covered rubber_boot.n.01_2 mud.n.03_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (inroom sink.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?rubber_boot.n.01 - rubber_boot.n.01) 
+                (and 
+                    (not 
+                        (covered ?rubber_boot.n.01 ?water.n.06_1)
+                    )
+                    (not 
+                        (covered ?rubber_boot.n.01 ?mud.n.03_1)
+                    )
+                )
+            ) 
+        )
+    )
+)

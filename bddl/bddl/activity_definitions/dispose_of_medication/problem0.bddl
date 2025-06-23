@@ -1,0 +1,35 @@
+(define (problem dispose_of_medication-0)
+    (:domain omnigibson)
+
+    (:objects
+        pill.n.02_1 - pill.n.02
+        pill_bottle.n.01_1 pill_bottle.n.01_2 - pill_bottle.n.01
+        shelf.n.01_1 - shelf.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled pill_bottle.n.01_1 pill.n.02_1)
+        (filled pill_bottle.n.01_2 pill.n.02_1)
+        (ontop pill_bottle.n.01_1 shelf.n.01_1) 
+        (ontop pill_bottle.n.01_2 shelf.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom shelf.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?pill_bottle.n.01 - pill_bottle.n.01)
+                (not
+                    (contains ?pill_bottle.n.01 ?pill.n.02_1)
+                )
+            )
+            (contains ?ashcan.n.01_1 ?pill.n.02_1)
+        )
+    )
+)

@@ -1,0 +1,47 @@
+(define (problem clean_conch_shells-0)
+    (:domain omnigibson)
+
+    (:objects
+        conch.n.01_1 conch.n.01_2 - conch.n.01
+        countertop.n.01_1 - countertop.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        dust.n.01_1 - dust.n.01
+        sand.n.04_1 - sand.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop conch.n.01_1 countertop.n.01_1) 
+        (ontop conch.n.01_2 countertop.n.01_1) 
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (covered conch.n.01_1 dust.n.01_1) 
+        (covered conch.n.01_2 dust.n.01_1) 
+        (covered conch.n.01_1 sand.n.04_1)
+        (covered conch.n.01_2 sand.n.04_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?conch.n.01 - conch.n.01) 
+                (and
+                    (ontop ?conch.n.01 ?countertop.n.01_1)
+                    (not 
+                        (covered ?conch.n.01 ?dust.n.01_1)
+                    )
+                    (not 
+                        (covered ?conch.n.01 ?sand.n.04_1)
+                    )
+                )
+            ) 
+        )
+    )
+)

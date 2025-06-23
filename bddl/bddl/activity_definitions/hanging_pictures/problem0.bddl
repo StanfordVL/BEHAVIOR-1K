@@ -1,0 +1,29 @@
+(define (problem hanging_pictures-0)
+    (:domain omnigibson)
+
+    (:objects
+        poster.n.01_1 - poster.n.01
+        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        wall_nail.n.01_1 wall_nail.n.01_* - wall_nail.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop poster.n.01_1 countertop.n.01_1)
+        (inroom floor.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom wall_nail.n.01_1 kitchen)
+        (inroom wall_nail.n.01_* kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?wall_nail.n.01 - wall_nail.n.01)
+                (attached ?poster.n.01_1 ?wall_nail.n.01)
+            )
+        )
+    )
+)

@@ -1,0 +1,69 @@
+(define (problem make_tacos-0)
+    (:domain omnigibson)
+
+    (:objects
+        tortilla.n.01_1 tortilla.n.01_2 tortilla.n.01_3 - tortilla.n.01
+        countertop.n.01_1 - countertop.n.01
+        cooked__ground_beef.n.01_1 - cooked__ground_beef.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        grated_cheese.n.01_1 - grated_cheese.n.01
+        sack.n.01_1 - sack.n.01
+        vidalia_onion.n.01_1 - vidalia_onion.n.01
+        diced__vidalia_onion.n.01_1 - diced__vidalia_onion.n.01
+        salsa.n.01_1 - salsa.n.01
+        salsa__bottle.n.01_1 - salsa__bottle.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chili.n.02_1 - chili.n.02
+        diced__chili.n.01_1 - diced__chili.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        platter.n.01_1 - platter.n.01
+        plate.n.04_1 - plate.n.04
+        tablespoon.n.02_1 - tablespoon.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tortilla.n.01_1 plate.n.04_1) 
+        (ontop tortilla.n.01_2 plate.n.04_1) 
+        (ontop tortilla.n.01_3 plate.n.04_1) 
+        (inside plate.n.04_1 electric_refrigerator.n.01_1)
+        (filled tupperware.n.01_1 cooked__ground_beef.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (filled sack.n.01_1 grated_cheese.n.01_1) 
+        (inside sack.n.01_1 electric_refrigerator.n.01_1)
+        (inside chili.n.02_1 electric_refrigerator.n.01_1) 
+        (ontop vidalia_onion.n.01_1 countertop.n.01_1)
+        (insource salsa__bottle.n.01_1 salsa.n.01_1)
+        (inside salsa__bottle.n.01_1 electric_refrigerator.n.01_1)
+        (ontop tablespoon.n.02_1 platter.n.01_1)
+        (ontop platter.n.01_1 chopping_board.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 platter.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future diced__chili.n.01_1)
+        (future diced__vidalia_onion.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__chili.n.01_1)
+            (real ?diced__vidalia_onion.n.01_1)
+            (forall 
+                (?tortilla.n.01 - tortilla.n.01)
+                (and
+                    (ontop ?tortilla.n.01 ?platter.n.01_1)
+                    (covered ?tortilla.n.01_1 ?cooked__ground_beef.n.01_1)
+                    (covered ?tortilla.n.01_1 ?grated_cheese.n.01_1)
+                    (covered ?tortilla.n.01_1 ?salsa.n.01_1)
+                    (covered ?tortilla.n.01_1 ?diced__vidalia_onion.n.01_1)
+                    (covered ?tortilla.n.01_1 ?diced__chili.n.01_1)
+                )
+            )
+        )
+    )
+)

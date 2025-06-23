@@ -1,0 +1,50 @@
+(define (problem folding_clean_laundry-0)
+    (:domain omnigibson)
+
+    (:objects
+        tablecloth.n.01_1 - tablecloth.n.01
+        sock.n.01_1 sock.n.01_2 - sock.n.01
+        trouser.n.01_1 - trouser.n.01
+        dishtowel.n.01_1 dishtowel.n.01_2 - dishtowel.n.01
+        bed.n.01_1 - bed.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tablecloth.n.01_1 bed.n.01_1) 
+        (ontop sock.n.01_1 bed.n.01_1) 
+        (ontop sock.n.01_2 bed.n.01_1) 
+        (ontop trouser.n.01_1 bed.n.01_1)
+        (ontop dishtowel.n.01_1 bed.n.01_1)
+        (ontop dishtowel.n.01_2 bed.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom bed.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom)
+    )
+    
+    (:goal 
+        (and 
+            (folded ?tablecloth.n.01_1) 
+            (forall 
+                (?sock.n.01 - sock.n.01) 
+                (folded ?sock.n.01)
+            ) 
+            (folded ?trouser.n.01_1)
+            (forall
+                (?dishtowel.n.01 - dishtowel.n.01) 
+                (folded ?dishtowel.n.01)
+            ) 
+            (ontop ?tablecloth.n.01_1 ?bed.n.01_1) 
+            (forall 
+                (?dishtowel.n.01 - dishtowel.n.01) 
+                (ontop ?dishtowel.n.01 ?bed.n.01_1)
+            )
+            (ontop ?trouser.n.01_1 ?bed.n.01_1)
+            (forall
+                (?sock.n.01 - sock.n.01) 
+                (ontop ?sock.n.01 ?bed.n.01_1)
+            )
+        )
+    )
+)

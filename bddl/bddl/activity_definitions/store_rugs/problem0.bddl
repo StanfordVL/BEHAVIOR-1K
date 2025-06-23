@@ -1,0 +1,30 @@
+(define (problem store_rugs-0)
+    (:domain omnigibson)
+
+    (:objects
+        rug.n.01_1 - rug.n.01
+        floor.n.01_1 - floor.n.01
+        dust.n.01_1 - dust.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        vacuum.n.04_1 - vacuum.n.04
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rug.n.01_1 floor.n.01_1) 
+        (covered rug.n.01_1 dust.n.01_1) 
+        (ontop vacuum.n.04_1 floor.n.01_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?rug.n.01_1 ?cabinet.n.01_1) 
+            (not 
+                (covered ?rug.n.01_1 ?dust.n.01_1)
+            )
+        )
+    )
+)

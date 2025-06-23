@@ -1,0 +1,99 @@
+(define (problem selling_products_at_flea_market-0)
+    (:domain omnigibson)
+
+    (:objects
+        box__of__chocolates.n.01_1 box__of__chocolates.n.01_2 - box__of__chocolates.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        bottle__of__soda.n.01_1 bottle__of__soda.n.01_2 - bottle__of__soda.n.01
+        chocolate_chip_cookie.n.01_1 chocolate_chip_cookie.n.01_2 - chocolate_chip_cookie.n.01
+        cash_register.n.01_1 - cash_register.n.01
+        booth.n.01_1 - booth.n.01
+        box__of__candy.n.01_1 box__of__candy.n.01_2 - box__of__candy.n.01
+        floor.n.01_1 - floor.n.01
+        price_tag.n.01_1 price_tag.n.01_2 price_tag.n.01_3 price_tag.n.01_4 - price_tag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside box__of__chocolates.n.01_1 carton.n.02_1) 
+        (inside box__of__chocolates.n.01_2 carton.n.02_1) 
+        (inside bottle__of__soda.n.01_1 carton.n.02_1) 
+        (inside bottle__of__soda.n.01_2 carton.n.02_1) 
+        (inside chocolate_chip_cookie.n.01_1 carton.n.02_1) 
+        (inside chocolate_chip_cookie.n.01_2 carton.n.02_1) 
+        (inside box__of__candy.n.01_1 carton.n.02_1) 
+        (inside box__of__candy.n.01_2 carton.n.02_1) 
+        (inside cash_register.n.01_1 carton.n.02_2)
+        (ontop carton.n.02_1 floor.n.01_1) 
+        (ontop carton.n.02_2 floor.n.01_1) 
+        (inside price_tag.n.01_1 carton.n.02_2) 
+        (inside price_tag.n.01_2 carton.n.02_2) 
+        (inside price_tag.n.01_3 carton.n.02_2) 
+        (inside price_tag.n.01_4 carton.n.02_2) 
+        (inroom floor.n.01_1 empty_room)
+        (ontop booth.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (ontop ?cash_register.n.01_1 ?booth.n.01_1)
+            (forall 
+                (?box__of__chocolates.n.01 - box__of__chocolates.n.01) 
+                (ontop ?box__of__chocolates.n.01 ?booth.n.01_1)
+            ) 
+            (nextto ?box__of__chocolates.n.01_1 ?box__of__chocolates.n.01_2)
+            (exists 
+                (?price_tag.n.01 - price_tag.n.01)
+                (and
+                    (exists
+                        (?box__of__chocolates.n.01 - box__of__chocolates.n.01)
+                        (touching ?price_tag.n.01 ?box__of__chocolates.n.01)
+                    )
+                )
+            )
+            (forall 
+                (?bottle__of__soda.n.01 - bottle__of__soda.n.01) 
+                (ontop ?bottle__of__soda.n.01 ?booth.n.01_1)
+            ) 
+            (nextto ?bottle__of__soda.n.01_1 ?bottle__of__soda.n.01_2)
+            (exists 
+                (?price_tag.n.01 - price_tag.n.01)
+                (and
+                    (exists
+                        (?bottle__of__soda.n.01 - bottle__of__soda.n.01)
+                        (touching ?price_tag.n.01 ?bottle__of__soda.n.01)
+                    )
+                )
+            )
+            (forall 
+                (?chocolate_chip_cookie.n.01 - chocolate_chip_cookie.n.01) 
+                (ontop ?chocolate_chip_cookie.n.01 ?booth.n.01_1)
+            ) 
+            (nextto ?chocolate_chip_cookie.n.01_1 ?chocolate_chip_cookie.n.01_2)
+            (exists 
+                (?price_tag.n.01 - price_tag.n.01)
+                (and
+                    (exists
+                        (?chocolate_chip_cookie.n.01 - chocolate_chip_cookie.n.01)
+                        (touching ?price_tag.n.01 ?chocolate_chip_cookie.n.01)
+                    )
+                )
+            )
+            (forall 
+                (?box__of__candy.n.01 - box__of__candy.n.01) 
+                (ontop ?box__of__candy.n.01 ?booth.n.01_1)
+            ) 
+            (nextto ?box__of__candy.n.01_1 ?box__of__candy.n.01_2)
+            (exists 
+                (?price_tag.n.01 - price_tag.n.01)
+                (and
+                    (exists
+                        (?box__of__candy.n.01 - box__of__candy.n.01)
+                        (touching ?price_tag.n.01 ?box__of__candy.n.01)
+                    )
+                )
+            )
+        )
+    )
+)

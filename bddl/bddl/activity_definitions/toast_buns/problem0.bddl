@@ -1,0 +1,58 @@
+(define (problem toast_buns-0)
+    (:domain omnigibson)
+
+    (:objects
+        bap.n.01_1 bap.n.01_2 bap.n.01_3 bap.n.01_4 - bap.n.01
+        toaster.n.02_1 - toaster.n.02
+        oven.n.01_1 - oven.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (hot bap.n.01_1)
+        ) 
+        (not 
+            (cooked bap.n.01_1)
+        )
+        (not 
+            (hot bap.n.01_2)
+        ) 
+        (not 
+            (cooked bap.n.01_2)
+        )
+        (not 
+            (hot bap.n.01_3)
+        ) 
+        (not 
+            (cooked bap.n.01_3)
+        )
+        (not 
+            (hot bap.n.01_4)
+        ) 
+        (not 
+            (cooked bap.n.01_4)
+        )
+        (ontop bap.n.01_1 oven.n.01_1) 
+        (ontop bap.n.01_2 oven.n.01_1) 
+        (ontop bap.n.01_3 oven.n.01_1) 
+        (ontop bap.n.01_4 oven.n.01_1) 
+        (ontop toaster.n.02_1 oven.n.01_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?bap.n.01 - bap.n.01)
+                (and
+                    (hot ?bap.n.01)
+                    (cooked ?bap.n.01)
+                )
+            )
+        )
+    )
+)

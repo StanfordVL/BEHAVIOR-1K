@@ -1,0 +1,39 @@
+{
+    "title": "HeatCookTransitionRule",
+    "description": "A mixing stick-based transition rule",
+    "properties": {
+        "rule_name": {
+            "type": "string",
+            "description": "The name of the specific rule - human readable and often having to do with inputs and outputs."
+        },
+        "input_synsets": {
+            "type": "object",
+            "description": "Synsets describing objects going into the recipe, mapped to integers indicating the required number. These will not exist at output time."
+        },
+        "input_states": {
+            "type": "object",
+            "description": "Synsets or concatenated strings of synsets found in input_synsets, mapped to a list of (predicate, boolean value) tuples indicating states of these synsets/sets of synsets at input time that are required for the transition to occur."
+        },
+        "container": {
+            "type": "object",
+            "description": "Container in which heat cooking is occurring. hot(container) must be true for the transition to occur."
+        },
+        "heat_source": {
+            "type": "object",
+            "description": "Heat source that is heating the container/inputs to induce the heat-cook-based transition."
+        },
+        "output_synsets": {
+            "type": "object",
+            "description": "Synsets describing objects coming out of the recipe, mapped to integers indicating the resulting number. These did not exist at input time."
+        },
+        "output_states": {
+            "type": "object",
+            "description": "Synsets or concatenated strings of synsets found in output_synsets, mapped to a list of (predicate, boolean value) tuples indicating states of these synsets/sets of synsets that are true at output time."
+        },
+        "timesteps": {
+            "type": "integer",
+            "description": "Number of timesteps that container spends getting heated before transition from input_synsets/input_states to output_synsets/output_states occurs."
+        }
+    },
+    "required": [ "rule_name", "input_synsets", "container", "heat_source", "output_synsets" ]
+}

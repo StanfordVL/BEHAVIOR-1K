@@ -1,0 +1,50 @@
+(define (problem make_curry_rice-0)
+    (:domain omnigibson)
+
+    (:objects
+        white_rice.n.01_1 - white_rice.n.01
+        cooked__white_rice.n.01_1 - cooked__white_rice.n.01
+        water.n.06_1 - water.n.06
+        curry_powder.n.01_1 - curry_powder.n.01
+        cooked__curry_powder.n.01_1 - cooked__curry_powder.n.01
+        stove.n.01_1 - stove.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        white_rice__sack.n.01_1 - white_rice__sack.n.01
+        curry_powder__shaker.n.01_1 - curry_powder__shaker.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled white_rice__sack.n.01_1 white_rice.n.01_1) 
+        (ontop white_rice__sack.n.01_1 countertop.n.01_1) 
+        (insource curry_powder__shaker.n.01_1 curry_powder.n.01_1) 
+        (ontop curry_powder__shaker.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop stockpot.n.01_1 countertop.n.01_1) 
+        (future cooked__white_rice.n.01_1) 
+        (future cooked__curry_powder.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__white_rice.n.01_1) 
+            (or 
+                (real ?cooked__curry_powder.n.01_1) 
+                (real ?curry_powder.n.01_1)
+            ) 
+            (contains ?stockpot.n.01_1 ?cooked__white_rice.n.01_1) 
+            (or 
+                (contains ?stockpot.n.01_1 ?cooked__curry_powder.n.01_1) 
+                (contains ?stockpot.n.01_1 ?curry_powder.n.01_1)
+            )
+        )
+    )
+)

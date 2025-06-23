@@ -1,0 +1,60 @@
+(define (problem make_a_tropical_breakfast-0)
+    (:domain omnigibson)
+
+    (:objects
+        yogurt.n.01_1 - yogurt.n.01
+        maple_syrup.n.01_1 - maple_syrup.n.01
+        mango.n.02_1 - mango.n.02
+        diced__mango.n.01_1 - diced__mango.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        kiwi.n.03_1 - kiwi.n.03
+        diced__kiwi.n.01_1 - diced__kiwi.n.01
+        raspberry.n.02_1 - raspberry.n.02
+        chia_seed.n.01_1 - chia_seed.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        yogurt__carton.n.01_1 - yogurt__carton.n.01
+        maple_syrup__jar.n.01_1 - maple_syrup__jar.n.01
+        chia_seed__bag.n.01_1 - chia_seed__bag.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+    )
+    
+    (:init 
+        (filled yogurt__carton.n.01_1 yogurt.n.01_1) 
+        (inside yogurt__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled maple_syrup__jar.n.01_1 maple_syrup.n.01_1) 
+        (inside maple_syrup__jar.n.01_1 electric_refrigerator.n.01_1) 
+        (inside mango.n.02_1 electric_refrigerator.n.01_1) 
+        (inside kiwi.n.03_1 electric_refrigerator.n.01_1) 
+        (inside raspberry.n.02_1 electric_refrigerator.n.01_1) 
+        (filled chia_seed__bag.n.01_1 chia_seed.n.01_1) 
+        (inside chia_seed__bag.n.01_1 cabinet.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_2) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (future diced__mango.n.01_1) 
+        (future diced__kiwi.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__mango.n.01_1) 
+            (real ?diced__kiwi.n.01_1) 
+            (contains ?electric_mixer.n.01_1 ?yogurt.n.01_1) 
+            (contains ?electric_mixer.n.01_1 ?maple_syrup.n.01_1) 
+            (contains ?electric_mixer.n.01_1 ?diced__mango.n.01_1) 
+            (contains ?electric_mixer.n.01_1 ?chia_seed.n.01_1) 
+            (ontop ?raspberry.n.02_1 ?electric_mixer.n.01_1)
+        )
+    )
+)

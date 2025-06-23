@@ -1,0 +1,37 @@
+(define (problem store_brownies-0)
+    (:domain omnigibson)
+
+    (:objects
+        brownie.n.03_1 brownie.n.03_2 brownie.n.03_3 brownie.n.03_4 brownie.n.03_5 - brownie.n.03
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tray.n.01_1 - tray.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop brownie.n.03_1 tray.n.01_1) 
+        (ontop brownie.n.03_2 tray.n.01_1) 
+        (ontop brownie.n.03_3 tray.n.01_1) 
+        (ontop brownie.n.03_4 tray.n.01_1) 
+        (ontop brownie.n.03_5 tray.n.01_1) 
+        (ontop tray.n.01_1 countertop.n.01_1) 
+        (ontop tupperware.n.01_1 countertop.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?brownie.n.03 - brownie.n.03)
+                (inside ?brownie.n.03 ?tupperware.n.01_1)
+            )
+            (inside ?tupperware.n.01_1 ?electric_refrigerator.n.01_1)
+        )
+    )
+)

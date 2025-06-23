@@ -1,0 +1,47 @@
+(define (problem make_jamaican_jerk_seasoning-0)
+    (:domain omnigibson)
+
+    (:objects
+        brown_sugar.n.01_1 - brown_sugar.n.01
+        chili.n.02_1 - chili.n.02
+        cayenne.n.02_1 - cayenne.n.02
+        clove.n.03_1 clove.n.03_2 - clove.n.03
+        jerk_seasoning.n.01_1 - jerk_seasoning.n.01
+        blender.n.01_1 - blender.n.01
+        bowl.n.01_1 - bowl.n.01
+        brown_sugar__sack.n.01_1 - brown_sugar__sack.n.01
+        cayenne__shaker.n.01_1 - cayenne__shaker.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        teaspoon.n.02_1 - teaspoon.n.02
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled brown_sugar__sack.n.01_1 brown_sugar.n.01_1) 
+        (ontop brown_sugar__sack.n.01_1 countertop.n.01_1) 
+        (inside chili.n.02_1 electric_refrigerator.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (insource cayenne__shaker.n.01_1 cayenne.n.02_1) 
+        (ontop cayenne__shaker.n.01_1 countertop.n.01_1) 
+        (inside clove.n.03_1 electric_refrigerator.n.01_1)
+        (inside clove.n.03_2 electric_refrigerator.n.01_1)
+        (ontop teaspoon.n.02_1 countertop.n.01_1)
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (future jerk_seasoning.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?jerk_seasoning.n.01_1) 
+            (contains ?bowl.n.01_1 ?jerk_seasoning.n.01_1)
+        )
+    )
+)

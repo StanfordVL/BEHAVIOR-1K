@@ -1,0 +1,35 @@
+(define (problem unloading_shopping_from_car-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        driveway.n.01_1 - driveway.n.01
+        floor.n.01_1 - floor.n.01
+        grocery.n.02_1 grocery.n.02_2 grocery.n.02_3 - grocery.n.02
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden) 
+        (inside grocery.n.02_1 car.n.01_1) 
+        (inside grocery.n.02_2 car.n.01_1) 
+        (inside grocery.n.02_3 car.n.01_1)
+        (inroom driveway.n.01_1 garden) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (ontop agent.n.01_1 driveway.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?grocery.n.02 - grocery.n.02) 
+                (or 
+                    (inside ?grocery.n.02 ?cabinet.n.01_1)
+                    (ontop ?grocery.n.02 ?floor.n.01_1)
+                )
+            ) 
+        )
+    )
+)

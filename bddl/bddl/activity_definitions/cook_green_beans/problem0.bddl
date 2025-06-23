@@ -1,0 +1,98 @@
+(define (problem cook_green_beans-0)
+    (:domain omnigibson)
+
+    (:objects
+        frying_pan.n.01_1 - frying_pan.n.01
+        oven.n.01_1 - oven.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        diced__clove.n.01_1 - diced__clove.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        green_bean.n.01_1 green_bean.n.01_10 green_bean.n.01_11 green_bean.n.01_12 green_bean.n.01_2 green_bean.n.01_3 green_bean.n.01_4 green_bean.n.01_5 green_bean.n.01_6 green_bean.n.01_7 green_bean.n.01_8 green_bean.n.01_9 - green_bean.n.01
+        plate.n.04_1 - plate.n.04
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop frying_pan.n.01_1 oven.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (inside olive_oil__bottle.n.01_1 cabinet.n.01_1)
+        (filled mason_jar.n.01_1 diced__clove.n.01_1) 
+        (inside mason_jar.n.01_1 electric_refrigerator.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (inside salt__shaker.n.01_1 cabinet.n.01_1)
+        (ontop green_bean.n.01_1 plate.n.04_1) 
+        (ontop green_bean.n.01_2 plate.n.04_1) 
+        (ontop green_bean.n.01_3 plate.n.04_1) 
+        (ontop green_bean.n.01_4 plate.n.04_1) 
+        (ontop green_bean.n.01_5 plate.n.04_1) 
+        (ontop green_bean.n.01_6 plate.n.04_1) 
+        (ontop green_bean.n.01_7 plate.n.04_1) 
+        (ontop green_bean.n.01_8 plate.n.04_1) 
+        (ontop green_bean.n.01_9 plate.n.04_1) 
+        (ontop green_bean.n.01_10 plate.n.04_1) 
+        (ontop green_bean.n.01_11 plate.n.04_1) 
+        (ontop green_bean.n.01_12 plate.n.04_1) 
+        (inside plate.n.04_1 electric_refrigerator.n.01_1)
+        (not 
+            (cooked green_bean.n.01_1)
+        ) 
+        (not 
+            (cooked green_bean.n.01_2)
+        ) 
+        (not 
+            (cooked green_bean.n.01_3)
+        ) 
+        (not 
+            (cooked green_bean.n.01_4)
+        ) 
+        (not 
+            (cooked green_bean.n.01_5)
+        ) 
+        (not 
+            (cooked green_bean.n.01_6)
+        ) 
+        (not 
+            (cooked green_bean.n.01_7)
+        ) 
+        (not 
+            (cooked green_bean.n.01_8)
+        ) 
+        (not 
+            (cooked green_bean.n.01_9)
+        ) 
+        (not 
+            (cooked green_bean.n.01_10)
+        ) 
+        (not 
+            (cooked green_bean.n.01_11)
+        ) 
+        (not 
+            (cooked green_bean.n.01_12)
+        ) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?green_bean.n.01 - green_bean.n.01) 
+                (and 
+                    (cooked ?green_bean.n.01)     
+                    (covered ?green_bean.n.01 ?salt.n.02_1) 
+                    (covered ?green_bean.n.01 ?olive_oil.n.01_1)
+                    (covered ?green_bean.n.01 ?diced__clove.n.01_1)
+                )
+            )
+        )
+    )
+)

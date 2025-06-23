@@ -1,0 +1,68 @@
+(define (problem distributing_groceries_at_food_bank-0)
+    (:domain omnigibson)
+
+    (:objects
+        carton__of__milk.n.01_1 carton__of__milk.n.01_2 carton__of__milk.n.01_3 carton__of__milk.n.01_4 - carton__of__milk.n.01
+        grocery_shelf.n.01_1 - grocery_shelf.n.01
+        bottle__of__apple_juice.n.01_1 bottle__of__apple_juice.n.01_2 bottle__of__apple_juice.n.01_3 bottle__of__apple_juice.n.01_4 bottle__of__apple_juice.n.01_5 - bottle__of__apple_juice.n.01
+        canned_food.n.01_1 canned_food.n.01_2 canned_food.n.01_3 canned_food.n.01_4 - canned_food.n.01
+        pack__of__pasta.n.01_1 pack__of__pasta.n.01_2 pack__of__pasta.n.01_3 pack__of__pasta.n.01_4 pack__of__pasta.n.01_5 pack__of__pasta.n.01_6 - pack__of__pasta.n.01
+        packing_box.n.02_1 packing_box.n.02_2 packing_box.n.02_3 packing_box.n.02_4 - packing_box.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop packing_box.n.02_1 floor.n.01_1) 
+        (ontop packing_box.n.02_2 floor.n.01_1) 
+        (ontop packing_box.n.02_3 floor.n.01_1) 
+        (ontop packing_box.n.02_4 floor.n.01_1) 
+        (inside carton__of__milk.n.01_1 grocery_shelf.n.01_1) 
+        (inside carton__of__milk.n.01_2 grocery_shelf.n.01_1) 
+        (inside carton__of__milk.n.01_3 grocery_shelf.n.01_1) 
+        (inside carton__of__milk.n.01_4 grocery_shelf.n.01_1) 
+        (inside bottle__of__apple_juice.n.01_1 grocery_shelf.n.01_1) 
+        (inside bottle__of__apple_juice.n.01_2 grocery_shelf.n.01_1) 
+        (inside bottle__of__apple_juice.n.01_3 grocery_shelf.n.01_1) 
+        (inside bottle__of__apple_juice.n.01_4 grocery_shelf.n.01_1) 
+        (inside bottle__of__apple_juice.n.01_5 grocery_shelf.n.01_1) 
+        (inside canned_food.n.01_1 grocery_shelf.n.01_1) 
+        (inside canned_food.n.01_2 grocery_shelf.n.01_1) 
+        (inside canned_food.n.01_3 grocery_shelf.n.01_1) 
+        (inside canned_food.n.01_4 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_1 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_2 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_3 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_4 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_5 grocery_shelf.n.01_1) 
+        (inside pack__of__pasta.n.01_6 grocery_shelf.n.01_1) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?packing_box.n.02 - packing_box.n.02)
+                (?carton__of__milk.n.01 - carton__of__milk.n.01)
+                (inside ?carton__of__milk.n.01 ?packing_box.n.02)
+            ) 
+            (forpairs 
+                (?packing_box.n.02 - packing_box.n.02)
+                (?pack__of__pasta.n.01 - pack__of__pasta.n.01)
+                (inside ?pack__of__pasta.n.01 ?packing_box.n.02)
+            ) 
+            (forpairs 
+                (?packing_box.n.02 - packing_box.n.02)
+                (?bottle__of__apple_juice.n.01 - bottle__of__apple_juice.n.01)
+                (inside ?bottle__of__apple_juice.n.01 ?packing_box.n.02)
+            ) 
+            (forpairs 
+                (?packing_box.n.02 - packing_box.n.02)
+                (?canned_food.n.01 - canned_food.n.01)
+                (inside ?canned_food.n.01 ?packing_box.n.02)
+            ) 
+        )
+    )
+)

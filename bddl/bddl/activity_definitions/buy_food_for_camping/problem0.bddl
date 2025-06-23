@@ -1,0 +1,75 @@
+(define (problem buy_food_for_camping-0)
+    (:domain omnigibson)
+
+    (:objects
+        cash_register.n.01_1 - cash_register.n.01
+        checkout.n.03_1 - checkout.n.03
+        water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+        grocery_shelf.n.01_1 grocery_shelf.n.01_2 grocery_shelf.n.01_3 grocery_shelf.n.01_4 - grocery_shelf.n.01
+        bottle__of__soda.n.01_1 bottle__of__soda.n.01_2 - bottle__of__soda.n.01
+        chocolate_chip_cookie.n.01_1 chocolate_chip_cookie.n.01_2 - chocolate_chip_cookie.n.01
+        hotdog.n.02_1 hotdog.n.02_2 - hotdog.n.02
+        canned_food.n.01_1 - canned_food.n.01
+        money.n.01_1 money.n.01_2 money.n.01_3 money.n.01_4 - money.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store)
+        (ontop water_bottle.n.01_1 grocery_shelf.n.01_1) 
+        (ontop water_bottle.n.01_2 grocery_shelf.n.01_1) 
+        (ontop bottle__of__soda.n.01_1 grocery_shelf.n.01_1) 
+        (ontop bottle__of__soda.n.01_2 grocery_shelf.n.01_1) 
+        (ontop chocolate_chip_cookie.n.01_1 grocery_shelf.n.01_2) 
+        (ontop chocolate_chip_cookie.n.01_2 grocery_shelf.n.01_2) 
+        (ontop hotdog.n.02_1 grocery_shelf.n.01_3) 
+        (ontop hotdog.n.02_2 grocery_shelf.n.01_3) 
+        (ontop canned_food.n.01_1 grocery_shelf.n.01_4) 
+        (ontop money.n.01_1 checkout.n.03_1) 
+        (ontop money.n.01_2 checkout.n.03_1) 
+        (ontop money.n.01_3 checkout.n.03_1) 
+        (ontop money.n.01_4 checkout.n.03_1) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_2 grocery_store) 
+        (inroom grocery_shelf.n.01_3 grocery_store) 
+        (inroom grocery_shelf.n.01_4 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    
+    )
+    
+    (:goal 
+        (and
+            (forall 
+                (?water_bottle.n.01 - water_bottle.n.01) 
+                (ontop ?water_bottle.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (forall 
+                (?bottle__of__soda.n.01 - bottle__of__soda.n.01) 
+                (ontop ?bottle__of__soda.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (forall 
+                (?chocolate_chip_cookie.n.01 - chocolate_chip_cookie.n.01) 
+                (ontop ?chocolate_chip_cookie.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (forall 
+                (?hotdog.n.02 - hotdog.n.02) 
+                (ontop ?hotdog.n.02 ?checkout.n.03_1)
+    
+            ) 
+            (ontop ?canned_food.n.01_1 ?checkout.n.03_1) 
+            (forall 
+                (?money.n.01 - money.n.01) 
+                (nextto ?money.n.01 ?cash_register.n.01_1)
+    
+            )
+    
+        )
+    
+    )
+)

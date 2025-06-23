@@ -1,0 +1,107 @@
+(define (problem serving_food_at_a_homeless_shelter-0)
+    (:domain omnigibson)
+
+    (:objects
+        salad.n.01_1 salad.n.01_2 - salad.n.01
+        cooked__white_rice.n.01_1 - cooked__white_rice.n.01
+        chicken_broth.n.01_1 - chicken_broth.n.01
+        mashed_potato.n.02_1 - mashed_potato.n.02
+        gravy.n.01_1 - gravy.n.01
+        cooked__diced__virginia_ham.n.01_1 - cooked__diced__virginia_ham.n.01
+        beef_stew.n.01_1 - beef_stew.n.01
+        casserole.n.02_1 casserole.n.02_2 casserole.n.02_3 casserole.n.02_4 casserole.n.02_5 casserole.n.02_6 - casserole.n.02
+        tupperware.n.01_1 - tupperware.n.01
+        gravy_boat.n.01_1 - gravy_boat.n.01
+        breakfast_table.n.01_1 breakfast_table.n.01_2 - breakfast_table.n.01
+        water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+        ladle.n.01_1 ladle.n.01_2 ladle.n.01_3 ladle.n.01_4 ladle.n.01_5 ladle.n.01_6 - ladle.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+        apple.n.01_1 apple.n.01_2 - apple.n.01
+        tablespoon.n.02_1 tablespoon.n.02_2 - tablespoon.n.02
+        tray.n.01_1 tray.n.01_2 - tray.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (cooked salad.n.01_1)
+        (cooked salad.n.01_2)
+        (inside salad.n.01_1 casserole.n.02_1)
+        (inside salad.n.01_2 casserole.n.02_1)
+        (filled casserole.n.02_2 cooked__white_rice.n.01_1) 
+        (filled casserole.n.02_3 chicken_broth.n.01_1) 
+        (filled casserole.n.02_4 mashed_potato.n.02_1)
+        (filled gravy_boat.n.01_1 gravy.n.01_1)
+        (filled tupperware.n.01_1 cooked__diced__virginia_ham.n.01_1)
+        (filled casserole.n.02_6 beef_stew.n.01_1)
+        (ontop casserole.n.02_1 breakfast_table.n.01_1) 
+        (ontop casserole.n.02_2 breakfast_table.n.01_1) 
+        (ontop casserole.n.02_3 breakfast_table.n.01_1) 
+        (ontop casserole.n.02_4 breakfast_table.n.01_1) 
+        (ontop casserole.n.02_5 breakfast_table.n.01_1) 
+        (ontop casserole.n.02_6 breakfast_table.n.01_1) 
+        (ontop gravy_boat.n.01_1 breakfast_table.n.01_1)
+        (ontop water_bottle.n.01_1 breakfast_table.n.01_1) 
+        (ontop water_bottle.n.01_2 breakfast_table.n.01_1) 
+        (ontop tupperware.n.01_1 breakfast_table.n.01_1)
+        (ontop ladle.n.01_1 casserole.n.02_1) 
+        (ontop ladle.n.01_2 casserole.n.02_2) 
+        (ontop ladle.n.01_3 casserole.n.02_3) 
+        (ontop ladle.n.01_4 casserole.n.02_4) 
+        (ontop ladle.n.01_5 casserole.n.02_5) 
+        (ontop ladle.n.01_6 casserole.n.02_6) 
+        (ontop plate.n.04_1 breakfast_table.n.01_2)
+        (ontop plate.n.04_2 breakfast_table.n.01_2)
+        (ontop bowl.n.01_1 breakfast_table.n.01_2)
+        (ontop bowl.n.01_2 breakfast_table.n.01_2)
+        (ontop apple.n.01_1 breakfast_table.n.01_2) 
+        (ontop apple.n.01_2 breakfast_table.n.01_2) 
+        (ontop tablespoon.n.02_1 breakfast_table.n.01_2) 
+        (ontop tablespoon.n.02_2 breakfast_table.n.01_2) 
+        (ontop tray.n.01_1 breakfast_table.n.01_2) 
+        (ontop tray.n.01_2 tray.n.01_1) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom breakfast_table.n.01_2 dining_room)
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (exists 
+                        (?salad.n.01 - salad.n.01)
+                        (ontop ?salad.n.01 ?plate.n.04)
+                    )
+                    (contains ?plate.n.04 ?mashed_potato.n.02_1)
+                    (contains ?plate.n.04 ?gravy.n.01_1)
+                    (contains ?plate.n.04 ?cooked__diced__virginia_ham.n.01_1)
+                    (contains ?plate.n.04 ?cooked__white_rice.n.01_1)
+                    (contains ?plate.n.04 ?beef_stew.n.01_1)
+                )
+            )
+            (forall 
+                (?bowl.n.01 - bowl.n.01)
+                (filled ?bowl.n.01 ?chicken_broth.n.01_1)
+            )
+            (forpairs 
+                (?plate.n.04 - plate.n.04)
+                (?bowl.n.01 - bowl.n.01)
+                (nextto ?plate.n.04 ?bowl.n.01)
+            )
+            (forpairs 
+                (?plate.n.04 - plate.n.04)
+                (?water_bottle.n.01 - water_bottle.n.01)
+                (nextto ?plate.n.04 ?water_bottle.n.01)
+            )
+            (forpairs 
+                (?plate.n.04 - plate.n.04)
+                (?apple.n.01 - apple.n.01)
+                (nextto ?plate.n.04 ?apple.n.01)
+            )
+        )
+    )
+)

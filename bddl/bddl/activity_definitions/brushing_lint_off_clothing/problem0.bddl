@@ -1,0 +1,45 @@
+(define (problem brushing_lint_off_clothing-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+     	sweater.n.01_1 sweater.n.01_2 sweater.n.01_3 sweater.n.01_4 - sweater.n.01
+    	floor.n.01_1 - floor.n.01
+    	bed.n.01_1 - bed.n.01
+    	scrub_brush.n.01_1 - scrub_brush.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sweater.n.01_1 floor.n.01_1) 
+        (ontop sweater.n.01_2 floor.n.01_1) 
+        (ontop sweater.n.01_3 bed.n.01_1) 
+        (ontop sweater.n.01_4 bed.n.01_1) 
+        (covered sweater.n.01_1 dust.n.01_1) 
+        (covered sweater.n.01_2 dust.n.01_1) 
+        (covered sweater.n.01_3 dust.n.01_1) 
+        (covered sweater.n.01_4 dust.n.01_1) 
+        (ontop scrub_brush.n.01_1 floor.n.01_1) 
+        (not 
+            (covered scrub_brush.n.01_1 dust.n.01_1)
+        ) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sweater.n.01 - sweater.n.01) 
+                (not 
+                    (covered ?sweater.n.01 ?dust.n.01_1)
+                )
+            ) 
+            (forall 
+                (?sweater.n.01 - sweater.n.01) 
+                (ontop ?sweater.n.01 ?bed.n.01_1)
+            )
+        )
+    )
+)

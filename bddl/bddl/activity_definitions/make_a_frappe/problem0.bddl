@@ -1,0 +1,59 @@
+(define (problem make_a_frappe-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        instant_coffee.n.01_1 - instant_coffee.n.01
+        cane_sugar.n.02_1 - cane_sugar.n.02
+        ice_cube.n.01_1 ice_cube.n.01_2 ice_cube.n.01_3 ice_cube.n.01_4 - ice_cube.n.01
+        milkshake.n.01_1 - milkshake.n.01
+        blender.n.01_1 - blender.n.01
+        cup.n.01_1 - cup.n.01
+        bowl.n.01_1 - bowl.n.01
+        instant_coffee__jar.n.01_1 - instant_coffee__jar.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        ice_cream__carton.n.01_1 - ice_cream__carton.n.01
+        scoop_of_ice_cream.n.01_1 - scoop_of_ice_cream.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled instant_coffee__jar.n.01_1 instant_coffee.n.01_1) 
+        (ontop instant_coffee__jar.n.01_1 countertop.n.01_1) 
+        (filled sugar__sack.n.01_1 cane_sugar.n.02_1)
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (inside ice_cube.n.01_1 bowl.n.01_1) 
+        (inside ice_cube.n.01_2 bowl.n.01_1) 
+        (inside ice_cube.n.01_3 bowl.n.01_1) 
+        (inside ice_cube.n.01_4 bowl.n.01_1) 
+        (ontop cup.n.01_1 countertop.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (inside scoop_of_ice_cream.n.01_1 ice_cream__carton.n.01_1)
+        (inside ice_cream__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (future milkshake.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?milkshake.n.01_1) 
+            (exists 
+                (?cup.n.01 - cup.n.01) 
+                (contains ?cup.n.01 ?milkshake.n.01_1)
+            )
+        )
+    )
+)

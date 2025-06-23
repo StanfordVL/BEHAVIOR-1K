@@ -1,0 +1,25 @@
+(define (problem clean_a_patio-0)
+    (:domain omnigibson)
+
+    (:objects
+        mud.n.03_1 - mud.n.03
+        broom.n.01_1 - broom.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered floor.n.01_1 mud.n.03_1) 
+        (ontop broom.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?floor.n.01_1 ?mud.n.03_1)
+            ) 
+        )
+    )
+)

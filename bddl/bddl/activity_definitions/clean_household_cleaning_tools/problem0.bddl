@@ -1,0 +1,74 @@
+(define (problem clean_household_cleaning_tools-0)
+    (:domain omnigibson)
+
+    (:objects
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        rag.n.01_1 - rag.n.01
+        sink.n.01_1 - sink.n.01
+        broom.n.01_1 - broom.n.01
+        swab.n.02_1 - swab.n.02
+        mop_bucket.n.01_1 - mop_bucket.n.01
+        bucket.n.01_1 - bucket.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        dust.n.01_1 - dust.n.01
+        stain.n.01_1 - stain.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (ontop broom.n.01_1 floor.n.01_1) 
+        (ontop swab.n.02_1 floor.n.01_1) 
+        (ontop mop_bucket.n.01_1 floor.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (not 
+            (covered broom.n.01_1 disinfectant.n.01_1)
+        ) 
+        (not 
+            (covered swab.n.02_1 disinfectant.n.01_1)
+        ) 
+        (not 
+            (covered mop_bucket.n.01_1 disinfectant.n.01_1)
+        ) 
+        (not 
+            (covered bucket.n.01_1 disinfectant.n.01_1)
+        ) 
+        (covered broom.n.01_1 stain.n.01_1)
+        (covered swab.n.02_1 dust.n.01_1)
+        (covered mop_bucket.n.01_1 dust.n.01_1)
+        (covered bucket.n.01_1 dust.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1) 
+        (ontop disinfectant__bottle.n.01_1 floor.n.01_1) 
+        (inroom sink.n.01_1 utility_room) 
+        (inroom floor.n.01_1 utility_room)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?broom.n.01_1 ?disinfectant.n.01_1)
+            (not 
+                (covered ?broom.n.01_1 ?stain.n.01_1)
+            )
+            (covered ?swab.n.02_1 ?disinfectant.n.01_1)
+            (not 
+                (covered ?swab.n.02_1 ?dust.n.01_1)
+            )
+            (covered ?mop_bucket.n.01_1 ?disinfectant.n.01_1)
+            (not 
+                (covered ?mop_bucket.n.01_1 ?dust.n.01_1)
+            )
+            (covered ?bucket.n.01_1 ?disinfectant.n.01_1)
+            (not 
+                (covered ?bucket.n.01_1 ?dust.n.01_1)
+            )
+        )
+    )
+)

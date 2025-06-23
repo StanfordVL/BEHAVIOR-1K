@@ -1,0 +1,204 @@
+(define (problem cook_seafood_paella-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        stove.n.01_1 - stove.n.01
+        white_rice.n.01_1 - white_rice.n.01
+        cooked__white_rice.n.01_1 - cooked__white_rice.n.01
+        saffron.n.02_1 - saffron.n.02
+        saffron__shaker.n.01_1 - saffron__shaker.n.01
+        cooked__saffron.n.01_1 - cooked__saffron.n.01
+        saucepot.n.01_1 - saucepot.n.01
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03
+        chorizo.n.01_1 chorizo.n.01_2 - chorizo.n.01
+        cooked__diced__chorizo.n.01_1 - cooked__diced__chorizo.n.01
+        paprika.n.02_1 - paprika.n.02
+        paprika__shaker.n.01_1 - paprika__shaker.n.01
+        cooked__paprika.n.01_1 - cooked__paprika.n.01
+        prawn.n.01_1 prawn.n.01_2 prawn.n.01_3 prawn.n.01_4 prawn.n.01_5 prawn.n.01_6 - prawn.n.01
+        clam.n.03_1 clam.n.03_2 clam.n.03_3 clam.n.03_4 clam.n.03_5 clam.n.03_6 - clam.n.03
+        pea.n.01_1 - pea.n.01
+        cooked__pea.n.01_1 - cooked__pea.n.01
+        tupperware.n.01_1 tupperware.n.01_2 tupperware.n.01_3 - tupperware.n.01
+        bowl.n.01_1 - bowl.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        white_rice__sack.n.01_1 - white_rice__sack.n.01
+        salt.n.02_1 - salt.n.02
+        cooked__salt.n.01_1 - cooked__salt.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        white_wine.n.01_1 - white_wine.n.01
+        wine_bottle.n.01_1 - wine_bottle.n.01
+        cooked__white_wine.n.01_1 - cooked__white_wine.n.01
+        cup.n.01_1 - cup.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (insource saffron__shaker.n.01_1 saffron.n.02_1) 
+        (ontop saffron__shaker.n.01_1 countertop.n.01_1)
+        (inside clove.n.03_1 electric_refrigerator.n.01_1)
+        (inside clove.n.03_2 electric_refrigerator.n.01_1)
+        (inside clove.n.03_3 electric_refrigerator.n.01_1)
+        (inside chorizo.n.01_1 tupperware.n.01_1) 
+        (inside chorizo.n.01_2 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (insource paprika__shaker.n.01_1 paprika.n.02_1) 
+        (ontop paprika__shaker.n.01_1 countertop.n.01_1)
+        (ontop saucepot.n.01_1 stove.n.01_1) 
+        (inside prawn.n.01_1 tupperware.n.01_2)
+        (inside prawn.n.01_2 tupperware.n.01_2)
+        (inside prawn.n.01_3 tupperware.n.01_2)
+        (inside prawn.n.01_4 tupperware.n.01_2)
+        (inside prawn.n.01_5 tupperware.n.01_2)
+        (inside prawn.n.01_6 tupperware.n.01_2)
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (filled white_rice__sack.n.01_1 white_rice.n.01_1) 
+        (ontop white_rice__sack.n.01_1 floor.n.01_1)
+        (inside cup.n.01_1 cabinet.n.01_1)
+        (ontop frying_pan.n.01_1 stove.n.01_1) 
+        (inside clam.n.03_1 tupperware.n.01_3)
+        (inside clam.n.03_2 tupperware.n.01_3)
+        (inside clam.n.03_3 tupperware.n.01_3)
+        (inside clam.n.03_4 tupperware.n.01_3)
+        (inside clam.n.03_5 tupperware.n.01_3)
+        (inside clam.n.03_6 tupperware.n.01_3)
+        (inside tupperware.n.01_3 electric_refrigerator.n.01_1)
+        (not 
+            (cooked prawn.n.01_1)
+        ) 
+        (not 
+            (cooked prawn.n.01_2)
+        ) 
+        (not 
+            (cooked prawn.n.01_3)
+        ) 
+        (not 
+            (cooked prawn.n.01_4)
+        ) 
+        (not 
+            (cooked prawn.n.01_5)
+        ) 
+        (not 
+            (cooked prawn.n.01_6)
+        ) 
+        (not 
+            (cooked clam.n.03_1)
+        ) 
+        (not 
+            (cooked clam.n.03_2)
+        ) 
+        (not 
+            (cooked clam.n.03_3)
+        ) 
+        (not 
+            (cooked clam.n.03_4)
+        ) 
+        (not 
+            (cooked clam.n.03_5)
+        ) 
+        (not 
+            (cooked clam.n.03_6)
+        ) 
+        (not 
+            (cooked chorizo.n.01_1)
+        ) 
+        (not 
+            (cooked chorizo.n.01_2)
+        ) 
+        (filled bowl.n.01_1 pea.n.01_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (filled wine_bottle.n.01_1 white_wine.n.01_1)
+        (inside wine_bottle.n.01_1 electric_refrigerator.n.01_1)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future cooked__white_rice.n.01_1)
+        (future cooked__diced__chorizo.n.01_1)
+        (future cooked__saffron.n.01_1)
+        (future cooked__salt.n.01_1)
+        (future cooked__white_wine.n.01_1)
+        (future cooked__paprika.n.01_1)
+        (future cooked__pea.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__white_rice.n.01_1)
+            (real ?cooked__diced__chorizo.n.01_1)
+            (real ?cooked__pea.n.01_1)
+            (or 
+                (real ?saffron.n.02_1)
+                (real ?cooked__saffron.n.01_1)
+            )
+            (or 
+                (real ?cooked__paprika.n.01_1)
+                (real ?paprika.n.02_1)
+            )
+            (or 
+                (real ?cooked__salt.n.01_1)
+                (real ?salt.n.02_1)
+            )
+            (or 
+                (real ?cooked__white_wine.n.01_1)
+                (real ?white_wine.n.01_1)
+            )
+            (contains ?frying_pan.n.01_1 ?cooked__white_rice.n.01_1)
+            (or 
+                (contains ?frying_pan.n.01_1 ?saffron.n.02_1) 
+                (contains ?frying_pan.n.01_1 ?cooked__saffron.n.01_1) 
+            )
+            (or 
+                (contains ?frying_pan.n.01_1 ?cooked__salt.n.01_1)
+                (contains ?frying_pan.n.01_1 ?salt.n.02_1)
+            )
+            (forall
+                (?prawn.n.01 - prawn.n.01)
+                (and 
+                    (cooked ?prawn.n.01)
+                    (inside ?prawn.n.01 ?frying_pan.n.01_1)
+                )
+            )
+            (forall
+                (?clam.n.03 - clam.n.03)
+                (and 
+                    (cooked ?clam.n.03)
+                    (inside ?clam.n.03 ?frying_pan.n.01_1)
+                )
+            )
+            (contains ?frying_pan.n.01_1 ?cooked__diced__chorizo.n.01_1)
+            (contains ?frying_pan.n.01_1 ?cooked__pea.n.01_1)
+            (or
+                (contains ?frying_pan.n.01_1 ?paprika.n.02_1) 
+                (contains ?frying_pan.n.01_1 ?cooked__paprika.n.01_1) 
+            )
+            (or 
+                (contains ?frying_pan.n.01_1 ?cooked__white_wine.n.01_1)
+                (contains ?frying_pan.n.01_1 ?white_wine.n.01_1)
+            )
+            (forall
+                (?clove.n.03 - clove.n.03)
+                (and
+                    (cooked ?clove.n.03)
+                    (inside ?clove.n.03 ?frying_pan.n.01_1)
+                )
+            )
+        )
+    )
+)

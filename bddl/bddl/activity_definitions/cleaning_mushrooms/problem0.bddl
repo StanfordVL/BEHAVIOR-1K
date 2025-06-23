@@ -1,0 +1,46 @@
+(define (problem cleaning_mushrooms-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        mushroom.n.05_1 mushroom.n.05_2 mushroom.n.05_3 mushroom.n.05_4 mushroom.n.05_5 - mushroom.n.05
+        water.n.06_1 - water.n.06
+        paper_towel.n.01_1 - paper_towel.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        countertop.n.01_1 - countertop.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered mushroom.n.05_1 dust.n.01_1) 
+        (covered mushroom.n.05_2 dust.n.01_1) 
+        (covered mushroom.n.05_3 dust.n.01_1) 
+        (covered mushroom.n.05_4 dust.n.01_1) 
+        (covered mushroom.n.05_5 dust.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1) 
+        (filled mixing_bowl.n.01_1 water.n.06_1)  
+        (ontop mushroom.n.05_1 chopping_board.n.01_1) 
+        (ontop mushroom.n.05_2 chopping_board.n.01_1) 
+        (ontop mushroom.n.05_3 chopping_board.n.01_1) 
+        (ontop mushroom.n.05_4 chopping_board.n.01_1) 
+        (ontop mushroom.n.05_5 chopping_board.n.01_1) 
+        (ontop paper_towel.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?mushroom.n.05 - mushroom.n.05) 
+                (not 
+                    (covered ?mushroom.n.05 ?dust.n.01_1)
+                )
+            ) 
+        )
+    )
+)

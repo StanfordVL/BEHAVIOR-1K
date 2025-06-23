@@ -1,0 +1,64 @@
+(define (problem cook_potatoes-0)
+    (:domain omnigibson)
+
+    (:objects
+        potato.n.01_1 potato.n.01_2 potato.n.01_3 - potato.n.01
+        cooked__diced__potato.n.01_1 - cooked__diced__potato.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        seawater.n.01_1 - seawater.n.01
+        rosemary.n.02_1 - rosemary.n.02
+        rosemary__shaker.n.01_1 - rosemary__shaker.n.01
+        countertop.n.01_1 - countertop.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        oven.n.01_1 - oven.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (cooked potato.n.01_1)
+        ) 
+        (not 
+            (cooked potato.n.01_2)
+        ) 
+        (not 
+            (cooked potato.n.01_3)
+        ) 
+        (ontop potato.n.01_1 countertop.n.01_1)
+        (ontop potato.n.01_2 countertop.n.01_1)
+        (ontop potato.n.01_3 countertop.n.01_1)
+        (inside frying_pan.n.01_1 cabinet.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (insource rosemary__shaker.n.01_1 rosemary.n.02_1)
+        (ontop rosemary__shaker.n.01_1 countertop.n.01_1)
+        (future seawater.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (future cooked__diced__potato.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__diced__potato.n.01_1)
+            (real ?seawater.n.01_1)
+            (contains ?frying_pan.n.01_1 ?cooked__diced__potato.n.01_1)
+            (contains ?frying_pan.n.01_1 ?rosemary.n.02_1)
+            (contains ?frying_pan.n.01_1 ?seawater.n.01_1)
+        )
+    )
+)

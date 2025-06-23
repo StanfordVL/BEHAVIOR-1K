@@ -1,0 +1,52 @@
+(define (problem cleaning_restaurant_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        dinner_napkin.n.01_1 - dinner_napkin.n.01
+        hand_towel.n.01_1 - hand_towel.n.01
+        breadcrumb.n.01_1 - breadcrumb.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        countertop.n.01_1 - countertop.n.01
+        rag.n.01_1 - rag.n.01
+        bowl.n.01_1 - bowl.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop dinner_napkin.n.01_1 breakfast_table.n.01_1) 
+        (ontop rag.n.01_1 breakfast_table.n.01_1) 
+        (ontop bowl.n.01_1 breakfast_table.n.01_1) 
+        (not 
+            (covered breakfast_table.n.01_1 disinfectant.n.01_1)
+        ) 
+        (covered breakfast_table.n.01_1 breadcrumb.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_2)
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1) 
+        (ontop disinfectant__bottle.n.01_1 countertop.n.01_1)
+        (ontop hand_towel.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_2 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (inside ?dinner_napkin.n.01_1 ?ashcan.n.01_1) 
+            (inside ?bowl.n.01_1 ?sink.n.01_1) 
+            (covered ?breakfast_table.n.01_1 ?disinfectant.n.01_1) 
+            (not 
+                (covered ?breakfast_table.n.01_1 ?breadcrumb.n.01_1)
+            )
+        )
+    )
+)

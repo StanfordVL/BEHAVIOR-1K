@@ -1,0 +1,49 @@
+(define (problem packing_bags_or_suitcase-0)
+    (:domain omnigibson)
+
+    (:objects
+     	backpack.n.01_1 - backpack.n.01
+    	floor.n.01_1 - floor.n.01
+    	toothbrush.n.01_1 - toothbrush.n.01
+    	bed.n.01_1 - bed.n.01
+    	bottle__of__shampoo.n.01_1 - bottle__of__shampoo.n.01
+    	hardback.n.01_1 - hardback.n.01
+    	undergarment.n.01_1 undergarment.n.01_2 - undergarment.n.01
+    	tube__of__toothpaste.n.01_1 - tube__of__toothpaste.n.01
+    	door.n.01_1 - door.n.01
+    	window.n.01_1 - window.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop backpack.n.01_1 floor.n.01_1) 
+        (ontop toothbrush.n.01_1 bed.n.01_1) 
+        (ontop bottle__of__shampoo.n.01_1 bed.n.01_1) 
+        (ontop hardback.n.01_1 bed.n.01_1) 
+        (ontop undergarment.n.01_1 bed.n.01_1) 
+        (ontop undergarment.n.01_2 bed.n.01_1) 
+        (ontop tube__of__toothpaste.n.01_1 bed.n.01_1) 
+        (inroom bed.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom door.n.01_1 bedroom) 
+        (inroom window.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?undergarment.n.01 - undergarment.n.01) 
+                (inside ?undergarment.n.01 ?backpack.n.01_1)
+            ) 
+            (inside ?toothbrush.n.01_1 ?backpack.n.01_1) 
+            (inside ?bottle__of__shampoo.n.01_1 ?backpack.n.01_1) 
+            (inside ?hardback.n.01_1 ?backpack.n.01_1) 
+            (inside ?tube__of__toothpaste.n.01_1 ?backpack.n.01_1) 
+            (or 
+                (ontop ?backpack.n.01_1 ?bed.n.01_1) 
+                (ontop ?backpack.n.01_1 ?floor.n.01_1)
+            )
+        )
+    )
+)

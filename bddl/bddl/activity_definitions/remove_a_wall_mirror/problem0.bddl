@@ -1,0 +1,25 @@
+(define (problem remove_a_wall_mirror-0)
+    (:domain omnigibson)
+
+    (:objects
+        mirror.n.01_1 - mirror.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (attached mirror.n.01_1 wall_nail.n.01_1) 
+        (inroom floor.n.01_1 bathroom)
+        (inroom wall_nail.n.01_1 bathroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (attached ?mirror.n.01_1 ?wall_nail.n.01_1)
+            )
+        )
+    )
+)

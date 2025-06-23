@@ -1,0 +1,36 @@
+(define (problem prepare_a_raised_bed_garden-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        marigold.n.01_1 marigold.n.01_2 - marigold.n.01
+        pot.n.04_1 pot.n.04_2 pot.n.04_3 - pot.n.04
+        trowel.n.01_1 - trowel.n.01
+        soil.n.02_1 - soil.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pot.n.04_1 floor.n.01_1)
+        (ontop pot.n.04_2 floor.n.01_1)
+        (filled pot.n.04_2 soil.n.02_1)
+        (ontop pot.n.04_3 floor.n.01_1)
+        (inside marigold.n.01_1 pot.n.04_3)
+        (inside marigold.n.01_2 pot.n.04_3)
+        (ontop trowel.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?marigold.n.01 - marigold.n.01)
+                (and 
+                    (inside ?marigold.n.01 ?pot.n.04_1)
+                    (covered ?marigold.n.01 ?soil.n.02_1)
+                ) 
+            )
+        )
+    )
+)

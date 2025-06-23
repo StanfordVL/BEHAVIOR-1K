@@ -1,0 +1,40 @@
+(define (problem putting_away_toys-0)
+    (:domain omnigibson)
+
+    (:objects
+        toy_figure.n.01_1 toy_figure.n.01_2 toy_figure.n.01_3 toy_figure.n.01_4 toy_figure.n.01_5 toy_figure.n.01_6 toy_figure.n.01_7 toy_figure.n.01_8 - toy_figure.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        toy_box.n.01_1 toy_box.n.01_2 - toy_box.n.01
+        agent.n.01_1 - agent.n.01
+        table.n.02_1 - table.n.02
+    )
+    
+    (:init 
+        (ontop toy_figure.n.01_1 floor.n.01_1) 
+        (ontop toy_figure.n.01_2 floor.n.01_1) 
+        (ontop toy_figure.n.01_3 floor.n.01_1) 
+        (ontop toy_figure.n.01_4 floor.n.01_1) 
+        (ontop toy_figure.n.01_5 floor.n.01_2) 
+        (ontop toy_figure.n.01_6 floor.n.01_2) 
+        (ontop toy_figure.n.01_7 floor.n.01_2) 
+        (ontop toy_figure.n.01_8 floor.n.01_2) 
+        (ontop toy_box.n.01_1 floor.n.01_1) 
+        (ontop toy_box.n.01_2 table.n.02_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom floor.n.01_2 dining_room) 
+        (inroom table.n.02_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?toy_figure.n.01 - toy_figure.n.01) 
+                (exists 
+                    (?toy_box.n.01 - toy_box.n.01) 
+                    (inside ?toy_figure.n.01 ?toy_box.n.01)
+                )
+            )
+        )
+    )
+)

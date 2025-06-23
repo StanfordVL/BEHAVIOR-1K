@@ -1,0 +1,47 @@
+(define (problem raking_leaves-0)
+    (:domain omnigibson)
+
+    (:objects
+        entire_leaf.n.01_1 entire_leaf.n.01_10 entire_leaf.n.01_11 entire_leaf.n.01_12 entire_leaf.n.01_13 entire_leaf.n.01_14 entire_leaf.n.01_15 entire_leaf.n.01_16 entire_leaf.n.01_2 entire_leaf.n.01_3 entire_leaf.n.01_4 entire_leaf.n.01_5 entire_leaf.n.01_6 entire_leaf.n.01_7 entire_leaf.n.01_8 entire_leaf.n.01_9 - entire_leaf.n.01
+        floor.n.01_1 - floor.n.01
+        rake.n.03_1 - rake.n.03
+        driveway.n.01_1 - driveway.n.01
+        lawn.n.01_1 - lawn.n.01
+        sack.n.01_1 - sack.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop entire_leaf.n.01_1 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_2 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_3 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_4 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_5 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_6 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_7 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_8 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_9 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_10 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_11 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_12 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_13 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_14 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_15 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_16 lawn.n.01_1) 
+        (ontop rake.n.03_1 driveway.n.01_1) 
+        (ontop sack.n.01_1 driveway.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?entire_leaf.n.01 - entire_leaf.n.01)
+                (inside ?entire_leaf.n.01 ?sack.n.01_1)
+            )
+        )
+    )
+)

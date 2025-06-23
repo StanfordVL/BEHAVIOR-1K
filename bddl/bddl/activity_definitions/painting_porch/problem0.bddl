@@ -1,0 +1,23 @@
+(define (problem painting_porch-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        spray_paint.n.01_1 - spray_paint.n.01
+        spray_paint__can.n.01_1 - spray_paint__can.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop spray_paint__can.n.01_1 floor.n.01_1)
+        (insource spray_paint__can.n.01_1 spray_paint.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?floor.n.01_1 ?spray_paint.n.01_1)
+        )
+    )
+)

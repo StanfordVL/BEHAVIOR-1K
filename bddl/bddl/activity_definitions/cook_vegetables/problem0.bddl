@@ -1,0 +1,58 @@
+(define (problem cook_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        stove.n.01_1 - stove.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        brussels_sprouts.n.01_1 - brussels_sprouts.n.01
+        broccoli.n.02_1 - broccoli.n.02
+        casserole.n.02_1 - casserole.n.02
+        spinach.n.02_1 - spinach.n.02
+        parmesan.n.01_1 - parmesan.n.01
+        parmesan__shaker.n.01_1 - parmesan__shaker.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside olive_oil__bottle.n.01_1 cabinet.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (not 
+            (cooked brussels_sprouts.n.01_1)
+        ) 
+        (not 
+            (cooked broccoli.n.02_1)
+        ) 
+        (not 
+            (cooked spinach.n.02_1)
+        ) 
+        (inside broccoli.n.02_1 electric_refrigerator.n.01_1) 
+        (inside brussels_sprouts.n.01_1 electric_refrigerator.n.01_1) 
+        (inside spinach.n.02_1 electric_refrigerator.n.01_1) 
+        (insource parmesan__shaker.n.01_1 parmesan.n.01_1)
+        (inside parmesan__shaker.n.01_1 electric_refrigerator.n.01_1)
+        (inside casserole.n.02_1 cabinet.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (cooked ?brussels_sprouts.n.01_1)
+            (cooked ?broccoli.n.02_1)
+            (cooked ?spinach.n.02_1)
+            (covered ?brussels_sprouts.n.01_1 ?parmesan.n.01_1)
+            (covered ?spinach.n.02_1 ?parmesan.n.01_1)
+            (covered ?broccoli.n.02_1 ?parmesan.n.01_1)
+            (covered ?brussels_sprouts.n.01_1 ?olive_oil.n.01_1)
+            (covered ?broccoli.n.02_1 ?olive_oil.n.01_1)
+            (covered ?spinach.n.02_1 ?olive_oil.n.01_1)
+        )
+    )
+)

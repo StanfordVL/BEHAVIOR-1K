@@ -1,0 +1,35 @@
+(define (problem clean_a_shower-0)
+    (:domain omnigibson)
+
+    (:objects
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        water.n.06_1 - water.n.06
+        showerhead.n.01_1 - showerhead.n.01
+        stain.n.01_1 - stain.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1)
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (covered showerhead.n.01_1 stain.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom)
+        (inroom showerhead.n.01_1 bathroom)
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?showerhead.n.01_1 ?stain.n.01_1)
+            ) 
+        )
+    )
+)

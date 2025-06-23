@@ -1,0 +1,64 @@
+(define (problem make_cookie_dough-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        butter.n.01_1 - butter.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        salt.n.02_1 - salt.n.02
+        sugar_cookie_dough.n.01_1 - sugar_cookie_dough.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        microwave.n.02_1 - microwave.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (inside flour__sack.n.01_1 cabinet.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (inside sugar__sack.n.01_1 cabinet.n.01_1) 
+        (inside raw_egg.n.01_1 bowl.n.01_2) 
+        (inside raw_egg.n.01_2 bowl.n.01_2) 
+        (inside bowl.n.01_2 electric_refrigerator.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (inside butter.n.01_1 bowl.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_2)
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1) 
+        (inside baking_powder__jar.n.01_1 cabinet.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom microwave.n.02_1 kitchen) 
+        (future sugar_cookie_dough.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (cooked ?sugar_cookie_dough.n.01_1)
+            ) 
+            (real ?sugar_cookie_dough.n.01_1) 
+            (inside ?sugar_cookie_dough.n.01_1 ?electric_mixer.n.01_1)
+        )
+    )
+)

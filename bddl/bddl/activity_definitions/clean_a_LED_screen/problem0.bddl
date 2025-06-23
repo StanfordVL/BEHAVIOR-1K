@@ -1,0 +1,27 @@
+(define (problem clean_a_LED_screen-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        television_receiver.n.01_1 - television_receiver.n.01
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered television_receiver.n.01_1 dust.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (inroom television_receiver.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?television_receiver.n.01_1 ?dust.n.01_1)
+            ) 
+        )
+    )
+)

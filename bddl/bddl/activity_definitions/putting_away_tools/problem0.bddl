@@ -1,0 +1,53 @@
+(define (problem putting_away_tools-0)
+    (:domain omnigibson)
+
+    (:objects
+        screwdriver.n.01_1 screwdriver.n.01_2 - screwdriver.n.01
+        floor.n.01_1 - floor.n.01
+        wrench.n.03_1 wrench.n.03_2 - wrench.n.03
+        wire_cutter.n.01_1 - wire_cutter.n.01 
+        chisel.n.01_1 - chisel.n.01
+        toolbox.n.01_1 toolbox.n.01_2 - toolbox.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop screwdriver.n.01_1 floor.n.01_1) 
+        (ontop screwdriver.n.01_2 floor.n.01_1) 
+        (ontop wrench.n.03_1 floor.n.01_1) 
+        (ontop wire_cutter.n.01_1 floor.n.01_1) 
+        (ontop chisel.n.01_1 floor.n.01_1) 
+        (ontop toolbox.n.01_1 floor.n.01_1) 
+        (ontop toolbox.n.01_2 floor.n.01_1) 
+        (ontop wrench.n.03_2 floor.n.01_1) 
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?toolbox.n.01 - toolbox.n.01)
+                (forall 
+                    (?screwdriver.n.01 - screwdriver.n.01)
+                    (inside ?screwdriver.n.01 ?toolbox.n.01)
+                )
+            )
+            (exists 
+                (?toolbox.n.01 - toolbox.n.01)
+                (inside ?wire_cutter.n.01_1 ?toolbox.n.01)
+            )
+            (exists 
+                (?toolbox.n.01 - toolbox.n.01)
+                (inside ?chisel.n.01_1 ?toolbox.n.01)
+            )
+            (exists 
+                (?toolbox.n.01 - toolbox.n.01)
+                (forall 
+                    (?wrench.n.03 - wrench.n.03)
+                    (inside ?wrench.n.03 ?toolbox.n.01)
+                )
+            )
+        )
+    )
+)

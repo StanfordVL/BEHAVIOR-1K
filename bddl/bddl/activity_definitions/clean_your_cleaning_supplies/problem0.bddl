@@ -1,0 +1,57 @@
+(define (problem clean_your_cleaning_supplies-0)
+    (:domain omnigibson)
+
+    (:objects
+        mop_bucket.n.01_1 - mop_bucket.n.01
+        swab.n.02_1 - swab.n.02
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        stain.n.01_1 - stain.n.01
+        dust.n.01_1 - dust.n.01
+        mold.n.05_1 - mold.n.05
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered mop_bucket.n.01_1 dust.n.01_1) 
+        (covered mop_bucket.n.01_1 mold.n.05_1)
+        (covered swab.n.02_1 dust.n.01_1) 
+        (covered swab.n.02_1 mold.n.05_1)
+        (covered rag.n.01_1 stain.n.01_1) 
+        (ontop rag.n.01_1 countertop.n.01_1)
+        (ontop mop_bucket.n.01_1 countertop.n.01_1)
+        (ontop swab.n.02_1 floor.n.01_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?mop_bucket.n.01_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?mop_bucket.n.01_1 ?mold.n.05_1)
+            ) 
+            (not 
+                (covered ?swab.n.02_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?swab.n.02_1 ?mold.n.05_1)
+            ) 
+            (not 
+                (covered ?rag.n.01_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

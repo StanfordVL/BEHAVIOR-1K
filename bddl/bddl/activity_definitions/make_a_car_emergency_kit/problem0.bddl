@@ -1,0 +1,50 @@
+(define (problem make_a_car_emergency_kit-0)
+    (:domain omnigibson)
+
+    (:objects
+     	insectifuge__atomizer.n.01_1 - insectifuge__atomizer.n.01
+    	coffee_table.n.01_1 - coffee_table.n.01
+    	shears.n.01_1 - shears.n.01
+    	backpack.n.01_1 - backpack.n.01
+    	water_bottle.n.01_1 - water_bottle.n.01
+    	inhaler.n.01_1 - inhaler.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop insectifuge__atomizer.n.01_1 coffee_table.n.01_1) 
+        (ontop shears.n.01_1 coffee_table.n.01_1) 
+        (ontop backpack.n.01_1 coffee_table.n.01_1) 
+        (ontop water_bottle.n.01_1 coffee_table.n.01_1) 
+        (ontop inhaler.n.01_1 coffee_table.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?insectifuge__atomizer.n.01 - insectifuge__atomizer.n.01) 
+                (ontop ?insectifuge__atomizer.n.01 ?backpack.n.01_1)
+            ) 
+            (forall 
+                (?shears.n.01 - shears.n.01) 
+                (ontop ?shears.n.01 ?backpack.n.01_1)
+            ) 
+            (forall 
+                (?backpack.n.01 - backpack.n.01) 
+                (ontop ?backpack.n.01 ?coffee_table.n.01_1)
+            ) 
+            (forall 
+                (?water_bottle.n.01 - water_bottle.n.01) 
+                (ontop ?water_bottle.n.01_1 ?backpack.n.01_1)
+            ) 
+            (forall 
+                (?inhaler.n.01 - inhaler.n.01) 
+                (ontop ?inhaler.n.01 ?backpack.n.01_1)
+            )
+        )
+    )
+)

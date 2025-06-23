@@ -1,0 +1,67 @@
+(define (problem sorting_books_on_shelf-0)
+    (:domain omnigibson)
+
+    (:objects
+        textbook.n.01_1 textbook.n.01_2 - textbook.n.01
+        comic_book.n.01_1 comic_book.n.01_2 comic_book.n.01_3 - comic_book.n.01
+        notebook.n.01_1 notebook.n.01_2 - notebook.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside notebook.n.01_1 bookcase.n.01_1) 
+        (inside comic_book.n.01_1 bookcase.n.01_1) 
+        (ontop notebook.n.01_2 comic_book.n.01_1) 
+        (ontop comic_book.n.01_2 notebook.n.01_1) 
+        (inside textbook.n.01_1 bookcase.n.01_1) 
+        (inside comic_book.n.01_3 bookcase.n.01_1) 
+        (ontop textbook.n.01_2 comic_book.n.01_3) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom bookcase.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?comic_book.n.01 - comic_book.n.01)
+                (inside ?comic_book.n.01 ?bookcase.n.01_1)
+            )
+            (forn
+                (2)
+                (?comic_book.n.01 - comic_book.n.01)
+                (or 
+                    (ontop ?comic_book.n.01 ?comic_book.n.01_1)
+                    (ontop ?comic_book.n.01 ?comic_book.n.01_2)
+                    (ontop ?comic_book.n.01 ?comic_book.n.01_3)
+                )
+            )
+            (forall 
+                (?notebook.n.01 - notebook.n.01)
+                (inside ?notebook.n.01 ?bookcase.n.01_1)
+            )
+            (exists
+                (?notebook.n.01 - notebook.n.01)
+                (or 
+                    (ontop ?notebook.n.01 ?notebook.n.01_1)
+                    (ontop ?notebook.n.01 ?notebook.n.01_2)
+                )
+            )
+            (forall 
+                (?textbook.n.01 - textbook.n.01)
+                (inside ?textbook.n.01 ?bookcase.n.01_1)
+            )
+            (exists
+                (?textbook.n.01 - textbook.n.01)
+                (or 
+                    (ontop ?textbook.n.01 ?textbook.n.01_1)
+                    (ontop ?textbook.n.01 ?textbook.n.01_2)
+                )
+            )
+        )
+    )
+)

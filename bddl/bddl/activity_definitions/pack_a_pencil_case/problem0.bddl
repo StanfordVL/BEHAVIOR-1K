@@ -1,0 +1,35 @@
+(define (problem pack_a_pencil_case-0)
+    (:domain omnigibson)
+
+    (:objects
+        pencil_box.n.01_1 - pencil_box.n.01
+        floor.n.01_1 - floor.n.01
+        pen.n.01_1 - pen.n.01
+        pencil.n.01_1 - pencil.n.01
+        eraser.n.01_1 - eraser.n.01
+        shears.n.01_1 - shears.n.01
+        desk.n.01_1 - desk.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pencil_box.n.01_1 desk.n.01_1) 
+        (ontop pen.n.01_1 desk.n.01_1) 
+        (ontop pencil.n.01_1 desk.n.01_1) 
+        (ontop eraser.n.01_1 desk.n.01_1) 
+        (ontop shears.n.01_1 desk.n.01_1)
+        (inroom desk.n.01_1 childs_room) 
+        (inroom floor.n.01_1 childs_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?pencil_box.n.01_1 ?desk.n.01_1) 
+            (inside ?pen.n.01_1 ?pencil_box.n.01_1) 
+            (inside ?pencil.n.01_1 ?pencil_box.n.01_1)
+            (inside ?eraser.n.01_1 ?pencil_box.n.01_1) 
+            (inside ?shears.n.01_1 ?pencil_box.n.01_1)
+        )
+    )
+)

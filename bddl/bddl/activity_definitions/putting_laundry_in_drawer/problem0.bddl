@@ -1,0 +1,42 @@
+(define (problem putting_laundry_in_drawer-0)
+    (:domain omnigibson)
+
+    (:objects
+        bed.n.01_1 - bed.n.01
+        floor.n.01_1 - floor.n.01
+        short_pants.n.01_1 - short_pants.n.01
+        tank_top.n.01_1 tank_top.n.01_2 - tank_top.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop short_pants.n.01_1 bed.n.01_1)
+        (ontop tank_top.n.01_1 bed.n.01_1)
+        (ontop tank_top.n.01_2 bed.n.01_1) 
+        (inroom bed.n.01_1 bedroom)
+        (inroom floor.n.01_1 bedroom)
+        (inroom cabinet.n.01_1 bedroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?cabinet.n.01 - cabinet.n.01)
+                (inside ?short_pants.n.01_1 ?cabinet.n.01)
+            )
+            (folded ?short_pants.n.01_1)
+            (forall
+                (?tank_top.n.01 - tank_top.n.01) 
+                (and
+                    (exists 
+                        (?cabinet.n.01 - cabinet.n.01)
+                        (inside ?tank_top.n.01 ?cabinet.n.01)   
+                    )
+                    (folded ?tank_top.n.01)             
+                )
+            ) 
+        )
+    )
+)

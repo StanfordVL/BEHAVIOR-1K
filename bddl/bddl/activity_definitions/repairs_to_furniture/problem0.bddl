@@ -1,0 +1,27 @@
+(define (problem repairs_to_furniture-0)
+    (:domain omnigibson)
+
+    (:objects
+        table.n.02_1 - table.n.02
+        incision.n.01_1 - incision.n.01
+        emery_paper.n.01_1 - emery_paper.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered table.n.02_1 incision.n.01_1) 
+        (ontop emery_paper.n.01_1 table.n.02_1)
+        (inroom floor.n.01_1 garage) 
+        (ontop table.n.02_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?table.n.02_1 ?incision.n.01_1)
+            )
+        )
+    )
+)

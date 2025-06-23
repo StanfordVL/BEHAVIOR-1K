@@ -1,0 +1,80 @@
+(define (problem sorting_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        mixing_bowl.n.01_1 mixing_bowl.n.01_2 mixing_bowl.n.01_3 - mixing_bowl.n.01
+        countertop.n.01_1 - countertop.n.01
+        wicker_basket.n.01_1 wicker_basket.n.01_2 - wicker_basket.n.01
+        bok_choy.n.02_1 bok_choy.n.02_2 bok_choy.n.02_3 - bok_choy.n.02
+        vidalia_onion.n.01_1 vidalia_onion.n.01_2 vidalia_onion.n.01_3 - vidalia_onion.n.01
+        sweet_corn.n.02_1 sweet_corn.n.02_2 sweet_corn.n.02_3 - sweet_corn.n.02
+        broccoli.n.02_1 broccoli.n.02_2 - broccoli.n.02
+        leek.n.02_1 leek.n.02_2 - leek.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_2 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_3 countertop.n.01_1) 
+        (ontop wicker_basket.n.01_1 floor.n.01_1)
+        (ontop wicker_basket.n.01_2 floor.n.01_1)
+        (inside bok_choy.n.02_1 wicker_basket.n.01_1)
+        (inside bok_choy.n.02_2 wicker_basket.n.01_1)
+        (inside bok_choy.n.02_3 wicker_basket.n.01_1)
+        (inside sweet_corn.n.02_1 wicker_basket.n.01_1)
+        (inside sweet_corn.n.02_2 wicker_basket.n.01_1)
+        (inside sweet_corn.n.02_3 wicker_basket.n.01_1)
+        (inside broccoli.n.02_1 wicker_basket.n.01_2) 
+        (inside broccoli.n.02_2 wicker_basket.n.01_2)
+        (inside leek.n.02_1 wicker_basket.n.01_2)
+        (inside leek.n.02_2 wicker_basket.n.01_2)
+        (inside vidalia_onion.n.01_1 wicker_basket.n.01_2)
+        (inside vidalia_onion.n.01_2 wicker_basket.n.01_2)
+        (inside vidalia_onion.n.01_3 wicker_basket.n.01_2)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?mixing_bowl.n.01 - mixing_bowl.n.01)
+                (and 
+                    (forall 
+                        (?bok_choy.n.02 - bok_choy.n.02)
+                        (inside ?bok_choy.n.02 ?mixing_bowl.n.01)
+                    )
+                    (forall 
+                        (?vidalia_onion.n.01 - vidalia_onion.n.01)
+                        (inside ?vidalia_onion.n.01 ?mixing_bowl.n.01)
+                    )
+                )
+            )
+            (exists 
+                (?mixing_bowl.n.01 - mixing_bowl.n.01)
+                (and 
+                    (forall 
+                        (?leek.n.02 - leek.n.02)
+                        (inside ?leek.n.02 ?mixing_bowl.n.01)
+                    )
+                    (forall 
+                        (?broccoli.n.02 - broccoli.n.02)
+                        (inside ?broccoli.n.02 ?mixing_bowl.n.01)
+                    )
+                )
+            )
+            (exists 
+                (?mixing_bowl.n.01 - mixing_bowl.n.01)
+                (and 
+                    (forall 
+                        (?sweet_corn.n.02 - sweet_corn.n.02)
+                        (inside ?sweet_corn.n.02 ?mixing_bowl.n.01)
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,28 @@
+(define (problem picking_up_baggage-0)
+    (:domain omnigibson)
+
+    (:objects
+        backpack.n.01_1 - backpack.n.01
+        table.n.02_1 - table.n.02
+        bag.n.06_1 - bag.n.06
+        car.n.01_1 - car.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (inroom car.n.01_1 garage)
+        (ontop backpack.n.01_1 table.n.02_1) 
+        (ontop bag.n.06_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom table.n.02_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?backpack.n.01_1 ?car.n.01_1)
+            (inside ?bag.n.06_1 ?car.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,40 @@
+(define (problem watering_outdoor_plants-0)
+    (:domain omnigibson)
+
+    (:objects
+        pot_plant.n.01_1 pot_plant.n.01_2 pot_plant.n.01_3 pot_plant.n.01_4 pot_plant.n.01_5 - pot_plant.n.01
+        tree.n.01_1 tree.n.01_2 tree.n.01_3 - tree.n.01
+        watering_can.n.01_1 - watering_can.n.01
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pot_plant.n.01_1 floor.n.01_1) 
+        (ontop pot_plant.n.01_2 floor.n.01_1) 
+        (ontop pot_plant.n.01_3 floor.n.01_1) 
+        (ontop pot_plant.n.01_4 floor.n.01_1) 
+        (ontop pot_plant.n.01_5 floor.n.01_1) 
+        (ontop watering_can.n.01_1 floor.n.01_1) 
+        (insource watering_can.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (inroom tree.n.01_2 garden) 
+        (inroom tree.n.01_3 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?pot_plant.n.01 - pot_plant.n.01)
+                (covered ?pot_plant.n.01 ?water.n.06_1)
+            )
+            (forall 
+                (?tree.n.01 - tree.n.01)
+                (covered ?tree.n.01 ?water.n.06_1)
+            )
+        )
+    )
+)

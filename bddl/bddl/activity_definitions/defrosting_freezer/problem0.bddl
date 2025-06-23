@@ -1,0 +1,47 @@
+(define (problem defrosting_freezer-0)
+    (:domain omnigibson)
+
+    (:objects
+     	floor.n.01_1 - floor.n.01
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	sink.n.01_1 - sink.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	dustpan.n.02_1 - dustpan.n.02
+    	bucket.n.01_1 - bucket.n.01
+    	scraper.n.01_1 - scraper.n.01
+    	towel.n.01_1 - towel.n.01
+    	rag.n.01_1 - rag.n.01
+    	crayfish.n.02_1 crayfish.n.02_2 crayfish.n.02_3 - crayfish.n.02
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (ontop dustpan.n.02_1 floor.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop scraper.n.01_1 countertop.n.01_1) 
+        (ontop towel.n.01_1 countertop.n.01_1)
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (inside crayfish.n.02_1 electric_refrigerator.n.01_1) 
+        (inside crayfish.n.02_2 electric_refrigerator.n.01_1) 
+        (inside crayfish.n.02_3 electric_refrigerator.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (nextto ?dustpan.n.02_1 ?electric_refrigerator.n.01_1) 
+            (nextto ?bucket.n.01_1 ?countertop.n.01_1) 
+            (ontop ?scraper.n.01_1 ?electric_refrigerator.n.01_1) 
+            (ontop ?towel.n.01_1 ?countertop.n.01_1) 
+            (inside ?rag.n.01_1 ?sink.n.01_1) 
+            (forall 
+                (?crayfish.n.02 - crayfish.n.02) 
+                (inside ?crayfish.n.02 ?bucket.n.01_1)
+            )
+        )
+    )
+)

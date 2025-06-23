@@ -1,0 +1,86 @@
+(define (problem make_a_cheese_pastry-0)
+    (:domain omnigibson)
+
+    (:objects
+        raw_egg.n.01_1 - raw_egg.n.01
+        cane_sugar.n.02_1 - cane_sugar.n.02
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        cream_cheese.n.01_1 - cream_cheese.n.01
+        salt.n.02_1 - salt.n.02
+        flour.n.01_1 - flour.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        cheese_tart.n.01_1 cheese_tart.n.01_2 cheese_tart.n.01_3 cheese_tart.n.01_4 cheese_tart.n.01_5 cheese_tart.n.01_6 - cheese_tart.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        sink.n.01_1 - sink.n.01
+        water.n.06_1 - water.n.06
+        butter.n.01_1 - butter.n.01
+        butter__package.n.01_1 - butter__package.n.01
+        food_processor.n.01_1 - food_processor.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside raw_egg.n.01_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 cane_sugar.n.02_1)
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (inside lemon_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 cabinet.n.01_1) 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_2) 
+        (filled tupperware.n.01_1 cream_cheese.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inside butter.n.01_1 butter__package.n.01_1) 
+        (inside butter__package.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop food_processor.n.01_1 countertop.n.01_2) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_2) 
+        (future cheese_tart.n.01_1) 
+        (future cheese_tart.n.01_2) 
+        (future cheese_tart.n.01_3) 
+        (future cheese_tart.n.01_4) 
+        (future cheese_tart.n.01_5) 
+        (future cheese_tart.n.01_6) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cheese_tart.n.01_1) 
+            (real ?cheese_tart.n.01_2) 
+            (real ?cheese_tart.n.01_3) 
+            (real ?cheese_tart.n.01_4) 
+            (real ?cheese_tart.n.01_5) 
+            (real ?cheese_tart.n.01_6) 
+            (forall 
+                (?cheese_tart.n.01 - cheese_tart.n.01) 
+                (cooked ?cheese_tart.n.01)
+            )
+        )
+    )
+)

@@ -1,0 +1,37 @@
+(define (problem mulching-0)
+    (:domain omnigibson)
+
+    (:objects
+        mulch__bag.n.01_1 mulch__bag.n.01_2 mulch__bag.n.01_3 mulch__bag.n.01_4 mulch__bag.n.01_5 - mulch__bag.n.01
+        lawn.n.01_1 - lawn.n.01
+        trowel.n.01_1 - trowel.n.01
+        mulch.n.01_1 - mulch.n.01
+        tree.n.01_1 - tree.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mulch__bag.n.01_1 lawn.n.01_1) 
+        (ontop mulch__bag.n.01_2 lawn.n.01_1) 
+        (ontop mulch__bag.n.01_3 lawn.n.01_1) 
+        (ontop mulch__bag.n.01_4 lawn.n.01_1) 
+        (ontop mulch__bag.n.01_5 lawn.n.01_1) 
+        (ontop trowel.n.01_1 lawn.n.01_1) 
+        (filled mulch__bag.n.01_1 mulch.n.01_1) 
+        (filled mulch__bag.n.01_2 mulch.n.01_1) 
+        (filled mulch__bag.n.01_3 mulch.n.01_1) 
+        (filled mulch__bag.n.01_4 mulch.n.01_1) 
+        (filled mulch__bag.n.01_5 mulch.n.01_1) 
+        (inroom lawn.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?lawn.n.01_1 ?mulch.n.01_1) 
+        )
+    )
+)

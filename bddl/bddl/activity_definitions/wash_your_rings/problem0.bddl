@@ -1,0 +1,44 @@
+(define (problem wash_your_rings-0)
+    (:domain omnigibson)
+
+    (:objects
+        ring.n.08_1 ring.n.08_2 - ring.n.08
+        sink.n.01_1 - sink.n.01
+        stain.n.01_1 - stain.n.01
+        toothbrush.n.01_1 - toothbrush.n.01
+        water.n.06_1 - water.n.06
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        stool.n.01_1 - stool.n.01
+        bowl.n.01_1 - bowl.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop stool.n.01_1 floor.n.01_1)
+        (ontop bowl.n.01_1 stool.n.01_1)
+        (inside ring.n.08_1 bowl.n.01_1) 
+        (inside ring.n.08_2 bowl.n.01_1) 
+        (covered ring.n.08_1 stain.n.01_1) 
+        (covered ring.n.08_2 stain.n.01_1) 
+        (ontop toothbrush.n.01_1 stool.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?ring.n.08 - ring.n.08)
+                (not
+                    (covered ?ring.n.08 ?stain.n.01_1)
+                )
+            )
+        )
+    )
+)

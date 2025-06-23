@@ -1,0 +1,23 @@
+(define (problem attach_a_camera_to_a_tripod-0)
+    (:domain omnigibson)
+
+    (:objects
+        digital_camera.n.01_1 - digital_camera.n.01
+        camera_tripod.n.01_1 - camera_tripod.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop digital_camera.n.01_1 floor.n.01_1)
+        (ontop camera_tripod.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?digital_camera.n.01_1 ?camera_tripod.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,33 @@
+(define (problem toast_sunflower_seeds-0)
+    (:domain omnigibson)
+
+    (:objects
+        sunflower_seed__bag.n.01_1 - sunflower_seed__bag.n.01
+        sunflower_seed.n.01_1 - sunflower_seed.n.01
+        cooked__sunflower_seed.n.01_1 - cooked__sunflower_seed.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        oven.n.01_1 - oven.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        tray.n.01_1 - tray.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled sunflower_seed__bag.n.01_1 sunflower_seed.n.01_1)
+        (inside sunflower_seed__bag.n.01_1 cabinet.n.01_1) 
+        (inside tray.n.01_1 cabinet.n.01_1)
+        (inside cookie_sheet.n.01_1 cabinet.n.01_1)
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen)
+        (future cooked__sunflower_seed.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__sunflower_seed.n.01_1)
+        )
+    )
+)

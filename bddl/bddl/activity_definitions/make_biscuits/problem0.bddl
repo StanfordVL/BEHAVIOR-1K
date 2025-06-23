@@ -1,0 +1,69 @@
+(define (problem make_biscuits-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        salt.n.02_1 - salt.n.02
+        shortening.n.01_1 - shortening.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        biscuit.n.01_1 biscuit.n.01_2 biscuit.n.01_3 biscuit.n.01_4 biscuit.n.01_5 biscuit.n.01_6 - biscuit.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        shortening__carton.n.01_1 - shortening__carton.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (inside flour__sack.n.01_1 cabinet.n.01_1) 
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1) 
+        (inside baking_powder__jar.n.01_1 cabinet.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled shortening__carton.n.01_1 shortening.n.01_1) 
+        (inside shortening__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (future biscuit.n.01_3) 
+        (future biscuit.n.01_5) 
+        (future biscuit.n.01_6) 
+        (future biscuit.n.01_4) 
+        (future biscuit.n.01_1) 
+        (future biscuit.n.01_2) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?biscuit.n.01_1) 
+            (real ?biscuit.n.01_2) 
+            (real ?biscuit.n.01_3) 
+            (real ?biscuit.n.01_4) 
+            (real ?biscuit.n.01_5) 
+            (real ?biscuit.n.01_6) 
+            (forall 
+                (?biscuit.n.01 - biscuit.n.01) 
+                (cooked ?biscuit.n.01)
+            )
+        )
+    )
+)

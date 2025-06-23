@@ -1,0 +1,31 @@
+(define (problem clean_wood_siding-0)
+    (:domain omnigibson)
+
+    (:objects
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        rubbing_alcohol.n.01_1 - rubbing_alcohol.n.01
+        rubbing_alcohol__atomizer.n.01_1 - rubbing_alcohol__atomizer.n.01
+        door.n.01_1 - door.n.01
+        sponge.n.01_1 - sponge.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered door.n.01_1 adhesive_material.n.01_1)
+        (insource rubbing_alcohol__atomizer.n.01_1 rubbing_alcohol.n.01_1)
+        (ontop rubbing_alcohol__atomizer.n.01_1 floor.n.01_1)
+        (ontop sponge.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom door.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom)
+    )
+    
+    (:goal 
+        (and 
+            (not
+                (covered ?door.n.01_1 ?adhesive_material.n.01_1)
+            )
+        )
+    )
+)

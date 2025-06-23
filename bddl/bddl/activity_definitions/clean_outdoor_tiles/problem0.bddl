@@ -1,0 +1,50 @@
+(define (problem clean_outdoor_tiles-0)
+    (:domain omnigibson)
+
+    (:objects
+        tile.n.01_1 tile.n.01_2 tile.n.01_3 tile.n.01_4 - tile.n.01
+        floor.n.01_1 - floor.n.01
+        bucket.n.01_1 - bucket.n.01
+        swab.n.02_1 - swab.n.02
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        bleaching_agent.n.01_1 - bleaching_agent.n.01
+        bleaching_agent__atomizer.n.01_1 - bleaching_agent__atomizer.n.01
+        stain.n.01_1 - stain.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tile.n.01_1 floor.n.01_1) 
+        (ontop tile.n.01_2 floor.n.01_1) 
+        (ontop tile.n.01_3 floor.n.01_1) 
+        (ontop tile.n.01_4 floor.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop swab.n.02_1 floor.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1)
+        (insource bleaching_agent__atomizer.n.01_1 bleaching_agent.n.01_1) 
+        (ontop bleaching_agent__atomizer.n.01_1 floor.n.01_1)
+        (covered tile.n.01_1 stain.n.01_1) 
+        (covered tile.n.01_2 stain.n.01_1) 
+        (covered tile.n.01_3 stain.n.01_1) 
+        (covered tile.n.01_4 stain.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?tile.n.01 - tile.n.01) 
+                (and
+                    (not 
+                        (covered ?tile.n.01 ?stain.n.01_1)
+                    )
+                    (covered ?tile.n.01 ?bleaching_agent.n.01_1)
+                    (ontop ?tile.n.01 ?floor.n.01_1)
+                )
+            )
+        )
+    )
+)

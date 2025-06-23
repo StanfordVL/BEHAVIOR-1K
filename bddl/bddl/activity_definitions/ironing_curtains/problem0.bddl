@@ -1,0 +1,30 @@
+(define (problem ironing_curtains-0)
+    (:domain omnigibson)
+
+    (:objects
+        iron.n.04_1 - iron.n.04
+        ironing_board.n.01_1 - ironing_board.n.01
+        floor.n.01_1 - floor.n.01
+        curtain.n.01_1 - curtain.n.01
+        wrinkle.n.01_1 - wrinkle.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop ironing_board.n.01_1 floor.n.01_1) 
+        (ontop curtain.n.01_1 ironing_board.n.01_1) 
+        (ontop iron.n.04_1 ironing_board.n.01_1)
+        (covered curtain.n.01_1 wrinkle.n.01_1) 
+        (inroom floor.n.01_1 empty_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?curtain.n.01_1 ?wrinkle.n.01_1)
+            ) 
+            (overlaid ?curtain.n.01_1 ?ironing_board.n.01_1)
+        )
+    )
+)

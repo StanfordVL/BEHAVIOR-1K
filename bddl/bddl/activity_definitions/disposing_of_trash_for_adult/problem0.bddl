@@ -1,0 +1,44 @@
+(define (problem disposing_of_trash_for_adult-0)
+    (:domain omnigibson)
+
+    (:objects
+        tray.n.01_1 - tray.n.01
+        stove.n.01_1 - stove.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        magazine.n.02_1 magazine.n.02_2 - magazine.n.02
+        paper_towel.n.01_1 - paper_towel.n.01
+        straw.n.04_1 - straw.n.04
+        ashcan.n.01_1 - ashcan.n.01
+        plastic_wrap.n.01_1 - plastic_wrap.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tray.n.01_1 stove.n.01_1) 
+        (ontop magazine.n.02_1 floor.n.01_2) 
+        (ontop magazine.n.02_2 floor.n.01_2) 
+        (ontop paper_towel.n.01_1 floor.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (ontop straw.n.04_1 stove.n.01_1) 
+        (ontop plastic_wrap.n.01_1 tray.n.01_1) 
+        (covered straw.n.04_1 water.n.06_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_2 bathroom)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?magazine.n.02_1 ?ashcan.n.01_1) 
+            (inside ?magazine.n.02_2 ?ashcan.n.01_1) 
+            (inside ?paper_towel.n.01_1 ?ashcan.n.01_1) 
+            (inside ?straw.n.04_1 ?ashcan.n.01_1) 
+            (inside ?plastic_wrap.n.01_1 ?ashcan.n.01_1)
+            (not 
+                (inside ?tray.n.01_1 ?ashcan.n.01_1)
+            )
+        ) 
+    )
+)

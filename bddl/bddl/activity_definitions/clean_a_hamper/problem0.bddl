@@ -1,0 +1,31 @@
+(define (problem clean_a_hamper-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        hamper.n.02_1 - hamper.n.02
+        washer.n.03_1 - washer.n.03
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered hamper.n.02_1 stain.n.01_1) 
+        (ontop hamper.n.02_1 floor.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (inroom washer.n.03_1 utility_room) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?hamper.n.02_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

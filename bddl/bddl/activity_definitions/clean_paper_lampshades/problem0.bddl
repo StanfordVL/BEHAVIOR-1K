@@ -1,0 +1,34 @@
+(define (problem clean_paper_lampshades-0)
+    (:domain omnigibson)
+
+    (:objects
+        rag.n.01_1 - rag.n.01
+        lampshade.n.01_1 lampshade.n.01_2 - lampshade.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        dust.n.01_1 - dust.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 coffee_table.n.01_1) 
+        (ontop lampshade.n.01_1 coffee_table.n.01_1)
+        (ontop lampshade.n.01_2 coffee_table.n.01_1) 
+        (covered lampshade.n.01_1 dust.n.01_1)
+        (covered lampshade.n.01_2 dust.n.01_1)
+        (inroom coffee_table.n.01_1 living_room)
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?lampshade.n.01 - lampshade.n.01) 
+                (not 
+                    (covered ?lampshade.n.01 ?dust.n.01_1)
+                )
+            )
+        )
+    )
+)

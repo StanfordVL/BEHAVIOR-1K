@@ -1,0 +1,27 @@
+(define (problem clean_a_piano-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        piano.n.01_1 - piano.n.01
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered piano.n.01_1 dust.n.01_1) 
+        (ontop rag.n.01_1 piano.n.01_1) 
+        (inroom piano.n.01_1 living_room)
+        (inroom floor.n.01_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?piano.n.01_1 ?dust.n.01_1)
+            ) 
+        )
+    )
+)

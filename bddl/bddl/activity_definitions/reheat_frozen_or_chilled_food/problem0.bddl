@@ -1,0 +1,44 @@
+(define (problem reheat_frozen_or_chilled_food-0)
+    (:domain omnigibson)
+
+    (:objects
+        tupperware.n.01_1 - tupperware.n.01
+        chicken_leg.n.01_1 - chicken_leg.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        muffin.n.01_1 muffin.n.01_2 - muffin.n.01
+        microwave.n.02_1 - microwave.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside chicken_leg.n.01_1 tupperware.n.01_1)
+        (frozen chicken_leg.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (inside muffin.n.01_1 electric_refrigerator.n.01_1) 
+        (inside muffin.n.01_2 electric_refrigerator.n.01_1) 
+        (not
+            (hot muffin.n.01_1)
+        )
+        (not
+            (hot muffin.n.01_2)
+        )
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom microwave.n.02_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?muffin.n.01 - muffin.n.01)
+                (hot ?muffin.n.01)
+            )
+            (not 
+                (frozen ?chicken_leg.n.01_1)
+            )
+            (hot ?chicken_leg.n.01_1)
+        )
+    )
+)

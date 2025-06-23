@@ -1,0 +1,33 @@
+(define (problem store_daffodil_bulbs-0)
+    (:domain omnigibson)
+
+    (:objects
+        daffodil_bulb.n.01_1 daffodil_bulb.n.01_2 daffodil_bulb.n.01_3 - daffodil_bulb.n.01
+        countertop.n.01_1 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop daffodil_bulb.n.01_1 countertop.n.01_1) 
+        (ontop daffodil_bulb.n.01_2 countertop.n.01_1) 
+        (ontop daffodil_bulb.n.01_3 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?daffodil_bulb.n.01 - daffodil_bulb.n.01)
+                (inside ?daffodil_bulb.n.01 ?mixing_bowl.n.01_1)
+            )
+            (inside ?mixing_bowl.n.01_1 ?cabinet.n.01_1)
+        )
+    )
+)

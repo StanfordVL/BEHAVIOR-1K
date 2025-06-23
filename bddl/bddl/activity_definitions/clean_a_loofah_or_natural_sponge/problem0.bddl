@@ -1,0 +1,35 @@
+(define (problem clean_a_loofah_or_natural_sponge-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        loofa.n.01_1 - loofa.n.01
+        water.n.06_1 - water.n.06
+        rag.n.01_1 - rag.n.01
+        bleaching_agent.n.01_1 - bleaching_agent.n.01
+        bleaching_agent__atomizer.n.01_1 - bleaching_agent__atomizer.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered loofa.n.01_1 stain.n.01_1)
+        (insource bleaching_agent__atomizer.n.01_1 bleaching_agent.n.01_1)
+        (ontop bleaching_agent__atomizer.n.01_1 floor.n.01_1)
+        (ontop loofa.n.01_1 sink.n.01_1)
+        (ontop rag.n.01_1 sink.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?loofa.n.01_1 ?stain.n.01_1)
+            ) 
+        )
+    )
+)

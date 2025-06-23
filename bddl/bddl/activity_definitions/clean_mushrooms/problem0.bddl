@@ -1,0 +1,56 @@
+(define (problem clean_mushrooms-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        bowl.n.01_1 - bowl.n.01
+        sink.n.01_1 - sink.n.01
+        dirt.n.02_1 - dirt.n.02
+        countertop.n.01_1 - countertop.n.01
+        mushroom.n.05_1 mushroom.n.05_2 mushroom.n.05_3 mushroom.n.05_4 mushroom.n.05_5 mushroom.n.05_6 mushroom.n.05_7 mushroom.n.05_8 - mushroom.n.05
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop paper_towel.n.01_1 countertop.n.01_1) 
+        (inside mushroom.n.05_1 bowl.n.01_1) 
+        (inside mushroom.n.05_2 bowl.n.01_1) 
+        (inside mushroom.n.05_3 bowl.n.01_1) 
+        (inside mushroom.n.05_4 bowl.n.01_1) 
+        (inside mushroom.n.05_5 bowl.n.01_1) 
+        (inside mushroom.n.05_6 bowl.n.01_1) 
+        (inside mushroom.n.05_7 bowl.n.01_1) 
+        (inside mushroom.n.05_8 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (covered mushroom.n.05_1 dirt.n.02_1)
+        (covered mushroom.n.05_2 dirt.n.02_1)
+        (covered mushroom.n.05_3 dirt.n.02_1)
+        (covered mushroom.n.05_4 dirt.n.02_1)
+        (covered mushroom.n.05_5 dirt.n.02_1)
+        (covered mushroom.n.05_6 dirt.n.02_1)
+        (covered mushroom.n.05_7 dirt.n.02_1)
+        (covered mushroom.n.05_8 dirt.n.02_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?mushroom.n.05 - mushroom.n.05)
+                (and
+                    (not
+                        (covered ?mushroom.n.05 ?dirt.n.02_1)
+                    )
+                )
+            )
+        )
+    )
+)

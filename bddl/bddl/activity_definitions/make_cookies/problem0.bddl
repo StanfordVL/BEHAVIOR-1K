@@ -1,0 +1,85 @@
+(define (problem make_cookies-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        butter.n.01_1 - butter.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        salt.n.02_1 - salt.n.02
+        cinnamon.n.03_1 - cinnamon.n.03
+        nutmeg.n.02_1 - nutmeg.n.02
+        cinnamon__shaker.n.01_1 - cinnamon__shaker.n.01
+        nutmeg__shaker.n.01_1 - nutmeg__shaker.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        spice_cookie.n.01_1 spice_cookie.n.01_2 spice_cookie.n.01_3 spice_cookie.n.01_4 spice_cookie.n.01_5 spice_cookie.n.01_6 - spice_cookie.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        butter__package.n.01_1 - butter__package.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (inside flour__sack.n.01_1 cabinet.n.01_2) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 cabinet.n.01_1) 
+        (inside raw_egg.n.01_1 tupperware.n.01_1) 
+        (inside raw_egg.n.01_2 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 cabinet.n.01_1) 
+        (inside butter.n.01_1 butter__package.n.01_1) 
+        (inside butter__package.n.01_1 electric_refrigerator.n.01_1)
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1) 
+        (inside baking_powder__jar.n.01_1 cabinet.n.01_2) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (inside salt__shaker.n.01_1 cabinet.n.01_1)
+        (insource cinnamon__shaker.n.01_1 cinnamon.n.03_1) 
+        (inside cinnamon__shaker.n.01_1 cabinet.n.01_1) 
+        (insource nutmeg__shaker.n.01_1 nutmeg.n.02_1) 
+        (inside nutmeg__shaker.n.01_1 cabinet.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom cabinet.n.01_2 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inside cookie_sheet.n.01_1 oven.n.01_1) 
+        (future spice_cookie.n.01_4) 
+        (future spice_cookie.n.01_1) 
+        (future spice_cookie.n.01_2) 
+        (future spice_cookie.n.01_6) 
+        (future spice_cookie.n.01_3) 
+        (future spice_cookie.n.01_5) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?spice_cookie.n.01_1) 
+            (real ?spice_cookie.n.01_2) 
+            (real ?spice_cookie.n.01_3) 
+            (real ?spice_cookie.n.01_4) 
+            (real ?spice_cookie.n.01_5) 
+            (real ?spice_cookie.n.01_6) 
+            (forall 
+                (?spice_cookie.n.01 - spice_cookie.n.01) 
+                (cooked ?spice_cookie.n.01)
+            )
+        )
+    )
+)

@@ -1,0 +1,89 @@
+(define (problem sorting_bottles_cans_and_paper-0)
+    (:domain omnigibson)
+
+    (:objects
+        bucket.n.01_1 bucket.n.01_2 bucket.n.01_3 - bucket.n.01
+        floor.n.01_1 - floor.n.01
+        water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        can.n.01_1 can.n.01_2 - can.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        magazine.n.02_1 - magazine.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop bucket.n.01_2 floor.n.01_1) 
+        (ontop bucket.n.01_3 floor.n.01_1) 
+        (ontop water_bottle.n.01_1 countertop.n.01_1) 
+        (ontop water_bottle.n.01_2 floor.n.01_1) 
+        (ontop can.n.01_1 floor.n.01_1) 
+        (ontop can.n.01_2 countertop.n.01_1) 
+        (ontop newspaper.n.03_1 countertop.n.01_1) 
+        (ontop magazine.n.02_1 countertop.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?bucket.n.01 - bucket.n.01)
+                (and
+                    (forall 
+                        (?water_bottle.n.01 - water_bottle.n.01)
+                        (inside ?water_bottle.n.01 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?can.n.01_1 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?newspaper.n.03_1 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?magazine.n.02_1 ?bucket.n.01)
+                    )
+                )
+            )
+            (exists 
+                (?bucket.n.01 - bucket.n.01)
+                (and
+                    (forall 
+                        (?can.n.01 - can.n.01)
+                        (inside ?can.n.01 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?water_bottle.n.01_1 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?newspaper.n.03_1 ?bucket.n.01)
+                    )
+                    (not 
+                        (inside ?magazine.n.02_1 ?bucket.n.01)
+                    )
+                )
+            )
+            (exists 
+                (?bucket.n.01 - bucket.n.01)
+                (and
+                    (forall 
+                        (?can.n.01 - can.n.01)
+                        (not
+                            (inside ?can.n.01 ?bucket.n.01)
+                        )
+                    )
+                    (forall 
+                        (?water_bottle.n.01 - water_bottle.n.01)
+                        (not
+                            (inside ?water_bottle.n.01 ?bucket.n.01)
+                        )
+                    )
+                    (inside ?newspaper.n.03_1 ?bucket.n.01)
+                    (inside ?magazine.n.02_1 ?bucket.n.01)
+                )
+            )
+        )
+    )
+)

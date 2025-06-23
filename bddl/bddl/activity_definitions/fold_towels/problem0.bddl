@@ -1,0 +1,49 @@
+(define (problem fold_towels-0)
+    (:domain omnigibson)
+
+    (:objects
+        hamper.n.02_1 - hamper.n.02
+        washer.n.03_1 - washer.n.03
+        hand_towel.n.01_1 hand_towel.n.01_2 - hand_towel.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        bath_towel.n.01_1 - bath_towel.n.01
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop hamper.n.02_1 floor.n.01_1) 
+        (ontop hand_towel.n.01_1 washer.n.03_1)
+        (ontop hand_towel.n.01_2 washer.n.03_1)
+        (ontop bath_towel.n.01_1 clothes_dryer.n.01_1)
+        (inside rag.n.01_1 clothes_dryer.n.01_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?hand_towel.n.01 - hand_towel.n.01) 
+                (folded ?hand_towel.n.01)
+            ) 
+            (forall 
+                (?bath_towel.n.01 - bath_towel.n.01) 
+                (folded ?bath_towel.n.01)
+            ) 
+            (folded ?rag.n.01_1) 
+            (forall 
+                (?bath_towel.n.01 - bath_towel.n.01) 
+                (inside ?bath_towel.n.01 ?hamper.n.02_1)
+            ) 
+            (forall 
+                (?hand_towel.n.01 - hand_towel.n.01) 
+                (inside ?hand_towel.n.01 ?hamper.n.02_1)
+            ) 
+            (inside ?rag.n.01_1 ?hamper.n.02_1) 
+        )
+    )
+)

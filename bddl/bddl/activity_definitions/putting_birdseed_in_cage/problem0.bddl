@@ -1,0 +1,30 @@
+(define (problem putting_birdseed_in_cage-0)
+    (:domain omnigibson)
+
+    (:objects
+        birdcage.n.01_1 - birdcage.n.01
+        pot_plant.n.01_1 - pot_plant.n.01
+        floor.n.01_1 - floor.n.01
+        bowl.n.01_1 - bowl.n.01
+        bird_feed.n.01_1 - bird_feed.n.01
+        bird_feed__bag.n.01_1 - bird_feed__bag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop birdcage.n.01_1 floor.n.01_1) 
+        (ontop pot_plant.n.01_1 floor.n.01_1) 
+        (ontop bowl.n.01_1 floor.n.01_1) 
+        (filled bird_feed__bag.n.01_1 bird_feed.n.01_1) 
+        (ontop bird_feed__bag.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (filled ?bowl.n.01_1 ?bird_feed.n.01_1) 
+            (inside ?bowl.n.01_1 ?birdcage.n.01_1)
+        )
+    )
+)

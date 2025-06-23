@@ -1,0 +1,133 @@
+(define (problem make_seafood_stew-0)
+    (:domain omnigibson)
+
+    (:objects
+        bell_pepper.n.02_1 - bell_pepper.n.02
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 clove.n.03_4 clove.n.03_5 - clove.n.03
+        olive_oil.n.01_1 - olive_oil.n.01
+        beefsteak_tomato.n.01_1 - beefsteak_tomato.n.01
+        tomato_sauce.n.01_1 - tomato_sauce.n.01
+        chicken_broth.n.01_1 - chicken_broth.n.01
+        clam.n.03_1 clam.n.03_2 clam.n.03_3 clam.n.03_4 clam.n.03_5 clam.n.03_6 - clam.n.03
+        prawn.n.01_1 prawn.n.01_2 prawn.n.01_3 prawn.n.01_4 prawn.n.01_5 - prawn.n.01
+        scallop.n.02_1 scallop.n.02_2 scallop.n.02_3 scallop.n.02_4 - scallop.n.02
+        marjoram.n.02_1 - marjoram.n.02
+        parsley.n.02_1 - parsley.n.02
+        fish_stew.n.01_1 - fish_stew.n.01
+        stove.n.01_1 - stove.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        tomato_sauce__jar.n.01_1 - tomato_sauce__jar.n.01
+        tupperware.n.01_1 tupperware.n.01_2 tupperware.n.01_3 - tupperware.n.01
+        marjoram__shaker.n.01_1 - marjoram__shaker.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        countertop.n.01_1 - countertop.n.01
+        cup.n.01_1 - cup.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside bell_pepper.n.02_1 electric_refrigerator.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (inside clove.n.03_1 electric_refrigerator.n.01_1)
+        (inside clove.n.03_2 electric_refrigerator.n.01_1)
+        (inside clove.n.03_3 electric_refrigerator.n.01_1)
+        (inside clove.n.03_4 electric_refrigerator.n.01_1)
+        (inside clove.n.03_5 electric_refrigerator.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (inside olive_oil__bottle.n.01_1 cabinet.n.01_1) 
+        (ontop beefsteak_tomato.n.01_1 countertop.n.01_1) 
+        (filled tomato_sauce__jar.n.01_1 tomato_sauce.n.01_1) 
+        (inside tomato_sauce__jar.n.01_1 electric_refrigerator.n.01_1) 
+        (filled cup.n.01_1 chicken_broth.n.01_1) 
+        (inside cup.n.01_1 electric_refrigerator.n.01_1) 
+        (not 
+            (cooked clam.n.03_1)
+        ) 
+        (inside clam.n.03_1 tupperware.n.01_1)
+        (not 
+            (cooked clam.n.03_2)
+        ) 
+        (inside clam.n.03_2 tupperware.n.01_1)
+        (not 
+            (cooked clam.n.03_3)
+        ) 
+        (inside clam.n.03_3 tupperware.n.01_1)
+        (not 
+            (cooked clam.n.03_4)
+        ) 
+        (inside clam.n.03_4 tupperware.n.01_1)
+        (not 
+            (cooked clam.n.03_5)
+        ) 
+        (inside clam.n.03_5 tupperware.n.01_1)
+        (not 
+            (cooked clam.n.03_6)
+        ) 
+        (inside clam.n.03_6 tupperware.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (inside prawn.n.01_1 tupperware.n.01_2)
+        (not 
+            (cooked prawn.n.01_1)
+        ) 
+        (inside prawn.n.01_2 tupperware.n.01_2)
+        (not 
+            (cooked prawn.n.01_2)
+        ) 
+        (inside prawn.n.01_3 tupperware.n.01_2)
+        (not 
+            (cooked prawn.n.01_3)
+        ) 
+        (inside prawn.n.01_4 tupperware.n.01_2)
+        (not 
+            (cooked prawn.n.01_4)
+        ) 
+        (inside prawn.n.01_5 tupperware.n.01_2)
+        (not 
+            (cooked prawn.n.01_5)
+        ) 
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1) 
+        (not 
+            (cooked scallop.n.02_1)
+        ) 
+        (inside scallop.n.02_1 tupperware.n.01_3) 
+        (not 
+            (cooked scallop.n.02_2)
+        ) 
+        (inside scallop.n.02_2 tupperware.n.01_3) 
+        (not 
+            (cooked scallop.n.02_3)
+        ) 
+        (inside scallop.n.02_3 tupperware.n.01_3) 
+        (not 
+            (cooked scallop.n.02_4)
+        ) 
+        (inside scallop.n.02_4 tupperware.n.01_3) 
+        (inside tupperware.n.01_3 electric_refrigerator.n.01_1) 
+        (insource marjoram__shaker.n.01_1 marjoram.n.02_1)
+        (inside marjoram__shaker.n.01_1 cabinet.n.01_1)
+        (inside parsley.n.02_1 mason_jar.n.01_1) 
+        (inside mason_jar.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop stockpot.n.01_1 stove.n.01_1) 
+        (future fish_stew.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?fish_stew.n.01_1) 
+            (contains ?stockpot.n.01_1 ?fish_stew.n.01_1)
+        )
+    )
+)

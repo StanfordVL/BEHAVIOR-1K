@@ -1,0 +1,32 @@
+(define (problem adding_chemicals_to_pool-0)
+    (:domain omnigibson)
+
+    (:objects
+        sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01
+        floor.n.01_1 - floor.n.01
+        sodium_carbonate.n.01_1 - sodium_carbonate.n.01
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        water.n.06_1 - water.n.06
+        pool.n.01_1 - pool.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled sodium_carbonate__jar.n.01_1 sodium_carbonate.n.01_1)
+        (filled pool.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 garden)
+        (inroom pool.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1)
+        (ontop disinfectant__bottle.n.01_1 floor.n.01_1)
+        (ontop sodium_carbonate__jar.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (contains ?pool.n.01_1 ?sodium_carbonate.n.01_1)
+            (contains ?pool.n.01_1 ?disinfectant.n.01_1)
+        )
+    )
+)

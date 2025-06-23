@@ -1,0 +1,45 @@
+(define (problem preserving_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        stove.n.01_1 - stove.n.01
+        water.n.06_1 - water.n.06
+        stockpot.n.01_1 - stockpot.n.01
+        carrot.n.03_1 carrot.n.03_2 - carrot.n.03
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        diced__carrot.n.01_1 - diced__carrot.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled stockpot.n.01_1 water.n.06_1) 
+        (ontop stockpot.n.01_1 stove.n.01_1) 
+        (ontop carrot.n.03_1 chopping_board.n.01_1) 
+        (ontop carrot.n.03_2 chopping_board.n.01_1) 
+        (ontop mason_jar.n.01_1 countertop.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1)
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1)
+        (ontop vinegar__bottle.n.01_1 countertop.n.01_1)
+        (future diced__carrot.n.01_1)
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__carrot.n.01_1)
+            (contains ?mason_jar.n.01_1 ?vinegar.n.01_1) 
+            (filled ?mason_jar.n.01_1 ?diced__carrot.n.01_1)
+            (hot ?mason_jar.n.01_1)
+        )
+    )
+)

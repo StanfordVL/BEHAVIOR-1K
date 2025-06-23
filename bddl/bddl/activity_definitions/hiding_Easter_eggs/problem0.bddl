@@ -1,0 +1,45 @@
+(define (problem hiding_Easter_eggs-0)
+    (:domain omnigibson)
+
+    (:objects
+        easter_egg.n.01_1 easter_egg.n.01_2 easter_egg.n.01_3 - easter_egg.n.01
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        lawn.n.01_1 - lawn.n.01
+        tree.n.01_1 tree.n.01_* - tree.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside easter_egg.n.01_1 wicker_basket.n.01_1) 
+        (inside easter_egg.n.01_2 wicker_basket.n.01_1) 
+        (inside easter_egg.n.01_3 wicker_basket.n.01_1) 
+        (ontop wicker_basket.n.01_1 lawn.n.01_1) 
+        (inroom lawn.n.01_1 garden) 
+        (inroom tree.n.01_1 garden)
+        (inroom tree.n.01_* garden)
+        (ontop agent.n.01_1 lawn.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?tree.n.01 - tree.n.01)
+                (forall
+                    (?easter_egg.n.01 - easter_egg.n.01)
+                    (and
+                        (nextto ?easter_egg.n.01 ?tree.n.01)
+                    )
+                )
+            )
+            (forall
+                (?easter_egg.n.01 - easter_egg.n.01)
+                (and
+                    (not
+                        (inside ?easter_egg.n.01 ?wicker_basket.n.01_1)
+                    )
+                    (ontop ?easter_egg.n.01 ?lawn.n.01_1)
+                )
+            )
+        )
+    )
+)

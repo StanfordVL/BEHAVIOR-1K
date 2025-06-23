@@ -1,0 +1,29 @@
+(define (problem paying_for_purchases-0)
+    (:domain omnigibson)
+
+    (:objects
+        shopping_basket.n.01_1 - shopping_basket.n.01
+        checkout.n.03_1 - checkout.n.03
+        money.n.01_1 - money.n.01
+        apple.n.01_1 apple.n.01_2 - apple.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside money.n.01_1 shopping_basket.n.01_1) 
+        (inside apple.n.01_1 shopping_basket.n.01_1) 
+        (inside apple.n.01_2 shopping_basket.n.01_1) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (ontop shopping_basket.n.01_1 floor.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?shopping_basket.n.01_1 ?checkout.n.03_1) 
+            (ontop ?money.n.01_1 ?checkout.n.03_1)
+        )
+    )
+)

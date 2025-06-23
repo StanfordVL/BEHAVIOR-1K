@@ -1,0 +1,53 @@
+(define (problem wash_an_infant_car_seat-0)
+    (:domain omnigibson)
+
+    (:objects
+        infant_car_seat.n.01_1 - infant_car_seat.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        dust.n.01_1 - dust.n.01
+        crumb.n.03_1 - crumb.n.03
+        dirt.n.02_1 - dirt.n.02
+        sponge.n.01_1 - sponge.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        water.n.06_1 - water.n.06
+        scrub_brush.n.01_1 - scrub_brush.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop infant_car_seat.n.01_1 floor.n.01_1) 
+        (covered infant_car_seat.n.01_1 adhesive_material.n.01_1) 
+        (covered infant_car_seat.n.01_1 dust.n.01_1) 
+        (covered infant_car_seat.n.01_1 crumb.n.03_1) 
+        (covered infant_car_seat.n.01_1 dirt.n.02_1) 
+        (ontop sponge.n.01_1 floor.n.01_1) 
+        (ontop scrub_brush.n.01_1 floor.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom floor.n.01_2 garage) 
+        (inroom sink.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?infant_car_seat.n.01_1 ?adhesive_material.n.01_1)
+            ) 
+            (not 
+                (covered ?infant_car_seat.n.01_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?infant_car_seat.n.01_1 ?crumb.n.03_1)
+            ) 
+            (not 
+                (covered ?infant_car_seat.n.01_1 ?dirt.n.02_1)
+            ) 
+        )
+    )
+)

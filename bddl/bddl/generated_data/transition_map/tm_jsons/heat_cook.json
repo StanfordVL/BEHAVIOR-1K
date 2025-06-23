@@ -1,0 +1,965 @@
+[
+    {
+        "rule_name": "sugar_cookies",
+        "input_synsets": {
+            "sugar_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "sugar_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "sugar_cookie.n.01": 6
+        },
+        "output_states": {
+            "sugar_cookie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "salt_water",
+        "input_synsets": {
+            "water.n.06": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "seawater.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "cheese_tarts",
+        "input_synsets": {
+            "pastry.n.01": 1,
+            "cheese_pastry_filling.n.01": 1
+        },
+        "input_states": {
+            "pastry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "pastry.n.01,cheese_pastry_filling.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "cheese_tart.n.01": 6
+        },
+        "output_states": {
+            "cheese_tart.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "red_meat_sauce",
+        "input_synsets": {
+            "tomato_sauce.n.01": 1,
+            "olive_oil.n.01": 1,
+            "clove.n.03": 3,
+            "basil.n.03": 4,
+            "ground_beef.n.01": 1,
+            "rosemary.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__red_meat_sauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "schnitzel",
+        "input_synsets": {
+            "cooking_oil.n.01": 1,
+            "flour.n.01": 1,
+            "raw_egg.n.01": 1,
+            "salt.n.02": 1,
+            "veal.n.01": 1,
+            "breadcrumb.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "veal.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "frying_pan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "schnitzel.n.01": 1
+        },
+        "output_states": {
+            "schnitzel.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "applesauce",
+        "input_synsets": {
+            "apple.n.01": 3,
+            "water.n.06": 1,
+            "lemon_juice.n.01": 1,
+            "cinnamon.n.03": 1,
+            "granulated_sugar.n.01": 1
+        },
+        "input_states": {
+            "apple.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "applesauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "bagels",
+        "input_synsets": {
+            "raw_egg.n.01": 1,
+            "bagel_dough.n.01": 1,
+            "sesame_seed.n.01": 1
+        },
+        "input_states": {
+            "raw_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "bagel_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "raw_egg.n.01,bagel_dough.n.01": [
+                [
+                    "ontop",
+                    true
+                ]
+            ],
+            "bagel_dough.n.01,sesame_seed.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "bagel.n.01": 4
+        },
+        "output_states": {
+            "bagel.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "biscuits",
+        "input_synsets": {
+            "biscuit_dough.n.01": 1
+        },
+        "input_states": {
+            "biscuit_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "biscuit.n.01": 4
+        },
+        "output_states": {
+            "biscuit.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "blueberry_compote",
+        "input_synsets": {
+            "lemon_juice.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "blueberry.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "blueberry_compote.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "chicken_curry",
+        "input_synsets": {
+            "diced__chicken_breast.n.01": 1,
+            "diced__beefsteak_tomato.n.01": 1,
+            "diced__vidalia_onion.n.01": 1,
+            "cooking_oil.n.01": 1,
+            "curry_powder.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "chicken_curry.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "chocolate_syrup",
+        "input_synsets": {
+            "granulated_sugar.n.01": 1,
+            "seawater.n.01": 1,
+            "vanilla.n.02": 1,
+            "cocoa_powder.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "chocolate_sauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "spice_cookies",
+        "input_synsets": {
+            "spice_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "spice_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "spice_cookie.n.01": 6
+        },
+        "output_states": {
+            "spice_cookie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "baps",
+        "input_synsets": {
+            "roll_dough.n.01": 1
+        },
+        "input_states": {
+            "roll_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "bap.n.01": 4
+        },
+        "output_states": {
+            "bap.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "granola",
+        "input_synsets": {
+            "oat.n.02": 1,
+            "honey.n.01": 1,
+            "cinnamon.n.03": 1,
+            "pecan.n.03": 1,
+            "raisin.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "granola.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "cocoa",
+        "input_synsets": {
+            "cocoa_powder.n.01": 1,
+            "whole_milk.n.01": 1,
+            "granulated_sugar.n.01": 1,
+            "vanilla.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "cocoa.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "ice_cubes",
+        "input_synsets": {
+            "water.n.06": 1
+        },
+        "input_states": null,
+        "container": {
+            "icetray.n.02": 1
+        },
+        "heat_source": {
+            "deep-freeze.n.02": 1
+        },
+        "output_synsets": {
+            "ice_cube.n.01": 6
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "cheese_sauce",
+        "input_synsets": {
+            "cream_cheese.n.01": 1,
+            "butter.n.01": 1,
+            "whole_milk.n.01": 1,
+            "grated_cheese.n.01": 1,
+            "parmesan.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "cheese_sauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "macaroni_and_cheese",
+        "input_synsets": {
+            "cooked__noodle.n.01": 1,
+            "breadcrumb.n.01": 1,
+            "cheese_sauce.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "casserole.n.02": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "macaroni_and_cheese.n.01": 1
+        },
+        "output_states": {
+            "macaroni_and_cheese.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "meatloaf",
+        "input_synsets": {
+            "ground_beef.n.01": 1,
+            "whole_milk.n.01": 1,
+            "diced__vidalia_onion.n.01": 1,
+            "breadcrumb.n.01": 1,
+            "brown_sugar.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "casserole.n.02": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "meat_loaf.n.01": 1
+        },
+        "output_states": {
+            "meat_loaf.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "muffins",
+        "input_synsets": {
+            "muffin_batter.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "muffin.n.01": 6
+        },
+        "output_states": {
+            "muffin.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "oatmeal",
+        "input_synsets": {
+            "seawater.n.01": 1,
+            "cinnamon.n.03": 1,
+            "honey.n.01": 1,
+            "oat.n.02": 1,
+            "low-fat_milk.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "oatmeal.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "marinara",
+        "input_synsets": {
+            "half__beefsteak_tomato.n.01": 6,
+            "clove.n.03": 5,
+            "diced__vidalia_onion.n.01": 1,
+            "basil.n.03": 4,
+            "marjoram.n.02": 1,
+            "granulated_sugar.n.01": 1,
+            "salt.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__marinara.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "tomato sauce",
+        "input_synsets": {
+            "beefsteak_tomato.n.01": 1,
+            "tomato_paste.n.01": 1,
+            "marjoram.n.02": 1,
+            "clove.n.03": 2,
+            "basil.n.03": 1
+        },
+        "input_states": null,
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "tomato_sauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "pizza",
+        "input_synsets": {
+            "pizza_dough.n.01": 1,
+            "tomato_sauce.n.01": 1,
+            "grated_cheese.n.01": 1,
+            "pepperoni.n.01": 7,
+            "marjoram.n.02": 1,
+            "half__mushroom.n.01": 10,
+            "diced__vidalia_onion.n.01": 1
+        },
+        "input_states": {
+            "pizza_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "pepperoni.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ],
+            "half__mushroom.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "pizza_dough.n.01,tomato_sauce.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pizza_dough.n.01,grated_cheese.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pizza_dough.n.01,marjoram.n.02": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pizza_dough.n.01,diced__vidalia_onion.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pepperoni.n.01,pizza_dough.n.01": [
+                [
+                    "ontop",
+                    true
+                ]
+            ],
+            "half__mushroom.n.01,pizza_dough.n.01": [
+                [
+                    "ontop",
+                    true
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "pizza.n.01": 1
+        },
+        "output_states": {
+            "pizza.n.01": [
+                [
+                    "hot",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "simple_pizza",
+        "input_synsets": {
+            "pizza_dough.n.01": 1,
+            "grated_cheese.n.01": 1,
+            "pepperoni.n.01": 1,
+            "half__mushroom.n.01": 1,
+            "diced__vidalia_onion.n.01": 1
+        },
+        "input_states": {
+            "pizza_dough.n.01,grated_cheese.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pizza_dough.n.01,diced__vidalia_onion.n.01": [
+                [
+                    "covered",
+                    true
+                ]
+            ],
+            "pepperoni.n.01,pizza_dough.n.01": [
+                [
+                    "ontop",
+                    true
+                ]
+            ],
+            "half__mushroom.n.01,pizza_dough.n.01": [
+                [
+                    "ontop",
+                    true
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "pizza.n.01": 1
+        },
+        "output_states": {
+            "pizza.n.01": [
+                [
+                    "hot",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "popsicles",
+        "input_synsets": {
+            "smoothie.n.02": 1
+        },
+        "input_states": null,
+        "container": {
+            "mold.n.02": 1
+        },
+        "heat_source": {
+            "deep-freeze.n.02": 1
+        },
+        "output_synsets": {
+            "ice_lolly.n.01": 4
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "fish_stew",
+        "input_synsets": {
+            "diced__bell_pepper.n.01": 1,
+            "diced__clove.n.01": 1,
+            "olive_oil.n.01": 1,
+            "diced__beefsteak_tomato.n.01": 1,
+            "tomato_sauce.n.01": 1,
+            "chicken_broth.n.01": 1,
+            "clam.n.03": 6,
+            "prawn.n.01": 5,
+            "scallop.n.02": 4,
+            "marjoram.n.02": 1,
+            "parsley.n.02": 1
+        },
+        "input_states": {
+            "clam.n.03": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "prawn.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ],
+            "scallop.n.02": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "fish_stew.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "chicken_soup",
+        "input_synsets": {
+            "chicken_broth.n.01": 1,
+            "diced__carrot.n.01": 1,
+            "diced__celery.n.01": 1,
+            "chicken.n.01": 1,
+            "salt.n.02": 1,
+            "rosemary.n.02": 1
+        },
+        "input_states": {
+            "chicken.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chicken_soup.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "beef_stew",
+        "input_synsets": {
+            "diced__carrot.n.01": 1,
+            "pea.n.01": 1,
+            "diced__vidalia_onion.n.01": 1,
+            "ground_beef.n.01": 1,
+            "beef_broth.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "stockpot.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "beef_stew.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    },
+    {
+        "rule_name": "brownie",
+        "input_synsets": {
+            "brownie_batter.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "brownie.n.03": 6
+        },
+        "output_states": {
+            "brownie.n.03": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "chocolate_biscuit",
+        "input_synsets": {
+            "chocolate_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "chocolate_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "container": {
+            "cookie_sheet.n.01": 1
+        },
+        "heat_source": {
+            "oven.n.01": 1
+        },
+        "output_synsets": {
+            "chocolate_biscuit.n.01": 6
+        },
+        "output_states": {
+            "chocolate_biscuit.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "timesteps": null
+    },
+    {
+        "rule_name": "white_wine_sauce",
+        "input_synsets": {
+            "heavy_cream.n.01": 1,
+            "white_wine.n.01": 1,
+            "flour.n.01": 1
+        },
+        "input_states": null,
+        "container": {
+            "saucepan.n.01": 1
+        },
+        "heat_source": {
+            "stove.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__wine_sauce.n.01": 1
+        },
+        "output_states": null,
+        "timesteps": null
+    }
+]

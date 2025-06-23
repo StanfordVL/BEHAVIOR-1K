@@ -1,0 +1,31 @@
+(define (problem make_the_ultimate_spa_basket-0)
+    (:domain omnigibson)
+
+    (:objects
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        console_table.n.01_1 - console_table.n.01
+        bottle__of__lotion.n.01_1 - bottle__of__lotion.n.01
+        bottle__of__perfume.n.01_1 - bottle__of__perfume.n.01
+        bottle__of__essential_oil.n.01_1 - bottle__of__essential_oil.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop wicker_basket.n.01_1 console_table.n.01_1) 
+        (ontop bottle__of__lotion.n.01_1 console_table.n.01_1) 
+        (ontop bottle__of__perfume.n.01_1 console_table.n.01_1) 
+        (ontop bottle__of__essential_oil.n.01_1 console_table.n.01_1) 
+        (inroom console_table.n.01_1 spa)
+        (inroom floor.n.01_1 spa) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?bottle__of__essential_oil.n.01_1 ?wicker_basket.n.01_1) 
+            (inside ?bottle__of__lotion.n.01_1 ?wicker_basket.n.01_1)
+            (inside ?bottle__of__perfume.n.01_1 ?wicker_basket.n.01_1) 
+        )
+    )
+)

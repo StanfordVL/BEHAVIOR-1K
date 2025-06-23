@@ -1,0 +1,55 @@
+(define (problem buy_school_supplies_for_high_school-0)
+    (:domain omnigibson)
+
+    (:objects
+        cash_register.n.01_1 - cash_register.n.01
+        checkout.n.03_1 - checkout.n.03
+        backpack.n.01_1 - backpack.n.01
+        laptop.n.01_1 - laptop.n.01
+        grocery_shelf.n.01_1 grocery_shelf.n.01_2 grocery_shelf.n.01_3 - grocery_shelf.n.01
+        calculator.n.02_1 - calculator.n.02
+        pen.n.01_1 - pen.n.01
+        pencil.n.01_1 - pencil.n.01
+        notebook.n.01_1 - notebook.n.01
+        shopping_cart.n.01_1 - shopping_cart.n.01
+        money.n.01_1 money.n.01_2 money.n.01_3 money.n.01_4 - money.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store)
+        (ontop backpack.n.01_1 grocery_shelf.n.01_1) 
+        (inside laptop.n.01_1 grocery_shelf.n.01_1) 
+        (inside calculator.n.02_1 grocery_shelf.n.01_2) 
+        (inside pen.n.01_1 grocery_shelf.n.01_3) 
+        (ontop pencil.n.01_1 grocery_shelf.n.01_3) 
+        (inside notebook.n.01_1 grocery_shelf.n.01_2) 
+        (inside money.n.01_1 shopping_cart.n.01_1)
+        (inside money.n.01_2 shopping_cart.n.01_1) 
+        (inside money.n.01_3 shopping_cart.n.01_1) 
+        (inside money.n.01_4 shopping_cart.n.01_1) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_2 grocery_store) 
+        (inroom grocery_shelf.n.01_3 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (inroom shopping_cart.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?backpack.n.01_1 ?checkout.n.03_1) 
+            (ontop ?laptop.n.01_1 ?checkout.n.03_1) 
+            (ontop ?calculator.n.02_1 ?notebook.n.01_1) 
+            (ontop ?pen.n.01_1 ?checkout.n.03_1) 
+            (ontop ?pencil.n.01_1 ?checkout.n.03_1) 
+            (ontop ?notebook.n.01_1 ?checkout.n.03_1) 
+            (forall 
+                (?money.n.01 - money.n.01) 
+                (inside ?money.n.01 ?cash_register.n.01_1)
+            )
+        )
+    )
+)

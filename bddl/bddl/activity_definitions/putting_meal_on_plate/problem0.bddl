@@ -1,0 +1,53 @@
+(define (problem putting_meal_on_plate-0)
+    (:domain omnigibson)
+
+    (:objects
+     	porkchop.n.01_1 porkchop.n.01_2 - porkchop.n.01
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	oven.n.01_1 - oven.n.01
+    	plate.n.04_1 plate.n.04_2 - plate.n.04
+    	countertop.n.01_1 - countertop.n.01
+    	water_glass.n.02_1 - water_glass.n.02
+    	apple.n.01_1 apple.n.01_2 - apple.n.01
+    	floor.n.01_1 - floor.n.01
+    	cabinet.n.01_1 - cabinet.n.01
+    	window.n.01_1 - window.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside porkchop.n.01_1 electric_refrigerator.n.01_1) 
+        (inside porkchop.n.01_2 oven.n.01_1) 
+        (open electric_refrigerator.n.01_1) 
+        (open oven.n.01_1) 
+        (ontop plate.n.04_1 countertop.n.01_1) 
+        (ontop plate.n.04_2 countertop.n.01_1) 
+        (ontop water_glass.n.02_1 countertop.n.01_1) 
+        (inside apple.n.01_1 electric_refrigerator.n.01_1) 
+        (inside apple.n.01_2 electric_refrigerator.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom window.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?porkchop.n.01_1 ?plate.n.04_1) 
+            (ontop ?porkchop.n.01_2 ?plate.n.04_2) 
+            (hot ?porkchop.n.01_2) 
+            (frozen ?porkchop.n.01_1) 
+            (or
+                (not
+                    (open ?oven.n.01_1)
+                )
+                (not
+                    (open ?oven.n.01_1)
+                )
+            )
+        )
+    )
+)

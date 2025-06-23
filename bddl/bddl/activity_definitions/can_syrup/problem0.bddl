@@ -1,0 +1,46 @@
+(define (problem can_syrup-0)
+    (:domain omnigibson)
+
+    (:objects
+        lid.n.02_1 lid.n.02_2 lid.n.02_3 - lid.n.02
+        cabinet.n.01_1 - cabinet.n.01
+        hingeless_jar.n.01_1 hingeless_jar.n.01_2 hingeless_jar.n.01_3 - hingeless_jar.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        stove.n.01_1 - stove.n.01
+        maple_syrup.n.01_1 - maple_syrup.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside lid.n.02_1 cabinet.n.01_1) 
+        (inside lid.n.02_2 cabinet.n.01_1) 
+        (inside lid.n.02_3 cabinet.n.01_1) 
+        (inside hingeless_jar.n.01_1 cabinet.n.01_1) 
+        (inside hingeless_jar.n.01_2 cabinet.n.01_1) 
+        (inside hingeless_jar.n.01_3 cabinet.n.01_1) 
+        (ontop stockpot.n.01_1 stove.n.01_1) 
+        (not 
+            (toggled_on stove.n.01_1)
+        )
+        (filled stockpot.n.01_1 maple_syrup.n.01_1) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?lid.n.02 - lid.n.02)
+                (?hingeless_jar.n.01 - hingeless_jar.n.01)
+                (attached ?lid.n.02 ?hingeless_jar.n.01)
+            )
+            (forall 
+                (?hingeless_jar.n.01 - hingeless_jar.n.01)
+                (filled ?hingeless_jar.n.01 ?maple_syrup.n.01_1)
+            )
+        )
+    )
+)

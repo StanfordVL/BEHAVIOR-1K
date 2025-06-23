@@ -1,0 +1,45 @@
+(define (problem cleaning_the_yard-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn.n.01_1 - lawn.n.01
+        floor.n.01_1 - floor.n.01
+        rail_fence.n.01_1 - rail_fence.n.01
+        scrub.n.01_1 - scrub.n.01
+        entire_leaf.n.01_1 entire_leaf.n.01_2 entire_leaf.n.01_3 entire_leaf.n.01_4 - entire_leaf.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        compost_bin.n.01_1 - compost_bin.n.01
+        weed.n.01_1 weed.n.01_2 - weed.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop scrub.n.01_1 lawn.n.01_1)
+        (ontop entire_leaf.n.01_1 lawn.n.01_1) 
+        (ontop ashcan.n.01_1 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_2 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_3 lawn.n.01_1) 
+        (ontop entire_leaf.n.01_4 lawn.n.01_1) 
+        (ontop weed.n.01_1 lawn.n.01_1) 
+        (ontop weed.n.01_2 lawn.n.01_1) 
+        (ontop compost_bin.n.01_1 lawn.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom rail_fence.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?entire_leaf.n.01 - entire_leaf.n.01)
+                (inside ?entire_leaf.n.01 ?ashcan.n.01_1)
+            )
+            (forall 
+                (?weed.n.01 - weed.n.01)
+                (inside ?weed.n.01 ?compost_bin.n.01_1)
+            )
+            (nextto ?compost_bin.n.01_1 ?ashcan.n.01_1)
+        )
+    )
+)

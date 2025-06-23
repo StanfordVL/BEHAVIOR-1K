@@ -1,0 +1,41 @@
+(define (problem clean_your_electronics-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        television_receiver.n.01_1 - television_receiver.n.01
+        laptop.n.01_1 - laptop.n.01
+        printer.n.03_1 - printer.n.03
+        rag.n.01_1 - rag.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered television_receiver.n.01_1 dust.n.01_1) 
+        (covered laptop.n.01_1 dust.n.01_1) 
+        (covered printer.n.03_1 dust.n.01_1) 
+        (ontop rag.n.01_1 desk.n.01_1) 
+        (ontop laptop.n.01_1 desk.n.01_1) 
+        (ontop printer.n.03_1 desk.n.01_1) 
+        (inroom television_receiver.n.01_1 bedroom) 
+        (inroom desk.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?television_receiver.n.01_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?laptop.n.01_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?printer.n.03_1 ?dust.n.01_1)
+            )
+        )
+    )
+)

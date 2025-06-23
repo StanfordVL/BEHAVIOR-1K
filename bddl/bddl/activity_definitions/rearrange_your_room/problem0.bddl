@@ -1,0 +1,30 @@
+(define (problem rearrange_your_room-0)
+    (:domain omnigibson)
+
+    (:objects
+        mattress.n.01_1 - mattress.n.01
+        floor.n.01_1 - floor.n.01
+        pillow.n.01_1 pillow.n.01_2 - pillow.n.01
+        bed.n.01_1 - bed.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mattress.n.01_1 floor.n.01_1) 
+        (ontop pillow.n.01_1 mattress.n.01_1) 
+        (ontop pillow.n.01_2 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?mattress.n.01_1 ?bed.n.01_1) 
+            (forall 
+                (?pillow.n.01 - pillow.n.01) 
+                (ontop ?pillow.n.01 ?mattress.n.01_1)
+            ) 
+        )
+    )
+)

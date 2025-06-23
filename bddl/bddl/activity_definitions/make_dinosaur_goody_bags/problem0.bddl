@@ -1,0 +1,52 @@
+(define (problem make_dinosaur_goody_bags-0)
+    (:domain omnigibson)
+
+    (:objects
+        sack.n.01_1 sack.n.01_2 - sack.n.01
+        countertop.n.01_1 - countertop.n.01
+        doll.n.01_1 doll.n.01_2 - doll.n.01
+        teddy.n.01_1 teddy.n.01_2 - teddy.n.01
+        box__of__chocolates.n.01_1 box__of__chocolates.n.01_2 box__of__chocolates.n.01_3 box__of__chocolates.n.01_4 - box__of__chocolates.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sack.n.01_1 countertop.n.01_1) 
+        (ontop sack.n.01_2 countertop.n.01_1) 
+        (ontop doll.n.01_1 countertop.n.01_1) 
+        (ontop doll.n.01_2 countertop.n.01_1) 
+        (ontop teddy.n.01_1 countertop.n.01_1) 
+        (ontop teddy.n.01_2 countertop.n.01_1) 
+        (ontop box__of__chocolates.n.01_1 countertop.n.01_1)
+        (ontop box__of__chocolates.n.01_2 countertop.n.01_1)
+        (ontop box__of__chocolates.n.01_3 countertop.n.01_1)
+        (ontop box__of__chocolates.n.01_4 countertop.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?sack.n.01 - sack.n.01)
+                (?doll.n.01 - doll.n.01)
+                (inside ?doll.n.01 ?sack.n.01)
+            )
+            (forpairs 
+                (?sack.n.01 - sack.n.01)
+                (?teddy.n.01 - teddy.n.01)
+                (inside ?teddy.n.01 ?sack.n.01)
+            )
+            (forall 
+                (?sack.n.01 - sack.n.01)
+                (forn 
+                    (2)
+                    (?box__of__chocolates.n.01 - box__of__chocolates.n.01)
+                    (inside ?box__of__chocolates.n.01 ?sack.n.01)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,30 @@
+(define (problem unhook_a_fish-0)
+    (:domain omnigibson)
+
+    (:objects
+        trout.n.01_1 - trout.n.01
+        sink.n.01_1 - sink.n.01
+        fishing_rod.n.01_1 - fishing_rod.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (attached trout.n.01_1 fishing_rod.n.01_1) 
+        (ontop fishing_rod.n.01_1 floor.n.01_1)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (attached ?trout.n.01_1 ?fishing_rod.n.01_1)
+            ) 
+            (inside ?trout.n.01_1 ?electric_refrigerator.n.01_1)
+        )
+    )
+)

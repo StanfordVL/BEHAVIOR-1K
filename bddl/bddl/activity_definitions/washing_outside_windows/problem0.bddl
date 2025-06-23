@@ -1,0 +1,42 @@
+(define (problem washing_outside_windows-0)
+    (:domain omnigibson)
+
+    (:objects
+        window.n.01_1 window.n.01_2 - window.n.01
+        sponge.n.01_1 - sponge.n.01
+        floor.n.01_1 - floor.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        watering_can.n.01_1 - watering_can.n.01
+        water.n.06_1 - water.n.06
+        bucket.n.01_1 - bucket.n.01
+        stain.n.01_1 - stain.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sponge.n.01_1 floor.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (ontop vinegar__bottle.n.01_1 floor.n.01_1) 
+        (covered window.n.01_1 stain.n.01_1) 
+        (covered window.n.01_2 stain.n.01_1) 
+        (ontop watering_can.n.01_1 floor.n.01_1)
+        (ontop bucket.n.01_1 floor.n.01_1)
+        (insource watering_can.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom window.n.01_1 garden) 
+        (inroom window.n.01_2 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?window.n.01 - window.n.01)
+                (not 
+                    (covered ?window.n.01 ?stain.n.01_1)
+                )
+            )
+        )
+    )
+)

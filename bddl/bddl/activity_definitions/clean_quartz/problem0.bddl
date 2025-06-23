@@ -1,0 +1,31 @@
+(define (problem clean_quartz-0)
+    (:domain omnigibson)
+
+    (:objects
+        rag.n.01_1 - rag.n.01
+        countertop.n.01_1 - countertop.n.01
+        dirt.n.02_1 - dirt.n.02
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (covered countertop.n.01_1 dirt.n.02_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom countertop.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?countertop.n.01_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

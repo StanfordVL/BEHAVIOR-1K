@@ -1,0 +1,31 @@
+(define (problem opening_windows-0)
+    (:domain omnigibson)
+
+    (:objects
+        openable_window.n.01_1 openable_window.n.01_2 - openable_window.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (not
+            (open openable_window.n.01_1)
+        )
+        (not
+            (open openable_window.n.01_2)
+        )
+        (inroom floor.n.01_1 living_room) 
+        (inroom openable_window.n.01_1 living_room) 
+        (inroom openable_window.n.01_2 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?openable_window.n.01 - openable_window.n.01)
+                (open ?openable_window.n.01)
+            )
+        )
+    )
+)

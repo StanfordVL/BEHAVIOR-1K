@@ -1,0 +1,29 @@
+(define (problem store_vintage_linens-0)
+    (:domain omnigibson)
+
+    (:objects
+     	doily.n.01_1 doily.n.01_2 - doily.n.01
+    	wardrobe.n.01_1 - wardrobe.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop doily.n.01_1 wardrobe.n.01_1) 
+        (ontop doily.n.01_2 wardrobe.n.01_1) 
+        (unfolded doily.n.01_1) 
+        (unfolded doily.n.01_2) 
+        (inroom wardrobe.n.01_1 closet) 
+        (inroom floor.n.01_1 closet) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?doily.n.01_1 ?wardrobe.n.01_1)
+            (ontop ?doily.n.01_2 ?wardrobe.n.01_1) 
+            (folded ?doily.n.01_1) 
+            (folded ?doily.n.01_2)
+        )
+    )
+)

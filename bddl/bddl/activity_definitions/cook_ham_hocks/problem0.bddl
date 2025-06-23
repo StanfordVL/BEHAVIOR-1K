@@ -1,0 +1,59 @@
+(define (problem cook_ham_hocks-0)
+    (:domain omnigibson)
+
+    (:objects
+        stockpot.n.01_1 - stockpot.n.01
+        oven.n.01_1 - oven.n.01
+        ham_hock.n.01_1 ham_hock.n.01_2 - ham_hock.n.01
+        bowl.n.01_1 - bowl.n.01
+        chicken_broth.n.01_1 - chicken_broth.n.01
+        chicken_broth__carton.n.01_1 - chicken_broth__carton.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        black_pepper.n.02_1 - black_pepper.n.02
+        pepper__shaker.n.01_1 - pepper__shaker.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop stockpot.n.01_1 oven.n.01_1) 
+        (inside ham_hock.n.01_1 bowl.n.01_1) 
+        (inside ham_hock.n.01_2 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (filled chicken_broth__carton.n.01_1 chicken_broth.n.01_1) 
+        (inside chicken_broth__carton.n.01_1 electric_refrigerator.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (insource pepper__shaker.n.01_1 black_pepper.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop pepper__shaker.n.01_1 countertop.n.01_1)
+        (not 
+            (cooked ham_hock.n.01_1)
+        ) 
+        (not 
+            (cooked ham_hock.n.01_2)
+        ) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?ham_hock.n.01 - ham_hock.n.01)
+                (and 
+                    (inside ?ham_hock.n.01 ?stockpot.n.01_1)
+                    (cooked ?ham_hock.n.01)
+                    (covered ?ham_hock.n.01 ?black_pepper.n.02_1)
+                    (covered ?ham_hock.n.01 ?salt.n.02_1)
+                )
+            )
+            (contains ?stockpot.n.01_1 ?chicken_broth.n.01_1)
+        )
+    )
+)

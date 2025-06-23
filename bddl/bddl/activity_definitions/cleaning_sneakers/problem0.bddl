@@ -1,0 +1,80 @@
+(define (problem cleaning_sneakers-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        dust.n.01_1 - dust.n.01
+     	gym_shoe.n.01_1 gym_shoe.n.01_2 gym_shoe.n.01_3 gym_shoe.n.01_4 - gym_shoe.n.01
+            countertop.n.01_1 - countertop.n.01
+            bar_soap.n.01_1 - bar_soap.n.01
+            cabinet.n.01_1 - cabinet.n.01
+            towel.n.01_1 - towel.n.01
+            scrub_brush.n.01_1 - scrub_brush.n.01
+            sink.n.01_1 - sink.n.01
+            floor.n.01_1 floor.n.01_2 - floor.n.01
+            table.n.02_1 - table.n.02
+            agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop gym_shoe.n.01_1 floor.n.01_2) 
+        (covered gym_shoe.n.01_1 stain.n.01_1) 
+        (ontop gym_shoe.n.01_2 floor.n.01_2) 
+        (covered gym_shoe.n.01_2 stain.n.01_1) 
+        (ontop gym_shoe.n.01_3 floor.n.01_2) 
+        (covered gym_shoe.n.01_3 dust.n.01_1) 
+        (ontop gym_shoe.n.01_4 floor.n.01_2) 
+        (covered gym_shoe.n.01_4 dust.n.01_1) 
+        (inside bar_soap.n.01_1 cabinet.n.01_1) 
+        (ontop towel.n.01_1 countertop.n.01_1) 
+        (not 
+            (covered towel.n.01_1 stain.n.01_1)
+        ) 
+        (ontop scrub_brush.n.01_1 countertop.n.01_1)
+        (not 
+            (covered scrub_brush.n.01_1 stain.n.01_1)
+        ) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom table.n.02_1 living_room) 
+        (inroom floor.n.01_2 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?towel.n.01_1 ?countertop.n.01_1) 
+            (inside ?bar_soap.n.01_1 ?sink.n.01_1) 
+            (nextto ?scrub_brush.n.01_1 ?towel.n.01_1)
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (not 
+                    (covered ?gym_shoe.n.01 dust.n.01_1)
+                )
+            ) 
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (not 
+                    (covered ?gym_shoe.n.01 stain.n.01_1)
+                )
+            ) 
+            (forn 
+                (2) 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (nextto ?gym_shoe.n.01 ?table.n.02_1)
+            ) 
+            (forn 
+                (2) 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (under ?gym_shoe.n.01 ?table.n.02_1)
+            ) 
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (ontop ?gym_shoe.n.01 ?floor.n.01_1)
+            )
+        )
+    )
+)
+

@@ -1,0 +1,32 @@
+(define (problem bringing_water-0)
+    (:domain omnigibson)
+
+    (:objects
+        bottle.n.01_1 bottle.n.01_2 - bottle.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bottle.n.01_2 electric_refrigerator.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom coffee_table.n.01_1 living_room)
+        (inroom floor.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?bottle.n.01 - bottle.n.01)
+                (ontop ?bottle.n.01 ?coffee_table.n.01_1)
+            )
+            (not
+                (open ?electric_refrigerator.n.01_1)
+            )
+        )
+    )
+)

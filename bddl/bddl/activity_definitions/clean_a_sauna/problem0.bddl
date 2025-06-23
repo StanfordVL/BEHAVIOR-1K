@@ -1,0 +1,56 @@
+(define (problem clean_a_sauna-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        mold.n.05_1 - mold.n.05
+        mildew.n.02_1 - mildew.n.02
+        bleaching_agent.n.01_1 - bleaching_agent.n.01
+        bleaching_agent__atomizer.n.01_1 - bleaching_agent__atomizer.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        swab.n.02_1 - swab.n.02
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        bench.n.01_1 - bench.n.01
+        sauna_heater.n.01_1 - sauna_heater.n.01
+        cabinet.n.03_1 - cabinet.n.03
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (covered floor.n.01_1 mildew.n.02_1) 
+        (covered sauna_heater.n.01_1 stain.n.01_1)
+        (covered bench.n.01_1 mold.n.05_1)
+        (insource bleaching_agent__atomizer.n.01_1 bleaching_agent.n.01_1)
+        (inside bleaching_agent__atomizer.n.01_1 cabinet.n.03_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (inside liquid_soap__bottle.n.01_1 cabinet.n.03_1)
+        (inside rag.n.01_1 cabinet.n.03_1) 
+        (ontop swab.n.02_1 floor.n.01_2)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom bench.n.01_1 sauna) 
+        (inroom floor.n.01_1 sauna) 
+        (inroom sauna_heater.n.01_1 sauna)
+        (inroom cabinet.n.03_1 bathroom)
+        (inroom floor.n.01_2 bathroom)
+        (inroom sink.n.01_1 bathroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered floor.n.01_1 mildew.n.02_1)
+            )
+            (not
+                (covered sauna_heater.n.01_1 stain.n.01_1)
+            )
+            (not 
+                (covered bench.n.01_1 mold.n.05_1)
+            )
+        )
+    )
+)

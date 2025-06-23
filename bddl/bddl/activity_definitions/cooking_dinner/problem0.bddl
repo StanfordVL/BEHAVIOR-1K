@@ -1,0 +1,36 @@
+(define (problem cooking_dinner-0)
+    (:domain omnigibson)
+
+    (:objects
+        lasagna.n.01_1 - lasagna.n.01
+        oven.n.01_1 - oven.n.01
+        platter.n.01_1 - platter.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        casserole.n.02_1 - casserole.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside lasagna.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop platter.n.01_1 countertop.n.01_1) 
+        (frozen lasagna.n.01_1) 
+        (ontop casserole.n.02_1 countertop.n.01_1)
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (hot ?lasagna.n.01_1)
+            (not
+                (frozen ?lasagna.n.01_1)
+            )
+            (inside ?lasagna.n.01_1 casserole.n.02_1)
+        )
+    )
+)

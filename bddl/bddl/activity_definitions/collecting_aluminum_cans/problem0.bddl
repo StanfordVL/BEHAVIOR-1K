@@ -1,0 +1,33 @@
+(define (problem collecting_aluminum_cans-0)
+    (:domain omnigibson)
+
+    (:objects
+     	can__of__soda.n.01_1 can__of__soda.n.01_2 can__of__soda.n.01_3 can__of__soda.n.01_4 can__of__soda.n.01_5 can__of__soda.n.01_6 - can__of__soda.n.01
+    	bed.n.01_1 - bed.n.01
+    	floor.n.01_1 - floor.n.01
+    	bucket.n.01_1 - bucket.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop can__of__soda.n.01_1 bed.n.01_1) 
+        (ontop can__of__soda.n.01_2 bed.n.01_1) 
+        (ontop can__of__soda.n.01_3 bed.n.01_1) 
+        (ontop can__of__soda.n.01_4 floor.n.01_1) 
+        (ontop can__of__soda.n.01_5 floor.n.01_1) 
+        (ontop can__of__soda.n.01_6 floor.n.01_1) 
+        (ontop bucket.n.01_1 bed.n.01_1) 
+        (inroom bed.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?can__of__soda.n.01 - can__of__soda.n.01) 
+                (inside ?can__of__soda.n.01 ?bucket.n.01_1)
+            )
+        )
+    )
+)

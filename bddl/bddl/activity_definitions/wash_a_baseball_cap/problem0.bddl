@@ -1,0 +1,34 @@
+(define (problem wash_a_baseball_cap-0)
+    (:domain omnigibson)
+
+    (:objects
+        baseball_cap.n.01_1 baseball_cap.n.01_2 - baseball_cap.n.01
+        dirt.n.02_1 - dirt.n.02
+        floor.n.01_1 - floor.n.01
+        washer.n.03_1 - washer.n.03
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop baseball_cap.n.01_1 countertop.n.01_1)
+        (covered baseball_cap.n.01_1 dirt.n.02_1) 
+        (ontop baseball_cap.n.01_2 countertop.n.01_1)
+        (covered baseball_cap.n.01_2 dirt.n.02_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom countertop.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )\
+    
+    (:goal 
+        (and 
+            (forall
+                (?baseball_cap.n.01 - baseball_cap.n.01)
+                (not 
+                    (covered ?baseball_cap.n.01 ?dirt.n.02_1)
+                )
+            )
+        )
+    )
+)

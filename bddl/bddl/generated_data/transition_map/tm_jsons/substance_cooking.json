@@ -1,0 +1,3008 @@
+[
+    {
+        "rule_name": "allspice.n.03-cooking",
+        "input_synsets": {
+            "allspice.n.03": 1
+        },
+        "output_synsets": {
+            "cooked__allspice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "almond.n.02-cooking",
+        "input_synsets": {
+            "almond.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__almond.n.01": 1
+        }
+    },
+    {
+        "rule_name": "barbecue_sauce.n.01-cooking",
+        "input_synsets": {
+            "barbecue_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__barbecue_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "beaten_egg.n.01-cooking",
+        "input_synsets": {
+            "beaten_egg.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__beaten_egg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "beef_broth.n.01-cooking",
+        "input_synsets": {
+            "beef_broth.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__beef_broth.n.01": 1
+        }
+    },
+    {
+        "rule_name": "beef_stew.n.01-cooking",
+        "input_synsets": {
+            "beef_stew.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__beef_stew.n.01": 1
+        }
+    },
+    {
+        "rule_name": "beer.n.01-cooking",
+        "input_synsets": {
+            "beer.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__beer.n.01": 1
+        }
+    },
+    {
+        "rule_name": "black_pepper.n.02-cooking",
+        "input_synsets": {
+            "black_pepper.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__black_pepper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "blueberry.n.02-cooking",
+        "input_synsets": {
+            "blueberry.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__blueberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "blueberry_compote.n.01-cooking",
+        "input_synsets": {
+            "blueberry_compote.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__blueberry_compote.n.01": 1
+        }
+    },
+    {
+        "rule_name": "blueberry_mousse.n.01-cooking",
+        "input_synsets": {
+            "blueberry_mousse.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__blueberry_mousse.n.01": 1
+        }
+    },
+    {
+        "rule_name": "breadcrumb.n.01-cooking",
+        "input_synsets": {
+            "breadcrumb.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__breadcrumb.n.01": 1
+        }
+    },
+    {
+        "rule_name": "brown_sugar.n.01-cooking",
+        "input_synsets": {
+            "brown_sugar.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__brown_sugar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "brownie_batter.n.01-cooking",
+        "input_synsets": {
+            "brownie_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__brownie_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cafe_au_lait.n.01-cooking",
+        "input_synsets": {
+            "cafe_au_lait.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cafe_au_lait.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cake_mix.n.01-cooking",
+        "input_synsets": {
+            "cake_mix.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cake_mix.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cashew.n.02-cooking",
+        "input_synsets": {
+            "cashew.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__cashew.n.01": 1
+        }
+    },
+    {
+        "rule_name": "catsup.n.01-cooking",
+        "input_synsets": {
+            "catsup.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__catsup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cayenne.n.02-cooking",
+        "input_synsets": {
+            "cayenne.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__cayenne.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cheese_pastry_filling.n.01-cooking",
+        "input_synsets": {
+            "cheese_pastry_filling.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cheese_pastry_filling.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cheese_sauce.n.01-cooking",
+        "input_synsets": {
+            "cheese_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cheese_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cherry_filling.n.01-cooking",
+        "input_synsets": {
+            "cherry_filling.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cherry_filling.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chia_seed.n.01-cooking",
+        "input_synsets": {
+            "chia_seed.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chia_seed.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chicken_broth.n.01-cooking",
+        "input_synsets": {
+            "chicken_broth.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chicken_broth.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chicken_curry.n.01-cooking",
+        "input_synsets": {
+            "chicken_curry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chicken_curry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chicken_soup.n.01-cooking",
+        "input_synsets": {
+            "chicken_soup.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chicken_soup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chocolate_sauce.n.01-cooking",
+        "input_synsets": {
+            "chocolate_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__chocolate_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cinnamon.n.03-cooking",
+        "input_synsets": {
+            "cinnamon.n.03": 1
+        },
+        "output_synsets": {
+            "cooked__cinnamon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cinnamon_sugar.n.01-cooking",
+        "input_synsets": {
+            "cinnamon_sugar.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cinnamon_sugar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "clove.n.04-cooking",
+        "input_synsets": {
+            "clove.n.04": 1
+        },
+        "output_synsets": {
+            "cooked__clove.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coca_cola.n.01-cooking",
+        "input_synsets": {
+            "coca_cola.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__coca_cola.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cocoa.n.01-cooking",
+        "input_synsets": {
+            "cocoa.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cocoa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cocoa_powder.n.01-cooking",
+        "input_synsets": {
+            "cocoa_powder.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cocoa_powder.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coconut.n.01-cooking",
+        "input_synsets": {
+            "coconut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__coconut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coconut_oil.n.01-cooking",
+        "input_synsets": {
+            "coconut_oil.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__coconut_oil.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coffee_bean.n.01-cooking",
+        "input_synsets": {
+            "coffee_bean.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__coffee_bean.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coffee_grounds.n.01-cooking",
+        "input_synsets": {
+            "coffee_grounds.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__coffee_grounds.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooking_oil.n.01-cooking",
+        "input_synsets": {
+            "cooking_oil.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cooking_oil.n.01": 1
+        }
+    },
+    {
+        "rule_name": "coriander.n.02-cooking",
+        "input_synsets": {
+            "coriander.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__coriander.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cornstarch.n.01-cooking",
+        "input_synsets": {
+            "cornstarch.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cornstarch.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cranberry.n.02-cooking",
+        "input_synsets": {
+            "cranberry.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__cranberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cream_cheese.n.01-cooking",
+        "input_synsets": {
+            "cream_cheese.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__cream_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "crouton.n.01-cooking",
+        "input_synsets": {
+            "crouton.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__crouton.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cumin.n.02-cooking",
+        "input_synsets": {
+            "cumin.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__cumin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "curry_powder.n.01-cooking",
+        "input_synsets": {
+            "curry_powder.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__curry_powder.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__apple.n.01-cooking",
+        "input_synsets": {
+            "diced__apple.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__apple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__apricot.n.01-cooking",
+        "input_synsets": {
+            "diced__apricot.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__arepa.n.01-cooking",
+        "input_synsets": {
+            "diced__arepa.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__arepa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__artichoke.n.01-cooking",
+        "input_synsets": {
+            "diced__artichoke.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__artichoke.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__arugula.n.01-cooking",
+        "input_synsets": {
+            "diced__arugula.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__arugula.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__asparagus.n.01-cooking",
+        "input_synsets": {
+            "diced__asparagus.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__asparagus.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__auricularia.n.01-cooking",
+        "input_synsets": {
+            "diced__auricularia.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__auricularia.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__avocado.n.01-cooking",
+        "input_synsets": {
+            "diced__avocado.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__avocado.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bacon.n.01-cooking",
+        "input_synsets": {
+            "diced__bacon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bacon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bagel.n.01-cooking",
+        "input_synsets": {
+            "diced__bagel.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bagel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bagel_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__bagel_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bagel_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__baguet.n.01-cooking",
+        "input_synsets": {
+            "diced__baguet.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__baguet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__banana.n.01-cooking",
+        "input_synsets": {
+            "diced__banana.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__banana.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__banana_bread.n.01-cooking",
+        "input_synsets": {
+            "diced__banana_bread.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__banana_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bay_leaf.n.01-cooking",
+        "input_synsets": {
+            "diced__bay_leaf.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bay_leaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bean_curd.n.01-cooking",
+        "input_synsets": {
+            "diced__bean_curd.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bean_curd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__beefsteak_tomato.n.01-cooking",
+        "input_synsets": {
+            "diced__beefsteak_tomato.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__beefsteak_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__beet.n.01-cooking",
+        "input_synsets": {
+            "diced__beet.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__beet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bell_pepper.n.01-cooking",
+        "input_synsets": {
+            "diced__bell_pepper.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bell_pepper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__biscuit_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__biscuit_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__biscuit_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__blackberry.n.01-cooking",
+        "input_synsets": {
+            "diced__blackberry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__blackberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bok_choy.n.01-cooking",
+        "input_synsets": {
+            "diced__bok_choy.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bok_choy.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bratwurst.n.01-cooking",
+        "input_synsets": {
+            "diced__bratwurst.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__bratwurst.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__brisket.n.01-cooking",
+        "input_synsets": {
+            "diced__brisket.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__brisket.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__broccoli.n.01-cooking",
+        "input_synsets": {
+            "diced__broccoli.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__broccoli.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__broccoli_rabe.n.01-cooking",
+        "input_synsets": {
+            "diced__broccoli_rabe.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__broccoli_rabe.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__broccolini.n.01-cooking",
+        "input_synsets": {
+            "diced__broccolini.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__broccolini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__brownie.n.01-cooking",
+        "input_synsets": {
+            "diced__brownie.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__brownie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__brussels_sprouts.n.01-cooking",
+        "input_synsets": {
+            "diced__brussels_sprouts.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__brussels_sprouts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__burrito.n.01-cooking",
+        "input_synsets": {
+            "diced__burrito.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__burrito.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__butter_cookie.n.01-cooking",
+        "input_synsets": {
+            "diced__butter_cookie.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__butter_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__buttermilk_pancake.n.01-cooking",
+        "input_synsets": {
+            "diced__buttermilk_pancake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__buttermilk_pancake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__butternut_squash.n.01-cooking",
+        "input_synsets": {
+            "diced__butternut_squash.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__butternut_squash.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cantaloup.n.01-cooking",
+        "input_synsets": {
+            "diced__cantaloup.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cantaloup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__carne_asada.n.01-cooking",
+        "input_synsets": {
+            "diced__carne_asada.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__carne_asada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__carrot.n.01-cooking",
+        "input_synsets": {
+            "diced__carrot.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__carrot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cauliflower.n.01-cooking",
+        "input_synsets": {
+            "diced__cauliflower.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cauliflower.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__celery.n.01-cooking",
+        "input_synsets": {
+            "diced__celery.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__celery.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chanterelle.n.01-cooking",
+        "input_synsets": {
+            "diced__chanterelle.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chanterelle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chard.n.01-cooking",
+        "input_synsets": {
+            "diced__chard.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cheese_tart.n.01-cooking",
+        "input_synsets": {
+            "diced__cheese_tart.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cheese_tart.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cheesecake.n.01-cooking",
+        "input_synsets": {
+            "diced__cheesecake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cheesecake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cherry.n.01-cooking",
+        "input_synsets": {
+            "diced__cherry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cherry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cherry_tomato.n.01-cooking",
+        "input_synsets": {
+            "diced__cherry_tomato.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cherry_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chestnut.n.01-cooking",
+        "input_synsets": {
+            "diced__chestnut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chestnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chicken.n.01-cooking",
+        "input_synsets": {
+            "diced__chicken.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chicken.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chicken_breast.n.01-cooking",
+        "input_synsets": {
+            "diced__chicken_breast.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_breast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chicken_leg.n.01-cooking",
+        "input_synsets": {
+            "diced__chicken_leg.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chicken_tender.n.01-cooking",
+        "input_synsets": {
+            "diced__chicken_tender.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_tender.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chicken_wing.n.01-cooking",
+        "input_synsets": {
+            "diced__chicken_wing.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_wing.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chili.n.01-cooking",
+        "input_synsets": {
+            "diced__chili.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chili.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chives.n.01-cooking",
+        "input_synsets": {
+            "diced__chives.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chives.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chocolate_biscuit.n.01-cooking",
+        "input_synsets": {
+            "diced__chocolate_biscuit.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_biscuit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chocolate_cake.n.01-cooking",
+        "input_synsets": {
+            "diced__chocolate_cake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_cake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chocolate_chip_cookie.n.01-cooking",
+        "input_synsets": {
+            "diced__chocolate_chip_cookie.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_chip_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chocolate_cookie_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__chocolate_cookie_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__chorizo.n.01-cooking",
+        "input_synsets": {
+            "diced__chorizo.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__chorizo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cinnamon_roll.n.01-cooking",
+        "input_synsets": {
+            "diced__cinnamon_roll.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cinnamon_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__clove.n.01-cooking",
+        "input_synsets": {
+            "diced__clove.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__clove.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__club_sandwich.n.01-cooking",
+        "input_synsets": {
+            "diced__club_sandwich.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__club_sandwich.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__coconut.n.01-cooking",
+        "input_synsets": {
+            "diced__coconut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__coconut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cold_cuts.n.01-cooking",
+        "input_synsets": {
+            "diced__cold_cuts.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cold_cuts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cookie_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__cookie_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__crab.n.01-cooking",
+        "input_synsets": {
+            "diced__crab.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__crab.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__crayfish.n.01-cooking",
+        "input_synsets": {
+            "diced__crayfish.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__crayfish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__crescent_roll.n.01-cooking",
+        "input_synsets": {
+            "diced__crescent_roll.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__crescent_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cucumber.n.01-cooking",
+        "input_synsets": {
+            "diced__cucumber.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__cucumber.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__danish.n.01-cooking",
+        "input_synsets": {
+            "diced__danish.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__danish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__date.n.01-cooking",
+        "input_synsets": {
+            "diced__date.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__date.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__doughnut.n.01-cooking",
+        "input_synsets": {
+            "diced__doughnut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__doughnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__dried_apricot.n.01-cooking",
+        "input_synsets": {
+            "diced__dried_apricot.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__dried_apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__duck.n.01-cooking",
+        "input_synsets": {
+            "diced__duck.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__duck.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__durian.n.01-cooking",
+        "input_synsets": {
+            "diced__durian.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__durian.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__edible_cookie_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__edible_cookie_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__edible_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__eggplant.n.01-cooking",
+        "input_synsets": {
+            "diced__eggplant.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__eggplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__enchilada.n.01-cooking",
+        "input_synsets": {
+            "diced__enchilada.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__enchilada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__fennel.n.01-cooking",
+        "input_synsets": {
+            "diced__fennel.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__fennel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__fillet.n.01-cooking",
+        "input_synsets": {
+            "diced__fillet.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__fillet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__frank.n.01-cooking",
+        "input_synsets": {
+            "diced__frank.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__frank.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__frankfurter_bun.n.01-cooking",
+        "input_synsets": {
+            "diced__frankfurter_bun.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__frankfurter_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__french_fries.n.01-cooking",
+        "input_synsets": {
+            "diced__french_fries.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__french_fries.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__french_toast.n.01-cooking",
+        "input_synsets": {
+            "diced__french_toast.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__french_toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__fruitcake.n.01-cooking",
+        "input_synsets": {
+            "diced__fruitcake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__fruitcake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__garlic_bread.n.01-cooking",
+        "input_synsets": {
+            "diced__garlic_bread.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__garlic_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__gelatin.n.01-cooking",
+        "input_synsets": {
+            "diced__gelatin.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__gelatin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__ginger.n.01-cooking",
+        "input_synsets": {
+            "diced__ginger.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__ginger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__gingerbread.n.01-cooking",
+        "input_synsets": {
+            "diced__gingerbread.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__gingerbread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__gooseberry.n.01-cooking",
+        "input_synsets": {
+            "diced__gooseberry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__gooseberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__gourd.n.01-cooking",
+        "input_synsets": {
+            "diced__gourd.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__gourd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__granola_bar.n.01-cooking",
+        "input_synsets": {
+            "diced__granola_bar.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__granola_bar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__grapefruit.n.01-cooking",
+        "input_synsets": {
+            "diced__grapefruit.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__grapefruit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__green_bean.n.01-cooking",
+        "input_synsets": {
+            "diced__green_bean.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__green_bean.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__green_onion.n.01-cooking",
+        "input_synsets": {
+            "diced__green_onion.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__green_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__ham_hock.n.01-cooking",
+        "input_synsets": {
+            "diced__ham_hock.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__ham_hock.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hamburger.n.01-cooking",
+        "input_synsets": {
+            "diced__hamburger.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hamburger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hamburger_bun.n.01-cooking",
+        "input_synsets": {
+            "diced__hamburger_bun.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hamburger_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hard-boiled_egg.n.01-cooking",
+        "input_synsets": {
+            "diced__hard-boiled_egg.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hard-boiled_egg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hazelnut.n.01-cooking",
+        "input_synsets": {
+            "diced__hazelnut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hazelnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__head_cabbage.n.01-cooking",
+        "input_synsets": {
+            "diced__head_cabbage.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__head_cabbage.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hip.n.01-cooking",
+        "input_synsets": {
+            "diced__hip.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__hotdog.n.01-cooking",
+        "input_synsets": {
+            "diced__hotdog.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__hotdog.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__huitre.n.01-cooking",
+        "input_synsets": {
+            "diced__huitre.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__huitre.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__kabob.n.01-cooking",
+        "input_synsets": {
+            "diced__kabob.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__kabob.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__kale.n.01-cooking",
+        "input_synsets": {
+            "diced__kale.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__kale.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__kielbasa.n.01-cooking",
+        "input_synsets": {
+            "diced__kielbasa.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__kielbasa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__kiwi.n.01-cooking",
+        "input_synsets": {
+            "diced__kiwi.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__kiwi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lamb.n.01-cooking",
+        "input_synsets": {
+            "diced__lamb.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lamb.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__leek.n.01-cooking",
+        "input_synsets": {
+            "diced__leek.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__leek.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lemon.n.01-cooking",
+        "input_synsets": {
+            "diced__lemon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lemon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lemon_peel.n.01-cooking",
+        "input_synsets": {
+            "diced__lemon_peel.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lemon_peel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lettuce.n.01-cooking",
+        "input_synsets": {
+            "diced__lettuce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lettuce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lime.n.01-cooking",
+        "input_synsets": {
+            "diced__lime.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lime.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__lobster.n.01-cooking",
+        "input_synsets": {
+            "diced__lobster.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__lobster.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__macaroon.n.01-cooking",
+        "input_synsets": {
+            "diced__macaroon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__macaroon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__mango.n.01-cooking",
+        "input_synsets": {
+            "diced__mango.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__mango.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__marshmallow.n.01-cooking",
+        "input_synsets": {
+            "diced__marshmallow.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__marshmallow.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__meat_loaf.n.01-cooking",
+        "input_synsets": {
+            "diced__meat_loaf.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__meat_loaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__meatball.n.01-cooking",
+        "input_synsets": {
+            "diced__meatball.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__meatball.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__melon.n.01-cooking",
+        "input_synsets": {
+            "diced__melon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__melon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__muffin.n.01-cooking",
+        "input_synsets": {
+            "diced__muffin.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__muffin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__mushroom.n.01-cooking",
+        "input_synsets": {
+            "diced__mushroom.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__mushroom.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__mustard.n.01-cooking",
+        "input_synsets": {
+            "diced__mustard.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__mustard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__nectarine.n.01-cooking",
+        "input_synsets": {
+            "diced__nectarine.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__nectarine.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__olive.n.01-cooking",
+        "input_synsets": {
+            "diced__olive.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__olive.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__omelet.n.01-cooking",
+        "input_synsets": {
+            "diced__omelet.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__omelet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__onion.n.01-cooking",
+        "input_synsets": {
+            "diced__onion.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__orange.n.01-cooking",
+        "input_synsets": {
+            "diced__orange.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__orange.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__papaya.n.01-cooking",
+        "input_synsets": {
+            "diced__papaya.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__papaya.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__parsley.n.01-cooking",
+        "input_synsets": {
+            "diced__parsley.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__parsley.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__parsnip.n.01-cooking",
+        "input_synsets": {
+            "diced__parsnip.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__parsnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pastry.n.01-cooking",
+        "input_synsets": {
+            "diced__pastry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pastry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__peach.n.01-cooking",
+        "input_synsets": {
+            "diced__peach.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__peach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pear.n.01-cooking",
+        "input_synsets": {
+            "diced__pear.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pear.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__peppermint.n.01-cooking",
+        "input_synsets": {
+            "diced__peppermint.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__peppermint.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pepperoni.n.01-cooking",
+        "input_synsets": {
+            "diced__pepperoni.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pepperoni.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pieplant.n.01-cooking",
+        "input_synsets": {
+            "diced__pieplant.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pieplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pineapple.n.01-cooking",
+        "input_synsets": {
+            "diced__pineapple.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pineapple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pita.n.01-cooking",
+        "input_synsets": {
+            "diced__pita.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pita.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pizza.n.01-cooking",
+        "input_synsets": {
+            "diced__pizza.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pizza.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pizza_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__pizza_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pizza_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__plum.n.01-cooking",
+        "input_synsets": {
+            "diced__plum.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__plum.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pomegranate.n.01-cooking",
+        "input_synsets": {
+            "diced__pomegranate.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pomegranate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pomelo.n.01-cooking",
+        "input_synsets": {
+            "diced__pomelo.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pomelo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pork.n.01-cooking",
+        "input_synsets": {
+            "diced__pork.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pork.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__porkchop.n.01-cooking",
+        "input_synsets": {
+            "diced__porkchop.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__porkchop.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__potato.n.01-cooking",
+        "input_synsets": {
+            "diced__potato.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__potato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__prawn.n.01-cooking",
+        "input_synsets": {
+            "diced__prawn.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__prawn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__prosciutto.n.01-cooking",
+        "input_synsets": {
+            "diced__prosciutto.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__prosciutto.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__pumpkin.n.01-cooking",
+        "input_synsets": {
+            "diced__pumpkin.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__pumpkin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__quail.n.01-cooking",
+        "input_synsets": {
+            "diced__quail.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__quail.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__quiche.n.01-cooking",
+        "input_synsets": {
+            "diced__quiche.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__quiche.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__radish.n.01-cooking",
+        "input_synsets": {
+            "diced__radish.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__radish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__ramen.n.01-cooking",
+        "input_synsets": {
+            "diced__ramen.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__ramen.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__rib.n.01-cooking",
+        "input_synsets": {
+            "diced__rib.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__rib.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__roast_beef.n.01-cooking",
+        "input_synsets": {
+            "diced__roast_beef.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__roast_beef.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__roll_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__roll_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__roll_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__rutabaga.n.01-cooking",
+        "input_synsets": {
+            "diced__rutabaga.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__rutabaga.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__salmon.n.01-cooking",
+        "input_synsets": {
+            "diced__salmon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__salmon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__scone.n.01-cooking",
+        "input_synsets": {
+            "diced__scone.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__scone.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__shiitake.n.01-cooking",
+        "input_synsets": {
+            "diced__shiitake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__shiitake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__snapper.n.01-cooking",
+        "input_synsets": {
+            "diced__snapper.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__snapper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__sour_bread.n.01-cooking",
+        "input_synsets": {
+            "diced__sour_bread.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__sour_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__spice_cookie.n.01-cooking",
+        "input_synsets": {
+            "diced__spice_cookie.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__spice_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__spice_cookie_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__spice_cookie_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__spice_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__spinach.n.01-cooking",
+        "input_synsets": {
+            "diced__spinach.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__spinach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__squid.n.01-cooking",
+        "input_synsets": {
+            "diced__squid.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__squid.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__steak.n.01-cooking",
+        "input_synsets": {
+            "diced__steak.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__steak.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__strawberry.n.01-cooking",
+        "input_synsets": {
+            "diced__strawberry.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__strawberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__sugar_cookie.n.01-cooking",
+        "input_synsets": {
+            "diced__sugar_cookie.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__sugar_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__sugar_cookie_dough.n.01-cooking",
+        "input_synsets": {
+            "diced__sugar_cookie_dough.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__sugar_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__sushi.n.01-cooking",
+        "input_synsets": {
+            "diced__sushi.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__sushi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__sweet_corn.n.01-cooking",
+        "input_synsets": {
+            "diced__sweet_corn.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__sweet_corn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__taco.n.01-cooking",
+        "input_synsets": {
+            "diced__taco.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__taco.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tenderloin.n.01-cooking",
+        "input_synsets": {
+            "diced__tenderloin.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tenderloin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__toast.n.01-cooking",
+        "input_synsets": {
+            "diced__toast.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tofu.n.01-cooking",
+        "input_synsets": {
+            "diced__tofu.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tofu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tomato.n.01-cooking",
+        "input_synsets": {
+            "diced__tomato.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tortilla.n.01-cooking",
+        "input_synsets": {
+            "diced__tortilla.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tortilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tortilla_chip.n.01-cooking",
+        "input_synsets": {
+            "diced__tortilla_chip.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tortilla_chip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__trout.n.01-cooking",
+        "input_synsets": {
+            "diced__trout.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__trout.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__tuna.n.01-cooking",
+        "input_synsets": {
+            "diced__tuna.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__tuna.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__turkey.n.01-cooking",
+        "input_synsets": {
+            "diced__turkey.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__turkey.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__turkey_leg.n.01-cooking",
+        "input_synsets": {
+            "diced__turkey_leg.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__turkey_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__vanilla.n.01-cooking",
+        "input_synsets": {
+            "diced__vanilla.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__vanilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__veal.n.01-cooking",
+        "input_synsets": {
+            "diced__veal.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__veal.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__venison.n.01-cooking",
+        "input_synsets": {
+            "diced__venison.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__venison.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__vidalia_onion.n.01-cooking",
+        "input_synsets": {
+            "diced__vidalia_onion.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__vidalia_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__virginia_ham.n.01-cooking",
+        "input_synsets": {
+            "diced__virginia_ham.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__virginia_ham.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__waffle.n.01-cooking",
+        "input_synsets": {
+            "diced__waffle.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__waffle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__walnut.n.01-cooking",
+        "input_synsets": {
+            "diced__walnut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__walnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__watermelon.n.01-cooking",
+        "input_synsets": {
+            "diced__watermelon.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__watermelon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__white_turnip.n.01-cooking",
+        "input_synsets": {
+            "diced__white_turnip.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__white_turnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__whole_garlic.n.01-cooking",
+        "input_synsets": {
+            "diced__whole_garlic.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__whole_garlic.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__yam.n.01-cooking",
+        "input_synsets": {
+            "diced__yam.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__yam.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__zucchini.n.01-cooking",
+        "input_synsets": {
+            "diced__zucchini.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__diced__zucchini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "dog_food.n.01-cooking",
+        "input_synsets": {
+            "dog_food.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__dog_food.n.01": 1
+        }
+    },
+    {
+        "rule_name": "drip_coffee.n.01-cooking",
+        "input_synsets": {
+            "drip_coffee.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__drip_coffee.n.01": 1
+        }
+    },
+    {
+        "rule_name": "eggnog.n.01-cooking",
+        "input_synsets": {
+            "eggnog.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__eggnog.n.01": 1
+        }
+    },
+    {
+        "rule_name": "espresso.n.01-cooking",
+        "input_synsets": {
+            "espresso.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__espresso.n.01": 1
+        }
+    },
+    {
+        "rule_name": "flour.n.01-cooking",
+        "input_synsets": {
+            "flour.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__flour.n.01": 1
+        }
+    },
+    {
+        "rule_name": "fritter_batter.n.01-cooking",
+        "input_synsets": {
+            "fritter_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__fritter_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "frosting.n.01-cooking",
+        "input_synsets": {
+            "frosting.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__frosting.n.01": 1
+        }
+    },
+    {
+        "rule_name": "ginger.n.02-cooking",
+        "input_synsets": {
+            "ginger.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__ginger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "granola.n.01-cooking",
+        "input_synsets": {
+            "granola.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__granola.n.01": 1
+        }
+    },
+    {
+        "rule_name": "granulated_salt.n.01-cooking",
+        "input_synsets": {
+            "granulated_salt.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__granulated_salt.n.01": 1
+        }
+    },
+    {
+        "rule_name": "gravy.n.01-cooking",
+        "input_synsets": {
+            "gravy.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__gravy.n.01": 1
+        }
+    },
+    {
+        "rule_name": "green_tea.n.01-cooking",
+        "input_synsets": {
+            "green_tea.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__green_tea.n.01": 1
+        }
+    },
+    {
+        "rule_name": "green_tea_latte.n.01-cooking",
+        "input_synsets": {
+            "green_tea_latte.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__green_tea_latte.n.01": 1
+        }
+    },
+    {
+        "rule_name": "ground_beef.n.01-cooking",
+        "input_synsets": {
+            "ground_beef.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__ground_beef.n.01": 1
+        }
+    },
+    {
+        "rule_name": "ground_coffee.n.01-cooking",
+        "input_synsets": {
+            "ground_coffee.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__ground_coffee.n.01": 1
+        }
+    },
+    {
+        "rule_name": "heavy_cream.n.01-cooking",
+        "input_synsets": {
+            "heavy_cream.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__heavy_cream.n.01": 1
+        }
+    },
+    {
+        "rule_name": "honey.n.01-cooking",
+        "input_synsets": {
+            "honey.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__honey.n.01": 1
+        }
+    },
+    {
+        "rule_name": "hot_sauce.n.01-cooking",
+        "input_synsets": {
+            "hot_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__hot_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "hummus.n.01-cooking",
+        "input_synsets": {
+            "hummus.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__hummus.n.01": 1
+        }
+    },
+    {
+        "rule_name": "iced_cappuccino.n.01-cooking",
+        "input_synsets": {
+            "iced_cappuccino.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__iced_cappuccino.n.01": 1
+        }
+    },
+    {
+        "rule_name": "iced_chocolate.n.01-cooking",
+        "input_synsets": {
+            "iced_chocolate.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__iced_chocolate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "instant_coffee.n.01-cooking",
+        "input_synsets": {
+            "instant_coffee.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__instant_coffee.n.01": 1
+        }
+    },
+    {
+        "rule_name": "jam.n.01-cooking",
+        "input_synsets": {
+            "jam.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__jam.n.01": 1
+        }
+    },
+    {
+        "rule_name": "jelly.n.02-cooking",
+        "input_synsets": {
+            "jelly.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__jelly.n.01": 1
+        }
+    },
+    {
+        "rule_name": "jelly_bean.n.01-cooking",
+        "input_synsets": {
+            "jelly_bean.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__jelly_bean.n.01": 1
+        }
+    },
+    {
+        "rule_name": "jerk_seasoning.n.01-cooking",
+        "input_synsets": {
+            "jerk_seasoning.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__jerk_seasoning.n.01": 1
+        }
+    },
+    {
+        "rule_name": "jimmies.n.01-cooking",
+        "input_synsets": {
+            "jimmies.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__jimmies.n.01": 1
+        }
+    },
+    {
+        "rule_name": "lemon-pepper_seasoning.n.01-cooking",
+        "input_synsets": {
+            "lemon-pepper_seasoning.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__lemon-pepper_seasoning.n.01": 1
+        }
+    },
+    {
+        "rule_name": "lemon_juice.n.01-cooking",
+        "input_synsets": {
+            "lemon_juice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__lemon_juice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "lemonade.n.01-cooking",
+        "input_synsets": {
+            "lemonade.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__lemonade.n.01": 1
+        }
+    },
+    {
+        "rule_name": "lime_juice.n.01-cooking",
+        "input_synsets": {
+            "lime_juice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__lime_juice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "limeade.n.01-cooking",
+        "input_synsets": {
+            "limeade.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__limeade.n.01": 1
+        }
+    },
+    {
+        "rule_name": "maple_syrup.n.01-cooking",
+        "input_synsets": {
+            "maple_syrup.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__maple_syrup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "marinade.n.01-cooking",
+        "input_synsets": {
+            "marinade.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__marinade.n.01": 1
+        }
+    },
+    {
+        "rule_name": "marinara.n.01-cooking",
+        "input_synsets": {
+            "marinara.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__marinara.n.01": 1
+        }
+    },
+    {
+        "rule_name": "marjoram.n.02-cooking",
+        "input_synsets": {
+            "marjoram.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__marjoram.n.01": 1
+        }
+    },
+    {
+        "rule_name": "mashed_potato.n.02-cooking",
+        "input_synsets": {
+            "mashed_potato.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__mashed_potato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "meringue.n.01-cooking",
+        "input_synsets": {
+            "meringue.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__meringue.n.01": 1
+        }
+    },
+    {
+        "rule_name": "milkshake.n.01-cooking",
+        "input_synsets": {
+            "milkshake.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__milkshake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "muffin_batter.n.01-cooking",
+        "input_synsets": {
+            "muffin_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__muffin_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "mustard.n.02-cooking",
+        "input_synsets": {
+            "mustard.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__mustard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "mustard_seed.n.01-cooking",
+        "input_synsets": {
+            "mustard_seed.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__mustard_seed.n.01": 1
+        }
+    },
+    {
+        "rule_name": "nutmeg.n.02-cooking",
+        "input_synsets": {
+            "nutmeg.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__nutmeg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "oat.n.02-cooking",
+        "input_synsets": {
+            "oat.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__oat.n.01": 1
+        }
+    },
+    {
+        "rule_name": "olive_oil.n.01-cooking",
+        "input_synsets": {
+            "olive_oil.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__olive_oil.n.01": 1
+        }
+    },
+    {
+        "rule_name": "onion_powder.n.01-cooking",
+        "input_synsets": {
+            "onion_powder.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__onion_powder.n.01": 1
+        }
+    },
+    {
+        "rule_name": "onion_ring_batter.n.01-cooking",
+        "input_synsets": {
+            "onion_ring_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__onion_ring_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "orange_juice.n.01-cooking",
+        "input_synsets": {
+            "orange_juice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__orange_juice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pancake_batter.n.01-cooking",
+        "input_synsets": {
+            "pancake_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pancake_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "paprika.n.02-cooking",
+        "input_synsets": {
+            "paprika.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__paprika.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pea.n.01-cooking",
+        "input_synsets": {
+            "pea.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pea.n.01": 1
+        }
+    },
+    {
+        "rule_name": "peanut.n.04-cooking",
+        "input_synsets": {
+            "peanut.n.04": 1
+        },
+        "output_synsets": {
+            "cooked__peanut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "peanut_butter.n.01-cooking",
+        "input_synsets": {
+            "peanut_butter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__peanut_butter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pecan.n.03-cooking",
+        "input_synsets": {
+            "pecan.n.03": 1
+        },
+        "output_synsets": {
+            "cooked__pecan.n.01": 1
+        }
+    },
+    {
+        "rule_name": "penne.n.01-cooking",
+        "input_synsets": {
+            "penne.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__penne.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pesto.n.01-cooking",
+        "input_synsets": {
+            "pesto.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pesto.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pine_nut.n.01-cooking",
+        "input_synsets": {
+            "pine_nut.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pine_nut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pistachio.n.02-cooking",
+        "input_synsets": {
+            "pistachio.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__pistachio.n.01": 1
+        }
+    },
+    {
+        "rule_name": "popcorn.n.02-cooking",
+        "input_synsets": {
+            "popcorn.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__popcorn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pumpkin_pie_spice.n.01-cooking",
+        "input_synsets": {
+            "pumpkin_pie_spice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pumpkin_pie_spice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "pumpkin_seed.n.01-cooking",
+        "input_synsets": {
+            "pumpkin_seed.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__pumpkin_seed.n.01": 1
+        }
+    },
+    {
+        "rule_name": "quinoa.n.01-cooking",
+        "input_synsets": {
+            "quinoa.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__quinoa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "raisin.n.01-cooking",
+        "input_synsets": {
+            "raisin.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__raisin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "ravioli.n.01-cooking",
+        "input_synsets": {
+            "ravioli.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__ravioli.n.01": 1
+        }
+    },
+    {
+        "rule_name": "red_meat_sauce.n.01-cooking",
+        "input_synsets": {
+            "red_meat_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__red_meat_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "red_wine.n.01-cooking",
+        "input_synsets": {
+            "red_wine.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__red_wine.n.01": 1
+        }
+    },
+    {
+        "rule_name": "refried_beans.n.01-cooking",
+        "input_synsets": {
+            "refried_beans.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__refried_beans.n.01": 1
+        }
+    },
+    {
+        "rule_name": "risotto.n.01-cooking",
+        "input_synsets": {
+            "risotto.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__risotto.n.01": 1
+        }
+    },
+    {
+        "rule_name": "saffron.n.02-cooking",
+        "input_synsets": {
+            "saffron.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__saffron.n.01": 1
+        }
+    },
+    {
+        "rule_name": "sage.n.02-cooking",
+        "input_synsets": {
+            "sage.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__sage.n.01": 1
+        }
+    },
+    {
+        "rule_name": "salsa.n.01-cooking",
+        "input_synsets": {
+            "salsa.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__salsa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "salt.n.02-cooking",
+        "input_synsets": {
+            "salt.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__salt.n.01": 1
+        }
+    },
+    {
+        "rule_name": "scrambled_eggs.n.01-cooking",
+        "input_synsets": {
+            "scrambled_eggs.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__scrambled_eggs.n.01": 1
+        }
+    },
+    {
+        "rule_name": "sesame_oil.n.01-cooking",
+        "input_synsets": {
+            "sesame_oil.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__sesame_oil.n.01": 1
+        }
+    },
+    {
+        "rule_name": "sesame_seed.n.01-cooking",
+        "input_synsets": {
+            "sesame_seed.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__sesame_seed.n.01": 1
+        }
+    },
+    {
+        "rule_name": "shortening.n.01-cooking",
+        "input_synsets": {
+            "shortening.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__shortening.n.01": 1
+        }
+    },
+    {
+        "rule_name": "soy.n.04-cooking",
+        "input_synsets": {
+            "soy.n.04": 1
+        },
+        "output_synsets": {
+            "cooked__soy.n.01": 1
+        }
+    },
+    {
+        "rule_name": "soy_sauce.n.01-cooking",
+        "input_synsets": {
+            "soy_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__soy_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "sugar_syrup.n.01-cooking",
+        "input_synsets": {
+            "sugar_syrup.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__sugar_syrup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "sunflower_seed.n.01-cooking",
+        "input_synsets": {
+            "sunflower_seed.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__sunflower_seed.n.01": 1
+        }
+    },
+    {
+        "rule_name": "thyme.n.02-cooking",
+        "input_synsets": {
+            "thyme.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__thyme.n.01": 1
+        }
+    },
+    {
+        "rule_name": "tomato_paste.n.01-cooking",
+        "input_synsets": {
+            "tomato_paste.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__tomato_paste.n.01": 1
+        }
+    },
+    {
+        "rule_name": "tomato_rice.n.01-cooking",
+        "input_synsets": {
+            "tomato_rice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__tomato_rice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "tomato_sauce.n.01-cooking",
+        "input_synsets": {
+            "tomato_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__tomato_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "vanilla.n.02-cooking",
+        "input_synsets": {
+            "vanilla.n.02": 1
+        },
+        "output_synsets": {
+            "cooked__vanilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "vinegar.n.01-cooking",
+        "input_synsets": {
+            "vinegar.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__vinegar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "waffle_batter.n.01-cooking",
+        "input_synsets": {
+            "waffle_batter.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__waffle_batter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "water.n.06-cooking",
+        "input_synsets": {
+            "water.n.06": 1
+        },
+        "output_synsets": {
+            "cooked__water.n.01": 1
+        }
+    },
+    {
+        "rule_name": "whipped_cream.n.01-cooking",
+        "input_synsets": {
+            "whipped_cream.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__whipped_cream.n.01": 1
+        }
+    },
+    {
+        "rule_name": "white_rice.n.01-cooking",
+        "input_synsets": {
+            "white_rice.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__white_rice.n.01": 1
+        }
+    },
+    {
+        "rule_name": "white_wine.n.01-cooking",
+        "input_synsets": {
+            "white_wine.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__white_wine.n.01": 1
+        }
+    },
+    {
+        "rule_name": "whole_milk.n.01-cooking",
+        "input_synsets": {
+            "whole_milk.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__whole_milk.n.01": 1
+        }
+    },
+    {
+        "rule_name": "wine_sauce.n.01-cooking",
+        "input_synsets": {
+            "wine_sauce.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__wine_sauce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "yogurt.n.01-cooking",
+        "input_synsets": {
+            "yogurt.n.01": 1
+        },
+        "output_synsets": {
+            "cooked__yogurt.n.01": 1
+        }
+    }
+]

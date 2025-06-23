@@ -1,0 +1,39 @@
+(define (problem wash_jeans-0)
+    (:domain omnigibson)
+
+    (:objects
+        long_trousers.n.01_1 long_trousers.n.01_2 - long_trousers.n.01
+        washer.n.03_1 - washer.n.03
+        stain.n.01_1 - stain.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (open washer.n.03_1)
+        (ontop long_trousers.n.01_1 floor.n.01_1)
+        (covered long_trousers.n.01_1 stain.n.01_1)
+        (ontop long_trousers.n.01_2 floor.n.01_1)
+        (covered long_trousers.n.01_2 stain.n.01_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 washer.n.03_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?long_trousers.n.01 - long_trousers.n.01)
+                (not 
+                    (covered ?long_trousers.n.01 ?stain.n.01_1)
+                )
+            ) 
+        )
+    )
+)

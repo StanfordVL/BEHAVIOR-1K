@@ -1,0 +1,57 @@
+(define (problem make_party_favors_from_candy-0)
+    (:domain omnigibson)
+
+    (:objects
+        cup.n.01_1 cup.n.01_2 - cup.n.01
+        countertop.n.01_1 - countertop.n.01
+        chocolate_chip_cookie.n.01_1 chocolate_chip_cookie.n.01_2 - chocolate_chip_cookie.n.01
+        jelly_bean.n.01_1 - jelly_bean.n.01
+        jelly_bean__jar.n.01_1 - jelly_bean__jar.n.01
+        jimmies.n.01_1 - jimmies.n.01
+        jimmies__jar.n.01_1 - jimmies__jar.n.01
+        marshmallow.n.01_1 marshmallow.n.01_2 - marshmallow.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chocolate_chip_cookie.n.01_1 countertop.n.01_1) 
+        (ontop chocolate_chip_cookie.n.01_2 countertop.n.01_1) 
+        (filled jelly_bean__jar.n.01_1 jelly_bean.n.01_1) 
+        (ontop jelly_bean__jar.n.01_1 countertop.n.01_1)
+        (filled jimmies__jar.n.01_1 jimmies.n.01_1) 
+        (ontop jimmies__jar.n.01_1 countertop.n.01_1)
+        (ontop marshmallow.n.01_1 countertop.n.01_1) 
+        (ontop marshmallow.n.01_2 countertop.n.01_1) 
+        (ontop cup.n.01_1 countertop.n.01_1) 
+        (ontop cup.n.01_2 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?cup.n.01 - cup.n.01)
+                (?chocolate_chip_cookie.n.01 - chocolate_chip_cookie.n.01)
+                (ontop ?chocolate_chip_cookie.n.01 ?cup.n.01)
+            )
+            (forpairs 
+                (?cup.n.01 - cup.n.01)
+                (?marshmallow.n.01 - marshmallow.n.01)
+                (inside ?marshmallow.n.01 ?cup.n.01)
+            )
+            (forpairs 
+                (?cup.n.01 - cup.n.01)
+                (?jimmies.n.01 - jimmies.n.01)
+                (contains ?cup.n.01 ?jimmies.n.01)
+            )
+            (forpairs 
+                (?cup.n.01 - cup.n.01)
+                (?jelly_bean.n.01 - jelly_bean.n.01)
+                (contains ?cup.n.01 ?jelly_bean.n.01)
+            )
+        )
+    )
+)

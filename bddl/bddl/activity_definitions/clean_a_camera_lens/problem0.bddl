@@ -1,0 +1,39 @@
+(define (problem clean_a_camera_lens-0)
+    (:domain omnigibson)
+
+    (:objects
+        digital_camera.n.01_1 - digital_camera.n.01
+        sink.n.01_1 - sink.n.01
+        lens.n.01_1 - lens.n.01
+        rag.n.01_1 - rag.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        countertop.n.01_1 - countertop.n.01
+        water.n.06_1 - water.n.06
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop digital_camera.n.01_1 countertop.n.01_1) 
+        (attached lens.n.01_1 digital_camera.n.01_1) 
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (not 
+            (covered lens.n.01_1 disinfectant.n.01_1)
+        ) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1) 
+        (ontop disinfectant__bottle.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?lens.n.01_1 ?disinfectant.n.01_1)
+            (attached ?lens.n.01_1 ?digital_camera.n.01_1)
+        )
+    )
+)

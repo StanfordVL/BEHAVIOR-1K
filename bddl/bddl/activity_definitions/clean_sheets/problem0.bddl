@@ -1,0 +1,47 @@
+(define (problem clean_sheets-0)
+    (:domain omnigibson)
+
+    (:objects
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        sheet.n.03_1 - sheet.n.03
+        case.n.19_1 - case.n.19
+        stain.n.01_1 - stain.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        washer.n.03_1 - washer.n.03
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 washer.n.03_1) 
+        (ontop sheet.n.03_1 floor.n.01_1) 
+        (ontop case.n.19_1 floor.n.01_1)
+        (covered case.n.19_1 stain.n.01_1) 
+        (covered sheet.n.03_1 stain.n.01_1) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom washer.n.03_1 utility_room)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future water.n.06_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?case.n.19_1 ?stain.n.01_1)
+            )
+            (not 
+                (covered ?sheet.n.03_1 ?stain.n.01_1)
+            )
+            (not 
+                (saturated ?case.n.19_1 ?water.n.06_1)
+            )
+            (not 
+                (saturated ?sheet.n.03_1 ?water.n.06_1)
+            )
+        )
+    )
+)

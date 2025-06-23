@@ -1,0 +1,23 @@
+(define (problem installing_a_trailer_hitch-0)
+    (:domain omnigibson)
+
+    (:objects
+        pickup.n.01_1 - pickup.n.01
+        floor.n.01_1 - floor.n.01
+        hitch.n.04_1 - hitch.n.04
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pickup.n.01_1 floor.n.01_1) 
+        (ontop hitch.n.04_1 floor.n.01_1)
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?hitch.n.04_1 ?pickup.n.01_1)
+        )
+    )
+)

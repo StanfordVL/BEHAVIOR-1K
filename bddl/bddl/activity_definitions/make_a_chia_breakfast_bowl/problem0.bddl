@@ -1,0 +1,58 @@
+(define (problem make_a_chia_breakfast_bowl-0)
+    (:domain omnigibson)
+
+    (:objects
+     	granola.n.01_1 - granola.n.01
+    	granola__box.n.01_1 - granola__box.n.01
+    	breakfast_table.n.01_1 - breakfast_table.n.01
+    	yogurt.n.01_1 - yogurt.n.01
+    	yogurt__carton.n.01_1 - yogurt__carton.n.01
+    	blackberry.n.01_1 blackberry.n.01_2 - blackberry.n.01
+    	bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+    	plate.n.04_1 - plate.n.04
+    	blueberry.n.02_1 - blueberry.n.02
+    	raspberry.n.02_1 raspberry.n.02_2 - raspberry.n.02
+    	chia_seed.n.01_1 - chia_seed.n.01
+    	chia_seed__bag.n.01_1 - chia_seed__bag.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled granola__box.n.01_1 granola.n.01_1)
+        (ontop granola__box.n.01_1 breakfast_table.n.01_1)
+        (ontop plate.n.04_1 breakfast_table.n.01_1)
+        (filled yogurt__carton.n.01_1 yogurt.n.01_1)
+        (ontop yogurt__carton.n.01_1 breakfast_table.n.01_1)
+        (ontop blackberry.n.01_1 plate.n.04_1)
+        (ontop blackberry.n.01_2 plate.n.04_1)
+        (ontop raspberry.n.02_1 plate.n.04_1)
+        (ontop raspberry.n.02_2 plate.n.04_1)
+        (filled bowl.n.01_1 blueberry.n.02_1)
+        (ontop bowl.n.01_1 breakfast_table.n.01_1)
+        (ontop bowl.n.01_2 breakfast_table.n.01_1)
+        (filled chia_seed__bag.n.01_1 chia_seed.n.01_1)
+        (ontop chia_seed__bag.n.01_1 breakfast_table.n.01_1) 
+        (inroom breakfast_table.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (contains ?bowl.n.01_2 ?granola.n.01_1)
+            (contains ?bowl.n.01_2 ?yogurt.n.01_1)
+            (forall 
+                (?blackberry.n.01 - blackberry.n.01) 
+                (inside ?blackberry.n.01 ?bowl.n.01_2)
+            )
+            (forall
+                (?raspberry.n.02 - raspberry.n.02)
+                (inside ?raspberry.n.02 ?bowl.n.01_2)
+            )
+            (contains ?bowl.n.01_2 ?blueberry.n.02_1)
+            (ontop ?bowl.n.01_2 ?breakfast_table.n.01_1)
+            (contains ?bowl.n.01_2 ?chia_seed.n.01_1)
+        )
+    )
+)
