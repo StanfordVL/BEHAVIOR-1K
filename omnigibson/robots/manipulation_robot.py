@@ -26,7 +26,6 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sampling_utils import raytest_batch
 from omnigibson.utils.usd_utils import (
@@ -52,10 +51,11 @@ m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
 m.MAX_ASSIST_FORCE = 100
 m.MIN_AG_DEFAULT_GRASP_POINT_PROP = 0.2
-m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 1.0
+m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.95
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
+m.GRASP_WINDOW = 3.0  # grasp window in seconds
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
 AG_MODES = {
@@ -193,8 +193,7 @@ class ManipulationRobot(BaseRobot):
         self._ag_obj_constraint_params = {arm: {} for arm in self.arm_names}
         self._ag_freeze_gripper = {arm: None for arm in self.arm_names}
         self._ag_release_counter = {arm: None for arm in self.arm_names}
-        self._ag_check_in_volume = {arm: None for arm in self.arm_names}
-        self._ag_calculate_volume = {arm: None for arm in self.arm_names}
+        self._ag_grasp_counter = {arm: None for arm in self.arm_names}
 
         # Call super() method
         super().__init__(
@@ -260,14 +259,6 @@ class ManipulationRobot(BaseRobot):
             self._infer_finger_properties()
         except AssertionError as e:
             log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
-
-        if gm.AG_CLOTH:
-            for arm in self.arm_names:
-                self._ag_check_in_volume[arm], self._ag_calculate_volume[arm] = (
-                    generate_points_in_volume_checker_function(
-                        obj=self, volume_link=self.eef_links[arm], mesh_name_prefixes="container"
-                    )
-                )
 
     def _infer_finger_properties(self):
         """
@@ -619,20 +610,19 @@ class ManipulationRobot(BaseRobot):
         self._ag_freeze_gripper[arm] = False
         self._ag_release_counter[arm] = 0
 
-    def release_grasp_immediately(self):
+    def release_grasp_immediately(self, arm="default"):
         """
-        Magic action to release this robot's grasp for all arms at once.
+        Magic action to release this robot's grasp for one arm.
         As opposed to @_release_grasp, this method would bypass the release window mechanism and immediately release.
         """
-        for arm in self.arm_names:
-            if self._ag_obj_constraints[arm] is not None:
-                self._release_grasp(arm=arm)
-                self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
-                self._handle_release_window(arm=arm)
-                assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
-                # TODO: Verify not needed!
-                # for finger_link in self.finger_links[arm]:
-                #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
+        if self._ag_obj_constraints[arm] is not None:
+            self._release_grasp(arm=arm)
+            self._ag_release_counter[arm] = int(math.ceil(m.RELEASE_WINDOW / og.sim.get_sim_step_dt()))
+            self._handle_release_window(arm=arm)
+            assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
+            # TODO: Verify not needed!
+            # for finger_link in self.finger_links[arm]:
+            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
@@ -802,6 +792,19 @@ class ManipulationRobot(BaseRobot):
 
     @cached_property
     @abstractmethod
+    def gripper_link_names(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to array of link names corresponding to
+                this robot's gripper. Should be mutual exclusive from self.arm_link_names and self.finger_link_names!
+
+                Note: the ordering within the dictionary is assumed to be intentional, and is
+                directly used to define the set of corresponding idxs.
+        """
+        raise NotImplementedError
+
+    @cached_property
+    @abstractmethod
     def finger_link_names(self):
         """
         Returns:
@@ -869,6 +872,15 @@ class ManipulationRobot(BaseRobot):
                 points from the left finger to the right finger, and the x-axis inferred programmatically
         """
         return {arm: self._links[self.eef_link_names[arm]] for arm in self.arm_names}
+
+    @cached_property
+    def gripper_links(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to robot links corresponding to
+                that arm's gripper links
+        """
+        return {arm: [self._links[link] for link in self.gripper_link_names[arm]] for arm in self.arm_names}
 
     @cached_property
     def finger_links(self):
@@ -1188,31 +1200,35 @@ class ManipulationRobot(BaseRobot):
         # (per arm appendage)
         # Since we'll be calculating the cartesian cross product between start and end points, we stack the start points
         # by the number of end points and repeat the individual elements of the end points by the number of start points
-        startpoints = []
-        endpoints = []
+        n_start_points = len(self.assisted_grasp_start_points[arm])
+        n_end_points = len(self.assisted_grasp_end_points[arm])
+        start_and_end_points = th.zeros(n_start_points + n_end_points, 3)
+        link_positions = th.zeros(n_start_points + n_end_points, 3)
+        link_quats = th.zeros(n_start_points + n_end_points, 4)
+        idx = 0
         for grasp_start_point in self.assisted_grasp_start_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_start_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to startpoints
-            start_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_start_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            startpoints.append(start_point)
-        # Repeat for end points
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_start_point.position
+            idx += 1
+
         for grasp_end_point in self.assisted_grasp_end_points[arm]:
             # Get world coordinates of link base frame
             link_pos, link_orn = self.links[grasp_end_point.link_name].get_position_orientation()
-            # Calculate grasp start point in world frame and add to endpoints
-            end_point, _ = T.pose_transform(
-                link_pos, link_orn, grasp_end_point.position, th.tensor([0, 0, 0, 1], dtype=th.float32)
-            )
-            endpoints.append(end_point)
+            link_positions[idx] = link_pos
+            link_quats[idx] = link_orn
+            start_and_end_points[idx] = grasp_end_point.position
+            idx += 1
+
+        # Transform start / end points into world frame (batched call for efficiency sake)
+        start_and_end_points = link_positions + (T.quat2mat(link_quats) @ start_and_end_points.unsqueeze(-1)).squeeze(
+            -1
+        )
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
-        n_startpoints, n_endpoints = len(startpoints), len(endpoints)
-        raycast_startpoints = startpoints * n_endpoints
-        raycast_endpoints = []
-        for endpoint in endpoints:
-            raycast_endpoints += [endpoint] * n_startpoints
+        raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
+        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
         ray_data = set()
         # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
@@ -1575,21 +1591,17 @@ class ManipulationRobot(BaseRobot):
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             control = cb.to_torch(controller.control)
-            threshold = th.mean(
-                th.stack([self.joint_lower_limits[controlled_joints], self.joint_upper_limits[controlled_joints]]),
-                dim=0,
-            )
             if control is None:
                 applying_grasp = False
             elif self._grasping_direction == "lower":
                 applying_grasp = (
-                    th.any(control < threshold)
+                    th.any(control < self.joint_upper_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control < 0)
                 )
             else:
                 applying_grasp = (
-                    th.any(control > threshold)
+                    th.any(control > self.joint_lower_limits[controlled_joints])
                     if controller.control_type == ControlType.POSITION
                     else th.any(control > 0)
                 )
@@ -1604,7 +1616,28 @@ class ManipulationRobot(BaseRobot):
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
             elif applying_grasp:
-                self._establish_grasp(arm=arm, ag_data=self._calculate_in_hand_object(arm=arm))
+                current_ag_data = self._calculate_in_hand_object(arm=arm)
+                if self._ag_grasp_counter[arm] is not None:
+                    # We're in a grasp window already
+                    if current_ag_data is None:
+                        # Lost contact with object, reset window
+                        self._ag_grasp_counter[arm] = None
+                    else:
+                        self._ag_grasp_counter[arm] += 1
+
+                        # Check if window is complete
+                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
+                        if time_in_grasp >= m.GRASP_WINDOW:
+                            # Establish grasp with the LATEST ag_data
+                            self._establish_grasp(arm=arm, ag_data=current_ag_data)
+                            # Reset the grasp window tracking
+                            self._ag_grasp_counter[arm] = None
+                elif current_ag_data is not None:
+                    # Start tracking a new potential grasp
+                    self._ag_grasp_counter[arm] = 0
+            else:
+                # Not trying to grasp, reset any pending grasp window
+                self._ag_grasp_counter[arm] = None
 
     def _update_constraint_cloth(self, arm="default"):
         """
@@ -1674,7 +1707,7 @@ class ManipulationRobot(BaseRobot):
         # Returns the first cloth that overlaps with the "ghost" box volume
         for cloth_obj in cloth_objs:
             attachment_point_pos = cloth_obj.links["attachment_point"].get_position_orientation()[0]
-            particles_in_volume = self._ag_check_in_volume[arm]([attachment_point_pos])
+            particles_in_volume = self.eef_links[arm].check_points_in_volume([attachment_point_pos])
             if particles_in_volume.sum() > 0:
                 return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos
 
@@ -1770,9 +1803,6 @@ class ManipulationRobot(BaseRobot):
         return state
 
     def _load_state(self, state):
-        # If there is an existing AG object, remove it
-        self.release_grasp_immediately()
-
         super()._load_state(state=state)
 
         # No additional loading needed if we're using physical grasping
@@ -1782,14 +1812,37 @@ class ManipulationRobot(BaseRobot):
         # Include AG_state
         # TODO: currently does not take care of cloth objects
         # TODO: add unit tests
-        if "ag_obj_constraint_params" not in state:
-            return
-        for arm in state["ag_obj_constraint_params"].keys():
-            if len(state["ag_obj_constraint_params"][arm]) > 0:
-                data = state["ag_obj_constraint_params"][arm]
-                obj = self.scene.object_registry("prim_path", data["ag_obj_prim_path"])
-                link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                contact_pos_global = data["contact_pos"]
+        for arm in self.arm_names:
+            current_ag_constraint = self._ag_obj_constraint_params[arm]
+            has_current_constraint = len(current_ag_constraint) > 0
+
+            loaded_ag_constraint = {}
+            has_loaded_constraint = False
+            if "ag_obj_constraint_params" in state:
+                loaded_ag_constraint = state["ag_obj_constraint_params"][arm]
+                has_loaded_constraint = len(loaded_ag_constraint) > 0
+
+            # Release existing grasp if needed
+            should_release = False
+            if has_current_constraint:
+                if not has_loaded_constraint:
+                    should_release = True
+                else:
+                    # Check if constraints are different
+                    are_equal = current_ag_constraint.keys() == loaded_ag_constraint.keys() and all(
+                        th.equal(v1, v2) if isinstance(v1, th.Tensor) and isinstance(v2, th.Tensor) else v1 == v2
+                        for v1, v2 in zip(current_ag_constraint.values(), loaded_ag_constraint.values())
+                    )
+                    should_release = not are_equal
+
+            if should_release:
+                self.release_grasp_immediately(arm=arm)
+
+            # Establish new grasp if needed
+            if has_loaded_constraint and (not has_current_constraint or should_release):
+                obj = self.scene.object_registry("prim_path", loaded_ag_constraint["ag_obj_prim_path"])
+                link = obj.links[loaded_ag_constraint["ag_link_prim_path"].split("/")[-1]]
+                contact_pos_global = loaded_ag_constraint["contact_pos"]
                 assert self.scene is not None, "Cannot set position and orientation relative to scene without a scene"
                 contact_pos_global, _ = self.scene.convert_scene_relative_pose_to_world(
                     contact_pos_global,

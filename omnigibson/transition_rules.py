@@ -12,6 +12,7 @@ import networkx as nx
 import torch as th
 
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import (
@@ -37,6 +38,8 @@ from omnigibson.utils.python_utils import Registerable, classproperty, torch_del
 from omnigibson.utils.registry_utils import Registry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
+from omnigibson.systems.system_base import VisualParticleSystem
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -136,6 +139,10 @@ class TransitionRuleAPI:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
         """
         for rule in rules:
+            # Skip if rule is not enabled
+            if not rule.ENABLED:
+                continue
+
             # Check if rule is still valid, if so, update its entry
             object_candidates = self.get_rule_candidates(rule=rule, objects=self.scene.objects)
 
@@ -236,6 +243,17 @@ class ObjectCandidateFilter(metaclass=ABCMeta):
     def __call__(self, obj):
         """Returns true if the given object passes the filter."""
         return False
+
+
+class ObjectPropertyFilter(ObjectCandidateFilter):
+    """Filter for arbitrary object properties"""
+
+    def __init__(self, name, value):
+        self.property = name
+        self.value = value
+
+    def __call__(self, obj):
+        return getattr(obj, self.property) == self.value
 
 
 class CategoryFilter(ObjectCandidateFilter):
@@ -596,6 +614,8 @@ class BaseTransitionRule(Registerable):
     Defines a set of categories of objects and how to transition their states.
     """
 
+    ENABLED = True
+
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
 
@@ -790,7 +810,7 @@ class WasherDryerRule(BaseTransitionRule):
         """
         del object_candidates
         obj_positions = global_info["obj_positions"]
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
+        in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions)
 
         in_volume_objs = [obj for obj, is_in_volume in zip(self.scene.objects, in_volume) if is_in_volume]
         # Remove the container itself
@@ -840,7 +860,6 @@ class WasherRule(WasherDryerRule):
         }
 
     def transition(self, object_candidates):
-        water = self.scene.get_system("water")
         global_info = self._compute_global_rule_info()
         for washer in object_candidates["washer"]:
             # Remove the systems if the conditions are met
@@ -864,19 +883,26 @@ class WasherRule(WasherDryerRule):
                     if any(washer.states[Contains].get_value(solvent) for solvent in solvents):
                         systems_to_remove.append(system)
 
-            for system in systems_to_remove:
-                washer.states[Contains].set_value(system, False)
-
-            # Make the objects wet
             container_info = self._compute_container_info(
                 object_candidates=object_candidates, container=washer, global_info=global_info
             )
             in_volume_objs = container_info["in_volume_objs"]
-            for obj in in_volume_objs:
-                if Saturated in obj.states:
-                    obj.states[Saturated].set_value(water, True)
+            for system in systems_to_remove:
+                if isinstance(system, VisualParticleSystem):
+                    # If the system is a visual particle system, remove it from the objects in the washer
+                    for obj in in_volume_objs:
+                        obj.states[Covered].set_value(system, False)
                 else:
-                    obj.states[Covered].set_value(water, True)
+                    washer.states[Contains].set_value(system, False)
+
+            if gm.USE_GPU_DYNAMICS:
+                # Make the objects wet
+                water = self.scene.get_system("water", force_init=True)
+                for obj in in_volume_objs:
+                    if Saturated in obj.states:
+                        obj.states[Saturated].set_value(water, True)
+                    else:
+                        obj.states[Covered].set_value(water, True)
 
         return TransitionResults(add=[], remove=[])
 
@@ -895,17 +921,18 @@ class DryerRule(WasherDryerRule):
         }
 
     def transition(self, object_candidates):
-        water = self.scene.get_system("water")
-        global_info = self._compute_global_rule_info()
-        for dryer in object_candidates["dryer"]:
-            container_info = self._compute_container_info(
-                object_candidates=object_candidates, container=dryer, global_info=global_info
-            )
-            in_volume_objs = container_info["in_volume_objs"]
-            for obj in in_volume_objs:
-                if Saturated in obj.states:
-                    obj.states[Saturated].set_value(water, False)
-            dryer.states[Contains].set_value(water, False)
+        water = self.scene.get_system("water", force_init=False)
+        if water.initialized:
+            global_info = self._compute_global_rule_info()
+            for dryer in object_candidates["dryer"]:
+                container_info = self._compute_container_info(
+                    object_candidates=object_candidates, container=dryer, global_info=global_info
+                )
+                in_volume_objs = container_info["in_volume_objs"]
+                for obj in in_volume_objs:
+                    if Saturated in obj.states:
+                        obj.states[Saturated].set_value(water, False)
+                dryer.states[Contains].set_value(water, False)
 
         return TransitionResults(add=[], remove=[])
 
@@ -944,15 +971,18 @@ class SlicingRule(BaseTransitionRule):
                 part_bb_pos = th.tensor(part["bb_pos"], dtype=th.float32)
                 part_bb_orn = th.tensor(part["bb_orn"], dtype=th.float32)
 
-                # Determine the relative scale to apply to the object part from the original object
-                # Note that proper (rotated) scaling can only be applied when the relative orientation of
-                # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                assert T.check_quat_right_angle(
-                    part_bb_orn
-                ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
-
                 # Scale the offset accordingly.
-                scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
+                # If the scale of the sliceable object is uniform, we can just take its scale
+                if th.all(sliceable_obj.scale == sliceable_obj.scale[0]):
+                    scale = sliceable_obj.scale
+                else:
+                    # Determine the relative scale to apply to the object part from the original object
+                    # Note that proper (rotated) scaling can only be applied when the relative orientation of
+                    # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+                    assert T.check_quat_right_angle(
+                        part_bb_orn
+                    ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                    scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
                 # Calculate global part bounding box pose.
                 part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
@@ -1588,7 +1618,7 @@ class RecipeRule(BaseTransitionRule):
         # Compute in volume for all relevant object positions
         # We check for either the object AABB being contained OR the object being on top of the container, in the
         # case that the container is too flat for the volume to contain the object
-        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | th.tensor(
+        in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions) | th.tensor(
             [obj.states[OnTop].get_value(container) for obj in self._objects]
         )
 
@@ -1621,6 +1651,8 @@ class RecipeRule(BaseTransitionRule):
         # Finally, compute relevant objects and category mapping based on relevant categories
         i = 0
         for category, objects in objects_by_category.items():
+            # Exclude fixed base objects for performance
+            objects = [obj for obj in objects if not obj.fixed_base]
             self._category_idxs[category] = i + th.arange(len(objects))
             self._objects += list(objects)
             for obj in objects:
@@ -1630,7 +1662,8 @@ class RecipeRule(BaseTransitionRule):
     @classproperty
     def candidate_filters(cls):
         # Fillable object required
-        return {"container": AbilityFilter(ability="fillable")}
+        # We also will filter out any fixed_base objects, because otherwise all cabinets, fridges, etc. would become valid containers!
+        return {"container": AndFilter([AbilityFilter(ability="fillable"), ObjectPropertyFilter("fixed_base", False)])}
 
     def transition(self, object_candidates):
         objs_to_add, objs_to_remove = [], []
@@ -1754,6 +1787,15 @@ class RecipeRule(BaseTransitionRule):
 
         volume += sum(obj.volume for obj in objs_to_remove)
 
+        # Compute full AABB containing all objects in objs_to_remove
+        full_aabb = None
+        if objs_to_remove:
+            aabbs = [obj.aabb for obj in objs_to_remove]
+            full_aabb = (
+                th.min(th.stack([aabb[0] for aabb in aabbs]), dim=0).values,
+                th.max(th.stack([aabb[1] for aabb in aabbs]), dim=0).values,
+            )
+
         # Define callback for spawning new objects inside container
         def _spawn_object_in_container(obj):
             # For simplicity sake, sample only OnTop
@@ -1783,11 +1825,28 @@ class RecipeRule(BaseTransitionRule):
             n_category_objs = len(container.scene.object_registry("category", category, []))
             models = get_all_object_category_models(category=category)
 
+            bounding_box_size = None
+            if full_aabb is not None and n_instances > 0:
+                # Compute the 3D bounding box size for the new objects
+                full_aabb_extent = full_aabb[1] - full_aabb[0]  # Get the full AABB extent
+
+                # Determine how to divide the space in the x-y plane
+                # Calculate factors for grid layout
+                n_rows = int(math.ceil(n_instances**0.5))
+                n_columns = math.ceil(n_instances / n_rows)
+
+                # Calculate the size for each instance in the x-y plane
+                bounding_box_size = th.tensor(
+                    [full_aabb_extent[0] / n_columns, full_aabb_extent[1] / n_rows, full_aabb_extent[2]],
+                    dtype=th.float32,
+                )
+
             for i in range(n_instances):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
                     category=category,
                     model=random.choice(models),
+                    bounding_box=bounding_box_size,
                 )
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,
@@ -1957,8 +2016,17 @@ class CookingPhysicalParticleRule(RecipeRule):
 
         # Generate cooked particles
         cooked_system = self.scene.get_system(recipe["output_systems"][0])
+        pre_gen_count = cooked_system.n_particles
         particle_positions = contained_particles_state.positions[in_volume_idx]
         cooked_system.generate_particles(positions=particle_positions)
+
+        # Stabilize generated particles
+        if isinstance(cooked_system, MacroPhysicalParticleSystem):
+            new_particle_indices = th.arange(pre_gen_count, cooked_system.n_particles)
+            lin_vel, ang_vel = cooked_system.get_particles_velocities()
+            lin_vel[new_particle_indices] = 0
+            ang_vel[new_particle_indices] = 0
+            cooked_system.set_particles_velocities(lin_vels=lin_vel, ang_vels=ang_vel)
 
         # Remove water if the cooking requires water
         if len(recipe["input_systems"]) > 1:
@@ -2039,6 +2107,7 @@ class ToggleableMachineRule(RecipeRule):
                 NotFilter(CategoryFilter("washer")),
                 NotFilter(CategoryFilter("clothes_dryer")),
                 NotFilter(CategoryFilter("hot_tub")),
+                NotFilter(CategoryFilter("oven")),
             ]
         )
         return candidate_filters

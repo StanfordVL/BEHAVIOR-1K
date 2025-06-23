@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 
 import torch as th
 from bddl.activity import (
@@ -15,6 +17,7 @@ from bddl.activity import (
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.scenes.scene_base import Scene
@@ -30,6 +33,7 @@ from omnigibson.utils.bddl_utils import (
     get_processed_bddl,
 )
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -50,6 +54,14 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
+        sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+            mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
+            that category. During sampling, if a given synset is found in this whitelist, only the specified
+            models will be used as options
+        sampling_blacklist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+            mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
+            that category. During sampling, if a given synset is found in this blacklist, all specified
+            models will not be used as options
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
@@ -59,6 +71,7 @@ class BehaviorTask(BaseTask):
             specific to the task class. Default is None, which corresponds to a default config being usd. Note that
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
+        include_obs (bool): Whether to include observations or not for this task
     """
 
     def __init__(
@@ -68,9 +81,12 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
+        sampling_whitelist=None,
+        sampling_blacklist=None,
         highlight_task_relevant_objects=False,
         termination_config=None,
         reward_config=None,
+        include_obs=True,
     ):
         # Make sure object states are enabled
         assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
@@ -107,6 +123,8 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
+        self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
+        self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
         self.object_scope = None  # Maps str to BDDLEntity
         self.object_instance_to_category = None  # Maps str to str
@@ -120,7 +138,7 @@ class BehaviorTask(BaseTask):
         self.activity_natural_language_goal_conditions = None  # str
 
         # Run super init
-        super().__init__(termination_config=termination_config, reward_config=reward_config)
+        super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
 
     @classmethod
     def get_cached_activity_scene_filename(
@@ -220,6 +238,14 @@ class BehaviorTask(BaseTask):
 
         og.sim.add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
         og.sim.add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
+
+    def reset(self, env):
+        super().reset(env)
+
+        # Force wake objects
+        for obj in self.object_scope.values():
+            if isinstance(obj, DatasetObject):
+                obj.wake()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -335,7 +361,10 @@ class BehaviorTask(BaseTask):
 
         if self.online_object_sampling:
             # Sample online
-            accept_scene, feedback = self.sampler.sample()
+            accept_scene, feedback = self.sampler.sample(
+                sampling_whitelist=self.sampling_whitelist,
+                sampling_blacklist=self.sampling_blacklist,
+            )
             if not accept_scene:
                 return accept_scene, feedback
         else:
@@ -370,7 +399,7 @@ class BehaviorTask(BaseTask):
             env (Environment): Current active environment instance
         """
         # Load task metadata
-        inst_to_name = self.load_task_metadata()["inst_to_name"]
+        inst_to_name = self.load_task_metadata(env=env)["inst_to_name"]
 
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
@@ -536,31 +565,51 @@ class BehaviorTask(BaseTask):
         )
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 
-    def save_task(self, path=None, override=False):
+    def save_task(self, env, save_dir=None, override=False, task_relevant_only=False, suffix=None):
         """
         Writes the current scene configuration to a .json file
 
         Args:
-            path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
+            env (og.Environment): OmniGibson active environment
+            save_dir (None or str): If specified, absolute fpath to the desired directory to write the .json. Default is
                 <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
+            task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
+                call dump_state() on all the BDDL instances in self.object_scope, else will save the entire sim state
+                via env.scene.save()
+            suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
-        if path is None:
-            assert self.scene_name is not None, "Scene name must be set in order to save task without specifying path"
-            fname = self.get_cached_activity_scene_filename(
-                scene_model=self.scene_name,
-                activity_name=self.activity_name,
-                activity_definition_id=self.activity_definition_id,
-                activity_instance_id=self.activity_instance_id,
-            )
-            path = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json", f"{fname}.json")
-
+        save_dir = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json") if save_dir is None else save_dir
+        assert self.scene_name is not None, "Scene name must be set in order to save task"
+        fname = self.get_cached_activity_scene_filename(
+            scene_model=self.scene_name,
+            activity_name=self.activity_name,
+            activity_definition_id=self.activity_definition_id,
+            activity_instance_id=self.activity_instance_id,
+        )
+        path = os.path.join(save_dir, f"{fname}.json")
+        if task_relevant_only:
+            path = path.replace(".json", "-tro_state.json")
+        if suffix is not None:
+            path = path.replace(".json", f"-{suffix}.json")
         if os.path.exists(path) and not override:
             log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
             return
-        # Write metadata and then save
-        self.write_task_metadata()
-        og.sim.save(json_paths=[path])
+
+        # Save based on whether we're only storing task-relevant object scope states or not
+        if task_relevant_only:
+            task_relevant_state_dict = {
+                bddl_name: bddl_inst.dump_state(serialized=False)
+                for bddl_name, bddl_inst in env.task.object_scope.items()
+                if bddl_inst.exists
+            }
+            Path(os.path.dirname(path)).mkdir(parents=True, exist_ok=True)
+            with open(path, "w+") as f:
+                json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
+        else:
+            # Write metadata and then save
+            self.write_task_metadata(env)
+            env.scene.save(json_path=path)
 
     @property
     def name(self):

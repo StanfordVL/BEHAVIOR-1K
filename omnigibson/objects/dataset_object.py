@@ -11,7 +11,14 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
-from omnigibson.utils.constants import DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType, PrimType
+from omnigibson.utils.constants import (
+    DEFAULT_PRISMATIC_JOINT_FRICTION,
+    DEFAULT_REVOLUTE_JOINT_FRICTION,
+    DEFAULT_PRISMATIC_JOINT_DAMPING,
+    DEFAULT_REVOLUTE_JOINT_DAMPING,
+    JointType,
+    PrimType,
+)
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -20,9 +27,6 @@ log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
-
-# A lower bound is needed in order to consistently trigger contacts
-m.MIN_OBJ_MASS = 0.4
 
 
 class DatasetType(IntEnum):
@@ -57,6 +61,7 @@ class DatasetObject(USDObject):
         include_default_states=True,
         bounding_box=None,
         in_rooms=None,
+        expected_file_hash=None,
         **kwargs,
     ):
         """
@@ -99,6 +104,7 @@ class DatasetObject(USDObject):
                 -- not both!
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
                 a list of room type(s) or a single room type
+            expected_file_hash (str): The expected hash of the file to load. This is used to check if the file has changed. None to disable check.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -146,6 +152,7 @@ class DatasetObject(USDObject):
             link_physics_materials=link_physics_materials,
             load_config=load_config,
             abilities=abilities,
+            expected_file_hash=expected_file_hash,
             **kwargs,
         )
 
@@ -215,18 +222,12 @@ class DatasetObject(USDObject):
 
             recursive_light_update(self._prim)
 
-        # Apply any forced roughness updates
-        for material in self.materials:
-            if material.is_glass:
-                continue
-            material.reflection_roughness_texture_influence = 0.0
-            material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
-
-        # Set the joint frictions based on category
-        friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
+        # Set the joint frictions based on joint type
         for joint in self._joints.values():
-            if joint.joint_type != JointType.JOINT_FIXED:
-                joint.friction = friction
+            if joint.joint_type == JointType.JOINT_PRISMATIC:
+                joint.friction = DEFAULT_PRISMATIC_JOINT_FRICTION
+            elif joint.joint_type == JointType.JOINT_REVOLUTE:
+                joint.friction = DEFAULT_REVOLUTE_JOINT_FRICTION
 
     def _post_load(self):
         # If manual bounding box is specified, scale based on ratio between that and the native bbox
@@ -251,68 +252,57 @@ class DatasetObject(USDObject):
         # Run super last
         super()._post_load()
 
-        # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
-        # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
-        # original USD folder, i.e. <category>/<model>/usd.
-        root_path = os.path.dirname(self._usd_path)
-        for material in self.materials:
-            material.shader_update_asset_paths_with_root_path(root_path)
-
-        # Assign realistic density and mass based on average object category spec, or fall back to a default value
-        if self.avg_obj_dims is not None and self.avg_obj_dims["density"] is not None:
-            density = self.avg_obj_dims["density"]
-        else:
-            density = 1000.0
+        # Get the average mass/density for this object category
+        avg_specs = get_og_avg_category_specs()
+        assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
+        category_mass = avg_specs[self.category]["mass"]
+        category_density = avg_specs[self.category]["density"]
 
         if self._prim_type == PrimType.RIGID:
+            total_volume = sum(link.volume for link in self._links.values())
             for link in self._links.values():
                 # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
                 if link.has_collision_meshes and isinstance(link, RigidDynamicPrim):
-                    link.mass = 0.0
-                    link.density = density
+                    if gm.FORCE_CATEGORY_MASS:
+                        # Each link should get the appropriate fraction of the category mass
+                        # based on the link volume
+                        link.mass = max(category_mass * (link.volume / total_volume), 1e-6)
+                        link.density = 0.0
+                    else:
+                        link.mass = 0.0
+                        link.density = category_density
+
+            # If there exists a center of mass annotation, apply it now
+            if self.prim.HasAttribute("ig:centerOfMass"):
+                center_of_mass_in_object_frame = th.tensor(self.get_attribute(attr="ig:centerOfMass"))
+
+                # Here we assume that the local frame of the object is the same as the local frame of the root link. We also do NOT need to apply a scale
+                # since the center of mass is already in the local frame of the object and thus the unscaled local frame of the root link.
+                self.root_link.center_of_mass = center_of_mass_in_object_frame
+
+            # For all joints under dataset objects,
+            # 1. we use "acceleration" drive type instead of "force" to properly account for link mass
+            # 2. we set non-zero damping to simulate dynamic friction:
+            #       the friction coefficient only accounts for static friction
+            from omnigibson.utils.asset_conversion_utils import find_all_prim_children_with_type
+
+            prismatic_joints = find_all_prim_children_with_type(prim_type="PhysicsPrismaticJoint", root_prim=self._prim)
+            revolute_joints = find_all_prim_children_with_type(prim_type="PhysicsRevoluteJoint", root_prim=self._prim)
+            for prismatic_joint in prismatic_joints:
+                prismatic_joint.GetAttribute("drive:linear:physics:type").Set("acceleration")
+                prismatic_joint.GetAttribute("drive:linear:physics:damping").Set(DEFAULT_PRISMATIC_JOINT_DAMPING)
+                prismatic_joint.GetAttribute("drive:linear:physics:stiffness").Set(0.0)
+                prismatic_joint.GetAttribute("drive:linear:physics:targetPosition").Set(0.0)
+                prismatic_joint.GetAttribute("drive:linear:physics:targetVelocity").Set(0.0)
+            for revolute_joint in revolute_joints:
+                revolute_joint.GetAttribute("drive:angular:physics:type").Set("acceleration")
+                revolute_joint.GetAttribute("drive:angular:physics:damping").Set(DEFAULT_REVOLUTE_JOINT_DAMPING)
+                revolute_joint.GetAttribute("drive:angular:physics:stiffness").Set(0.0)
+                revolute_joint.GetAttribute("drive:angular:physics:targetPosition").Set(0.0)
+                revolute_joint.GetAttribute("drive:angular:physics:targetVelocity").Set(0.0)
 
         elif self._prim_type == PrimType.CLOTH:
-            self.root_link.mass = density * self.root_link.volume
-
-    def _update_texture_change(self, object_state):
-        """
-        Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
-        to match the frozen state. If object_state is None, update the diffuse color to the default value. It attempts
-        to load the cached texture map named DIFFUSE/albedo_[STATE_NAME].png. If the cached texture map does not exist,
-        it modifies the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
-
-        Args:
-            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
-        """
-        # TODO: uncomment these once our dataset has the object state-conditioned texture maps
-        # DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
-        # state_name = object_state.__class__.__name__ if object_state is not None else None
-        for material in self.materials:
-            # texture_path = material.diffuse_texture
-            # assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
-            #
-            # # Get updated texture file path for state.
-            # texture_path_split = texture_path.split("/")
-            # filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
-            # assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
-            #
-            # filename_split = filename[:-4].split("_")
-            # # Check all three file names for backward compatibility.
-            # if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
-            #     filename_split.pop()
-            # target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            # target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
-            #
-            # if os.path.exists(target_texture_path):
-            #     # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
-            #     self._update_albedo_value(None, material)
-            #     if material.diffuse_texture != target_texture_path:
-            #         material.diffuse_texture = target_texture_path
-            # else:
-            #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
-            #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
-
-            self._update_albedo_value(object_state, material)
+            self.root_link.mass = category_mass if gm.FORCE_CATEGORY_MASS else category_density * self.root_link.volume
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """
@@ -467,17 +457,6 @@ class DatasetObject(USDObject):
                         scales[child_name] = scale_in_child_lf
 
         return scales
-
-    @property
-    def avg_obj_dims(self):
-        """
-        Get the average object dimensions for this object, based on its category
-
-        Returns:
-            None or dict: Average object information based on its category
-        """
-        avg_specs = get_og_avg_category_specs()
-        return avg_specs.get(self.category, None)
 
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs (bounding_box is already captured in load_config)

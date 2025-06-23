@@ -1,16 +1,23 @@
 from functools import cached_property
 
+from scipy.spatial import Delaunay
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
+from omnigibson.utils.geometry_utils import (
+    check_points_in_cone,
+    check_points_in_cube,
+    check_points_in_cylinder,
+    check_points_in_sphere,
+)
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import PoseAPI, mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -35,6 +42,8 @@ class GeomPrim(XFormPrim):
         name,
         load_config=None,
     ):
+        self._mesh_type = None
+
         # Run super method
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -45,6 +54,10 @@ class GeomPrim(XFormPrim):
     def _load(self):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
+
+    def _post_load(self):
+        super()._post_load()
+        self._mesh_type = self.prim.GetTypeName()
 
     @property
     def purpose(self):
@@ -148,9 +161,13 @@ class GeomPrim(XFormPrim):
             for j in range(count - 2):
                 faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
             i += count
-        faces = th.tensor(faces, dtype=th.float32)
+        faces = th.tensor(faces, dtype=th.int)
 
         return faces
+
+    @cached_property
+    def delaunay_triangulation(self):
+        return Delaunay(self.points.numpy())
 
     @property
     def geom_type(self):
@@ -159,6 +176,68 @@ class GeomPrim(XFormPrim):
             str: the type of the geom prim, one of {"Sphere", "Cube", "Cone", "Cylinder", "Mesh"}
         """
         return self._prim.GetPrimTypeInfo().GetTypeName()
+
+    @cached_property
+    def mesh_face_centroids(self):
+        return self.points[self.faces].mean(dim=1)
+
+    @cached_property
+    def mesh_face_normals(self):
+        # Get the vertices for each triangle
+        vertices = self.points[self.faces]  # Shape: (N_triangles, 3, 3)
+
+        # Compute two edges of each triangle
+        edge1 = vertices[:, 1] - vertices[:, 0]  # Shape: (N_triangles, 3)
+        edge2 = vertices[:, 2] - vertices[:, 0]  # Shape: (N_triangles, 3)
+
+        # Compute the cross product of the two edges to get the normal vector
+        face_normals = th.cross(edge1, edge2, dim=1)  # Shape: (N_triangles, 3)
+
+        # Normalize the normal vectors
+        face_normals_norm = th.norm(face_normals, dim=1, keepdim=True)
+
+        # Handle potential division by zero for degenerate faces
+        epsilon = 1e-8
+        face_normals_norm = th.clamp(face_normals_norm, min=epsilon)
+
+        face_normals = face_normals / face_normals_norm
+
+        return face_normals
+
+    def check_local_points_in_volume(self, particle_positions_in_mesh_frame):
+        if self._mesh_type == "Mesh":
+            return th.as_tensor(self.delaunay_triangulation.find_simplex(particle_positions_in_mesh_frame.numpy())) >= 0
+        elif self._mesh_type == "Sphere":
+            return check_points_in_sphere(
+                size=self.get_attribute("radius"),
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif self._mesh_type == "Cylinder":
+            return check_points_in_cylinder(
+                size=[self.get_attribute("radius"), self.get_attribute("height")],
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif self._mesh_type == "Cone":
+            return check_points_in_cone(
+                size=[self.get_attribute("radius"), self.get_attribute("height")],
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        elif self._mesh_type == "Cube":
+            return check_points_in_cube(
+                size=self.get_attribute("size"),
+                particle_positions=particle_positions_in_mesh_frame,
+            )
+        else:
+            raise ValueError(f"Cannot check in volume for mesh of type: {self._mesh_type}")
+
+    def check_points_in_volume(self, particle_positions_world):
+        # Move particles into local frame
+        world_pose_w_scale = self.scaled_transform
+        particle_positions_world_homogeneous = th.cat(
+            (particle_positions_world, th.ones((particle_positions_world.shape[0], 1))), dim=1
+        )
+        particle_positions_local = (particle_positions_world_homogeneous @ th.linalg.inv(world_pose_w_scale).T)[:, :3]
+        return self.check_local_points_in_volume(particle_positions_local)
 
     @property
     def points_in_parent_frame(self):
@@ -174,7 +253,7 @@ class GeomPrim(XFormPrim):
 
     @property
     def aabb(self):
-        world_pose_w_scale = PoseAPI.get_world_pose_with_scale(self.prim_path)
+        world_pose_w_scale = self.scaled_transform
 
         # transform self.points into world frame
         points = self.points
@@ -451,12 +530,35 @@ class CollisionGeomPrim(GeomPrim):
             if path == "":
                 return None
             else:
-                self._applied_physics_material = lazy.isaacsim.core.materials.PhysicsMaterial(prim_path=path)
+                self._applied_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(prim_path=path)
                 return self._applied_physics_material
 
 
 class VisualGeomPrim(GeomPrim):
-    pass
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # TODO: tmp fix for visible metalinks
+        if "meta" in self.name:
+            if "togglebutton" in self.name:
+                # Make sure togglebutton mesh is visible
+                self.purpose = "default"
+            elif any(
+                [
+                    metalink in self.name
+                    for metalink in [
+                        "particlesource",
+                        "particlesink",
+                        "fillable",
+                        "particleremover",
+                        "particleapplier",
+                        "slicer",
+                    ]
+                ]
+            ):
+                # Make sure particlesource, particlesink and fillable meshes are not visible
+                self.purpose = "guide"
 
 
 class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):

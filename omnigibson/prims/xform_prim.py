@@ -46,6 +46,7 @@ class XFormPrim(BasePrim):
         # Other values that will be filled in at runtime
         self._material = None
         self.original_scale = None
+        self._cached_scale = None
 
         # Run super method
         super().__init__(
@@ -136,6 +137,9 @@ class XFormPrim(BasePrim):
             xform_op_rot = lazy.pxr.UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
+        if not gm.ENABLE_FLATCACHE:
+            # TODO: not sure why this is needed only in USD mode
+            PoseAPI.invalidate()
         # TODO: This is the line that causes Transformation Change on... errors. Fix it.
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         new_position, new_orientation = self.get_position_orientation()
@@ -170,7 +174,7 @@ class XFormPrim(BasePrim):
             bool: True if there is a visual material bound to this prim. False otherwise
         """
         material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
-        return material_path != ""
+        return material_path != "" and lazy.isaacsim.core.utils.prims.is_prim_path_valid(material_path)
 
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
@@ -409,6 +413,8 @@ class XFormPrim(BasePrim):
         Returns:
             th.tensor: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
+        if self._cached_scale is not None:
+            return self._cached_scale
         scale = self.get_attribute("xformOp:scale")
         assert scale is not None, "Attribute 'xformOp:scale' is None for prim {}".format(self.name)
         return th.tensor(scale)
@@ -429,6 +435,8 @@ class XFormPrim(BasePrim):
         else:
             scale = th.ones(3, dtype=th.float32) * scale
         assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        # Invalidate the cached scale
+        self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
@@ -479,21 +487,12 @@ class XFormPrim(BasePrim):
         prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self.prim_path)
 
     def _dump_state(self):
-        if self.scene is None:
-            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
-            pos, ori = self.get_position_orientation()
-        else:
-            pos, ori = self.get_position_orientation(frame="scene")
-
+        pos, ori = self.get_position_orientation()
         return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
         pos, orn = state["pos"], state["ori"]
-        if self.scene is None:
-            # this is a special case for objects (e.g. viewer_camera) that are not in a scene. Default to world frame
-            self.set_position_orientation(pos, orn)
-        else:
-            self.set_position_orientation(pos, orn, frame="scene")
+        self.set_position_orientation(pos, orn)
 
     def serialize(self, state):
         return th.cat([state["pos"], state["ori"]])

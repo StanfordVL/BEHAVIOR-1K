@@ -42,7 +42,7 @@ def start_env(robot_type):
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Wainscott_0_int",
-            "load_object_categories": ["floors", "walls", "countertop", "fridge", "sink", "stove"],
+            "load_object_categories": ["floors", "walls", "countertop", "fridge", "furniture_sink", "stove"],
             "scene_source": "OG",
         },
         "robots": [robots],
@@ -141,8 +141,8 @@ def stove(env):
 
 
 @pytest.fixture
-def sink(env):
-    return next(iter(env.scene.object_registry("category", "sink")))
+def furniture_sink(env):
+    return next(iter(env.scene.object_registry("category", "furniture_sink")))
 
 
 @pytest.fixture
@@ -207,47 +207,47 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert apple.states[object_states.OnTop].get_value(pan)
 
-    def test_toggle_on(self, env, prim_gen, stove, sink):
+    def test_toggle_on(self, env, prim_gen, stove, furniture_sink):
         assert not stove.states[object_states.ToggledOn].get_value()
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
             env.step(action)
         assert stove.states[object_states.ToggledOn].get_value()
 
-        assert not sink.states[object_states.ToggledOn].get_value()
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
+        assert not furniture_sink.states[object_states.ToggledOn].get_value()
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, furniture_sink):
             env.step(action)
-        assert sink.states[object_states.ToggledOn].get_value()
+        assert furniture_sink.states[object_states.ToggledOn].get_value()
 
     @pytest.mark.skip("Disabled until GPU dynamics does not cause cuda memory issues")
-    def test_soak_under(self, env, prim_gen, robot, sponge, sink):
+    def test_soak_under(self, env, prim_gen, robot, sponge, furniture_sink):
         water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
-        assert not sink.states[object_states.ToggledOn].get_value()
+        assert not furniture_sink.states[object_states.ToggledOn].get_value()
 
         # First grasp the sponge
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
             env.step(action)
         assert robot.states[object_states.IsGrasping].get_value(sponge)
 
-        # Then toggle on the sink
-        sink.states[object_states.ToggledOn].set_value(True)
-        assert sink.states[object_states.ToggledOn].get_value()
+        # Then toggle on the furniture_sink
+        furniture_sink.states[object_states.ToggledOn].set_value(True)
+        assert furniture_sink.states[object_states.ToggledOn].get_value()
 
         # Then soak the sponge under the water
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, furniture_sink):
             env.step(action)
         assert sponge.states[object_states.Saturated].get_value(water_system)
 
-        # toggle off the sink after the test is done
-        sink.states[object_states.ToggledOn].set_value(False)
-        assert not sink.states[object_states.ToggledOn].get_value()
+        # toggle off the furniture_sink after the test is done
+        furniture_sink.states[object_states.ToggledOn].set_value(False)
+        assert not furniture_sink.states[object_states.ToggledOn].get_value()
 
     @pytest.mark.skip("Disabled until GPU dynamics does not cause cuda memory issues")
-    def test_wipe(self, env, prim_gen, robot, sponge, sink, countertop):
+    def test_wipe(self, env, prim_gen, robot, sponge, furniture_sink, countertop):
         # Some pre-assertions
         water_system = env.scene.get_system("water")
         assert not sponge.states[object_states.Saturated].get_value(water_system)
-        assert not sink.states[object_states.ToggledOn].get_value()
+        assert not furniture_sink.states[object_states.ToggledOn].get_value()
 
         # Dirty the countertop as the setup
         mud_system = env.scene.get_system("mud")
@@ -258,18 +258,18 @@ class TestSymbolicPrimitives:
             env.step(action)
         assert robot.states[object_states.IsGrasping].get_value(sponge)
 
-        # Then toggle on the sink
-        sink.states[object_states.ToggledOn].set_value(True)
-        assert sink.states[object_states.ToggledOn].get_value()
+        # Then toggle on the furniture_sink
+        furniture_sink.states[object_states.ToggledOn].set_value(True)
+        assert furniture_sink.states[object_states.ToggledOn].get_value()
 
         # Then soak the sponge under the water
-        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+        for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, furniture_sink):
             env.step(action)
         assert sponge.states[object_states.Saturated].get_value(water_system)
 
-        # Then toggle off the sink
-        sink.states[object_states.ToggledOn].set_value(False)
-        assert not sink.states[object_states.ToggledOn].get_value()
+        # Then toggle off the furniture_sink
+        furniture_sink.states[object_states.ToggledOn].set_value(False)
+        assert not furniture_sink.states[object_states.ToggledOn].get_value()
 
         # Wipe the countertop with the sponge
         for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.WIPE, countertop):

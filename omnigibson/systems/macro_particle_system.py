@@ -1,4 +1,3 @@
-import cv2
 import torch as th
 import trimesh
 
@@ -7,7 +6,6 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import CollisionVisualGeomPrim, VisualGeomPrim
-from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import torch_delete
@@ -27,6 +25,11 @@ m = create_module_macros(module_path=__file__)
 m.MIN_PARTICLE_RADIUS = (
     0.01  # Minimum particle radius for physical macro particles -- this reduces the chance of omni physx crashing
 )
+m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY = None  # If set, the maximum density for macro particle systems
+
+m.MACRO_PHYSICAL_STATIC_FRICTION = 1.0
+m.MACRO_PHYSICAL_DYNAMIC_FRICTION = 0.8
+m.MACRO_PHYSICAL_RESTITUTION = 0.0
 
 
 class MacroParticleSystem(BaseSystem):
@@ -112,8 +115,9 @@ class MacroParticleSystem(BaseSystem):
 
     def remove_all_particles(self):
         # Use list explicitly to prevent mid-loop mutation of dict
-        for particle_name in tuple(self.particles.keys()):
-            self.remove_particle_by_name(name=particle_name)
+        if self.particles is not None:
+            for particle_name in tuple(self.particles.keys()):
+                self.remove_particle_by_name(name=particle_name)
 
     def reset(self):
         # Call super first
@@ -203,15 +207,7 @@ class MacroParticleSystem(BaseSystem):
         # Update color if the particle object has any material
         color = th.ones(3)
         if self.particle_object.has_material():
-            if self.particle_object.material.is_glass:
-                color = self.particle_object.material.glass_color
-            else:
-                diffuse_texture = self.particle_object.material.diffuse_texture
-                color = (
-                    cv2.imread(diffuse_texture).mean()
-                    if diffuse_texture
-                    else self.particle_object.material.diffuse_color_constant
-                )
+            color = self.particle_object.material.average_diffuse_color
         self._color = color
 
     def add_particle(self, relative_prim_path, scale, idn=None):
@@ -347,10 +343,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         min_scale=None,
         max_scale=None,
         scale_relative_to_parent=False,
-        sampling_axis_probabilities=(0.25, 0.25, 0.5),
+        sampling_axis_probabilities=(0.0, 0.0, 0.1),
         sampling_aabb_offset=0.01,
-        sampling_bimodal_mean_fraction=0.9,
-        sampling_bimodal_stdev_fraction=0.2,
+        sampling_bimodal_mean_fraction=1.0,
+        sampling_bimodal_stdev_fraction=1e-5,
         sampling_max_attempts=20,
         sampling_hit_proportion=0.4,
         **kwargs,
@@ -678,7 +674,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if local:
             poses = th.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
-                poses[i] = T.pose2mat(self.particles[name].get_position_orientation(frame="parent"))
+                poses[i] = self._particles_local_mat[name]
         else:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
@@ -693,12 +689,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
+                        link_tfs[obj] = obj.scaled_transform
                     link = obj
                 else:
                     link = self._particles_info[name]["link"]
                     if link not in link_tfs:
-                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                        link_tfs[link] = link.scaled_transform
+
                 link_tfs_batch[i] = link_tfs[link]
                 particle_local_poses_batch[i] = self._particles_local_mat[name]
 
@@ -706,7 +703,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             poses = link_tfs_batch @ particle_local_poses_batch
 
         # Decompose back into positions and orientations
-        return poses[:, :3, 3], T.mat2quat(poses[:, :3, :3])
+        return T.mat2pose_batched(poses)
 
     def get_particles_position_orientation(self):
         return self._compute_batch_particles_position_orientation(particles=self.particles, local=False)
@@ -727,11 +724,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
         local_mat = self._particles_local_mat[name]
-        link_tf = (
-            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
-            if is_cloth
-            else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
-        )
+        # link_tf = (
+        #     T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
+        #     if is_cloth
+        #     else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
+        # )
+
+        link_tf = parent_obj.scaled_transform if is_cloth else self._particles_info[name]["link"].scaled_transform
 
         # Multiply the local pose by the link's global transform, then return as pos, quat tuple
         return T.mat2pose(link_tf @ local_mat)
@@ -784,20 +783,22 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                         # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
                         # get the transform, and not obj.get_position_orientation(frame="parent") which will give us the local pose of the
                         # root link!
-                        link_tfs[obj] = T.pose2mat(XFormPrim.get_position_orientation(obj, frame="parent"))
+                        link_tfs[obj] = obj.scaled_transform
                     link_tf = link_tfs[obj]
                 else:
                     link = self._particles_info[name]["link"]
                     if link not in link_tfs:
-                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                        link_tfs[link] = link.scaled_transform
                     link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
             # particle_local_poses_batch = th.linalg.inv_ex(link_tfs_batch).inverse @ particle_local_poses_batch
             particle_local_poses_batch = th.linalg.solve(link_tfs_batch, particle_local_poses_batch)
+            # Make sure this is a valid homogeneous matrix (lower-left three elements all 0)
+            particle_local_poses_batch[:, 3, :3] = 0.0
 
         for i, name in enumerate(particles):
-            self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i], ignore_scale=local)
+            self._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i])
 
     def set_particles_position_orientation(self, positions=None, orientations=None):
         return self._modify_batch_particles_position_orientation(
@@ -836,14 +837,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # First, get global pose, scale it by the parent link's scale, and then convert into a matrix
         parent_obj = self._particles_info[name]["obj"]
         is_cloth = self._is_cloth_obj(obj=parent_obj)
-        link_tf = (
-            T.pose2mat(XFormPrim.get_position_orientation(parent_obj, frame="parent"))
-            if is_cloth
-            else T.pose2mat(self._particles_info[name]["link"].get_position_orientation())
-        )
+        link_tf = parent_obj.scaled_transform if is_cloth else self._particles_info[name]["link"].scaled_transform
         local_mat = th.linalg.inv_ex(link_tf).inverse @ global_mat
 
-        self._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=False)
+        self._modify_particle_local_mat(name=name, mat=local_mat)
 
     def set_particle_local_pose(self, idx, position=None, orientation=None):
         if position is None or orientation is None:
@@ -859,7 +856,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         local_mat[-1, -1] = 1.0
         local_mat[:3, 3] = position
         local_mat[:3, :3] = T.quat2mat(orientation)
-        self._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=True)
+        self._modify_particle_local_mat(name=name, mat=local_mat)
 
     def _is_cloth_obj(self, obj):
         """
@@ -873,40 +870,30 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         return obj.prim_type == PrimType.CLOTH
 
-    def _compute_particle_local_mat(self, name, ignore_scale=False):
+    def _compute_particle_local_mat(self, name):
         """
         Computes particle @name's local transform as a homogeneous 4x4 matrix
 
         Args:
             name (str): Name of the particle to compute local transform matrix for
-            ignore_scale (bool): Whether to ignore the parent_link scale when computing the local transform
 
         Returns:
             th.tensor: (4, 4) homogeneous transform matrix
         """
         particle = self.particles[name]
-        parent_obj = self._particles_info[name]["obj"]
-        is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = particle.get_position_orientation(frame="parent")
-        local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
 
-    def _modify_particle_local_mat(self, name, mat, ignore_scale=False):
+    def _modify_particle_local_mat(self, name, mat):
         """
         Sets particle @name's local transform as a homogeneous 4x4 matrix
 
         Args:
             name (str): Name of the particle to compute local transform matrix for
             mat (n-array): (4, 4) homogeneous transform matrix
-            ignore_scale (bool): Whether to ignore the parent_link scale when setting the local transform
         """
         particle = self.particles[name]
-        parent_obj = self._particles_info[name]["obj"]
-        is_cloth = self._is_cloth_obj(obj=parent_obj)
-        scale = th.ones(3) if is_cloth else self._particles_info[name]["link"].scale
         local_pos, local_quat = T.mat2pose(mat)
-        local_pos = local_pos if ignore_scale else local_pos / scale
         particle.set_position_orientation(position=local_pos, orientation=local_quat, frame="parent")
 
         # Store updated value
@@ -946,10 +933,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         }
 
         current_group_names = self.groups
-        desired_group_names = set(obj.name for obj in group_objects)
-        groups_to_delete = current_group_names - desired_group_names
-        groups_to_create = desired_group_names - current_group_names
-        common_groups = current_group_names.intersection(desired_group_names)
+        # Preserve original order by using list comprehension instead of set
+        desired_group_names_ordered = [obj.name for obj in group_objects]
+        desired_group_names_set = set(desired_group_names_ordered)
+        groups_to_delete = [name for name in current_group_names if name not in desired_group_names_set]
+        groups_to_create = [name for name in desired_group_names_ordered if name not in current_group_names]
+        common_groups = [name for name in desired_group_names_ordered if name in current_group_names]
 
         # Sanity check the common groups, we will recreate any where there is a mismatch
         for name in common_groups:
@@ -957,8 +946,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             if self.num_group_particles(group=name) != info["n_particles"]:
                 log.debug(f"Got mismatch in particle group {name} when syncing, " f"deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
-                groups_to_delete.add(name)
-                groups_to_create.add(name)
+                groups_to_delete.append(name)
+                groups_to_create.append(name)
 
         # Delete any groups we no longer want
         for name in groups_to_delete:
@@ -1175,7 +1164,11 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
 
         self._create_particle_template_fcn = create_particle_template
 
-        self._particle_density = particle_density
+        self._particle_density = (
+            particle_density
+            if m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY is None
+            else min(particle_density, m.MACRO_PARTICLE_SYSTEM_MAX_DENSITY)
+        )
 
         # Physics rigid body view for keeping track of all particles' state
         self.particles_view = None
@@ -1184,12 +1177,24 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         self._particle_radius = None
         self._particle_offset = None
 
+        # Physics material
+        self.particle_physics_material = None
+
     def initialize(self, scene):
         # Run super method first
         super().initialize(scene)
 
         # Create the particles head prim -- this is merely a scope prim
         og.sim.stage.DefinePrim(f"{self.prim_path}/particles", "Scope")
+
+        # Physics material to apply to the particles
+        self.particle_physics_material = lazy.isaacsim.core.api.materials.PhysicsMaterial(
+            prim_path=f"{self.prim_path}/material",
+            name=f"{self.name}_physics_material",
+            static_friction=m.MACRO_PHYSICAL_STATIC_FRICTION,
+            dynamic_friction=m.MACRO_PHYSICAL_DYNAMIC_FRICTION,
+            restitution=m.MACRO_PHYSICAL_RESTITUTION,
+        )
 
         # A new view needs to be created every time once sim is playing, so we add a callback now
         og.sim.add_callback_on_play(name=f"{self.name}_particles_view", callback=self.refresh_particles_view)
@@ -1211,6 +1216,8 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
+            mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
+            mass_api.GetDensityAttr().Set(self.particle_density)
             lazy.isaacsim.core.utils.semantics.add_update_semantics(
                 prim=prim,
                 semantic_label=self.name,
@@ -1218,6 +1225,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             )
         result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
+        result.apply_physics_material(self.particle_physics_material)
         return result
 
     def process_particle_object(self):
@@ -1273,14 +1281,16 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
         super().remove_particle_by_name(name=name)
 
         # Refresh particles view
-        self.refresh_particles_view()
+        if og.sim.is_playing():
+            self.refresh_particles_view()
 
     def add_particle(self, relative_prim_path, scale, idn=None):
         # Run super first
         particle = super().add_particle(relative_prim_path=relative_prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
-        self.refresh_particles_view()
+        if og.sim.is_playing():
+            self.refresh_particles_view()
 
         return particle
 

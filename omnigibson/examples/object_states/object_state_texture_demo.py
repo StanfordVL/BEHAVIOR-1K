@@ -83,7 +83,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         print("obj is cooked:", obj.states[object_states.Cooked].get_value())
         print("obj is burnt:", obj.states[object_states.Burnt].get_value())
         print("obj is soaked:", obj.states[object_states.Saturated].get_value(env.scene.get_system("water")))
-        print("obj textures:", obj.get_textures())
 
     # Report default states
     print("==== Initial state ====")

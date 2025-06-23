@@ -1,9 +1,12 @@
+import time
+
 import torch as th
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
+from omnigibson.macros import macros as m
 from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -184,7 +187,7 @@ def test_robot_load_drive():
                 f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
             }
             robot.reload_controllers(controller_config=controller_config)
-            env.scene.update_initial_state()
+            env.scene.update_initial_file()
 
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
 
@@ -282,7 +285,7 @@ def test_grasping_mode():
         # At least one step is always needed while sim is playing for any imported object to be fully initialized
         og.sim.play()
 
-        env.scene.reset()
+        env.scene.reset(hard=False)
 
         # Reset robot and make sure it's not moving
         robot.reset()
@@ -306,7 +309,12 @@ def test_grasping_mode():
 
         # Grasp the box
         gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
-        for _ in range(20):
+        for _ in range(10):
+            og.sim.step()
+
+        curr_time = time.time()
+        time_required = m.robots.manipulation_robot.GRASP_WINDOW
+        while time.time() - curr_time < time_required:
             og.sim.step()
 
         assert object_is_in_hand(

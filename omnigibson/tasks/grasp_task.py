@@ -23,7 +23,13 @@ class GraspTask(BaseTask):
     """
 
     def __init__(
-        self, obj_name, termination_config=None, reward_config=None, precached_reset_pose_path=None, objects_config=None
+        self,
+        obj_name,
+        termination_config=None,
+        reward_config=None,
+        include_obs=True,
+        precached_reset_pose_path=None,
+        objects_config=None,
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
@@ -32,7 +38,7 @@ class GraspTask(BaseTask):
         if precached_reset_pose_path is not None:
             with open(precached_reset_pose_path) as f:
                 self._reset_poses = json.load(f)
-        super().__init__(termination_config=termination_config, reward_config=reward_config)
+        super().__init__(termination_config=termination_config, reward_config=reward_config, include_obs=include_obs)
 
     def _load(self, env):
         for obj_config in self._objects_config:
@@ -70,7 +76,8 @@ class GraspTask(BaseTask):
 
     def _reset_agent(self, env):
         robot = env.robots[0]
-        robot.release_grasp_immediately()
+        for arm in robot.arm_names:
+            robot.release_grasp_immediately(arm=arm)
 
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.

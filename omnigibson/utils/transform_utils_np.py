@@ -496,6 +496,80 @@ def mat2quat_batch(rmat):
     return quat
 
 
+def decompose_mat(hmat):
+    """Batched decompose_mat function - assumes input is already batched
+
+    Args:
+        hmat: (B, 4, 4) batch of homogeneous matrices
+
+    Returns:
+        scale: (B, 3) scale factors
+        shear: (B, 3) shear factors
+        quat: (B, 4) quaternions
+        translate: (B, 3) translations
+    """
+    batch_size = hmat.shape[0]
+    M = np.array(hmat, dtype=np.float32).transpose(0, 2, 1)  # (B, 4, 4) transposed
+
+    # Check M[3, 3] for all batch items
+    diag_vals = M[:, 3, 3]  # (B,)
+    if np.any(np.abs(diag_vals) < EPS):
+        raise ValueError("Some M[3, 3] values are zero")
+
+    M = M / diag_vals[:, np.newaxis, np.newaxis]  # (B, 4, 4)
+    P = M.copy()
+    P[:, :, 3] = np.array([0.0, 0.0, 0.0, 1.0])[np.newaxis, :].repeat(batch_size, axis=0)
+
+    det_P = np.linalg.det(P[:, :3, :3])  # (B,)
+    if np.any(np.abs(det_P) < EPS):
+        raise ValueError("Some matrices are singular and cannot be decomposed")
+
+    if not np.allclose(M[:, :3, 3], 0.0):
+        raise ValueError("Some matrices have perspective components")
+
+    scale = np.zeros((batch_size, 3))
+    shear = np.zeros((batch_size, 3))
+
+    translate = M[:, 3, :3].copy()  # (B, 3)
+    M[:, 3, :3] = 0.0
+
+    row = M[:, :3, :3].copy()  # (B, 3, 3)
+
+    # Scale and orthogonalize rows
+    scale[:, 0] = np.linalg.norm(row[:, 0], axis=-1)  # (B,)
+    row[:, 0] = row[:, 0] / scale[:, 0, np.newaxis]  # (B, 3)
+
+    shear[:, 0] = np.sum(row[:, 0] * row[:, 1], axis=-1)  # (B,)
+    row[:, 1] = row[:, 1] - row[:, 0] * shear[:, 0, np.newaxis]  # (B, 3)
+
+    scale[:, 1] = np.linalg.norm(row[:, 1], axis=-1)  # (B,)
+    row[:, 1] = row[:, 1] / scale[:, 1, np.newaxis]  # (B, 3)
+    shear[:, 0] = shear[:, 0] / scale[:, 1]
+
+    shear[:, 1] = np.sum(row[:, 0] * row[:, 2], axis=-1)  # (B,)
+    row[:, 2] = row[:, 2] - row[:, 0] * shear[:, 1, np.newaxis]  # (B, 3)
+
+    shear[:, 2] = np.sum(row[:, 1] * row[:, 2], axis=-1)  # (B,)
+    row[:, 2] = row[:, 2] - row[:, 1] * shear[:, 2, np.newaxis]  # (B, 3)
+
+    scale[:, 2] = np.linalg.norm(row[:, 2], axis=-1)  # (B,)
+    row[:, 2] = row[:, 2] / scale[:, 2, np.newaxis]  # (B, 3)
+    shear[:, 1:] = shear[:, 1:] / scale[:, 2, np.newaxis]
+
+    # Check orientation
+    cross_product = np.cross(row[:, 1], row[:, 2], axis=-1)  # (B, 3)
+    dot_product = np.sum(row[:, 0] * cross_product, axis=-1)  # (B,)
+    neg_mask = dot_product < 0  # (B,)
+
+    scale = np.where(neg_mask[:, np.newaxis], -scale, scale)  # (B, 3)
+    row = np.where(neg_mask[:, np.newaxis, np.newaxis], -row, row)  # (B, 3, 3)
+
+    # Convert to quaternions - assuming mat2quat can handle batched input
+    quat = mat2quat(row.transpose(0, 2, 1))  # (B, 4)
+
+    return scale, shear, quat, translate
+
+
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -505,12 +579,29 @@ def mat2pose(hmat):
 
     Returns:
         2-tuple:
-            - (np.array) (x,y,z) position array in cartesian coordinates
-            - (np.array) (x,y,z,w) orientation array in quaternion form
+            - (np.array) (3,) position array in cartesian coordinates
+            - (np.array) (4,) orientation array in quaternion form
     """
-    pos = hmat[:3, 3]
-    orn = mat2quat(hmat[:3, :3])
-    return pos, orn
+    # Add batch dimension, process, then squeeze
+    hmat_batched = hmat[np.newaxis, ...]  # (1, 4, 4)
+    _, _, quat, translate = decompose_mat(hmat_batched)
+    return translate.squeeze(0), quat.squeeze(0)
+
+
+def mat2pose_batched(hmat):
+    """
+    Converts batched homogeneous 4x4 matrices into poses.
+
+    Args:
+        hmat (np.array): (B, 4, 4) batch of homogeneous matrices
+
+    Returns:
+        2-tuple:
+            - (np.array) (B, 3) position arrays in cartesian coordinates
+            - (np.array) (B, 4) orientation arrays in quaternion form
+    """
+    _, _, quat, translate = decompose_mat(hmat)
+    return translate, quat
 
 
 def vec2quat(vec, up=(0, 0, 1.0)):

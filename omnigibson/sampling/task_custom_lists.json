@@ -1,0 +1,2089 @@
+{
+    "picking_up_trash": {
+        "room_types": [
+            "living_room",
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "can__of__soda.n.01": {
+                    "can_of_soda": {
+                        "itolcg": null,
+                        "lugwcz": null,
+                        "opivig": null
+                    }
+                },
+                "ashcan.n.01": {
+                    "trash_can": {
+                        "wkxtxh": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_away_Halloween_decorations": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "pumpkin.n.02": {
+                    "pumpkin": {
+                        "apitmi": null
+                    }
+                },
+                "caldron.n.01": {
+                    "cauldron": {
+                        "zndohl": null
+                    }
+                },
+                "candle.n.01": {
+                    "pillar_candle": {
+                        "bhaqam": null,
+                        "cxswbc": null,
+                        "omdnwg": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "picking_up_toys": {
+        "room_types": [
+            "childs_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "board_game.n.01": {
+                    "board_game": {
+                        "eoywpy": null,
+                        "vbamua": null,
+                        "rgvkmy": null,
+                        "gcfkqa": null,
+                        "ovttum": null
+                    }
+                },
+                "jigsaw_puzzle.n.01": {
+                    "jigsaw_puzzle": {
+                        "antykn": [0.19, 0.15, 0.01]
+                    }
+                },
+                "tennis_ball.n.01": {
+                    "tennis_ball": {
+                        "rgekxe": null
+                    }
+                },
+                "toy_box.n.01": {
+                    "toy_box": {
+                        "aviadj": [0.3160, 0.4553, 0.1384]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "carrying_in_groceries": {
+        "room_types": [
+            "garage",
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "beefsteak_tomato.n.01": {
+                    "beefsteak_tomato": {
+                        "altlfz": null
+                    }
+                },
+                "carton__of__milk.n.01": {
+                    "carton_of_milk": {
+                        "xmugpm": null
+                    }
+                },
+                "sack.n.01": {
+                    "paper_bag": {
+                        "bzsxgw": [0.20, 0.30, 0.48]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "setting_mousetraps": {
+        "room_types": [
+            "bathroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "mousetrap.n.01": {
+                    "mousetrap": {
+                        "mwfwsv": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "hiding_Easter_eggs": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "easter_egg.n.01": {
+                    "easter_egg": {
+                        "rxwfse": [0.1549, 0.1451, 0.1305]
+                    }
+                },
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "drxfmr": null
+                    }
+                },
+                "lawn.n.01": {
+                    "lawn": {
+                        "aztwla": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "rearranging_kitchen_furniture": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "food_processor.n.01": {
+                    "food_processor": {
+                        "gamkbo": [0.2469, 0.2367, 0.3468]
+                    }
+                },
+                "french_press.n.01": {
+                    "french_press": {
+                        "zidmyo": null
+                    }
+                },
+                "toaster.n.02": {
+                    "toaster": {
+                        "kjwqav": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "loading_the_dishwasher": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bowl.n.01": {
+                    "bowl": {
+                        "jblalf": null
+                    }
+                },
+                "mug.n.04": {
+                    "mug": {
+                        "yxaapv": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "luhkiz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cleaning_up_plates_and_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "plate.n.04": {
+                    "plate": {
+                        "itoeew": [0.408, 0.408, 0.024]
+                    }
+                },
+                "pizza.n.01": {
+                    "pizza": {
+                        "vyfhkm": [0.3, 0.3, 0.04]
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "adciys": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "can_meat": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "hinged_jar.n.01": {
+                    "hinged_jar": {
+                        "vzwhbg": null
+                    }
+                },
+                "bratwurst.n.01": {
+                    "bratwurst": {
+                        "pqfrrn": [0.1148, 0.0570, 0.0203]
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "jfrbuz": [0.5141, 0.3012, 0.0254]
+                    }
+                },
+                "cabinet.n.01": {
+                    "top_cabinet": {
+                        "lkxmne": null
+                    }
+
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_away_toys": {
+        "room_types": [
+            "living_room",
+            "dining_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "toy_box.n.01": {
+                    "toy_box": {
+                        "qgfbdj": null
+                    }
+                },
+                "toy_figure.n.01": {
+                    "toy_figure": {
+                        "fnueyn": null,
+                        "dgphap": null,
+                        "fekpjq": null,
+                        "gnofgv": null,
+                        "lfxygp": null,
+                        "orunry": null,
+                        "psfkaj": null,
+                        "tjchdg": null,
+                        "usnnxe": null,
+                        "vcmcoi": null,
+                        "zltgeo": null,
+                        "zuntus": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "assembling_gift_baskets": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "dgkhyn": null
+                    }
+                },
+                "candle.n.01": {
+                    "pillar_candle": {
+                        "bhaqam": null
+                    }
+                },
+                "butter_cookie.n.01": {
+                    "butter_cookie": {
+                        "kukrla": [0.08, 0.08, 0.02]
+                    }
+                },
+                "swiss_cheese.n.01": {
+                    "swiss_cheese": {
+                        "hwxeto": null
+                    }
+                },
+                "bow.n.08": {
+                    "bow": {
+                        "fhchql": [0.08, 0.08, 0.02]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_up_broken_glass": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "broken__glass.n.01": {
+                    "broken_glass": {
+                        "beltgg": null,
+                        "rvpgpt": null
+                    }
+                },
+                "broom.n.01": {
+                    "broom": {
+                        "tpyvbt": [0.81, 0.27, 0.06]
+                    }
+                },
+                "ashcan.n.01": {
+                    "trash_can": {
+                        "wklill": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "sorting_mail": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "mail.n.04": {
+                    "mail": {
+                        "azunex": [0.13, 0.2, 0.01]
+                    }
+                },
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "ukamcl": null
+                    }
+                },
+                "table.n.02": {
+                    "desk": {
+                        "iotfzl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_up_Christmas_decorations_inside": {
+        "room_types": [
+            "living_room",
+            "dining_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "candy_cane.n.01": {
+                    "candy_cane": {
+                        "qfomjj": [0.12 , 0.045, 0.015]
+                    }
+                },
+                "pillar_candle.n.01": {
+                    "pillar_candle": {
+                        "cxswbc": [0.05, 0.05, 0.07]
+                    }
+                },
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "dgkhyn": null
+                    }
+                },
+                "christmas_tree.n.05": {
+                    "christmas_tree": {
+                        "eadukw": null
+                    }
+                },
+                "gift_box.n.01": {
+                    "gift_box": {
+                        "mfalrc": null
+                    }
+                },
+                "wreath.n.01": {
+                    "wreath": {
+                        "rkrxno": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "hanging_pictures": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "poster.n.01": {
+                    "poster": {
+                        "dsrcyt": [0.01, 0.31 , 0.445]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "can_beans": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "canister.n.02": {
+                    "canister": {
+                        "gqwnfv": null
+                    }
+                },
+                "stockpot.n.01": {
+                    "stockpot": {
+                        "dcleem": null
+                    }
+                },
+                "soup_ladle.n.01": {
+                    "soup_ladle": {
+                        "cfzneb": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "canning_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "usqmjc": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "aibvew": [0.35, 0.25, 0.02]
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "belcml": [0.255, 0.255, 0.15]
+                    }
+                },
+                "pineapple.n.02": {
+                    "pineapple": {
+                        "wfaybl": null
+                    }
+                },
+                "steak.n.01": {
+                    "steak": {
+                        "ppykkp": [0.13, 0.19, 0.05]
+                    }
+                },
+                "cabinet.n.01": {
+                    "bottom_cabinet": {
+                        "fancyy": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_cabbage": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "awvoox": null
+                    }
+                },
+                "chili.n.02": {
+                    "chili": {
+                        "xhbpqh": 6.0
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "cprjvq": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "zpddxu": null
+                    }
+                },
+                "head_cabbage.n.02": {
+                    "head_cabbage": {
+                        "tqohvs": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelker": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "spraying_for_bugs": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "insectifuge__atomizer.n.01": {
+                    "insectifuge_atomizer": {
+                        "qnroki": null
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
+                },
+                "pot_plant.n.01": {
+                    "pot_plant": {
+                        "arwvvc": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "spraying_fruit_trees": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "pesticide__atomizer.n.01": {
+                    "pesticide_atomizer": {
+                        "eisckl": null
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
+                },
+                "tree.n.01": {
+                    "tree": {
+                        "dyymaq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_bacon": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bacon.n.01": {
+                    "bacon": {
+                        "eclhdh": null
+                    }
+                },
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "mhndon": null
+                    }
+                },
+                "tray.n.01": {
+                    "tray": {
+                        "gsxbym": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_a_brisket": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "brisket.n.01": {
+                    "brisket": {
+                        "nnnnqw": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "cprjvq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cool_cakes": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": null
+                    }
+                },
+                "fruitcake.n.02": {
+                    "fruitcake": {
+                        "kxckts": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_pies": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "apple_pie.n.01": {
+                    "apple_pie": {
+                        "rpdhbr": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "bgxzec": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": [0.25, 0.25, 0.10]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_fruit": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "apple.n.01": {
+                    "apple": {
+                        "agveuv": null,
+                        "omzprq": null
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "byzaxy": null
+                    }
+                },
+                "strawberry.n.01": {
+                    "strawberry": {
+                        "xcnzxh": [0.06, 0.05, 0.05]
+                    }
+                },
+                "tray.n.01": {
+                    "tray": {
+                        "vxbtax": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bell_pepper.n.02": {
+                    "bell_pepper": {
+                        "wszvwc": null,
+                        "ggurxn": null,
+                        "ihctxa": null
+                    }
+                },
+                "carrot.n.03": {
+                    "carrot": {
+                        "nktmff": null,
+                        "aucrah": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "half__zucchini.n.01": {
+                    "half_zucchini": {
+                        "career": null,
+                        "uzezze": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_meat": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "chicken.n.01": {
+                    "chicken": {
+                        "nppsmz": [0.2, 0.16, 0.096]
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "dnqekb": null
+                    }
+                },
+                "steak.n.01": {
+                    "steak": {
+                        "ppykkp": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": [0.25, 0.25, 0.15]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "thawing_frozen_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "date.n.08": {
+                    "date": {
+                        "kdfasq": null
+                    }
+                },
+                "lobster.n.01": {
+                    "lobster": {
+                        "fhvrtx": null
+                    }
+                },
+                "olive.n.04": {
+                    "olive": {
+                        "ghjddf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "turning_on_radio": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "radio_receiver.n.01": {
+                    "radio": {
+                        "wxnicr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "chop_an_onion": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "aibvew": [0.3, 0.2 , 0.02]
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "aspeds": [0.225, 0.225, 0.075]
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                },
+                "countertop.n.01": {
+                    "bar": {
+                        "egwapq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "slicing_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "beet.n.02": {
+                    "beet": {
+                        "wantjv": null
+                    }
+                },
+                "bell_pepper.n.02": {
+                    "bell_pepper": {
+                        "wszvwc": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "zucchini.n.02": {
+                    "zucchini": {
+                        "udvfaz": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "chopping_wood": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "ax.n.01": {
+                    "axe": {
+                        "plqyos": null
+                    }
+                },
+                "chopping_block.n.01": {
+                    "chopping_block": {
+                        "ekowsj":[0.30, 0.27, 0.10]
+                    }
+                },
+                "log.n.01": {
+                    "log": {
+                        "pepele": 0.67
+                    }
+                },
+                "driveway.n.01": {
+                    "driveway": {
+                        "umalys": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_eggplant": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": null
+                    }
+                },
+                "eggplant.n.01": {
+                    "eggplant": {
+                        "gfytkk": null
+                    }
+                },
+                "feta.n.01": {
+                    "feta": {
+                        "gkaitc": [0.09, 0.055, 0.05]
+                    }
+                },
+                "feta__box.n.01": {
+                    "feta_box": {
+                        "qxnzpx": null
+                    }
+                },
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_in_wood": {
+        "room_types": [
+            "corridor",
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "plywood.n.01": {
+                    "plywood": {
+                        "fkmkqa": [0.07, 0.47, 0.02]
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "qadhjb": null,
+                        "xorxro": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_water": {
+        "room_types": [
+            "kitchen",
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle.n.01": {
+                    "beer_bottle": {
+                        "nigfha": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_in_kindling": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "firewood.n.01": {
+                    "firewood": {
+                        "agntyc": null,
+                        "bfalqo": null,
+                        "fpqlgh": null,
+                        "soubgn": null,
+                        "gmwelp": null
+                    }   
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "bringing_newspaper_in": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "omsont": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_up_your_desk": {
+        "room_types": [
+            "childs_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "folder.n.02": {
+                    "folder": {
+                        "lktggf": null
+                    }
+                },
+                "laptop.n.01": {
+                    "laptop": {
+                        "izydvb": null
+                    }
+                },
+                "paperback_book.n.01": {
+                    "paperback_book": {
+                        "yxujzs": [0.25, 0.19, 0.02]
+                    }
+                },
+                "pen.n.01": {
+                    "pen": {
+                        "gqwdor": [0.15, 0.01, 0.01]
+                    }
+                },
+                "pencil.n.01": {
+                    "pencil": {
+                        "lamaxq": [0.13, 0.01, 0.01]
+                    }
+                },
+                "pencil_box.n.01": {
+                    "pencil_case": {
+                        "otcmih": [0.105, 0.3  , 0.105]
+                    }
+                },
+                "stapler.n.01": {
+                    "stapler": {
+                        "kgnsas": [0.18, 0.04, 0.1]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "moving_boxes_to_storage": {
+        "room_types": [
+            "living_room",
+            "garage"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "storage_container.n.01": {
+                    "storage_box": {
+                        "izcglf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "outfit_a_basic_toolbox": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "allen_wrench.n.01": {
+                    "allen_wrench": {
+                        "neqlcn": [0.3 , 0.06, 0.02]
+                    }
+                },
+                "drill.n.01": {
+                    "drill": {
+                        "nzgmza": null
+                    }
+                },
+                "flashlight.n.01": {
+                    "flashlight": {
+                        "jtrbkc": null
+                    }
+                },
+                "pliers.n.01": {
+                    "plier": {
+                        "zwzncq": [0.3 , 0.08, 0.02]
+                    }
+                },
+                "screwdriver.n.01": {
+                    "screwdriver": {
+                        "irtslw": null
+                    }
+                },
+                "toolbox.n.01": {
+                    "toolbox": {
+                        "redmtl": null
+                    }
+                },
+                "tabletop.n.01": {
+                    "countertop": {
+                        "fjkase": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "re_shelving_library_books": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "okcflv": null,
+                        "acbrnv": null,
+                        "dichmv": null,
+                        "mekfxk": null,
+                        "wfjsog": null,
+                        "rdqqum": null,
+                        "eaktib": null,
+                        "hrxujh": null
+                    }
+                }
+            },
+            "blacklist": {
+                "table.n.02": {
+                    "coffee_table": {
+                        "osroux": null
+                    }
+                }
+            }
+        }
+    },
+    "putting_dishes_away_after_cleaning": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "plate.n.04": {
+                    "plate": {
+                        "luhkiz": null,
+                        "ntedfx": null,
+                        "pkkgzc": null,
+                        "lkomhp": null,
+                        "xfjmld": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "dispose_of_a_pizza_box": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "ashcan.n.01": {
+                    "trash_can": {
+                        "cdzyew": [0.58, 0.48, 0.78]
+                    }
+                },
+                "half__pizza.n.01": {
+                    "half_pizza": {
+                        "frlqiv": [0.235, 0.12 , 0.02]
+                    }
+                },
+                "pizza_box.n.01": {
+                    "pizza_box": {
+                        "hvaucj": [0.39, 0.40, 0.05]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "preparing_lunch_box": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle__of__tea.n.01": {
+                    "bottle_of_tea": {
+                        "iladfg": null
+                    }
+                },
+                "chocolate_chip_cookie.n.01": {
+                    "chocolate_chip_cookie": {
+                        "xprsse": [0.13, 0.13, 0.04]
+                    }
+                },
+                "chopping_board.n.01": {
+                    "chopping_board": {
+                        "afwefw": [0.5 , 0.74, 0.04]
+                    }
+                },
+                "club_sandwich.n.01": {
+                    "club_sandwich": {
+                        "ablfyd": [0.1575, 0.15  , 0.06]
+                    }
+                },
+                "half__apple.n.01": {
+                    "half_apple": {
+                        "qusmpx": null
+                    }
+                },
+                "packing_box.n.02": {
+                    "packing_box": {
+                        "cjhskr": [0.228, 0.282, 0.132]
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelker": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "loading_the_car": {
+        "room_types": [
+            "living_room",
+            "garage"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "container.n.01": {
+                    "toy_box": {
+                        "uvhflb": [0.3 , 0.45, 0.15]
+                    }
+                },
+                "digital_camera.n.01": {
+                    "digital_camera": {
+                        "wbzzjl": null
+                    }
+                },
+                "tennis_racket.n.01": {
+                    "tennis_racket": {
+                        "rmvafy": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "carrying_out_garden_furniture": {
+        "room_types": [
+            "garden",
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "barrow.n.03": {
+                    "wheelbarrow": {
+                        "msaevo": null
+                    }
+                },
+                "lawn_chair.n.01": {
+                    "garden_chair": {
+                        "cottya": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "tidying_bedroom": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "dmqfqx": null
+                    }
+                },
+                "sandal.n.01": {
+                    "sandal": {
+                        "tkfdsk": null,
+                        "txkidl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "set_up_a_coffee_station_in_your_kitchen": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bottle__of__coffee.n.01": {
+                    "bottle_of_coffee": {
+                        "zywanc": [0.078, 0.078, 0.168]
+                    }
+                },
+                "coffee_cup.n.01": {
+                    "coffee_cup": {
+                        "nbhcgu": null
+                    }
+                },
+                "coffee_maker.n.01": {
+                    "coffee_maker": {
+                        "fwlabx": null
+                    }
+                },
+                "electric_kettle.n.01": {
+                    "electric_kettle": {
+                        "hkdsla": null
+                    }
+                },
+                "paper_coffee_filter.n.01": {
+                    "paper_coffee_filter": {
+                        "kizndy": null
+                    }
+                },
+                "saucer.n.02": {
+                    "saucer": {
+                        "vghfkh": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                },
+                "shelf.n.01": {
+                    "shelf": {
+                        "pfusrd": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "collecting_childrens_toys": {
+        "room_types": [
+            "living_room",
+            "childs_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "board_game.n.01": {
+                    "board_game": {
+                        "eoywpy": null,
+                        "gcfkqa": null,
+                        "lzslbu": null
+                    }
+                },
+                "die.n.01": {
+                    "dice": {
+                        "iswudu": [0.04, 0.04, 0.04],
+                        "jommvx": [0.04, 0.04, 0.04]
+                    }
+                },
+                "teddy.n.01": {
+                    "teddy_bear": {
+                        "dgagea": null,
+                        "ecvxmu": null
+                    }
+                },
+                "train_set.n.01": {
+                    "toy_train": {
+                        "zdfhbw": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "delivering_groceries_to_doorstep": {
+        "room_types": [
+            "corridor",
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bread_slice.n.01": {
+                    "bread_slice": {
+                        "yedlgq": null
+                    }
+                },
+                "carton__of__milk.n.01": {
+                    "carton_of_milk": {
+                        "znqqft": null
+                    }
+                },
+                "sack.n.01": {
+                    "paper_bag": {
+                        "bzsxgw": [0.20, 0.30, 0.40]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "gathering_nuts": {
+        "room_types": [
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bucket.n.01": {
+                    "bucket": {
+                        "bdhvnt": null
+                    }
+                },
+                "walnut.n.01": {
+                    "walnut": {
+                        "fbswir": null,
+                        "rmwtdh": [0.6, 0.6, 0.4]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "put_togethera_basic_pruning_kit": {
+        "room_types": [
+            "garage"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "pruner.n.02": {
+                    "pruner": {
+                        "lucqrs": null
+                    }
+                },
+                "shears.n.01": {
+                    "shears": {
+                        "iizidc": [0.208, 0.08, 0.02]
+                    }
+                },
+                "toolbox.n.01": {
+                    "toolbox": {
+                        "redmtl": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "sorting_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "broccoli.n.02": {
+                    "broccoli": {
+                        "wsxavx": [0.09, 0.09, 0.06]
+                    }
+                },
+                "bok_choy.n.02": {
+                    "bok_choy": {
+                        "bbvcji": null
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                },
+                "leek.n.02": {
+                    "leek": {
+                        "fyihsq": null
+                    }
+                },
+                "mixing_bowl.n.01": {
+                    "mixing_bowl": {
+                        "bsgybx": [0.36 , 0.315, 0.165]
+                    }
+                },
+                "sweet_corn.n.02": {
+                    "sweet_corn": {
+                        "qtesku": null
+                    }
+                },
+                "wicker_basket.n.01": {
+                    "wicker_basket": {
+                        "dgkhyn": [0.3, 0.45, 0.19]
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "boxing_books_up_for_storage": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "book.n.02": {
+                    "hardback": {
+                        "okcflv": null,
+                        "acbrnv": null,
+                        "dichmv": null,
+                        "mekfxk": null,
+                        "wfjsog": null,
+                        "rdqqum": null,
+                        "eaktib": null,
+                        "hrxujh": null,
+                        "xkjctf": null,
+                        "yomcyv": null,
+                        "poanfs": null,
+                        "tvydcv": null,
+                        "znlewl": null
+                    }
+                },
+                "box.n.01": {
+                    "storage_box": {
+                        "bwbpvg": [0.48, 0.5 , 0.12]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_shoes_on_rack": {
+        "room_types": [
+            "corridor"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "gym_shoe.n.01": {
+                    "gym_shoe": {
+                        "kmcbym": null,
+                        "mcfcwq": null
+                    }
+                },
+                "sandal.n.01": {
+                    "sandal": {
+                        "dfkzbd": null,
+                        "vwbomj": null
+                    }
+                },
+                "hallstand.n.01": {
+                    "hall_tree": {
+                        "daxzaw": null
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "xorxro": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clearing_food_from_table_into_fridge": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "half__chicken.n.01": {
+                    "half_chicken": {
+                        "hkcqlq": null
+                    }
+                },
+                "half__apple_pie.n.01": {
+                    "half_apple_pie": {
+                        "grcock": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "fhdyrj": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                },
+                "countertop.n.01": {
+                    "bar": {
+                        "egwapq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "storing_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bag__of__chips.n.01": {
+                    "bag_of_chips": {
+                        "bryahw": null
+                    }
+                },
+                "bottle__of__olive_oil.n.01": {
+                    "bottle_of_olive_oil": {
+                        "ajswsh": null
+                    }
+                },
+                "box__of__oatmeal.n.01": {
+                    "box_of_oatmeal": {
+                        "zkggxm": null
+                    }
+                },
+                "jar__of__sugar.n.01": {
+                    "jar_of_sugar": {
+                        "pnbbfb": null
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "kelzer": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "getting_organized_for_work": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "computer.n.01": {
+                    "desktop_computer": {
+                        "eantds": null
+                    }
+                },
+                "monitor.n.04": {
+                    "monitor": {
+                        "qvpbge": null
+                    }
+                },
+                "folder.n.02": {
+                    "folder": {
+                        "guhatz": null
+                    }
+                },
+                "keyboard.n.01": {
+                    "keyboard": {
+                        "injrgc": null
+                    }
+                },
+                "mouse.n.04": {
+                    "mouse": {
+                        "oydobn": [0.09, 0.06, 0.03]
+                    }
+                },
+                "notebook.n.01": {
+                    "notebook": {
+                        "eijrqw": null
+                    }
+                },
+                "pen.n.01": {
+                    "pen": {
+                        "enfumt": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "setting_the_table": {
+        "room_types": [
+            "kitchen",
+            "dining_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "cupcake.n.01": {
+                    "cupcake": {
+                        "mbhweg": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "spppps": null
+                    }
+                },
+                "table_knife.n.01": {
+                    "table_knife": {
+                        "jxdfyy": null
+                    }
+                },
+                "tablefork.n.01": {
+                    "tablefork": {
+                        "hktwlm": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "wash_dog_toys": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "softball.n.01": {
+                    "softball": {
+                        "erhbze": null
+                    }
+                },
+                "teddy.n.01": {
+                    "teddy_bear": {
+                        "mvwvlv": null
+                    }
+                },
+                "tennis_ball.n.01": {
+                    "tennis_ball": {
+                        "rgekxe": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "wash_a_baseball_cap": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "baseball_cap.n.01": {
+                    "baseball_cap": {
+                        "ogptul": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_boxing_gloves": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "boxing_glove.n.01": {
+                    "boxing_gloves": {
+                        "jlfuaf": [0.259, 0.175, 0.126]
+                    }
+                },
+                "countertop.n.01": {
+                    "countertop": {
+                        "sjxber": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "make_pizza": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "fqqbop": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "chopping_board": {
+                        "sygezm": [0.22, 0.33, 0.015]
+                    }
+                },
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": [0.27, 0.30, 0.03]
+                    }
+                },
+                "mushroom.n.05": {
+                    "mushroom": {
+                        "zlukhz": null
+                    }
+                },
+                "pepperoni.n.01": {
+                    "pepperoni": {
+                        "xcurfr": [0.03, 0.03, 0.005]
+                    }
+                },
+                "pizza_dough.n.01": {
+                    "pizza_dough": {
+                        "jguwbv": [0.23, 0.23, 0.005]
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "szgdpc": null
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "make_microwave_popcorn": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "popcorn__bag.n.01": {
+                    "popcorn_bag": {
+                        "hdcpqg": [0.2025, 0.2775, 0.18]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "scrubbing_bathroom_floor": {
+        "room_types": [
+            "bathroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_felt_pool_table_top": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                },
+                "pool_table.n.01": {
+                    "pool_table": {
+                        "atjfhn": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_rug": {
+        "room_types": [
+            "utility_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "rug.n.01": {
+                    "carpet": {
+                        "sehjcp": null
+                    }
+                },
+                "vacuum.n.04": {
+                    "vacuum": {
+                        "bdmsbr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_patio": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "broom.n.01": {
+                    "broom": {
+                        "tpyvbt": [0.81, 0.27, 0.06]
+                    }
+                },
+                "floor.n.01": {
+                    "floors": {
+                        "ghetev": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "attach_a_camera_to_a_tripod": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "camera_tripod.n.01": {
+                    "camera_tripod": {
+                        "hnpofr": null
+                    }
+                },
+                "digital_camera.n.01": {
+                    "digital_camera": {
+                        "zcnxuz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "putting_on_license_plates": {
+        "room_types": [
+            "garden"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "license_plate.n.01": {
+                    "license_plate": {
+                        "nuqnlr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "installing_a_fence": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "spray_paint__can.n.01": {
+                    "spray_paint_can": {
+                        "pgbbbb": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "setting_the_fire": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "cigar_lighter.n.01": {
+                    "lighter": {
+                        "zsxfjz": null
+                    }
+                },
+                "firewood.n.01": {
+                    "firewood": {
+                        "agntyc": null
+                    }
+                },
+                "newspaper.n.03": {
+                    "newspaper": {
+                        "omsont": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_gas_logs": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "log.n.01": {
+                    "log": {
+                        "pepele": [0.3, 0.1, 0.1]
+                    }
+                },
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": [0.195, 0.06 , 0.03]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "clean_a_trumpet": {
+        "room_types": [
+            "bedroom"
+        ],
+        "house_double_floor_upper": {
+            "whitelist": {
+                "cornet.n.01": {
+                    "trumpet": {
+                        "bafgow": null
+                    }
+                },
+                "scrub_brush.n.01": {
+                    "scrub_brush": {
+                        "hsejyi": null
+                    }
+                },
+                "desk.n.01": {
+                    "desk": {
+                        "aduafr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    }
+}

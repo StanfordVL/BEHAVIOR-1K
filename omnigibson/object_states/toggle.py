@@ -5,6 +5,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
+from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.utils.constants import PrimType
@@ -27,16 +28,52 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     # Set of objects that are contacting any manipulation robots
     _finger_contact_objs = None
 
-    def __init__(self, obj, scale=None):
+    def __init__(self, obj, scale=None, requires_closed=False):
         self.scale = scale
         self.value = False
         self.robot_can_toggle_steps = 0
         self.visual_marker = None
 
+        if requires_closed:
+            assert Open in obj.states
+        self.requires_closed = requires_closed
+
         # We also generate the function for checking overlaps at runtime
         self._check_overlap = None
 
         super().__init__(obj)
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        if kwargs.get("requires_closed", False) and Open not in obj.states:
+            return False, f"{cls.__name__} has requires_closed but obj has no Open state!"
+
+        return True, None
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        if kwargs.get("requires_closed", False) and not Open.is_compatible_asset(prim=prim, **kwargs)[0]:
+            return False, f"{cls.__name__} has requires_closed but obj has no Open state!"
+
+        return True, None
+
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        deps.add(Open)
+        return deps
 
     @classmethod
     def global_update(cls):
@@ -78,13 +115,17 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
                         cls._finger_contact_objs.add(obj)
 
     @classproperty
-    def meta_link_type(cls):
-        return m.TOGGLE_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.TOGGLE_META_LINK_TYPE]
 
     def _get_value(self):
         return self.value
 
     def _set_value(self, new_value):
+        if new_value and self.requires_closed and self.obj.states[Open].get_value():
+            # If the object is open, we cannot toggle it on
+            return False
+
         self.value = new_value
 
         # Choose which color to apply to the toggle marker
@@ -136,7 +177,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.visual_marker.visible = True
 
         # Store the projection mesh's IDs
-        projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
+        # projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
 
         # Define function for checking overlap
         valid_hit = False
@@ -154,15 +195,27 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         def check_overlap():
             nonlocal valid_hit
             valid_hit = False
-            if self.visual_marker.prim.GetTypeName() == "Mesh":
-                og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
-            else:
-                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+            # TODO: This is a temporary fix for flatcache before we properly implement trigger volumes
+            og.sim.psqi.overlap_sphere(
+                radius=th.min(self.visual_marker.extent * self.scale).item(),
+                pos=self.visual_marker.get_position_orientation()[0].tolist(),
+                reportFn=overlap_callback,
+            )
+            # if self.visual_marker.prim.GetTypeName() == "Mesh":
+            #     og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
+            # else:
+            #     og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
             return valid_hit
 
         self._check_overlap = check_overlap
 
     def _update(self):
+        # If the object is required to be closed to toggle on, and it is not, we turn it off and stop.
+        if self.requires_closed and self.obj.states[Open].get_value():
+            self.set_value(False)
+            self.robot_can_toggle_steps = 0
+            return
+
         # If we're not nearby any fingers, we automatically can't toggle
         if self.obj not in self._finger_contact_objs:
             robot_can_toggle = False

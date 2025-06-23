@@ -7,7 +7,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm, macros
+from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
@@ -22,7 +22,6 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
-    generate_points_in_volume_checker_function,
     get_particle_positions_from_frame,
     get_particle_positions_in_frame,
 )
@@ -31,7 +30,6 @@ from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import (
-    FlatcacheAPI,
     absolute_prim_path_to_scene_relative,
     create_primitive_mesh,
     delete_or_deactivate_prim,
@@ -56,14 +54,14 @@ m.VISUAL_PARTICLES_APPLICATION_LIMIT = 1000000
 m.PHYSICAL_PARTICLES_APPLICATION_LIMIT = 1000000
 
 # Saturation thresholds -- maximum number of particles that can be removed ("absorbed") by a ParticleRemover
-m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
+m.VISUAL_PARTICLES_REMOVAL_LIMIT = 200
 m.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 400
 
 # Fallback particle visualization radius for visualizing projected visual particles
 m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS = 0.01
 
 # The margin (> 0) to add to the remover area's AABB when detecting overlaps with other objects
-m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
+m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.02
 
 # Settings for determining how the projection particles are visualized as they're projected
 m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
@@ -71,6 +69,9 @@ m.PROJECTION_VISUALIZATION_RATE = 200
 m.PROJECTION_VISUALIZATION_SPEED = 2.0
 m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 1e6
 m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
+
+# Whether to visualize direction vector for particle applier
+m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR = True
 
 
 def create_projection_visualization(
@@ -233,7 +234,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self.method = method
         self.projection_source_sphere = None
         self.projection_mesh = None
-        self._check_in_mesh = None
         self._check_overlap = None
         self._link_prim_paths = None
         self._current_step = None
@@ -382,6 +382,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 for shape_attr, default_val in shape_defaults.items():
                     if shape_attr in property_names:
                         mesh.GetAttribute(shape_attr).Set(default_val)
+
             else:
                 # Potentially populate projection mesh params if the prim exists
                 mesh_type = pre_existing_mesh.GetTypeName()
@@ -439,9 +440,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 frame="parent",
             )
 
-            # Generate the function for checking whether points are within the projection mesh
-            self._check_in_mesh, _ = generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
-
             # Store the projection mesh's IDs
             projection_mesh_ids = lazy.pxr.PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
 
@@ -449,21 +447,53 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                if gm.ENABLE_FLATCACHE:
+                    # When flatcache is on, overlap_shape doesn't work, so we use a more coarse approximation for this broadphase check
+                    aabb = self.link.visual_aabb
+                    og.sim.psqi.overlap_box(
+                        halfExtent=((aabb[1] - aabb[0]) / 2.0).tolist(),
+                        pos=((aabb[1] + aabb[0]) / 2.0).tolist(),
+                        rot=[0, 0, 0, 1.0],
+                        reportFn=overlap_callback,
+                    )
+                else:
+                    og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
+            # Define direction indicator if requested
+            if m.USE_PARTICLE_APPLIER_DIRECTION_INDICATOR:
+                indicator_mesh_path = f"{mesh_prim_path}_direction_indicator"
+                indicator_mesh_prim = (
+                    getattr(lazy.pxr.UsdGeom, self._projection_mesh_params["type"])
+                    .Define(og.sim.stage, indicator_mesh_path)
+                    .GetPrim()
+                )
+                property_names = set(indicator_mesh_prim.GetPropertyNames())
+                for shape_attr, default_val in shape_defaults.items():
+                    if shape_attr in property_names:
+                        indicator_mesh_prim.GetAttribute(shape_attr).Set(default_val)
+                indicator_mesh = VisualGeomPrim(
+                    relative_prim_path=absolute_prim_path_to_scene_relative(self.obj.scene, indicator_mesh_path),
+                    name=f"{name_prefix}_projection_mesh_direction_indicator",
+                )
+                indicator_mesh.load(self.obj.scene)
+                indicator_mesh.initialize()
+                indicator_mesh.visible = True
+                # Scale is 10% of the full scale
+                indicator_mesh_rel_scale = 0.1
+                indicator_mesh.scale = self._projection_mesh_params["extents"] * indicator_mesh_rel_scale
+                indicator_z_offset = (
+                    0.0
+                    if self._projection_mesh_params["type"] == "Sphere"
+                    else self._projection_mesh_params["extents"][2] * indicator_mesh_rel_scale / 2
+                )
+                indicator_mesh.set_position_orientation(
+                    position=th.tensor([0, 0, -indicator_z_offset]),
+                    orientation=T.euler2quat(th.tensor([0, 0, 0], dtype=th.float32)),
+                    frame="parent",
+                )
+
         elif self.method == ParticleModifyMethod.ADJACENCY:
-            # Define the function for checking whether points are within the adjacency mesh
-            def check_in_adjacency_mesh(particle_positions):
-                # Define the AABB bounds
-                lower, upper = self.link.visual_aabb
-                # Add the margin
-                lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-                return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
-
-            self._check_in_mesh = check_in_adjacency_mesh
-
             # Define the function for checking overlaps at runtime
             def check_overlap():
                 nonlocal valid_hit
@@ -484,14 +514,19 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         self._check_overlap = check_overlap
 
         # We abuse the Saturated state to store the limit for particle modifier (including both applier and remover)
-        for system_name in self.conditions.keys():
-            system = self.obj.scene.get_system(system_name, force_init=False)
-            limit = (
-                self.visual_particle_modification_limit
-                if self.obj.scene.is_visual_particle_system(system_name=system.name)
-                else self.physical_particle_modification_limit
-            )
-            self.obj.states[Saturated].set_limit(system=system, limit=limit)
+        self.obj.states[Saturated].set_visual_particle_limit(self.visual_particle_modification_limit)
+        self.obj.states[Saturated].set_physical_particle_limit(self.physical_particle_modification_limit)
+
+    def _check_in_mesh(self, particle_positions):
+        if self.method == ParticleModifyMethod.ADJACENCY:
+            # Define the AABB bounds
+            lower, upper = self.link.visual_aabb
+            # Add the margin
+            lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+            upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+            return ((lower < particle_positions) & (particle_positions < upper)).all(dim=-1)
+        else:
+            return self.link.check_points_in_volume(particle_positions)
 
     def _generate_condition(self, condition_type, value):
         """
@@ -656,17 +691,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         return all(condition(self.obj) for condition in self.conditions[system_name])
 
     def _update(self):
-        # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
-        # so the corresponding visualization and overlap meshes are updated properly
-        # This is expensive, so only do it if the object is not a fixed object and we have an active projection
-        if (
-            self.method == ParticleModifyMethod.PROJECTION
-            and gm.ENABLE_FLATCACHE
-            and not self.obj.fixed_base
-            and self.projection_is_active
-        ):
-            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
-
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0:
             # Iterate over all systems to check
@@ -939,8 +963,8 @@ class ParticleRemover(ParticleModifier):
         return False
 
     @classproperty
-    def meta_link_type(cls):
-        return m.REMOVAL_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.REMOVAL_META_LINK_TYPE]
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
@@ -1323,9 +1347,9 @@ class ParticleApplier(ParticleModifier):
                 # Generate particles for this group
                 system.generate_group_particles(
                     group=group,
-                    positions=th.tensor(particle_info["positions"]),
-                    orientations=th.tensor(particle_info["orientations"]),
-                    scales=th.tensor(particles_info[group]["scales"]),
+                    positions=th.stack(particle_info["positions"], dim=0),
+                    orientations=th.stack(particle_info["orientations"], dim=0),
+                    scales=th.stack(particles_info[group]["scales"], dim=0),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
@@ -1517,8 +1541,8 @@ class ParticleApplier(ParticleModifier):
         return self._projection_is_active
 
     @classproperty
-    def meta_link_type(cls):
-        return m.APPLICATION_META_LINK_TYPE
+    def meta_link_types(cls):
+        return [m.APPLICATION_META_LINK_TYPE]
 
     @classmethod
     def requires_meta_link(cls, **kwargs):
@@ -1531,10 +1555,6 @@ class ParticleApplier(ParticleModifier):
         compatible, reason = super().is_compatible(obj, **kwargs)
         if not compatible:
             return compatible, reason
-
-        # Check whether GPU dynamics are enabled (necessary for this object state)
-        if not gm.USE_GPU_DYNAMICS:
-            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
 
         return True, None
 

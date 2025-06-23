@@ -20,7 +20,7 @@ from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformComman
 from omni.kit.primitive.mesh.command import _get_all_evaluators
 from omni.replicator.core import random_colours
 from PIL import Image, ImageDraw
-from pxr import PhysxSchema, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
 from scipy.spatial.transform import Rotation as R
 
 DEG2RAD = math.pi / 180.0
@@ -445,9 +445,11 @@ class ArticulationView(_ArticulationView):
             )
             self._physics_view.set_dof_positions(new_dof_pos, indices)
 
-            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # THIS IS THE FIX:
+            #   FIX V1: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            #   FIX V2: DECOUPLE INSTANTANEOUS POSITION FROM TARGETS
             # self._physics_view.set_dof_position_targets(new_dof_pos, indices)
-            self.set_joint_position_targets(positions, indices, joint_indices)
+            # self.set_joint_position_targets(positions, indices, joint_indices)
         else:
             carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_positions")
 
@@ -511,9 +513,11 @@ class ArticulationView(_ArticulationView):
             )
             self._physics_view.set_dof_velocities(new_dof_vel, indices)
 
-            # THIS IS THE FIX: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            # THIS IS THE FIX:
+            #   FIX V1: COMMENT OUT THE BELOW LINE AND SET TARGETS INSTEAD
+            #   FIX V2: DECOUPLE INSTANTANEOUS VELOCITY FROM TARGETS
             # self._physics_view.set_dof_velocity_targets(new_dof_vel, indices)
-            self.set_joint_velocity_targets(velocities, indices, joint_indices)
+            # self.set_joint_velocity_targets(velocities, indices, joint_indices)
         else:
             carb.log_warn("Physics Simulation View is not created yet in order to use set_joint_velocities")
         return
@@ -863,6 +867,160 @@ class RigidPrimView(_RigidPrimView):
                     self._physx_rigid_body_apis[i] = rigid_api
                 self._physx_rigid_body_apis[i].GetDisableGravityAttr().Set(True)
             return
+
+    def get_coms(
+        self, indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None, clone: bool = True
+    ) -> Union[np.ndarray, torch.Tensor, wp.indexedarray]:
+        """Get rigid body center of mass (COM) of bodies in the view.
+
+        Args:
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to query. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+            clone (bool, optional): True to return a clone of the internal buffer. Otherwise False. Defaults to True.
+
+        Returns:
+            Union[np.ndarray, torch.Tensor, wp.indexedarray]: rigid body center of mass positions and orientations of prims in the view.
+            position shape is (M, 1, 3), orientation shape is (M, 1, 4).
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # get all rigid body center of mass.
+            >>> # Returned shape is (5, 1, 3) for positions and (5, 1, 4) for orientations for the example: 5 envs
+            >>> positions, orientations = prims.get_coms()
+            >>> positions
+            [[[0. 0. 0.]]
+             [[0. 0. 0.]]
+             [[0. 0. 0.]]
+             [[0. 0. 0.]]
+             [[0. 0. 0.]]]
+            >>> orientations
+            [[[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]]
+            >>>
+            >>> # get rigid body center of mass for the first, middle and last of the 5 envs.
+            >>> # Returned shape is (3, 1, 3) for positions and (3, 1, 4) for orientations
+            >>> positions, orientations = prims.get_coms(indices=np.array([0, 2, 4]))
+            >>> positions
+            [[[0. 0. 0.]]
+             [[0. 0. 0.]]
+             [[0. 0. 0.]]]
+            >>> orientations
+            [[[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]
+             [[1. 0. 0. 0.]]]
+        """
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
+        if self.is_physics_handle_valid():
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            current_values = self._backend_utils.move_data(
+                self._physics_view.get_coms().reshape((self.count, 7)), self._device
+            )
+            if clone:
+                current_values = self._backend_utils.clone_tensor(current_values, device=self._device)
+            positions = current_values[
+                self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, 0:3
+            ]
+            orientations = self._backend_utils.xyzw2wxyz(
+                current_values[self._backend_utils.expand_dims(indices, 1) if self._backend != "warp" else indices, 3:7]
+            )
+            return positions, orientations
+        else:
+            indices = self._backend_utils.resolve_indices(indices, self.count, self._device)
+            positions = np.zeros((indices.shape[0], 1, 3), dtype=np.float32)
+            orientations = np.zeros((indices.shape[0], 1, 4), dtype=np.float32)
+            indices = self._backend_utils.to_list(indices)
+            write_idx = 0
+            for i in indices:
+                positions[write_idx][0] = np.array(self._prims[i].GetAttribute("physics:centerOfMass").Get())
+                orientations[write_idx][0] = np.array([1, 0, 0, 0])
+                write_idx += 1
+            positions = self._backend_utils.convert(positions, device=self._device, dtype="float32", indexed=True)
+            orientations = self._backend_utils.convert(orientations, device=self._device, dtype="float32", indexed=True)
+            return positions, orientations
+
+    def set_coms(
+        self,
+        positions: Union[np.ndarray, torch.Tensor, wp.array] = None,
+        orientations: Union[np.ndarray, torch.Tensor, wp.array] = None,
+        indices: Optional[Union[np.ndarray, List, torch.Tensor, wp.array]] = None,
+    ) -> None:
+        """Set body center of mass (COM) positions and orientations for bodies in the view.
+
+        Args:
+            positions (Union[np.ndarray, torch.Tensor, wp.array]): body center of mass positions for bodies in the view. shape (M, 1, 3).
+            orientations (Union[np.ndarray, torch.Tensor, wp.array]): body center of mass orientations for bodies in the view. shape (M, 1, 4).
+            indices (Optional[Union[np.ndarray, List, torch.Tensor, wp.array]], optional): indices to specify which prims
+                                                                                 to manipulate. Shape (M,).
+                                                                                 Where M <= size of the encapsulated prims in the view.
+                                                                                 Defaults to None (i.e: all prims in the view).
+
+        Example:
+
+        .. code-block:: python
+
+            >>> # set the center of mass for all the rigid bodies to the specified values.
+            >>> # Since there are 5 envs, the inertias are repeated 5 times
+            >>> positions = np.tile(np.array([0.01, 0.02, 0.03]), (num_envs, 1, 1))
+            >>> orientations = np.tile(np.array([1.0, 0.0, 0.0, 0.0]), (num_envs, 1, 1))
+            >>> prims.set_coms(positions, orientations)
+            >>>
+            >>> # set the rigid bodies center of mass for the first, middle and last of the 5 envs
+            >>> positions = np.tile(np.array([0.01, 0.02, 0.03]), (3, 1, 1))
+            >>> orientations = np.tile(np.array([1.0, 0.0, 0.0, 0.0]), (3, 1, 1))
+            >>> prims.set_coms(positions, orientations, indices=np.array([0, 2, 4]))
+        """
+        if not self._is_valid:
+            raise Exception("prim view {} is not a valid view".format(self._regex_prim_paths))
+        indices = self._backend_utils.resolve_indices(indices, self.count, "cpu")
+        if self.is_physics_handle_valid():
+            coms = self._physics_view.get_coms().reshape((self.count, 7))
+            if positions is not None:
+                if self._backend == "warp":
+                    coms = self._backend_utils.assign(
+                        self._backend_utils.move_data(positions, device="cpu"),
+                        coms,
+                        [indices, wp.array([0, 1, 2], dtype=wp.int32, device="cpu")],
+                    )
+                else:
+                    coms[self._backend_utils.expand_dims(indices, 1), 0:3] = self._backend_utils.move_data(
+                        positions, device="cpu"
+                    )
+            if orientations is not None:
+                if self._backend == "warp":
+                    coms = self._backend_utils.assign(
+                        self._backend_utils.move_data(self._backend_utils.wxyz2xyzw(orientations), device="cpu"),
+                        coms,
+                        [indices, wp.array([3, 4, 5, 6], dtype=wp.int32, device="cpu")],
+                    )
+                else:
+                    coms[self._backend_utils.expand_dims(indices, 1), 3:7] = self._backend_utils.move_data(
+                        orientations[:, :, [1, 2, 3, 0]], device="cpu"
+                    )
+            self._physics_view.set_coms(coms, indices)
+        else:
+            # Note: this does NOT set orientation, as it is not supported in USD
+            positions = self._backend_utils.to_list(positions)
+            write_idx = 0
+            for i in indices:
+                properties = self._prims[i].GetPropertyNames()
+                position = Gf.Vec3f(*positions[write_idx][0])
+                if "physics:centerOfMass" not in properties:
+                    carb.log_error(
+                        "physics:centerOfMass property needs to be set for {} before setting its position".format(
+                            self.name
+                        )
+                    )
+                xform_op = self._prims[i].GetAttribute("physics:centerOfMass")
+                xform_op.Set(position)
+                write_idx += 1
 
 
 def colorize_bboxes(bboxes_2d_data, bboxes_2d_rgb, num_channels=3):

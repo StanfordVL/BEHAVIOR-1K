@@ -49,8 +49,8 @@ AbilityDependencies = namedtuple("AbilityDependencies", ("states", "requirements
 _ABILITY_DEPENDENCIES = {
     "robot": AbilityDependencies(states=[IsGrasping, ObjectsInFOVOfRobot], requirements=[]),
     "attachable": AbilityDependencies(states=[AttachedTo], requirements=[]),
-    "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[ParticleRequirement]),
-    "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[ParticleRequirement]),
+    "particleApplier": AbilityDependencies(states=[ParticleApplier], requirements=[]),
+    "particleRemover": AbilityDependencies(states=[ParticleRemover], requirements=[]),
     "particleSource": AbilityDependencies(states=[ParticleSource], requirements=[ParticleRequirement]),
     "particleSink": AbilityDependencies(states=[ParticleSink], requirements=[ParticleRequirement]),
     "coldSource": AbilityDependencies(states=[HeatSourceOrSink], requirements=[]),
@@ -197,7 +197,15 @@ def get_states_by_dependency_order(states=None):
     Returns:
         list: all states in topological order of dependency
     """
-    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
+    return list(
+        reversed(
+            list(
+                nx.algorithms.lexicographical_topological_sort(
+                    get_state_dependency_graph(states), key=lambda n: n.__name__
+                )
+            )
+        )
+    )
 
 
 # Define all meta links
@@ -205,6 +213,7 @@ META_LINK_TYPES = set()
 for state in get_states_by_dependency_order():
     if issubclass(state, LinkBasedStateMixin):
         try:
-            META_LINK_TYPES.add(state.meta_link_type)
+            for meta_link_type in state.meta_link_types:
+                META_LINK_TYPES.add(meta_link_type)
         except NotImplementedError:
             pass

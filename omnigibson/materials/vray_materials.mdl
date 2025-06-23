@@ -1,0 +1,161 @@
+// Copyright 2023 NVIDIA Corporation. All rights reserved.
+//
+// NVIDIA CORPORATION and its licensors retain all intellectual property
+// and proprietary rights in and to this software, related documentation
+// and any modifications thereto.  Any use, reproduction, disclosure or
+// distribution of this software and related documentation without an express
+// license agreement from NVIDIA CORPORATION is strictly prohibited.
+
+mdl 1.8;
+
+import ::anno::*;
+import ::df::*;
+import ::math::*;
+import ::state::*;
+
+
+// VRay Material
+export material VRayMtl(
+    color Diffuse = color(0.5f)
+    [[
+        anno::in_group("Diffuse Parameters"),
+        anno::display_name("Diffuse")
+    ]],
+    uniform float diffuse_roughness = 0.f
+    [[
+        anno::in_group("Diffuse Parameters"),
+        anno::display_name("Roughness"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    color Reflection = color(0.f)
+    [[
+        anno::in_group("Reflections"),
+        anno::display_name("Reflect")
+    ]],
+    float reflection_glossiness = 1.f
+    [[
+        anno::in_group("Reflections"),
+        anno::display_name("Glossiness"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    float reflection_ior = 1.6f
+    [[
+        anno::in_group("Reflections"),
+        anno::display_name("Fresnel IOR"),
+        anno::soft_range(0.2f, 5.f),
+        anno::hard_range(1.e-6f, 100.f)
+    ]],
+    float reflection_metalness = 0.f
+    [[
+        anno::in_group("Reflections"),
+        anno::display_name("Metalness"),
+        anno::hard_range(0.f, 1.f)
+    ]],
+    uniform float refraction_ior = 1.6f // not textureable to be physically plausible
+    [[
+        anno::in_group("Refractions"),
+        anno::display_name("IOR"),
+        anno::soft_range(0.2,5.),
+        anno::hard_range(1.e-6f, 100.f)
+    ]],
+    color self_illumination = color(0.f)
+    [[
+        anno::in_group("Self-Illumination"),
+        anno::display_name("Self-illumination")
+    ]],
+    uniform float self_illumination_multiplier = 1.f
+    [[
+        anno::in_group("Self-Illumination"),
+        anno::display_name("Multiplier")
+    ]],
+    float3 texmap_bump = state::normal()
+    [[
+        anno::in_group("Maps"),
+        anno::display_name("Bump Map")
+    ]],
+    float texmap_opacity = 1.0f
+    [[
+        anno::in_group("Maps"),
+        anno::display_name("Opacity Map")
+    ]],
+    uniform bool thin_walled = false
+    [[
+        anno::in_group("Options"),
+        anno::hidden()
+    ]]
+)
+[[
+    anno::author("NVIDIA Corporation and Stanford Vision and Learning Lab")
+]]
+ = let
+ {
+    float reflection_roughness =  math::pow((1.f - reflection_glossiness), 2.f);
+    float R0 = math::pow((1.f - reflection_ior)/(1.f + reflection_ior), 2.f);
+    
+    // diffuse
+    bsdf diffuse_bsdf  = 
+        df::weighted_layer
+        (
+            weight  : 1.f,
+            layer   : df::diffuse_reflection_bsdf
+            (
+                tint      : Diffuse,
+                roughness : diffuse_roughness
+            ),
+            normal  : texmap_bump
+        );
+               
+    // reflection    
+    bsdf glossy_reflection_bsdf =
+        df::simple_glossy_bsdf(
+            mode: df::scatter_reflect,
+            tint: Reflection,
+            roughness_u: reflection_roughness
+        );
+        
+    // diffuse glossy reflection
+    bsdf diffuse_glossy_reflection_bsdf =
+        df::simple_glossy_bsdf(
+            mode: df::scatter_reflect,
+            tint: Diffuse,
+            roughness_u: reflection_roughness
+        );
+
+    // surface
+    float reflection_intensity = math::luminance(Reflection);
+    bsdf surface_bsdf =
+        df::color_custom_curve_layer
+        (
+            normal_reflectivity : color(R0 * reflection_intensity),
+            grazing_reflectivity: color(reflection_intensity),
+            layer               : glossy_reflection_bsdf,
+            base                : 
+                df::weighted_layer
+                (
+                    weight  : reflection_metalness,
+                    layer   : diffuse_glossy_reflection_bsdf,
+                    base    : diffuse_bsdf,
+                    normal  : texmap_bump
+                ),
+            normal              : texmap_bump
+        );
+            
+} 
+in material
+(
+        ior         : color(refraction_ior),
+        thin_walled : thin_walled,
+        surface     : material_surface
+        (
+            scattering  : surface_bsdf, 
+            emission    : material_emission
+            (
+                emission  : df::diffuse_edf(),
+                intensity : self_illumination*self_illumination_multiplier
+            )
+        ),
+        geometry    : material_geometry
+        (
+            cutout_opacity: texmap_opacity
+        )
+);

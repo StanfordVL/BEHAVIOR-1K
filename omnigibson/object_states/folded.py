@@ -120,11 +120,11 @@ class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
             ax = plt.gca()
             ax.set_aspect("equal")
 
-            plt.plot(points[:, dims[0]], points[:, dims[1]], "o")
+            plt.plot(points[:, 0], points[:, 1], "o")
             for simplex in hull.simplices:
-                plt.plot(points[simplex, dims[0]], points[simplex, dims[1]], "k-")
-            plt.plot(points[hull.vertices, dims[0]], points[hull.vertices, dims[1]], "r--", lw=2)
-            plt.plot(points[hull.vertices[0], dims[0]], points[hull.vertices[0], dims[1]], "ro")
+                plt.plot(points[simplex, 0], points[simplex, 1], "k-")
+            plt.plot(points[hull.vertices, 0], points[hull.vertices, 1], "r--", lw=2)
+            plt.plot(points[hull.vertices[0], 0], points[hull.vertices[0], 1], "ro")
             plt.show()
 
         return area, diagonal

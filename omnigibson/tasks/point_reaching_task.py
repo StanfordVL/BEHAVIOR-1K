@@ -44,6 +44,7 @@ class PointReachingTask(PointNavigationTask):
             specific to the task class. Default is None, which corresponds to a default config being usd. Note that
             any keyword required by a specific task class but not specified in the config will automatically be filled
             in with the default config. See cls.default_reward_config for default values used
+        include_obs (bool): Whether to include observations or not for this task
     """
 
     def __init__(
@@ -65,6 +66,7 @@ class PointReachingTask(PointNavigationTask):
         n_vis_waypoints=10,
         reward_config=None,
         termination_config=None,
+        include_obs=True,
     ):
         # Store inputs
         self._height_range = height_range
@@ -88,6 +90,7 @@ class PointReachingTask(PointNavigationTask):
             reward_type="l2",  # Must use l2 for reaching task
             reward_config=reward_config,
             termination_config=termination_config,
+            include_obs=include_obs,
         )
 
     def _create_termination_conditions(self):

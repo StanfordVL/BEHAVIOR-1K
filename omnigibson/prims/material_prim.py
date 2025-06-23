@@ -1,12 +1,18 @@
 import os
 
+import cv2
+from omnigibson.utils.ui_utils import create_module_logger
 import torch as th
 
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.utils.usd_utils import absolute_prim_path_to_scene_relative, get_sdf_value_type_name
+
+
+log = create_module_logger(module_name=__name__)
 
 
 class MaterialPrim(BasePrim):
@@ -34,31 +40,82 @@ class MaterialPrim(BasePrim):
     MATERIALS = dict()
 
     @classmethod
-    def get_material(cls, scene, name, prim_path, load_config=None):
+    def get_material(cls, scene, name, prim_path, **kwargs):
         """
         Get a material prim from the persistent dictionary of materials, or create a new one if it doesn't exist.
 
         Args:
+            scene (Scene): Scene to which this material belongs.
             name (str): Name for the object.
             prim_path (str): prim path of the MaterialPrim.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists.
+            **kwargs: Additional keyword arguments to pass to the MaterialPrim or subclass constructor.
+
         Returns:
             MaterialPrim: Material prim at the specified path
         """
         # If the material already exists, return it
-        if prim_path in cls.MATERIALS:
-            return cls.MATERIALS[prim_path]
+        if prim_path in MaterialPrim.MATERIALS:
+            return MaterialPrim.MATERIALS[prim_path]
 
         # Otherwise, create a new one and return it
+        material_class = cls
+        if lazy.isaacsim.core.utils.prims.is_prim_path_valid(prim_path):
+            # If the prim already exists, infer its type.
+            material_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+            shader_prim = lazy.omni.usd.get_shader_from_material(material_prim)
+            assert shader_prim is not None, (
+                f"Material prim at {prim_path} exists, but does not have a shader associated with it! "
+                f"Please make sure the material is created correctly."
+            )
+
+            # If we are able to obtain the asset path and sub-identifier, we can determine the material class.
+            mdl_asset = shader_prim.GetSourceAsset("mdl")
+            if mdl_asset is not None:
+                asset_path = mdl_asset.path
+                asset_sub_identifier = shader_prim.GetSourceAssetSubIdentifier("mdl")
+
+                if cls == MaterialPrim:
+                    # If this function is getting called on MaterialPrim, then we try to pick a compatible subclass.
+                    compatible_classes = [
+                        subclass
+                        for subclass in MaterialPrim.__subclasses__()
+                        if subclass.supports_material(asset_path, asset_sub_identifier)
+                    ]
+                    assert len(compatible_classes) <= 1, (
+                        "Found multiple compatible material prim classes for "
+                        f"material at {prim_path} with asset path {asset_path} and sub-identifier {asset_sub_identifier}: "
+                        f"{compatible_classes}"
+                    )
+                    if len(compatible_classes) == 1:
+                        # Use the only found compatible class
+                        material_class = compatible_classes[0]
+                    else:
+                        # Fall back to MaterialPrim
+                        log.warning(
+                            f"No compatible material prim class found for material at {prim_path} with "
+                            f"asset path {asset_path} and sub-identifier {asset_sub_identifier}. "
+                            f"Using MaterialPrim as a fallback."
+                        )
+                else:
+                    # If this function is called on a subclass of MaterialPrim, then we check if the subclass supports the material.
+                    assert material_class.supports_material(asset_path, asset_sub_identifier), (
+                        f"MaterialPrim subclass {material_class.__name__} does not support material at {prim_path} "
+                        f"with asset path {asset_path} and sub-identifier {asset_sub_identifier}!"
+                    )
+            else:
+                # If the material prim exists, but does not have a shader file we can recognize.
+                log.warning(
+                    f"Material prim at {prim_path} exists, but does not have a known shader file associated with it! "
+                    f"Using MaterialPrim as a fallback. If this is not intended, please make sure the material is created correctly."
+                )
+
         relative_prim_path = absolute_prim_path_to_scene_relative(scene, prim_path)
-        new_material = cls(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+        new_material = material_class(relative_prim_path=relative_prim_path, name=name, **kwargs)
         new_material.load(scene)
         assert (
             new_material.prim_path == prim_path
         ), f"Material prim path {new_material.prim_path} does not match {prim_path}"
-        cls.MATERIALS[prim_path] = new_material
+        MaterialPrim.MATERIALS[prim_path] = new_material
         return new_material
 
     def __init__(
@@ -81,15 +138,57 @@ class MaterialPrim(BasePrim):
             load_config=load_config,
         )
 
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        """
+        Checks if this material prim supports the given asset path and sub-identifier.
+
+        Args:
+            asset_path (str): The asset path of the MDL file.
+            asset_sub_identifier (str): The sub-identifier of the MDL file.
+
+        Returns:
+            bool: True if this material prim supports the given asset path and sub-identifier, False otherwise.
+        """
+        raise NotImplementedError(f"MaterialPrim subclass {cls.__name__} does not implement supports_material method!")
+
+    @property
+    def mdl_name(self):
+        """
+        The name of the MDL file to load for this material.
+        This is expected to be defined in the load_config dictionary for this base class which is used
+        for generic material prims. The PBR and V-Ray material prims will override this method
+        to return their own MDL names.
+        """
+        assert "mdl_name" in self._load_config, (
+            f"MaterialPrim at {self.prim_path} does not have a 'mdl_name' in its load_config! "
+            f"Please specify it in the load_config dictionary or use one of the subclasses that "
+            f"already define it (e.g. OmniPBRMaterialPrim, VRayMaterialPrim, OmniGlassMaterialPrim, OmniSurfaceMaterialPrim)"
+        )
+        return self._load_config["mdl_name"]
+
+    @property
+    def mtl_name(self):
+        """
+        The name of the material from the MDL file to load for this material.
+        This is expected to be defined in the load_config dictionary for this base class which is used
+        for generic material prims. The PBR and V-Ray material prims will override this method
+        to return their own MDL names.
+        """
+        assert "mtl_name" in self._load_config, (
+            f"MaterialPrim at {self.prim_path} does not have a 'mtl_name' in its load_config! "
+            f"Please specify it in the load_config dictionary or use one of the subclasses that "
+            f"already define it (e.g. OmniPBRMaterialPrim, VRayMaterialPrim, OmniGlassMaterialPrim)"
+        )
+        return self._load_config["mtl_name"]
+
     def _load(self):
         # We create a new material at the specified path
         mtl_created = []
         lazy.omni.kit.commands.execute(
             "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name=(
-                "OmniPBR.mdl" if self._load_config.get("mdl_name", None) is None else self._load_config["mdl_name"]
-            ),
-            mtl_name="OmniPBR" if self._load_config.get("mtl_name", None) is None else self._load_config["mtl_name"],
+            mdl_name=self.mdl_name,
+            mtl_name=self.mtl_name,
             mtl_created_list=mtl_created,
         )
         material_path = mtl_created[0]
@@ -220,14 +319,6 @@ class MaterialPrim(BasePrim):
             raise ValueError(f"Got invalid shader input to set! Got: {inp}")
 
     @property
-    def is_glass(self):
-        """
-        Returns:
-            bool: Whether this material is a glass material or not
-        """
-        return "glass_color" in self.shader_input_names | self.shader_default_input_names
-
-    @property
     def shader(self):
         """
         Returns:
@@ -272,6 +363,86 @@ class MaterialPrim(BasePrim):
         return shader_input_names | shader_default_input_names
 
     @property
+    def average_diffuse_color(self):
+        return th.zeros(3)
+
+    @property
+    def albedo_add(self):
+        """
+        Returns:
+            float: this material's applied albedo_add
+        """
+        return 0.0
+
+    @albedo_add.setter
+    def albedo_add(self, add):
+        """
+        Args:
+             add (float): this material's applied albedo_add
+        """
+        return
+
+    @property
+    def diffuse_tint(self):
+        """
+        Returns:
+            3-array: this material's applied (R,G,B) diffuse_tint
+        """
+        return th.zeros(3)
+
+    @diffuse_tint.setter
+    def diffuse_tint(self, color):
+        """
+        Args:
+             color (3-array): this material's applied (R,G,B) diffuse_tint
+        """
+        return
+
+    def enable_highlight(self, highlight_color, highlight_intensity):
+        """
+        Enables highlight for this material with the specified color and intensity.
+
+        Args:
+            highlight_color (3-array): Color of the highlight in (R,G,B)
+            highlight_intensity (float): Intensity of the highlight
+        """
+        pass
+
+    def disable_highlight(self):
+        """
+        Disables highlight for this material.
+        """
+        pass
+
+
+class OmniPBRMaterialPrim(MaterialPrim):
+    """
+    A MaterialPrim that uses the OmniPBR material preset.
+    """
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "OmniPBR.mdl" and asset_sub_identifier == "OmniPBR"
+
+    @property
+    def mdl_name(self):
+        return "OmniPBR.mdl"
+
+    @property
+    def mtl_name(self):
+        return "OmniPBR"
+
+    def _post_load(self):
+        # Run super first
+        super()._post_load()
+
+        # Apply any forced roughness updates
+        self.set_input(inp="reflection_roughness_texture_influence", val=0.0)
+        self.set_input(inp="reflection_roughness_constant", val=gm.FORCE_ROUGHNESS)
+
+        # TODO: Check that it does not use emission by default.
+
+    @property
     def diffuse_color_constant(self):
         """
         Returns:
@@ -305,22 +476,6 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="diffuse_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
 
     @property
-    def albedo_desaturation(self):
-        """
-        Returns:
-            float: this material's applied albedo_desaturation
-        """
-        return self.get_input(inp="albedo_desaturation")
-
-    @albedo_desaturation.setter
-    def albedo_desaturation(self, desaturation):
-        """
-        Args:
-             desaturation (float): this material's applied albedo_desaturation
-        """
-        self.set_input(inp="albedo_desaturation", val=desaturation)
-
-    @property
     def albedo_add(self):
         """
         Returns:
@@ -335,22 +490,6 @@ class MaterialPrim(BasePrim):
              add (float): this material's applied albedo_add
         """
         self.set_input(inp="albedo_add", val=add)
-
-    @property
-    def albedo_brightness(self):
-        """
-        Returns:
-            float: this material's applied albedo_brightness
-        """
-        return self.get_input(inp="albedo_brightness")
-
-    @albedo_brightness.setter
-    def albedo_brightness(self, brightness):
-        """
-        Args:
-             brightness (float): this material's applied albedo_brightness
-        """
-        self.set_input(inp="albedo_brightness", val=brightness)
 
     @property
     def diffuse_tint(self):
@@ -370,634 +509,151 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
 
     @property
-    def reflection_roughness_constant(self):
-        """
-        Returns:
-            float: this material's applied reflection_roughness_constant
-        """
-        return self.get_input(inp="reflection_roughness_constant")
+    def average_diffuse_color(self):
+        diffuse_texture = self.diffuse_texture
+        return cv2.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else self.diffuse_color_constant
 
-    @reflection_roughness_constant.setter
-    def reflection_roughness_constant(self, roughness):
+    def enable_highlight(self, highlight_color, highlight_intensity):
         """
+        Enables highlight for this material with the specified color and intensity.
+
         Args:
-             roughness (float): this material's applied reflection_roughness_constant
+            highlight_color (3-array): Color of the highlight in (R,G,B)
+            highlight_intensity (float): Intensity of the highlight
         """
-        self.set_input(inp="reflection_roughness_constant", val=roughness)
+        # Set emissive properties to enable highlight
+        self.set_input(inp="enable_emission", val=True)
+        self.set_input(inp="emissive_color", val=lazy.pxr.Gf.Vec3f(*highlight_color))
+        self.set_input(inp="emissive_intensity", val=highlight_intensity)
+
+    def disable_highlight(self):
+        self.set_input(inp="enable_emission", val=False)
+
+
+class VRayMaterialPrim(MaterialPrim):
+    """
+    A MaterialPrim that uses the V-Ray material preset.
+    """
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "omnigibson_vray_mtl.mdl" and asset_sub_identifier == "OmniGibsonVRayMtl"
 
     @property
-    def reflection_roughness_texture_influence(self):
-        """
-        Returns:
-            float: this material's applied reflection_roughness_texture_influence
-        """
-        return self.get_input(inp="reflection_roughness_texture_influence")
-
-    @reflection_roughness_texture_influence.setter
-    def reflection_roughness_texture_influence(self, prop):
-        """
-        Args:
-             prop (float): this material's applied reflection_roughness_texture_influence proportion
-        """
-        self.set_input(inp="reflection_roughness_texture_influence", val=prop)
+    def mdl_name(self):
+        return "omnigibson_vray_mtl.mdl"
 
     @property
-    def reflectionroughness_texture(self):
-        """
-        Returns:
-            None or str: this material's applied reflectionroughness_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="reflectionroughness_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @reflectionroughness_texture.setter
-    def reflectionroughness_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied reflectionroughness_texture fpath
-        """
-        self.set_input(inp="reflectionroughness_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
+    def mtl_name(self):
+        return "OmniGibsonVRayMtl"
 
     @property
-    def metallic_constant(self):
+    def diffuse_texture(self):
         """
         Returns:
-            float: this material's applied metallic_constant
+            str: this material's applied diffuse_texture filepath
         """
-        return self.get_input(inp="metallic_constant")
-
-    @metallic_constant.setter
-    def metallic_constant(self, constant):
-        """
-        Args:
-             constant (float): this material's applied metallic_constant
-        """
-        self.set_input(inp="metallic_constant", val=constant)
+        return self.get_input(inp="diffuse_texture").resolvedPath
 
     @property
-    def metallic_texture_influence(self):
+    def average_diffuse_color(self):
         """
         Returns:
-            float: this material's applied metallic_texture_influence
+            3-array: this material's average diffuse color.
         """
-        return self.get_input(inp="metallic_texture_influence")
+        return cv2.imread(self.diffuse_texture).mean(axis=(0, 1))
 
-    @metallic_texture_influence.setter
-    def metallic_texture_influence(self, prop):
+    def enable_highlight(self, highlight_color, highlight_intensity):
         """
+        Enables highlight for this material with the specified color and intensity.
+
         Args:
-             prop (float): this material's applied metallic_texture_influence
+            highlight_color (3-array): Color of the highlight in (R,G,B)
+            highlight_intensity (float): Intensity of the highlight
         """
-        self.set_input(inp="metallic_texture_influence", val=prop)
+        # Set emissive properties to enable highlight
+        self.set_input(inp="emission_color", val=lazy.pxr.Gf.Vec3f(*highlight_color))
+        self.set_input(inp="emission_intensity", val=highlight_intensity)
+
+    def disable_highlight(self):
+        self.set_input(inp="emission_color", val=lazy.pxr.Gf.Vec3f(0, 0, 0))
+        self.set_input(inp="emission_intensity", val=0.0)
+
+
+class OmniGlassMaterialPrim(MaterialPrim):
+    """
+    A MaterialPrim that uses the OmniGlass material preset.
+    """
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return asset_path == "OmniGlass.mdl" and asset_sub_identifier == "OmniGlass"
 
     @property
-    def metallic_texture(self):
-        """
-        Returns:
-            None or str: this material's applied metallic_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="metallic_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @metallic_texture.setter
-    def metallic_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied metallic_texture fpath
-        """
-        self.set_input(inp="metallic_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
+    def mdl_name(self):
+        return "OmniGlass.mdl"
 
     @property
-    def specular_level(self):
-        """
-        Returns:
-            float: this material's applied specular_level
-        """
-        return self.get_input(inp="specular_level")
-
-    @specular_level.setter
-    def specular_level(self, level):
-        """
-        Args:
-             level (float): this material's applied specular_level
-        """
-        self.set_input(inp="specular_level", val=level)
+    def mtl_name(self):
+        return "OmniGlass"
 
     @property
-    def enable_ORM_texture(self):
+    def color(self):
         """
         Returns:
-            bool: this material's applied enable_ORM_texture
+            3-array: this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
         """
-        return self.get_input(inp="enable_ORM_texture")
+        glass_color = self.get_input(inp="glass_color")
+        return th.tensor(glass_color, dtype=th.float32) if glass_color is not None else None
 
-    @enable_ORM_texture.setter
-    def enable_ORM_texture(self, enabled):
+    @color.setter
+    def color(self, color):
         """
         Args:
-             enabled (bool): this material's applied enable_ORM_texture
+             color (3-array): this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
         """
-        self.set_input(inp="enable_ORM_texture", val=enabled)
+        self.set_input(inp="glass_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
-    def ORM_texture(self):
+    def average_diffuse_color(self):
         """
         Returns:
-            None or str: this material's applied ORM_texture fpath if there is a texture applied, else
-                None
+            3-array: this material's average diffuse color - we pretend this is the same as the glass color.
         """
-        inp = self.get_input(inp="ORM_texture")
-        return None if inp is None else inp.resolvedPath
+        return self.color
 
-    @ORM_texture.setter
-    def ORM_texture(self, fpath):
+
+class OmniSurfaceMaterialPrim(MaterialPrim):
+    """
+    A MaterialPrim that uses the OmniSurface material preset.
+    """
+
+    def __init__(self, relative_prim_path, name, preset_name, load_config=None):
         """
         Args:
-             fpath (str): this material's applied ORM_texture fpath
+            relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
+            name (str): Name for the object. Names need to be unique per scene.
+            preset_name (str): Name of the preset to use for this material. If None, defaults to "OmniSurface".
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+                @relative_prim_path -- it will be ignored if it already exists.
         """
-        self.set_input(inp="ORM_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
+        self.preset_name = preset_name
+        super().__init__(relative_prim_path=relative_prim_path, name=name, load_config=load_config)
+
+    @classmethod
+    def supports_material(cls, asset_path, asset_sub_identifier):
+        return (asset_path == "OmniSurface.mdl" and asset_sub_identifier == "OmniSurface") or (
+            asset_path == "OmniSurfacePresets.mdl" and asset_sub_identifier.startswith("OmniSurface_")
+        )
 
     @property
-    def ao_to_diffuse(self):
-        """
-        Returns:
-            float: this material's applied ao_to_diffuse
-        """
-        return self.get_input(inp="ao_to_diffuse")
-
-    @ao_to_diffuse.setter
-    def ao_to_diffuse(self, val):
-        """
-        Args:
-             val (float): this material's applied ao_to_diffuse
-        """
-        self.set_input(inp="ao_to_diffuse", val=val)
+    def mdl_name(self):
+        return "OmniSurfacePresets.mdl" if self.preset_name else "OmniSurface.mdl"
 
     @property
-    def ao_texture(self):
-        """
-        Returns:
-            None or str: this material's applied ao_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="ao_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @ao_texture.setter
-    def ao_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied ao_texture fpath
-        """
-        self.set_input(inp="ao_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def enable_emission(self):
-        """
-        Returns:
-            bool: this material's applied enable_emission
-        """
-        return self.get_input(inp="enable_emission")
-
-    @enable_emission.setter
-    def enable_emission(self, enabled):
-        """
-        Args:
-             enabled (bool): this material's applied enable_emission
-        """
-        self.set_input(inp="enable_emission", val=enabled)
-
-    @property
-    def emissive_color(self):
-        """
-        Returns:
-            3-array: this material's applied (R,G,B) emissive_color
-        """
-        color = self.get_input(inp="emissive_color")
-        return th.tensor(color, dtype=th.float32) if color is not None else None
-
-    @emissive_color.setter
-    def emissive_color(self, color):
-        """
-        Args:
-             color (3-array): this material's applied emissive_color
-        """
-        self.set_input(inp="emissive_color", val=lazy.pxr.Gf.Vec3f(*color))
-
-    @property
-    def emissive_color_texture(self):
-        """
-        Returns:
-            None or str: this material's applied emissive_color_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="emissive_color_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @emissive_color_texture.setter
-    def emissive_color_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied emissive_color_texture fpath
-        """
-        self.set_input(inp="emissive_color_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def emissive_mask_texture(self):
-        """
-        Returns:
-            None or str: this material's applied emissive_mask_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="emissive_mask_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @emissive_mask_texture.setter
-    def emissive_mask_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied emissive_mask_texture fpath
-        """
-        self.set_input(inp="emissive_mask_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def emissive_intensity(self):
-        """
-        Returns:
-            float: this material's applied emissive_intensity
-        """
-        return self.get_input(inp="emissive_intensity")
-
-    @emissive_intensity.setter
-    def emissive_intensity(self, intensity):
-        """
-        Args:
-             intensity (float): this material's applied emissive_intensity
-        """
-        self.set_input(inp="emissive_intensity", val=intensity)
-
-    @property
-    def enable_opacity(self):
-        """
-        Returns:
-            bool: this material's applied enable_opacity
-        """
-        return self.get_input(inp="enable_opacity")
-
-    @enable_opacity.setter
-    def enable_opacity(self, enabled):
-        """
-        Args:
-             enabled (bool): this material's applied enable_opacity
-        """
-        self.set_input(inp="enable_opacity", val=enabled)
-
-    @property
-    def enable_opacity_texture(self):
-        """
-        Returns:
-            bool: this material's applied enable_opacity_texture
-        """
-        return self.get_input(inp="enable_opacity_texture")
-
-    @enable_opacity_texture.setter
-    def enable_opacity_texture(self, enabled):
-        """
-        Args:
-             enabled (bool): this material's applied enable_opacity_texture
-        """
-        self.set_input(inp="enable_opacity_texture", val=enabled)
-
-    @property
-    def opacity_constant(self):
-        """
-        Returns:
-            float: this material's applied opacity_constant
-        """
-        return self.get_input(inp="opacity_constant")
-
-    @opacity_constant.setter
-    def opacity_constant(self, constant):
-        """
-        Args:
-             constant (float): this material's applied opacity_constant
-        """
-        # TODO: another instance of missing config type checking
-        self.set_input(inp="opacity_constant", val=float(constant))
-
-    @property
-    def opacity_texture(self):
-        """
-        Returns:
-            None or str: this material's applied opacity_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="opacity_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @opacity_texture.setter
-    def opacity_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied opacity_texture fpath
-        """
-        self.set_input(inp="opacity_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def opacity_mode(self):
-        """
-        Returns:
-            int: this material's applied opacity_mode
-        """
-        return self.get_input(inp="opacity_mode")
-
-    @opacity_mode.setter
-    def opacity_mode(self, mode):
-        """
-        Args:
-             mode (int): this material's applied opacity_mode
-        """
-        self.set_input(inp="opacity_mode", val=mode)
-
-    @property
-    def opacity_threshold(self):
-        """
-        Returns:
-            float: this material's applied opacity_threshold
-        """
-        return self.get_input(inp="opacity_threshold")
-
-    @opacity_threshold.setter
-    def opacity_threshold(self, threshold):
-        """
-        Args:
-             threshold (float): this material's applied opacity_threshold
-        """
-        self.set_input(inp="opacity_threshold", val=threshold)
-
-    @property
-    def bump_factor(self):
-        """
-        Returns:
-            float: this material's applied bump_factor
-        """
-        return self.get_input(inp="bump_factor")
-
-    @bump_factor.setter
-    def bump_factor(self, factor):
-        """
-        Args:
-             factor (float): this material's applied bump_factor
-        """
-        self.set_input(inp="bump_factor", val=factor)
-
-    @property
-    def normalmap_texture(self):
-        """
-        Returns:
-            None or str: this material's applied normalmap_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="normalmap_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @normalmap_texture.setter
-    def normalmap_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied normalmap_texture fpath
-        """
-        self.set_input(inp="normalmap_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def detail_bump_factor(self):
-        """
-        Returns:
-            float: this material's applied detail_bump_factor
-        """
-        return self.get_input(inp="detail_bump_factor")
-
-    @detail_bump_factor.setter
-    def detail_bump_factor(self, factor):
-        """
-        Args:
-             factor (float): this material's applied detail_bump_factor
-        """
-        self.set_input(inp="detail_bump_factor", val=factor)
-
-    @property
-    def detail_normalmap_texture(self):
-        """
-        Returns:
-            None or str: this material's applied detail_normalmap_texture fpath if there is a texture applied, else
-                None
-        """
-        inp = self.get_input(inp="detail_normalmap_texture")
-        return None if inp is None else inp.resolvedPath
-
-    @detail_normalmap_texture.setter
-    def detail_normalmap_texture(self, fpath):
-        """
-        Args:
-             fpath (str): this material's applied detail_normalmap_texture fpath
-        """
-        self.set_input(inp="detail_normalmap_texture", val=lazy.pxr.Sdf.AssetPath(fpath))
-
-    @property
-    def flip_tangent_u(self):
-        """
-        Returns:
-            bool: this material's applied flip_tangent_u
-        """
-        return self.get_input(inp="flip_tangent_u")
-
-    @flip_tangent_u.setter
-    def flip_tangent_u(self, flipped):
-        """
-        Args:
-             flipped (bool): this material's applied flip_tangent_u
-        """
-        self.set_input(inp="flip_tangent_u", val=flipped)
-
-    @property
-    def flip_tangent_v(self):
-        """
-        Returns:
-            bool: this material's applied flip_tangent_v
-        """
-        return self.get_input(inp="flip_tangent_v")
-
-    @flip_tangent_v.setter
-    def flip_tangent_v(self, flipped):
-        """
-        Args:
-             flipped (bool): this material's applied flip_tangent_v
-        """
-        self.set_input(inp="flip_tangent_v", val=flipped)
-
-    @property
-    def project_uvw(self):
-        """
-        Returns:
-            bool: this material's applied project_uvw
-        """
-        return self.get_input(inp="project_uvw")
-
-    @project_uvw.setter
-    def project_uvw(self, projected):
-        """
-        Args:
-             projected (bool): this material's applied project_uvw
-        """
-        self.set_input(inp="project_uvw", val=projected)
-
-    @property
-    def world_or_object(self):
-        """
-        Returns:
-            bool: this material's applied world_or_object
-        """
-        return self.get_input(inp="world_or_object")
-
-    @world_or_object.setter
-    def world_or_object(self, val):
-        """
-        Args:
-             val (bool): this material's applied world_or_object
-        """
-        self.set_input(inp="world_or_object", val=val)
-
-    @property
-    def uv_space_index(self):
-        """
-        Returns:
-            int: this material's applied uv_space_index
-        """
-        return self.get_input(inp="uv_space_index")
-
-    @uv_space_index.setter
-    def uv_space_index(self, index):
-        """
-        Args:
-             index (int): this material's applied uv_space_index
-        """
-        self.set_input(inp="uv_space_index", val=index)
-
-    @property
-    def texture_translate(self):
-        """
-        Returns:
-            2-array: this material's applied texture_translate
-        """
-        return th.tensor(self.get_input(inp="texture_translate"))
-
-    @texture_translate.setter
-    def texture_translate(self, translate):
-        """
-        Args:
-             translate (2-array): this material's applied (x,y) texture_translate
-        """
-        self.set_input(inp="texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
-
-    @property
-    def texture_rotate(self):
-        """
-        Returns:
-            float: this material's applied texture_rotate
-        """
-        return self.get_input(inp="texture_rotate")
-
-    @texture_rotate.setter
-    def texture_rotate(self, rotate):
-        """
-        Args:
-             rotate (float): this material's applied texture_rotate
-        """
-        self.set_input(inp="texture_rotate", val=rotate)
-
-    @property
-    def texture_scale(self):
-        """
-        Returns:
-            2-array: this material's applied texture_scale
-        """
-        return th.tensor(self.get_input(inp="texture_scale"))
-
-    @texture_scale.setter
-    def texture_scale(self, scale):
-        """
-        Args:
-             scale (2-array): this material's applied (x,y) texture_scale
-        """
-        self.set_input(inp="texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
-
-    @property
-    def detail_texture_translate(self):
-        """
-        Returns:
-            2-array: this material's applied detail_texture_translate
-        """
-        detail_texture_translate = self.get_input(inp="detail_texture_translate")
-        return th.tensor(detail_texture_translate, dtype=th.float32) if detail_texture_translate is not None else None
-
-    @detail_texture_translate.setter
-    def detail_texture_translate(self, translate):
-        """
-        Args:
-             translate (2-array): this material's applied detail_texture_translate
-        """
-        self.set_input(inp="detail_texture_translate", val=lazy.pxr.Gf.Vec2f(*th.tensor(translate, dtype=th.float32)))
-
-    @property
-    def detail_texture_rotate(self):
-        """
-        Returns:
-            float: this material's applied detail_texture_rotate
-        """
-        return self.get_input(inp="detail_texture_rotate")
-
-    @detail_texture_rotate.setter
-    def detail_texture_rotate(self, rotate):
-        """
-        Args:
-             rotate (float): this material's applied detail_texture_rotate
-        """
-        self.set_input(inp="detail_texture_rotate", val=rotate)
-
-    @property
-    def detail_texture_scale(self):
-        """
-        Returns:
-            2-array: this material's applied detail_texture_scale
-        """
-        detail_texture_scale = self.get_input(inp="detail_texture_scale")
-        return th.tensor(detail_texture_scale, dtype=th.float32) if detail_texture_scale is not None else None
-
-    @detail_texture_scale.setter
-    def detail_texture_scale(self, scale):
-        """
-        Args:
-             scale (2-array): this material's applied detail_texture_scale
-        """
-        self.set_input(inp="detail_texture_scale", val=lazy.pxr.Gf.Vec2f(*th.tensor(scale, dtype=th.float32)))
-
-    @property
-    def exclude_from_white_mode(self):
-        """
-        Returns:
-            bool: this material's applied excludeFromWhiteMode
-        """
-        return self.get_input(inp="excludeFromWhiteMode")
-
-    @exclude_from_white_mode.setter
-    def exclude_from_white_mode(self, exclude):
-        """
-        Args:
-             exclude (bool): this material's applied excludeFromWhiteMode
-        """
-        self.set_input(inp="excludeFromWhiteMode", val=exclude)
+    def mtl_name(self):
+        return f"OmniSurface_{self.preset_name}" if self.preset_name else "OmniSurface"
 
     @property
     def diffuse_reflection_weight(self):
@@ -1065,34 +721,13 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="diffuse_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
-    def specular_reflection_color(self):
-        """
-        Returns:
-            3-array: this material's specular_reflection_color in (R,G,B)
-        """
-        specular_reflection_color = self.get_input(inp="specular_reflection_color")
-        return th.tensor(specular_reflection_color, dtype=th.float32) if specular_reflection_color is not None else None
-
-    @specular_reflection_color.setter
-    def specular_reflection_color(self, color):
-        """
-        Args:
-             color (3-array): this material's specular_reflection_color in (R,G,B)
-        """
-        self.set_input(inp="specular_reflection_color", val=lazy.pxr.Gf.Vec3f(*color))
-
-    @property
     def specular_transmission_color(self):
         """
         Returns:
             3-array: this material's specular_transmission_color in (R,G,B)
         """
         specular_transmission_color = self.get_input(inp="specular_transmission_color")
-        return (
-            th.tensor(specular_transmission_color, dtype=th.float32)
-            if specular_transmission_color is not None
-            else None
-        )
+        return th.tensor(specular_transmission_color, dtype=th.float32)
 
     @specular_transmission_color.setter
     def specular_transmission_color(self, color):
@@ -1109,11 +744,7 @@ class MaterialPrim(BasePrim):
             3-array: this material's specular_transmission_scattering_color in (R,G,B)
         """
         specular_transmission_scattering_color = self.get_input(inp="specular_transmission_scattering_color")
-        return (
-            th.tensor(specular_transmission_scattering_color, dtype=th.float32)
-            if specular_transmission_scattering_color is not None
-            else None
-        )
+        return th.tensor(specular_transmission_scattering_color, dtype=th.float32)
 
     @specular_transmission_scattering_color.setter
     def specular_transmission_scattering_color(self, color):
@@ -1124,57 +755,18 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="specular_transmission_scattering_color", val=lazy.pxr.Gf.Vec3f(*color))
 
     @property
-    def specular_reflection_ior_preset(self):
-        """
-        Returns:
-            int: this material's specular_reflection_ior_preset (int corresponding to enum)
-        """
-        return self.get_input(inp="specular_reflection_ior_preset")
+    def average_diffuse_color(self):
+        base_color_weight = self.diffuse_reflection_weight
+        transmission_weight = self.enable_specular_transmission * self.specular_transmission_weight
+        total_weight = base_color_weight + transmission_weight
 
-    @specular_reflection_ior_preset.setter
-    def specular_reflection_ior_preset(self, preset):
-        """
-        Args:
-             preset (int): this material's specular_reflection_ior_preset (int corresponding to enum)
-        """
-        self.set_input(inp="specular_reflection_ior_preset", val=preset)
+        # If the fluid doesn't have any color, we add a "blue" tint by default
+        if total_weight == 0.0:
+            return th.tensor([0.0, 0.0, 1.0])
 
-    @property
-    def enable_diffuse_transmission(self):
-        """
-        Returns:
-            float: this material's applied enable_diffuse_transmission
-        """
-        return self.get_input(inp="enable_diffuse_transmission")
-
-    @enable_diffuse_transmission.setter
-    def enable_diffuse_transmission(self, val):
-        """
-        Args:
-             val (bool): this material's applied enable_diffuse_transmission
-        """
-        self.set_input(inp="enable_diffuse_transmission", val=val)
-
-    @property
-    def glass_color(self):
-        """
-        Returns:
-            3-array: this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
-        """
-        assert self.is_glass, (
-            f"Tried to query glass_color shader input, "
-            f"but material at {self.prim_path} is not an OmniGlass material!"
+        base_color_weight /= total_weight
+        transmission_weight /= total_weight
+        # Weighted sum of base color and transmission color
+        return base_color_weight * self.diffuse_reflection_color + transmission_weight * (
+            0.5 * self.specular_transmission_color + 0.5 * self.specular_transmission_scattering_color
         )
-        glass_color = self.get_input(inp="glass_color")
-        return th.tensor(glass_color, dtype=th.float32) if glass_color is not None else None
-
-    @glass_color.setter
-    def glass_color(self, color):
-        """
-        Args:
-             color (3-array): this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
-        """
-        assert self.is_glass, (
-            f"Tried to set glass_color shader input, " f"but material at {self.prim_path} is not an OmniGlass material!"
-        )
-        self.set_input(inp="glass_color", val=lazy.pxr.Gf.Vec3f(*color))

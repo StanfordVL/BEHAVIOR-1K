@@ -1,6 +1,7 @@
 import math
 
 import torch as th
+import cv2
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -8,11 +9,14 @@ from omnigibson.macros import Dict, create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
-from omnigibson.utils.constants import PrimType
-from omnigibson.utils.ui_utils import debug_breakpoint
+from omnigibson.utils.constants import GROUND_CATEGORIES, PrimType
+from omnigibson.utils.ui_utils import debug_breakpoint, create_module_logger
+from omnigibson.utils.constants import JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
+
+log = create_module_logger(module_name=__name__)
 
 m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS = 10
 m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS = 10
@@ -95,6 +99,8 @@ def sample_kinematics(
     max_trials=None,
     z_offset=0.05,
     skip_falling=False,
+    use_last_ditch_effort=True,
+    use_trav_map=True,
 ):
     """
     Samples the given @predicate kinematic state for @objA with respect to @objB
@@ -108,10 +114,21 @@ def sample_kinematics(
         max_trials (int): Number of attempts for sampling
         z_offset (float): Z-offset to apply to the sampled pose
         skip_falling (bool): Whether to let @objA fall after its position is sampled or not
+        use_last_ditch_effort (bool): Whether to use last-ditch effort to sample the kinematics if the first
+            sampling attempt fails. This will place @objA at the center of @objB's AABB, offset in z direction such
+        use_trav_map (bool): Whether to use the traversability map of the scene to check if the sampled position is traversable.
 
     Returns:
         bool: True if successfully sampled, else False
     """
+    if use_trav_map:
+        from omnigibson.scenes.traversable_scene import TraversableScene
+
+        if not isinstance(objB.scene, TraversableScene):
+            log.warning(
+                f"Using trav_map=True requires objB.scene to be a TraversableScene, but got {type(objB.scene)} instead."
+            )
+            use_trav_map = False
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
     assert (
@@ -127,6 +144,20 @@ def sample_kinematics(
 
     # Save the state of the simulator
     state = og.sim.dump_state()
+
+    if use_trav_map:
+        trav_map = objB.scene.trav_map
+        trav_map_floor_map = trav_map.floor_map[0]
+        eroded_trav_map = trav_map._erode_trav_map(trav_map_floor_map, robot=objB.scene.robots[0])
+
+        # Hardcoding R1 robot arm length for now
+        arm_length_xy = 0.8
+        eef_z_max = 1.7
+        eef_z_min = 0.3
+        arm_length_pixel = int(math.ceil(arm_length_xy / trav_map.map_resolution))
+        reachability_map = th.tensor(
+            cv2.dilate(trav_map_floor_map.cpu().numpy(), th.ones((arm_length_pixel, arm_length_pixel)).cpu().numpy())
+        )
 
     # Attempt sampling
     for i in range(max_trials):
@@ -182,6 +213,27 @@ def sample_kinematics(
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
+            if use_trav_map:
+                xy_map = trav_map.world_to_map(pos[:2])
+                if pos[2] > eef_z_max:
+                    # We need to check if the sampled position is above the maximum z of the arm
+                    pos = None
+                elif pos[2] < eef_z_min and predicate == "inside":
+                    # If sampling inside an object, we need to check if the sampled position is above the minimum z of the arm
+                    pos = None
+                elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+                    # If sampling onTop an objB of ground category, we need to check if
+                    # the sampled position of objA is traversable
+                    if eroded_trav_map[xy_map[0], xy_map[1]] != 255:
+                        pos = None
+                else:
+                    has_prismatic_joint = any(j.joint_type == JointType.JOINT_PRISMATIC for j in objB.joints.values())
+                    if not has_prismatic_joint:
+                        # If sampling onTop/inside/under an objB with no prismatic joints, we need to check if
+                        # the sampled position of objA is reachable
+                        if reachability_map[xy_map[0], xy_map[1]] != 255:
+                            pos = None
+
         if pos is None:
             success = False
         else:
@@ -201,18 +253,23 @@ def sample_kinematics(
         else:
             og.sim.load_state(state)
 
-    # If we didn't succeed, try last-ditch effort
-    if not success and predicate in {"onTop", "inside"}:
-        og.sim.step_physics()
-        # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
-        # until it settles
-        aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
-        aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-        bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
-        desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
-        desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
-        pos = desired_bbox_pos + bbox_to_obj
-        success = True
+    # If we didn't succeed, optionally try last-ditch effort
+    if not success and use_last_ditch_effort and predicate in {"onTop", "inside"}:
+        # Do not use last-ditch effort for onTop ground categories because it will
+        # break the traversability constraint (see above)
+        if predicate == "onTop" and objB.category in GROUND_CATEGORIES:
+            pass
+        else:
+            og.sim.step_physics()
+            # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
+            # until it settles
+            aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
+            aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
+            bbox_to_obj = objA.get_position_orientation()[0] - (aabb_lower_a + aabb_upper_a) / 2.0
+            desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
+            desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
+            pos = desired_bbox_pos + bbox_to_obj
+            success = True
 
     if success and not skip_falling:
         objA.set_position_orientation(position=pos, orientation=orientation)

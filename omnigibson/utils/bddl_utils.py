@@ -1,5 +1,6 @@
 import os
 import random
+import re
 from collections import defaultdict
 from copy import deepcopy
 
@@ -39,81 +40,87 @@ m.MIN_DYNAMIC_SCALE = 0.5
 m.DYNAMIC_SCALE_INCREMENT = 0.1
 
 GOOD_MODELS = {
-    "jar": {"kijnrj"},
-    "carton": {"causya", "msfzpz", "sxlklf"},
-    "hamper": {"drgdfh", "hlgjme", "iofciz", "pdzaca", "ssfvij"},
-    "hanging_plant": set(),
-    "hardback": {"esxakn"},
-    "notebook": {"hwhisw"},
-    "paperback": {"okcflv"},
-    "plant_pot": {"ihnfbi", "vhglly", "ygrtaz"},
-    "pot_plant": {"cvthyv", "dbjcic", "cecdwu"},
-    "recycling_bin": {"nuoypc"},
-    "tray": {"gsxbym", "huwhjg", "txcjux", "uekqey", "yqtlhy"},
+    # "jar": {"kijnrj"},
+    # "carton": {"causya", "msfzpz", "sxlklf"},
+    # "hamper": {"drgdfh", "hlgjme", "iofciz", "pdzaca", "ssfvij"},
+    # "hanging_plant": set(),
+    # "hardback": {"esxakn"},
+    # "notebook": {"hwhisw"},
+    # "paperback": {"okcflv"},
+    # "plant_pot": {"ihnfbi", "vhglly", "ygrtaz"},
+    # "pot_plant": {"cvthyv", "dbjcic", "cecdwu"},
+    # "recycling_bin": {"nuoypc"},
+    # "tray": {"gsxbym", "huwhjg", "txcjux", "uekqey", "yqtlhy"},
 }
 
 GOOD_BBOXES = {
-    "basil": {
-        "dkuhvb": [0.07286304, 0.0545199, 0.03108144],
-    },
-    "basil_jar": {
-        "swytaw": [0.22969539, 0.19492961, 0.30791675],
-    },
-    "bicycle_chain": {
-        "czrssf": [0.242, 0.012, 0.021],
-    },
-    "clam": {
-        "ihhbfj": [0.078, 0.081, 0.034],
-    },
-    "envelope": {
-        "urcigc": [0.004, 0.06535058, 0.10321216],
-    },
-    "mail": {
-        "azunex": [0.19989018, 0.005, 0.12992871],
-        "gvivdi": [0.28932137, 0.005, 0.17610794],
-        "mbbwhn": [0.27069291, 0.005, 0.13114884],
-        "ojkepk": [0.19092424, 0.005, 0.13252979],
-        "qpwlor": [0.22472473, 0.005, 0.18983322],
-    },
-    "pill_bottle": {
-        "csvdbe": [0.078, 0.078, 0.109],
-        "wsasmm": [0.078, 0.078, 0.109],
-    },
-    "plant_pot": {
-        "ihnfbi": [0.24578613, 0.2457865, 0.18862737],
-    },
-    "razor": {
-        "jocsgp": [0.046, 0.063, 0.204],
-    },
-    "recycling_bin": {
-        "nuoypc": [0.69529409, 0.80712041, 1.07168694],
-    },
-    "tupperware": {
-        "mkstwr": [0.33, 0.33, 0.21],
-    },
+    # "basil": {
+    #     "dkuhvb": [0.07286304, 0.0545199, 0.03108144],
+    # },
+    # "basil_jar": {
+    #     "swytaw": [0.22969539, 0.19492961, 0.30791675],
+    # },
+    # "bicycle_chain": {
+    #     "czrssf": [0.242, 0.012, 0.021],
+    # },
+    # "clam": {
+    #     "ihhbfj": [0.078, 0.081, 0.034],
+    # },
+    # "envelope": {
+    #     "urcigc": [0.004, 0.06535058, 0.10321216],
+    # },
+    # "mail": {
+    #     "azunex": [0.19989018, 0.005, 0.12992871],
+    #     "gvivdi": [0.28932137, 0.005, 0.17610794],
+    #     "mbbwhn": [0.27069291, 0.005, 0.13114884],
+    #     "ojkepk": [0.19092424, 0.005, 0.13252979],
+    #     "qpwlor": [0.22472473, 0.005, 0.18983322],
+    # },
+    # "pill_bottle": {
+    #     "csvdbe": [0.078, 0.078, 0.109],
+    #     "wsasmm": [0.078, 0.078, 0.109],
+    # },
+    # "plant_pot": {
+    #     "ihnfbi": [0.24578613, 0.2457865, 0.18862737],
+    # },
+    # "razor": {
+    #     "jocsgp": [0.046, 0.063, 0.204],
+    # },
+    # "recycling_bin": {
+    #     "nuoypc": [0.69529409, 0.80712041, 1.07168694],
+    # },
+    # "tupperware": {
+    #     "mkstwr": [0.33, 0.33, 0.21],
+    # },
+    # "copper_wire": {
+    #     "nzafel": [0.1762, 0.17655, 0.0631],
+    # },
+    # "backpack": {
+    #     "gvbiwl": [0.7397, 0.6109, 0.6019],
+    # },
 }
 
 BAD_CLOTH_MODELS = {
-    "bandana": {"wbhliu"},
-    "curtain": {"ohvomi", "shbakk"},
-    "cardigan": {"itrkhr"},
-    "sweatshirt": {"nowqqh"},
-    "jeans": {"nmvvil", "pvzxyp"},
-    "pajamas": {"rcgdde"},
-    "polo_shirt": {"vqbvph"},
-    "vest": {"girtqm"},  # bddl NOT FIXED
-    "onesie": {"pbytey"},
-    "dishtowel": {"ltydgg"},
-    "dress": {"gtghon"},
-    "hammock": {"aiftuk", "fglfga", "klhkgd", "lqweda", "qewdqa"},
-    "jacket": {"kiiium", "nogevo", "remcyk"},
-    "quilt": {"mksdlu", "prhems"},
-    "pennant": {"tfnwti"},
-    "pillowcase": {"dtoahb", "yakvci"},
-    "rubber_glove": {"leuiso"},
-    "scarf": {"kclcrj"},
-    "sock": {"vpafgj"},
-    "tank_top": {"fzldgi"},
+    # "bandana": {"wbhliu"},
+    # "curtain": {"ohvomi", "shbakk"},
+    # "cardigan": {"itrkhr"},
+    # "sweatshirt": {"nowqqh"},
+    # "jeans": {"nmvvil", "pvzxyp"},
+    # "pajamas": {"rcgdde"},
+    # "polo_shirt": {"vqbvph"},
+    # "vest": {"girtqm"},  # bddl NOT FIXED
+    # "onesie": {"pbytey"},
+    # "dishtowel": {"ltydgg"},
+    # "dress": {"gtghon"},
+    # "hammock": {"aiftuk", "fglfga", "klhkgd", "lqweda", "qewdqa"},
+    # "jacket": {"kiiium", "nogevo", "remcyk"},
+    # "quilt": {"mksdlu", "prhems"},
+    # "pennant": {"tfnwti"},
+    # "pillowcase": {"dtoahb", "yakvci"},
+    # "rubber_glove": {"leuiso"},
+    # "scarf": {"kclcrj"},
+    # "sock": {"vpafgj"},
+    # "tank_top": {"fzldgi"},
 }
 
 
@@ -158,11 +165,17 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_NAME = None
 
     def _evaluate(self, entity1, entity2, **kwargs):
-        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else False
+        return (
+            entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs)
+            if (entity2.exists and entity2.initialized)
+            else False
+        )
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
         return (
-            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
+            entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs)
+            if (entity2.exists and entity2.initialized)
+            else None
         )
 
 
@@ -480,6 +493,8 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
     # Manually parse BDDL to hot-swap wildcard scene objects
     swap_info = dict()
     in_goal = False
+    start_init_idx = None
+    end_init_idx = None
     for idx, line in enumerate(raw_bddl):
         if "*" in line:
             # Make sure we're not in the goal conditions -- we ONLY expect the wildcard to be
@@ -537,36 +552,58 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 swap_info[wildcard_instance]["room"] = room
                 swap_info[wildcard_instance]["init_cond_idx"] = idx
 
-    # Now, infer how to convert the wildcard information given the number of valid objects in the current scene
-    # NOTE: For now, we only support room instance 0
-    init_cond_offset = 0
-    for wildcard_instance, info in swap_info.items():
-        valid_objs = set()
-        for category in info["categories"]:
-            valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
-        in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_0")
-        valid_objs = valid_objs.intersection(in_room_objs)
-        n_valid_objects = len(valid_objs)
+        elif ":init" in line:
+            start_init_idx = idx
+        elif ":goal" in line:
+            end_init_idx = idx
 
-        # Make sure we have the minimum number of objects requested
-        n_min_instances = info["n_minimum_instances"]
-        synset = info["synset"]
-        assert (
-            n_valid_objects >= n_min_instances
-        ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in room {room}_0!"
+    raw_bddl_init_cond_lines = deepcopy(raw_bddl[start_init_idx:end_init_idx])
+    new_init_cond_lines = []
+    for line in raw_bddl_init_cond_lines:
+        if "*" in line:
+            # parse line to get the space-delimited token that includes the star
+            tokens = line.split(" ")
+            wildcard_instance = None
+            for token in tokens:
+                if "*" in token:
+                    wildcard_instance = token
+                    break
+            assert wildcard_instance is not None, f"Expected to find wildcard synset in line: {line}"
+            # Search for swap info and hot swap in condition
+            info = swap_info[wildcard_instance]
+            # Make sure we have the minimum number of objects requested
+            n_min_instances = info["n_minimum_instances"]
+            synset = info["synset"]
 
-        # Hot swap this information into the BDDL
-        extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
-        extra_instances_str = " ".join(extra_instances)
-        obj_scope_idx = info["object_scope_idx"]
-        init_cond_idx = info["init_cond_idx"] + init_cond_offset
-        raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
-        init_cond_line = raw_bddl[init_cond_idx]
-        extra_cond_lines = [
-            init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
-        ]
-        raw_bddl = raw_bddl[:init_cond_idx] + extra_cond_lines + raw_bddl[init_cond_idx + 1 :]
-        init_cond_offset += len(extra_instances)
+            valid_objs = set()
+            for category in info["categories"]:
+                valid_objs = valid_objs.union(scene.object_registry("category", category, default_val=set()))
+            # TODO: This is a temporary fix before we properly implement room instance handling for wildcards
+            n_valid_objects = 0
+            for i in range(11):  # Check room instances 0 through 10
+                in_room_objs = scene.object_registry("in_rooms", f"{info['room']}_{i}")
+                if in_room_objs is not None:
+                    n_valid_objects = max(n_valid_objects, len(valid_objs.intersection(in_room_objs)))
+
+            assert (
+                n_valid_objects >= n_min_instances
+            ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in rooms of type {info['room']}!"
+
+            # Hot swap this information into the BDDL
+            extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
+            extra_instances_str = " ".join(extra_instances)
+            obj_scope_idx = info["object_scope_idx"]
+            init_cond_idx = info["init_cond_idx"]
+            raw_bddl[obj_scope_idx] = raw_bddl[obj_scope_idx].replace(wildcard_instance, extra_instances_str)
+            init_cond_line = raw_bddl[init_cond_idx]
+            extra_cond_lines = [
+                init_cond_line.replace(wildcard_instance, extra_instance) for extra_instance in extra_instances
+            ]
+            new_init_cond_lines = new_init_cond_lines + extra_cond_lines
+        else:
+            new_init_cond_lines.append(line)
+
+    raw_bddl = raw_bddl[:start_init_idx] + new_init_cond_lines + raw_bddl[end_init_idx:]
 
     # Return the compiled processed BDDL as a single string
     return "".join(raw_bddl)
@@ -657,7 +694,9 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else False
         """
-        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists else False
+        return (
+            self.wrapped_obj.states[state].get_value(*args, **kwargs) if (self.exists and self.initialized) else False
+        )
 
     def set_state(self, state, *args, **kwargs):
         """
@@ -671,7 +710,9 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
         """
-        assert self.exists, f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
+        assert (
+            self.exists and self.initialized
+        ), f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist or is not initialized!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
 
@@ -699,6 +740,8 @@ class BDDLSampler:
         }
 
         # Initialize other variables that will be filled in later
+        self._sampling_whitelist = None  # Maps str to str to list
+        self._sampling_blacklist = None  # Maps str to str to list
         self._room_type_to_object_instance = None  # dict
         self._inroom_object_instances = None  # set of str
         self._object_sampling_orders = None  # dict mapping str to list of str
@@ -708,12 +751,20 @@ class BDDLSampler:
         self._inroom_object_scope_filtered_initial = None  # dict mapping str to BDDLEntity
         self._attached_objects = defaultdict(set)  # dict mapping str to set of str
 
-    def sample(self, validate_goal=False):
+    def sample(self, validate_goal=False, sampling_whitelist=None, sampling_blacklist=None):
         """
         Run sampling for this BEHAVIOR task
 
         Args:
             validate_goal (bool): Whether the goal should be validated or not
+            sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+                mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
+                that category. During sampling, if a given synset is found in this whitelist, only the specified
+                models will be used as options
+            sampling_blacklist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
+                mapping category name (e.g.: "breakfast_table") to a list of invalid models that should not be sampled from
+                that category. During sampling, if a given synset is found in this blacklist, all specified
+                models will not be used as options
 
         Returns:
             2-tuple:
@@ -721,6 +772,10 @@ class BDDLSampler:
                 - None or str: None if successful, otherwise the associated error message
         """
         log.info("Sampling task...")
+        # Store sampling white / blacklists
+        self._sampling_whitelist = sampling_whitelist
+        self._sampling_blacklist = sampling_blacklist
+
         # Reject scenes with missing non-sampleable objects
         # Populate object_scope with sampleable objects and the robot
         accept_scene, feedback = self._prepare_scene_for_sampling()
@@ -749,6 +804,8 @@ class BDDLSampler:
         """
         # Auto-initialize all sampleable objects
         with og.sim.playing():
+            # Update the scene to include the latest robots / objects
+            self._env.scene.update_initial_file()
             self._env.scene.reset()
 
             error_msg = self._sample_initial_conditions()
@@ -767,7 +824,7 @@ class BDDLSampler:
                 log.error(error_msg)
                 return False, error_msg
 
-            self._env.scene.update_initial_state()
+            self._env.scene.update_initial_file()
 
         return True, None
 
@@ -1025,6 +1082,12 @@ class BDDLSampler:
             for obj_inst in self._room_type_to_object_instance[room_type]:
                 room_type_to_scene_objs[room_type][obj_inst] = {}
                 obj_synset = self._object_instance_to_synset[obj_inst]
+                synset_whitelist = (
+                    None if self._sampling_whitelist is None else self._sampling_whitelist.get(obj_synset, None)
+                )
+                synset_blacklist = (
+                    None if self._sampling_blacklist is None else self._sampling_blacklist.get(obj_synset, None)
+                )
 
                 # We allow burners to be used as if they are stoves
                 # No need to safeguard check for subtree_substances because inroom objects will never be substances
@@ -1048,6 +1111,22 @@ class BDDLSampler:
                     cat: self._filter_model_choices_by_attached_states(models, cat, obj_inst)
                     for cat, models in valid_models.items()
                 }
+
+                # Filter based on white / blacklist
+                if synset_whitelist is not None:
+                    valid_models = {
+                        cat: models.intersection(set(synset_whitelist[cat].keys()))
+                        if cat in synset_whitelist
+                        else set()
+                        for cat, models in valid_models.items()
+                    }
+
+                if synset_blacklist is not None:
+                    valid_models = {
+                        cat: models - set(synset_blacklist[cat].keys()) if cat in synset_blacklist else models
+                        for cat, models in valid_models.items()
+                    }
+
                 room_insts = (
                     [None]
                     if self._scene_model is None
@@ -1152,7 +1231,7 @@ class BDDLSampler:
                                     str(success),
                                 ]
                             )
-                            log.info(log_msg)
+                            log.warning(log_msg)
 
                             # Record the result for the child object
                             assert (
@@ -1245,13 +1324,14 @@ class BDDLSampler:
             # Help function to check if a child object can attach to a parent object
             def can_attach(child_attachment_links, parent_attachment_links):
                 for child_link_name in child_attachment_links:
-                    child_category = child_link_name.split("_")[1]
+                    child_category = re.search(r"attachment_(.+?)_\d+_link$", child_link_name).group(1)
                     if child_category.endswith("F"):
                         continue
                     assert child_category.endswith("M")
-                    parent_category = child_category[:-1] + "F"
+                    target_parent_category = child_category[:-1] + "F"
                     for parent_link_name in parent_attachment_links:
-                        if parent_category in parent_link_name:
+                        parent_category = re.search(r"attachment_(.+?)_\d+_link$", parent_link_name).group(1)
+                        if parent_category == target_parent_category:
                             return True
                 return False
 
@@ -1315,6 +1395,12 @@ class BDDLSampler:
         dependencies = {key: self._attached_objects.get(key, {}) for key in self._object_instance_to_synset.keys()}
         for obj_inst in list(reversed(list(nx.algorithms.topological_sort(nx.DiGraph(dependencies))))):
             obj_synset = self._object_instance_to_synset[obj_inst]
+            synset_whitelist = (
+                None if self._sampling_whitelist is None else self._sampling_whitelist.get(obj_synset, None)
+            )
+            synset_blacklist = (
+                None if self._sampling_blacklist is None else self._sampling_blacklist.get(obj_synset, None)
+            )
 
             # Don't populate agent
             if obj_synset == "agent.n.01":
@@ -1366,6 +1452,23 @@ class BDDLSampler:
                     )
                     model_choices -= BAD_CLOTH_MODELS.get(category, set())
                     model_choices = self._filter_model_choices_by_attached_states(model_choices, category, obj_inst)
+
+                    # Filter based on white / blacklist
+                    if synset_whitelist is not None:
+                        model_choices = (
+                            model_choices.intersection(set(synset_whitelist[category].keys()))
+                            if category in synset_whitelist
+                            else set()
+                        )
+
+                    if synset_blacklist is not None:
+                        model_choices = (
+                            model_choices - set(synset_blacklist[category].keys())
+                            if category in synset_blacklist
+                            else model_choices
+                        )
+
+                    # Filter by category
                     if len(model_choices) > 0:
                         break
 
@@ -1379,7 +1482,16 @@ class BDDLSampler:
                 # Potentially add additional kwargs
                 obj_kwargs = dict()
 
-                obj_kwargs["bounding_box"] = GOOD_BBOXES.get(category, dict()).get(model, None)
+                size = synset_whitelist.get(category, dict()).get(model, None) if synset_whitelist else None
+
+                # if size is one dimension, this is a scale; if it's three dimensions, this is a bounding box
+                if size is not None:
+                    if isinstance(size, (int, float)):
+                        obj_kwargs["scale"] = th.tensor(size, dtype=th.float32)
+                    elif isinstance(size, list) and len(size) == 3:
+                        obj_kwargs["bounding_box"] = th.tensor(size, dtype=th.float32)
+                    else:
+                        return f"Invalid size for object {obj_inst} with model {model} in category {category}: {size}"
 
                 # create the object
                 simulator_obj = DatasetObject(
@@ -1456,7 +1568,7 @@ class BDDLSampler:
         if not goal_condition_success:
             return error_msg
 
-    def _sample_initial_conditions_final(self):
+    def _sample_initial_conditions_final(self, dynamic_scale=False):
         """
         Sample final initial conditions
 
@@ -1504,6 +1616,15 @@ class BDDLSampler:
                             num_trials = 1
                             for _ in range(num_trials):
                                 success = condition.sample(binary_state=positive, **kwargs)
+                                log_msg = " ".join(
+                                    [
+                                        "initial final kinematic condition sampling",
+                                        condition.STATE_NAME,
+                                        str(condition.body),
+                                        str(success),
+                                    ]
+                                )
+                                log.warning(log_msg)
                                 if success:
                                     # Update state
                                     state = og.sim.dump_state(serialized=False)
@@ -1527,21 +1648,22 @@ class BDDLSampler:
                             ):
                                 break
 
-                            # If any scales are equal or less than the lower threshold, terminate immediately
-                            new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
-                            if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
-                                break
+                            if dynamic_scale:
+                                # If any scales are equal or less than the lower threshold, terminate immediately
+                                new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
+                                if th.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                                    break
 
-                            # Re-scale and re-attempt
-                            # Re-scaling is not respected unless sim cycle occurs
-                            og.sim.stop()
-                            entity.scale = new_scale
-                            log.info(
-                                f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}"
-                            )
-                            og.sim.play()
-                            og.sim.load_state(state, serialized=False)
-                            og.sim.step_physics()
+                                # Re-scale and re-attempt
+                                # Re-scaling is not respected unless sim cycle occurs
+                                og.sim.stop()
+                                entity.scale = new_scale
+                                log.info(
+                                    f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}"
+                                )
+                                og.sim.play()
+                                og.sim.load_state(state, serialized=False)
+                                og.sim.step_physics()
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
                             self._env.scene.object_registry.update(keys=["in_rooms"])

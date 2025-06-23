@@ -276,8 +276,9 @@ class OperationalSpaceController(ManipulationController):
         super()._load_state(state=state)
 
         # If self._goal is populated, then set fixed_quat_target as well if the mode uses it
-        if self.mode == "position_fixed_ori" and self._goal is not None:
-            self._fixed_quat_target = self._goal["target_quat"]
+        if self._goal is not None:
+            if self.mode == "position_fixed_ori":
+                self._fixed_quat_target = self._goal["target_quat"]
 
     def _clear_variable_gains(self):
         """

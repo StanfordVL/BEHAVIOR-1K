@@ -1,0 +1,503 @@
+{
+    "cook_eggplant": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": null
+                    }
+                },
+                "eggplant.n.01": {
+                    "eggplant": {
+                        "gfytkk": null
+                    }
+                },
+                "feta.n.01": {
+                    "feta": {
+                        "gkaitc": [0.09, 0.055, 0.05]
+                    }
+                },
+                "feta__box.n.01": {
+                    "feta_box": {
+                        "qxnzpx": null
+                    }
+                },
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "chopping_wood": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "ax.n.01": {
+                    "axe": {
+                        "plqyos": null
+                    }
+                },
+                "chopping_block.n.01": {
+                    "chopping_block": {
+                        "ekowsj": null
+                    }
+                },
+                "log.n.01": {
+                    "log": {
+                        "pepele": null
+                    }
+                },
+                "lawn.n.01": {
+                    "lawn": {
+                        "tiqndr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "slicing_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "beet.n.02": {
+                    "beet": {
+                        "wantjv": null
+                    }
+                },
+                "bell_pepper.n.02": {
+                    "bell_pepper": {
+                        "wszvwc": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "zucchini.n.02": {
+                    "zucchini": {
+                        "udvfaz": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "chop_an_onion": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "parer.n.02": {
+                    "parer": {
+                        "lwpdhi": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "mixing_bowl.n.01": {
+                    "mixing_bowl": {
+                        "bsgybx": null
+                    }
+                },
+                "vidalia_onion.n.01": {
+                    "vidalia_onion": {
+                        "buyxll": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "installing_alarms": {
+        "room_types": [
+            "dining_room",
+            "living_room"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "alarm.n.02": {
+                    "fire_alarm": {
+                        "dkwmmf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "turning_on_radio": {
+        "room_types": [
+            "living_room"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "radio_receiver.n.01": {
+                    "radio": {
+                        "wxnicr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "thawing_frozen_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "date.n.08": {
+                    "date": {
+                        "kdfasq": null
+                    }
+                },
+                "lobster.n.01": {
+                    "lobster": {
+                        "fhvrtx": null
+                    }
+                },
+                "olive.n.04": {
+                    "olive": {
+                        "ghjddf": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_meat": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "chicken.n.01": {
+                    "chicken": {
+                        "nppsmz": [0.2, 0.16, 0.096]
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "dnqekb": null
+                    }
+                },
+                "steak.n.01": {
+                    "steak": {
+                        "ppykkp": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": [0.25, 0.25, 0.15]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_vegetables": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bell_pepper.n.02": {
+                    "bell_pepper": {
+                        "wszvwc": null,
+                        "ggurxn": null,
+                        "ihctxa": null
+                    }
+                },
+                "carrot.n.03": {
+                    "carrot": {
+                        "nktmff": null,
+                        "aucrah": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "half__zucchini.n.01": {
+                    "half_zucchini": {
+                        "career": null,
+                        "uzezze": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_fruit": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "apple.n.01": {
+                    "apple": {
+                        "agveuv": null,
+                        "omzprq": null
+                    }
+                },
+                "bowl.n.01": {
+                    "bowl": {
+                        "byzaxy": null
+                    }
+                },
+                "strawberry.n.01": {
+                    "strawberry": {
+                        "xcnzxh": null
+                    }
+                },
+                "tray.n.01": {
+                    "tray": {
+                        "coqeme": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "freeze_pies": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "apple_pie.n.01": {
+                    "apple_pie": {
+                        "rpdhbr": null
+                    }
+                },
+                "plate.n.04": {
+                    "plate": {
+                        "bgxzec": null
+                    }
+                },
+                "tupperware.n.01": {
+                    "tupperware": {
+                        "mkstwr": [0.25, 0.25, 0.10]
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cool_cakes": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "cookie_sheet.n.01": {
+                    "baking_sheet": {
+                        "yhurut": null
+                    }
+                },
+                "fruitcake.n.02": {
+                    "fruitcake": {
+                        "kxckts": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_a_brisket": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "brisket.n.01": {
+                    "brisket": {
+                        "nnnnqw": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "cprjvq": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_bacon": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "bacon.n.01": {
+                    "bacon": {
+                        "eclhdh": null
+                    }
+                },
+                "griddle.n.01": {
+                    "griddle_pan": {
+                        "ryvqep": null
+                    }
+                },
+                "tray.n.01": {
+                    "tray": {
+                        "gsxbym": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "can_beans": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "canister.n.02": {
+                    "canister": {
+                        "gqwnfv": null
+                    }
+                },
+                "stockpot.n.01": {
+                    "stockpot": {
+                        "dcleem": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "spraying_for_bugs": {
+        "room_types": [
+            "garden"
+        ],
+        "house_double_floor_lower": {
+            "whitelist": {
+                "insectifuge__atomizer.n.01": {
+                    "insectifuge_atomizer": {
+                        "qnroki": null
+                    }
+                },
+                "lawn.n.01": {
+                    "lawn": {
+                        "tiqndr": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "canning_food": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "awvoox": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "hinged_jar.n.01": {
+                    "hinged_jar": {
+                        "vzwhbg": null
+                    }
+                },
+                "pineapple.n.02": {
+                    "pineapple": {
+                        "wfaybl": null
+                    }
+                },
+                "steak.n.01": {
+                    "steak": {
+                        "ppykkp": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    },
+    "cook_cabbage": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "carving_knife.n.01": {
+                    "carving_knife": {
+                        "awvoox": null
+                    }
+                },
+                "chili.n.02": {
+                    "chili": {
+                        "xhbpqh": null
+                    }
+                },
+                "chopping_board.n.01": {
+                    "cutting_board": {
+                        "tcdrzs": null
+                    }
+                },
+                "frying_pan.n.01": {
+                    "frying_pan": {
+                        "cprjvq": null
+                    }
+                },
+                "head_cabbage.n.02": {
+                    "head_cabbage": {
+                        "tqohvs": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
+    }
+}

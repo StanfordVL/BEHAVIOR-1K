@@ -77,5 +77,8 @@ def test_save_restore_full(env):
     # Restore the saved environment
     og.sim.restore([tmp_json_path])
 
+    # This generates a new scene, so we monkey-patch it into the original env to avoid crashes
+    env._scene = og.sim.scenes[0]
+
     # Make sure we still have an object that existed beforehand
     assert og.sim.scenes[0].object_registry("name", "breakfast_table") is not None

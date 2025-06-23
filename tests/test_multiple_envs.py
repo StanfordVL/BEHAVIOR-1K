@@ -164,11 +164,9 @@ def test_multi_scene_set_local_position():
 def test_multi_scene_scene_prim():
     vec_env = setup_multi_environment(1)
     original_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
-    scene_state = vec_env.envs[0].scene._dump_state()
     scene_prim_displacement = th.tensor([10.0, 0.0, 0.0], dtype=th.float32)
     original_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     vec_env.envs[0].scene.set_position_orientation(position=original_scene_prim_pos + scene_prim_displacement)
-    vec_env.envs[0].scene._load_state(scene_state)
     new_scene_prim_pos = vec_env.envs[0].scene._scene_prim.get_position_orientation()[0]
     new_robot_pos = vec_env.envs[0].scene.robots[0].get_position_orientation()[0]
     assert th.allclose(new_scene_prim_pos - original_scene_prim_pos, scene_prim_displacement, atol=1e-3)
@@ -181,9 +179,8 @@ def test_multi_scene_particle_source():
     sink_cfg = dict(
         type="DatasetObject",
         name="sink",
-        category="sink",
-        model="egwapq",
-        bounding_box=[2.427, 0.625, 1.2],
+        category="furniture_sink",
+        model="czyfhq",
         abilities={
             "toggleable": {},
             "particleSource": {
@@ -200,7 +197,7 @@ def test_multi_scene_particle_source():
                 },
             },
         },
-        position=[0.0, -1.5, 0.42],
+        position=[0.0, -1.5, 0.0],
     )
 
     vec_env = setup_multi_environment(3, additional_objects_cfg=[sink_cfg])

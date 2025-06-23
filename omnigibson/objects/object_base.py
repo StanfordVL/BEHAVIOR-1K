@@ -89,8 +89,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._link_physics_materials = dict() if link_physics_materials is None else link_physics_materials
 
         # Values to be created at runtime
-        self._highlight_cached_values = None
-        self._highlighted = None
+        self._highlighted = False
+        self._highlight_color = m.HIGHLIGHT_RGB
+        self._highlight_intensity = m.HIGHLIGHT_INTENSITY
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
@@ -247,20 +248,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Run super first
         super()._initialize()
 
-        # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
-        self._highlighted = False
-        self._highlight_cached_values = dict()
-
-        for material in self.materials:
-            if material.is_glass:
-                # Skip glass materials
-                continue
-            self._highlight_cached_values[material] = {
-                "enable_emission": material.enable_emission,
-                "emissive_color": material.emissive_color,
-                "emissive_intensity": material.emissive_intensity,
-            }
-
     @cached_property
     def articulation_root_path(self):
         has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
@@ -362,26 +349,29 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             return
 
         for material in self.materials:
-            if material.is_glass:
-                # Skip glass materials
-                continue
             if enabled:
-                # Store values before swapping
-                self._highlight_cached_values[material] = {
-                    "enable_emission": material.enable_emission,
-                    "emissive_color": material.emissive_color,
-                    "emissive_intensity": material.emissive_intensity,
-                }
-            material.enable_emission = True if enabled else self._highlight_cached_values[material]["enable_emission"]
-            material.emissive_color = (
-                m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[material]["emissive_color"].tolist()
-            )
-            material.emissive_intensity = (
-                m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[material]["emissive_intensity"]
-            )
+                material.enable_highlight(self._highlight_color, self._highlight_intensity)
+            else:
+                material.disable_highlight()
 
         # Update internal value
         self._highlighted = enabled
+
+    def set_highlight_properties(self, color=m.HIGHLIGHT_RGB, intensity=m.HIGHLIGHT_INTENSITY):
+        """
+        Sets the highlight properties for this object
+
+        Args:
+            color (3-array): RGB color for the highlight
+            intensity (float): Intensity for the highlight
+        """
+        self._highlight_color = color
+        self._highlight_intensity = intensity
+
+        # Update the highlight properties if the object is currently highlighted
+        if self._highlighted:
+            self.highlighted = False
+            self.highlighted = True
 
     def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False):
         """

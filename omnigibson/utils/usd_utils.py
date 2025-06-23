@@ -1,22 +1,20 @@
 import collections
 import itertools
-import math
 import os
 import re
 from collections.abc import Iterable
+from typing import Tuple
 
 import numpy as np
 import torch as th
 import trimesh
 from numba import jit, prange
-from typing import Tuple
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
-from omnigibson.macros import gm
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.constants import PRIMITIVE_MESH_TYPES, JointType, PrimType
@@ -612,113 +610,6 @@ class CollisionAPI:
 
         # Clear the dictionary
         cls.ACTIVE_COLLISION_GROUPS = {}
-
-
-class FlatcacheAPI:
-    """
-    Monolithic class for leveraging functionality meant to be used EXCLUSIVELY with flatcache.
-    """
-
-    # Modified prims since transition from sim being stopped to sim being played occurred
-    # This should get cleared every time og.sim.stop() gets called
-    MODIFIED_PRIMS = set()
-
-    @classmethod
-    def sync_raw_object_transforms_in_usd(cls, prim):
-        """
-        Manually synchronizes the per-link local raw transforms per-joint raw states from entity prim @prim using
-        dynamic control interface as the ground truth.
-
-        NOTE: This slightly abuses the dynamic control - usd integration, and should ONLY be used if flatcache
-        is active, since the USD is not R/W at runtime and so we can write directly to child link poses on the USD
-        without breaking the simulation!
-
-        Args:
-            prim (EntityPrim): prim whose owned links and joints should have their raw local states updated to match the
-                "true" values found from the dynamic control interface
-        """
-        # Make sure flatcache is enabled -- this should NEVER be called otherwise!!
-        assert gm.ENABLE_FLATCACHE, "Syncing raw object transforms should only occur if flatcache is being used!"
-
-        # We're somewhat abusing low-level dynamic control - physx - usd integration, but we (supposedly) know
-        # what we're doing so we suppress logging so we don't see any error messages :D
-        with suppress_omni_log(["omni.physx.plugin"]):
-            # Import here to avoid circular imports
-            from omnigibson.prims.xform_prim import XFormPrim
-
-            # 1. For every link, update its xformOp properties based on the delta_tf between object frame and link frame
-            obj_pos, obj_quat = XFormPrim.get_position_orientation(prim, frame="parent")
-            for link in prim.links.values():
-                rel_pos, rel_quat = T.relative_pose_transform(*link.get_position_orientation(), obj_pos, obj_quat)
-                XFormPrim.set_position_orientation(link, position=rel_pos, orientation=rel_quat, frame="parent")
-            # 2. For every joint, update its linear / angular joint state
-            if prim.n_joints > 0:
-                joints_pos = prim.get_joint_positions()
-                for joint, joint_pos in zip(prim.joints.values(), joints_pos):
-                    state_name = "linear" if joint.joint_type == JointType.JOINT_PRISMATIC else "angular"
-                    joint_pos = (
-                        joint_pos if joint.joint_type == JointType.JOINT_PRISMATIC else joint_pos * 180.0 / math.pi
-                    )
-                    joint.set_attribute(f"state:{state_name}:physics:position", float(joint_pos))
-
-            # Update the simulation without taking any time
-            # This is needed because physx complains that we're manually writing to child links' poses, and will
-            # subsequently not respect any additional writes to the object pose before an additional step is taken.
-            # So we take a "zero" length step so that any additional writes to the object's pose at the current
-            # timestep are respected
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
-
-        # Add this prim to the set of modified prims
-        cls.MODIFIED_PRIMS.add(prim)
-
-    @classmethod
-    def reset_raw_object_transforms_in_usd(cls, prim):
-        """
-        Manually resets the per-link local raw transforms and per-joint raw states from entity prim @prim to be zero.
-
-        NOTE: This slightly abuses the dynamic control - usd integration, and should ONLY be used if flatcache
-        is active, since the USD is not R/W at runtime and so we can write directly to child link poses on the USD
-        without breaking the simulation!
-
-        Args:
-            prim (EntityPrim): prim whose owned links and joints should have their local values reset to be zero
-        """
-        # Make sure flatcache is enabled -- this should NEVER be called otherwise!!
-        assert gm.ENABLE_FLATCACHE, "Resetting raw object transforms should only occur if flatcache is being used!"
-
-        # We're somewhat abusing low-level dynamic control - physx - usd integration, but we (supposedly) know
-        # what we're doing so we suppress logging so we don't see any error messages :D
-        with suppress_omni_log(["omni.physx.plugin"]):
-            # Import here to avoid circular imports
-            from omnigibson.prims.xform_prim import XFormPrim
-
-            # 1. For every link, update its xformOp properties to be 0
-            for link in prim.links.values():
-                XFormPrim.set_position_orientation(
-                    link, position=th.zeros(3), orientation=th.tensor([0, 0, 0, 1.0]), frame="parent"
-                )
-            # 2. For every joint, update its linear / angular joint state to be 0
-            if prim.n_joints > 0:
-                for joint in prim.joints.values():
-                    state_name = "linear" if joint.joint_type == JointType.JOINT_PRISMATIC else "angular"
-                    joint.set_attribute(f"state:{state_name}:physics:position", 0.0)
-
-            # Update the simulation without taking any time
-            # This is needed because physx complains that we're manually writing to child links' poses, and will
-            # subsequently not respect any additional writes to the object pose before an additional step is taken.
-            # So we take a "zero" length step so that any additional writes to the object's pose at the current
-            # timestep are respected
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
-
-    @classmethod
-    def reset(cls):
-        """
-        Resets the internal state of this FlatcacheAPI.This should only occur when the simulator is stopped
-        """
-        # For any prim transforms that were manually updated, we need to restore their original transforms
-        for prim in cls.MODIFIED_PRIMS:
-            cls.reset_raw_object_transforms_in_usd(prim)
-        cls.MODIFIED_PRIMS = set()
 
 
 class PoseAPI:
@@ -2003,6 +1894,20 @@ def delete_or_deactivate_prim(prim_path):
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True
+
+
+def activate_prim_and_children(prim_path):
+    """
+    Recursively activates the prim at @prim_path and all of its children.
+
+    Args:
+        prim_path (str): Path to the prim to activate
+    """
+    current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+    current_prim.SetActive(True)
+    # Use GetAllChildren to also find those that are inactive
+    for child in current_prim.GetAllChildren():
+        activate_prim_and_children(child.GetPath().pathString)
 
 
 def get_sdf_value_type_name(val):

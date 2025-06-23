@@ -31,6 +31,7 @@ from omnigibson.controllers import (
     DifferentialDriveController,
 )
 from omnigibson.macros import create_module_macros
+from omnigibson.macros import macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.robots import (
     R1,
@@ -230,6 +231,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         self._curobo_batch_size = curobo_batch_size
         self.debug_visual_marker = debug_visual_marker
+
+        # Action primitives uses assisted grasping; we ignore delayed AG here
+        with macros.unlocked():
+            macros.robots.manipulation_robot.GRASP_WINDOW = 0.0
 
     @property
     def arm(self):
