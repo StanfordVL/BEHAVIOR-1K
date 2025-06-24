@@ -34,7 +34,6 @@ setup(
         "trimesh>=4.0.8",
         "h5py>=3.10.0",
         "cryptography>=41.0.7",
-        "bddl~=3.5.0",
         "opencv-python>=4.8.1",
         "nest_asyncio>=1.5.6",
         "imageio>=2.33.1",
@@ -66,6 +65,7 @@ setup(
             "mkdocs-section-index",
             "mkdocs-literate-nav",
             "telemoma~=0.2.0",
+            "gspread",
         ],
         "primitives": [
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",
