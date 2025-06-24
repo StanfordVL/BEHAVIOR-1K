@@ -1,7 +1,7 @@
 from collections import defaultdict
 import sys
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pathlib
 import json
@@ -55,7 +55,7 @@ def scale_pivot(tgt_obj, delta_scale):
 def apply_qa_fixes_in_open_file(apply_scale=True, apply_orientation=True):
     # Load the fixes
     fixes = defaultdict(dict)
-    with open(r"D:\ig_pipeline\metadata\orientation_and_scale_edits.json") as f:
+    with open(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\orientation_and_scale_edits.json") as f:
         data = json.load(f)
         for model, orientation in data["orientations"].items():
             if not np.allclose(orientation, [0, 0, 0, 1], atol=1e-3):

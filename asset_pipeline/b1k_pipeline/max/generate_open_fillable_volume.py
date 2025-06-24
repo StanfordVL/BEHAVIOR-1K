@@ -1,6 +1,6 @@
 import sys
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.max.generate_fillable_volume import generate_fillable_mesh_from_seed
 

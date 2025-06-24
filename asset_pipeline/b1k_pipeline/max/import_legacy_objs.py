@@ -2,7 +2,7 @@ import re
 import sys
 import traceback
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import collections
 import glob
@@ -30,7 +30,7 @@ CONFIRM_EACH = True
 INTERACTIVE_MODE = True
 JOINT_TYPES = {"prismatic": "P", "revolute": "R", "fixed": "F", "continuous": "R"}
 IN_DATASET_ROOT = r"C:\Users\Cem\research\iGibson-dev\igibson\data\ig_dataset"
-OUTPUT_ROOT = r"D:\ig_pipeline\cad\objects"
+OUTPUT_ROOT = r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects"
 TRANSLATION_PATH = os.path.join(IN_DATASET_ROOT, "metadata", "model_rename.yaml")
 with open(TRANSLATION_PATH, "r") as f:
     TRANSLATION_DICT = yaml.load(f, Loader=yaml.SafeLoader)

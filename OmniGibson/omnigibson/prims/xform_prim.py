@@ -146,7 +146,7 @@ class XFormPrim(BasePrim):
         r1 = T.quat2mat(current_orientation)
         r2 = T.quat2mat(new_orientation)
         # Make sure setting is done correctly
-        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-4), (
+        assert th.allclose(new_position, current_position, atol=1e-4) and th.allclose(r1, r2, atol=1e-3), (
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, "
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
         )

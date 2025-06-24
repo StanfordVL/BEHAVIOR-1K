@@ -18,7 +18,7 @@ def parse_name(name):
 
 
 def translate_names():
-    with open(r"D:\ig_pipeline\scripts\model_rename.yml") as f:
+    with open(r"D:\BEHAVIOR-1K\asset_pipeline\scripts\model_rename.yml") as f:
         mapping = yaml.load(f, Loader=yaml.FullLoader)
 
     for obj in rt.objects:

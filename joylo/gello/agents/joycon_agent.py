@@ -91,7 +91,8 @@ class JoyconAgent(Agent):
 
         for serial, side in zip((left_serial, right_serial), ("left", "right")):
             try:
-                with open(f"{calibration_dir}/joycon_calibration_{serial}.yaml", "r") as f:
+                path_serial = serial.replace(':', '-')
+                with open(f"{calibration_dir}/joycon_calibration_{path_serial}.yaml", "r") as f:
                     self.calibration_data["joystick"][side] = yaml.load(f, Loader=yaml.FullLoader)["joystick"]
 
             except FileNotFoundError as e:

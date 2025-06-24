@@ -6,7 +6,7 @@ dependencies:
   - pip=22.3.1
   - python=3.8.0
   - pip:
-    - bddl==3.0.0b1
+    - bddl==3.6.0
     - black>=22.10.0
     - distributed>=2023.1.1
     - docker~=7.0.0

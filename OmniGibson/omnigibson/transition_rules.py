@@ -2108,6 +2108,7 @@ class ToggleableMachineRule(RecipeRule):
                 NotFilter(CategoryFilter("clothes_dryer")),
                 NotFilter(CategoryFilter("hot_tub")),
                 NotFilter(CategoryFilter("oven")),
+                NotFilter(CategoryFilter("microwave")),
             ]
         )
         return candidate_filters

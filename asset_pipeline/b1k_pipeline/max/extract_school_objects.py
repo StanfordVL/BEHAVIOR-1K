@@ -6,7 +6,7 @@ import sys
 
 import tqdm
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pymxs
 
@@ -106,7 +106,7 @@ IDS_TO_MERGE = {
 
 
 def merge_files():
-    max_files = glob.glob(r"D:\ig_pipeline\cad\scenes\*\processed.max")
+    max_files = glob.glob(r"D:\BEHAVIOR-1K\asset_pipeline\cad\scenes\*\processed.max")
     school_files = sorted(
         [pathlib.Path(x) for x in max_files if "scenes" in x and "school_" in x]
     )

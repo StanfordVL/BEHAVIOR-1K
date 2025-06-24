@@ -48,7 +48,7 @@ def generate_particle(name, shape, colors, size):
     return objs
         
 def substance_generation_round_one():
-    with open(r"D:\ig_pipeline\metadata\substance_generation.csv") as f:
+    with open(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\substance_generation.csv") as f:
         particles = []
         for row in csv.DictReader(f):
             if row["Request"] != "GENERATE" or row["Shape"] not in ("cube", "sphere"):
@@ -59,7 +59,7 @@ def substance_generation_round_one():
             particle.position = rt.Point3(i * 100, 0, 0)
 
 def substance_generation_round_two():
-    with open(r"D:/ig_pipeline/metadata/diced_particle_systems_colors.json") as f:
+    with open(r"D:/BEHAVIOR-1K/asset_pipeline/metadata/diced_particle_systems_colors.json") as f:
         data = json.load(f)
 
     particles = []

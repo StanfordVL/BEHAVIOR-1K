@@ -26,8 +26,8 @@ def run_on_batch(dataset_path, batch, mode):
     python_cmd = ["python", "-m", script, dataset_path] + batch
     cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
     obj = batch[0][:-1].split("/")[-1]
-    with open(f"/scr/ig_pipeline/logs/{obj}-{mode}.log", "w") as f, open(f"/scr/ig_pipeline/logs/{obj}-{mode}.err", "w") as ferr:
-        return subprocess.run(cmd, stdout=f, stderr=ferr, check=True, cwd="/scr/ig_pipeline")
+    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}-{mode}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}-{mode}.err", "w") as ferr:
+        return subprocess.run(cmd, stdout=f, stderr=ferr, check=True, cwd="/scr/BEHAVIOR-1K/asset_pipeline")
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
         with pipeline_fs.open("metadata/fillable_assignments.json") as f:
             assignments = json.load(f)
 
-        has_dip_log = {obj for obj in ids if os.path.exists("/scr/ig_pipeline/logs/{obj}-dip.err")}
+        has_dip_log = {obj for obj in ids if os.path.exists("/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}-dip.err")}
         no_need_dip = {k for k, v in assignments.items() if v == "ray"} # | has_dip_log
         no_need_ray = {k for k, v in assignments.items() if v == "dip"}
 

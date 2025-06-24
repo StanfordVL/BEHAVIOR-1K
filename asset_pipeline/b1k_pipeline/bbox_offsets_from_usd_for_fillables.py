@@ -13,7 +13,7 @@ from fs.zipfs import ZipFS
 
 FILLABLE_DIR = pathlib.Path(r"D:\fillable-10-21")
 KEY_PATH = pathlib.Path(r"C:\Users\cgokmen\research\OmniGibson\omnigibson\data\omnigibson.key")
-PIPELINE_ROOT = pathlib.Path(r"D:\ig_pipeline")
+PIPELINE_ROOT = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline")
 MODE = "JSON"   # use one of "ATTRIBUTE", "USD" or "JSON"
 
 

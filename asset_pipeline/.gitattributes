@@ -1,4 +1,3 @@
-cad/*/*/artifacts/collision_selection.json merge=json-obj
 *.dvc merge=dvc
 *.json eol=lf
 *.py eol=lf

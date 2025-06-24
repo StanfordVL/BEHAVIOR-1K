@@ -11,12 +11,12 @@ import os
 import sys
 import tempfile
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.utils import parse_name
 from b1k_pipeline.max.collision_vertex_reduction import reduce_mesh
 
-VHACD_EXECUTABLE = r"D:\ig_pipeline\b1k_pipeline\vhacd2.exe"
+VHACD_EXECUTABLE = r"D:\BEHAVIOR-1K\asset_pipeline\b1k_pipeline\vhacd2.exe"
 
 
 def run_coacd(input_mesh, hull_count):

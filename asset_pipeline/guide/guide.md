@@ -289,7 +289,7 @@ Requirements:
 * **No Editorial or Branded** if possible. If unavoidable, mark `1` in Column I; you'll need to remove branding later.
     ![](image13.png) 
 
-## 1\. Import files Into `ig_pipeline/cad/objects`
+## 1\. Import files Into `asset_pippeline/cad/objects`
 
 Import the raw model into the repository correctly:
 
@@ -304,14 +304,14 @@ Import the raw model into the repository correctly:
     2.  Add to cart.
     3.  Download via cart.
     4.  **Remove from cart**.
-    5.  Save download to a folder **outside** the `ig_pipeline` repository (e.g., `Downloads/objects`).
+    5.  Save download to a folder **outside** the repository (e.g., `Downloads/objects`).
     6.  Extract files to the same **external** folder.
 4.  Open the `.max` file in 3ds Max. Check for texture/plugin errors. Report errors.
 5.  Go to **Utilities tab** (wrench icon) > **More... > Resource Collector**.
 6.  Check **Collect Bitmaps**, **Copy**, **Update Materials**. Click **Browse**, navigate to the *external* folder where you extracted the files, create a `textures` subfolder, and select it. (Alternative if this fails: use **File > Archive**, save somewhere, unzip, find textures in the unzipped archive, and copy them manually to the external `textures` folder).
 7.  Click **Begin** in Resource Collector.
 8.  Go to **File > Save As...**:
-    1.  Navigate to `ig_pipeline/cad/objects/`.
+    1.  Navigate to `asset_pipeline/cad/objects/`.
     2.  Create a new folder: `{category}-{xy}` where `{category}` is from the spreadsheet and `{xy}` is a random 2-char string (just to avoid folder name clashes at this stage). Use a combined name if multiple categories, e.g., `raw_meats-xy`.
     3.  Enter the new folder.
     4.  Save as `raw.max`.
