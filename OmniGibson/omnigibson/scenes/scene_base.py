@@ -953,7 +953,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self._pose_info["pose_inv"]
 
-    @torch_compile
     def convert_world_pose_to_scene_relative(self, position, orientation):
         """
         Convert a world pose to a scene-relative pose.
