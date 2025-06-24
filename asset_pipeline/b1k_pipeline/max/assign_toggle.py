@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pymxs
 

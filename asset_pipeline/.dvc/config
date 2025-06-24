@@ -4,9 +4,5 @@
     hardlink_lock = false
 [cache]
     type = symlink
-['remote "cvgl"']
-    url = ssh://capri32.stanford.edu/cvgl/group/Gibson/ig_pipeline
-    ask_password = true
-    jobs = 4
 ['remote "google"']
     url = gs://ig-pipeline-cache

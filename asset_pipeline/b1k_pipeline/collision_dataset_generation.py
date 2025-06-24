@@ -108,7 +108,7 @@ def preprocess_target(target):
     return candidates
 
 def main():
-    all_targets = ["/scr/ig_pipeline/obj_out"]
+    all_targets = ["/scr/BEHAVIOR-1K/asset_pipeline/obj_out"]
 
     # Now get a list of all the objects that we can process.
     print("Getting list of objects to process...")

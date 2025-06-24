@@ -20,7 +20,7 @@ possible number of convex volumes. For example:
 **If an object is assigned a collision complaint, its current collision mesh was deemed by a reviewer to have issues with one or more of the above requirements.** It is very important to correctly identify the issue prior to starting work on the object.
 
 ## Understanding the Tooling
-The ig_pipeline repository contains some tools to allow quick processing of collision meshes. These can be installed by running the `b1k_pipeline/add_buttons.py` script from the Scripting > Run Script menu dialog. After running this script a SVL menu will be placed in the main menu of 3ds Max with buttons for each of the below described scripts and more.
+The asset pipeline contains some tools to allow quick processing of collision meshes. These can be installed by running the `asset_pipeline/b1k_pipeline/add_buttons.py` script from the Scripting > Run Script menu dialog. After running this script a SVL menu will be placed in the main menu of 3ds Max with buttons for each of the below described scripts and more.
 
 ### View Complaints
 The View Complaints tool shows you unresolved complaints that are attached to the currently selected object, or if no object is selected, it shows you the complaints on all the objects in the current file.
@@ -54,9 +54,9 @@ Quick note: if any of the steps below fail due to missing dependencies, you can 
 
 After reading all of the above, follow the below setup steps:
 
-1. `git pull` the ig_pipeline repository's `main` branch
+1. `git pull` the BEHAVIOR-1K repository's `main` branch
 2. Create your own branch for what you're working on, e.g. `git checkout -b collision`
-2. `dvc pull` in the ig_pipeline repository to make sure you have the latest files.
+2. `dvc pull` in the BEHAVIOR-1K repository's asset_pipeline directory to make sure you have the latest files.
 3. **Make sure you did BOTH of the above! Otherwise you will be editing an outdated copy of the file and you'll have to redo the work because these files cannot be diffed and merged.**
 4. "Unprotect" all of the files. This allows you to edit the files, replacing the symlinks with editable copies of the file. You can run this Powershell command to do that: `dvc unprotect (Get-Item cad/objects/*/processed.max).FullName`
 
@@ -91,5 +91,5 @@ After doing the above, follow the steps described below for each file matching c
 To upload your work (e.g. when done, or if you want us to check progress):
 
 1. Run `dvc push` and make sure it finishes
-2. Run `git push` to your branch on the ig_pipeline repository. **Make sure you did step 1 before this, otherwise you'll be pushing just pointers and not actual files!**
-3. Open a PR on the ig_pipeline repository and tag @cgokmen for review.
+2. Run `git push` to your branch on the BEHAVIOR-1K repository. **Make sure you did step 1 before this, otherwise you'll be pushing just pointers and not actual files!**
+3. Open a PR on the BEHAVIOR-1K repository and tag @cgokmen for review.

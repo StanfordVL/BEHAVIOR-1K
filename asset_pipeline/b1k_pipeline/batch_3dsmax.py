@@ -4,7 +4,7 @@ import sys
 import xmlrpc.client
 
 # TODO: Remove this and call it with python -m when ready to rerun everything.
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 import b1k_pipeline.utils
 
 USE_RPC = False

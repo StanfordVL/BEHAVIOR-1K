@@ -7,7 +7,7 @@ import sys
 import numpy as np
 import tqdm
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pymxs
 
@@ -175,7 +175,7 @@ def merge_files():
 
     # Merge in each file
     for target, ids in tqdm.tqdm(MERGES_BY_TARGET.items()):
-        p = pathlib.Path(r"D:\ig_pipeline\cad") / target / "processed.max"
+        p = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / target / "processed.max"
         filename = str(p)
 
         # Get the right object names from the file
