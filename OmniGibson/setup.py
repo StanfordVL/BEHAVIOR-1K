@@ -72,8 +72,12 @@ setup(
             "ompl @ https://storage.googleapis.com/gibson_scenes/ompl-1.6.0-cp310-cp310-manylinux_2_28_x86_64.whl",
         ],
         "learning": [
+            "dm_tree",
+            "fpsample",
+            "hydra-core",
+            "mediapy",
             "open3d",
-            "fpsample"
+            # conda install -c conda-forge ffmpeg=4.2.2 needed to get mediapy working
         ]
     },
     tests_require=[],

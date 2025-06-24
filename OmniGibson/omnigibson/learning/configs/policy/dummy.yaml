@@ -2,6 +2,7 @@
 
 env: omnigibson
 policy_name: dummy 
+log_path: /home/svl/Documents/logs/dummy
 module:
   _target_: omnigibson.learning.policies.DummyPolicy
 
