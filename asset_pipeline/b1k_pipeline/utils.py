@@ -191,7 +191,7 @@ def create_docker_container(cl, hostname:str, i: int):
             mounts=[
                 docker.types.Mount(source="/scr", target="/scr", type="bind"),
                 docker.types.Mount(source="/scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker/data", target="/data", type="bind", read_only=True),
-                docker.types.Mount(source="/scr/OmniGibson", target="/omnigibson-src", type="bind", read_only=True),
+                docker.types.Mount(source="/scr/BEHAVIOR-1K/OmniGibson", target="/omnigibson-src", type="bind", read_only=True),
             ],
             device_requests=[
                 docker.types.DeviceRequest(device_ids=[str(gpu)], capabilities=[['gpu']])

@@ -40,7 +40,7 @@ done
 declare -A MOUNTS=(
     [${SCR_DIR}]=/scr
     [${DATA_PATH}]=/data
-    ["/scr/OmniGibson"]=/omnigibson-src
+    ["/scr/BEHAVIOR-1K/OmniGibson"]=/omnigibson-src
     ["/scr/bddl"]=/bddl-src
 )
 

@@ -15,8 +15,8 @@ from fs.zipfs import ZipFS
 import torch as th
 import cv2
 
-DATASET_DIR = pathlib.Path(r"/scr/OmniGibson/omnigibson/data/og_dataset")
-KEY_PATH = pathlib.Path(r"/scr/OmniGibson/omnigibson/data/omnigibson.key")
+DATASET_DIR = pathlib.Path(r"/scr/BEHAVIOR-1K/OmniGibson/omnigibson/data/og_dataset")
+KEY_PATH = pathlib.Path(r"/scr/BEHAVIOR-1K/OmniGibson/omnigibson/data/omnigibson.key")
 MODE = "USD"   # use one of "ATTRIBUTE", "USD" or "JSON"
 
 
