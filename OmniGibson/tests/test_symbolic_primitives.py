@@ -67,7 +67,6 @@ def start_env(robot_type):
                 "category": "apple",
                 "model": "agveuv",
                 "position": [4.75, 10.75, 1.0],
-                "bounding_box": [0.05, 0.05, 0.05],
             },
             {
                 "type": "DatasetObject",
