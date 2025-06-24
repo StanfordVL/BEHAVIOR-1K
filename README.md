@@ -47,3 +47,15 @@ To see all available options:
 ```bash
 . ./setup.sh --help
 ```
+
+## Windows Installation
+
+For Windows users, use the PowerShell script:
+
+```powershell
+git clone https://github.com/StanfordVL/BEHAVIOR-1K
+cd BEHAVIOR-1K
+.\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+```
+
+> **Note**: Run PowerShell as Administrator and set execution policy if needed: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
