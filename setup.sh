@@ -1,42 +1,4 @@
-# Validate dependencies
-if [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] ; then
-    echo "[ERROR] --dataset requires --omnigibson"
-    exit 1
-fi
-
-if [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] ; then
-    echo "[ERROR] --primitives requires --omnigibson"
-    exit 1
-fi
-
-# Create conda environment if requested
-if [ "$NEW_ENV" = true ] ; then
-    echo "[ENV] Creating conda environment 'behavior'..."
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
-    
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to create conda environment"
-        echo "[HELP] Try running: conda clean --all"
-        echo "[HELP] Or manually create environment: conda create -n behavior python=3.10"
-        exit 1
-    fi
-    
-    echo "[ENV] Activating conda environment 'behavior'..."
-    conda activate behavior
-    
-    # Verify environment
-    PYTHON_VERSION=$(python --version)
-    echo "[ENV] Python version: $PYTHON_VERSION"
-    
-    # Check PyTorch installation
-    PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
-    if [ $? -eq 0 ] ; then
-        CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())")
-        echo "[ENV] PyTorch version: $PYTORCH_VERSION, CUDA available: $CUDA_AVAILABLE"
-    else
-        echo "[WARNING] PyTorch not properly installed in conda environment"
-    fi
-fi#!/bin/bash
+#!/bin/bash
 
 # BEHAVIOR-1K Installation Script
 # Usage: ./setup.sh [OPTIONS]
@@ -114,32 +76,91 @@ if [ "$HELP" = true ] ; then
     echo ""
     echo "  # Teleoperation setup"
     echo "  ./setup.sh --new-env --omnigibson --teleop --dataset"
-    exit 0
+    return 0
 fi
 
 # Check if we're in the right directory
 if [ ! -d "omnigibson" ] && [ ! -d "bddl" ] && [ ! -d "joylo" ] ; then
     echo "[ERROR] Cannot find omnigibson, bddl, or joylo directories"
     echo "[ERROR] Please run this script from the BEHAVIOR-1K root directory"
-    exit 1
+    return 1
 fi
-
-# Remove the teleop flag handling section since teleop directly means joylo
 
 # Get system information
 WORKDIR=$(pwd)
 echo "[SYSTEM] Working directory: $WORKDIR"
 
+# Validate dependencies
+if [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] ; then
+    echo "[ERROR] --dataset requires --omnigibson"
+    return 1
+fi
+
+if [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] ; then
+    echo "[ERROR] --primitives requires --omnigibson"
+    return 1
+fi
+
+# Create conda environment if requested
+if [ "$NEW_ENV" = true ] ; then
+    echo "[ENV] Creating conda environment 'behavior'..."
+    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
+    
+    if [ $? -ne 0 ] ; then
+        echo "[ERROR] Failed to create conda environment"
+        echo "[HELP] Try running: conda clean --all"
+        echo "[HELP] Or manually create environment: conda create -n behavior python=3.10"
+        return 1
+    fi
+    
+    echo "[ENV] Activating conda environment 'behavior'..."
+    conda activate behavior
+    
+    # Verify environment
+    PYTHON_VERSION=$(python --version)
+    echo "[ENV] Python version: $PYTHON_VERSION"
+    
+    # Check PyTorch installation
+    PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
+    if [ $? -eq 0 ] ; then
+        CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())")
+        echo "[ENV] PyTorch version: $PYTORCH_VERSION, CUDA available: $CUDA_AVAILABLE"
+    else
+        echo "[WARNING] PyTorch not properly installed in conda environment"
+    fi
+fi
+
+# Install BDDL
+if [ "$BDDL" = true ] ; then
+    echo "[BDDL] Installing BDDL..."
+    
+    if [ ! -d "bddl" ] ; then
+        echo "[ERROR] bddl directory not found"
+        return 1
+    fi
+    
+    cd bddl
+    pip install -e .
+    
+    if [ $? -ne 0 ] ; then
+        echo "[ERROR] Failed to install BDDL"
+        return 1
+    fi
+    
+    cd $WORKDIR
+    echo "[BDDL] Installation completed successfully"
+fi
+
 # Install OmniGibson
 if [ "$OMNIGIBSON" = true ] ; then
     echo "[OMNIGIBSON] Installing OmniGibson..."
     
-    if [ ! -d "omnigibson" ] ; then
+    if [ ! -d "OmniGibson" ] ; then
         echo "[ERROR] omnigibson directory not found"
-        exit 1
+        return 1
     fi
     
-    cd omnigibson
+    cd OmniGibson
     
     # Build extra requirements string
     EXTRAS=""
@@ -156,7 +177,7 @@ if [ "$OMNIGIBSON" = true ] ; then
     
     if [ $? -ne 0 ] ; then
         echo "[ERROR] Failed to install OmniGibson"
-        exit 1
+        return 1
     fi
     
     cd $WORKDIR
@@ -177,34 +198,13 @@ if [ "$OMNIGIBSON" = true ] ; then
     fi
 fi
 
-# Install BDDL
-if [ "$BDDL" = true ] ; then
-    echo "[BDDL] Installing BDDL..."
-    
-    if [ ! -d "bddl" ] ; then
-        echo "[ERROR] bddl directory not found"
-        exit 1
-    fi
-    
-    cd bddl
-    pip install -e .
-    
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install BDDL"
-        exit 1
-    fi
-    
-    cd $WORKDIR
-    echo "[BDDL] Installation completed successfully"
-fi
-
 # Install JoyLo (teleoperation)
 if [ "$TELEOP" = true ] ; then
     echo "[TELEOP] Installing JoyLo teleoperation interface..."
     
     if [ ! -d "joylo" ] ; then
         echo "[ERROR] joylo directory not found"
-        exit 1
+        return 1
     fi
     
     cd joylo
@@ -212,7 +212,7 @@ if [ "$TELEOP" = true ] ; then
     
     if [ $? -ne 0 ] ; then
         echo "[ERROR] Failed to install JoyLo"
-        exit 1
+        return 1
     fi
     
     cd $WORKDIR

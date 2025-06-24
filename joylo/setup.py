@@ -5,12 +5,12 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="joylo",
-    version="3.6.0",
+    version="3.7.0-alpha",
     author="Stanford University",
     description="JoyLo for OmniGibson",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/StanfordVL/og-gello",
+    url="https://github.com/StanfordVL/BEHAVIOR-1K",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",

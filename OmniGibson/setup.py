@@ -13,11 +13,11 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="1.2.0-alpha",
+    version="3.7.0-alpha",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
-    url="https://github.com/StanfordVL/OmniGibson",
+    url="https://github.com/StanfordVL/BEHAVIOR-1K",
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
@@ -34,6 +34,7 @@ setup(
         "trimesh>=4.0.8",
         "h5py>=3.10.0",
         "cryptography>=41.0.7",
+        "bddl~=3.7.0-alpha",
         "opencv-python>=4.8.1",
         "nest_asyncio>=1.5.6",
         "imageio>=2.33.1",
