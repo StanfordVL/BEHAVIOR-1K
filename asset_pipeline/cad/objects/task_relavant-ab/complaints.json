@@ -1,0 +1,2278 @@
+[
+    {
+        "object": "agave-bvlsig",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3753
+    },
+    {
+        "object": "agave-bvlsig",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3754
+    },
+    {
+        "object": "agave-cnlzlq",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3755
+    },
+    {
+        "object": "agave-cnlzlq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3756
+    },
+    {
+        "object": "auricularia-coecnm",
+        "complaint": "\u001b[A",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: auricularia.n.01\nDefinition: type genus of the Auriculariaceae\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3757
+    },
+    {
+        "object": "bean_curd-hekigc",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3758
+    },
+    {
+        "object": "bean_curd-hekigc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3759
+    },
+    {
+        "object": "chanterelle-rwntzn",
+        "complaint": "texture black (even in 3dsmax)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3760
+    },
+    {
+        "object": "chanterelle-rwntzn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3761
+    },
+    {
+        "object": "copper_pot-gqemcq",
+        "complaint": "no texture (but maybe it's okay)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3762
+    },
+    {
+        "object": "copper_pot-gqemcq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3763
+    },
+    {
+        "object": "copper_pot-gqemcq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 3764
+    },
+    {
+        "object": "cutting_board-olftkr",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3765
+    },
+    {
+        "object": "cutting_board-olftkr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 3766
+    },
+    {
+        "object": "cutting_board-wagwoy",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3767
+    },
+    {
+        "object": "cutting_board-wagwoy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 3768
+    },
+    {
+        "object": "half_enchilada-cgrjfr",
+        "complaint": "bad texture (even in 3dsmax)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3769
+    },
+    {
+        "object": "half_enchilada-cgrjfr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3770
+    },
+    {
+        "object": "half_enchilada-yyikja",
+        "complaint": "bad texture (even in 3dsmax)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3771
+    },
+    {
+        "object": "half_enchilada-yyikja",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3772
+    },
+    {
+        "object": "half_mozzarella-luofri",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3773
+    },
+    {
+        "object": "half_mozzarella-luofri",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3774
+    },
+    {
+        "object": "half_mozzarella-yflmjs",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3775
+    },
+    {
+        "object": "half_snapper-rjsbgp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3776
+    },
+    {
+        "object": "half_tenderloin-hsxfzx",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3777
+    },
+    {
+        "object": "half_tenderloin-hsxfzx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3778
+    },
+    {
+        "object": "half_tenderloin-zlimsu",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3779
+    },
+    {
+        "object": "half_tenderloin-zlimsu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3780
+    },
+    {
+        "object": "half_zucchini-tncuen",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3781
+    },
+    {
+        "object": "half_zucchini-tncuen",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3782
+    },
+    {
+        "object": "lemon_peel-mrvvpr",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3783
+    },
+    {
+        "object": "lemon_peel-mrvvpr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3784
+    },
+    {
+        "object": "lemon_peel-qirncy",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3785
+    },
+    {
+        "object": "lemon_peel-qirncy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3786
+    },
+    {
+        "object": "lemon_peel-sdvrmi",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3787
+    },
+    {
+        "object": "lemon_peel-sdvrmi",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3788
+    },
+    {
+        "object": "liquid_carton-rsvypp",
+        "complaint": "black, no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3789
+    },
+    {
+        "object": "liquid_carton-rsvypp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3790
+    },
+    {
+        "object": "liquid_carton-ykfkyq",
+        "complaint": "black, no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3791
+    },
+    {
+        "object": "liquid_carton-ykfkyq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3792
+    },
+    {
+        "object": "liquid_carton-ykfkyq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3793
+    },
+    {
+        "object": "mat-ieqyct",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3794
+    },
+    {
+        "object": "pottable_chili-lpshnm",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3795
+    },
+    {
+        "object": "pottable_chili-lpshnm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3796
+    },
+    {
+        "object": "pottable_chili-pwalol",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3797
+    },
+    {
+        "object": "pottable_chili-pwalol",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3798
+    },
+    {
+        "object": "ramen-ofnvor",
+        "complaint": "bad texture (even in 3dsmax)",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3799
+    },
+    {
+        "object": "ramen-ofnvor",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3800
+    },
+    {
+        "object": "tenderloin-gbyqap",
+        "complaint": "black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3801
+    },
+    {
+        "object": "tenderloin-gbyqap",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3802
+    },
+    {
+        "object": "banana_bread-outrja",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3803
+    },
+    {
+        "object": "banana_bread-outrja",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3804
+    },
+    {
+        "object": "bread_slice-pgzsxe",
+        "complaint": "all black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3805
+    },
+    {
+        "object": "bread_slice-pgzsxe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3806
+    },
+    {
+        "object": "bread_slice-yremdf",
+        "complaint": "no texture. blue in 3dsmax",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3807
+    },
+    {
+        "object": "bread_slice-yremdf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3808
+    },
+    {
+        "object": "cap-sjsles",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3809
+    },
+    {
+        "object": "cap-sjsles",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3810
+    },
+    {
+        "object": "cap-xsxeij",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3811
+    },
+    {
+        "object": "cap-xsxeij",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3812
+    },
+    {
+        "object": "carving_knife-ghhbgo",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3813
+    },
+    {
+        "object": "carving_knife-ghhbgo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3814
+    },
+    {
+        "object": "carving_knife-ghhbgo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 3815
+    },
+    {
+        "object": "carving_knife-ghhbgo",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 3816
+    },
+    {
+        "object": "cheddar-cheqcd",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3817
+    },
+    {
+        "object": "cheddar-cheqcd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3818
+    },
+    {
+        "object": "cheddar-ewvbng",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3819
+    },
+    {
+        "object": "cheddar-ewvbng",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3820
+    },
+    {
+        "object": "conch-dovqcj",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3821
+    },
+    {
+        "object": "conch-dovqcj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3822
+    },
+    {
+        "object": "enchilada-dwvaig",
+        "complaint": "black mesh",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3823
+    },
+    {
+        "object": "enchilada-dwvaig",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3824
+    },
+    {
+        "object": "half_agave-npxccb",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3825
+    },
+    {
+        "object": "half_agave-npxccb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3826
+    },
+    {
+        "object": "half_agave-qylfyr",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3827
+    },
+    {
+        "object": "half_agave-qylfyr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3828
+    },
+    {
+        "object": "half_auricularia-ddjzqg",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3829
+    },
+    {
+        "object": "half_auricularia-ddjzqg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3830
+    },
+    {
+        "object": "half_auricularia-putkli",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3831
+    },
+    {
+        "object": "half_auricularia-putkli",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3832
+    },
+    {
+        "object": "half_banana_bread-myxyfa",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3833
+    },
+    {
+        "object": "half_banana_bread-myxyfa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3834
+    },
+    {
+        "object": "half_banana_bread-sooaaz",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3835
+    },
+    {
+        "object": "half_banana_bread-sooaaz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3836
+    },
+    {
+        "object": "half_bean_curd-abzrit",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3837
+    },
+    {
+        "object": "half_bean_curd-abzrit",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3838
+    },
+    {
+        "object": "half_bean_curd-mdqpoj",
+        "complaint": "g",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: half__bean_curd.n.01 (custom synset)\nDefinition: (hypernyms: curd.n.01): a coagulated liquid resembling milk curd\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3839
+    },
+    {
+        "object": "half_bean_curd-mdqpoj",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3840
+    },
+    {
+        "object": "half_bean_curd-mdqpoj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3841
+    },
+    {
+        "object": "half_bleu-gpzeaz",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3842
+    },
+    {
+        "object": "half_bleu-gpzeaz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3843
+    },
+    {
+        "object": "half_bleu-nelbjr",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3844
+    },
+    {
+        "object": "half_bleu-nelbjr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3845
+    },
+    {
+        "object": "half_cheddar-cortmw",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3846
+    },
+    {
+        "object": "half_cheddar-cortmw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3847
+    },
+    {
+        "object": "half_cheddar-zkwspo",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3848
+    },
+    {
+        "object": "half_garlic_bread-smddfo",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3849
+    },
+    {
+        "object": "half_garlic_bread-smddfo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3850
+    },
+    {
+        "object": "half_garlic_bread-vipzpb",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3851
+    },
+    {
+        "object": "half_garlic_bread-vipzpb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3852
+    },
+    {
+        "object": "half_pita-fmkiep",
+        "complaint": "no texture, no thickness",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3853
+    },
+    {
+        "object": "half_pita-fmkiep",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3854
+    },
+    {
+        "object": "half_pita-mhwlwr",
+        "complaint": "no texture, no thickness",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3855
+    },
+    {
+        "object": "half_pita-mhwlwr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3856
+    },
+    {
+        "object": "half_ramen-argnww",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3857
+    },
+    {
+        "object": "half_ramen-mplogd",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3858
+    },
+    {
+        "object": "half_ramen-mplogd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3859
+    },
+    {
+        "object": "half_venison-ixnagn",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3860
+    },
+    {
+        "object": "half_venison-ixnagn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3861
+    },
+    {
+        "object": "half_venison-mszwzw",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3862
+    },
+    {
+        "object": "half_venison-mszwzw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3863
+    },
+    {
+        "object": "infant_car_seat-nulroi",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3864
+    },
+    {
+        "object": "infant_car_seat-nulroi",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3865
+    },
+    {
+        "object": "lint_screen-wnbcnn",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3866
+    },
+    {
+        "object": "lint_screen-wnbcnn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3867
+    },
+    {
+        "object": "mozzarella-rsiccz",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3868
+    },
+    {
+        "object": "mozzarella-rsiccz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3869
+    },
+    {
+        "object": "pottable_beefsteak_tomato-rrjizb",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3870
+    },
+    {
+        "object": "pottable_beefsteak_tomato-rrjizb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3871
+    },
+    {
+        "object": "pottable_beefsteak_tomato-rrjizb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 3872
+    },
+    {
+        "object": "squeeze_bottle-cuvgtq",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3873
+    },
+    {
+        "object": "squeeze_bottle-cuvgtq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3874
+    },
+    {
+        "object": "squeeze_bottle-exfkfw",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3875
+    },
+    {
+        "object": "squeeze_bottle-exfkfw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3876
+    },
+    {
+        "object": "squeeze_bottle-ikiwps",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3877
+    },
+    {
+        "object": "squeeze_bottle-ikiwps",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3878
+    },
+    {
+        "object": "squeeze_bottle-snyiat",
+        "complaint": "missing texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3879
+    },
+    {
+        "object": "squeeze_bottle-snyiat",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3880
+    },
+    {
+        "object": "steak-jtgckm",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3881
+    },
+    {
+        "object": "steak-jtgckm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3882
+    },
+    {
+        "object": "wine_bottle-hlzfxw",
+        "complaint": "different texture from 3ds Max",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3883
+    },
+    {
+        "object": "wine_bottle-vjdkci",
+        "complaint": "different texture from 3ds max",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3884
+    },
+    {
+        "object": "wine_bottle-zuctnl",
+        "complaint": "different texture from 3ds max",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3885
+    },
+    {
+        "object": "bap-enbbud",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3886
+    },
+    {
+        "object": "bap-enbbud",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3887
+    },
+    {
+        "object": "bap-pabfde",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3888
+    },
+    {
+        "object": "bap-pabfde",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3889
+    },
+    {
+        "object": "cookie_stick-zlhayf",
+        "complaint": "all black. 3dsmax shows all black which also seems wrong",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3890
+    },
+    {
+        "object": "cookie_stick-zlhayf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3891
+    },
+    {
+        "object": "garlic_bread-kjhxsq",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3892
+    },
+    {
+        "object": "garlic_bread-kjhxsq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3893
+    },
+    {
+        "object": "half_chanterelle-bsfuew",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3894
+    },
+    {
+        "object": "half_chanterelle-bsfuew",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3895
+    },
+    {
+        "object": "half_chanterelle-ftedsa",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3896
+    },
+    {
+        "object": "half_chanterelle-ftedsa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3897
+    },
+    {
+        "object": "scoop_of_ice_cream-dodndj",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3898
+    },
+    {
+        "object": "scoop_of_ice_cream-dodndj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3899
+    },
+    {
+        "object": "scoop_of_ice_cream-kmbwth",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3900
+    },
+    {
+        "object": "scoop_of_ice_cream-kmbwth",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3901
+    },
+    {
+        "object": "scoop_of_ice_cream-trpctm",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3902
+    },
+    {
+        "object": "scoop_of_ice_cream-trpctm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3903
+    },
+    {
+        "object": "scoop_of_ice_cream-vdtzvz",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3904
+    },
+    {
+        "object": "scoop_of_ice_cream-zenrml",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3905
+    },
+    {
+        "object": "scoop_of_ice_cream-zenrml",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 3906
+    },
+    {
+        "object": "scoop_of_ice_cream-zenrml",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3907
+    },
+    {
+        "object": "venison-dhhbvg",
+        "complaint": "all black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3908
+    },
+    {
+        "object": "venison-dhhbvg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3909
+    },
+    {
+        "object": "bleu-wxahdr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_2",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3910
+    },
+    {
+        "object": "bleu-wxahdr",
+        "complaint": "texture black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3911
+    },
+    {
+        "object": "pita-igejpf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_2",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3912
+    },
+    {
+        "object": "pita-igejpf",
+        "complaint": "\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D\u001b[D",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: pita.n.01\nDefinition: usually small round bread that can open into a pocket for filling\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3913
+    },
+    {
+        "object": "pita-igejpf",
+        "complaint": "weird texture in both OG and 3dsmax",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3914
+    },
+    {
+        "object": "plant_pot-skbcqq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_2",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3915
+    },
+    {
+        "object": "plant_pot-skbcqq",
+        "complaint": "0",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: pot.n.04\nDefinition: a container in which plants are cultivated\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 3916
+    },
+    {
+        "object": "plant_pot-skbcqq",
+        "complaint": "weird texture in both OG and 3dsmax",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3917
+    },
+    {
+        "object": "plant_pot-ygrtaz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_2",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3918
+    },
+    {
+        "object": "plant_pot-ygrtaz",
+        "complaint": "weird texture in both OG and 3dsmax",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 3919
+    },
+    {
+        "id": 6925,
+        "object": "half_garlic_bread-smddfo",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6951,
+        "object": "infant_car_seat-nulroi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6964,
+        "object": "half_agave-npxccb",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6974,
+        "object": "plant_pot-skbcqq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6989,
+        "object": "half_bean_curd-abzrit",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6999,
+        "object": "bean_curd-hekigc",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7031,
+        "object": "bap-enbbud",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7043,
+        "object": "enchilada-dwvaig",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7053,
+        "object": "scoop_of_ice_cream-zenrml",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7068,
+        "object": "cheddar-ewvbng",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7069,
+        "object": "half_enchilada-cgrjfr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7073,
+        "object": "venison-dhhbvg",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7098,
+        "object": "banana_bread-outrja",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7106,
+        "object": "scoop_of_ice_cream-dodndj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7117,
+        "object": "steak-jtgckm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7138,
+        "object": "half_chanterelle-ftedsa",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7189,
+        "object": "cheddar-cheqcd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7211,
+        "object": "squeeze_bottle-ikiwps",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7233,
+        "object": "conch-dovqcj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7240,
+        "object": "garlic_bread-kjhxsq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7242,
+        "object": "half_bleu-nelbjr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7324,
+        "object": "cap-sjsles",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7330,
+        "object": "wine_bottle-hlzfxw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7335,
+        "object": "half_chanterelle-bsfuew",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7366,
+        "object": "bread_slice-pgzsxe",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7369,
+        "object": "scoop_of_ice_cream-kmbwth",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7376,
+        "object": "liquid_carton-ykfkyq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7443,
+        "object": "chanterelle-rwntzn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7450,
+        "object": "pottable_chili-pwalol",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7456,
+        "object": "necktie-llnxru",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7460,
+        "object": "scoop_of_ice_cream-trpctm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7464,
+        "object": "half_banana_bread-sooaaz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7471,
+        "object": "half_bean_curd-mdqpoj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7472,
+        "object": "half_pita-fmkiep",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7475,
+        "object": "half_ramen-mplogd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7479,
+        "object": "half_mozzarella-yflmjs",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7497,
+        "object": "pottable_beefsteak_tomato-rrjizb",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7532,
+        "object": "half_tenderloin-zlimsu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7546,
+        "object": "half_enchilada-yyikja",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7550,
+        "object": "half_cheddar-zkwspo",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7577,
+        "object": "half_venison-ixnagn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7590,
+        "object": "half_agave-qylfyr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7606,
+        "object": "half_auricularia-ddjzqg",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7608,
+        "object": "squeeze_bottle-snyiat",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7625,
+        "object": "scoop_of_ice_cream-vdtzvz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7630,
+        "object": "half_garlic_bread-vipzpb",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7634,
+        "object": "mozzarella-rsiccz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7644,
+        "object": "tenderloin-gbyqap",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7649,
+        "object": "piano-qlcpph",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7662,
+        "object": "half_cheddar-cortmw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7688,
+        "object": "auricularia-coecnm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7724,
+        "object": "cutting_board-olftkr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7745,
+        "object": "squeeze_bottle-cuvgtq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7753,
+        "object": "plant_pot-ygrtaz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7788,
+        "object": "half_tenderloin-hsxfzx",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7813,
+        "object": "half_mozzarella-luofri",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7819,
+        "object": "ramen-ofnvor",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7839,
+        "object": "half_ramen-argnww",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7852,
+        "object": "pottable_chili-lpshnm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7859,
+        "object": "cap-xsxeij",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7871,
+        "object": "lemon_peel-mrvvpr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7879,
+        "object": "necklace-ythgnf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7887,
+        "object": "music_stool-qwqxew",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7913,
+        "object": "pita-igejpf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7942,
+        "object": "half_pita-mhwlwr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7971,
+        "object": "half_zucchini-tncuen",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8012,
+        "object": "cutting_board-wagwoy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8061,
+        "object": "lint_screen-wnbcnn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8080,
+        "object": "lemon_peel-sdvrmi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8114,
+        "object": "bap-pabfde",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8119,
+        "object": "half_auricularia-putkli",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8120,
+        "object": "half_banana_bread-myxyfa",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8129,
+        "object": "bleu-wxahdr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8132,
+        "object": "wine_bottle-zuctnl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8135,
+        "object": "half_bleu-gpzeaz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8142,
+        "object": "wine_bottle-vjdkci",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8162,
+        "object": "squeeze_bottle-exfkfw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8209,
+        "object": "cookie_stick-zlhayf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8211,
+        "object": "lemon_peel-qirncy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8215,
+        "object": "carving_knife-ghhbgo",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8230,
+        "object": "agave-bvlsig",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8243,
+        "object": "bread_slice-yremdf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8266,
+        "object": "liquid_carton-rsvypp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8280,
+        "object": "copper_pot-gqemcq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8288,
+        "object": "half_venison-mszwzw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8292,
+        "object": "agave-cnlzlq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

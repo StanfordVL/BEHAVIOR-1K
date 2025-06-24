@@ -1,0 +1,36 @@
+(define (problem clean_a_gravestone-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        sponge.n.01_1 - sponge.n.01
+        mold.n.05_1 - mold.n.05
+        gravestone.n.01_1 - gravestone.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered gravestone.n.01_1 mold.n.05_1) 
+        (ontop sponge.n.01_1 floor.n.01_1) 
+        (ontop gravestone.n.01_1 floor.n.01_2) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom floor.n.01_2 garden) 
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?gravestone.n.01_1 ?mold.n.05_1)
+            ) 
+        )
+    )
+)

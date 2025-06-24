@@ -1,0 +1,47 @@
+(define (problem bag_groceries-0)
+    (:domain omnigibson)
+
+    (:objects
+     	sack.n.01_1 sack.n.01_2 - sack.n.01
+    	checkout.n.03_1 - checkout.n.03
+    	canned_food.n.01_1 - canned_food.n.01
+    	egg.n.02_1 - egg.n.02
+    	apple.n.01_1 - apple.n.01
+    	bottle__of__orange_juice.n.01_1 - bottle__of__orange_juice.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sack.n.01_1 checkout.n.03_1)
+        (ontop sack.n.01_2 checkout.n.03_1)
+        (ontop canned_food.n.01_1 checkout.n.03_1) 
+        (ontop egg.n.02_1 checkout.n.03_1) 
+        (ontop apple.n.01_1 checkout.n.03_1) 
+        (ontop bottle__of__orange_juice.n.01_1 checkout.n.03_1) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?canned_food.n.01_1 ?sack.n.01)
+            )
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?egg.n.02_1 ?sack.n.01)
+            )
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?bottle__of__orange_juice.n.01_1 ?sack.n.01)
+            )
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?apple.n.01_1 ?sack.n.01)
+            )
+        )
+    )
+)

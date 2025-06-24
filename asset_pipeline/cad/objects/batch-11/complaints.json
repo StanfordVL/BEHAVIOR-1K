@@ -1,0 +1,722 @@
+[
+    {
+        "object": "shelf_shelf-ymtnqa",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1290
+    },
+    {
+        "object": "clamp-feswhy",
+        "complaint": "missing texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1291
+    },
+    {
+        "object": "electric_fan-lclkju",
+        "complaint": "togglebutton;coldsource",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 1292
+    },
+    {
+        "object": "electric_fan-lclkju",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1293
+    },
+    {
+        "object": "half_chicken_tender-cmfwiz",
+        "complaint": "lacks texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1294
+    },
+    {
+        "object": "half_chicken_tender-cmfwiz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1295
+    },
+    {
+        "object": "half_chicken_tender-zzwgnh",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1296
+    },
+    {
+        "object": "half_chicken_tender-zzwgnh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1297
+    },
+    {
+        "object": "ice_cream_cone-thwtmp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1298
+    },
+    {
+        "object": "lid-zjtjrn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 1299
+    },
+    {
+        "object": "lid-zjtjrn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1300
+    },
+    {
+        "object": "mail-azunex",
+        "complaint": "\u001b",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: mail.n.04\nDefinition: any particular collection of letters or packages that is delivered\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 1301
+    },
+    {
+        "object": "mail-mbbwhn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1302
+    },
+    {
+        "object": "mail-ojkepk",
+        "complaint": "\u001b[F",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: mail.n.04\nDefinition: any particular collection of letters or packages that is delivered\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 1303
+    },
+    {
+        "object": "wrench-klnawb",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n42.35cm, 11.56cm, 2.17cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1304
+    },
+    {
+        "object": "textbook-nloqia",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1305
+    },
+    {
+        "object": "tray-glwebh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1306
+    },
+    {
+        "object": "bread-xhqnuc",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1307
+    },
+    {
+        "object": "baguette-xhqnuc",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1308
+    },
+    {
+        "object": "baguette-xhqnuc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1309
+    },
+    {
+        "object": "bread-ypbyek",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1310
+    },
+    {
+        "object": "baguette-ypbyek",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1311
+    },
+    {
+        "object": "baguette-ypbyek",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1312
+    },
+    {
+        "object": "bird_feeder-hvlkjx",
+        "complaint": "x3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n46.24cm, 30.30cm, 79.50cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1313
+    },
+    {
+        "object": "shelf_baseboard-hlhneo",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1314
+    },
+    {
+        "object": "shelf_side-bxfkjj",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1315
+    },
+    {
+        "object": "shelf_top-pfiole",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1316
+    },
+    {
+        "object": "bottle_of_maple_syrup-qfgewi",
+        "complaint": "glass is not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1317
+    },
+    {
+        "object": "bottle_of_soy_sauce-afxisg",
+        "complaint": "all black. should be transparent too",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1318
+    },
+    {
+        "object": "bottle_of_sriracha-gnklax",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 1319
+    },
+    {
+        "object": "chicken_tender-eiwmqk",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1320
+    },
+    {
+        "object": "chicken_tender-eiwmqk",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1321
+    },
+    {
+        "object": "chicken_tender-eiwmqk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1322
+    },
+    {
+        "object": "chicken_tender-mjimcu",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1323
+    },
+    {
+        "object": "chicken_tender-mjimcu",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1324
+    },
+    {
+        "object": "chicken_tender-mjimcu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1325
+    },
+    {
+        "object": "chicken_tender-waemzf",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1326
+    },
+    {
+        "object": "chicken_tender-waemzf",
+        "complaint": "wrong texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1327
+    },
+    {
+        "object": "chicken_tender-waemzf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1328
+    },
+    {
+        "object": "chips-obgeiz",
+        "complaint": "multiple objects;no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1329
+    },
+    {
+        "object": "goggles-wszdxi",
+        "complaint": "x200",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n69.51m, 77.09m, 35.88m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1330
+    },
+    {
+        "object": "lawnmower-hrebgj",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n99.51cm, 2.62m, 2.02m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1331
+    },
+    {
+        "object": "lawnmower-hrebgj",
+        "complaint": "togglebutton;particleremover",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 1332
+    },
+    {
+        "object": "lawn_mower-hrebgj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1333
+    },
+    {
+        "object": "mailbox-bktljr",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1334
+    },
+    {
+        "object": "mailbox-bktljr",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1335
+    },
+    {
+        "object": "marker-hmlofs",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.61cm, 3.67cm, 37.42cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1336
+    },
+    {
+        "object": "marker-rsxbso",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.67cm, 3.61cm, 33.32cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1337
+    },
+    {
+        "object": "outlet-rdinfq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1338
+    },
+    {
+        "object": "pipe-emwpby",
+        "complaint": "\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: pipe.n.02\nDefinition: a long tube made of metal or plastic that is used to carry water or oil or gas etc.\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 1339
+    },
+    {
+        "object": "pipe_cleaner-qdazrd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 1340
+    },
+    {
+        "object": "pitcher-ankfvi",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 1341
+    },
+    {
+        "object": "roasting_pan-nrecsa",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 1342
+    },
+    {
+        "object": "shovel-guynvr",
+        "complaint": "1/100",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n7.37cm, 1.47cm, 7.41mm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1343
+    },
+    {
+        "object": "star_anise-fwjuab",
+        "complaint": "x3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n9.26cm, 9.26cm, 1.79cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1344
+    },
+    {
+        "object": "star_anise-nbawoz",
+        "complaint": "x3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n9.97cm, 9.98cm, 1.93cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1345
+    },
+    {
+        "object": "star_anise-njpqwe",
+        "complaint": "x3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n8.15cm, 8.16cm, 1.58cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1346
+    },
+    {
+        "object": "organizer-hmygav",
+        "complaint": "1/3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n22.86cm, 31.75cm, 13.60cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1347
+    },
+    {
+        "object": "storage_organizer-hmygav",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 1348
+    },
+    {
+        "object": "biscuit-cgkiti",
+        "complaint": "x2.74",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n18.52cm, 19.45cm, 1.47cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1349
+    },
+    {
+        "object": "biscuit-cgkiti",
+        "complaint": "cookie ?",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: biscuit\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 1350
+    },
+    {
+        "object": "biscuit-hlyeaq",
+        "complaint": "x2.74",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n18.55cm, 19.48cm, 1.47cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1351
+    },
+    {
+        "object": "biscuit-hlyeaq",
+        "complaint": "cookie?",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: biscuit.n.01\nDefinition: small round bread leavened with baking-powder or soda\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 1352
+    },
+    {
+        "object": "biscuit-hlyeaq",
+        "complaint": "cookie?",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: biscuit\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 1353
+    },
+    {
+        "object": "tortilla_chips-dlkrgq",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n9.40cm, 7.26cm, 3.00cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1354
+    },
+    {
+        "object": "tortilla_chips-kdjrni",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n12.02cm, 9.32cm, 3.62cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1355
+    },
+    {
+        "object": "valentine_wreath-xpbsof",
+        "complaint": "x10",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n6.50m, 3.16m, 1.67m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1356
+    },
+    {
+        "object": "denture-cvkqkf",
+        "complaint": "x10",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n98.99cm, 1.25m, 91.81cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1357
+    },
+    {
+        "object": "jar-jnjtrl",
+        "complaint": "should be glass",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 1358
+    },
+    {
+        "object": "jar-jnjtrl",
+        "complaint": "should be articulated",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 1359
+    },
+    {
+        "object": "hinged_jar-jnjtrl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 1360
+    },
+    {
+        "object": "rope-lasdsa",
+        "complaint": "rope",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 1361
+    },
+    {
+        "object": "shelf_back_panel-gjsnrt",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 1362
+    },
+    {
+        "object": "waffle-gjwper",
+        "complaint": "x10",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n2.84m, 2.83m, 44.31cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 1363
+    },
+    {
+        "id": 6940,
+        "object": "half_chicken_tender-cmfwiz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7184,
+        "object": "baguette-xhqnuc",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7217,
+        "object": "lid-zjtjrn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7313,
+        "object": "half_chicken_tender-zzwgnh",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7403,
+        "object": "chicken_tender-eiwmqk",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7446,
+        "object": "roasting_pan-nrecsa",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7524,
+        "object": "chicken_tender-waemzf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7677,
+        "object": "chicken_tender-mjimcu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8098,
+        "object": "ice_cream_cone-thwtmp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8296,
+        "object": "baguette-ypbyek",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

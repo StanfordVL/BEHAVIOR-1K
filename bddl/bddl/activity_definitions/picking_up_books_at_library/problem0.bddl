@@ -1,0 +1,36 @@
+(define (problem picking_up_books_at_library-0)
+    (:domain omnigibson)
+
+    (:objects
+        paperback_book.n.01_1 paperback_book.n.01_2 - paperback_book.n.01
+        desk.n.01_1 - desk.n.01
+        book.n.02_1 book.n.02_2 - book.n.02
+        backpack.n.01_1 - backpack.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop paperback_book.n.01_1 desk.n.01_1) 
+        (ontop paperback_book.n.01_2 desk.n.01_1) 
+        (ontop book.n.02_1 desk.n.01_1) 
+        (ontop book.n.02_2 desk.n.01_1) 
+        (ontop backpack.n.01_1 desk.n.01_1) 
+        (inroom floor.n.01_1 private_office) 
+        (inroom desk.n.01_1 private_office) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?book.n.02 - book.n.02)
+                (inside ?book.n.02 ?backpack.n.01_1)   
+            )
+            (forall 
+                (?paperback_book.n.01 - paperback_book.n.01)
+                (inside ?paperback_book.n.01 ?backpack.n.01_1)   
+            )
+        )
+    )
+)

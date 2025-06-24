@@ -1,0 +1,49 @@
+(define (problem clean_a_chicken_coop-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        chicken_coop.n.01_1 - chicken_coop.n.01
+        feather.n.01_1 feather.n.01_2 feather.n.01_3 feather.n.01_4 - feather.n.01
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        rag.n.01_1 - rag.n.01
+        watering_can.n.01_1 - watering_can.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered chicken_coop.n.01_1 stain.n.01_1) 
+        (ontop chicken_coop.n.01_1 floor.n.01_1) 
+        (insource watering_can.n.01_1 water.n.06_1) 
+        (ontop watering_can.n.01_1 floor.n.01_1) 
+        (ontop rag.n.01_1 chicken_coop.n.01_1) 
+        (not
+            (covered chicken_coop.n.01_1 detergent.n.02_1) 
+        )
+        (filled detergent__bottle.n.01_1 detergent.n.02_1)
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1)
+        (inside feather.n.01_1 chicken_coop.n.01_1)
+        (inside feather.n.01_2 chicken_coop.n.01_1)
+        (inside feather.n.01_3 chicken_coop.n.01_1)
+        (inside feather.n.01_4 chicken_coop.n.01_1)
+        (inroom floor.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?chicken_coop.n.01_1 ?stain.n.01_1)
+            ) 
+            (forall 
+                (?feather.n.01 - feather.n.01)
+                (inside ?feather.n.01 ?ashcan.n.01_1)
+            )
+        )
+    )
+)

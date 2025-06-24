@@ -1,0 +1,37 @@
+(define (problem polishing_shoes-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+    	shoe.n.01_1 shoe.n.01_2 - shoe.n.01
+    	rag.n.01_1 - rag.n.01
+    	floor.n.01_1 - floor.n.01
+    	sink.n.01_1 - sink.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered shoe.n.01_1 stain.n.01_1) 
+        (covered shoe.n.01_2 stain.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (ontop shoe.n.01_1 floor.n.01_1) 
+        (ontop shoe.n.01_2 floor.n.01_1) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (nextto ?rag.n.01_1 ?sink.n.01_1) 
+            (and 
+                (not 
+                    (covered ?shoe.n.01_1 ?stain.n.01_1)
+                ) 
+                (not 
+                    (covered ?shoe.n.01_2 ?stain.n.01_1)
+                )
+            )
+        )
+    )
+)

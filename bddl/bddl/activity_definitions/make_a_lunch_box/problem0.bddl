@@ -1,0 +1,44 @@
+(define (problem make_a_lunch_box-0)
+    (:domain omnigibson)
+
+    (:objects
+     	club_sandwich.n.01_1 - club_sandwich.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	bottle__of__apple_juice.n.01_1 - bottle__of__apple_juice.n.01
+    	sack.n.01_1 - sack.n.01
+    	plastic_wrap.n.01_1 - plastic_wrap.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop club_sandwich.n.01_1 countertop.n.01_1) 
+        (ontop bottle__of__apple_juice.n.01_1 countertop.n.01_1) 
+        (ontop sack.n.01_1 countertop.n.01_1) 
+        (ontop plastic_wrap.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?club_sandwich.n.01 - club_sandwich.n.01) 
+                (ontop ?club_sandwich.n.01 ?sack.n.01_1)
+            ) 
+            (forall 
+                (?bottle__of__apple_juice.n.01 - bottle__of__apple_juice.n.01) 
+                (ontop ?bottle__of__apple_juice.n.01 ?sack.n.01_1)
+            ) 
+            (forall 
+                (?sack.n.01 - sack.n.01) 
+                (ontop ?sack.n.01 ?countertop.n.01_1)
+            ) 
+            (forall 
+                (?plastic_wrap.n.01 - plastic_wrap.n.01) 
+                (overlaid ?plastic_wrap.n.01 ?club_sandwich.n.01_1)
+            )
+        )
+    )
+)

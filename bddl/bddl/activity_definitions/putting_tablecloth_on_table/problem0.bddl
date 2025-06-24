@@ -1,0 +1,26 @@
+(define (problem putting_tablecloth_on_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tablecloth.n.01_1 - tablecloth.n.01
+        floor.n.01_1 - floor.n.01
+        pot_plant.n.01_1 - pot_plant.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tablecloth.n.01_1 floor.n.01_1) 
+        (ontop pot_plant.n.01_1 breakfast_table.n.01_1) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (overlaid ?tablecloth.n.01_1 ?breakfast_table.n.01_1)
+            (ontop ?pot_plant.n.01_1 ?breakfast_table.n.01_1)
+        )
+    )
+)

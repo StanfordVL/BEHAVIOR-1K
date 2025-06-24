@@ -1,0 +1,2563 @@
+[
+    {
+        "object": "blanket-corgks",
+        "complaint": "\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: blanket.n.01\nDefinition: bedding that keeps a person warm in bed\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5171
+    },
+    {
+        "object": "blanket-corgks",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 5172
+    },
+    {
+        "object": "blanket-uwbyty",
+        "complaint": "not fully unfolded",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5173
+    },
+    {
+        "object": "blanket-uwbyty",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 5174
+    },
+    {
+        "object": "blanket-yscwot",
+        "complaint": "0",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: blanket.n.01\nDefinition: bedding that keeps a person warm in bed\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5175
+    },
+    {
+        "object": "blanket-yscwot",
+        "complaint": "not fully unfolded",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5176
+    },
+    {
+        "object": "blanket-yscwot",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 5177
+    },
+    {
+        "object": "curtain-didlbp",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5178
+    },
+    {
+        "object": "curtain-didlbp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 5179
+    },
+    {
+        "object": "curtain-zmodhv",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5180
+    },
+    {
+        "object": "curtain-zmodhv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 5181
+    },
+    {
+        "object": "downlight-oxglnt",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5182
+    },
+    {
+        "object": "downlight-oxglnt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5183
+    },
+    {
+        "object": "downlight-vlplia",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5184
+    },
+    {
+        "object": "floor_lamp-drpann",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5185
+    },
+    {
+        "object": "floor_lamp-drpann",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5186
+    },
+    {
+        "object": "floor_lamp-drpann",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5187
+    },
+    {
+        "object": "floor_lamp-mqfdjk",
+        "complaint": "\u001b[3~table_lamp",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: floor_lamp.n.01\nDefinition: a lamp that stands on the floor\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5188
+    },
+    {
+        "object": "floor_lamp-mqfdjk",
+        "complaint": "table_lamp",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: floor_lamp\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5189
+    },
+    {
+        "object": "floor_lamp-mqfdjk",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5190
+    },
+    {
+        "object": "floor_lamp-mqfdjk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5191
+    },
+    {
+        "object": "floor_lamp-mqfdjk",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5192
+    },
+    {
+        "object": "floor_lamp-ogolip",
+        "complaint": "\u001b[6~\u001b[6~\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: floor_lamp.n.01\nDefinition: a lamp that stands on the floor\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5193
+    },
+    {
+        "object": "floor_lamp-ogolip",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5194
+    },
+    {
+        "object": "floor_lamp-ogolip",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5195
+    },
+    {
+        "object": "flower-xxvkkw",
+        "complaint": "\u001b[",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: flower.n.02\nDefinition: reproductive organ of angiosperm plants especially one having showy or colorful parts\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5196
+    },
+    {
+        "object": "decoration-ydrlth",
+        "complaint": "maybe remove this object. too tricky",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5197
+    },
+    {
+        "object": "folderal-ydrlth",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5198
+    },
+    {
+        "object": "hardback-ajpulw",
+        "complaint": "\u001b[5~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5199
+    },
+    {
+        "object": "hardback-bvqdte",
+        "complaint": "'",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5200
+    },
+    {
+        "object": "hardback-csgebz",
+        "complaint": "\u001b[6",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5201
+    },
+    {
+        "object": "hardback-csjnvj",
+        "complaint": "\t",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5202
+    },
+    {
+        "object": "hardback-cvotie",
+        "complaint": "\u001b[6",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5203
+    },
+    {
+        "object": "hardback-fhwnhz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5204
+    },
+    {
+        "object": "hardback-grxiqn",
+        "complaint": "bad object, containing 2 books",
+        "processed": true,
+        "new": true,
+        "type": "connectedness",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5205
+    },
+    {
+        "object": "hardback-grxiqn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 5206
+    },
+    {
+        "object": "hardback-orkzoz",
+        "complaint": "\u001b[",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: hardback.n.01\nDefinition: a book with cardboard or cloth or leather covers\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5207
+    },
+    {
+        "object": "hardback-zgeveh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5208
+    },
+    {
+        "object": "magazine-kbzalg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5209
+    },
+    {
+        "object": "magazine-kbzalg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5210
+    },
+    {
+        "object": "mug-lgxhsc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5211
+    },
+    {
+        "object": "mug-yiamah",
+        "complaint": "extra plate at the bottom, need to detach",
+        "processed": true,
+        "new": true,
+        "type": "connectedness",
+        "additional_info": "CONNECTED: Confirm object is a single body. An object cannot contain disconnected parts.",
+        "id": 5212
+    },
+    {
+        "object": "mug-yiamah",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5213
+    },
+    {
+        "object": "nightstand-roxnbe",
+        "complaint": "wensi: missing handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5214
+    },
+    {
+        "object": "nightstand-roxnbe",
+        "complaint": "seems like drawer is openable",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 5215
+    },
+    {
+        "object": "nightstand-roxnbe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 5216
+    },
+    {
+        "object": "nightstand-uzxrlg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 5217
+    },
+    {
+        "object": "picture-abtgvz",
+        "complaint": "no thickness",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5218
+    },
+    {
+        "object": "picture-aicjaq",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5219
+    },
+    {
+        "object": "picture-aicjaq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5220
+    },
+    {
+        "object": "picture-bzmdxc",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5221
+    },
+    {
+        "object": "picture-hdcvfu",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5222
+    },
+    {
+        "object": "picture-hdcvfu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5223
+    },
+    {
+        "object": "picture-jovfqj",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5224
+    },
+    {
+        "object": "picture-ngyduh",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5225
+    },
+    {
+        "object": "picture-ngyduh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5226
+    },
+    {
+        "object": "picture-nxjgqw",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5227
+    },
+    {
+        "object": "picture-nxjgqw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5228
+    },
+    {
+        "object": "picture-nxqoed",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5229
+    },
+    {
+        "object": "picture-nxqoed",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5230
+    },
+    {
+        "object": "picture-trqgni",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5231
+    },
+    {
+        "object": "picture-trqgni",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5232
+    },
+    {
+        "object": "picture-xnuynn",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5233
+    },
+    {
+        "object": "picture-xnuynn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5234
+    },
+    {
+        "object": "picture_frame-htwjfo",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5235
+    },
+    {
+        "object": "picture_frame-htwjfo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5236
+    },
+    {
+        "object": "railing-pqzbbb",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5237
+    },
+    {
+        "object": "swivel_chair-iiihwn",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5238
+    },
+    {
+        "object": "tray-iaaiyi",
+        "complaint": "fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 5239
+    },
+    {
+        "object": "walls-avbnnx",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5240
+    },
+    {
+        "object": "walls-avbnnx",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5241
+    },
+    {
+        "object": "walls-avbnnx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5242
+    },
+    {
+        "object": "walls-avbnnx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5243
+    },
+    {
+        "object": "walls-cegpja",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5244
+    },
+    {
+        "object": "walls-dohvvk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5245
+    },
+    {
+        "object": "walls-hltkbe",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "STRUCTURE-SYNSET: This object is assigned to a wall/floor category but it may need to either be attached to a structure object or moved into another category.",
+        "id": 5246
+    },
+    {
+        "object": "walls-hltkbe",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5247
+    },
+    {
+        "object": "walls-hltkbe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5248
+    },
+    {
+        "object": "walls-iobzfe",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5249
+    },
+    {
+        "object": "walls-ispfoo",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5250
+    },
+    {
+        "object": "walls-ispfoo",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5251
+    },
+    {
+        "object": "walls-jamapi",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5252
+    },
+    {
+        "object": "walls-jamapi",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5253
+    },
+    {
+        "object": "walls-keugzu",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5254
+    },
+    {
+        "object": "walls-klcxyf",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5255
+    },
+    {
+        "object": "walls-klcxyf",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5256
+    },
+    {
+        "object": "walls-klcxyf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5257
+    },
+    {
+        "object": "walls-kuhhbl",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5258
+    },
+    {
+        "object": "walls-ndfsrm",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureconnectedness",
+        "additional_info": "STRUCTURE-MULTIPLE-PIECES: This object is made up of multiple pieces - it should be broken apart. Please consult w/ Cem on how to do this for things like pavers - we want those to be together, but we want large, disjoint flat pieces of floor to be separate objects.",
+        "id": 5259
+    },
+    {
+        "object": "walls-ndfsrm",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5260
+    },
+    {
+        "object": "walls-nnxsjd",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5261
+    },
+    {
+        "object": "walls-nvykqp",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5262
+    },
+    {
+        "object": "walls-ogrxqz",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5263
+    },
+    {
+        "object": "walls-onrszv",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5264
+    },
+    {
+        "object": "walls-onrszv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5265
+    },
+    {
+        "object": "walls-orjpqs",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5266
+    },
+    {
+        "object": "walls-pffhuv",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5267
+    },
+    {
+        "object": "walls-pohzfc",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5268
+    },
+    {
+        "object": "walls-pqbutt",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5269
+    },
+    {
+        "object": "walls-pqbutt",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5270
+    },
+    {
+        "object": "walls-qwwinf",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5271
+    },
+    {
+        "object": "walls-rstyxz",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5272
+    },
+    {
+        "object": "walls-tcrhve",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5273
+    },
+    {
+        "object": "walls-vtwnqs",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5274
+    },
+    {
+        "object": "walls-xayqcu",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5275
+    },
+    {
+        "object": "walls-xayqcu",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5276
+    },
+    {
+        "object": "walls-xayqcu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5277
+    },
+    {
+        "object": "walls-xsfcrp",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5278
+    },
+    {
+        "object": "walls-xsfcrp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5279
+    },
+    {
+        "object": "walls-ynhwyn",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5280
+    },
+    {
+        "object": "walls-ynhwyn",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5281
+    },
+    {
+        "object": "walls-ynporc",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5282
+    },
+    {
+        "object": "walls-ynporc",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureunclosed",
+        "additional_info": "STRUCTURE-UNCLOSED: This object is not a closed mesh: at least one of its sides is open when it should be a solid volume.",
+        "id": 5283
+    },
+    {
+        "object": "walls-yorsom",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5284
+    },
+    {
+        "object": "walls-yorsom",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5285
+    },
+    {
+        "object": "walls-zpsuqe",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5286
+    },
+    {
+        "object": "walls-zpsuqe",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5287
+    },
+    {
+        "object": "walls-zpsuqe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5288
+    },
+    {
+        "object": "walls-zpsuqe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5289
+    },
+    {
+        "object": "alarm_clock-trwyaq",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5290
+    },
+    {
+        "object": "alarm_clock-trwyaq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5291
+    },
+    {
+        "object": "bed-siuxgz",
+        "complaint": "bed_mattress",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: bed\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5292
+    },
+    {
+        "object": "bottom_cabinet-ncgmqr",
+        "complaint": "wensi: does not model door handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5293
+    },
+    {
+        "object": "ceilings-laeuzw",
+        "complaint": "requires splitting",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5294
+    },
+    {
+        "object": "ceilings-pcpvvu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5295
+    },
+    {
+        "object": "door-dlncrt",
+        "complaint": "wensi: does not model door handle well",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5296
+    },
+    {
+        "object": "door-dlncrt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5297
+    },
+    {
+        "object": "door-pevmgl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5298
+    },
+    {
+        "object": "door-pevmgl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5299
+    },
+    {
+        "object": "door-pxhbim",
+        "complaint": "no handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5300
+    },
+    {
+        "object": "door-pxhbim",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5301
+    },
+    {
+        "object": "door-pxhbim",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5302
+    },
+    {
+        "object": "furniture_sink-ojjqku",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5303
+    },
+    {
+        "object": "picture-fdtxut",
+        "complaint": "no thickness",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5304
+    },
+    {
+        "object": "picture-fdtxut",
+        "complaint": "map.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: photograph.n.01\nDefinition: a representation of a person or scene in the form of a print or transparent slide; recorded by a camera on light-sensitive material\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5305
+    },
+    {
+        "object": "picture-fdtxut",
+        "complaint": "map",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: picture\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5306
+    },
+    {
+        "object": "picture-hsbtqi",
+        "complaint": "map.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: photograph.n.01\nDefinition: a representation of a person or scene in the form of a print or transparent slide; recorded by a camera on light-sensitive material\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5307
+    },
+    {
+        "object": "picture-hsbtqi",
+        "complaint": "map",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: picture\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5308
+    },
+    {
+        "object": "mirror-ovdinr",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5309
+    },
+    {
+        "object": "mirror-ovdinr",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5310
+    },
+    {
+        "object": "mirror-ovdinr",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "MIRROR: This object is a mirror. Please ensure that the object is reflective.",
+        "id": 5311
+    },
+    {
+        "object": "monitor-qaacxt",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5312
+    },
+    {
+        "object": "magazine-mtveio",
+        "complaint": "notebook.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: magazine.n.02\nDefinition: product consisting of a paperback periodic publication as a physical object\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5313
+    },
+    {
+        "object": "magazine-mtveio",
+        "complaint": "notebook",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: magazine\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5314
+    },
+    {
+        "object": "pencil_holder-jkuiqg",
+        "complaint": "fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 5315
+    },
+    {
+        "object": "cart-vvtcby",
+        "complaint": "wensi: does not model door handles",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5316
+    },
+    {
+        "object": "serving_cart-vvtcby",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5317
+    },
+    {
+        "object": "shelf-sapyzl",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5318
+    },
+    {
+        "object": "shelf-sapyzl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5319
+    },
+    {
+        "object": "shelf-sapyzl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5320
+    },
+    {
+        "object": "statue-bpqnof",
+        "complaint": "should have transparency",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5321
+    },
+    {
+        "object": "statue-bpqnof",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5322
+    },
+    {
+        "object": "statue-cgzwut",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5323
+    },
+    {
+        "object": "statue-eyepsu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5324
+    },
+    {
+        "object": "statue-hhipck",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5325
+    },
+    {
+        "object": "statue-oaxifo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5326
+    },
+    {
+        "object": "statue-ssooxw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5327
+    },
+    {
+        "object": "table_lamp-erfbgw",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5328
+    },
+    {
+        "object": "table_lamp-erfbgw",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5329
+    },
+    {
+        "object": "table_lamp-erfbgw",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5330
+    },
+    {
+        "object": "table_lamp-erfbgw",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5331
+    },
+    {
+        "object": "table_lamp-htmtsr",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5332
+    },
+    {
+        "object": "table_lamp-htmtsr",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5333
+    },
+    {
+        "object": "table_lamp-htmtsr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5334
+    },
+    {
+        "object": "table_lamp-htmtsr",
+        "complaint": "maybe make this movable",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 5335
+    },
+    {
+        "object": "table_lamp-htmtsr",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5336
+    },
+    {
+        "object": "table_lamp-lshxmu",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5337
+    },
+    {
+        "object": "table_lamp-lshxmu",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5338
+    },
+    {
+        "object": "table_lamp-lshxmu",
+        "complaint": "maybe add joint",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 5339
+    },
+    {
+        "object": "table_lamp-lshxmu",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5340
+    },
+    {
+        "object": "table_lamp-vbjpad",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5341
+    },
+    {
+        "object": "table_lamp-vbjpad",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5342
+    },
+    {
+        "object": "table_lamp-vbjpad",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5343
+    },
+    {
+        "object": "table_lamp-vbjpad",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 5344
+    },
+    {
+        "object": "table_lamp-vbjpad",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5345
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5346
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 5347
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5348
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5349
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 5350
+    },
+    {
+        "object": "table_lamp-wbcgev",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5351
+    },
+    {
+        "object": "beer_bottle-nigfha",
+        "complaint": "bad texture - all white. 3ds max image also bad - shows all black",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5352
+    },
+    {
+        "object": "centerpiece-gakixx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 5353
+    },
+    {
+        "object": "desk-aduafr",
+        "complaint": "looks like drawer could be openable",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 5354
+    },
+    {
+        "object": "desk-aduafr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 5355
+    },
+    {
+        "object": "desk-iotfzl",
+        "complaint": "\u001b[F",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: desk.n.01\nDefinition: a piece of furniture with a writing surface and usually drawers or other compartments\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5356
+    },
+    {
+        "object": "floors-gfgnbf",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "structureconnectedness",
+        "additional_info": "STRUCTURE-MULTIPLE-PIECES: This object is made up of multiple pieces - it should be broken apart. Please consult w/ Cem on how to do this for things like pavers - we want those to be together, but we want large, disjoint flat pieces of floor to be separate objects.",
+        "id": 5357
+    },
+    {
+        "object": "floors-gfgnbf",
+        "complaint": "See message",
+        "processed": false,
+        "new": true,
+        "type": "structurethickness",
+        "additional_info": "STRUCTURE-THICKNESS: This object is a paper-thin floor or wall that should have some thickness.",
+        "id": 5358
+    },
+    {
+        "object": "pillow-agclpq",
+        "complaint": "no texture",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5359
+    },
+    {
+        "object": "pillow-poyzyt",
+        "complaint": "no texture",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5360
+    },
+    {
+        "object": "pillow-poyzyt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5361
+    },
+    {
+        "object": "pot_plant-kyrcpw",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5362
+    },
+    {
+        "object": "pot_plant-mqhlkf",
+        "complaint": "pot_tree ?",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: pot_plant\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5363
+    },
+    {
+        "object": "pot_plant-mqhlkf",
+        "complaint": "dirt is black and not filling the pot",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 5364
+    },
+    {
+        "object": "pot_plant-mqhlkf",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 5365
+    },
+    {
+        "object": "shower-giialz",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5366
+    },
+    {
+        "object": "shower-giialz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 5367
+    },
+    {
+        "object": "showerhead-afoeoa",
+        "complaint": "particleApplier",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: True\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 5368
+    },
+    {
+        "object": "showerhead-svuhzb",
+        "complaint": "particleApplier",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: True\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 5369
+    },
+    {
+        "object": "wall_socket-zyzufw",
+        "complaint": "not watertight",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 5370
+    },
+    {
+        "object": "wall_socket-zyzufw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 5371
+    },
+    {
+        "object": "window-etjpqr",
+        "complaint": "\u001b[A",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: window.n.01\nDefinition: a framework of wood or metal that contains a glass windowpane and is built into a wall or roof to admit light or air\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5372
+    },
+    {
+        "object": "window-etjpqr",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: True\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 5373
+    },
+    {
+        "object": "window-etjpqr",
+        "complaint": "can't see through window",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 5374
+    },
+    {
+        "object": "keyboard-mzskhj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah_2",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 5375
+    },
+    {
+        "object": "magazine_rack-szdjbr",
+        "complaint": "folder.n.02",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: magazine_rack.n.01\nDefinition: a rack for displaying magazines\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 5376
+    },
+    {
+        "object": "magazine_rack-szdjbr",
+        "complaint": "folder",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: magazine_rack\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 5377
+    },
+    {
+        "id": 6907,
+        "object": "table_lamp-wbcgev",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6960,
+        "object": "walls-vtwnqs",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6966,
+        "object": "chandelier-fveyao",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6977,
+        "object": "walls-jamapi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6992,
+        "object": "ceilings-pcpvvu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6994,
+        "object": "walls-pffhuv",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7005,
+        "object": "walls-yorsom",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7007,
+        "object": "walls-onrszv",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7023,
+        "object": "mug-kewbyf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7049,
+        "object": "walls-klcxyf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7154,
+        "object": "walls-xayqcu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7190,
+        "object": "walls-autzye",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7236,
+        "object": "sound_system-wllxyl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7239,
+        "object": "walls-nnxsjd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7247,
+        "object": "walls-ispfoo",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7288,
+        "object": "walls-tcrhve",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7289,
+        "object": "walls-cegpja",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7294,
+        "object": "downlight-oxglnt",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7302,
+        "object": "table_lamp-vbjpad",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7303,
+        "object": "walls-ffybck",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7357,
+        "object": "walls-orjpqs",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7395,
+        "object": "walls-ynhwyn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7400,
+        "object": "curtain-zmodhv",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7462,
+        "object": "mug-yiamah",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7463,
+        "object": "table_lamp-lshxmu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7559,
+        "object": "walls-ynporc",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7570,
+        "object": "walls-potacy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7574,
+        "object": "hardback-vywxev",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7616,
+        "object": "plate-uumkbl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7620,
+        "object": "walls-keugzu",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7621,
+        "object": "walls-qwwinf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7622,
+        "object": "walls-penqpk",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7627,
+        "object": "cap-amryfj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7633,
+        "object": "picture-yrkfct",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7635,
+        "object": "digital_camera-tymxet",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7640,
+        "object": "shelf-sapyzl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7681,
+        "object": "walls-yijzob",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7692,
+        "object": "bottle_of_water-qaceen",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7694,
+        "object": "taboret-cgwxtq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7718,
+        "object": "walls-tghwgm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7729,
+        "object": "walls-pqbutt",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7749,
+        "object": "beaker-uzgibd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7762,
+        "object": "walls-rstyxz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7785,
+        "object": "walls-hltkbe",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7804,
+        "object": "pot_plant-kyrcpw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7818,
+        "object": "picture-aqahkx",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7823,
+        "object": "armchair-axcwcm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7847,
+        "object": "hardback-mkxbhk",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7862,
+        "object": "walls-dohvvk",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7869,
+        "object": "walls-nvykqp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7895,
+        "object": "walls-acugsx",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7907,
+        "object": "picture-krwzus",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7921,
+        "object": "floor_lamp-mqfdjk",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7944,
+        "object": "curtain-didlbp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7957,
+        "object": "picture-ttwhjj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7978,
+        "object": "walls-xsfcrp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7984,
+        "object": "walls-kuhhbl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7987,
+        "object": "walls-rqcytb",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7989,
+        "object": "picture-rypaxo",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8000,
+        "object": "picture-nzctlq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8003,
+        "object": "fixed_window-etjpqr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8025,
+        "object": "walls-avbnnx",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8040,
+        "object": "picture-hyjqxp",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8065,
+        "object": "walls-pohzfc",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8075,
+        "object": "table_lamp-erfbgw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8085,
+        "object": "walls-iobzfe",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8087,
+        "object": "table_lamp-htmtsr",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8097,
+        "object": "picture-vezfau",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8113,
+        "object": "statue-bpqnof",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8122,
+        "object": "folderal-ydrlth",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8145,
+        "object": "walls-ogrxqz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8163,
+        "object": "plate-nikfgd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8174,
+        "object": "tray-iaaiyi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8199,
+        "object": "beer_bottle-nigfha",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8205,
+        "object": "walls-vqgvuw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8219,
+        "object": "walls-edumiy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8220,
+        "object": "flower-xxvkkw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8228,
+        "object": "walls-zpsuqe",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8259,
+        "object": "floors-gfgnbf",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8262,
+        "object": "teacup-kccqwj",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8274,
+        "object": "walls-ndfsrm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

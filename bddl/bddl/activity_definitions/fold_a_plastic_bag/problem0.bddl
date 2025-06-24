@@ -1,0 +1,25 @@
+(define (problem fold_a_plastic_bag-0)
+    (:domain omnigibson)
+
+    (:objects
+        plastic_bag.n.01_1 - plastic_bag.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop plastic_bag.n.01_1 clothes_dryer.n.01_1)
+        (inroom floor.n.01_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (and 
+                (folded ?plastic_bag.n.01_1)
+            )
+        )
+    )
+)

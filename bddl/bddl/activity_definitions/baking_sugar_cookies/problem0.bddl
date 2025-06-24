@@ -1,0 +1,83 @@
+(define (problem baking_sugar_cookies-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        raw_egg.n.01_1 - raw_egg.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        melted__butter.n.01_1 - melted__butter.n.01
+        sodium_carbonate.n.01_1 - sodium_carbonate.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        sugar_cookie.n.01_1 sugar_cookie.n.01_2 sugar_cookie.n.01_3 sugar_cookie.n.01_4 sugar_cookie.n.01_5 sugar_cookie.n.01_6 - sugar_cookie.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        plate.n.04_1 - plate.n.04
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1)
+        (ontop flour__sack.n.01_1 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop tablespoon.n.02_1 countertop.n.01_1)
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1)
+        (ontop sugar__sack.n.01_1 countertop.n.01_1)
+        (ontop raw_egg.n.01_1 plate.n.04_1)
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (ontop vanilla__bottle.n.01_1 countertop.n.01_1)
+        (filled mason_jar.n.01_1 melted__butter.n.01_1)
+        (ontop mason_jar.n.01_1 countertop.n.01_1)
+        (filled sodium_carbonate__jar.n.01_1 sodium_carbonate.n.01_1)
+        (ontop sodium_carbonate__jar.n.01_1 countertop.n.01_2)
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1)
+        (ontop baking_powder__jar.n.01_1 countertop.n.01_2)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2)
+        (inroom oven.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom countertop.n.01_2 kitchen)
+        (inside plate.n.04_1 electric_refrigerator.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop cookie_sheet.n.01_1 countertop.n.01_2)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future sugar_cookie.n.01_4) 
+        (future sugar_cookie.n.01_1) 
+        (future sugar_cookie.n.01_2) 
+        (future sugar_cookie.n.01_6) 
+        (future sugar_cookie.n.01_3) 
+        (future sugar_cookie.n.01_5) 
+    )
+    
+    (:goal 
+        (and 
+            (real ?sugar_cookie.n.01_1) 
+            (real ?sugar_cookie.n.01_2) 
+            (real ?sugar_cookie.n.01_3) 
+            (real ?sugar_cookie.n.01_4) 
+            (real ?sugar_cookie.n.01_5) 
+            (real ?sugar_cookie.n.01_6) 
+            (forall 
+                (?sugar_cookie.n.01 - sugar_cookie.n.01) 
+                (and 
+                    (cooked ?sugar_cookie.n.01) 
+                    (ontop ?sugar_cookie.n.01 ?cookie_sheet.n.01_1)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,1760 @@
+[
+    {
+        "object": "bottle_of_fennel-ihlkfu",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 215
+    },
+    {
+        "object": "bottle_of_mustard_seeds-grryaf",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 216
+    },
+    {
+        "object": "bottle_of_tea_leaves-pfbtus",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 217
+    },
+    {
+        "object": "chopstick-bdvjuf",
+        "complaint": "two objects",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 218
+    },
+    {
+        "object": "chopstick-bdvjuf",
+        "complaint": "\u001b[",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: chopstick.n.01\nDefinition: one of a pair of slender sticks used as oriental tableware to eat food with\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 219
+    },
+    {
+        "object": "frame-trhhqo",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n11.74cm, 1.98m, 3.52m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 220
+    },
+    {
+        "object": "frame-trhhqo",
+        "complaint": "\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: frame.n.10\nDefinition: a framework that supports and protects a picture or a mirror\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 221
+    },
+    {
+        "object": "frame-trhhqo",
+        "complaint": "black in the middle?",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 222
+    },
+    {
+        "object": "bun-fqxumh",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n14.44cm, 14.16cm, 4.40cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 223
+    },
+    {
+        "object": "bun-jeygaq",
+        "complaint": "x2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n14.88cm, 14.94cm, 2.70cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 224
+    },
+    {
+        "object": "lid-gerjlh",
+        "complaint": "pot_lid",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: lid\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 225
+    },
+    {
+        "object": "lid-gerjlh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 226
+    },
+    {
+        "object": "lid-jzwezh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 227
+    },
+    {
+        "object": "lid-mloxso",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 228
+    },
+    {
+        "object": "lid-stukvk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 229
+    },
+    {
+        "object": "loudspeaker-fsyioq",
+        "complaint": "texture a little bad on the back otherwise ffine",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 230
+    },
+    {
+        "object": "menu-tissfg",
+        "complaint": "two objects",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 231
+    },
+    {
+        "object": "menu-tissfg",
+        "complaint": "hard to identify what object this is, should discord completely",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 232
+    },
+    {
+        "object": "paperback_book-okcflv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 233
+    },
+    {
+        "object": "paperback_book-sbrrwi",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 234
+    },
+    {
+        "object": "paperback_book-smlors",
+        "complaint": "the book is opened",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 235
+    },
+    {
+        "object": "paperback_book-smlors",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 236
+    },
+    {
+        "object": "paperback_book-smlors",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 237
+    },
+    {
+        "object": "paperback_book-xdnswn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 238
+    },
+    {
+        "object": "postage_stamps-biqmtn",
+        "complaint": "x20",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n83.20cm, 66.07cm, 8.69cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 239
+    },
+    {
+        "object": "postage_stamp-yszkpy",
+        "complaint": "no thickness",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 240
+    },
+    {
+        "object": "poster_roll-mlezct",
+        "complaint": "\u001b[6~\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: scroll.n.02\nDefinition: a document that can be rolled up (as for storage)\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 241
+    },
+    {
+        "object": "radio-vgioak",
+        "complaint": "togglebutton",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 242
+    },
+    {
+        "object": "clam-nekgsq",
+        "complaint": "white texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 243
+    },
+    {
+        "object": "seashell-nekgsq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 244
+    },
+    {
+        "object": "sourdough-lourny",
+        "complaint": "\u001b",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: sour_bread.n.01\nDefinition: made with a starter of a small amount of dough in which fermentation is active\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 245
+    },
+    {
+        "object": "sourdough-lourny",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 246
+    },
+    {
+        "object": "sourdough-ltjltm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 247
+    },
+    {
+        "object": "sourdough-ndcexh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "Converted to a material complaint",
+        "id": 248
+    },
+    {
+        "object": "swivel_chair-pkpcew",
+        "complaint": "1/2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n64.36cm, 64.38cm, 73.56cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 249
+    },
+    {
+        "object": "swivel_chair-pkpcew",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 250
+    },
+    {
+        "object": "syringe-gagwke",
+        "complaint": "white texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 251
+    },
+    {
+        "object": "tarp-beaglk",
+        "complaint": "no texture",
+        "processed": false,
+        "type": "clothappearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 252
+    },
+    {
+        "object": "tarp-beaglk",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 253
+    },
+    {
+        "object": "tarp-beaglk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 254
+    },
+    {
+        "object": "tarp-beaglk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 255
+    },
+    {
+        "object": "tarp-hijmda",
+        "complaint": "no texture",
+        "processed": false,
+        "type": "clothappearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 256
+    },
+    {
+        "object": "tarp-hijmda",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 257
+    },
+    {
+        "object": "tarp-hijmda",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 258
+    },
+    {
+        "object": "tarp-hijmda",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 259
+    },
+    {
+        "object": "tarp-jpawpo",
+        "complaint": "no texture",
+        "processed": false,
+        "type": "clothappearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 260
+    },
+    {
+        "object": "tarp-jpawpo",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 261
+    },
+    {
+        "object": "tarp-jpawpo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 262
+    },
+    {
+        "object": "tarp-jpawpo",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 263
+    },
+    {
+        "object": "tassel-bgiewk",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 264
+    },
+    {
+        "object": "tray-spopfj",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 265
+    },
+    {
+        "object": "tray-spopfj",
+        "complaint": "fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 266
+    },
+    {
+        "object": "tray-spopfj",
+        "complaint": "\u001b[3~",
+        "processed": true,
+        "new": true,
+        "type": "connectedness",
+        "additional_info": "CONNECTED: Confirm object is a single body. An object cannot contain disconnected parts.",
+        "id": 267
+    },
+    {
+        "object": "trombone-pianqd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 268
+    },
+    {
+        "object": "trombone-pianqd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 269
+    },
+    {
+        "object": "asparagus-xguktb",
+        "complaint": "bundle of objects",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 270
+    },
+    {
+        "object": "asparagus-xguktb",
+        "complaint": "x10",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n55.61cm, 54.01cm, 1.93m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 271
+    },
+    {
+        "object": "bedhseet-ivmsdt",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 272
+    },
+    {
+        "object": "bed_sheet-ivmsdt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 273
+    },
+    {
+        "object": "bedsheet-jfsovh",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 274
+    },
+    {
+        "object": "bed_sheet-jfsovh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 275
+    },
+    {
+        "object": "bedsheet-ldpbcu",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 276
+    },
+    {
+        "object": "bed_sheet-ldpbcu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 277
+    },
+    {
+        "object": "bedsheet-omsbux",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 278
+    },
+    {
+        "object": "bed_sheet-omsbux",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 279
+    },
+    {
+        "object": "bedsheet-padfds",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 280
+    },
+    {
+        "object": "bed_sheet-padfds",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 281
+    },
+    {
+        "object": "bedsheet-xeskbh",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 282
+    },
+    {
+        "object": "bed_sheet-xeskbh",
+        "complaint": ".",
+        "processed": true,
+        "new": true,
+        "type": "substanceness",
+        "additional_info": "SUBSTANCE: Confirm if object should be a rigid body, cloth, or substance.\nIf it's marked softBody or rope, that means it will be a rigid body for now, which is OK.\n\nCurrently, it is annotated as: cloth.\n\nEnter one of \"rigidBody\", \"liquid\", \"macroPhysicalSubstance\", \"microPhysicalSubstance\", \"visualSubstance\", \"cloth\", \"softBody\", \"rope\" to change.",
+        "id": 283
+    },
+    {
+        "object": "bed_sheet-xeskbh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 284
+    },
+    {
+        "object": "champagne-npsevx",
+        "complaint": "x20",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.58m, 1.58m, 6.01m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 285
+    },
+    {
+        "object": "bottle_of_chili_pepper-hjalqq",
+        "complaint": "texture looks off",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 286
+    },
+    {
+        "object": "cleaner-svzbeq",
+        "complaint": "x3",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n8.49cm, 30.79cm, 74.52cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 287
+    },
+    {
+        "object": "bottle_of_cleaner-svzbeq",
+        "complaint": "nth-particleApplier",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 288
+    },
+    {
+        "object": "bottle_of_cleaner-svzbeq",
+        "complaint": "more like a spray bottle",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: bottle_of_cleaner\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 289
+    },
+    {
+        "object": "bottle_of_cleaner-svzbeq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 290
+    },
+    {
+        "object": "bottle_of_ground_cloves-vzamzb",
+        "complaint": "content texture missing",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 291
+    },
+    {
+        "object": "bottle_of_ground_nutmeg-qebruq",
+        "complaint": "needs glass outer",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 292
+    },
+    {
+        "object": "bottle_of_paprika-nrdgrp",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 293
+    },
+    {
+        "object": "bottle_of_poppy_seeds-xdtrgi",
+        "complaint": "not transparent.",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 294
+    },
+    {
+        "object": "bottle_of_rum-oidmvy",
+        "complaint": "need to annotate center of mass",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 295
+    },
+    {
+        "object": "bottle_of_seasoning-vqwqqv",
+        "complaint": "needs glass outer",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 296
+    },
+    {
+        "object": "can_of_bay_leaves-ppwvjf",
+        "complaint": "missing bay leaves texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 297
+    },
+    {
+        "object": "ciigarette-oejihn",
+        "complaint": "x100",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.29m, 13.39cm, 37.83cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 298
+    },
+    {
+        "object": "decanter-ofasfw",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 299
+    },
+    {
+        "object": "dumpling-upqcop",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 300
+    },
+    {
+        "object": "electric_kettle-hkdsla",
+        "complaint": "plug?",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 301
+    },
+    {
+        "object": "electric_kettle-hkdsla",
+        "complaint": "togglebutton;heatsource",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 302
+    },
+    {
+        "object": "jar_of_cumin-tsktnz",
+        "complaint": "not transparent",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 303
+    },
+    {
+        "object": "jar_of_dill_seed-reavkt",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 304
+    },
+    {
+        "object": "marker-ablbdc",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 305
+    },
+    {
+        "object": "monitor-qvpbge",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 306
+    },
+    {
+        "object": "notebook-yibctu",
+        "complaint": "if the cover is not articulated, should remove it",
+        "processed": true,
+        "type": "joint",
+        "additional_info": "Confirm articulation:\nThis object has the below movable links annotated:\n- N/A\n\nThey have now all been set to their upper (maximum) limits.\nVerify that these are all the moving parts you expect from this object\nand that the joint limits look reasonable.",
+        "id": 307
+    },
+    {
+        "object": "notebook-yibctu",
+        "complaint": "joint motion is wrong",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- j_cover, RevoluteJoint\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 308
+    },
+    {
+        "object": "notebook-yibctu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 309
+    },
+    {
+        "object": "pencil_holder-eodvyo",
+        "complaint": "white texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 310
+    },
+    {
+        "object": "pencil_holder-eodvyo",
+        "complaint": "nth-fillable",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 311
+    },
+    {
+        "object": "pencil_holder-vdtheb",
+        "complaint": "no texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 312
+    },
+    {
+        "object": "pencil_holder-vdtheb",
+        "complaint": "nth-fillable",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 313
+    },
+    {
+        "object": "pressure_cooker-otyngn",
+        "complaint": "togglebutton;heatsource",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 314
+    },
+    {
+        "object": "pressure_cooker-otyngn",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: True\n    openable: True\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: True\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 315
+    },
+    {
+        "object": "pruner-lucqrs",
+        "complaint": "x10",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n2.28m, 1.42m, 29.29cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 316
+    },
+    {
+        "object": "pruner-lucqrs",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 317
+    },
+    {
+        "object": "pruner-lucqrs",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 318
+    },
+    {
+        "object": "pruner-lucqrs",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 319
+    },
+    {
+        "object": "storage_box-izcglf",
+        "complaint": "openable, fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 320
+    },
+    {
+        "object": "storage_box-izcglf",
+        "complaint": "joint for openning lid?",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 321
+    },
+    {
+        "object": "storage_box-izcglf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 322
+    },
+    {
+        "object": "storage_box-izcglf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 323
+    },
+    {
+        "object": "storage_box-izcglf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 324
+    },
+    {
+        "object": "storage_box-qsaoni",
+        "complaint": "openable, fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 325
+    },
+    {
+        "object": "storage_box-qsaoni",
+        "complaint": "joint for opening lid?",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 326
+    },
+    {
+        "object": "storage_box-qsaoni",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 327
+    },
+    {
+        "object": "storage_box-qsaoni",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 328
+    },
+    {
+        "object": "storage_box-twvgzf",
+        "complaint": "openable, fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 329
+    },
+    {
+        "object": "storage_box-twvgzf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 330
+    },
+    {
+        "object": "storage_box-twvgzf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 331
+    },
+    {
+        "object": "sweatshirt-nowqqh",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 332
+    },
+    {
+        "object": "tablecloth-egtqpa",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 333
+    },
+    {
+        "object": "tablecloth-egtqpa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 334
+    },
+    {
+        "object": "tablecloth-gwgbkq",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 335
+    },
+    {
+        "object": "tablecloth-gwgbkq",
+        "complaint": "particleRemover?",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: True\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: True\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 336
+    },
+    {
+        "object": "tablecloth-gwgbkq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 337
+    },
+    {
+        "object": "tablecloth-sgmepr",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 338
+    },
+    {
+        "object": "tablecloth-sgmepr",
+        "complaint": "particleRemover?",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: True\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: True\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 339
+    },
+    {
+        "object": "tablecloth-sgmepr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 340
+    },
+    {
+        "object": "tablecloth-sgmepr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 341
+    },
+    {
+        "object": "tablecloth-shgmwu",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 342
+    },
+    {
+        "object": "tablecloth-shgmwu",
+        "complaint": "particleRemover?",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: True\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: True\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 343
+    },
+    {
+        "object": "tablecloth-shgmwu",
+        "complaint": "are any of these tablecloths functional? since they're cloth but not unfolded",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 344
+    },
+    {
+        "object": "tablecloth-shgmwu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 345
+    },
+    {
+        "object": "table_lamp-ajrzlq",
+        "complaint": "center of mass needs to be annotated",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 346
+    },
+    {
+        "object": "table_lamp-ajrzlq",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 347
+    },
+    {
+        "object": "table_lamp-ajrzlq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 348
+    },
+    {
+        "object": "table_lamp-ajrzlq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 349
+    },
+    {
+        "object": "table_lamp-ajrzlq",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 350
+    },
+    {
+        "object": "bookcase-ftzmow",
+        "complaint": "should be bookshelf.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: bookcase.n.01\nDefinition: a piece of furniture with shelves for storing books\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 351
+    },
+    {
+        "object": "bookcase-ftzmow",
+        "complaint": "should be bookshelf",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: bookcase\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 352
+    },
+    {
+        "object": "bottle_of_antihistamines-agavwx",
+        "complaint": "collision mesh of the bottom may be a little offf",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 353
+    },
+    {
+        "object": "bottle_of_ginger-drqhzo",
+        "complaint": "all black. should be glass",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 354
+    },
+    {
+        "object": "bottle_of_ground_mace-lgpxro",
+        "complaint": "glass",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 355
+    },
+    {
+        "object": "bottle_of_sesame_seeds-lzndie",
+        "complaint": "content texture is not visible",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 356
+    },
+    {
+        "object": "burlap_bag-hlqrxm",
+        "complaint": "fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 357
+    },
+    {
+        "object": "burlap_bag-hlqrxm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 358
+    },
+    {
+        "object": "squash-swehmg",
+        "complaint": "x30",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n11.56m, 11.68m, 23.27m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 359
+    },
+    {
+        "object": "chainsaw-xfihoe",
+        "complaint": "white texture",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 360
+    },
+    {
+        "object": "chainsaw-xfihoe",
+        "complaint": "togglebutton",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 361
+    },
+    {
+        "object": "chainsaw-xfihoe",
+        "complaint": "no texture",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 362
+    },
+    {
+        "object": "chainsaw-xfihoe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 363
+    },
+    {
+        "object": "chainsaw-xfihoe",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "SLICER: This object has a slicer meta link. Many objects of this type have issues with their positioning. Check it.",
+        "id": 364
+    },
+    {
+        "object": "desk-iufjhy",
+        "complaint": "drawers need to be articulated",
+        "processed": true,
+        "type": "joint",
+        "additional_info": "Confirm articulation:\nThis object has the below movable links annotated:\n- N/A\n\nThey have now all been set to their upper (maximum) limits.\nVerify that these are all the moving parts you expect from this object\nand that the joint limits look reasonable.",
+        "id": 365
+    },
+    {
+        "object": "desk-iufjhy",
+        "complaint": "the drawers could be openable",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "ARTICULATION: Confirm articulation:\nThis object has the below movable links annotated:\n- None\n\nVerify that the joint limits look reasonable and that the object is not\nmissing articulations that would make it useless. Do NOT be overly ambitious - we\nonly care about MUST-HAVE articulations here.",
+        "id": 366
+    },
+    {
+        "object": "desk-iufjhy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 367
+    },
+    {
+        "object": "donut-hfdwgc",
+        "complaint": "0",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: doughnut.n.02\nDefinition: a small ring-shaped friedcake\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 368
+    },
+    {
+        "object": "half_muffin-ubimyt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 369
+    },
+    {
+        "object": "half_muffin-ypzhst",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 370
+    },
+    {
+        "object": "jar_of_curry_powder-ozhftu",
+        "complaint": "content texture is not visible",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 371
+    },
+    {
+        "object": "mouse-wwyopp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 372
+    },
+    {
+        "object": "pot_plant-cqqyzp",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 373
+    },
+    {
+        "object": "pot_plant-jgkozi",
+        "complaint": "1/2",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n7.25cm, 8.26cm, 11.34cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 374
+    },
+    {
+        "object": "pot_plant-jgkozi",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 375
+    },
+    {
+        "object": "power_washer-pkhrip",
+        "complaint": "togglebutton;fluidsource",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links listed below:\n- N/A\n\nMake sure these match mechanisms you expect from this object.",
+        "id": 376
+    },
+    {
+        "object": "power_washer-pkhrip",
+        "complaint": "particleRemover",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: True\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 377
+    },
+    {
+        "object": "power_washer-pkhrip",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 378
+    },
+    {
+        "object": "quilt-gxmcpy",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 379
+    },
+    {
+        "object": "quilt-mksdlu",
+        "complaint": "cloth",
+        "processed": true,
+        "type": "softbody",
+        "additional_info": "Check if the object looks like it absolutely MUST be a soft body.\nRequirements:\n- type 'cloth' if you think the object can reasonably be simulated by 2D cloth.\n- type 'soft' if it needs to be soft but still needs to have a volume.\n- just hit enter without typing anything if the object does NOT have to be a soft body.",
+        "id": 380
+    },
+    {
+        "object": "soup_ladle-wrctgd",
+        "complaint": "spoon",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: soup_ladle.n.01\nDefinition: a ladle for serving soup\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 381
+    },
+    {
+        "object": "soup_ladle-wrctgd",
+        "complaint": "serving_spoon",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: soup_ladle\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 382
+    },
+    {
+        "object": "toast-nmxadm",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 383
+    },
+    {
+        "object": "baby_monitor-fabztm",
+        "complaint": "questionable texture",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 384
+    },
+    {
+        "object": "webcam-fabztm",
+        "complaint": "no lens",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 385
+    },
+    {
+        "object": "keyboard-kzcreb",
+        "complaint": "1",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: keyboard.n.01\nDefinition: device consisting of a set of keys on a piano or organ or typewriter or typesetting machine or computer or the like\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 386
+    },
+    {
+        "id": 6912,
+        "object": "sourdough-lourny",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 6961,
+        "object": "half_doughnut-qhhrmz",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7057,
+        "object": "cinnamon_roll-xjlptd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7156,
+        "object": "toast-nmxadm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7202,
+        "object": "cupcake-outske",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7221,
+        "object": "postage_stamp-biqmtn",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7297,
+        "object": "sourdough-ndcexh",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7309,
+        "object": "cheese_tart-pyynjg",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7387,
+        "object": "donut-hfdwgc",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7439,
+        "object": "half_toast-gjpbgv",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7482,
+        "object": "mint-jezepy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7505,
+        "object": "sourdough-ltjltm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7544,
+        "object": "half_cinnamon_roll-mijkzq",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7596,
+        "object": "curtain-trwest",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7643,
+        "object": "half_muffin-ubimyt",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7710,
+        "object": "muffin-upcxno",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7713,
+        "object": "postage_stamp-yszkpy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7760,
+        "object": "half_sourdough-flwdle",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7888,
+        "object": "half_sourdough-wgcbuy",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7929,
+        "object": "donut-euibpi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7930,
+        "object": "half_muffin-ypzhst",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7953,
+        "object": "half_cheese_tart-txjdgi",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 7976,
+        "object": "half_toast-xvqnvl",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8015,
+        "object": "cupcake-sutaow",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8017,
+        "object": "half_doughnut-qcuowh",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8037,
+        "object": "half_cupcake-ofuznw",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8062,
+        "object": "half_cupcake-opuxgd",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8066,
+        "object": "half_cinnamon_roll-tmlned",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8137,
+        "object": "cupcake-mbhweg",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    },
+    {
+        "id": 8294,
+        "object": "half_cheese_tart-jldqnm",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

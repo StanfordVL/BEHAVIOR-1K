@@ -1,0 +1,79 @@
+(define (problem make_muffins-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        salt.n.02_1 - salt.n.02
+        raw_egg.n.01_1 - raw_egg.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        cooking_oil.n.01_1 - cooking_oil.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        muffin.n.01_1 muffin.n.01_2 muffin.n.01_3 muffin.n.01_4 muffin.n.01_5 muffin.n.01_6 - muffin.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        floor.n.01_1 - floor.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cooking_oil__bottle.n.01_1 - cooking_oil__bottle.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 floor.n.01_1) 
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1) 
+        (inside baking_powder__jar.n.01_1 cabinet.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (inside raw_egg.n.01_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 floor.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled cooking_oil__bottle.n.01_1 cooking_oil.n.01_1) 
+        (inside cooking_oil__bottle.n.01_1 cabinet.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_2) 
+        (future muffin.n.01_5) 
+        (future muffin.n.01_6) 
+        (future muffin.n.01_1) 
+        (future muffin.n.01_2) 
+        (future muffin.n.01_3) 
+        (future muffin.n.01_4) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?muffin.n.01_1) 
+            (real ?muffin.n.01_2) 
+            (real ?muffin.n.01_3) 
+            (real ?muffin.n.01_4) 
+            (real ?muffin.n.01_5) 
+            (real ?muffin.n.01_6) 
+            (forall 
+                (?muffin.n.01 - muffin.n.01) 
+                (and 
+                    (cooked ?muffin.n.01) 
+                    (ontop ?muffin.n.01 ?cookie_sheet.n.01_1)
+                )
+            )
+        )
+    )
+)

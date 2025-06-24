@@ -1,0 +1,28 @@
+(define (problem make_a_christmas_gift_box-0)
+    (:domain omnigibson)
+
+    (:objects
+        wrapping_paper.n.01_1 - wrapping_paper.n.01
+        console_table.n.01_1 - console_table.n.01
+        bell.n.01_1 - bell.n.01
+        packing_box.n.02_1 - packing_box.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop wrapping_paper.n.01_1 console_table.n.01_1) 
+        (ontop bell.n.01_1 console_table.n.01_1) 
+        (ontop packing_box.n.02_1 console_table.n.01_1) 
+        (inroom console_table.n.01_1 living_room)
+        (inroom floor.n.01_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (overlaid ?wrapping_paper.n.01_1 ?packing_box.n.02_1)
+            (inside ?bell.n.01_1 ?packing_box.n.02_1)
+        )
+    )
+)

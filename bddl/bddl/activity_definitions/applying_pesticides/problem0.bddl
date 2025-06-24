@@ -1,0 +1,25 @@
+(define (problem applying_pesticides-0)
+    (:domain omnigibson)
+
+    (:objects
+        pesticide__atomizer.n.01_1 - pesticide__atomizer.n.01
+        floor.n.01_1 - floor.n.01
+        lawn.n.01_1 - lawn.n.01
+        pesticide.n.01_1 - pesticide.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pesticide__atomizer.n.01_1 floor.n.01_1) 
+        (insource pesticide__atomizer.n.01_1 pesticide.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?lawn.n.01_1 ?pesticide.n.01_1)
+        )
+    )
+)

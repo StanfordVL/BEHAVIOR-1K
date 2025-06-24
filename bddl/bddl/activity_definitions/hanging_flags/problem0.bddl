@@ -1,0 +1,25 @@
+(define (problem hanging_flags-0)
+    (:domain omnigibson)
+
+    (:objects
+        pole.n.01_1 - pole.n.01
+        floor.n.01_1 - floor.n.01
+        national_flag.n.01_1 - national_flag.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (attached pole.n.01_1 wall_nail.n.01_1) 
+        (ontop national_flag.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom wall_nail.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (draped ?national_flag.n.01_1 ?pole.n.01_1)
+        )
+    )
+)

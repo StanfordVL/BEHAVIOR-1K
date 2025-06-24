@@ -1,0 +1,34 @@
+(define (problem clean_boxing_gloves-0)
+    (:domain omnigibson)
+
+    (:objects
+        boxing_glove.n.01_1 boxing_glove.n.01_2 - boxing_glove.n.01
+        dust.n.01_1 - dust.n.01
+        washer.n.03_1 - washer.n.03
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop boxing_glove.n.01_1 countertop.n.01_1) 
+        (ontop boxing_glove.n.01_2 countertop.n.01_1) 
+        (covered boxing_glove.n.01_1 dust.n.01_1)
+        (covered boxing_glove.n.01_2 dust.n.01_1)
+        (inroom washer.n.03_1 utility_room)
+        (inroom countertop.n.01_1 utility_room)
+        (inroom floor.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?boxing_glove.n.01 - boxing_glove.n.01)
+                (not 
+                    (covered ?boxing_glove.n.01 ?dust.n.01_1)
+                )
+            )
+        )
+    )
+)

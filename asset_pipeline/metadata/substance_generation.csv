@@ -1,0 +1,134 @@
+Name,Done,Unused,Type,Request,Shape,Count,Color,Diameter (mm),Args,Notes
+brown_rice,1,0,microphysical,ACTION,mesh,single,,,,"Maybe we have some kind of rice already, check"
+coal,1,0,microphysical,BUY,mesh,multishape,,,3D model realistic coal - TurboSquid 1169720,Maybe this should not be micro? Resolve w/ Josiah & Eric
+hair,1,0,macrophysical,BUY,mesh,single,,,,
+popcorn,1,0,macrophysical,BUY,mesh,multishape,,,popcorn corns 3d model (turbosquid.com),
+sesame_seed,1,0,microphysical,ACTION,mesh,single,,,,perhaps recolor an existing kind of seed
+tomato_rice,1,0,microphysical,ACTION,mesh,single,,,,another rice colored in orange hue
+white_rice,1,0,microphysical,ACTION,mesh,single,,,,use another kind of rice if we have it
+stain,1,0,visual,BUY,stain,multishape,,,,High priority - many things depend on this!
+diced__apple,,0,macrophysical,GENERATE,cube,single,"255,240,125",10,,
+diced__avocado,,0,macrophysical,GENERATE,cube,single,"181,198,120",10,,
+diced__beef_roast,,0,macrophysical,GENERATE,cube,single,"255,127,127",15,,
+diced__beefsteak_tomato,,0,macrophysical,GENERATE,cube,single,"255,40,5",10,,
+diced__beet,,0,macrophysical,GENERATE,cube,single,"171,0,78",10,,
+diced__bell_pepper,,0,macrophysical,GENERATE,cube,single,"236,15,15",10,,
+diced__carrot,,0,macrophysical,GENERATE,cube,single,"235,83,0",10,,
+diced__cheddar,,0,macrophysical,GENERATE,cube,single,"241,234,180",10,,
+diced__chicken,,0,macrophysical,GENERATE,cube,single,"249,213,144",10,,
+diced__chili,,0,macrophysical,GENERATE,cube,single,"30,156,73",5,,
+diced__clove,,0,macrophysical,GENERATE,cube,single,"247,243,225",5,,
+diced__cucumber,,0,macrophysical,GENERATE,cube,single,"200,255,102",10,,
+diced__feta,,0,macrophysical,GENERATE,cube,single,"214,211,180",10,,
+diced__kiwi,,0,macrophysical,GENERATE,cube,single,"97,171,90",10,,
+diced__lemon,,0,macrophysical,GENERATE,cube,single,"233,255,150",10,,
+diced__lettuce,,0,macrophysical,GENERATE,cube,single,"16,120,0",5,,
+diced__mango,,0,macrophysical,GENERATE,cube,single,"255,213,0",10,,
+diced__pineapple,,0,macrophysical,GENERATE,cube,single,"255,244,0",10,,
+diced__potato,,0,macrophysical,GENERATE,cube,single,"178,94,9",10,,
+diced__spinach,,0,macrophysical,GENERATE,cube,single,"0,177,0",5,,
+diced__vidalia_onion,,0,macrophysical,GENERATE,cube,single,"216,105,158",10,,
+diced__virginia_ham,,0,macrophysical,GENERATE,cube,single,"255,118,118",10,,
+diced__watermelon,,0,macrophysical,GENERATE,cube,single,"253,87,87",10,,
+diced__zucchini,,0,macrophysical,GENERATE,cube,single,"227,255,200",10,,
+cat_food,1,0,macrophysical,ACTION,,,,,,generated before
+jimmies,1,0,microphysical,GENERATE,cylinder,multicolor,,,,sprinkles!
+pellet_food,1,0,macrophysical,GENERATE,cylinder,single,,,,
+dirt,,0,visual,GENERATE,dirt,multishape,,,,stain with dark gray transparent-pattern texture
+dust,,0,visual,GENERATE,dirt,multishape,,,,dirt with light gray transparent-pattern texture
+lint,,0,visual,GENERATE,dirt,multishape,,,,purplish gray transparent-pattern texture
+mildew,,0,visual,GENERATE,dirt,multishape,,,,cyan-like dirt
+mold,,0,visual,GENERATE,dirt,multishape,,,,"black dirt, bigger particle size"
+rust,,0,visual,GENERATE,dirt,multishape,,,,orange transparent-pattern texture
+sand,,0,visual,GENERATE,dirt,multishape,,,,yellow transparent-pattern texture
+house_paint,,0,visual,GENERATE,disk,single,,,,use white paint material from vray if available
+insectifuge,1,0,visual,GENERATE,disk,multishape,,,,Tglass for transparency
+spray_paint,1,0,visual,GENERATE,disk,single,,,,white color disk
+tarnish,1,0,visual,GENERATE,disk,single, ,,,glassy disk.
+chia_seed,,0,microphysical,GENERATE,some existing seed,single,,,,
+allspice,,0,microphysical,GENERATE,sphere,single,"136,100,81",1,,
+ash,,0,microphysical,GENERATE,sphere,multicolor,"172,172,180;70,73,93",1,,
+baking_powder,,0,microphysical,GENERATE,sphere,single,"253,251,251",1,,
+black_pepper,,0,microphysical,GENERATE,sphere,single,"47,31,28",5,,
+brown_sugar,,0,microphysical,GENERATE,sphere,single,"122,63,2",3,,
+cake_mix,,0,microphysical,GENERATE,sphere,single,"238,238,238",1,,
+cane_sugar,,0,microphysical,GENERATE,sphere,single,"242,237,237",3,,
+cayenne,,0,microphysical,GENERATE,sphere,single,"242,95,53",1,,
+cinnamon,,0,microphysical,GENERATE,sphere,single,"207,145,80",1,,
+cinnamon_sugar,,0,microphysical,GENERATE,sphere,single,"207,145,80",3,,
+clove,,0,microphysical,GENERATE,sphere,single,"247,243,225",1,,Not actual cloves but garlic powder
+cocoa_powder,,0,microphysical,GENERATE,sphere,single,"65,41,16",1,,
+coffee_grounds,,0,visual,GENERATE,sphere,single,"45,25,3",1,,
+coriander,,0,microphysical,GENERATE,sphere,single,"266,180,98",5,,
+cornstarch,,0,microphysical,GENERATE,sphere,single,"242,243,238",1,,
+cream_of_tartar,,0,microphysical,GENERATE,sphere,single,"255,255,255",1,,
+cumin,,0,microphysical,GENERATE,sphere,single,"199,119,29",3,,
+curry_powder,,0,microphysical,GENERATE,sphere,single,"224,170,39",1,,
+flour,,0,microphysical,GENERATE,sphere,single,"243,239,233",1,,
+ginger,,0,microphysical,GENERATE,sphere,single,"251,237,102",1,,
+granulated_salt,,0,microphysical,GENERATE,sphere,single,"247,246,243",5,,
+granulated_sugar,,0,microphysical,GENERATE,sphere,single,"242,237,237",5,,
+grated_cheese,,0,macrophysical,GENERATE,sphere,single,"255,252,219",3,,
+green_tea,,0,macrophysical,GENERATE,sphere,single,"115,156,76",3,,"also there's stuff assigned to this currently that's not a substance mesh, reassign/delete those"
+ground_beef,,0,microphysical,GENERATE,sphere,single,"255,127,127",3,,
+ground_coffee,,0,microphysical,GENERATE,sphere,single,"136,100,81",3,,
+instant_coffee,,0,microphysical,GENERATE,sphere,single,"136,100,81",3,,
+jerk_seasoning,,0,microphysical,GENERATE,sphere,single,"171,113,24",1,,or maybe multicolor idk
+lemon-pepper_seasoning,,0,microphysical,GENERATE,sphere,multicolor,"249,236,73;47,31,28",3,,yellow/black particles
+marjoram,,0,microphysical,GENERATE,sphere,single,"122,193,67",5,,supposed to be like dried leaves but its ok
+mustard_seasoning,,0,microphysical,GENERATE,sphere,single,"246,243,195",1,,
+mustard_seed,,0,macrophysical,GENERATE,sphere,single,"230,184,55",5,,
+nutmeg,,0,microphysical,GENERATE,sphere,single,"193,138,69",3,,
+oat,,0,microphysical,GENERATE,sphere,single,"240,230,189",5,,
+onion_powder,,0,microphysical,GENERATE,sphere,single,"255,246,218",1,,
+paprika,,0,microphysical,GENERATE,sphere,single,"134,12,26",1,,
+parmesan,,0,microphysical,GENERATE,sphere,single,"255,250,204",3,,
+pumpkin_pie_spice,,0,microphysical,GENERATE,sphere,single,"246,143,57",1,,
+quinoa,,0,microphysical,GENERATE,sphere,single,"242,221,135",3,,
+saffron,,0,microphysical,GENERATE,sphere,single,"221,41,40",3,,
+sage,,0,microphysical,GENERATE,sphere,single,"118,138,118",5,,should be dried leaves but OK for now
+salt,,0,microphysical,GENERATE,sphere,single,"247,246,243",3,,
+sodium_carbonate,,0,macrophysical,GENERATE,sphere,single,"247,246,243",5,,
+soil,,0,microphysical,GENERATE,sphere,multicolor,"70,46,34;193,155,107",1,,brown/black
+sugar_coffee_scrub,,0,visual,GENERATE,sphere,single,"136,100,81",1,,
+thyme,,0,microphysical,GENERATE,sphere,single,"97,162,68",5,,
+yeast,,0,microphysical,GENERATE,sphere,single,"240,230,189",1,,
+wax_remnant,1,0,visual,GENERATE,stain,multishape,,,,this is talking about candle wax remnant so use candle color (yellowish)
+adhesive_material,1,0,visual,GENERATE,stain,multishape,,,,
+debris,1,0,visual,GENERATE,stain,multishape,,,,similar to dust
+fecal_matter,1,0,visual,GENERATE,stain,multishape,,,,brown stain
+grease,1,0,visual,GENERATE,stain,multishape,,,,
+incision,1,0,visual,GENERATE,stain,multishape,,,,use thinned stain if needed. needs to look like a scratch. can be gray or glass
+mud,1,0,visual,GENERATE,stain,multishape,,,,brown stains
+snow,1,0,visual,GENERATE,stain,multishape,,,,"thick, white stain"
+stucco,1,0,visual,GENERATE,stain,multishape,,,,"add a slight thickness, make it wall colored"
+wrinkle,1,0,visual,GENERATE,stain,multishape,,,,"see if the stain shape, when thinned, works for this"
+hay,1,0,macrophysical,GENERATE,thin cuboid,multishape,,,,also remove problematic haystack assigned to this object
+mulch,1,0,macrophysical,GENERATE,thin cuboid,multicolor,,,Mulch 3D model - TurboSquid 1684104,diff size / shape
+noodle,1,0,macrophysical,GENERATE,thin cuboid,multishape,,,Instant Noodles 3D model - TurboSquid 1891229, 
+bird_feed,,0,microphysical,MODIFY,mesh,multishape,,,,object is a single thing showing up as a cloud. fix that (maybe already fixed)
+black_bean,,0,macrophysical,MODIFY,mesh,single,,,,"looks like objects might be missing texture, take a look"
+blueberry,,0,macrophysical,MODIFY,mesh,single,,,,all verified except blueberry-pfapuv which previously had multiple blueberries. fix (maybe already fixed)
+chickpea,,0,macrophysical,MODIFY,mesh,single,,,,Check texture. Something might be wrong
+granola,,0,macrophysical,MODIFY,mesh,multishape,,,,see the make_granola task - make granola particles a combination of the constituent particles maybe?
+kidney_bean,,0,macrophysical,MODIFY,mesh,single,,,,recolor another kind of bean
+orzo,,0,macrophysical,MODIFY,mesh,single,,,,"Leave this to the end, maybe something will look like it. Otherwise we'll use a cylinder or something"
+coconut,,1,macrophysical,REMOVEUNUSED,,,,,,
+petfood,,0,macrophysical,REMOVEUNUSED,,,,,,use its children instead
+crumb,,0,microphysical,REMOVEUNUSED,,,,,,use its children instead
+almond,,0,macrophysical,VERIFIED,mesh,single,,,,
+breadcrumb,,0,microphysical,VERIFIED,mesh,single,,,,later: resize
+bunchgrass,,0,visual,VERIFIED,mesh,multishape,,,,later: resize + increase diversity
+chocolate_kiss,,0,macrophysical,VERIFIED,mesh,single,,,,
+coffee_bean,,0,macrophysical,VERIFIED,mesh,single,,,,
+crouton,,0,macrophysical,VERIFIED,mesh,single,,,,
+diced__green_onion,,0,macrophysical,VERIFIED,mesh,single,,,,
+dog_food,,0,macrophysical,VERIFIED,mesh,single,,,,
+jelly_bean,,0,macrophysical,VERIFIED,mesh,multishape,,,,
+pea,,0,macrophysical,VERIFIED,mesh,multishape,,,,check the size
+pecan,,0,macrophysical,VERIFIED,mesh,single,,,,
+pill,,0,macrophysical,VERIFIED,mesh,multishape,,,,check the size
+pumpkin_seed,,0,microphysical,VERIFIED,mesh,multishape,,,,check the size
+raisin,,0,macrophysical,VERIFIED,mesh,multishape,,,,check the size
+rosemary,,0,macrophysical,VERIFIED,mesh,multishape,,,,check the size
+sunflower_seed,,0,microphysical,VERIFIED,mesh,multishape,,,,

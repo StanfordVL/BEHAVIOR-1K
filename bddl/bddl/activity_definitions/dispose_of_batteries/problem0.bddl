@@ -1,0 +1,33 @@
+(define (problem dispose_of_batteries-0)
+    (:domain omnigibson)
+
+    (:objects
+        battery.n.02_1 battery.n.02_2 - battery.n.02
+        cabinet.n.01_1 - cabinet.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        razor.n.01_1 - razor.n.01
+        hand_blower.n.01_1 - hand_blower.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop battery.n.02_1 floor.n.01_1)
+        (inside hand_blower.n.01_1 cabinet.n.01_1)
+        (ontop battery.n.02_2 floor.n.01_1)
+        (ontop razor.n.01_1 cabinet.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (inroom cabinet.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?battery.n.02 - battery.n.02)
+                (inside ?battery.n.02 ?ashcan.n.01_1)
+            )
+        )
+    )
+)

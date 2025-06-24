@@ -1,0 +1,63 @@
+(define (problem drying_dishes-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 plate.n.04_4 - plate.n.04
+        saucer.n.02_1 saucer.n.02_2 - saucer.n.02
+        platter.n.01_1 - platter.n.01
+        dishtowel.n.01_1 - dishtowel.n.01
+        sink.n.01_1 - sink.n.01
+        dishwasher.n.01_1 - dishwasher.n.01
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered plate.n.04_1 water.n.06_1)
+        (covered plate.n.04_2 water.n.06_1)
+        (covered plate.n.04_1 water.n.06_1)
+        (covered plate.n.04_2 water.n.06_1)
+        (covered saucer.n.02_1 water.n.06_1) 
+        (covered saucer.n.02_2 water.n.06_1) 
+        (covered platter.n.01_1 water.n.06_1) 
+        (ontop dishtowel.n.01_1 countertop.n.01_1) 
+        (ontop plate.n.04_1 sink.n.01_1)
+        (ontop plate.n.04_2 sink.n.01_1)
+        (ontop plate.n.04_3 sink.n.01_1)
+        (ontop plate.n.04_4 sink.n.01_1)
+        (ontop saucer.n.02_1 countertop.n.01_1) 
+        (ontop saucer.n.02_2 countertop.n.01_1) 
+        (ontop platter.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom cabinet.n.01_2 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (not 
+                    (covered ?plate.n.04 ?water.n.06_1)
+                )
+            ) 
+            (forall 
+                (?saucer.n.02 - saucer.n.02) 
+                (not 
+                    (covered ?saucer.n.02 ?water.n.06_1)
+                )
+            ) 
+            (not 
+                (covered ?platter.n.01_1 ?water.n.06_1)
+            ) 
+        )
+    )
+)

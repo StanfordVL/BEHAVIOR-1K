@@ -1,0 +1,59 @@
+(define (problem make_a_sandwich-0)
+    (:domain omnigibson)
+
+    (:objects
+        jelly.n.02_1 - jelly.n.02
+        jelly__jar.n.01_1 - jelly__jar.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        peanut_butter.n.01_1 - peanut_butter.n.01
+        peanut_butter__jar.n.01_1 - peanut_butter__jar.n.01
+        bread_slice.n.01_1 bread_slice.n.01_2 - bread_slice.n.01
+        sack.n.01_1 - sack.n.01
+        plate.n.04_1 - plate.n.04
+        countertop.n.01_1 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        table_knife.n.01_1 - table_knife.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled jelly__jar.n.01_1 jelly.n.02_1) 
+        (inside jelly__jar.n.01_1 electric_refrigerator.n.01_1) 
+        (filled peanut_butter__jar.n.01_1 peanut_butter.n.01_1) 
+        (inside peanut_butter__jar.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bread_slice.n.01_1 sack.n.01_1)
+        (inside bread_slice.n.01_2 sack.n.01_1)
+        (inside sack.n.01_1 electric_refrigerator.n.01_1)
+        (inside plate.n.04_1 cabinet.n.01_1) 
+        (ontop table_knife.n.01_1 countertop.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?bread_slice.n.01 - bread_slice.n.01)
+                (or 
+                    (ontop ?bread_slice.n.01 ?bread_slice.n.01_1)
+                    (ontop ?bread_slice.n.01 ?bread_slice.n.01_2)
+                )
+            )
+            (exists 
+                (?bread_slice.n.01 - bread_slice.n.01)
+                (ontop ?bread_slice.n.01 ?plate.n.04_1)
+            )
+            (forall 
+                (?bread_slice.n.01 - bread_slice.n.01)
+                (and
+                    (covered ?bread_slice.n.01 ?peanut_butter.n.01_1)
+                    (covered ?bread_slice.n.01 ?jelly.n.02_1)
+                )
+            )
+        )
+    )
+)

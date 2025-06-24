@@ -1,0 +1,53 @@
+(define (problem make_batter-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        baking_powder.n.01_1 - baking_powder.n.01
+        salt.n.02_1 - salt.n.02
+        whole_milk.n.01_1 - whole_milk.n.01
+        water.n.06_1 - water.n.06
+        pancake_batter.n.01_1 - pancake_batter.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        baking_powder__jar.n.01_1 - baking_powder__jar.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        sink.n.01_1 - sink.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled baking_powder__jar.n.01_1 baking_powder.n.01_1) 
+        (ontop baking_powder__jar.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_2) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future pancake_batter.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?pancake_batter.n.01_1) 
+            (contains ?mixing_bowl.n.01_1 ?pancake_batter.n.01_1)
+        )
+    )
+)

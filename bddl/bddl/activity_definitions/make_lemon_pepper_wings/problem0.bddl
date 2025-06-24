@@ -1,0 +1,121 @@
+(define (problem make_lemon_pepper_wings-0)
+    (:domain omnigibson)
+
+    (:objects
+        melted__butter.n.01_1 - melted__butter.n.01
+        lemon-pepper_seasoning.n.01_1 - lemon-pepper_seasoning.n.01
+        cooked__lemon-pepper_seasoning.n.01_1 - cooked__lemon-pepper_seasoning.n.01
+        chicken_wing.n.01_1 chicken_wing.n.01_2 chicken_wing.n.01_3 chicken_wing.n.01_4 chicken_wing.n.01_5 chicken_wing.n.01_6 chicken_wing.n.01_7 chicken_wing.n.01_8 - chicken_wing.n.01
+        tray.n.01_1 tray.n.01_2 - tray.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        cooked__olive_oil.n.01_1 - cooked__olive_oil.n.01
+        stove.n.01_1 - stove.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        salt.n.02_1 - salt.n.02
+        cooked__salt.n.01_1 - cooked__salt.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        bowl.n.01_1 - bowl.n.01
+        lemon-pepper_seasoning__shaker.n.01_1 - lemon-pepper_seasoning__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        tongs.n.01_1 - tongs.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled bowl.n.01_1 melted__butter.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (inside salt__shaker.n.01_1 cabinet.n.01_1)
+        (insource lemon-pepper_seasoning__shaker.n.01_1 lemon-pepper_seasoning.n.01_1) 
+        (inside lemon-pepper_seasoning__shaker.n.01_1 cabinet.n.01_1) 
+        (not 
+            (cooked chicken_wing.n.01_1)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_2)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_3)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_4)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_5)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_6)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_7)
+        ) 
+        (not 
+            (cooked chicken_wing.n.01_8)
+        ) 
+        (ontop chicken_wing.n.01_1 tray.n.01_1)
+        (ontop chicken_wing.n.01_2 tray.n.01_1)
+        (ontop chicken_wing.n.01_3 tray.n.01_1)
+        (ontop chicken_wing.n.01_4 tray.n.01_1)
+        (ontop chicken_wing.n.01_5 tray.n.01_2)
+        (ontop chicken_wing.n.01_6 tray.n.01_2)
+        (ontop chicken_wing.n.01_7 tray.n.01_2)
+        (ontop chicken_wing.n.01_8 tray.n.01_2)
+        (inside tray.n.01_1 electric_refrigerator.n.01_1)
+        (inside tray.n.01_2 electric_refrigerator.n.01_1)
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1) 
+        (ontop tongs.n.01_1 countertop.n.01_2)
+        (inroom stove.n.01_1 kitchen) 
+        (ontop frying_pan.n.01_1 countertop.n.01_2) 
+        (future cooked__lemon-pepper_seasoning.n.01_1) 
+        (future cooked__olive_oil.n.01_1) 
+        (future cooked__salt.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (or 
+                (real ?lemon-pepper_seasoning.n.01_1) 
+                (real ?cooked__lemon-pepper_seasoning.n.01_1)
+            ) 
+            (or 
+                (real ?olive_oil.n.01_1) 
+                (real ?cooked__olive_oil.n.01_1)
+            ) 
+            (real ?melted__butter.n.01_1) 
+            (or 
+                (real ?salt.n.02_1) 
+                (real ?cooked__salt.n.01_1)
+            ) 
+            (forall 
+                (?chicken_wing.n.01 - chicken_wing.n.01) 
+                (and 
+                    (cooked ?chicken_wing.n.01) 
+                    (or 
+                        (covered ?chicken_wing.n.01 ?lemon-pepper_seasoning.n.01_1) 
+                        (covered ?chicken_wing.n.01 ?cooked__lemon-pepper_seasoning.n.01_1)
+                    ) 
+                    (or 
+                        (covered ?chicken_wing.n.01 ?olive_oil.n.01_1) 
+                        (covered ?chicken_wing.n.01 ?cooked__olive_oil.n.01_1)
+                    ) 
+                    (covered ?chicken_wing.n.01 ?melted__butter.n.01_1) 
+                    (or 
+                        (covered ?chicken_wing.n.01 ?salt.n.02_1) 
+                        (covered ?chicken_wing.n.01 ?cooked__salt.n.01_1)
+                    )
+                )
+            )
+        )
+    )
+)

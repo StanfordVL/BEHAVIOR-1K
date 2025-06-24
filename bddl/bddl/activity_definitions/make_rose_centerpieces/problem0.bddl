@@ -1,0 +1,31 @@
+(define (problem make_rose_centerpieces-0)
+    (:domain omnigibson)
+
+    (:objects
+        vase.n.01_1 - vase.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        rose.n.01_1 rose.n.01_2 rose.n.01_3 rose.n.01_4 - rose.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop vase.n.01_1 coffee_table.n.01_1) 
+        (ontop rose.n.01_1 coffee_table.n.01_1) 
+        (ontop rose.n.01_2 coffee_table.n.01_1) 
+        (ontop rose.n.01_3 coffee_table.n.01_1) 
+        (ontop rose.n.01_4 coffee_table.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?rose.n.01_1 ?vase.n.01_1) 
+            (inside ?rose.n.01_2 ?vase.n.01_1) 
+            (inside ?rose.n.01_3 ?vase.n.01_1) 
+            (inside ?rose.n.01_4 ?vase.n.01_1)
+        )
+    )
+)

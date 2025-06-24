@@ -1,0 +1,30 @@
+(define (problem shoveling_coal-0)
+    (:domain omnigibson)
+
+    (:objects
+        coal.n.01_1 - coal.n.01
+        bucket.n.01_1 - bucket.n.01
+        lawn.n.01_1 - lawn.n.01
+        shovel.n.01_1 - shovel.n.01
+        grill.n.02_1 - grill.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled bucket.n.01_1 coal.n.01_1) 
+        (ontop bucket.n.01_1 lawn.n.01_1) 
+        (ontop shovel.n.01_1 lawn.n.01_1)
+        (inroom grill.n.02_1 garden) 
+        (inroom lawn.n.01_1 garden) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?grill.n.02_1 ?coal.n.01_1) 
+            (ontop ?bucket.n.01_1 ?lawn.n.01_1)
+        )
+    )
+)

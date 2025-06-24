@@ -1,0 +1,54 @@
+(define (problem stock_a_bar_cart-0)
+    (:domain omnigibson)
+
+    (:objects
+     	bottle__of__beer.n.01_1 - bottle__of__beer.n.01
+    	shelf.n.01_1 - shelf.n.01
+    	beer_glass.n.01_1 beer_glass.n.01_2 - beer_glass.n.01
+    	cabinet.n.01_1 - cabinet.n.01
+    	bottle__of__wine.n.01_1 - bottle__of__wine.n.01
+    	bottle__of__whiskey.n.01_1 - bottle__of__whiskey.n.01
+    	dishtowel.n.01_1 - dishtowel.n.01
+    	bottle__of__tonic.n.01_1 - bottle__of__tonic.n.01
+    	bottle__of__lemonade.n.01_1 - bottle__of__lemonade.n.01
+    	teaspoon.n.02_1 - teaspoon.n.02
+    	shot_glass.n.01_1 - shot_glass.n.01
+    	floor.n.01_1 - floor.n.01
+    	serving_cart.n.01_1 - serving_cart.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bottle__of__beer.n.01_1 shelf.n.01_1)
+        (ontop beer_glass.n.01_1 cabinet.n.01_1)
+        (ontop bottle__of__wine.n.01_1 shelf.n.01_1)
+        (ontop beer_glass.n.01_2 cabinet.n.01_1)
+        (ontop bottle__of__whiskey.n.01_1 shelf.n.01_1)
+        (ontop dishtowel.n.01_1 shelf.n.01_1)
+        (ontop bottle__of__tonic.n.01_1 shelf.n.01_1)
+        (ontop bottle__of__lemonade.n.01_1 shelf.n.01_1)
+        (ontop teaspoon.n.02_1 shelf.n.01_1)
+        (ontop shot_glass.n.01_1 shelf.n.01_1)
+        (inroom floor.n.01_1 kitchen)
+        (ontop serving_cart.n.01_1 floor.n.01_1)
+        (inroom shelf.n.01_1 kitchen)
+        (inroom cabinet.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (nextto ?bottle__of__wine.n.01_1 ?bottle__of__beer.n.01_1) 
+            (ontop ?shot_glass.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?bottle__of__whiskey.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?bottle__of__beer.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?bottle__of__tonic.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?bottle__of__lemonade.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?beer_glass.n.01_1 ?serving_cart.n.01_1)
+            (ontop ?beer_glass.n.01_2 ?serving_cart.n.01_1)
+            (ontop ?dishtowel.n.01_1 ?serving_cart.n.01_1)
+            (folded ?dishtowel.n.01_1)
+            (ontop ?teaspoon.n.02_1 ?serving_cart.n.01_1)
+        )
+    )
+)

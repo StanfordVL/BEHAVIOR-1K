@@ -1,0 +1,7074 @@
+[
+    {
+        "rule_name": "cooked-half__apple.n.01-dicing",
+        "input_synsets": {
+            "half__apple.n.01": 1
+        },
+        "input_states": {
+            "half__apple.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__apple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__apricot.n.01-dicing",
+        "input_synsets": {
+            "half__apricot.n.01": 1
+        },
+        "input_states": {
+            "half__apricot.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__arepa.n.01-dicing",
+        "input_synsets": {
+            "half__arepa.n.01": 1
+        },
+        "input_states": {
+            "half__arepa.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__arepa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__artichoke.n.01-dicing",
+        "input_synsets": {
+            "half__artichoke.n.01": 1
+        },
+        "input_states": {
+            "half__artichoke.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__artichoke.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__arugula.n.01-dicing",
+        "input_synsets": {
+            "half__arugula.n.01": 1
+        },
+        "input_states": {
+            "half__arugula.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__arugula.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__asparagus.n.01-dicing",
+        "input_synsets": {
+            "half__asparagus.n.01": 1
+        },
+        "input_states": {
+            "half__asparagus.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__asparagus.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__auricularia.n.01-dicing",
+        "input_synsets": {
+            "half__auricularia.n.01": 1
+        },
+        "input_states": {
+            "half__auricularia.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__auricularia.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__avocado.n.01-dicing",
+        "input_synsets": {
+            "half__avocado.n.01": 1
+        },
+        "input_states": {
+            "half__avocado.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__avocado.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bacon.n.01-dicing",
+        "input_synsets": {
+            "half__bacon.n.01": 1
+        },
+        "input_states": {
+            "half__bacon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bacon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bagel.n.01-dicing",
+        "input_synsets": {
+            "half__bagel.n.01": 1
+        },
+        "input_states": {
+            "half__bagel.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bagel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bagel_dough.n.01-dicing",
+        "input_synsets": {
+            "half__bagel_dough.n.01": 1
+        },
+        "input_states": {
+            "half__bagel_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bagel_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__baguet.n.01-dicing",
+        "input_synsets": {
+            "half__baguet.n.01": 1
+        },
+        "input_states": {
+            "half__baguet.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__baguet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__banana.n.01-dicing",
+        "input_synsets": {
+            "half__banana.n.01": 1
+        },
+        "input_states": {
+            "half__banana.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__banana.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__banana_bread.n.01-dicing",
+        "input_synsets": {
+            "half__banana_bread.n.01": 1
+        },
+        "input_states": {
+            "half__banana_bread.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__banana_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bay_leaf.n.01-dicing",
+        "input_synsets": {
+            "half__bay_leaf.n.01": 1
+        },
+        "input_states": {
+            "half__bay_leaf.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bay_leaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bean_curd.n.01-dicing",
+        "input_synsets": {
+            "half__bean_curd.n.01": 1
+        },
+        "input_states": {
+            "half__bean_curd.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bean_curd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__beefsteak_tomato.n.01-dicing",
+        "input_synsets": {
+            "half__beefsteak_tomato.n.01": 1
+        },
+        "input_states": {
+            "half__beefsteak_tomato.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__beefsteak_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__beet.n.01-dicing",
+        "input_synsets": {
+            "half__beet.n.01": 1
+        },
+        "input_states": {
+            "half__beet.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__beet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bell_pepper.n.01-dicing",
+        "input_synsets": {
+            "half__bell_pepper.n.01": 1
+        },
+        "input_states": {
+            "half__bell_pepper.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bell_pepper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__biscuit_dough.n.01-dicing",
+        "input_synsets": {
+            "half__biscuit_dough.n.01": 1
+        },
+        "input_states": {
+            "half__biscuit_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__biscuit_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__blackberry.n.01-dicing",
+        "input_synsets": {
+            "half__blackberry.n.01": 1
+        },
+        "input_states": {
+            "half__blackberry.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__blackberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bok_choy.n.01-dicing",
+        "input_synsets": {
+            "half__bok_choy.n.01": 1
+        },
+        "input_states": {
+            "half__bok_choy.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bok_choy.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__bratwurst.n.01-dicing",
+        "input_synsets": {
+            "half__bratwurst.n.01": 1
+        },
+        "input_states": {
+            "half__bratwurst.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__bratwurst.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__brisket.n.01-dicing",
+        "input_synsets": {
+            "half__brisket.n.01": 1
+        },
+        "input_states": {
+            "half__brisket.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__brisket.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__broccoli.n.01-dicing",
+        "input_synsets": {
+            "half__broccoli.n.01": 1
+        },
+        "input_states": {
+            "half__broccoli.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__broccoli.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__broccoli_rabe.n.01-dicing",
+        "input_synsets": {
+            "half__broccoli_rabe.n.01": 1
+        },
+        "input_states": {
+            "half__broccoli_rabe.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__broccoli_rabe.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__broccolini.n.01-dicing",
+        "input_synsets": {
+            "half__broccolini.n.01": 1
+        },
+        "input_states": {
+            "half__broccolini.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__broccolini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__brownie.n.01-dicing",
+        "input_synsets": {
+            "half__brownie.n.01": 1
+        },
+        "input_states": {
+            "half__brownie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__brownie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__brussels_sprouts.n.01-dicing",
+        "input_synsets": {
+            "half__brussels_sprouts.n.01": 1
+        },
+        "input_states": {
+            "half__brussels_sprouts.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__brussels_sprouts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__burrito.n.01-dicing",
+        "input_synsets": {
+            "half__burrito.n.01": 1
+        },
+        "input_states": {
+            "half__burrito.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__burrito.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__buttermilk_pancake.n.01-dicing",
+        "input_synsets": {
+            "half__buttermilk_pancake.n.01": 1
+        },
+        "input_states": {
+            "half__buttermilk_pancake.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__buttermilk_pancake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__butternut_squash.n.01-dicing",
+        "input_synsets": {
+            "half__butternut_squash.n.01": 1
+        },
+        "input_states": {
+            "half__butternut_squash.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__butternut_squash.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cantaloup.n.01-dicing",
+        "input_synsets": {
+            "half__cantaloup.n.01": 1
+        },
+        "input_states": {
+            "half__cantaloup.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cantaloup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__carne_asada.n.01-dicing",
+        "input_synsets": {
+            "half__carne_asada.n.01": 1
+        },
+        "input_states": {
+            "half__carne_asada.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__carne_asada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__carrot.n.01-dicing",
+        "input_synsets": {
+            "half__carrot.n.01": 1
+        },
+        "input_states": {
+            "half__carrot.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__carrot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cauliflower.n.01-dicing",
+        "input_synsets": {
+            "half__cauliflower.n.01": 1
+        },
+        "input_states": {
+            "half__cauliflower.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cauliflower.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__celery.n.01-dicing",
+        "input_synsets": {
+            "half__celery.n.01": 1
+        },
+        "input_states": {
+            "half__celery.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__celery.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chanterelle.n.01-dicing",
+        "input_synsets": {
+            "half__chanterelle.n.01": 1
+        },
+        "input_states": {
+            "half__chanterelle.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chanterelle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chard.n.01-dicing",
+        "input_synsets": {
+            "half__chard.n.01": 1
+        },
+        "input_states": {
+            "half__chard.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cheese_tart.n.01-dicing",
+        "input_synsets": {
+            "half__cheese_tart.n.01": 1
+        },
+        "input_states": {
+            "half__cheese_tart.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cheese_tart.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cheesecake.n.01-dicing",
+        "input_synsets": {
+            "half__cheesecake.n.01": 1
+        },
+        "input_states": {
+            "half__cheesecake.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cheesecake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cherry.n.01-dicing",
+        "input_synsets": {
+            "half__cherry.n.01": 1
+        },
+        "input_states": {
+            "half__cherry.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cherry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cherry_tomato.n.01-dicing",
+        "input_synsets": {
+            "half__cherry_tomato.n.01": 1
+        },
+        "input_states": {
+            "half__cherry_tomato.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cherry_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chestnut.n.01-dicing",
+        "input_synsets": {
+            "half__chestnut.n.01": 1
+        },
+        "input_states": {
+            "half__chestnut.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chestnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chicken.n.01-dicing",
+        "input_synsets": {
+            "half__chicken.n.01": 1
+        },
+        "input_states": {
+            "half__chicken.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chicken.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chicken_breast.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_breast.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_breast.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_breast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chicken_leg.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_leg.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_leg.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chicken_tender.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_tender.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_tender.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_tender.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chicken_wing.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_wing.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_wing.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chicken_wing.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chili.n.01-dicing",
+        "input_synsets": {
+            "half__chili.n.01": 1
+        },
+        "input_states": {
+            "half__chili.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chili.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chives.n.01-dicing",
+        "input_synsets": {
+            "half__chives.n.01": 1
+        },
+        "input_states": {
+            "half__chives.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chives.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chocolate_biscuit.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_biscuit.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_biscuit.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_biscuit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chocolate_cake.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_cake.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_cake.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_cake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chocolate_chip_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_chip_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_chip_cookie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_chip_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chocolate_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chocolate_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__chorizo.n.01-dicing",
+        "input_synsets": {
+            "half__chorizo.n.01": 1
+        },
+        "input_states": {
+            "half__chorizo.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__chorizo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cinnamon_roll.n.01-dicing",
+        "input_synsets": {
+            "half__cinnamon_roll.n.01": 1
+        },
+        "input_states": {
+            "half__cinnamon_roll.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cinnamon_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__clove.n.01-dicing",
+        "input_synsets": {
+            "half__clove.n.01": 1
+        },
+        "input_states": {
+            "half__clove.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__clove.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__club_sandwich.n.01-dicing",
+        "input_synsets": {
+            "half__club_sandwich.n.01": 1
+        },
+        "input_states": {
+            "half__club_sandwich.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__club_sandwich.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__coconut.n.01-dicing",
+        "input_synsets": {
+            "half__coconut.n.01": 1
+        },
+        "input_states": {
+            "half__coconut.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__coconut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cold_cuts.n.01-dicing",
+        "input_synsets": {
+            "half__cold_cuts.n.01": 1
+        },
+        "input_states": {
+            "half__cold_cuts.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cold_cuts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__cookie_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__crab.n.01-dicing",
+        "input_synsets": {
+            "half__crab.n.01": 1
+        },
+        "input_states": {
+            "half__crab.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__crab.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__crayfish.n.01-dicing",
+        "input_synsets": {
+            "half__crayfish.n.01": 1
+        },
+        "input_states": {
+            "half__crayfish.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__crayfish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__crescent_roll.n.01-dicing",
+        "input_synsets": {
+            "half__crescent_roll.n.01": 1
+        },
+        "input_states": {
+            "half__crescent_roll.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__crescent_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__cucumber.n.01-dicing",
+        "input_synsets": {
+            "half__cucumber.n.01": 1
+        },
+        "input_states": {
+            "half__cucumber.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cucumber.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__danish.n.01-dicing",
+        "input_synsets": {
+            "half__danish.n.01": 1
+        },
+        "input_states": {
+            "half__danish.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__danish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__date.n.01-dicing",
+        "input_synsets": {
+            "half__date.n.01": 1
+        },
+        "input_states": {
+            "half__date.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__date.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__doughnut.n.01-dicing",
+        "input_synsets": {
+            "half__doughnut.n.01": 1
+        },
+        "input_states": {
+            "half__doughnut.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__doughnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__dried_apricot.n.01-dicing",
+        "input_synsets": {
+            "half__dried_apricot.n.01": 1
+        },
+        "input_states": {
+            "half__dried_apricot.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__dried_apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__duck.n.01-dicing",
+        "input_synsets": {
+            "half__duck.n.01": 1
+        },
+        "input_states": {
+            "half__duck.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__duck.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__durian.n.01-dicing",
+        "input_synsets": {
+            "half__durian.n.01": 1
+        },
+        "input_states": {
+            "half__durian.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__durian.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__edible_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__edible_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__edible_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__edible_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__eggplant.n.01-dicing",
+        "input_synsets": {
+            "half__eggplant.n.01": 1
+        },
+        "input_states": {
+            "half__eggplant.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__eggplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__enchilada.n.01-dicing",
+        "input_synsets": {
+            "half__enchilada.n.01": 1
+        },
+        "input_states": {
+            "half__enchilada.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__enchilada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__fennel.n.01-dicing",
+        "input_synsets": {
+            "half__fennel.n.01": 1
+        },
+        "input_states": {
+            "half__fennel.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__fennel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__fillet.n.01-dicing",
+        "input_synsets": {
+            "half__fillet.n.01": 1
+        },
+        "input_states": {
+            "half__fillet.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__fillet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__frank.n.01-dicing",
+        "input_synsets": {
+            "half__frank.n.01": 1
+        },
+        "input_states": {
+            "half__frank.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__frank.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__frankfurter_bun.n.01-dicing",
+        "input_synsets": {
+            "half__frankfurter_bun.n.01": 1
+        },
+        "input_states": {
+            "half__frankfurter_bun.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__frankfurter_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__french_fries.n.01-dicing",
+        "input_synsets": {
+            "half__french_fries.n.01": 1
+        },
+        "input_states": {
+            "half__french_fries.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__french_fries.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__french_toast.n.01-dicing",
+        "input_synsets": {
+            "half__french_toast.n.01": 1
+        },
+        "input_states": {
+            "half__french_toast.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__french_toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__fruitcake.n.01-dicing",
+        "input_synsets": {
+            "half__fruitcake.n.01": 1
+        },
+        "input_states": {
+            "half__fruitcake.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__fruitcake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__garlic_bread.n.01-dicing",
+        "input_synsets": {
+            "half__garlic_bread.n.01": 1
+        },
+        "input_states": {
+            "half__garlic_bread.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__garlic_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__gelatin.n.01-dicing",
+        "input_synsets": {
+            "half__gelatin.n.01": 1
+        },
+        "input_states": {
+            "half__gelatin.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__gelatin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__ginger.n.01-dicing",
+        "input_synsets": {
+            "half__ginger.n.01": 1
+        },
+        "input_states": {
+            "half__ginger.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__ginger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__gingerbread.n.01-dicing",
+        "input_synsets": {
+            "half__gingerbread.n.01": 1
+        },
+        "input_states": {
+            "half__gingerbread.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__gingerbread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__gooseberry.n.01-dicing",
+        "input_synsets": {
+            "half__gooseberry.n.01": 1
+        },
+        "input_states": {
+            "half__gooseberry.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__gooseberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__gourd.n.01-dicing",
+        "input_synsets": {
+            "half__gourd.n.01": 1
+        },
+        "input_states": {
+            "half__gourd.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__gourd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__granola_bar.n.01-dicing",
+        "input_synsets": {
+            "half__granola_bar.n.01": 1
+        },
+        "input_states": {
+            "half__granola_bar.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__granola_bar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__grapefruit.n.01-dicing",
+        "input_synsets": {
+            "half__grapefruit.n.01": 1
+        },
+        "input_states": {
+            "half__grapefruit.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__grapefruit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__green_bean.n.01-dicing",
+        "input_synsets": {
+            "half__green_bean.n.01": 1
+        },
+        "input_states": {
+            "half__green_bean.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__green_bean.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__green_onion.n.01-dicing",
+        "input_synsets": {
+            "half__green_onion.n.01": 1
+        },
+        "input_states": {
+            "half__green_onion.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__green_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__ham_hock.n.01-dicing",
+        "input_synsets": {
+            "half__ham_hock.n.01": 1
+        },
+        "input_states": {
+            "half__ham_hock.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__ham_hock.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hamburger.n.01-dicing",
+        "input_synsets": {
+            "half__hamburger.n.01": 1
+        },
+        "input_states": {
+            "half__hamburger.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hamburger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hamburger_bun.n.01-dicing",
+        "input_synsets": {
+            "half__hamburger_bun.n.01": 1
+        },
+        "input_states": {
+            "half__hamburger_bun.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hamburger_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hard-boiled_egg.n.01-dicing",
+        "input_synsets": {
+            "half__hard-boiled_egg.n.01": 1
+        },
+        "input_states": {
+            "half__hard-boiled_egg.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hard-boiled_egg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hazelnut.n.01-dicing",
+        "input_synsets": {
+            "half__hazelnut.n.01": 1
+        },
+        "input_states": {
+            "half__hazelnut.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hazelnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__head_cabbage.n.01-dicing",
+        "input_synsets": {
+            "half__head_cabbage.n.01": 1
+        },
+        "input_states": {
+            "half__head_cabbage.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__head_cabbage.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hip.n.01-dicing",
+        "input_synsets": {
+            "half__hip.n.01": 1
+        },
+        "input_states": {
+            "half__hip.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__hotdog.n.01-dicing",
+        "input_synsets": {
+            "half__hotdog.n.01": 1
+        },
+        "input_states": {
+            "half__hotdog.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__hotdog.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__huitre.n.01-dicing",
+        "input_synsets": {
+            "half__huitre.n.01": 1
+        },
+        "input_states": {
+            "half__huitre.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__huitre.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__kabob.n.01-dicing",
+        "input_synsets": {
+            "half__kabob.n.01": 1
+        },
+        "input_states": {
+            "half__kabob.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__kabob.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__kale.n.01-dicing",
+        "input_synsets": {
+            "half__kale.n.01": 1
+        },
+        "input_states": {
+            "half__kale.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__kale.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__kielbasa.n.01-dicing",
+        "input_synsets": {
+            "half__kielbasa.n.01": 1
+        },
+        "input_states": {
+            "half__kielbasa.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__kielbasa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__kiwi.n.01-dicing",
+        "input_synsets": {
+            "half__kiwi.n.01": 1
+        },
+        "input_states": {
+            "half__kiwi.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__kiwi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lamb.n.01-dicing",
+        "input_synsets": {
+            "half__lamb.n.01": 1
+        },
+        "input_states": {
+            "half__lamb.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lamb.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__leek.n.01-dicing",
+        "input_synsets": {
+            "half__leek.n.01": 1
+        },
+        "input_states": {
+            "half__leek.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__leek.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lemon.n.01-dicing",
+        "input_synsets": {
+            "half__lemon.n.01": 1
+        },
+        "input_states": {
+            "half__lemon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lemon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lemon_peel.n.01-dicing",
+        "input_synsets": {
+            "half__lemon_peel.n.01": 1
+        },
+        "input_states": {
+            "half__lemon_peel.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lemon_peel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lettuce.n.01-dicing",
+        "input_synsets": {
+            "half__lettuce.n.01": 1
+        },
+        "input_states": {
+            "half__lettuce.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lettuce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lime.n.01-dicing",
+        "input_synsets": {
+            "half__lime.n.01": 1
+        },
+        "input_states": {
+            "half__lime.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lime.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__lobster.n.01-dicing",
+        "input_synsets": {
+            "half__lobster.n.01": 1
+        },
+        "input_states": {
+            "half__lobster.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lobster.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__macaroon.n.01-dicing",
+        "input_synsets": {
+            "half__macaroon.n.01": 1
+        },
+        "input_states": {
+            "half__macaroon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__macaroon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__mango.n.01-dicing",
+        "input_synsets": {
+            "half__mango.n.01": 1
+        },
+        "input_states": {
+            "half__mango.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__mango.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__marshmallow.n.01-dicing",
+        "input_synsets": {
+            "half__marshmallow.n.01": 1
+        },
+        "input_states": {
+            "half__marshmallow.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__marshmallow.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__meat_loaf.n.01-dicing",
+        "input_synsets": {
+            "half__meat_loaf.n.01": 1
+        },
+        "input_states": {
+            "half__meat_loaf.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__meat_loaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__meatball.n.01-dicing",
+        "input_synsets": {
+            "half__meatball.n.01": 1
+        },
+        "input_states": {
+            "half__meatball.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__meatball.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__muffin.n.01-dicing",
+        "input_synsets": {
+            "half__muffin.n.01": 1
+        },
+        "input_states": {
+            "half__muffin.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__muffin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__mushroom.n.01-dicing",
+        "input_synsets": {
+            "half__mushroom.n.01": 1
+        },
+        "input_states": {
+            "half__mushroom.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__mushroom.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__mustard.n.01-dicing",
+        "input_synsets": {
+            "half__mustard.n.01": 1
+        },
+        "input_states": {
+            "half__mustard.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__mustard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__nectarine.n.01-dicing",
+        "input_synsets": {
+            "half__nectarine.n.01": 1
+        },
+        "input_states": {
+            "half__nectarine.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__nectarine.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__olive.n.01-dicing",
+        "input_synsets": {
+            "half__olive.n.01": 1
+        },
+        "input_states": {
+            "half__olive.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__olive.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__omelet.n.01-dicing",
+        "input_synsets": {
+            "half__omelet.n.01": 1
+        },
+        "input_states": {
+            "half__omelet.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__omelet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__orange.n.01-dicing",
+        "input_synsets": {
+            "half__orange.n.01": 1
+        },
+        "input_states": {
+            "half__orange.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__orange.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__papaya.n.01-dicing",
+        "input_synsets": {
+            "half__papaya.n.01": 1
+        },
+        "input_states": {
+            "half__papaya.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__papaya.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__parsley.n.01-dicing",
+        "input_synsets": {
+            "half__parsley.n.01": 1
+        },
+        "input_states": {
+            "half__parsley.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__parsley.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__parsnip.n.01-dicing",
+        "input_synsets": {
+            "half__parsnip.n.01": 1
+        },
+        "input_states": {
+            "half__parsnip.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__parsnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pastry.n.01-dicing",
+        "input_synsets": {
+            "half__pastry.n.01": 1
+        },
+        "input_states": {
+            "half__pastry.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pastry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__peach.n.01-dicing",
+        "input_synsets": {
+            "half__peach.n.01": 1
+        },
+        "input_states": {
+            "half__peach.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__peach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pear.n.01-dicing",
+        "input_synsets": {
+            "half__pear.n.01": 1
+        },
+        "input_states": {
+            "half__pear.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pear.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__peppermint.n.01-dicing",
+        "input_synsets": {
+            "half__peppermint.n.01": 1
+        },
+        "input_states": {
+            "half__peppermint.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__peppermint.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pepperoni.n.01-dicing",
+        "input_synsets": {
+            "half__pepperoni.n.01": 1
+        },
+        "input_states": {
+            "half__pepperoni.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pepperoni.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pieplant.n.01-dicing",
+        "input_synsets": {
+            "half__pieplant.n.01": 1
+        },
+        "input_states": {
+            "half__pieplant.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pieplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pineapple.n.01-dicing",
+        "input_synsets": {
+            "half__pineapple.n.01": 1
+        },
+        "input_states": {
+            "half__pineapple.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pineapple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pita.n.01-dicing",
+        "input_synsets": {
+            "half__pita.n.01": 1
+        },
+        "input_states": {
+            "half__pita.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pita.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pizza.n.01-dicing",
+        "input_synsets": {
+            "half__pizza.n.01": 1
+        },
+        "input_states": {
+            "half__pizza.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pizza.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pizza_dough.n.01-dicing",
+        "input_synsets": {
+            "half__pizza_dough.n.01": 1
+        },
+        "input_states": {
+            "half__pizza_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pizza_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__plum.n.01-dicing",
+        "input_synsets": {
+            "half__plum.n.01": 1
+        },
+        "input_states": {
+            "half__plum.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__plum.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pomegranate.n.01-dicing",
+        "input_synsets": {
+            "half__pomegranate.n.01": 1
+        },
+        "input_states": {
+            "half__pomegranate.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pomegranate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pomelo.n.01-dicing",
+        "input_synsets": {
+            "half__pomelo.n.01": 1
+        },
+        "input_states": {
+            "half__pomelo.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pomelo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pork.n.01-dicing",
+        "input_synsets": {
+            "half__pork.n.01": 1
+        },
+        "input_states": {
+            "half__pork.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pork.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__porkchop.n.01-dicing",
+        "input_synsets": {
+            "half__porkchop.n.01": 1
+        },
+        "input_states": {
+            "half__porkchop.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__porkchop.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__potato.n.01-dicing",
+        "input_synsets": {
+            "half__potato.n.01": 1
+        },
+        "input_states": {
+            "half__potato.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__potato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__prawn.n.01-dicing",
+        "input_synsets": {
+            "half__prawn.n.01": 1
+        },
+        "input_states": {
+            "half__prawn.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__prawn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__prosciutto.n.01-dicing",
+        "input_synsets": {
+            "half__prosciutto.n.01": 1
+        },
+        "input_states": {
+            "half__prosciutto.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__prosciutto.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__pumpkin.n.01-dicing",
+        "input_synsets": {
+            "half__pumpkin.n.01": 1
+        },
+        "input_states": {
+            "half__pumpkin.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__pumpkin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__quail.n.01-dicing",
+        "input_synsets": {
+            "half__quail.n.01": 1
+        },
+        "input_states": {
+            "half__quail.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__quail.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__quiche.n.01-dicing",
+        "input_synsets": {
+            "half__quiche.n.01": 1
+        },
+        "input_states": {
+            "half__quiche.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__quiche.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__radish.n.01-dicing",
+        "input_synsets": {
+            "half__radish.n.01": 1
+        },
+        "input_states": {
+            "half__radish.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__radish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__ramen.n.01-dicing",
+        "input_synsets": {
+            "half__ramen.n.01": 1
+        },
+        "input_states": {
+            "half__ramen.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__ramen.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__rib.n.01-dicing",
+        "input_synsets": {
+            "half__rib.n.01": 1
+        },
+        "input_states": {
+            "half__rib.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__rib.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__roll_dough.n.01-dicing",
+        "input_synsets": {
+            "half__roll_dough.n.01": 1
+        },
+        "input_states": {
+            "half__roll_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__roll_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__rutabaga.n.01-dicing",
+        "input_synsets": {
+            "half__rutabaga.n.01": 1
+        },
+        "input_states": {
+            "half__rutabaga.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__rutabaga.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__salmon.n.01-dicing",
+        "input_synsets": {
+            "half__salmon.n.01": 1
+        },
+        "input_states": {
+            "half__salmon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__salmon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__scone.n.01-dicing",
+        "input_synsets": {
+            "half__scone.n.01": 1
+        },
+        "input_states": {
+            "half__scone.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__scone.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__shiitake.n.01-dicing",
+        "input_synsets": {
+            "half__shiitake.n.01": 1
+        },
+        "input_states": {
+            "half__shiitake.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__shiitake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__snapper.n.01-dicing",
+        "input_synsets": {
+            "half__snapper.n.01": 1
+        },
+        "input_states": {
+            "half__snapper.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__snapper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__sour_bread.n.01-dicing",
+        "input_synsets": {
+            "half__sour_bread.n.01": 1
+        },
+        "input_states": {
+            "half__sour_bread.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__sour_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__spice_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__spice_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__spice_cookie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__spice_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__spice_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__spice_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__spice_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__spice_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__spinach.n.01-dicing",
+        "input_synsets": {
+            "half__spinach.n.01": 1
+        },
+        "input_states": {
+            "half__spinach.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__spinach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__squid.n.01-dicing",
+        "input_synsets": {
+            "half__squid.n.01": 1
+        },
+        "input_states": {
+            "half__squid.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__squid.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__steak.n.01-dicing",
+        "input_synsets": {
+            "half__steak.n.01": 1
+        },
+        "input_states": {
+            "half__steak.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__steak.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__strawberry.n.01-dicing",
+        "input_synsets": {
+            "half__strawberry.n.01": 1
+        },
+        "input_states": {
+            "half__strawberry.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__strawberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__sugar_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__sugar_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__sugar_cookie.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__sugar_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__sugar_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__sugar_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__sugar_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__sugar_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__sushi.n.01-dicing",
+        "input_synsets": {
+            "half__sushi.n.01": 1
+        },
+        "input_states": {
+            "half__sushi.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__sushi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__sweet_corn.n.01-dicing",
+        "input_synsets": {
+            "half__sweet_corn.n.01": 1
+        },
+        "input_states": {
+            "half__sweet_corn.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__sweet_corn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__taco.n.01-dicing",
+        "input_synsets": {
+            "half__taco.n.01": 1
+        },
+        "input_states": {
+            "half__taco.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__taco.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__tenderloin.n.01-dicing",
+        "input_synsets": {
+            "half__tenderloin.n.01": 1
+        },
+        "input_states": {
+            "half__tenderloin.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tenderloin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__toast.n.01-dicing",
+        "input_synsets": {
+            "half__toast.n.01": 1
+        },
+        "input_states": {
+            "half__toast.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__tofu.n.01-dicing",
+        "input_synsets": {
+            "half__tofu.n.01": 1
+        },
+        "input_states": {
+            "half__tofu.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tofu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__tortilla.n.01-dicing",
+        "input_synsets": {
+            "half__tortilla.n.01": 1
+        },
+        "input_states": {
+            "half__tortilla.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tortilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__tortilla_chip.n.01-dicing",
+        "input_synsets": {
+            "half__tortilla_chip.n.01": 1
+        },
+        "input_states": {
+            "half__tortilla_chip.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tortilla_chip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__trout.n.01-dicing",
+        "input_synsets": {
+            "half__trout.n.01": 1
+        },
+        "input_states": {
+            "half__trout.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__trout.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__tuna.n.01-dicing",
+        "input_synsets": {
+            "half__tuna.n.01": 1
+        },
+        "input_states": {
+            "half__tuna.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tuna.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__turkey.n.01-dicing",
+        "input_synsets": {
+            "half__turkey.n.01": 1
+        },
+        "input_states": {
+            "half__turkey.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__turkey.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__turkey_leg.n.01-dicing",
+        "input_synsets": {
+            "half__turkey_leg.n.01": 1
+        },
+        "input_states": {
+            "half__turkey_leg.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__turkey_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__vanilla.n.01-dicing",
+        "input_synsets": {
+            "half__vanilla.n.01": 1
+        },
+        "input_states": {
+            "half__vanilla.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__vanilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__veal.n.01-dicing",
+        "input_synsets": {
+            "half__veal.n.01": 1
+        },
+        "input_states": {
+            "half__veal.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__veal.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__venison.n.01-dicing",
+        "input_synsets": {
+            "half__venison.n.01": 1
+        },
+        "input_states": {
+            "half__venison.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__venison.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__vidalia_onion.n.01-dicing",
+        "input_synsets": {
+            "half__vidalia_onion.n.01": 1
+        },
+        "input_states": {
+            "half__vidalia_onion.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__vidalia_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__virginia_ham.n.01-dicing",
+        "input_synsets": {
+            "half__virginia_ham.n.01": 1
+        },
+        "input_states": {
+            "half__virginia_ham.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__virginia_ham.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__waffle.n.01-dicing",
+        "input_synsets": {
+            "half__waffle.n.01": 1
+        },
+        "input_states": {
+            "half__waffle.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__waffle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__walnut.n.01-dicing",
+        "input_synsets": {
+            "half__walnut.n.01": 1
+        },
+        "input_states": {
+            "half__walnut.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__walnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__watermelon.n.01-dicing",
+        "input_synsets": {
+            "half__watermelon.n.01": 1
+        },
+        "input_states": {
+            "half__watermelon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__watermelon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__white_turnip.n.01-dicing",
+        "input_synsets": {
+            "half__white_turnip.n.01": 1
+        },
+        "input_states": {
+            "half__white_turnip.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__white_turnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__whole_garlic.n.01-dicing",
+        "input_synsets": {
+            "half__whole_garlic.n.01": 1
+        },
+        "input_states": {
+            "half__whole_garlic.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__whole_garlic.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__yam.n.01-dicing",
+        "input_synsets": {
+            "half__yam.n.01": 1
+        },
+        "input_states": {
+            "half__yam.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__yam.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-half__zucchini.n.01-dicing",
+        "input_synsets": {
+            "half__zucchini.n.01": 1
+        },
+        "input_states": {
+            "half__zucchini.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__zucchini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__brisket.n.01-dicing",
+        "input_synsets": {
+            "sliced__brisket.n.01": 1
+        },
+        "input_states": {
+            "sliced__brisket.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__brisket.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__cucumber.n.01-dicing",
+        "input_synsets": {
+            "sliced__cucumber.n.01": 1
+        },
+        "input_states": {
+            "sliced__cucumber.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__cucumber.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__eggplant.n.01-dicing",
+        "input_synsets": {
+            "sliced__eggplant.n.01": 1
+        },
+        "input_states": {
+            "sliced__eggplant.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__eggplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__lemon.n.01-dicing",
+        "input_synsets": {
+            "sliced__lemon.n.01": 1
+        },
+        "input_states": {
+            "sliced__lemon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lemon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__lime.n.01-dicing",
+        "input_synsets": {
+            "sliced__lime.n.01": 1
+        },
+        "input_states": {
+            "sliced__lime.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__lime.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__melon.n.01-dicing",
+        "input_synsets": {
+            "sliced__melon.n.01": 1
+        },
+        "input_states": {
+            "sliced__melon.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__melon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__onion.n.01-dicing",
+        "input_synsets": {
+            "sliced__onion.n.01": 1
+        },
+        "input_states": {
+            "sliced__onion.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__papaya.n.01-dicing",
+        "input_synsets": {
+            "sliced__papaya.n.01": 1
+        },
+        "input_states": {
+            "sliced__papaya.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__papaya.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__roast_beef.n.01-dicing",
+        "input_synsets": {
+            "sliced__roast_beef.n.01": 1
+        },
+        "input_states": {
+            "sliced__roast_beef.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__roast_beef.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cooked-sliced__tomato.n.01-dicing",
+        "input_synsets": {
+            "sliced__tomato.n.01": 1
+        },
+        "input_states": {
+            "sliced__tomato.n.01": [
+                [
+                    "cooked",
+                    true
+                ]
+            ]
+        },
+        "output_synsets": {
+            "cooked__diced__tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__agave.n.01-dicing",
+        "input_synsets": {
+            "half__agave.n.01": 1
+        },
+        "input_states": {
+            "half__agave.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__agave.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__apple.n.01-dicing",
+        "input_synsets": {
+            "half__apple.n.01": 1
+        },
+        "input_states": {
+            "half__apple.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__apple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__apricot.n.01-dicing",
+        "input_synsets": {
+            "half__apricot.n.01": 1
+        },
+        "input_states": {
+            "half__apricot.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__arepa.n.01-dicing",
+        "input_synsets": {
+            "half__arepa.n.01": 1
+        },
+        "input_states": {
+            "half__arepa.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__arepa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__artichoke.n.01-dicing",
+        "input_synsets": {
+            "half__artichoke.n.01": 1
+        },
+        "input_states": {
+            "half__artichoke.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__artichoke.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__arugula.n.01-dicing",
+        "input_synsets": {
+            "half__arugula.n.01": 1
+        },
+        "input_states": {
+            "half__arugula.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__arugula.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__asparagus.n.01-dicing",
+        "input_synsets": {
+            "half__asparagus.n.01": 1
+        },
+        "input_states": {
+            "half__asparagus.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__asparagus.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__auricularia.n.01-dicing",
+        "input_synsets": {
+            "half__auricularia.n.01": 1
+        },
+        "input_states": {
+            "half__auricularia.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__auricularia.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__avocado.n.01-dicing",
+        "input_synsets": {
+            "half__avocado.n.01": 1
+        },
+        "input_states": {
+            "half__avocado.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__avocado.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bacon.n.01-dicing",
+        "input_synsets": {
+            "half__bacon.n.01": 1
+        },
+        "input_states": {
+            "half__bacon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bacon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bagel.n.01-dicing",
+        "input_synsets": {
+            "half__bagel.n.01": 1
+        },
+        "input_states": {
+            "half__bagel.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bagel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bagel_dough.n.01-dicing",
+        "input_synsets": {
+            "half__bagel_dough.n.01": 1
+        },
+        "input_states": {
+            "half__bagel_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bagel_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__baguet.n.01-dicing",
+        "input_synsets": {
+            "half__baguet.n.01": 1
+        },
+        "input_states": {
+            "half__baguet.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__baguet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__banana.n.01-dicing",
+        "input_synsets": {
+            "half__banana.n.01": 1
+        },
+        "input_states": {
+            "half__banana.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__banana.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__banana_bread.n.01-dicing",
+        "input_synsets": {
+            "half__banana_bread.n.01": 1
+        },
+        "input_states": {
+            "half__banana_bread.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__banana_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bay_leaf.n.01-dicing",
+        "input_synsets": {
+            "half__bay_leaf.n.01": 1
+        },
+        "input_states": {
+            "half__bay_leaf.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bay_leaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bean_curd.n.01-dicing",
+        "input_synsets": {
+            "half__bean_curd.n.01": 1
+        },
+        "input_states": {
+            "half__bean_curd.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bean_curd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__beefsteak_tomato.n.01-dicing",
+        "input_synsets": {
+            "half__beefsteak_tomato.n.01": 1
+        },
+        "input_states": {
+            "half__beefsteak_tomato.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__beefsteak_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__beet.n.01-dicing",
+        "input_synsets": {
+            "half__beet.n.01": 1
+        },
+        "input_states": {
+            "half__beet.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__beet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bell_pepper.n.01-dicing",
+        "input_synsets": {
+            "half__bell_pepper.n.01": 1
+        },
+        "input_states": {
+            "half__bell_pepper.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bell_pepper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__biscuit_dough.n.01-dicing",
+        "input_synsets": {
+            "half__biscuit_dough.n.01": 1
+        },
+        "input_states": {
+            "half__biscuit_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__biscuit_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__blackberry.n.01-dicing",
+        "input_synsets": {
+            "half__blackberry.n.01": 1
+        },
+        "input_states": {
+            "half__blackberry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__blackberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bleu.n.01-dicing",
+        "input_synsets": {
+            "half__bleu.n.01": 1
+        },
+        "input_states": {
+            "half__bleu.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bleu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bok_choy.n.01-dicing",
+        "input_synsets": {
+            "half__bok_choy.n.01": 1
+        },
+        "input_states": {
+            "half__bok_choy.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bok_choy.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__branch.n.01-dicing",
+        "input_synsets": {
+            "half__branch.n.01": 1
+        },
+        "input_states": {
+            "half__branch.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__branch.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__bratwurst.n.01-dicing",
+        "input_synsets": {
+            "half__bratwurst.n.01": 1
+        },
+        "input_states": {
+            "half__bratwurst.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__bratwurst.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__brisket.n.01-dicing",
+        "input_synsets": {
+            "half__brisket.n.01": 1
+        },
+        "input_states": {
+            "half__brisket.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__brisket.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__broccoli.n.01-dicing",
+        "input_synsets": {
+            "half__broccoli.n.01": 1
+        },
+        "input_states": {
+            "half__broccoli.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__broccoli.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__broccoli_rabe.n.01-dicing",
+        "input_synsets": {
+            "half__broccoli_rabe.n.01": 1
+        },
+        "input_states": {
+            "half__broccoli_rabe.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__broccoli_rabe.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__broccolini.n.01-dicing",
+        "input_synsets": {
+            "half__broccolini.n.01": 1
+        },
+        "input_states": {
+            "half__broccolini.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__broccolini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__brownie.n.01-dicing",
+        "input_synsets": {
+            "half__brownie.n.01": 1
+        },
+        "input_states": {
+            "half__brownie.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__brownie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__brussels_sprouts.n.01-dicing",
+        "input_synsets": {
+            "half__brussels_sprouts.n.01": 1
+        },
+        "input_states": {
+            "half__brussels_sprouts.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__brussels_sprouts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__burrito.n.01-dicing",
+        "input_synsets": {
+            "half__burrito.n.01": 1
+        },
+        "input_states": {
+            "half__burrito.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__burrito.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__butter.n.01-dicing",
+        "input_synsets": {
+            "half__butter.n.01": 1
+        },
+        "input_states": {
+            "half__butter.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__butter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__butter_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__butter_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__butter_cookie.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__butter_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__buttermilk_pancake.n.01-dicing",
+        "input_synsets": {
+            "half__buttermilk_pancake.n.01": 1
+        },
+        "input_states": {
+            "half__buttermilk_pancake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__buttermilk_pancake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__butternut_squash.n.01-dicing",
+        "input_synsets": {
+            "half__butternut_squash.n.01": 1
+        },
+        "input_states": {
+            "half__butternut_squash.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__butternut_squash.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cantaloup.n.01-dicing",
+        "input_synsets": {
+            "half__cantaloup.n.01": 1
+        },
+        "input_states": {
+            "half__cantaloup.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cantaloup.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__carne_asada.n.01-dicing",
+        "input_synsets": {
+            "half__carne_asada.n.01": 1
+        },
+        "input_states": {
+            "half__carne_asada.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__carne_asada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__carrot.n.01-dicing",
+        "input_synsets": {
+            "half__carrot.n.01": 1
+        },
+        "input_states": {
+            "half__carrot.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__carrot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cauliflower.n.01-dicing",
+        "input_synsets": {
+            "half__cauliflower.n.01": 1
+        },
+        "input_states": {
+            "half__cauliflower.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cauliflower.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__celery.n.01-dicing",
+        "input_synsets": {
+            "half__celery.n.01": 1
+        },
+        "input_states": {
+            "half__celery.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__celery.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chanterelle.n.01-dicing",
+        "input_synsets": {
+            "half__chanterelle.n.01": 1
+        },
+        "input_states": {
+            "half__chanterelle.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chanterelle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chard.n.01-dicing",
+        "input_synsets": {
+            "half__chard.n.01": 1
+        },
+        "input_states": {
+            "half__chard.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cheddar.n.01-dicing",
+        "input_synsets": {
+            "half__cheddar.n.01": 1
+        },
+        "input_states": {
+            "half__cheddar.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cheddar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cheese_tart.n.01-dicing",
+        "input_synsets": {
+            "half__cheese_tart.n.01": 1
+        },
+        "input_states": {
+            "half__cheese_tart.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cheese_tart.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cheesecake.n.01-dicing",
+        "input_synsets": {
+            "half__cheesecake.n.01": 1
+        },
+        "input_states": {
+            "half__cheesecake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cheesecake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cherry.n.01-dicing",
+        "input_synsets": {
+            "half__cherry.n.01": 1
+        },
+        "input_states": {
+            "half__cherry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cherry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cherry_tomato.n.01-dicing",
+        "input_synsets": {
+            "half__cherry_tomato.n.01": 1
+        },
+        "input_states": {
+            "half__cherry_tomato.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cherry_tomato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chestnut.n.01-dicing",
+        "input_synsets": {
+            "half__chestnut.n.01": 1
+        },
+        "input_states": {
+            "half__chestnut.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chestnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chicken.n.01-dicing",
+        "input_synsets": {
+            "half__chicken.n.01": 1
+        },
+        "input_states": {
+            "half__chicken.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chicken.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chicken_breast.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_breast.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_breast.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chicken_breast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chicken_leg.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_leg.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_leg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chicken_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chicken_tender.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_tender.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_tender.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chicken_tender.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chicken_wing.n.01-dicing",
+        "input_synsets": {
+            "half__chicken_wing.n.01": 1
+        },
+        "input_states": {
+            "half__chicken_wing.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chicken_wing.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chili.n.01-dicing",
+        "input_synsets": {
+            "half__chili.n.01": 1
+        },
+        "input_states": {
+            "half__chili.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chili.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chives.n.01-dicing",
+        "input_synsets": {
+            "half__chives.n.01": 1
+        },
+        "input_states": {
+            "half__chives.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chives.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chocolate_biscuit.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_biscuit.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_biscuit.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chocolate_biscuit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chocolate_cake.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_cake.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_cake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chocolate_cake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chocolate_chip_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_chip_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_chip_cookie.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chocolate_chip_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chocolate_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__chocolate_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__chocolate_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chocolate_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__chorizo.n.01-dicing",
+        "input_synsets": {
+            "half__chorizo.n.01": 1
+        },
+        "input_states": {
+            "half__chorizo.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__chorizo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cinnamon_roll.n.01-dicing",
+        "input_synsets": {
+            "half__cinnamon_roll.n.01": 1
+        },
+        "input_states": {
+            "half__cinnamon_roll.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cinnamon_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__clove.n.01-dicing",
+        "input_synsets": {
+            "half__clove.n.01": 1
+        },
+        "input_states": {
+            "half__clove.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__clove.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__club_sandwich.n.01-dicing",
+        "input_synsets": {
+            "half__club_sandwich.n.01": 1
+        },
+        "input_states": {
+            "half__club_sandwich.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__club_sandwich.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__coconut.n.01-dicing",
+        "input_synsets": {
+            "half__coconut.n.01": 1
+        },
+        "input_states": {
+            "half__coconut.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__coconut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cold_cuts.n.01-dicing",
+        "input_synsets": {
+            "half__cold_cuts.n.01": 1
+        },
+        "input_states": {
+            "half__cold_cuts.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cold_cuts.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__crab.n.01-dicing",
+        "input_synsets": {
+            "half__crab.n.01": 1
+        },
+        "input_states": {
+            "half__crab.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__crab.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__crayfish.n.01-dicing",
+        "input_synsets": {
+            "half__crayfish.n.01": 1
+        },
+        "input_states": {
+            "half__crayfish.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__crayfish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__crescent_roll.n.01-dicing",
+        "input_synsets": {
+            "half__crescent_roll.n.01": 1
+        },
+        "input_states": {
+            "half__crescent_roll.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__crescent_roll.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cucumber.n.01-dicing",
+        "input_synsets": {
+            "half__cucumber.n.01": 1
+        },
+        "input_states": {
+            "half__cucumber.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cucumber.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__cupcake.n.01-dicing",
+        "input_synsets": {
+            "half__cupcake.n.01": 1
+        },
+        "input_states": {
+            "half__cupcake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cupcake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__danish.n.01-dicing",
+        "input_synsets": {
+            "half__danish.n.01": 1
+        },
+        "input_states": {
+            "half__danish.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__danish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__date.n.01-dicing",
+        "input_synsets": {
+            "half__date.n.01": 1
+        },
+        "input_states": {
+            "half__date.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__date.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__doughnut.n.01-dicing",
+        "input_synsets": {
+            "half__doughnut.n.01": 1
+        },
+        "input_states": {
+            "half__doughnut.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__doughnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__dried_apricot.n.01-dicing",
+        "input_synsets": {
+            "half__dried_apricot.n.01": 1
+        },
+        "input_states": {
+            "half__dried_apricot.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__dried_apricot.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__duck.n.01-dicing",
+        "input_synsets": {
+            "half__duck.n.01": 1
+        },
+        "input_states": {
+            "half__duck.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__duck.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__durian.n.01-dicing",
+        "input_synsets": {
+            "half__durian.n.01": 1
+        },
+        "input_states": {
+            "half__durian.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__durian.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__edible_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__edible_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__edible_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__edible_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__eggplant.n.01-dicing",
+        "input_synsets": {
+            "half__eggplant.n.01": 1
+        },
+        "input_states": {
+            "half__eggplant.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__eggplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__enchilada.n.01-dicing",
+        "input_synsets": {
+            "half__enchilada.n.01": 1
+        },
+        "input_states": {
+            "half__enchilada.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__enchilada.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__entire_leaf.n.01-dicing",
+        "input_synsets": {
+            "half__entire_leaf.n.01": 1
+        },
+        "input_states": {
+            "half__entire_leaf.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__entire_leaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__fennel.n.01-dicing",
+        "input_synsets": {
+            "half__fennel.n.01": 1
+        },
+        "input_states": {
+            "half__fennel.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__fennel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__feta.n.01-dicing",
+        "input_synsets": {
+            "half__feta.n.01": 1
+        },
+        "input_states": {
+            "half__feta.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__feta.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__fillet.n.01-dicing",
+        "input_synsets": {
+            "half__fillet.n.01": 1
+        },
+        "input_states": {
+            "half__fillet.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__fillet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__frank.n.01-dicing",
+        "input_synsets": {
+            "half__frank.n.01": 1
+        },
+        "input_states": {
+            "half__frank.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__frank.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__frankfurter_bun.n.01-dicing",
+        "input_synsets": {
+            "half__frankfurter_bun.n.01": 1
+        },
+        "input_states": {
+            "half__frankfurter_bun.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__frankfurter_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__french_fries.n.01-dicing",
+        "input_synsets": {
+            "half__french_fries.n.01": 1
+        },
+        "input_states": {
+            "half__french_fries.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__french_fries.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__french_toast.n.01-dicing",
+        "input_synsets": {
+            "half__french_toast.n.01": 1
+        },
+        "input_states": {
+            "half__french_toast.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__french_toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__fruitcake.n.01-dicing",
+        "input_synsets": {
+            "half__fruitcake.n.01": 1
+        },
+        "input_states": {
+            "half__fruitcake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__fruitcake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__garlic_bread.n.01-dicing",
+        "input_synsets": {
+            "half__garlic_bread.n.01": 1
+        },
+        "input_states": {
+            "half__garlic_bread.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__garlic_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__gelatin.n.01-dicing",
+        "input_synsets": {
+            "half__gelatin.n.01": 1
+        },
+        "input_states": {
+            "half__gelatin.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__gelatin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__ginger.n.01-dicing",
+        "input_synsets": {
+            "half__ginger.n.01": 1
+        },
+        "input_states": {
+            "half__ginger.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__ginger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__gingerbread.n.01-dicing",
+        "input_synsets": {
+            "half__gingerbread.n.01": 1
+        },
+        "input_states": {
+            "half__gingerbread.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__gingerbread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__gooseberry.n.01-dicing",
+        "input_synsets": {
+            "half__gooseberry.n.01": 1
+        },
+        "input_states": {
+            "half__gooseberry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__gooseberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__gourd.n.01-dicing",
+        "input_synsets": {
+            "half__gourd.n.01": 1
+        },
+        "input_states": {
+            "half__gourd.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__gourd.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__granola_bar.n.01-dicing",
+        "input_synsets": {
+            "half__granola_bar.n.01": 1
+        },
+        "input_states": {
+            "half__granola_bar.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__granola_bar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__grapefruit.n.01-dicing",
+        "input_synsets": {
+            "half__grapefruit.n.01": 1
+        },
+        "input_states": {
+            "half__grapefruit.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__grapefruit.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__green_bean.n.01-dicing",
+        "input_synsets": {
+            "half__green_bean.n.01": 1
+        },
+        "input_states": {
+            "half__green_bean.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__green_bean.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__green_onion.n.01-dicing",
+        "input_synsets": {
+            "half__green_onion.n.01": 1
+        },
+        "input_states": {
+            "half__green_onion.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__green_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__ham_hock.n.01-dicing",
+        "input_synsets": {
+            "half__ham_hock.n.01": 1
+        },
+        "input_states": {
+            "half__ham_hock.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__ham_hock.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hamburger.n.01-dicing",
+        "input_synsets": {
+            "half__hamburger.n.01": 1
+        },
+        "input_states": {
+            "half__hamburger.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hamburger.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hamburger_bun.n.01-dicing",
+        "input_synsets": {
+            "half__hamburger_bun.n.01": 1
+        },
+        "input_states": {
+            "half__hamburger_bun.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hamburger_bun.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hard-boiled_egg.n.01-dicing",
+        "input_synsets": {
+            "half__hard-boiled_egg.n.01": 1
+        },
+        "input_states": {
+            "half__hard-boiled_egg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hard-boiled_egg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hazelnut.n.01-dicing",
+        "input_synsets": {
+            "half__hazelnut.n.01": 1
+        },
+        "input_states": {
+            "half__hazelnut.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hazelnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__head_cabbage.n.01-dicing",
+        "input_synsets": {
+            "half__head_cabbage.n.01": 1
+        },
+        "input_states": {
+            "half__head_cabbage.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__head_cabbage.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hip.n.01-dicing",
+        "input_synsets": {
+            "half__hip.n.01": 1
+        },
+        "input_states": {
+            "half__hip.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__hotdog.n.01-dicing",
+        "input_synsets": {
+            "half__hotdog.n.01": 1
+        },
+        "input_states": {
+            "half__hotdog.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__hotdog.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__huitre.n.01-dicing",
+        "input_synsets": {
+            "half__huitre.n.01": 1
+        },
+        "input_states": {
+            "half__huitre.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__huitre.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__kabob.n.01-dicing",
+        "input_synsets": {
+            "half__kabob.n.01": 1
+        },
+        "input_states": {
+            "half__kabob.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__kabob.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__kale.n.01-dicing",
+        "input_synsets": {
+            "half__kale.n.01": 1
+        },
+        "input_states": {
+            "half__kale.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__kale.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__kielbasa.n.01-dicing",
+        "input_synsets": {
+            "half__kielbasa.n.01": 1
+        },
+        "input_states": {
+            "half__kielbasa.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__kielbasa.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__kiwi.n.01-dicing",
+        "input_synsets": {
+            "half__kiwi.n.01": 1
+        },
+        "input_states": {
+            "half__kiwi.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__kiwi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lamb.n.01-dicing",
+        "input_synsets": {
+            "half__lamb.n.01": 1
+        },
+        "input_states": {
+            "half__lamb.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lamb.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__leek.n.01-dicing",
+        "input_synsets": {
+            "half__leek.n.01": 1
+        },
+        "input_states": {
+            "half__leek.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__leek.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lemon.n.01-dicing",
+        "input_synsets": {
+            "half__lemon.n.01": 1
+        },
+        "input_states": {
+            "half__lemon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lemon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lemon_peel.n.01-dicing",
+        "input_synsets": {
+            "half__lemon_peel.n.01": 1
+        },
+        "input_states": {
+            "half__lemon_peel.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lemon_peel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lettuce.n.01-dicing",
+        "input_synsets": {
+            "half__lettuce.n.01": 1
+        },
+        "input_states": {
+            "half__lettuce.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lettuce.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lime.n.01-dicing",
+        "input_synsets": {
+            "half__lime.n.01": 1
+        },
+        "input_states": {
+            "half__lime.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lime.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__lobster.n.01-dicing",
+        "input_synsets": {
+            "half__lobster.n.01": 1
+        },
+        "input_states": {
+            "half__lobster.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lobster.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__macaroon.n.01-dicing",
+        "input_synsets": {
+            "half__macaroon.n.01": 1
+        },
+        "input_states": {
+            "half__macaroon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__macaroon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__mango.n.01-dicing",
+        "input_synsets": {
+            "half__mango.n.01": 1
+        },
+        "input_states": {
+            "half__mango.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__mango.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__marshmallow.n.01-dicing",
+        "input_synsets": {
+            "half__marshmallow.n.01": 1
+        },
+        "input_states": {
+            "half__marshmallow.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__marshmallow.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__meat_loaf.n.01-dicing",
+        "input_synsets": {
+            "half__meat_loaf.n.01": 1
+        },
+        "input_states": {
+            "half__meat_loaf.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__meat_loaf.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__meatball.n.01-dicing",
+        "input_synsets": {
+            "half__meatball.n.01": 1
+        },
+        "input_states": {
+            "half__meatball.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__meatball.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__mozzarella.n.01-dicing",
+        "input_synsets": {
+            "half__mozzarella.n.01": 1
+        },
+        "input_states": {
+            "half__mozzarella.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__mozzarella.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__muffin.n.01-dicing",
+        "input_synsets": {
+            "half__muffin.n.01": 1
+        },
+        "input_states": {
+            "half__muffin.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__muffin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__mushroom.n.01-dicing",
+        "input_synsets": {
+            "half__mushroom.n.01": 1
+        },
+        "input_states": {
+            "half__mushroom.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__mushroom.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__mustard.n.01-dicing",
+        "input_synsets": {
+            "half__mustard.n.01": 1
+        },
+        "input_states": {
+            "half__mustard.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__mustard.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__nectarine.n.01-dicing",
+        "input_synsets": {
+            "half__nectarine.n.01": 1
+        },
+        "input_states": {
+            "half__nectarine.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__nectarine.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__olive.n.01-dicing",
+        "input_synsets": {
+            "half__olive.n.01": 1
+        },
+        "input_states": {
+            "half__olive.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__olive.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__omelet.n.01-dicing",
+        "input_synsets": {
+            "half__omelet.n.01": 1
+        },
+        "input_states": {
+            "half__omelet.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__omelet.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__orange.n.01-dicing",
+        "input_synsets": {
+            "half__orange.n.01": 1
+        },
+        "input_states": {
+            "half__orange.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__orange.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__papaya.n.01-dicing",
+        "input_synsets": {
+            "half__papaya.n.01": 1
+        },
+        "input_states": {
+            "half__papaya.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__papaya.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__parsley.n.01-dicing",
+        "input_synsets": {
+            "half__parsley.n.01": 1
+        },
+        "input_states": {
+            "half__parsley.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__parsley.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__parsnip.n.01-dicing",
+        "input_synsets": {
+            "half__parsnip.n.01": 1
+        },
+        "input_states": {
+            "half__parsnip.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__parsnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pastry.n.01-dicing",
+        "input_synsets": {
+            "half__pastry.n.01": 1
+        },
+        "input_states": {
+            "half__pastry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pastry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__peach.n.01-dicing",
+        "input_synsets": {
+            "half__peach.n.01": 1
+        },
+        "input_states": {
+            "half__peach.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__peach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pear.n.01-dicing",
+        "input_synsets": {
+            "half__pear.n.01": 1
+        },
+        "input_states": {
+            "half__pear.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pear.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__peppermint.n.01-dicing",
+        "input_synsets": {
+            "half__peppermint.n.01": 1
+        },
+        "input_states": {
+            "half__peppermint.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__peppermint.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pepperoni.n.01-dicing",
+        "input_synsets": {
+            "half__pepperoni.n.01": 1
+        },
+        "input_states": {
+            "half__pepperoni.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pepperoni.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pickle.n.01-dicing",
+        "input_synsets": {
+            "half__pickle.n.01": 1
+        },
+        "input_states": {
+            "half__pickle.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pickle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pieplant.n.01-dicing",
+        "input_synsets": {
+            "half__pieplant.n.01": 1
+        },
+        "input_states": {
+            "half__pieplant.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pieplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pineapple.n.01-dicing",
+        "input_synsets": {
+            "half__pineapple.n.01": 1
+        },
+        "input_states": {
+            "half__pineapple.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pineapple.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pita.n.01-dicing",
+        "input_synsets": {
+            "half__pita.n.01": 1
+        },
+        "input_states": {
+            "half__pita.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pita.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pizza.n.01-dicing",
+        "input_synsets": {
+            "half__pizza.n.01": 1
+        },
+        "input_states": {
+            "half__pizza.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pizza.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pizza_dough.n.01-dicing",
+        "input_synsets": {
+            "half__pizza_dough.n.01": 1
+        },
+        "input_states": {
+            "half__pizza_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pizza_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__plum.n.01-dicing",
+        "input_synsets": {
+            "half__plum.n.01": 1
+        },
+        "input_states": {
+            "half__plum.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__plum.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pomegranate.n.01-dicing",
+        "input_synsets": {
+            "half__pomegranate.n.01": 1
+        },
+        "input_states": {
+            "half__pomegranate.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pomegranate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pomelo.n.01-dicing",
+        "input_synsets": {
+            "half__pomelo.n.01": 1
+        },
+        "input_states": {
+            "half__pomelo.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pomelo.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pork.n.01-dicing",
+        "input_synsets": {
+            "half__pork.n.01": 1
+        },
+        "input_states": {
+            "half__pork.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pork.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__porkchop.n.01-dicing",
+        "input_synsets": {
+            "half__porkchop.n.01": 1
+        },
+        "input_states": {
+            "half__porkchop.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__porkchop.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__potato.n.01-dicing",
+        "input_synsets": {
+            "half__potato.n.01": 1
+        },
+        "input_states": {
+            "half__potato.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__potato.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__prawn.n.01-dicing",
+        "input_synsets": {
+            "half__prawn.n.01": 1
+        },
+        "input_states": {
+            "half__prawn.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__prawn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pretzel.n.01-dicing",
+        "input_synsets": {
+            "half__pretzel.n.01": 1
+        },
+        "input_states": {
+            "half__pretzel.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pretzel.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__prosciutto.n.01-dicing",
+        "input_synsets": {
+            "half__prosciutto.n.01": 1
+        },
+        "input_states": {
+            "half__prosciutto.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__prosciutto.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__pumpkin.n.01-dicing",
+        "input_synsets": {
+            "half__pumpkin.n.01": 1
+        },
+        "input_states": {
+            "half__pumpkin.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__pumpkin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__quail.n.01-dicing",
+        "input_synsets": {
+            "half__quail.n.01": 1
+        },
+        "input_states": {
+            "half__quail.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__quail.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__quiche.n.01-dicing",
+        "input_synsets": {
+            "half__quiche.n.01": 1
+        },
+        "input_states": {
+            "half__quiche.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__quiche.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__radish.n.01-dicing",
+        "input_synsets": {
+            "half__radish.n.01": 1
+        },
+        "input_states": {
+            "half__radish.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__radish.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__ramen.n.01-dicing",
+        "input_synsets": {
+            "half__ramen.n.01": 1
+        },
+        "input_states": {
+            "half__ramen.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__ramen.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__rib.n.01-dicing",
+        "input_synsets": {
+            "half__rib.n.01": 1
+        },
+        "input_states": {
+            "half__rib.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__rib.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__roll_dough.n.01-dicing",
+        "input_synsets": {
+            "half__roll_dough.n.01": 1
+        },
+        "input_states": {
+            "half__roll_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__roll_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__rutabaga.n.01-dicing",
+        "input_synsets": {
+            "half__rutabaga.n.01": 1
+        },
+        "input_states": {
+            "half__rutabaga.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__rutabaga.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__salmon.n.01-dicing",
+        "input_synsets": {
+            "half__salmon.n.01": 1
+        },
+        "input_states": {
+            "half__salmon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__salmon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__scone.n.01-dicing",
+        "input_synsets": {
+            "half__scone.n.01": 1
+        },
+        "input_states": {
+            "half__scone.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__scone.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__shiitake.n.01-dicing",
+        "input_synsets": {
+            "half__shiitake.n.01": 1
+        },
+        "input_states": {
+            "half__shiitake.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__shiitake.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__snapper.n.01-dicing",
+        "input_synsets": {
+            "half__snapper.n.01": 1
+        },
+        "input_states": {
+            "half__snapper.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__snapper.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sour_bread.n.01-dicing",
+        "input_synsets": {
+            "half__sour_bread.n.01": 1
+        },
+        "input_states": {
+            "half__sour_bread.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sour_bread.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__spice_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__spice_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__spice_cookie.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__spice_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__spice_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__spice_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__spice_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__spice_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__spinach.n.01-dicing",
+        "input_synsets": {
+            "half__spinach.n.01": 1
+        },
+        "input_states": {
+            "half__spinach.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__spinach.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__squid.n.01-dicing",
+        "input_synsets": {
+            "half__squid.n.01": 1
+        },
+        "input_states": {
+            "half__squid.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__squid.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__steak.n.01-dicing",
+        "input_synsets": {
+            "half__steak.n.01": 1
+        },
+        "input_states": {
+            "half__steak.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__steak.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__strawberry.n.01-dicing",
+        "input_synsets": {
+            "half__strawberry.n.01": 1
+        },
+        "input_states": {
+            "half__strawberry.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__strawberry.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sugar_cookie.n.01-dicing",
+        "input_synsets": {
+            "half__sugar_cookie.n.01": 1
+        },
+        "input_states": {
+            "half__sugar_cookie.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sugar_cookie.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sugar_cookie_dough.n.01-dicing",
+        "input_synsets": {
+            "half__sugar_cookie_dough.n.01": 1
+        },
+        "input_states": {
+            "half__sugar_cookie_dough.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sugar_cookie_dough.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sunflower.n.01-dicing",
+        "input_synsets": {
+            "half__sunflower.n.01": 1
+        },
+        "input_states": {
+            "half__sunflower.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sunflower.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sushi.n.01-dicing",
+        "input_synsets": {
+            "half__sushi.n.01": 1
+        },
+        "input_states": {
+            "half__sushi.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sushi.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__sweet_corn.n.01-dicing",
+        "input_synsets": {
+            "half__sweet_corn.n.01": 1
+        },
+        "input_states": {
+            "half__sweet_corn.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__sweet_corn.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__swiss_cheese.n.01-dicing",
+        "input_synsets": {
+            "half__swiss_cheese.n.01": 1
+        },
+        "input_states": {
+            "half__swiss_cheese.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__swiss_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__taco.n.01-dicing",
+        "input_synsets": {
+            "half__taco.n.01": 1
+        },
+        "input_states": {
+            "half__taco.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__taco.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tenderloin.n.01-dicing",
+        "input_synsets": {
+            "half__tenderloin.n.01": 1
+        },
+        "input_states": {
+            "half__tenderloin.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tenderloin.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tiramisu.n.01-dicing",
+        "input_synsets": {
+            "half__tiramisu.n.01": 1
+        },
+        "input_states": {
+            "half__tiramisu.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tiramisu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__toast.n.01-dicing",
+        "input_synsets": {
+            "half__toast.n.01": 1
+        },
+        "input_states": {
+            "half__toast.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__toast.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tofu.n.01-dicing",
+        "input_synsets": {
+            "half__tofu.n.01": 1
+        },
+        "input_states": {
+            "half__tofu.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tofu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tortilla.n.01-dicing",
+        "input_synsets": {
+            "half__tortilla.n.01": 1
+        },
+        "input_states": {
+            "half__tortilla.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tortilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tortilla_chip.n.01-dicing",
+        "input_synsets": {
+            "half__tortilla_chip.n.01": 1
+        },
+        "input_states": {
+            "half__tortilla_chip.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tortilla_chip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__trout.n.01-dicing",
+        "input_synsets": {
+            "half__trout.n.01": 1
+        },
+        "input_states": {
+            "half__trout.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__trout.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tulip.n.01-dicing",
+        "input_synsets": {
+            "half__tulip.n.01": 1
+        },
+        "input_states": {
+            "half__tulip.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tulip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__tuna.n.01-dicing",
+        "input_synsets": {
+            "half__tuna.n.01": 1
+        },
+        "input_states": {
+            "half__tuna.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tuna.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__turkey.n.01-dicing",
+        "input_synsets": {
+            "half__turkey.n.01": 1
+        },
+        "input_states": {
+            "half__turkey.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__turkey.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__turkey_leg.n.01-dicing",
+        "input_synsets": {
+            "half__turkey_leg.n.01": 1
+        },
+        "input_states": {
+            "half__turkey_leg.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__turkey_leg.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__vanilla.n.01-dicing",
+        "input_synsets": {
+            "half__vanilla.n.01": 1
+        },
+        "input_states": {
+            "half__vanilla.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__vanilla.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__veal.n.01-dicing",
+        "input_synsets": {
+            "half__veal.n.01": 1
+        },
+        "input_states": {
+            "half__veal.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__veal.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__venison.n.01-dicing",
+        "input_synsets": {
+            "half__venison.n.01": 1
+        },
+        "input_states": {
+            "half__venison.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__venison.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__vidalia_onion.n.01-dicing",
+        "input_synsets": {
+            "half__vidalia_onion.n.01": 1
+        },
+        "input_states": {
+            "half__vidalia_onion.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__vidalia_onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__virginia_ham.n.01-dicing",
+        "input_synsets": {
+            "half__virginia_ham.n.01": 1
+        },
+        "input_states": {
+            "half__virginia_ham.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__virginia_ham.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__waffle.n.01-dicing",
+        "input_synsets": {
+            "half__waffle.n.01": 1
+        },
+        "input_states": {
+            "half__waffle.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__waffle.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__walnut.n.01-dicing",
+        "input_synsets": {
+            "half__walnut.n.01": 1
+        },
+        "input_states": {
+            "half__walnut.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__walnut.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__watermelon.n.01-dicing",
+        "input_synsets": {
+            "half__watermelon.n.01": 1
+        },
+        "input_states": {
+            "half__watermelon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__watermelon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__white_turnip.n.01-dicing",
+        "input_synsets": {
+            "half__white_turnip.n.01": 1
+        },
+        "input_states": {
+            "half__white_turnip.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__white_turnip.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__whole_garlic.n.01-dicing",
+        "input_synsets": {
+            "half__whole_garlic.n.01": 1
+        },
+        "input_states": {
+            "half__whole_garlic.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__whole_garlic.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__yam.n.01-dicing",
+        "input_synsets": {
+            "half__yam.n.01": 1
+        },
+        "input_states": {
+            "half__yam.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__yam.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-half__zucchini.n.01-dicing",
+        "input_synsets": {
+            "half__zucchini.n.01": 1
+        },
+        "input_states": {
+            "half__zucchini.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__zucchini.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__brisket.n.01-dicing",
+        "input_synsets": {
+            "sliced__brisket.n.01": 1
+        },
+        "input_states": {
+            "sliced__brisket.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__brisket.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__cucumber.n.01-dicing",
+        "input_synsets": {
+            "sliced__cucumber.n.01": 1
+        },
+        "input_states": {
+            "sliced__cucumber.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__cucumber.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__eggplant.n.01-dicing",
+        "input_synsets": {
+            "sliced__eggplant.n.01": 1
+        },
+        "input_states": {
+            "sliced__eggplant.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__eggplant.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__lemon.n.01-dicing",
+        "input_synsets": {
+            "sliced__lemon.n.01": 1
+        },
+        "input_states": {
+            "sliced__lemon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lemon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__lime.n.01-dicing",
+        "input_synsets": {
+            "sliced__lime.n.01": 1
+        },
+        "input_states": {
+            "sliced__lime.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__lime.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__melon.n.01-dicing",
+        "input_synsets": {
+            "sliced__melon.n.01": 1
+        },
+        "input_states": {
+            "sliced__melon.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__melon.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__onion.n.01-dicing",
+        "input_synsets": {
+            "sliced__onion.n.01": 1
+        },
+        "input_states": {
+            "sliced__onion.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__onion.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__papaya.n.01-dicing",
+        "input_synsets": {
+            "sliced__papaya.n.01": 1
+        },
+        "input_states": {
+            "sliced__papaya.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__papaya.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__roast_beef.n.01-dicing",
+        "input_synsets": {
+            "sliced__roast_beef.n.01": 1
+        },
+        "input_states": {
+            "sliced__roast_beef.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__roast_beef.n.01": 1
+        }
+    },
+    {
+        "rule_name": "uncooked-sliced__tomato.n.01-dicing",
+        "input_synsets": {
+            "sliced__tomato.n.01": 1
+        },
+        "input_states": {
+            "sliced__tomato.n.01": [
+                [
+                    "cooked",
+                    false
+                ]
+            ]
+        },
+        "output_synsets": {
+            "diced__tomato.n.01": 1
+        }
+    }
+]

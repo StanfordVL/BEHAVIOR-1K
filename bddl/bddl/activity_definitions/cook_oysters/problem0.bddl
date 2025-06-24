@@ -1,0 +1,60 @@
+(define (problem cook_oysters-0)
+    (:domain omnigibson)
+
+    (:objects
+        huitre.n.01_1 huitre.n.01_2 huitre.n.01_3 - huitre.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        bowl.n.01_1 - bowl.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        stove.n.01_1 - stove.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (cooked huitre.n.01_1)
+        ) 
+        (not 
+            (cooked huitre.n.01_2)
+        ) 
+        (not 
+            (cooked huitre.n.01_3)
+        ) 
+        (inside huitre.n.01_1 bowl.n.01_1)
+        (inside huitre.n.01_2 bowl.n.01_1)
+        (inside huitre.n.01_3 bowl.n.01_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (ontop stockpot.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?huitre.n.01 - huitre.n.01)
+                (inside ?huitre.n.01 ?stockpot.n.01_1)
+            ) 
+            (forall 
+                (?huitre.n.01 - huitre.n.01)
+                (and 
+                    (cooked ?huitre.n.01)
+                    (covered ?huitre.n.01 ?salt.n.02_1)
+                )
+            ) 
+        )
+    )
+)

@@ -1,0 +1,43 @@
+(define (problem boxing_food_after_dinner-0)
+    (:domain omnigibson)
+
+    (:objects
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        kabob.n.01_1 kabob.n.01_2 kabob.n.01_3 - kabob.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        tupperware.n.01_1 - tupperware.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (cooked kabob.n.01_1)
+        (cooked kabob.n.01_2)
+        (cooked kabob.n.01_3)
+        (ontop kabob.n.01_1 plate.n.04_1) 
+        (ontop kabob.n.01_2 plate.n.04_2) 
+        (ontop kabob.n.01_3 plate.n.04_3) 
+        (ontop plate.n.04_1 breakfast_table.n.01_1) 
+        (ontop plate.n.04_2 breakfast_table.n.01_1) 
+        (ontop plate.n.04_3 breakfast_table.n.01_1) 
+        (ontop tupperware.n.01_1 breakfast_table.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?kabob.n.01 - kabob.n.01)
+                (inside ?kabob.n.01 ?tupperware.n.01_1)
+            )
+            (inside ?tupperware.n.01_1 ?electric_refrigerator.n.01_1)
+            (not
+                (open ?electric_refrigerator.n.01_1)
+            )
+        )
+    )
+)

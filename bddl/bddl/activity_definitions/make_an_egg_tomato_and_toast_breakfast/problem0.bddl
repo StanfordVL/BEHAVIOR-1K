@@ -1,0 +1,38 @@
+(define (problem make_an_egg_tomato_and_toast_breakfast-0)
+    (:domain omnigibson)
+
+    (:objects
+     	plate.n.04_1 - plate.n.04
+     	bowl.n.01_1 - bowl.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	toast.n.01_1 - toast.n.01
+    	raw_egg.n.01_1 - raw_egg.n.01
+    	stove.n.01_1 - stove.n.01
+    	avocado.n.01_1 - avocado.n.01
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (ontop toast.n.01_1 plate.n.04_1)
+        (inside raw_egg.n.01_1 bowl.n.01_1)
+        (ontop bowl.n.01_1 countertop.n.01_1)
+        (inside avocado.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?toast.n.01_1 ?plate.n.04_1)
+            (cooked ?raw_egg.n.01_1)
+            (ontop ?raw_egg.n.01_1 ?toast.n.01_1)
+            (ontop ?avocado.n.01_1 ?toast.n.01_1)
+        )
+    )
+)

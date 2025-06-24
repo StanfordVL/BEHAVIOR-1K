@@ -1,0 +1,52 @@
+(define (problem setting_up_garden_furniture-0)
+    (:domain omnigibson)
+
+    (:objects
+        pitcher.n.02_1 - pitcher.n.02
+        floor.n.01_1 - floor.n.01
+        lawn_chair.n.01_1 lawn_chair.n.01_2 lawn_chair.n.01_3 - lawn_chair.n.01
+        teacup.n.02_1 teacup.n.02_2 - teacup.n.02
+        lawn.n.01_1 - lawn.n.01
+        driveway.n.01_1 - driveway.n.01
+        tree.n.01_1 - tree.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pitcher.n.02_1 floor.n.01_1) 
+        (ontop lawn_chair.n.01_1 floor.n.01_1)
+        (ontop lawn_chair.n.01_2 floor.n.01_1)
+        (ontop lawn_chair.n.01_3 floor.n.01_1)
+        (ontop teacup.n.02_1 lawn_chair.n.01_3)
+        (ontop teacup.n.02_2 lawn_chair.n.01_3)
+        (inroom floor.n.01_1 garden)
+        (inroom lawn.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?pitcher.n.02_1 ?coffee_table.n.01_1) 
+            (forall 
+                (?lawn_chair.n.01 - lawn_chair.n.01)
+                (and 
+                    (ontop ?lawn_chair.n.01 ?floor.n.01_1)
+                    (nextto ?lawn_chair.n.01 ?coffee_table.n.01_1)
+                    (or 
+                        (nextto ?lawn_chair.n.01 ?lawn_chair.n.01_1)
+                        (nextto ?lawn_chair.n.01 ?lawn_chair.n.01_2)
+                        (nextto ?lawn_chair.n.01 ?lawn_chair.n.01_3)
+                    )
+                )
+            )
+            (forall 
+                (?teacup.n.02 - teacup.n.02) 
+                (ontop ?teacup.n.02 ?coffee_table.n.01_1)
+            ) 
+        )
+    )
+)

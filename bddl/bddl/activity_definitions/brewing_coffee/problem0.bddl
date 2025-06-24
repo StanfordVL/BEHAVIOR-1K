@@ -1,0 +1,38 @@
+(define (problem brewing_coffee-0)
+    (:domain omnigibson)
+
+    (:objects
+        coffee_bean.n.01_1 - coffee_bean.n.01
+        water.n.06_1 - water.n.06
+        drip_coffee.n.01_1 - drip_coffee.n.01
+        coffee_maker.n.01_1 - coffee_maker.n.01
+        mug.n.04_1 - mug.n.04
+        coffee_bean__jar.n.01_1 - coffee_bean__jar.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled coffee_bean__jar.n.01_1 coffee_bean.n.01_1) 
+        (ontop coffee_bean__jar.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop coffee_maker.n.01_1 countertop.n.01_1) 
+        (ontop mug.n.04_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (future drip_coffee.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?drip_coffee.n.01_1) 
+            (contains ?mug.n.04_1 ?drip_coffee.n.01_1)
+        )
+    )
+)

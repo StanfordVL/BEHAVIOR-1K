@@ -1,0 +1,29 @@
+(define (problem iron_a_tie-0)
+    (:domain omnigibson)
+
+    (:objects
+        ironing_board.n.01_1 - ironing_board.n.01
+        floor.n.01_1 - floor.n.01
+        necktie.n.01_1 - necktie.n.01
+        iron.n.04_1 - iron.n.04
+        wrinkle.n.01_1 - wrinkle.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop ironing_board.n.01_1 floor.n.01_1) 
+        (ontop necktie.n.01_1 ironing_board.n.01_1) 
+        (ontop iron.n.04_1 ironing_board.n.01_1) 
+        (covered necktie.n.01_1 wrinkle.n.01_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?necktie.n.01_1 ?wrinkle.n.01_1)
+            )
+        )
+    )
+)

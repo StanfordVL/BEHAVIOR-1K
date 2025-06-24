@@ -1,0 +1,52 @@
+(define (problem emptying_trash_cans-0)
+    (:domain omnigibson)
+
+    (:objects
+        ashcan.n.01_1 ashcan.n.01_2 - ashcan.n.01
+        floor.n.01_1 - floor.n.01
+        rag.n.01_1 rag.n.01_2 - rag.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        water_bottle.n.01_1 - water_bottle.n.01
+        sack.n.01_1 sack.n.01_2 - sack.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (ontop ashcan.n.01_2 floor.n.01_1) 
+        (inside rag.n.01_1 ashcan.n.01_1) 
+        (inside rag.n.01_2 ashcan.n.01_1) 
+        (inside newspaper.n.03_1 ashcan.n.01_2) 
+        (inside water_bottle.n.01_1 ashcan.n.01_2) 
+        (ontop sack.n.01_1 countertop.n.01_1) 
+        (ontop sack.n.01_2 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sack.n.01 - sack.n.01)
+                (ontop ?sack.n.01 ?floor.n.01_1)
+            )
+            (forall 
+                (?rag.n.01 - rag.n.01) 
+                (exists 
+                    (?sack.n.01 - sack.n.01)
+                    (inside ?rag.n.01 ?sack.n.01)
+                )
+            ) 
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?newspaper.n.03_1 ?sack.n.01)
+            )
+            (exists 
+                (?sack.n.01 - sack.n.01)
+                (inside ?water_bottle.n.01_1 ?sack.n.01)
+            )
+        )
+    )
+)

@@ -1,0 +1,48 @@
+(define (problem clean_batting_gloves-0)
+    (:domain omnigibson)
+
+    (:objects
+        batting_glove.n.01_1 batting_glove.n.01_2 - batting_glove.n.01
+        mud.n.03_1 - mud.n.03
+        water.n.06_1 - water.n.06
+        washer.n.03_1 - washer.n.03
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop batting_glove.n.01_1 washer.n.03_1) 
+        (ontop batting_glove.n.01_2 washer.n.03_1) 
+        (covered batting_glove.n.01_1 mud.n.03_1)
+        (covered batting_glove.n.01_2 mud.n.03_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future water.n.06_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?batting_glove.n.01 - batting_glove.n.01)
+                (and
+                    (not 
+                        (covered ?batting_glove.n.01 ?mud.n.03_1)
+                    )
+                    (not 
+                        (covered ?batting_glove.n.01 ?water.n.06_1)
+                    )
+                    (not 
+                        (saturated ?batting_glove.n.01 ?water.n.06_1)
+                    )
+                )
+            ) 
+        )
+    )
+)

@@ -1,0 +1,27 @@
+(define (problem vacuuming_floors-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+     	floor.n.01_1 - floor.n.01
+    	vacuum.n.04_1 - vacuum.n.04
+        ashcan.n.01_1 - ashcan.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered floor.n.01_1 dust.n.01_1) 
+        (ontop vacuum.n.04_1 floor.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?floor.n.01_1 ?dust.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,36 @@
+(define (problem mopping_floors-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        soap__bottle.n.01_1 - soap__bottle.n.01
+        bucket.n.01_1 - bucket.n.01
+        swab.n.02_1 - swab.n.02
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop soap__bottle.n.01_1 floor.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop swab.n.02_1 floor.n.01_1) 
+        (covered floor.n.01_1 stain.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom floor.n.01_2 corridor) 
+        (inroom sink.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal
+        (and 
+            (not 
+                (covered ?floor.n.01_1 ?stain.n.01_1)
+            ) 
+        )
+    )
+)

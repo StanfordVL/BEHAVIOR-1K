@@ -1,0 +1,31 @@
+{
+    "title": "MixingStickTransitionRule",
+    "description": "A mixing stick-based transition rule",
+    "properties": {
+        "rule_name": {
+            "type": "string",
+            "description": "The name of the specific rule - human readable and often having to do with inputs and outputs."
+        },
+        "input_synsets": {
+            "type": "object",
+            "description": "Synsets describing objects going into the recipe, mapped to integers indicating the required number. These will not exist at output time."
+        },
+        "input_states": {
+            "type": "object",
+            "description": "Synsets or concatenated strings of synsets found in input_objects, mapped to a list of (predicate, boolean value) tuples indicating states of these synsets/sets of synsets at input time that are required for the transition to occur."
+        },
+        "machine": {
+            "type": "object",
+            "description": "Toggleable machine in which the transition is occurring. toggled_on(machine) must be true for the transition to occur."
+        },
+        "output_synsets": {
+            "type": "object",
+            "description": "Synsets describing objects coming out of the recipe, mapped to integers indicating the resulting number. These did not exist at input time."
+        },
+        "output_states": {
+            "type": "object",
+            "description": "Synsets or concatenated strings of synsets found in output_synsets, mapped to a list of (predicate, boolean value) tuples indicating states of these synsets/sets of synsets that are true at output time."
+        }
+    },
+    "required": [ "rule_name", "input_synsets", "machine", "output_synsets" ]
+}

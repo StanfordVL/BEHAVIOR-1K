@@ -1,0 +1,36 @@
+(define (problem cook_arepas-0)
+    (:domain omnigibson)
+
+    (:objects
+     	arepa.n.01_1 - arepa.n.01
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	cooking_oil.n.01_1 - cooking_oil.n.01
+    	griddle.n.01_1 - griddle.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+        countertop.n.01_1 - countertop.n.01
+        stove.n.01_1 - stove.n.01
+    )
+    
+    (:init 
+        (inside arepa.n.01_1 electric_refrigerator.n.01_1) 
+        (covered griddle.n.01_1 cooking_oil.n.01_1) 
+        (not 
+            (cooked arepa.n.01_1)
+        ) 
+        (ontop griddle.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?arepa.n.01_1 ?griddle.n.01_1) 
+            (cooked ?arepa.n.01_1)
+            (ontop griddle.n.01_1 countertop.n.01_1) 
+        )
+    )
+)

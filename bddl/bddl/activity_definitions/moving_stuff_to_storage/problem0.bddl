@@ -1,0 +1,65 @@
+(define (problem moving_stuff_to_storage-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        ice_skate.n.01_1 ice_skate.n.01_2 - ice_skate.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        bowling_ball.n.01_1 - bowling_ball.n.01
+        painting.n.01_1 - painting.n.01
+        textbook.n.01_1 textbook.n.01_2 - textbook.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside ice_skate.n.01_1 bookcase.n.01_1) 
+        (inside ice_skate.n.01_2 bookcase.n.01_1) 
+        (ontop bowling_ball.n.01_1 floor.n.01_1) 
+        (inside textbook.n.01_1 bookcase.n.01_1) 
+        (inside textbook.n.01_2 bookcase.n.01_1) 
+        (ontop painting.n.01_1 floor.n.01_1)
+        (ontop carton.n.02_1 floor.n.01_1)
+        (ontop carton.n.02_2 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom bookcase.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room)
+        (inroom floor.n.01_2 storage_room)
+    )
+    
+    (:goal 
+        (and 
+            (forn
+                (1)
+                (?carton.n.02 - carton.n.02)
+                (and 
+                    (forall 
+                        (?ice_skate.n.01 - ice_skate.n.01)
+                        (inside ?ice_skate.n.01 ?carton.n.02)
+                    )
+                    (forall 
+                        (?bowling_ball.n.01 - bowling_ball.n.01)
+                        (inside ?bowling_ball.n.01 ?carton.n.02)
+                    )
+                    (not 
+                        (inside ?textbook.n.01_1 ?carton.n.02)
+                    )
+                )
+            )
+            (forn
+                (1)
+                (?carton.n.02 - carton.n.02)
+                (and 
+                    (forall 
+                        (?textbook.n.01 - textbook.n.01)
+                        (inside ?textbook.n.01 ?carton.n.02)
+                    )
+                    (inside ?painting.n.01_1 ?carton.n.02)
+                    (not 
+                        (inside ?bowling_ball.n.01_1 ?carton.n.02)
+                    )
+                )
+            )
+        )
+    )
+)

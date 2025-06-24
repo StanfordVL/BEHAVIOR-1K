@@ -1,0 +1,27 @@
+(define (problem hanging_clothes_on_clothesline-0)
+    (:domain omnigibson)
+
+    (:objects
+        undergarment.n.01_1 - undergarment.n.01
+        hamper.n.02_1 - hamper.n.02
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        clothesline.n.01_1 - clothesline.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (inside undergarment.n.01_1 hamper.n.02_1)
+        (ontop hamper.n.02_1 floor.n.01_1)
+        (ontop clothesline.n.01_1 floor.n.01_1)
+        (saturated undergarment.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (draped ?undergarment.n.01_1 ?clothesline.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,44 @@
+(define (problem decorating_outside_for_parties-0)
+    (:domain omnigibson)
+
+    (:objects
+        balloon.n.01_1 balloon.n.01_2 balloon.n.01_3 balloon.n.01_4 - balloon.n.01
+        carton.n.02_1 - carton.n.02
+        floor.n.01_1 - floor.n.01
+        centerpiece.n.02_1 - centerpiece.n.02
+        gift_box.n.01_1 - gift_box.n.01
+        bow.n.08_1 - bow.n.08
+        tree.n.01_1 - tree.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside balloon.n.01_1 carton.n.02_1) 
+        (inside balloon.n.01_2 carton.n.02_1) 
+        (inside balloon.n.01_3 carton.n.02_1) 
+        (inside balloon.n.01_4 carton.n.02_1) 
+        (ontop carton.n.02_1 floor.n.01_1)
+        (ontop centerpiece.n.02_1 floor.n.01_1) 
+        (ontop bow.n.08_1 floor.n.01_1)
+        (ontop gift_box.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (inroom wall_nail.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?gift_box.n.01_1 ?coffee_table.n.01_1)
+            (ontop ?centerpiece.n.02_1 ?coffee_table.n.01_1) 
+            (forall 
+                (?balloon.n.01 - balloon.n.01)
+                (ontop ?balloon.n.01 ?floor.n.01_1)
+            ) 
+            (attached ?bow.n.08_1 ?wall_nail.n.01_1)
+        )
+    )
+)

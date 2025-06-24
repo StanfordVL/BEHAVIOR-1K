@@ -1,0 +1,93 @@
+(define (problem make_a_small_vegetable_garden-0)
+    (:domain omnigibson)
+
+    (:objects
+     	fertilizer.n.01_1 - fertilizer.n.01
+        fertilizer__atomizer.n.01_1 - fertilizer__atomizer.n.01
+    	floor.n.01_1 - floor.n.01
+    	soil.n.02_1 - soil.n.02
+        soil__bag.n.01_1 - soil__bag.n.01
+        pumpkin_seed.n.01_1 - pumpkin_seed.n.01
+    	pumpkin_seed__bag.n.01_1 - pumpkin_seed__bag.n.01
+        pottable__beefsteak_tomato.n.01_1 pottable__beefsteak_tomato.n.01_2 - pottable__beefsteak_tomato.n.01
+        pottable__chili.n.01_1 - pottable__chili.n.01
+        pot.n.04_1 pot.n.04_2 pot.n.04_3 - pot.n.04
+    	coffee_table.n.01_1 - coffee_table.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (insource fertilizer__atomizer.n.01_1 fertilizer.n.01_1)
+        (ontop fertilizer__atomizer.n.01_1 floor.n.01_1)
+        (filled soil__bag.n.01_1 soil.n.02_1)
+        (ontop soil__bag.n.01_1 floor.n.01_1)
+        (filled pumpkin_seed__bag.n.01_1 pumpkin_seed.n.01_1)
+        (ontop pumpkin_seed__bag.n.01_1 coffee_table.n.01_1)
+        (ontop pottable__chili.n.01_1 coffee_table.n.01_1)
+        (ontop pottable__beefsteak_tomato.n.01_1 coffee_table.n.01_1)
+        (ontop pottable__beefsteak_tomato.n.01_2 coffee_table.n.01_1)
+        (ontop pot.n.04_1 floor.n.01_1)
+        (ontop pot.n.04_2 floor.n.01_1)
+        (ontop pot.n.04_3 floor.n.01_1)
+        (inroom floor.n.01_1 garden)
+        (inroom coffee_table.n.01_1 garden)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (exists
+                (?pot.n.04 - pot.n.04)
+                (and
+                    (forall
+                        (?pottable__beefsteak_tomato.n.01 - pottable__beefsteak_tomato.n.01)
+                        (inside ?pottable__beefsteak_tomato.n.01 ?pot.n.04)
+                    )
+                    (not
+                        (contains ?pot.n.04 ?pumpkin_seed.n.01_1)
+                    )
+                    (not
+                        (inside ?pottable__chili.n.01_1 ?pot.n.04)
+                    )
+                )
+            )
+            (exists
+                (?pot.n.04 - pot.n.04)
+                (and
+                    (forall
+                        (?pottable__beefsteak_tomato.n.01 - pottable__beefsteak_tomato.n.01)
+                        (not
+                            (inside ?pottable__beefsteak_tomato.n.01 ?pot.n.04)
+                        )
+                    )
+                    (contains ?pot.n.04 ?pumpkin_seed.n.01_1)
+                    (not
+                        (inside ?pottable__chili.n.01_1 ?pot.n.04)
+                    )
+                )
+            )
+            (exists
+                (?pot.n.04 - pot.n.04)
+                (and
+                    (forall
+                        (?pottable__beefsteak_tomato.n.01 - pottable__beefsteak_tomato.n.01)
+                        (not
+                            (inside ?pottable__beefsteak_tomato.n.01 ?pot.n.04)
+                        )
+                    )
+                    (not
+                        (contains ?pot.n.04 ?pumpkin_seed.n.01_1)
+                    )
+                    (inside ?pottable__chili.n.01_1 ?pot.n.04)
+                )
+            )
+            (forall 
+                (?pot.n.04 - pot.n.04)
+                (and 
+                    (contains ?pot.n.04 ?soil.n.02_1)
+                    (contains ?pot.n.04 ?fertilizer.n.01_1)
+                )
+            )
+        )
+    )
+)

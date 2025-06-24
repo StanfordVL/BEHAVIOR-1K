@@ -1,0 +1,111 @@
+(define (problem clean_your_house_after_a_wild_party-0)
+    (:domain omnigibson)
+
+    (:objects
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        beer_bottle.n.01_1 beer_bottle.n.01_2 - beer_bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 floor.n.01_2 floor.n.01_3 - floor.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        cup.n.01_1 cup.n.01_2 cup.n.01_3 - cup.n.01
+        sink.n.01_1 sink.n.01_2 - sink.n.01
+        recycling_bin.n.01_1 recycling_bin.n.01_2 - recycling_bin.n.01
+        broom.n.01_1 - broom.n.01
+        vacuum.n.04_1 - vacuum.n.04
+        swab.n.02_1 - swab.n.02
+        cabinet.n.01_1 - cabinet.n.01
+        hand_towel.n.01_1 hand_towel.n.01_2 - hand_towel.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        bleaching_agent.n.01_1 - bleaching_agent.n.01
+        bleaching_agent__atomizer.n.01_1 - bleaching_agent__atomizer.n.01
+        water.n.06_1 - water.n.06
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        dust.n.01_1 - dust.n.01
+        stain.n.01_1 - stain.n.01
+        toilet.n.02_1 - toilet.n.02
+        dishwasher.n.01_1 - dishwasher.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop plate.n.04_1 countertop.n.01_1) 
+        (ontop plate.n.04_2 floor.n.01_2) 
+        (ontop plate.n.04_3 coffee_table.n.01_1) 
+        (ontop cup.n.01_1 coffee_table.n.01_1) 
+        (ontop cup.n.01_2 sink.n.01_1)
+        (ontop cup.n.01_3 floor.n.01_1) 
+        (ontop recycling_bin.n.01_1 floor.n.01_2) 
+        (ontop recycling_bin.n.01_2 floor.n.01_1) 
+        (ontop beer_bottle.n.01_1 floor.n.01_3)
+        (ontop beer_bottle.n.01_2 floor.n.01_3)
+        (open recycling_bin.n.01_1) 
+        (open recycling_bin.n.01_2) 
+        (ontop broom.n.01_1 floor.n.01_2) 
+        (ontop vacuum.n.04_1 floor.n.01_3) 
+        (inside swab.n.02_1 cabinet.n.01_1) 
+        (inside liquid_soap__bottle.n.01_1 cabinet.n.01_1) 
+        (inside bleaching_agent__atomizer.n.01_1 cabinet.n.01_1) 
+        (ontop hand_towel.n.01_1 floor.n.01_1) 
+        (ontop hand_towel.n.01_2 countertop.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (insource bleaching_agent__atomizer.n.01_1 bleaching_agent.n.01_1) 
+        (covered floor.n.01_1 water.n.06_1) 
+        (covered floor.n.01_2 adhesive_material.n.01_1) 
+        (covered floor.n.01_3 dust.n.01_1) 
+        (covered countertop.n.01_1 stain.n.01_1) 
+        (covered coffee_table.n.01_1 dust.n.01_1) 
+        (covered toilet.n.02_1 stain.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (insource sink.n.01_2 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom floor.n.01_2 kitchen) 
+        (inroom floor.n.01_3 living_room) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom sink.n.01_2 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom toilet.n.02_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04) 
+                (inside ?plate.n.04 ?dishwasher.n.01_1)
+            ) 
+            (forall 
+                (?cup.n.01 - cup.n.01) 
+                (inside ?cup.n.01 ?dishwasher.n.01_1)
+            ) 
+            (not 
+                (covered ?floor.n.01_1 ?water.n.06_1)
+            ) 
+            (not 
+                (covered ?toilet.n.02_1 ?stain.n.01_1)
+            ) 
+            (not 
+                (covered ?floor.n.01_3 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?coffee_table.n.01_1 ?dust.n.01_1)
+            ) 
+            (not 
+                (covered ?floor.n.01_2 ?adhesive_material.n.01_1)
+            ) 
+            (not 
+                (covered ?countertop.n.01_1 ?stain.n.01_1)
+            ) 
+            (forall 
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (exists 
+                    (?recycling_bin.n.01 - recycling_bin.n.01)
+                    (inside ?beer_bottle.n.01 ?recycling_bin.n.01)
+                )
+            )
+        )
+    )
+)

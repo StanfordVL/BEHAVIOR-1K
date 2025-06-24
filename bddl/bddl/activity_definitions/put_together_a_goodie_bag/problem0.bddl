@@ -1,0 +1,66 @@
+(define (problem put_together_a_goodie_bag-0)
+    (:domain omnigibson)
+
+    (:objects
+        sack.n.01_1 sack.n.01_2 - sack.n.01
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        box__of__cookies.n.01_1 box__of__cookies.n.01_2 - box__of__cookies.n.01
+        countertop.n.01_1 - countertop.n.01
+        postcard.n.01_1 postcard.n.01_2 - postcard.n.01
+        chocolate_kiss.n.01_1 - chocolate_kiss.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        ribbon.n.01_1 ribbon.n.01_2 - ribbon.n.01
+        oven.n.01_1 - oven.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside sack.n.01_1 cabinet.n.01_1) 
+        (inside sack.n.01_2 cabinet.n.01_2) 
+        (ontop box__of__cookies.n.01_1 countertop.n.01_1) 
+        (ontop box__of__cookies.n.01_2 countertop.n.01_1) 
+        (ontop postcard.n.01_1 countertop.n.01_1) 
+        (ontop postcard.n.01_2 countertop.n.01_1) 
+        (filled mason_jar.n.01_1 chocolate_kiss.n.01_1)
+        (inside mason_jar.n.01_1 cabinet.n.01_1)
+        (ontop ribbon.n.01_1 oven.n.01_1) 
+        (ontop ribbon.n.01_2 oven.n.01_1) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom cabinet.n.01_2 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sack.n.01 - sack.n.01) 
+                (ontop ?sack.n.01 ?countertop.n.01_1)
+            ) 
+            (forall
+                (?sack.n.01 - sack.n.01)
+                (contains ?sack.n.01 ?chocolate_kiss.n.01_1)
+            ) 
+            (forpairs 
+                (?sack.n.01 - sack.n.01) 
+                (?postcard.n.01 - postcard.n.01) 
+                (inside ?postcard.n.01 ?sack.n.01) 
+            )
+            (forpairs 
+                (?sack.n.01 - sack.n.01) 
+                (?box__of__cookies.n.01 - box__of__cookies.n.01) 
+                (inside ?box__of__cookies.n.01 ?sack.n.01) 
+            ) 
+            (forpairs 
+                (?sack.n.01 - sack.n.01) 
+                (?ribbon.n.01 - ribbon.n.01) 
+                (ontop ?ribbon.n.01 ?sack.n.01)
+            )
+        )
+    )
+)

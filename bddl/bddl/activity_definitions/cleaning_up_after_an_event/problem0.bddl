@@ -1,0 +1,60 @@
+(define (problem cleaning_up_after_an_event-0)
+    (:domain omnigibson)
+
+    (:objects
+        cup.n.01_1 cup.n.01_2 cup.n.01_3 cup.n.01_4 - cup.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        dishwasher.n.01_1 - dishwasher.n.01
+        hotdog.n.02_1 - hotdog.n.02
+        sink.n.01_1 - sink.n.01
+        bottle__of__apple_juice.n.01_1 - bottle__of__apple_juice.n.01
+        broom.n.01_1 - broom.n.01
+        sponge.n.01_1 - sponge.n.01
+        water.n.06_1 - water.n.06
+        disinfectant.n.01_1 - disinfectant.n.01
+        curtain.n.01_1 - curtain.n.01
+        window.n.01_1 - window.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside cup.n.01_1 cabinet.n.01_1) 
+        (ontop cup.n.01_2 floor.n.01_1) 
+        (ontop cup.n.01_3 electric_refrigerator.n.01_1) 
+        (ontop cup.n.01_4 dishwasher.n.01_1) 
+        (ontop hotdog.n.02_1 sink.n.01_1)
+        (ontop bottle__of__apple_juice.n.01_1 sink.n.01_1)
+        (ontop broom.n.01_1 floor.n.01_1) 
+        (ontop sponge.n.01_1 sink.n.01_1)
+        (not 
+            (covered sponge.n.01_1 water.n.06_1)
+        ) 
+        (covered cabinet.n.01_1 disinfectant.n.01_1) 
+        (ontop curtain.n.01_1 floor.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom window.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?cup.n.01 - cup.n.01) 
+                (inside ?cup.n.01 ?dishwasher.n.01_1)
+            ) 
+            (inside ?hotdog.n.02_1 ?electric_refrigerator.n.01_1) 
+            (inside ?bottle__of__apple_juice.n.01_1 ?electric_refrigerator.n.01_1) 
+            (nextto ?broom.n.01_1 ?dishwasher.n.01_1) 
+            (covered ?sponge.n.01_1 ?water.n.06_1) 
+            (inside ?sponge.n.01_1 ?sink.n.01_1) 
+            (overlaid ?curtain.n.01_1 ?window.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,43 @@
+(define (problem cook_broccolini-0)
+    (:domain omnigibson)
+
+    (:objects
+     	broccolini.n.01_1 - broccolini.n.01
+    	cookie_sheet.n.01_1 - cookie_sheet.n.01
+    	clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03
+    	bell_pepper.n.02_1 - bell_pepper.n.02
+    	oven.n.01_1 - oven.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop broccolini.n.01_1 cookie_sheet.n.01_1) 
+        (ontop clove.n.03_1 cookie_sheet.n.01_1)
+        (ontop clove.n.03_2 cookie_sheet.n.01_1)
+        (ontop clove.n.03_3 cookie_sheet.n.01_1)
+        (ontop bell_pepper.n.02_1 cookie_sheet.n.01_1) 
+        (ontop cookie_sheet.n.01_1 oven.n.01_1) 
+        (not 
+            (cooked broccolini.n.01_1)
+        ) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (forall
+                (?clove.n.03 - clove.n.03)
+                (and
+                    (ontop ?clove.n.03 ?cookie_sheet.n.01_1)
+                    (cooked ?clove.n.03)
+                )
+            )
+            (ontop ?broccolini.n.01_1 ?cookie_sheet.n.01_1)
+            (cooked ?broccolini.n.01_1)
+            (inside ?cookie_sheet.n.01_1 ?oven.n.01_1)
+        )
+    )
+)

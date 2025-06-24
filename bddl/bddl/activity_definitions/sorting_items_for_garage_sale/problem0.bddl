@@ -1,0 +1,112 @@
+(define (problem sorting_items_for_garage_sale-0)
+    (:domain omnigibson)
+
+    (:objects
+        ball.n.01_1 - ball.n.01
+        floor.n.01_1 - floor.n.01
+        toaster.n.02_1 toaster.n.02_2 - toaster.n.02
+        gummed_label.n.01_1 gummed_label.n.01_2 gummed_label.n.01_3 gummed_label.n.01_4 - gummed_label.n.01
+        textbook.n.01_1 textbook.n.01_2 textbook.n.01_3 textbook.n.01_4 - textbook.n.01
+        packing_box.n.02_1 packing_box.n.02_2 packing_box.n.02_3 packing_box.n.02_4 - packing_box.n.02
+        cooking_utensil.n.01_1 cooking_utensil.n.01_2 - cooking_utensil.n.01
+        tennis_racket.n.01_1 tennis_racket.n.01_2 - tennis_racket.n.01
+        coat.n.01_1 coat.n.01_2 - coat.n.01
+        blanket.n.01_1 - blanket.n.01
+        gym_shoe.n.01_1 gym_shoe.n.01_2 - gym_shoe.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop ball.n.01_1 floor.n.01_1) 
+        (ontop toaster.n.02_2 floor.n.01_1) 
+        (inside gummed_label.n.01_1 bookcase.n.01_1) 
+        (inside gummed_label.n.01_2 bookcase.n.01_1) 
+        (inside gummed_label.n.01_3 bookcase.n.01_1) 
+        (inside gummed_label.n.01_4 bookcase.n.01_1) 
+        (ontop textbook.n.01_1 floor.n.01_1) 
+        (ontop textbook.n.01_2 floor.n.01_1) 
+        (ontop textbook.n.01_3 floor.n.01_1) 
+        (ontop textbook.n.01_4 textbook.n.01_2) 
+        (ontop toaster.n.02_1 floor.n.01_1) 
+        (ontop packing_box.n.02_1 floor.n.01_1) 
+        (ontop packing_box.n.02_2 floor.n.01_1) 
+        (ontop packing_box.n.02_3 floor.n.01_1) 
+        (ontop packing_box.n.02_4 floor.n.01_1) 
+        (ontop cooking_utensil.n.01_1 floor.n.01_1) 
+        (ontop cooking_utensil.n.01_2 floor.n.01_1) 
+        (ontop tennis_racket.n.01_1 floor.n.01_1) 
+        (ontop tennis_racket.n.01_2 tennis_racket.n.01_1) 
+        (ontop coat.n.01_1 floor.n.01_1)
+        (ontop coat.n.01_2 floor.n.01_1)
+        (ontop blanket.n.01_1 floor.n.01_1) 
+        (ontop gym_shoe.n.01_1 textbook.n.01_3) 
+        (ontop gym_shoe.n.01_2 textbook.n.01_3) 
+        (inroom floor.n.01_1 garage) 
+        (inroom bookcase.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (inside ?ball.n.01_1 ?packing_box.n.02) 
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?textbook.n.01 - textbook.n.01) 
+                    (inside ?textbook.n.01 ?packing_box.n.02)
+                ) 
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?cooking_utensil.n.01 - cooking_utensil.n.01) 
+                    (inside ?cooking_utensil.n.01 ?packing_box.n.02)
+                ) 
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?tennis_racket.n.01 - tennis_racket.n.01) 
+                    (inside ?tennis_racket.n.01 ?packing_box.n.02)
+                ) 
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?gym_shoe.n.01 - gym_shoe.n.01) 
+                    (inside ?gym_shoe.n.01 ?packing_box.n.02)
+                ) 
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?toaster.n.02 - toaster.n.02) 
+                    (inside ?toaster.n.02 ?packing_box.n.02_2)
+                )
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (and
+                    (inside ?blanket.n.01_1 ?packing_box.n.02) 
+                    (folded ?blanket.n.01_1)
+                    (forall 
+                        (?coat.n.01 - coat.n.01)
+                        (and
+                            (inside ?coat.n.01 ?packing_box.n.02)
+                            (folded ?coat.n.01)
+                        )
+                    ) 
+                )
+            )
+            (forpairs
+                (?gummed_label.n.01 - gummed_label.n.01)
+                (?packing_box.n.02 - packing_box.n.02)
+                (ontop ?gummed_label.n.01 ?packing_box.n.02)
+            )
+        )
+    )
+)

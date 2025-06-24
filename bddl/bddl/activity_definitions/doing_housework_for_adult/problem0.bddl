@@ -1,0 +1,64 @@
+(define (problem doing_housework_for_adult-0)
+    (:domain omnigibson)
+
+    (:objects
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        pillow.n.01_1 pillow.n.01_2 - pillow.n.01
+        mug.n.04_1 mug.n.04_2 - mug.n.04
+        vacuum.n.04_1 - vacuum.n.04
+        lint.n.01_1 - lint.n.01
+        dust.n.01_1 - dust.n.01
+        rug.n.01_1 - rug.n.01
+        rag.n.01_1 - rag.n.01
+        window.n.01_1 - window.n.01
+        sink.n.01_1 - sink.n.01
+        sofa.n.01_1 - sofa.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop vacuum.n.04_1 floor.n.01_1)
+        (covered rug.n.01_1 lint.n.01_1)
+        (covered rug.n.01_1 dust.n.01_1)
+        (covered window.n.01_1 dust.n.01_1)
+        (ontop pillow.n.01_1 floor.n.01_1)
+        (ontop pillow.n.01_2 floor.n.01_1)
+        (ontop rug.n.01_1 floor.n.01_1)
+        (ontop mug.n.04_1 coffee_table.n.01_1)
+        (ontop mug.n.04_2 coffee_table.n.01_1)
+        (ontop rag.n.01_1 coffee_table.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_2) 
+        (inroom sofa.n.01_1 living_room)
+        (inroom floor.n.01_1 living_room) 
+        (inroom floor.n.01_2 kitchen) 
+        (inroom window.n.01_1 kitchen)
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom sink.n.01_1 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (not
+                (covered ?rug.n.01_1 ?lint.n.01_1)
+            )
+            (not
+                (covered ?rug.n.01_1 ?dust.n.01_1)
+            )
+            (forall 
+                (?pillow.n.01 - pillow.n.01)
+                (ontop ?pillow.n.01 ?sofa.n.01_1)
+            )
+            (not
+                (covered ?window.n.01_1 ?dust.n.01_1)
+            )
+            (forall
+                (?mug.n.04 - mug.n.04)
+                (or
+                    (inside ?mug.n.04 ?sink.n.01_1)
+                    (nextto ?mug.n.04 ?sink.n.01_1)
+                )
+            )
+        )
+    )
+)

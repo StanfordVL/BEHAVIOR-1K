@@ -1,0 +1,25 @@
+joints:
+  # Configuration for all joints
+  # First 8 are the left arm, from shoulder to wrist
+  # Second 8 are the right arm, from shoulder to wrist
+  
+  # Offsets are in degrees, and are multiples of 90
+  offsets:
+    - 360
+    - 0
+    - 270
+    - 90
+    - 0
+    - 180
+    - 180
+    - 0
+    - -90
+    - 360
+    - 90
+    - 270
+    - 360
+    - 180
+    - 180
+    - 90
+
+  signs: [-1, 1, -1, 1, -1, 1, -1, 1, -1, 1, 1, -1, 1, 1, 1, 1]

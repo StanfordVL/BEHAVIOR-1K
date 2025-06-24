@@ -1,0 +1,34 @@
+(define (problem waxing_floors-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        floor.n.01_1 - floor.n.01
+        floor_wax.n.01_1 - floor_wax.n.01
+        rag.n.01_1 - rag.n.01
+        floor_wax__bottle.n.01_1 - floor_wax__bottle.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered floor.n.01_1 dust.n.01_1) 
+        (filled floor_wax__bottle.n.01_1 floor_wax.n.01_1)
+        (ontop floor_wax__bottle.n.01_1 floor.n.01_1)
+        (inside rag.n.01_1 cabinet.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (and 
+                (not 
+                    (covered ?floor.n.01_1 ?dust.n.01_1)
+                ) 
+                (covered ?floor.n.01_1 ?floor_wax.n.01_1) 
+            )
+        )
+    )
+)

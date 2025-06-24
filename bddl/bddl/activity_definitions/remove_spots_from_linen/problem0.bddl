@@ -1,0 +1,39 @@
+(define (problem remove_spots_from_linen-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        sheet.n.03_1 - sheet.n.03
+        floor.n.01_1 - floor.n.01
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        water.n.06_1 - water.n.06
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        detergent.n.02_1 - detergent.n.02
+        sponge.n.01_1 - sponge.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered sheet.n.03_1 stain.n.01_1) 
+        (ontop sheet.n.03_1 floor.n.01_1) 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop lemon_juice__bottle.n.01_1 floor.n.01_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (ontop sponge.n.01_1 floor.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 living_room) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?sheet.n.03_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,165 @@
+(define (problem set_up_a_buffet-0)
+    (:domain omnigibson)
+
+    (:objects
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 plate.n.04_4 - plate.n.04
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        cabinet.n.01_1 cabinet.n.01_2 - cabinet.n.01
+        napkin.n.01_1 napkin.n.01_2 napkin.n.01_3 napkin.n.01_4 - napkin.n.01
+        water_glass.n.02_1 water_glass.n.02_2 - water_glass.n.02
+        casserole.n.02_1 casserole.n.02_2 casserole.n.02_3 casserole.n.02_4 - casserole.n.02
+        cooked__diced__broccoli.n.01_1 - cooked__diced__broccoli.n.01
+        chicken_leg.n.01_1 chicken_leg.n.01_2 - chicken_leg.n.01
+        cooked__quinoa.n.01_1 - cooked__quinoa.n.01
+        chocolate_biscuit.n.01_1 chocolate_biscuit.n.01_2 - chocolate_biscuit.n.01
+        countertop.n.01_1 - countertop.n.01
+        ladle.n.01_1 ladle.n.01_2 - ladle.n.01
+        tongs.n.01_1 tongs.n.01_2 - tongs.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init
+        (ontop plate.n.04_2 plate.n.04_1)
+        (inside plate.n.04_1 cabinet.n.01_1)
+        (ontop napkin.n.01_1 breakfast_table.n.01_1) 
+        (ontop napkin.n.01_2 breakfast_table.n.01_1) 
+        (ontop napkin.n.01_3 breakfast_table.n.01_1)
+        (ontop napkin.n.01_4 breakfast_table.n.01_1) 
+        (inside water_glass.n.02_1 cabinet.n.01_1) 
+        (ontop water_glass.n.02_2 countertop.n.01_1)
+        (ontop casserole.n.02_1 countertop.n.01_1)
+        (ontop casserole.n.02_2 countertop.n.01_1)
+        (ontop casserole.n.02_3 countertop.n.01_1)
+        (ontop casserole.n.02_4 countertop.n.01_1)
+        (inside ladle.n.01_1 cabinet.n.01_2)
+        (ontop ladle.n.01_2 countertop.n.01_1)
+        (ontop tongs.n.01_1 countertop.n.01_1)
+        (ontop tongs.n.01_2 countertop.n.01_1)
+        (filled tupperware.n.01_1 cooked__diced__broccoli.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (cooked chicken_leg.n.01_1)
+        (cooked chicken_leg.n.01_2)
+        (ontop chicken_leg.n.01_1 plate.n.04_3)
+        (ontop chicken_leg.n.01_2 plate.n.04_3)
+        (inside plate.n.04_3 electric_refrigerator.n.01_1)
+        (filled tupperware.n.01_2 cooked__quinoa.n.01_1)
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1)
+        (ontop chocolate_biscuit.n.01_1 plate.n.04_4)
+        (ontop chocolate_biscuit.n.01_2 plate.n.04_4)
+        (ontop plate.n.04_4 countertop.n.01_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom cabinet.n.01_2 kitchen)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__diced__broccoli.n.01_1)
+            (real ?cooked__quinoa.n.01_1)
+            (forall 
+                (?napkin.n.01 - napkin.n.01)
+                (and 
+                    (folded ?napkin.n.01)
+                    (ontop ?napkin.n.01 ?breakfast_table.n.01_1)
+                )
+            )
+            (forall 
+                (?water_glass.n.02 - water_glass.n.02)
+                (ontop ?water_glass.n.02 ?breakfast_table.n.01_1)
+            )
+            (exists 
+                (?casserole.n.02 - casserole.n.02)
+                (and 
+                    (exists 
+                        (?ladle.n.01 - ladle.n.01)
+                        (inside ?ladle.n.01 ?casserole.n.02)
+                    )
+                    (contains ?casserole.n.02 ?cooked__diced__broccoli.n.01_1)
+                    (not 
+                        (inside ?chicken_leg.n.01_1 ?casserole.n.02)
+                    )
+                    (not 
+                        (contains ?casserole.n.02 ?cooked__quinoa.n.01_1)
+                    )
+                    (not 
+                        (inside ?chocolate_biscuit.n.01_1 ?casserole.n.02)
+                    )
+                )
+            )
+            (exists 
+                (?casserole.n.02 - casserole.n.02)
+                (and 
+                    (exists 
+                        (?tongs.n.01 - tongs.n.01)
+                        (inside ?tongs.n.01 ?casserole.n.02)
+                    )
+                    (forall 
+                        (?chicken_leg.n.01 - chicken_leg.n.01)
+                        (and 
+                            (hot ?chicken_leg.n.01)
+                            (inside ?chicken_leg.n.01 ?casserole.n.02)
+                        )
+                    )
+                    (not
+                        (contains ?casserole.n.02 ?cooked__diced__broccoli.n.01_1)
+                    )
+                    (not 
+                        (contains ?casserole.n.02 ?cooked__quinoa.n.01_1)
+                    )
+                    (not 
+                        (inside ?chocolate_biscuit.n.01_1 ?casserole.n.02)
+                    )
+                )
+            )
+            (exists 
+                (?casserole.n.02 - casserole.n.02)
+                (and 
+                    (exists 
+                        (?ladle.n.01 - ladle.n.01)
+                        (inside ?ladle.n.01 ?casserole.n.02)
+                    )
+                    (contains ?casserole.n.02 ?cooked__quinoa.n.01_1)
+                    (not 
+                        (inside ?chicken_leg.n.01_1 ?casserole.n.02)
+                    )
+                    (not 
+                        (contains ?casserole.n.02 ?cooked__diced__broccoli.n.01_1)
+                    )
+                    (not 
+                        (inside ?chocolate_biscuit.n.01_1 ?casserole.n.02)
+                    )
+                )
+            )
+            (exists 
+                (?casserole.n.02 - casserole.n.02)
+                (and 
+                    (exists 
+                        (?tongs.n.01 - tongs.n.01)
+                        (inside ?tongs.n.01 ?casserole.n.02)
+                    )
+                    (forall 
+                        (?chocolate_biscuit.n.01 - chocolate_biscuit.n.01)
+                        (inside ?chocolate_biscuit.n.01 ?casserole.n.02)
+                    )
+                    (not
+                        (contains ?casserole.n.02 ?cooked__diced__broccoli.n.01_1)
+                    )
+                    (not 
+                        (contains ?casserole.n.02 ?cooked__quinoa.n.01_1)
+                    )
+                    (not 
+                        (inside ?chicken_leg.n.01_1 ?casserole.n.02)
+                    )
+                )
+            )
+        
+        )
+    )
+)

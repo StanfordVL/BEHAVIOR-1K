@@ -1,0 +1,54 @@
+(define (problem washing_plates-0)
+    (:domain omnigibson)
+
+    (:objects
+        dishtowel.n.01_1 - dishtowel.n.01
+        sink.n.01_1 - sink.n.01
+        scrub_brush.n.01_1 - scrub_brush.n.01
+        breadcrumb.n.01_1 - breadcrumb.n.01
+        pesto.n.01_1 - pesto.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        countertop.n.01_1 - countertop.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop dishtowel.n.01_1 sink.n.01_1)
+        (ontop scrub_brush.n.01_1 countertop.n.01_1) 
+        (covered plate.n.04_1 breadcrumb.n.01_1) 
+        (covered plate.n.04_2 breadcrumb.n.01_1) 
+        (covered plate.n.04_2 pesto.n.01_1) 
+        (covered plate.n.04_3 breadcrumb.n.01_1) 
+        (covered plate.n.04_3 pesto.n.01_1) 
+        (ontop plate.n.04_1 floor.n.01_1) 
+        (ontop plate.n.04_2 floor.n.01_1) 
+        (ontop plate.n.04_3 floor.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom countertop.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (and 
+                    (not 
+                        (covered ?plate.n.04 ?pesto.n.01_1)
+                    )
+                    (not 
+                        (covered ?plate.n.04 ?breadcrumb.n.01_1)
+                    )
+                )
+            )
+        )
+    )
+)

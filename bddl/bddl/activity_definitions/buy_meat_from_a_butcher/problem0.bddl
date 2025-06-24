@@ -1,0 +1,70 @@
+(define (problem buy_meat_from_a_butcher-0)
+    (:domain omnigibson)
+
+    (:objects
+        cash_register.n.01_1 - cash_register.n.01
+        checkout.n.03_1 - checkout.n.03
+        steak.n.01_1 steak.n.01_2 - steak.n.01
+        grocery_shelf.n.01_1 grocery_shelf.n.01_2 - grocery_shelf.n.01
+        brisket.n.01_1 - brisket.n.01
+        bratwurst.n.01_1 bratwurst.n.01_2 - bratwurst.n.01
+        pack__of__ground_beef.n.01_1 - pack__of__ground_beef.n.01
+        money.n.01_1 money.n.01_2 money.n.01_3 money.n.01_4 money.n.01_5 money.n.01_6 - money.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store) 
+        (ontop steak.n.01_1 grocery_shelf.n.01_1) 
+        (ontop steak.n.01_2 grocery_shelf.n.01_1) 
+        (ontop brisket.n.01_1 grocery_shelf.n.01_2) 
+        (ontop bratwurst.n.01_1 grocery_shelf.n.01_2) 
+        (ontop bratwurst.n.01_2 grocery_shelf.n.01_2) 
+        (ontop pack__of__ground_beef.n.01_1 grocery_shelf.n.01_1)
+        (ontop money.n.01_1 checkout.n.03_1) 
+        (ontop money.n.01_2 checkout.n.03_1) 
+        (ontop money.n.01_3 checkout.n.03_1) 
+        (ontop money.n.01_4 checkout.n.03_1) 
+        (ontop money.n.01_5 checkout.n.03_1) 
+        (ontop money.n.01_6 checkout.n.03_1) 
+        (ontop steak.n.01_1 steak.n.01_2) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_2 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    
+    )
+    
+    (:goal 
+        (and
+            (forn 
+                (5) 
+                (?money.n.01 - money.n.01) 
+                (nextto ?money.n.01 ?cash_register.n.01_1)
+    
+            ) 
+            (forn 
+                (1) 
+                (?money.n.01 - money.n.01) 
+                (nextto ?money.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (forall 
+                (?steak.n.01 - steak.n.01) 
+                (ontop ?steak.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (forall 
+                (?bratwurst.n.01 - bratwurst.n.01) 
+                (ontop ?bratwurst.n.01 ?checkout.n.03_1)
+    
+            ) 
+            (ontop ?brisket.n.01_1 ?checkout.n.03_1) 
+            (ontop ?pack__of__ground_beef.n.01_1 ?checkout.n.03_1)
+    
+        )
+    
+    )
+)

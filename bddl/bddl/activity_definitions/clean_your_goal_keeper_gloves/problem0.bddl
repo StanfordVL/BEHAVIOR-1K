@@ -1,0 +1,41 @@
+(define (problem clean_your_goal_keeper_gloves-0)
+    (:domain omnigibson)
+
+    (:objects
+        mud.n.03_1 - mud.n.03
+        goalkeeper_gloves.n.01_1 - goalkeeper_gloves.n.01
+        floor.n.01_1 - floor.n.01
+        sink.n.01_1 - sink.n.01
+        water.n.06_1 - water.n.06
+        detergent.n.02_1 - detergent.n.02
+        microwave.n.02_1 - microwave.n.02
+        vinegar.n.01_1 - vinegar.n.01
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        rag.n.01_1 - rag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered goalkeeper_gloves.n.01_1 mud.n.03_1)
+        (ontop goalkeeper_gloves.n.01_1 floor.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (ontop detergent__bottle.n.01_1 floor.n.01_1) 
+        (ontop vinegar__bottle.n.01_1 floor.n.01_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (inroom microwave.n.02_1 kitchen) 
+        (inroom floor.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?goalkeeper_gloves.n.01_1 ?mud.n.03_1)
+            ) 
+        )
+    )
+)

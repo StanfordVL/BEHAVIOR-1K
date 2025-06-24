@@ -1,0 +1,96 @@
+(define (problem laying_restaurant_table_for_dinner-0)
+    (:domain omnigibson)
+
+    (:objects
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 plate.n.04_4 - plate.n.04
+        cabinet.n.01_1 - cabinet.n.01
+        dinner_napkin.n.01_1 dinner_napkin.n.01_2 dinner_napkin.n.01_3 dinner_napkin.n.01_4 - dinner_napkin.n.01
+        tablefork.n.01_1 tablefork.n.01_2 tablefork.n.01_3 tablefork.n.01_4 - tablefork.n.01
+        table_knife.n.01_1 table_knife.n.01_2 table_knife.n.01_3 table_knife.n.01_4 - table_knife.n.01
+        tablespoon.n.02_1 tablespoon.n.02_2 tablespoon.n.02_3 tablespoon.n.02_4 - tablespoon.n.02
+        wineglass.n.01_1 wineglass.n.01_2 wineglass.n.01_3 wineglass.n.01_4 - wineglass.n.01
+        water_glass.n.02_1 water_glass.n.02_2 water_glass.n.02_3 water_glass.n.02_4 - water_glass.n.02
+        chair.n.01_1 chair.n.01_2 chair.n.01_3 chair.n.01_4 - chair.n.01
+        table.n.02_1 table.n.02_2 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside plate.n.04_1 cabinet.n.01_1) 
+        (ontop plate.n.04_2 plate.n.04_1) 
+        (ontop plate.n.04_3 plate.n.04_2) 
+        (ontop plate.n.04_4 plate.n.04_3) 
+        (ontop wineglass.n.01_1 table.n.02_2) 
+        (ontop wineglass.n.01_2 table.n.02_2) 
+        (ontop wineglass.n.01_3 table.n.02_2) 
+        (ontop wineglass.n.01_4 table.n.02_2) 
+        (ontop water_glass.n.02_1 table.n.02_2)
+        (ontop water_glass.n.02_2 table.n.02_2)
+        (ontop water_glass.n.02_3 table.n.02_2)
+        (ontop water_glass.n.02_4 table.n.02_2)
+        (inside tablefork.n.01_1 cabinet.n.01_1) 
+        (inside tablefork.n.01_2 cabinet.n.01_1) 
+        (inside tablefork.n.01_3 cabinet.n.01_1) 
+        (inside tablefork.n.01_4 cabinet.n.01_1) 
+        (inside table_knife.n.01_1 cabinet.n.01_1)
+        (inside table_knife.n.01_2 cabinet.n.01_1)
+        (inside table_knife.n.01_3 cabinet.n.01_1)
+        (inside table_knife.n.01_4 cabinet.n.01_1)
+        (inside tablespoon.n.02_1 cabinet.n.01_1)
+        (inside tablespoon.n.02_2 cabinet.n.01_1)
+        (inside tablespoon.n.02_3 cabinet.n.01_1)
+        (inside tablespoon.n.02_4 cabinet.n.01_1)
+        (ontop dinner_napkin.n.01_1 table.n.02_2)
+        (ontop dinner_napkin.n.01_2 table.n.02_2)
+        (ontop dinner_napkin.n.01_3 table.n.02_2)
+        (ontop dinner_napkin.n.01_4 table.n.02_2)
+        (inroom table.n.02_1 dining_room) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom chair.n.01_1 dining_room)
+        (inroom chair.n.01_2 dining_room)
+        (inroom chair.n.01_3 dining_room)
+        (inroom chair.n.01_4 dining_room)
+        (inroom table.n.02_2 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04)
+                (ontop ?plate.n.04 ?table.n.02_1)
+            )
+            (forall 
+                (?dinner_napkin.n.01 - dinner_napkin.n.01)
+                (folded ?dinner_napkin.n.01)
+            )
+            (forpairs
+                (?wineglass.n.01 - wineglass.n.01)
+                (?plate.n.04 - plate.n.04)
+                (nextto ?wineglass.n.01 ?plate.n.04)
+            )
+            (forpairs
+                (?water_glass.n.02 - water_glass.n.02)
+                (?plate.n.04 - plate.n.04)
+                (nextto ?water_glass.n.02 ?plate.n.04)
+            )
+            (forpairs
+                (?dinner_napkin.n.01 - dinner_napkin.n.01)
+                (?plate.n.04 - plate.n.04)
+                (nextto ?dinner_napkin.n.01 ?plate.n.04)
+            )
+            (forpairs
+                (?dinner_napkin.n.01 - dinner_napkin.n.01)
+                (?tablefork.n.01 - tablefork.n.01)
+                (nextto ?dinner_napkin.n.01 ?tablefork.n.01)
+            )
+            (forpairs
+                (?tablespoon.n.02 - tablespoon.n.02)
+                (?table_knife.n.01 - table_knife.n.01)
+                (nextto ?tablespoon.n.02 ?table_knife.n.01)
+            )
+        )
+    )
+)

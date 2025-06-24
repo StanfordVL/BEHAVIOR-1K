@@ -1,0 +1,31 @@
+(define (problem clean_up_spilled_egg-0)
+    (:domain omnigibson)
+
+    (:objects
+        beaten_egg.n.01_1 - beaten_egg.n.01
+        floor.n.01_1 - floor.n.01
+        sink.n.01_1 - sink.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        water.n.06_1 - water.n.06
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered floor.n.01_1 beaten_egg.n.01_1)
+        (ontop paper_towel.n.01_1 countertop.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered floor.n.01_1 beaten_egg.n.01_1)
+            )
+        )
+    )
+)

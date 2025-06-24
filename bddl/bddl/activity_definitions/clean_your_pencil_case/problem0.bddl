@@ -1,0 +1,37 @@
+(define (problem clean_your_pencil_case-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        pencil_box.n.01_1 - pencil_box.n.01
+        rag.n.01_1 - rag.n.01
+        pencil.n.01_1 pencil.n.01_2 - pencil.n.01
+        crayon.n.01_1 - crayon.n.01
+        pen.n.01_1 pen.n.01_2 - pen.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered pencil_box.n.01_1 dust.n.01_1) 
+        (inside pencil.n.01_1 pencil_box.n.01_1) 
+        (inside pencil.n.01_2 pencil_box.n.01_1) 
+        (inside crayon.n.01_1 pencil_box.n.01_1) 
+        (inside pen.n.01_1 pencil_box.n.01_1) 
+        (inside pen.n.01_2 pencil_box.n.01_1) 
+        (ontop pencil_box.n.01_1 desk.n.01_1) 
+        (ontop rag.n.01_1 desk.n.01_1) 
+        (inroom desk.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?pencil_box.n.01_1 ?dust.n.01_1)
+            ) 
+        )
+    )
+)

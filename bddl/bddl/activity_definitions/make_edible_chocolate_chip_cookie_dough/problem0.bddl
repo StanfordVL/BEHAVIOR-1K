@@ -1,0 +1,70 @@
+(define (problem make_edible_chocolate_chip_cookie_dough-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        brown_sugar.n.01_1 - brown_sugar.n.01
+        salt.n.02_1 - salt.n.02
+        vanilla.n.02_1 - vanilla.n.02
+        chocolate_kiss.n.01_1 - chocolate_kiss.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        edible_cookie_dough.n.01_1 - edible_cookie_dough.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        bowl.n.01_1 - bowl.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        brown_sugar__sack.n.01_1 - brown_sugar__sack.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        jimmies.n.01_1 - jimmies.n.01
+        sack.n.01_1 - sack.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        oven.n.01_1 - oven.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_1)
+        (filled mason_jar.n.01_1 chocolate_kiss.n.01_1)
+        (inside mason_jar.n.01_1 cabinet.n.01_1)
+        (filled bowl.n.01_1 melted__butter.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled brown_sugar__sack.n.01_1 brown_sugar.n.01_1) 
+        (ontop brown_sugar__sack.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sack.n.01_1 jimmies.n.01_1)
+        (inside sack.n.01_1 cabinet.n.01_1)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inside cookie_sheet.n.01_1 oven.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (future edible_cookie_dough.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (cooked ?edible_cookie_dough.n.01_1)
+            ) 
+            (real ?edible_cookie_dough.n.01_1) 
+            (inside ?edible_cookie_dough.n.01_1 ?electric_mixer.n.01_1)
+        )
+    )
+)

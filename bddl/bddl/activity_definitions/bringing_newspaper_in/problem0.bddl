@@ -1,0 +1,25 @@
+(define (problem bringing_newspaper_in-0)
+    (:domain omnigibson)
+
+    (:objects
+        newspaper.n.03_1 - newspaper.n.03
+        driveway.n.01_1 - driveway.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop newspaper.n.03_1 driveway.n.01_1) 
+        (inroom driveway.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?newspaper.n.03_1 ?coffee_table.n.01_1) 
+        )
+    )
+)

@@ -1,0 +1,75 @@
+(define (problem make_waffles-0)
+    (:domain omnigibson)
+
+    (:objects
+        raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01
+        butter.n.01_1 - butter.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        flour.n.01_1 - flour.n.01
+        yogurt.n.01_1 - yogurt.n.01
+        salt.n.02_1 - salt.n.02
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        bowl.n.01_1 - bowl.n.01
+        waffle.n.01_1 waffle.n.01_2 waffle.n.01_3 waffle.n.01_4 - waffle.n.01
+        waffle_iron.n.01_1 - waffle_iron.n.01
+        plate.n.04_1 - plate.n.04
+        flour__sack.n.01_1 - flour__sack.n.01
+        yogurt__carton.n.01_1 - yogurt__carton.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (ontop raw_egg.n.01_1 plate.n.04_1)
+        (ontop raw_egg.n.01_2 plate.n.04_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (inside butter.n.01_1 bowl.n.01_1)
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (ontop vanilla__bottle.n.01_1 countertop.n.01_1)
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_1) 
+        (filled yogurt__carton.n.01_1 yogurt.n.01_1) 
+        (inside yogurt__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (ontop milk__carton.n.01_1 countertop.n.01_1)
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (ontop waffle_iron.n.01_1 countertop.n.01_2)
+        (ontop plate.n.04_1 countertop.n.01_2) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom countertop.n.01_2 kitchen)
+        (future waffle.n.01_1) 
+        (future waffle.n.01_2) 
+        (future waffle.n.01_3) 
+        (future waffle.n.01_4) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?waffle.n.01_1) 
+            (real ?waffle.n.01_2) 
+            (real ?waffle.n.01_3) 
+            (real ?waffle.n.01_4) 
+            (forall 
+                (?waffle.n.01 - waffle.n.01) 
+                (cooked ?waffle.n.01)
+            )
+        )
+    )
+)

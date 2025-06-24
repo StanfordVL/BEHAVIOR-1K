@@ -1,0 +1,42 @@
+(define (problem set_up_a_coffee_station_in_your_kitchen-0)
+    (:domain omnigibson)
+
+    (:objects
+     	coffee_maker.n.01_1 - coffee_maker.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	bottle__of__coffee.n.01_1 - bottle__of__coffee.n.01
+        shelf.n.01_1 - shelf.n.01
+    	paper_coffee_filter.n.01_1 - paper_coffee_filter.n.01
+    	coffee_cup.n.01_1 - coffee_cup.n.01
+    	dishwasher.n.01_1 - dishwasher.n.01
+    	saucer.n.02_1 - saucer.n.02
+    	electric_kettle.n.01_1 - electric_kettle.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop coffee_maker.n.01_1 countertop.n.01_1) 
+        (ontop bottle__of__coffee.n.01_1 shelf.n.01_1) 
+        (ontop paper_coffee_filter.n.01_1 countertop.n.01_1) 
+        (ontop coffee_cup.n.01_1 countertop.n.01_1) 
+        (ontop saucer.n.02_1 countertop.n.01_1) 
+        (ontop electric_kettle.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom shelf.n.01_1 kitchen) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?coffee_maker.n.01_1 ?countertop.n.01_1) 
+            (nextto ?bottle__of__coffee.n.01_1 ?coffee_maker.n.01_1) 
+            (ontop ?paper_coffee_filter.n.01_1 ?coffee_maker.n.01_1) 
+            (nextto ?saucer.n.02_1 ?coffee_maker.n.01_1) 
+            (ontop ?coffee_cup.n.01_1 ?saucer.n.02_1) 
+            (nextto ?electric_kettle.n.01_1 ?coffee_maker.n.01_1)
+        )
+    )
+)

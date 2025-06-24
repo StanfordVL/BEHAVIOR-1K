@@ -1,0 +1,55 @@
+(define (problem make_limeade-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        lime_juice.n.01_1 - lime_juice.n.01
+        pitcher.n.02_1 - pitcher.n.02
+        limeade.n.01_1 - limeade.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        lime_juice__bottle.n.01_1 - lime_juice__bottle.n.01
+        ice_cube.n.01_1 ice_cube.n.01_2 ice_cube.n.01_3 ice_cube.n.01_4 - ice_cube.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        bowl.n.01_1 - bowl.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (inside sugar__sack.n.01_1 cabinet.n.01_1) 
+        (filled lime_juice__bottle.n.01_1 lime_juice.n.01_1) 
+        (inside lime_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop pitcher.n.02_1 countertop.n.01_1) 
+        (ontop wooden_spoon.n.02_1 countertop.n.01_1)
+        (inside ice_cube.n.01_1 bowl.n.01_1)
+        (inside ice_cube.n.01_2 bowl.n.01_1) 
+        (inside ice_cube.n.01_3 bowl.n.01_1) 
+        (inside ice_cube.n.01_4 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (future limeade.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?limeade.n.01_1) 
+            (contains ?pitcher.n.02_1 ?limeade.n.01_1) 
+            (forall 
+                (?ice_cube.n.01 - ice_cube.n.01) 
+                (inside ?ice_cube.n.01 ?pitcher.n.02_1)
+            )
+        )
+    )
+)

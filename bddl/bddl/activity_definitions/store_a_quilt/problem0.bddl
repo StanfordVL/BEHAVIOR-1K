@@ -1,0 +1,26 @@
+(define (problem store_a_quilt-0)
+    (:domain omnigibson)
+
+    (:objects
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        floor.n.01_1 - floor.n.01
+        quilt.n.01_1 - quilt.n.01
+        wardrobe.n.01_1 - wardrobe.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop wicker_basket.n.01_1 floor.n.01_1) 
+        (inside quilt.n.01_1 wicker_basket.n.01_1) 
+        (inroom wardrobe.n.01_1 closet) 
+        (inroom floor.n.01_1 closet) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?quilt.n.01_1 ?wardrobe.n.01_1)
+            (folded ?quilt.n.01_1)
+        )
+    )
+)

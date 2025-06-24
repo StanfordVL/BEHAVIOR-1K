@@ -1,0 +1,49 @@
+(define (problem wash_grapes-0)
+    (:domain omnigibson)
+
+    (:objects
+        grape.n.01_1 grape.n.01_2 grape.n.01_3 grape.n.01_4 - grape.n.01
+        dirt.n.02_1 - dirt.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        countertop.n.01_1 - countertop.n.01
+        water.n.06_1 - water.n.06
+        bowl.n.01_1 - bowl.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside grape.n.01_1 bowl.n.01_1) 
+        (inside grape.n.01_2 bowl.n.01_1) 
+        (inside grape.n.01_3 bowl.n.01_1) 
+        (inside grape.n.01_4 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (ontop paper_towel.n.01_1 countertop.n.01_1) 
+        (covered grape.n.01_1 dirt.n.02_1)
+        (covered grape.n.01_2 dirt.n.02_1)
+        (covered grape.n.01_3 dirt.n.02_1)
+        (covered grape.n.01_4 dirt.n.02_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?grape.n.01 - grape.n.01) 
+                (and
+                    (not 
+                        (covered ?grape.n.01 ?dirt.n.02_1)
+                    )
+                    (inside ?grape.n.01 ?bowl.n.01_1)
+                )
+            ) 
+        )
+    )
+)

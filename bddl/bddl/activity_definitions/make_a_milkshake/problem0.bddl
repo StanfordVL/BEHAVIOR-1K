@@ -1,0 +1,44 @@
+(define (problem make_a_milkshake-0)
+    (:domain omnigibson)
+
+    (:objects
+        whole_milk.n.01_1 - whole_milk.n.01
+        chocolate_sauce.n.01_1 - chocolate_sauce.n.01
+        scoop_of_ice_cream.n.01_1 - scoop_of_ice_cream.n.01
+        milkshake.n.01_1 - milkshake.n.01
+        blender.n.01_1 - blender.n.01
+        cup.n.01_1 - cup.n.01
+        ice_cream__carton.n.01_1 - ice_cream__carton.n.01
+        countertop.n.01_1 - countertop.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        chocolate_sauce__bottle.n.01_1 - chocolate_sauce__bottle.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+
+    (:init
+        (filled milk__carton.n.01_1 whole_milk.n.01_1)
+        (ontop tablespoon.n.02_1 countertop.n.01_1)
+        (insource chocolate_sauce__bottle.n.01_1 chocolate_sauce.n.01_1)
+        (inside scoop_of_ice_cream.n.01_1 ice_cream__carton.n.01_1)
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (ontop cup.n.01_1 countertop.n.01_1) 
+        (inside ice_cream__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inside chocolate_sauce__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (future milkshake.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?milkshake.n.01_1) 
+            (contains ?cup.n.01_1 ?milkshake.n.01_1)
+        )
+    )
+)

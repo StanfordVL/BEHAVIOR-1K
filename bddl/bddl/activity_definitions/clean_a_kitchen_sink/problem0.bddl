@@ -1,0 +1,50 @@
+(define (problem clean_a_kitchen_sink-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        sink.n.01_1 - sink.n.01
+        crumb.n.03_1 - crumb.n.03
+        water.n.06_1 - water.n.06
+        sponge.n.01_1 - sponge.n.01
+        spinach.n.02_1 spinach.n.02_2 spinach.n.02_3 - spinach.n.02
+        compost_bin.n.01_1 - compost_bin.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered sink.n.01_1 stain.n.01_1) 
+        (covered sink.n.01_1 crumb.n.03_1) 
+        (ontop sponge.n.01_1 countertop.n.01_1)
+        (ontop compost_bin.n.01_1 floor.n.01_1)
+        (ontop spinach.n.02_1 sink.n.01_1)
+        (ontop spinach.n.02_2 sink.n.01_1)
+        (ontop spinach.n.02_3 sink.n.01_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?sink.n.01_1 ?stain.n.01_1)
+            ) 
+            (not 
+                (covered ?sink.n.01_1 ?crumb.n.03_1)
+            ) 
+            (forall
+                (?spinach.n.02 - spinach.n.02)
+                (inside ?spinach.n.02 ?compost_bin.n.01_1)
+            )
+        )
+    )
+)

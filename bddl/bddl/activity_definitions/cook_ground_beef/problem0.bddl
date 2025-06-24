@@ -1,0 +1,64 @@
+(define (problem cook_ground_beef-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 - bowl.n.01
+        oven.n.01_1 - oven.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        onion_powder.n.01_1 - onion_powder.n.01
+        cooked__onion_powder.n.01_1 - cooked__onion_powder.n.01
+        onion_powder__shaker.n.01_1 - onion_powder__shaker.n.01
+        salt.n.02_1 - salt.n.02
+        cooked__salt.n.01_1 - cooked__salt.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        ground_beef.n.01_1 - ground_beef.n.01
+        cooked__ground_beef.n.01_1 - cooked__ground_beef.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop frying_pan.n.01_1 oven.n.01_1) 
+        (ontop wooden_spoon.n.02_1 oven.n.01_1) 
+        (insource onion_powder__shaker.n.01_1 onion_powder.n.01_1) 
+        (ontop onion_powder__shaker.n.01_1 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled bowl.n.01_1 ground_beef.n.01_1) 
+        (inroom oven.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (future cooked__ground_beef.n.01_1)
+        (future cooked__salt.n.01_1)
+        (future cooked__onion_powder.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__ground_beef.n.01_1)
+            (or 
+                (real ?cooked__salt.n.01_1)
+                (real ?salt.n.02_1)
+            )
+            (or 
+                (real ?onion_powder.n.01_1)
+                (real ?cooked__onion_powder.n.01_1)
+            )
+            (contains ?frying_pan.n.01_1 ?cooked__ground_beef.n.01_1)
+            (or 
+                (contains ?frying_pan.n.01_1 ?salt.n.02_1)
+                (contains ?frying_pan.n.01_1 ?cooked__salt.n.01_1)
+            )
+            (or 
+                (contains ?frying_pan.n.01_1 ?onion_powder.n.01_1)
+                (contains ?frying_pan.n.01_1 ?cooked__onion_powder.n.01_1)
+            )
+        )
+    )
+)

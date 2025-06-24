@@ -1,0 +1,40 @@
+(define (problem washing_curtains-0)
+    (:domain omnigibson)
+
+    (:objects
+        curtain.n.01_1 curtain.n.01_2 - curtain.n.01
+        washer.n.03_1 - washer.n.03
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        stain.n.01_1 - stain.n.01
+        floor.n.01_1 - floor.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop curtain.n.01_1 floor.n.01_1) 
+        (ontop curtain.n.01_2 floor.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 washer.n.03_1) 
+        (covered curtain.n.01_1 stain.n.01_1) 
+        (covered curtain.n.01_2 stain.n.01_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (and 
+                (forall 
+                    (?curtain.n.01 - curtain.n.01)
+                    (not 
+                        (covered ?curtain.n.01 ?stain.n.01_1) 
+                    )
+                )
+            )
+        )
+    )
+)

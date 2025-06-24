@@ -1,0 +1,35 @@
+name: Run BDDL tests
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  run-tests:
+    name: Run BDDL tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        ref: develop
+    
+    - name: Setup python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        architecture: x64
+
+    - name: Install BDDL
+      run: pip install -e .
+
+    - name: Install dev requirements
+      run: pip install -r requirements-dev.txt
+
+    - name: Run general tests
+      run: python tests/bddl_tests.py batch_verify
+
+    - name: Run transition map tests
+      run: python tests/tm_tests.py
+
+    - name: Test if knowledgebase loads OK
+      run: python -c "from bddl.knowledge_base import *"

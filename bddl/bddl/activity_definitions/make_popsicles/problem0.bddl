@@ -1,0 +1,53 @@
+(define (problem make_popsicles-0)
+    (:domain omnigibson)
+
+    (:objects
+        raspberry.n.02_1 raspberry.n.02_2 - raspberry.n.02
+        strawberry.n.01_1 strawberry.n.01_2 - strawberry.n.01
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        yogurt.n.01_1 - yogurt.n.01
+        honey.n.01_1 - honey.n.01
+        blender.n.01_1 - blender.n.01
+        ice_lolly.n.01_1 ice_lolly.n.01_2 - ice_lolly.n.01
+        deep-freeze.n.02_1 - deep-freeze.n.02
+        mold.n.02_1 - mold.n.02
+        yogurt__carton.n.01_1 - yogurt__carton.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        honey__jar.n.01_1 - honey__jar.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside raspberry.n.02_1 electric_refrigerator.n.01_1)
+        (inside raspberry.n.02_2 electric_refrigerator.n.01_1)
+        (inside strawberry.n.01_1 electric_refrigerator.n.01_1)
+        (inside strawberry.n.01_2 electric_refrigerator.n.01_1)
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1)
+        (inside lemon_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled yogurt__carton.n.01_1 yogurt.n.01_1) 
+        (inside yogurt__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled honey__jar.n.01_1 honey.n.01_1) 
+        (inside honey__jar.n.01_1 cabinet.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (inroom deep-freeze.n.02_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (ontop mold.n.02_1 countertop.n.01_1) 
+        (future ice_lolly.n.01_1)
+        (future ice_lolly.n.01_2)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?ice_lolly.n.01_1) 
+            (real ?ice_lolly.n.01_2)
+        )
+    )
+)

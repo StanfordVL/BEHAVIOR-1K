@@ -1,0 +1,50 @@
+(define (problem filling_pepper-0)
+    (:domain omnigibson)
+
+    (:objects
+        bell_pepper.n.02_1 - bell_pepper.n.02
+        half__bell_pepper.n.01_1 half__bell_pepper.n.01_2 - half__bell_pepper.n.01
+        white_rice.n.01_1 - white_rice.n.01
+        saucepot.n.01_1 - saucepot.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        chili.n.02_1 - chili.n.02
+        diced__chili.n.01_1 - diced__chili.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        plate.n.04_1 - plate.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside bell_pepper.n.02_1 electric_refrigerator.n.01_1) 
+        (inside chili.n.02_1 electric_refrigerator.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1) 
+        (filled saucepot.n.01_1 white_rice.n.01_1)
+        (ontop saucepot.n.01_1 countertop.n.01_1)
+        (ontop plate.n.04_1 countertop.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (future half__bell_pepper.n.01_1)
+        (future half__bell_pepper.n.01_2)
+        (future diced__chili.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__chili.n.01_1)
+            (real ?half__bell_pepper.n.01_1)
+            (real ?half__bell_pepper.n.01_2)
+            (forall 
+                (?half__bell_pepper.n.01 - half__bell_pepper.n.01)
+                (and 
+                    (covered ?half__bell_pepper.n.01 ?white_rice.n.01_1)
+                    (covered ?half__bell_pepper.n.01 ?diced__chili.n.01_1)
+                    (ontop ?half__bell_pepper.n.01 ?plate.n.04_1)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,57 @@
+(define (problem make_homemade_bird_food-0)
+    (:domain omnigibson)
+
+    (:objects
+        peanut_butter.n.01_1 - peanut_butter.n.01
+        almond.n.02_1 - almond.n.02
+        sack.n.01_1 - sack.n.01
+        apple.n.01_1 - apple.n.01
+        sunflower_seed.n.01_1 - sunflower_seed.n.01
+        raisin.n.01_1 - raisin.n.01
+        raisin__box.n.01_1 - raisin__box.n.01
+        pinecone.n.01_1 - pinecone.n.01
+        diced__apple.n.01_1 - diced__apple.n.01
+        table_knife.n.01_1 - table_knife.n.01
+        peanut_butter__jar.n.01_1 - peanut_butter__jar.n.01
+        sunflower_seed__bag.n.01_1 - sunflower_seed__bag.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled peanut_butter__jar.n.01_1 peanut_butter.n.01_1) 
+        (inside peanut_butter__jar.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sack.n.01_1 almond.n.02_1) 
+        (ontop sack.n.01_1 floor.n.01_1)
+        (ontop apple.n.01_1 countertop.n.01_1)
+        (filled sunflower_seed__bag.n.01_1 sunflower_seed.n.01_1)
+        (ontop sunflower_seed__bag.n.01_1 floor.n.01_1)
+        (filled raisin__box.n.01_1 raisin.n.01_1) 
+        (ontop raisin__box.n.01_1 countertop.n.01_1)
+        (ontop pinecone.n.01_1 countertop.n.01_2) 
+        (ontop table_knife.n.01_1 countertop.n.01_2) 
+        (ontop carving_knife.n.01_1 countertop.n.01_2) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_2) 
+        (inroom countertop.n.01_1 kitchen)
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future diced__apple.n.01_1)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__apple.n.01_1)
+            (covered ?pinecone.n.01_1 ?peanut_butter.n.01_1)
+            (covered ?pinecone.n.01_1 ?almond.n.02_1)
+            (covered ?pinecone.n.01_1 ?diced__apple.n.01_1)
+            (covered ?pinecone.n.01_1 ?sunflower_seed.n.01_1)
+            (covered ?pinecone.n.01_1 ?raisin.n.01_1)
+        )
+    )
+)

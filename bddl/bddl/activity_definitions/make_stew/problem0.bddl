@@ -1,0 +1,56 @@
+(define (problem make_stew-0)
+    (:domain omnigibson)
+
+    (:objects
+        carrot.n.03_1 carrot.n.03_2 carrot.n.03_3 - carrot.n.03
+        vidalia_onion.n.01_1 vidalia_onion.n.01_2 - vidalia_onion.n.01
+        pea.n.01_1 - pea.n.01
+        ground_beef.n.01_1 - ground_beef.n.01
+        beef_broth.n.01_1 - beef_broth.n.01
+        beef_stew.n.01_1 - beef_stew.n.01
+        stove.n.01_1 - stove.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        countertop.n.01_1 - countertop.n.01
+        wicker_basket.n.01_1 - wicker_basket.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        beef_broth__carton.n.01_1 - beef_broth__carton.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside carrot.n.03_1 electric_refrigerator.n.01_1) 
+        (inside carrot.n.03_2 electric_refrigerator.n.01_1) 
+        (inside carrot.n.03_3 electric_refrigerator.n.01_1) 
+        (inside vidalia_onion.n.01_1 wicker_basket.n.01_1) 
+        (inside vidalia_onion.n.01_2 wicker_basket.n.01_1) 
+        (ontop wicker_basket.n.01_1 countertop.n.01_1) 
+        (filled tupperware.n.01_2 pea.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (filled tupperware.n.01_1 ground_beef.n.01_1) 
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1) 
+        (inside chopping_board.n.01_1 cabinet.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (filled beef_broth__carton.n.01_1 beef_broth.n.01_1) 
+        (inside beef_broth__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop stockpot.n.01_1 countertop.n.01_1) 
+        (future beef_stew.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?beef_stew.n.01_1) 
+            (contains ?stockpot.n.01_1 ?beef_stew.n.01_1)
+        )
+    )
+)

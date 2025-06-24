@@ -1,0 +1,18 @@
+[
+    {
+        "object": "ceilings-hzdavr",
+        "complaint": "wensi: top corner not perpendicular",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4014
+    },
+    {
+        "object": "ceilings-xqauyk",
+        "complaint": "ceiling",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 4015
+    }
+]

@@ -1,0 +1,60 @@
+(define (problem putting_out_condiments-0)
+    (:domain omnigibson)
+
+    (:objects
+        wicker_basket.n.01_1 wicker_basket.n.01_2 - wicker_basket.n.01
+        countertop.n.01_1 - countertop.n.01
+        bottle__of__vinegar.n.01_1 - bottle__of__vinegar.n.01
+        pickle.n.01_1 - pickle.n.01
+        bottle__of__mustard.n.01_1 - bottle__of__mustard.n.01
+        bottle__of__peanut_butter.n.01_1 - bottle__of__peanut_butter.n.01
+        jar__of__spaghetti_sauce.n.01_1 - jar__of__spaghetti_sauce.n.01
+        bottle__of__mayonnaise.n.01_1 - bottle__of__mayonnaise.n.01
+        table_knife.n.01_1 table_knife.n.01_2 table_knife.n.01_3 table_knife.n.01_4 table_knife.n.01_5 table_knife.n.01_6 table_knife.n.01_7 - table_knife.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop wicker_basket.n.01_1 countertop.n.01_1) 
+        (ontop wicker_basket.n.01_2 countertop.n.01_1) 
+        (ontop bottle__of__vinegar.n.01_1 countertop.n.01_1) 
+        (inside pickle.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bottle__of__mustard.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bottle__of__peanut_butter.n.01_1 cabinet.n.01_1) 
+        (inside jar__of__spaghetti_sauce.n.01_1 electric_refrigerator.n.01_1)
+        (inside bottle__of__mayonnaise.n.01_1 electric_refrigerator.n.01_1) 
+        (inside table_knife.n.01_1 cabinet.n.01_1)
+        (inside table_knife.n.01_2 cabinet.n.01_1)
+        (inside table_knife.n.01_3 cabinet.n.01_1)
+        (inside table_knife.n.01_4 cabinet.n.01_1)
+        (inside table_knife.n.01_5 cabinet.n.01_1)
+        (inside table_knife.n.01_6 cabinet.n.01_1)
+        (inside table_knife.n.01_7 cabinet.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom breakfast_table.n.01_1 dining_room)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?bottle__of__vinegar.n.01_1 ?breakfast_table.n.01_1) 
+            (ontop ?pickle.n.01_1 ?breakfast_table.n.01_1) 
+            (ontop ?bottle__of__mustard.n.01_1 ?breakfast_table.n.01_1) 
+            (ontop ?jar__of__spaghetti_sauce.n.01_1 ?breakfast_table.n.01_1)
+            (ontop ?bottle__of__peanut_butter.n.01_1 ?breakfast_table.n.01_1) 
+            (ontop ?bottle__of__mayonnaise.n.01_1 ?breakfast_table.n.01_1)
+            (forn
+                (4)
+                (?table_knife.n.01 - table_knife.n.01)
+                (ontop ?table_knife.n.01 ?breakfast_table.n.01_1)
+            )
+        )
+    )
+)

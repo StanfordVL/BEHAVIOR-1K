@@ -1,0 +1,47 @@
+(define (problem clean_leather_sandals-0)
+    (:domain omnigibson)
+
+    (:objects
+        saddle_soap.n.01_1 - saddle_soap.n.01
+        saddle_soap__bottle.n.01_1 - saddle_soap__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        hand_towel.n.01_1 - hand_towel.n.01
+        sandal.n.01_1 sandal.n.01_2 - sandal.n.01
+        conditioner.n.03_1 - conditioner.n.03
+        conditioner__atomizer.n.01_1 - conditioner__atomizer.n.01
+        stain.n.01_1 - stain.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled saddle_soap__bottle.n.01_1 saddle_soap.n.01_1) 
+        (ontop saddle_soap__bottle.n.01_1 floor.n.01_1) 
+        (insource conditioner__atomizer.n.01_1 conditioner.n.03_1)
+        (ontop conditioner__atomizer.n.01_1 floor.n.01_1)
+        (ontop hand_towel.n.01_1 floor.n.01_1) 
+        (ontop sandal.n.01_1 floor.n.01_1) 
+        (ontop sandal.n.01_2 floor.n.01_1) 
+        (covered sandal.n.01_1 stain.n.01_1) 
+        (covered sandal.n.01_2 stain.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 utility_room) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sandal.n.01 - sandal.n.01) 
+                (and
+                    (not 
+                        (covered ?sandal.n.01 ?stain.n.01_1)
+                    )
+                    (covered ?sandal.n.01 ?conditioner.n.03_1)
+                )
+            )
+        )
+    )
+)

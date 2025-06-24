@@ -1,0 +1,36 @@
+(define (problem make_a_basic_brine-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        salt.n.02_1 - salt.n.02
+        seawater.n.01_1 - seawater.n.01
+        stove.n.01_1 - stove.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource sink.n.01_1 water.n.06_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (inroom stove.n.01_1 kitchen) 
+        (ontop stockpot.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (future seawater.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?seawater.n.01_1) 
+            (contains ?stockpot.n.01_1 ?seawater.n.01_1)
+        )
+    )
+)

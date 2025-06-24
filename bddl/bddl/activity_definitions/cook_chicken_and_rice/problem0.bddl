@@ -1,0 +1,53 @@
+(define (problem cook_chicken_and_rice-0)
+    (:domain omnigibson)
+
+    (:objects
+        white_rice.n.01_1 - white_rice.n.01
+        cooked__white_rice.n.01_1 - cooked__white_rice.n.01
+        bowl.n.01_1 - bowl.n.01
+        countertop.n.01_1 - countertop.n.01
+        chicken.n.01_1 - chicken.n.01
+        rice_cooker.n.01_1 - rice_cooker.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled bowl.n.01_1 white_rice.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inside chicken.n.01_1 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (ontop rice_cooker.n.01_1 countertop.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (not 
+            (cooked chicken.n.01_1)
+        ) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future cooked__white_rice.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real cooked__white_rice.n.01_1)
+            (cooked ?chicken.n.01_1)
+            (covered ?chicken.n.01_1 ?salt.n.02_1)
+            (covered ?chicken.n.01_1 ?olive_oil.n.01_1)
+        )
+    )
+)

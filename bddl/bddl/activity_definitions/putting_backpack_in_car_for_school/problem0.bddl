@@ -1,0 +1,30 @@
+(define (problem putting_backpack_in_car_for_school-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        backpack.n.01_1 - backpack.n.01
+        table.n.02_1 - table.n.02
+        book.n.02_1 - book.n.02
+        pencil_box.n.01_1 - pencil_box.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden)
+        (ontop backpack.n.01_1 table.n.02_1) 
+        (inside book.n.02_1 backpack.n.01_1) 
+        (inside pencil_box.n.01_1 backpack.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom table.n.02_1 bedroom)
+        (inroom floor.n.01_2 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?backpack.n.01_1 ?car.n.01_1) 
+        )
+    )
+)

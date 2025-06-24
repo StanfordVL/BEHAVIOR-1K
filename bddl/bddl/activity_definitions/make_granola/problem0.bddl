@@ -1,0 +1,51 @@
+(define (problem make_granola-0)
+    (:domain omnigibson)
+
+    (:objects
+        oat.n.02_1 - oat.n.02
+        honey.n.01_1 - honey.n.01
+        cinnamon.n.03_1 - cinnamon.n.03
+        pecan.n.03_1 - pecan.n.03
+        raisin.n.01_1 - raisin.n.01
+        granola.n.01_1 - granola.n.01
+        oven.n.01_1 - oven.n.01
+        sack.n.01_1 - sack.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        oat__box.n.01_1 - oat__box.n.01
+        cinnamon__shaker.n.01_1 - cinnamon__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        honey__jar.n.01_1 - honey__jar.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled oat__box.n.01_1 oat.n.02_1)
+        (inside oat__box.n.01_1 cabinet.n.01_1) 
+        (filled honey__jar.n.01_1 honey.n.01_1) 
+        (inside honey__jar.n.01_1 cabinet.n.01_1) 
+        (insource cinnamon__shaker.n.01_1 cinnamon.n.03_1) 
+        (inside cinnamon__shaker.n.01_1 cabinet.n.01_1) 
+        (filled sack.n.01_1 pecan.n.03_1) 
+        (ontop sack.n.01_1 countertop.n.01_1) 
+        (filled tupperware.n.01_1 raisin.n.01_1) 
+        (inside tupperware.n.01_1 cabinet.n.01_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_2) 
+        (future granola.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?granola.n.01_1) 
+            (contains ?cookie_sheet.n.01_1 ?granola.n.01_1)
+        )
+    )
+)

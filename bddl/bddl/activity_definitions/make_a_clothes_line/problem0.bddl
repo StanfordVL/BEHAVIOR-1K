@@ -1,0 +1,27 @@
+(define (problem make_a_clothes_line-0)
+    (:domain omnigibson)
+
+    (:objects
+        clothesline_rope.n.01_1 - clothesline_rope.n.01
+        clothesline_pole.n.01_1 clothesline_pole.n.01_2 - clothesline_pole.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom clothesline_pole.n.01_1 garden)
+        (inroom clothesline_pole.n.01_2 garden)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop clothesline_rope.n.01_1 floor.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?clothesline_pole.n.01 - clothesline_pole.n.01)
+                (attached ?clothesline_rope.n.01_1 ?clothesline_pole.n.01_1)
+            )
+        )
+    )
+)

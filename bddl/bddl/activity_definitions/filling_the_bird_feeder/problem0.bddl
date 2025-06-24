@@ -1,0 +1,25 @@
+(define (problem filling_the_bird_feeder-0)
+    (:domain omnigibson)
+
+    (:objects
+        bird_feeder.n.01_1 - bird_feeder.n.01
+        floor.n.01_1 - floor.n.01
+        bird_feed.n.01_1 - bird_feed.n.01
+        bird_feed__bag.n.01_1 - bird_feed__bag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init 
+        (ontop bird_feeder.n.01_1 floor.n.01_1) 
+        (filled bird_feed__bag.n.01_1 bird_feed.n.01_1)
+        (ontop bird_feed__bag.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (filled ?bird_feeder.n.01_1 ?bird_feed.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,65 @@
+(define (problem setting_up_for_an_event-0)
+    (:domain omnigibson)
+
+    (:objects
+        hamburger.n.01_1 hamburger.n.01_2 hamburger.n.01_3 hamburger.n.01_4 - hamburger.n.01
+        floor.n.01_1 - floor.n.01
+        beer_bottle.n.01_1 beer_bottle.n.01_2 beer_bottle.n.01_3 beer_bottle.n.01_4 - beer_bottle.n.01
+        gift_box.n.01_1 gift_box.n.01_2 gift_box.n.01_3 gift_box.n.01_4 - gift_box.n.01
+        tablecloth.n.01_1 - tablecloth.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop hamburger.n.01_1 coffee_table.n.01_1) 
+        (ontop hamburger.n.01_2 coffee_table.n.01_1) 
+        (ontop hamburger.n.01_3 coffee_table.n.01_1) 
+        (ontop hamburger.n.01_4 coffee_table.n.01_1) 
+        (ontop beer_bottle.n.01_1 coffee_table.n.01_1) 
+        (ontop beer_bottle.n.01_2 coffee_table.n.01_1) 
+        (ontop beer_bottle.n.01_3 coffee_table.n.01_1) 
+        (ontop beer_bottle.n.01_4 coffee_table.n.01_1) 
+        (ontop gift_box.n.01_1 floor.n.01_1)
+        (ontop gift_box.n.01_2 floor.n.01_1)
+        (ontop gift_box.n.01_3 floor.n.01_1)
+        (ontop gift_box.n.01_4 floor.n.01_1)
+        (ontop tablecloth.n.01_1 floor.n.01_1) 
+        (inroom coffee_table.n.01_1 garden)
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (overlaid ?tablecloth.n.01_1 ?coffee_table.n.01_1)
+            (forpairs 
+                (?hamburger.n.01 - hamburger.n.01)
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (nextto ?hamburger.n.01 ?beer_bottle.n.01)
+            )
+            (forpairs 
+                (?gift_box.n.01 - gift_box.n.01)
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (nextto ?gift_box.n.01 ?beer_bottle.n.01)
+            )
+            (forpairs 
+                (?hamburger.n.01 - hamburger.n.01)
+                (?gift_box.n.01 - gift_box.n.01)
+                (nextto ?hamburger.n.01 ?gift_box.n.01)
+            )
+            (forall
+                (?hamburger.n.01 - hamburger.n.01)
+                (ontop ?hamburger.n.01 ?coffee_table.n.01_1)
+            )
+            (forall
+                (?gift_box.n.01 - gift_box.n.01)
+                (ontop ?gift_box.n.01 ?coffee_table.n.01_1)
+            )
+            (forall
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (ontop ?beer_bottle.n.01 ?coffee_table.n.01_1)
+            )
+        )
+    )
+)

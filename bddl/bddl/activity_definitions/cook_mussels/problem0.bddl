@@ -1,0 +1,112 @@
+(define (problem cook_mussels-0)
+    (:domain omnigibson)
+
+    (:objects
+        mussel.n.01_1 mussel.n.01_2 mussel.n.01_3 mussel.n.01_4 mussel.n.01_5 mussel.n.01_6 mussel.n.01_7 mussel.n.01_8 - mussel.n.01
+        beefsteak_tomato.n.01_1 beefsteak_tomato.n.01_2 - beefsteak_tomato.n.01
+        cooked__diced__beefsteak_tomato.n.01_1 - cooked__diced__beefsteak_tomato.n.01
+        salt.n.02_1 - salt.n.02
+        marjoram.n.02_1 - marjoram.n.02
+        marjoram__shaker.n.01_1 - marjoram__shaker.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        plate.n.04_1 - plate.n.04
+        carving_knife.n.01_1 - carving_knife.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        water.n.06_1 - water.n.06
+        stockpot.n.01_1 - stockpot.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        seawater.n.01_1 - seawater.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sink.n.01_1 - sink.n.01
+        stove.n.01_1 - stove.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside mussel.n.01_1 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_2 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_3 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_4 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_5 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_6 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_7 electric_refrigerator.n.01_1)
+        (inside mussel.n.01_8 electric_refrigerator.n.01_1)
+        (not
+            (cooked mussel.n.01_1)
+        ) 
+        (not 
+            (cooked mussel.n.01_2)
+        ) 
+        (not 
+            (cooked mussel.n.01_3)
+        ) 
+        (not 
+            (cooked mussel.n.01_4)
+        ) 
+        (not 
+            (cooked mussel.n.01_5)
+        ) 
+        (not 
+            (cooked mussel.n.01_6)
+        ) 
+        (not 
+            (cooked mussel.n.01_7)
+        ) 
+        (not 
+            (cooked mussel.n.01_8)
+        ) 
+        (frozen mussel.n.01_1)
+        (frozen mussel.n.01_2)
+        (frozen mussel.n.01_3)
+        (frozen mussel.n.01_4)
+        (frozen mussel.n.01_5)
+        (frozen mussel.n.01_6)
+        (frozen mussel.n.01_7)
+        (frozen mussel.n.01_8)
+        (inside beefsteak_tomato.n.01_1 electric_refrigerator.n.01_1)
+        (inside beefsteak_tomato.n.01_2 electric_refrigerator.n.01_1)
+        (not 
+            (cooked beefsteak_tomato.n.01_1)
+        )
+        (not 
+            (cooked beefsteak_tomato.n.01_2)
+        )
+        (insource sink.n.01_1 water.n.06_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (insource marjoram__shaker.n.01_1 marjoram.n.02_1)
+        (inside salt__shaker.n.01_1 cabinet.n.01_1)
+        (inside marjoram__shaker.n.01_1 cabinet.n.01_1)
+        (ontop stockpot.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (inside plate.n.04_1 cabinet.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (future seawater.n.01_1)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (future cooked__diced__beefsteak_tomato.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__diced__beefsteak_tomato.n.01_1)
+            (forall 
+                (?mussel.n.01 - mussel.n.01)
+                (and 
+                    (cooked ?mussel.n.01)
+                    (inside ?mussel.n.01 ?stockpot.n.01_1)
+                )
+            )
+            (contains ?stockpot.n.01_1 ?cooked__diced__beefsteak_tomato.n.01_1)
+            (real ?seawater.n.01_1)
+            (contains ?stockpot.n.01_1 ?seawater.n.01_1)
+            (contains ?stockpot.n.01_1 ?marjoram.n.02_1)
+        )
+    )
+)

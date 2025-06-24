@@ -1,0 +1,54 @@
+(define (problem make_pizza_sauce-0)
+    (:domain omnigibson)
+
+    (:objects
+        beefsteak_tomato.n.01_1 - beefsteak_tomato.n.01
+        tomato_paste.n.01_1 - tomato_paste.n.01
+        marjoram.n.02_1 - marjoram.n.02
+        clove.n.03_1 clove.n.03_2 - clove.n.03
+        salt.n.02_1 - salt.n.02
+        basil.n.03_1 - basil.n.03
+        tomato_sauce.n.01_1 - tomato_sauce.n.01
+        stove.n.01_1 - stove.n.01
+        bowl.n.01_1 - bowl.n.01
+        tomato_paste__can.n.01_1 - tomato_paste__can.n.01
+        marjoram__shaker.n.01_1 - marjoram__shaker.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled tomato_paste__can.n.01_1 tomato_paste.n.01_1) 
+        (inside tomato_paste__can.n.01_1 cabinet.n.01_1) 
+        (inside beefsteak_tomato.n.01_1 electric_refrigerator.n.01_1)
+        (insource marjoram__shaker.n.01_1 marjoram.n.02_1)
+        (inside marjoram__shaker.n.01_1 cabinet.n.01_1)
+        (ontop clove.n.03_1 countertop.n.01_1)
+        (ontop clove.n.03_2 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (inside basil.n.03_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop stockpot.n.01_1 countertop.n.01_2)
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future tomato_sauce.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?tomato_sauce.n.01_1) 
+            (contains ?stockpot.n.01_1 ?tomato_sauce.n.01_1)
+        )
+    )
+)

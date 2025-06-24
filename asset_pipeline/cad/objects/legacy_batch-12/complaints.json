@@ -1,0 +1,186 @@
+[
+    {
+        "object": "wrapped_gift-wpmksn",
+        "complaint": "present.n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3521
+    },
+    {
+        "object": "wrapped_gift-wpmksn",
+        "complaint": "open top",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3522
+    },
+    {
+        "object": "gift_box-wpmksn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3523
+    },
+    {
+        "object": "lid-dadswa",
+        "complaint": "gift_lid",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: lid\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 3524
+    },
+    {
+        "object": "lid-dadswa",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 3525
+    },
+    {
+        "object": "tray-xzcnjq",
+        "complaint": "fillable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: True\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 3526
+    },
+    {
+        "object": "turnip-nnvlrd",
+        "complaint": "it's not the plant",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: turnip.n.01\nDefinition: widely cultivated plant having a large fleshy edible white or yellow root\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3527
+    },
+    {
+        "object": "wreath-rkrxno",
+        "complaint": "lokks barren",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3528
+    },
+    {
+        "object": "wreath-rkrxno",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 3529
+    },
+    {
+        "object": "vinegar-snzyfk",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: vinegar.n.01\nDefinition: sour-tasting liquid produced usually by oxidation of the alcohol in wine or cider and used as a condiment or food preservative\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3530
+    },
+    {
+        "object": "vinegar-snzyfk",
+        "complaint": "texture is weird",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3531
+    },
+    {
+        "object": "bottle_of_vinegar-snzyfk",
+        "complaint": "particleApplier",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 3532
+    },
+    {
+        "object": "bottle_of_vinegar-snzyfk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 3533
+    },
+    {
+        "object": "water_bottle-emquat",
+        "complaint": "missing cap",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3534
+    },
+    {
+        "object": "cap-gmdwwe",
+        "complaint": "on its own i'm not sure why we have it",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cap.n.01\nDefinition: a tight-fitting headdress\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3535
+    },
+    {
+        "object": "cap-gmdwwe",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n83.51cm, 83.50cm, 55.96cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 3536
+    },
+    {
+        "object": "cap-gmdwwe",
+        "complaint": "dustyable stainable ",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 3537
+    },
+    {
+        "object": "trowel-ematag",
+        "complaint": "cant navigate to see what it is",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: trowel.n.01\nDefinition: a small hand tool with a handle and flat metal blade; used for scooping or spreading plaster or similar materials\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3538
+    },
+    {
+        "object": "yogurt-kihdsj",
+        "complaint": "cup of yoghurt maybe connect it to whats inside",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: yogurt__cup.n.01 (custom synset)\nDefinition: cup.n.01(hypernyms): a small open container usually used for drinking; usually has a handle\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3539
+    },
+    {
+        "object": "yogurt-kihdsj",
+        "complaint": "brand? can't see",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 3540
+    },
+    {
+        "object": "t_shirt-kvidcx",
+        "complaint": "no dfe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 3541
+    },
+    {
+        "object": "t_shirt-kvidcx",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 3542
+    }
+]

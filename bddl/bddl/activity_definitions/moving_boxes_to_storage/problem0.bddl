@@ -1,0 +1,32 @@
+(define (problem moving_boxes_to_storage-0)
+    (:domain omnigibson)
+
+    (:objects
+        storage_container.n.01_1 storage_container.n.01_2 - storage_container.n.01
+    	floor.n.01_1 floor.n.01_2 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop storage_container.n.01_1 floor.n.01_1)
+        (ontop storage_container.n.01_2 floor.n.01_1)
+        (inroom floor.n.01_1 living_room) 
+        (inroom floor.n.01_2 garage) 
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (or
+                (and
+                    (ontop ?storage_container.n.01_1 ?floor.n.01_2)
+                    (ontop ?storage_container.n.01_2 ?storage_container.n.01_1)
+                )
+                (and
+                    (ontop ?storage_container.n.01_2 ?floor.n.01_2)
+                    (ontop ?storage_container.n.01_1 ?storage_container.n.01_2)
+                )
+            )
+        )
+    )
+)

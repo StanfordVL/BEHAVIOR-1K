@@ -1,0 +1,73 @@
+(define (problem clean_quarters-0)
+    (:domain omnigibson)
+
+    (:objects
+        dirt.n.02_1 - dirt.n.02
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        quarter.n.10_1 quarter.n.10_2 quarter.n.10_3 quarter.n.10_4 quarter.n.10_5 quarter.n.10_6 quarter.n.10_7 quarter.n.10_8 quarter.n.10_9 - quarter.n.10
+        rag.n.01_1 - rag.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered quarter.n.10_1 dirt.n.02_1)
+        (covered quarter.n.10_2 dirt.n.02_1)
+        (covered quarter.n.10_3 dirt.n.02_1)
+        (covered quarter.n.10_4 dirt.n.02_1)
+        (covered quarter.n.10_5 dirt.n.02_1)
+        (covered quarter.n.10_6 dirt.n.02_1)
+        (covered quarter.n.10_7 dirt.n.02_1)
+        (covered quarter.n.10_8 dirt.n.02_1)
+        (covered quarter.n.10_9 dirt.n.02_1)
+        (covered quarter.n.10_1 adhesive_material.n.01_1)
+        (covered quarter.n.10_2 adhesive_material.n.01_1)
+        (covered quarter.n.10_3 adhesive_material.n.01_1)
+        (covered quarter.n.10_4 adhesive_material.n.01_1)
+        (covered quarter.n.10_5 adhesive_material.n.01_1)
+        (covered quarter.n.10_6 adhesive_material.n.01_1)
+        (covered quarter.n.10_7 adhesive_material.n.01_1)
+        (covered quarter.n.10_8 adhesive_material.n.01_1)
+        (covered quarter.n.10_9 adhesive_material.n.01_1)
+        (ontop quarter.n.10_1 countertop.n.01_1) 
+        (ontop quarter.n.10_2 countertop.n.01_1) 
+        (ontop quarter.n.10_3 countertop.n.01_1) 
+        (ontop quarter.n.10_4 countertop.n.01_1) 
+        (ontop quarter.n.10_5 countertop.n.01_1) 
+        (ontop quarter.n.10_6 countertop.n.01_1) 
+        (ontop quarter.n.10_7 countertop.n.01_1) 
+        (ontop quarter.n.10_8 countertop.n.01_1) 
+        (ontop quarter.n.10_9 countertop.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 countertop.n.01_1)
+        (inside rag.n.01_1 cabinet.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?quarter.n.10 - quarter.n.10)
+                (and 
+                    (not
+                        (covered ?quarter.n.10 ?dirt.n.02_1)
+                    )
+                    (not
+                        (covered ?quarter.n.10 ?adhesive_material.n.01_1)
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,28 @@
+(define (problem store_firewood-0)
+    (:domain omnigibson)
+
+    (:objects
+     	firewood.n.01_1 firewood.n.01_2 firewood.n.01_3 - firewood.n.01
+    	floor.n.01_1 - floor.n.01
+    	table.n.02_1 - table.n.02
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop firewood.n.01_1 floor.n.01_1) 
+        (ontop firewood.n.01_2 floor.n.01_1) 
+        (ontop firewood.n.01_3 floor.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom table.n.02_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?firewood.n.01 - firewood.n.01) 
+                (ontop ?firewood.n.01 ?table.n.02_1)
+            )
+        )
+    )
+)

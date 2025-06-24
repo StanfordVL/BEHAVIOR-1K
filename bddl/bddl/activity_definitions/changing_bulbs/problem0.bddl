@@ -1,0 +1,30 @@
+(define (problem changing_bulbs-0)
+    (:domain omnigibson)
+
+    (:objects
+        broken__light_bulb.n.01_1 - broken__light_bulb.n.01
+        light_bulb.n.01_1 - light_bulb.n.01
+        table_lamp.n.01_1 - table_lamp.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (attached broken__light_bulb.n.01_1 table_lamp.n.01_1)
+        (ontop light_bulb.n.01_1 coffee_table.n.01_1) 
+        (ontop table_lamp.n.01_1 coffee_table.n.01_1) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?light_bulb.n.01_1 ?table_lamp.n.01_1) 
+            (not 
+                (attached ?broken__light_bulb.n.01_1 ?table_lamp.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,37 @@
+(define (problem buying_postage_stamps-0)
+    (:domain omnigibson)
+
+    (:objects
+        checkout.n.03_1 - checkout.n.03
+        floor.n.01_1 - floor.n.01
+        cash_register.n.01_1 - cash_register.n.01
+        postage.n.02_1 postage.n.02_2 postage.n.02_3 - postage.n.02
+        money.n.01_1 money.n.01_2 - money.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store) 
+        (ontop postage.n.02_1 checkout.n.03_1) 
+        (ontop postage.n.02_2 checkout.n.03_1) 
+        (ontop postage.n.02_3 checkout.n.03_1) 
+        (ontop money.n.01_1 checkout.n.03_1) 
+        (ontop money.n.01_2 checkout.n.03_1) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?postage.n.02 - postage.n.02) 
+                (ontop ?postage.n.02 ?checkout.n.03_1)
+            ) 
+            (forall 
+                (?money.n.01 - money.n.01) 
+                (inside ?money.n.01 ?cash_register.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,105 @@
+[
+    {
+        "object": "floor_lamp-cosjfl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 4308
+    },
+    {
+        "object": "floor_lamp-cosjfl",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 4309
+    },
+    {
+        "object": "floor_lamp-ozknkr",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 4310
+    },
+    {
+        "object": "nightstand-uudzva",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 4311
+    },
+    {
+        "object": "swivel_chair-fieiyo",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 4312
+    },
+    {
+        "object": "trash_can-jlawet",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 4313
+    },
+    {
+        "object": "ceilings-yownri",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 4314
+    },
+    {
+        "object": "table_lamp-bbentu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 4315
+    },
+    {
+        "object": "table_lamp-bbentu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 4316
+    },
+    {
+        "object": "table_lamp-bbentu",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 4317
+    },
+    {
+        "object": "fixed_window-xdxisn",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 4318
+    },
+    {
+        "id": 6879,
+        "object": "fixed_window-xdxisn",
+        "type": "appearance",
+        "complaint": "Automatic complaint: window object has no glass part. Investigate & fix if necessary.",
+        "additional_info": "Some legacy glass objects don't have a glass pane at all which needs to be added manually so that stuff can't go through the window. Other windows like in the gates bedroom are actually not glass in which case this complaint can be removed.",
+        "new": true,
+        "processed": false
+    }
+]

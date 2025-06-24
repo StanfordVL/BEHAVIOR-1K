@@ -1,0 +1,47 @@
+(define (problem putting_up_shelves-0)
+    (:domain omnigibson)
+
+    (:objects
+     	bookcase_back.n.01_1 - bookcase_back.n.01
+     	bookcase_side.n.01_1 bookcase_side.n.01_2 - bookcase_side.n.01
+        bookcase_shelf.n.01_1 bookcase_shelf.n.01_2 bookcase_shelf.n.01_3 bookcase_shelf.n.01_4 bookcase_shelf.n.01_5 bookcase_shelf.n.01_6 - bookcase_shelf.n.01
+        bookcase_top.n.01_1 - bookcase_top.n.01
+        bookcase_baseboard.n.01_1 - bookcase_baseboard.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom floor.n.01_1 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+        (ontop bookcase_back.n.01_1 floor.n.01_1)
+        (ontop bookcase_side.n.01_1 floor.n.01_1)
+        (ontop bookcase_side.n.01_2 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_1 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_2 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_3 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_4 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_5 floor.n.01_1)
+        (ontop bookcase_shelf.n.01_6 floor.n.01_1)
+        (ontop bookcase_top.n.01_1 floor.n.01_1)
+        (ontop bookcase_baseboard.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?bookcase_shelf.n.01 - bookcase_shelf.n.01)
+                (attached ?bookcase_shelf.n.01 ?bookcase_back.n.01_1)
+            )
+            (forall
+                (?bookcase_side.n.01 - bookcase_side.n.01)
+                (attached ?bookcase_side.n.01 ?bookcase_back.n.01_1)
+            )
+            (attached ?bookcase_top.n.01_1 ?bookcase_back.n.01_1)
+            (exists
+                (?bookcase_side.n.01 - bookcase_side.n.01)
+                (attached ?bookcase_baseboard.n.01_1 ?bookcase_side.n.01)
+            )
+        )
+    )
+)

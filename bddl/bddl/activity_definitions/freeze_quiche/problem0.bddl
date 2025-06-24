@@ -1,0 +1,46 @@
+(define (problem freeze_quiche-0)
+    (:domain omnigibson)
+
+    (:objects
+        quiche.n.02_1 quiche.n.02_2 - quiche.n.02
+        oven.n.01_1 - oven.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        plastic_wrap.n.01_1 plastic_wrap.n.01_2 - plastic_wrap.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tray.n.01_1 - tray.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tray.n.01_1 countertop.n.01_1)
+        (ontop quiche.n.02_1 tray.n.01_1) 
+        (ontop quiche.n.02_2 tray.n.01_1) 
+        (inside plastic_wrap.n.01_1 cabinet.n.01_1) 
+        (inside plastic_wrap.n.01_2 cabinet.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?plastic_wrap.n.01 - plastic_wrap.n.01) 
+                (?quiche.n.02 - quiche.n.02) 
+                (overlaid ?plastic_wrap.n.01 ?quiche.n.02)
+            ) 
+            (forall 
+                (?quiche.n.02 - quiche.n.02) 
+                (and
+                    (frozen ?quiche.n.02)
+                    (inside ?quiche.n.02 ?electric_refrigerator.n.01_1)
+                )
+            )
+        )
+    )
+)

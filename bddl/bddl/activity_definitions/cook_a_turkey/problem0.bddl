@@ -1,0 +1,44 @@
+(define (problem cook_a_turkey-0)
+    (:domain omnigibson)
+
+    (:objects
+        turkey.n.04_1 - turkey.n.04
+        oven.n.01_1 - oven.n.01
+        wax_paper.n.01_1 - wax_paper.n.01
+        rosemary.n.02_1 - rosemary.n.02
+        rosemary__shaker.n.01_1 - rosemary__shaker.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop frying_pan.n.01_1 oven.n.01_1) 
+        (ontop turkey.n.04_1 wax_paper.n.01_1) 
+        (inside wax_paper.n.01_1 oven.n.01_1)
+        (insource rosemary__shaker.n.01_1 rosemary.n.02_1) 
+        (inside rosemary__shaker.n.01_1 cabinet.n.01_1)
+        (inside butter.n.01_1 cabinet.n.01_1) 
+        (not 
+            (cooked turkey.n.04_1)
+        ) 
+        (future melted__butter.n.01_1)
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?melted__butter.n.01_1)
+            (inside ?turkey.n.04_1 ?frying_pan.n.01_1)
+            (covered ?turkey.n.04_1 ?melted__butter.n.01_1)
+            (covered ?turkey.n.04_1 ?rosemary.n.02_1)
+            (cooked ?turkey.n.04_1)
+        )
+    )
+)

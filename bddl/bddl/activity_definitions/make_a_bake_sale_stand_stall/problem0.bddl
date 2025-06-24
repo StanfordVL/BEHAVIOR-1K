@@ -1,0 +1,119 @@
+(define (problem make_a_bake_sale_stand_stall-0)
+    (:domain omnigibson)
+
+    (:objects
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        lemonade.n.01_1 - lemonade.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        pitcher.n.02_1 - pitcher.n.02
+        booth.n.01_1 - booth.n.01
+        plastic_wrap.n.01_1 - plastic_wrap.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        cupcake.n.01_1 cupcake.n.01_2 cupcake.n.01_3 - cupcake.n.01
+        brownie.n.03_1 brownie.n.03_2 brownie.n.03_3 - brownie.n.03
+        muffin.n.01_1 muffin.n.01_2 muffin.n.01_3 - muffin.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside plate.n.04_1 carton.n.02_1) 
+        (inside plate.n.04_2 carton.n.02_1) 
+        (inside plate.n.04_3 carton.n.02_1) 
+        (inside pitcher.n.02_1 carton.n.02_1)
+        (filled mason_jar.n.01_1 lemonade.n.01_1)
+        (inside mason_jar.n.01_1 carton.n.02_2) 
+        (overlaid plastic_wrap.n.01_1 cookie_sheet.n.01_1)
+        (inside cookie_sheet.n.01_1 carton.n.02_2)
+        (ontop brownie.n.03_1 cookie_sheet.n.01_1) 
+        (ontop brownie.n.03_2 cookie_sheet.n.01_1) 
+        (ontop brownie.n.03_3 cookie_sheet.n.01_1)
+        (inside cupcake.n.01_1 tupperware.n.01_1) 
+        (inside cupcake.n.01_2 tupperware.n.01_1) 
+        (inside cupcake.n.01_3 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 carton.n.02_2)
+        (inside muffin.n.01_1 tupperware.n.01_2) 
+        (inside muffin.n.01_2 tupperware.n.01_2) 
+        (inside muffin.n.01_3 tupperware.n.01_2) 
+        (inside tupperware.n.01_2 carton.n.02_2)
+        (ontop carton.n.02_1 floor.n.01_1) 
+        (ontop carton.n.02_2 floor.n.01_1) 
+        (ontop booth.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 empty_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?plate.n.04 - plate.n.04)
+                (ontop ?plate.n.04 ?booth.n.01_1)
+            )
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (forall 
+                        (?brownie.n.03 - brownie.n.03)
+                        (ontop ?brownie.n.03 ?plate.n.04)
+                    )
+                    (exists
+                        (?cupcake.n.01 - cupcake.n.01)
+                        (not
+                            (ontop ?cupcake.n.01 ?plate.n.04)
+                        )
+                    )
+                    (exists
+                        (?muffin.n.01 - muffin.n.01)
+                        (not
+                            (ontop ?muffin.n.01 ?plate.n.04)
+                        )
+                    )
+                )
+            )
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (forall 
+                        (?cupcake.n.01 - cupcake.n.01)
+                        (ontop ?cupcake.n.01 ?plate.n.04)
+                    )
+                    (exists
+                        (?brownie.n.03 - brownie.n.03)
+                        (not
+                            (ontop ?brownie.n.03 ?plate.n.04)
+                        )
+                    )
+                    (exists
+                        (?muffin.n.01 - muffin.n.01)
+                        (not
+                            (ontop ?muffin.n.01 ?plate.n.04)
+                        )
+                    )
+                )
+            )
+            (exists 
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (forall 
+                        (?muffin.n.01 - muffin.n.01)
+                        (ontop ?muffin.n.01 ?plate.n.04)
+                    )
+                    (exists
+                        (?brownie.n.03 - brownie.n.03)
+                        (not
+                            (ontop ?brownie.n.03 ?plate.n.04)
+                        )
+                    )
+                    (exists
+                        (?cupcake.n.01 - cupcake.n.01)
+                        (not
+                            (ontop ?cupcake.n.01 ?plate.n.04)
+                        )
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,60 @@
+(define (problem prepare_and_cook_swiss_chard-0)
+    (:domain omnigibson)
+
+    (:objects
+        chopping_board.n.01_1 - chopping_board.n.01
+        floor.n.01_1 - floor.n.01
+        chard.n.02_1 - chard.n.02
+        cooked__diced__chard.n.01_1 - cooked__diced__chard.n.01
+        plate.n.04_1 - plate.n.04
+        saucepot.n.01_1 - saucepot.n.01
+        clove.n.03_1 clove.n.03_2 - clove.n.03
+        diced__clove.n.01_1 - diced__clove.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        cayenne__shaker.n.01_1 - cayenne__shaker.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        cayenne.n.02_1 - cayenne.n.02
+        stove.n.01_1 - stove.n.01
+        countertop.n.01_1 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1)
+        (ontop chard.n.02_1 chopping_board.n.01_1)
+        (inside plate.n.04_1 cabinet.n.01_1) 
+        (inside saucepot.n.01_1 cabinet.n.01_1) 
+        (inside clove.n.03_1 cabinet.n.01_1)
+        (inside clove.n.03_2 cabinet.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (insource cayenne__shaker.n.01_1 cayenne.n.02_1) 
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1) 
+        (ontop cayenne__shaker.n.01_1 countertop.n.01_1) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (future cooked__diced__chard.n.01_1)
+        (future diced__clove.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?diced__clove.n.01_1)
+            (real ?cooked__diced__chard.n.01_1)
+            (contains ?saucepot.n.01_1 ?cooked__diced__chard.n.01_1)
+            (contains ?saucepot.n.01_1 ?salt.n.02_1) 
+            (contains ?saucepot.n.01_1 ?diced__clove.n.01_1) 
+            (contains ?saucepot.n.01_1 ?olive_oil.n.01_1) 
+            (contains ?saucepot.n.01_1 ?cayenne.n.02_1) 
+        )
+    )
+)

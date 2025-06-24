@@ -1,0 +1,53 @@
+(define (problem buy_and_clean_mussels-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        mussel.n.01_1 mussel.n.01_2 mussel.n.01_3 mussel.n.01_4 - mussel.n.01
+        sand.n.04_1 - sand.n.04
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sack.n.01_1 - sack.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside mussel.n.01_1 sack.n.01_1)
+        (inside mussel.n.01_2 sack.n.01_1)
+        (inside mussel.n.01_3 sack.n.01_1)
+        (inside mussel.n.01_4 sack.n.01_1)
+        (frozen mussel.n.01_1)
+        (frozen mussel.n.01_2)
+        (frozen mussel.n.01_3)
+        (frozen mussel.n.01_4)
+        (covered mussel.n.01_1 sand.n.04_1)
+        (covered mussel.n.01_2 sand.n.04_1)
+        (covered mussel.n.01_3 sand.n.04_1)
+        (covered mussel.n.01_4 sand.n.04_1)
+        (ontop sack.n.01_1 countertop.n.01_1)
+        (filled mixing_bowl.n.01_1 water.n.06_1)
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1)
+        (ontop paper_towel.n.01_1 countertop.n.01_1)  
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?mussel.n.01 - mussel.n.01)
+                (and
+                    (covered ?mussel.n.01 ?water.n.06_1)
+                    (not
+                        (covered ?mussel.n.01 ?sand.n.04_1)
+                    )
+                )
+            )
+        )
+    )
+)

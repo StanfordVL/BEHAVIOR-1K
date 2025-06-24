@@ -1,0 +1,31 @@
+(define (problem dispose_of_a_pizza_box-0)
+    (:domain omnigibson)
+
+    (:objects
+        half__pizza.n.01_1 - half__pizza.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        pizza_box.n.01_1 - pizza_box.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside pizza_box.n.01_1 electric_refrigerator.n.01_1) 
+        (inside half__pizza.n.01_1 pizza_box.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?ashcan.n.01_1 ?floor.n.01_1) 
+            (and 
+                (inside ?pizza_box.n.01_1 ?ashcan.n.01_1) 
+                (inside ?half__pizza.n.01_1 ?ashcan.n.01_1)
+            )
+        )
+    )
+)

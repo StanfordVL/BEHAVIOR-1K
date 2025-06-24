@@ -1,0 +1,41 @@
+(define (problem setting_the_fire-0)
+    (:domain omnigibson)
+
+    (:objects
+        firewood.n.01_1 firewood.n.01_2 - firewood.n.01
+        floor.n.01_1 - floor.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        table.n.02_1 - table.n.02
+        cigar_lighter.n.01_1 - cigar_lighter.n.01
+        wood_fireplace.n.01_1 - wood_fireplace.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop firewood.n.01_1 floor.n.01_1) 
+        (ontop firewood.n.01_2 floor.n.01_1) 
+        (ontop newspaper.n.03_1 table.n.02_1)
+        (ontop cigar_lighter.n.01_1 table.n.02_1)
+        (inroom wood_fireplace.n.01_1 living_room)
+        (inroom table.n.02_1 living_room)
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?firewood.n.01 - firewood.n.01) 
+                (and
+                    (on_fire ?firewood.n.01)
+                    (ontop ?firewood.n.01 ?newspaper.n.03_1)
+                    (inside ?firewood.n.01 ?wood_fireplace.n.01_1)
+                )
+            )
+            (on_fire ?newspaper.n.03_1)
+            (not
+                (toggled_on cigar_lighter.n.01_1)
+            )
+        )
+    )
+)

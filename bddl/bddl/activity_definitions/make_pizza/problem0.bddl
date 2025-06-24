@@ -1,0 +1,56 @@
+(define (problem make_pizza-0)
+    (:domain omnigibson)
+
+    (:objects
+        pizza_dough.n.01_1 - pizza_dough.n.01
+        grated_cheese.n.01_1 - grated_cheese.n.01
+        pepperoni.n.01_1 pepperoni.n.01_2 pepperoni.n.01_3 pepperoni.n.01_4 - pepperoni.n.01
+        mushroom.n.05_1 mushroom.n.05_2 - mushroom.n.05
+        vidalia_onion.n.01_1 - vidalia_onion.n.01
+        pizza.n.01_1 - pizza.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        bowl.n.01_1 - bowl.n.01
+        tupperware.n.01_1 tupperware.n.01_2 tupperware.n.01_3 - tupperware.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (ontop pizza_dough.n.01_1 cookie_sheet.n.01_1) 
+        (filled tupperware.n.01_1 grated_cheese.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1) 
+        (inside pepperoni.n.01_1 tupperware.n.01_3) 
+        (inside pepperoni.n.01_2 tupperware.n.01_3) 
+        (inside pepperoni.n.01_3 tupperware.n.01_3) 
+        (inside pepperoni.n.01_4 tupperware.n.01_3)
+        (inside tupperware.n.01_3 electric_refrigerator.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (inside mushroom.n.05_1 tupperware.n.01_2) 
+        (inside mushroom.n.05_2 tupperware.n.01_2) 
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1)
+        (ontop vidalia_onion.n.01_1 chopping_board.n.01_1) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_1) 
+        (future pizza.n.01_1) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?pizza.n.01_1) 
+            (ontop ?pizza.n.01_1 ?cookie_sheet.n.01_1)
+        )
+    )
+)

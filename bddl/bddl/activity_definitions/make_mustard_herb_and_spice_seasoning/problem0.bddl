@@ -1,0 +1,56 @@
+(define (problem make_mustard_herb_and_spice_seasoning-0)
+    (:domain omnigibson)
+
+    (:objects
+        mustard_seed.n.01_1 - mustard_seed.n.01
+        sage.n.02_1 - sage.n.02
+        cumin.n.02_1 - cumin.n.02
+        clove.n.03_1 clove.n.03_2 - clove.n.03
+        rosemary.n.02_1 - rosemary.n.02
+        salt.n.02_1 - salt.n.02
+        mustard_seasoning.n.01_1 - mustard_seasoning.n.01
+        blender.n.01_1 - blender.n.01
+        bowl.n.01_1 - bowl.n.01
+        mustard_seed__shaker.n.01_1 - mustard_seed__shaker.n.01
+        sage__shaker.n.01_1 - sage__shaker.n.01
+        cumin__shaker.n.01_1 - cumin__shaker.n.01
+        rosemary__shaker.n.01_1 - rosemary__shaker.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource mustard_seed__shaker.n.01_1 mustard_seed.n.01_1) 
+        (inside mustard_seed__shaker.n.01_1 cabinet.n.01_1) 
+        (insource sage__shaker.n.01_1 sage.n.02_1) 
+        (inside sage__shaker.n.01_1 cabinet.n.01_1) 
+        (insource cumin__shaker.n.01_1 cumin.n.02_1) 
+        (inside cumin__shaker.n.01_1 cabinet.n.01_1) 
+        (ontop clove.n.03_1 chopping_board.n.01_1)
+        (ontop clove.n.03_2 chopping_board.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (insource rosemary__shaker.n.01_1 rosemary.n.02_1) 
+        (inside rosemary__shaker.n.01_1 cabinet.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_2)
+        (ontop blender.n.01_1 countertop.n.01_2) 
+        (ontop bowl.n.01_1 countertop.n.01_2) 
+        (future mustard_seasoning.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?mustard_seasoning.n.01_1) 
+            (contains ?bowl.n.01_1 ?mustard_seasoning.n.01_1)
+        )
+    )
+)

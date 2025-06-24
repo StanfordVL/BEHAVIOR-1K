@@ -1,0 +1,76 @@
+(define (problem clearing_table_after_breakfast-0)
+    (:domain omnigibson)
+
+    (:objects
+        banana.n.02_1 - banana.n.02
+        french_toast.n.01_1 french_toast.n.01_2 - french_toast.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        mug.n.04_1 mug.n.04_2 - mug.n.04
+        chocolate_milk.n.01_1 - chocolate_milk.n.01
+        pitcher.n.02_1 - pitcher.n.02
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop banana.n.02_1 plate.n.04_1)
+        (ontop french_toast.n.01_1 plate.n.04_2)
+        (ontop french_toast.n.01_2 french_toast.n.01_1)
+        (ontop plate.n.04_1 breakfast_table.n.01_1) 
+        (ontop plate.n.04_2 breakfast_table.n.01_1) 
+        (ontop plate.n.04_3 breakfast_table.n.01_1) 
+        (ontop mug.n.04_1 breakfast_table.n.01_1)
+        (ontop mug.n.04_2 breakfast_table.n.01_1)
+        (ontop pitcher.n.02_1 breakfast_table.n.01_1)
+        (covered mug.n.04_1 chocolate_milk.n.01_1)
+        (filled pitcher.n.02_1 chocolate_milk.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 dining_room) 
+        (inroom breakfast_table.n.01_1 dining_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?banana.n.02_1 ?electric_refrigerator.n.01_1) 
+            (forn
+                (1)
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (exists
+                        (?french_toast.n.01 - french_toast.n.01)
+                        (ontop ?french_toast.n.01 ?plate.n.04)
+                    )
+                    (inside ?electric_refrigerator.n.01_1 ?plate.n.04)
+                )
+            )
+            (or 
+                (ontop ?french_toast.n.01_1 ?french_toast.n.01_2)
+                (ontop ?french_toast.n.01_2 ?french_toast.n.01_1)
+            )
+            (filled ?pitcher.n.02_1 ?chocolate_milk.n.01_1)
+            (inside ?pitcher.n.02_1 ?electric_refrigerator.n.01_1)
+            (forn
+                (2)
+                (?plate.n.04 - plate.n.04)
+                (or 
+                    (nextto ?plate.n.04 ?sink.n.01_1)
+                    (inside ?plate.n.04 ?sink.n.01_1)
+                )
+            )
+            (forall 
+                (?mug.n.04 - mug.n.04)
+                (or 
+                    (nextto ?mug.n.04 ?sink.n.01_1)
+                    (inside ?mug.n.04 ?sink.n.01_1)
+                )
+            )
+        )
+    )
+)

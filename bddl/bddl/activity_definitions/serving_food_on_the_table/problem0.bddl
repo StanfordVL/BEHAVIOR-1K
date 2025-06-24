@@ -1,0 +1,56 @@
+(define (problem serving_food_on_the_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        casserole.n.02_1 - casserole.n.02
+        console_table.n.01_1 console_table.n.01_2 console_table.n.01_3 - console_table.n.01
+        cooked__diced__chicken.n.01_1 - cooked__diced__chicken.n.01
+        cooked__penne.n.01_1 - cooked__penne.n.01
+        cooked__chickpea.n.01_1 - cooked__chickpea.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        plate.n.04_1 - plate.n.04
+        tablefork.n.01_1 tablefork.n.01_2 - tablefork.n.01
+        napkin.n.01_1 - napkin.n.01
+        tablespoon.n.02_1 tablespoon.n.02_2 tablespoon.n.02_3 - tablespoon.n.02
+        bowl.n.01_1 bowl.n.01_2 bowl.n.01_3 - bowl.n.01
+        bap.n.01_1 - bap.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop casserole.n.02_1 console_table.n.01_1) 
+        (filled casserole.n.02_1 cooked__diced__chicken.n.01_1) 
+        (filled bowl.n.01_1 cooked__penne.n.01_1) 
+        (filled bowl.n.01_2 cooked__chickpea.n.01_1)
+        (ontop plate.n.04_1 breakfast_table.n.01_1)
+        (ontop tablefork.n.01_1 breakfast_table.n.01_1)
+        (ontop napkin.n.01_1 breakfast_table.n.01_1) 
+        (ontop tablespoon.n.02_1 breakfast_table.n.01_1) 
+        (ontop bap.n.01_1 console_table.n.01_2)
+        (ontop bowl.n.01_1 console_table.n.01_2)
+        (ontop bowl.n.01_2 console_table.n.01_2)
+        (ontop bowl.n.01_3 console_table.n.01_2)
+        (ontop tablefork.n.01_2 console_table.n.01_3)
+        (ontop tablespoon.n.02_2 console_table.n.01_3)
+        (ontop tablespoon.n.02_3 console_table.n.01_3)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom console_table.n.01_1 dining_room)
+        (inroom console_table.n.01_2 dining_room)
+        (inroom console_table.n.01_3 dining_room)
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (contains ?plate.n.04_1 ?cooked__diced__chicken.n.01_1)
+            (contains ?plate.n.04_1 ?cooked__penne.n.01_1)
+            (contains ?plate.n.04_1 ?cooked__chickpea.n.01_1)
+            (ontop ?bap.n.01_1 ?plate.n.04_1)
+            (ontop ?plate.n.04_1 ?breakfast_table.n.01_1)
+            (nextto ?tablespoon.n.02_1 ?plate.n.04_1)
+            (nextto ?napkin.n.01_1 ?plate.n.04_1)
+        )
+    )
+)

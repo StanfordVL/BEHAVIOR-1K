@@ -1,0 +1,50 @@
+(define (problem cleaning_stuff_out_of_car-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        driveway.n.01_1 - driveway.n.01
+        dixie_cup.n.01_1 dixie_cup.n.01_2 - dixie_cup.n.01
+        newspaper.n.03_1 - newspaper.n.03
+        plastic_bag.n.01_1 - plastic_bag.n.01
+        box__of__candy.n.01_1 box__of__candy.n.01_2 - box__of__candy.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden) 
+        (inside plastic_bag.n.01_1 car.n.01_1)
+        (inside dixie_cup.n.01_1 car.n.01_1)
+        (inside dixie_cup.n.01_2 car.n.01_1)
+        (inside newspaper.n.03_1 car.n.01_1)
+        (inside box__of__candy.n.01_1 car.n.01_1)
+        (inside box__of__candy.n.01_2 car.n.01_1)
+        (inroom driveway.n.01_1 garden) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?dixie_cup.n.01 - dixie_cup.n.01)
+                (not 
+                    (inside ?dixie_cup.n.01 ?car.n.01_1)
+                )
+            )
+            (forall 
+                (?box__of__candy.n.01 - box__of__candy.n.01)
+                (not 
+                    (inside ?box__of__candy.n.01 ?car.n.01_1)
+                )
+            )
+            (not
+                (inside ?newspaper.n.03_1 ?car.n.01_1)
+            )
+            (not
+                (inside ?plastic_bag.n.01_1 ?car.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,67 @@
+(define (problem putting_away_games-0)
+    (:domain omnigibson)
+
+    (:objects
+        board_game.n.01_1 board_game.n.01_2 board_game.n.01_3 - board_game.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        jigsaw_puzzle.n.01_1 jigsaw_puzzle.n.01_2 jigsaw_puzzle.n.01_3 - jigsaw_puzzle.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop board_game.n.01_1 desk.n.01_1) 
+        (ontop board_game.n.01_2 floor.n.01_1) 
+        (ontop board_game.n.01_3 floor.n.01_1) 
+        (ontop carton.n.02_1 desk.n.01_1) 
+        (ontop carton.n.02_2 floor.n.01_1) 
+        (ontop jigsaw_puzzle.n.01_1 desk.n.01_1) 
+        (ontop jigsaw_puzzle.n.01_2 floor.n.01_1) 
+        (ontop jigsaw_puzzle.n.01_3 floor.n.01_1)
+        (inroom floor.n.01_1 childs_room) 
+        (inroom bookcase.n.01_1 childs_room) 
+        (inroom desk.n.01_1 childs_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?carton.n.02 - carton.n.02)
+                (and 
+                    (forall 
+                        (?jigsaw_puzzle.n.01 - jigsaw_puzzle.n.01)
+                        (inside ?jigsaw_puzzle.n.01 ?carton.n.02)
+                    )
+                    (forall 
+                        (?board_game.n.01 - board_game.n.01)
+                        (not
+                            (inside ?board_game.n.01 ?carton.n.02)
+                        )
+                    )
+                )
+            )
+            (exists 
+                (?carton.n.02 - carton.n.02)
+                (and 
+                    (forall 
+                        (?board_game.n.01 - board_game.n.01)
+                        (inside ?board_game.n.01 ?carton.n.02)
+                    )
+                    (forall 
+                        (?jigsaw_puzzle.n.01 - jigsaw_puzzle.n.01)
+                        (not
+                            (inside ?jigsaw_puzzle.n.01 ?carton.n.02)
+                        )
+                    )
+                )
+            )
+            (forall 
+                (?carton.n.02 - carton.n.02)
+                (inside ?carton.n.02 bookcase.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,29 @@
+(define (problem disinfect_nail_clippers-0)
+    (:domain omnigibson)
+
+    (:objects
+        disinfectant.n.01_1 - disinfectant.n.01
+        clipper.n.04_1 - clipper.n.04
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        stool.n.01_1 - stool.n.01
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop stool.n.01_1 floor.n.01_1)
+        (ontop clipper.n.04_1 stool.n.01_1) 
+        (ontop disinfectant__bottle.n.01_1 stool.n.01_1) 
+        (ontop rag.n.01_1 stool.n.01_1) 
+        (inroom floor.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (covered ?clipper.n.04_1 ?disinfectant.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,43 @@
+(define (problem carrying_in_groceries-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        sack.n.01_1 - sack.n.01
+        beefsteak_tomato.n.01_1 - beefsteak_tomato.n.01
+        carton__of__milk.n.01_1 - carton__of__milk.n.01
+        electric_refrigerator.n.01_1 electric_refrigerator.n.01_* - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garage) 
+        (open car.n.01_1)
+        (inside sack.n.01_1 car.n.01_1)
+        (inside beefsteak_tomato.n.01_1 sack.n.01_1)
+        (inside carton__of__milk.n.01_1 sack.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_* kitchen)
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists
+                (?electric_refrigerator.n.01 - electric_refrigerator.n.01)
+                (and
+                    (inside ?beefsteak_tomato.n.01_1 ?electric_refrigerator.n.01)
+                    (inside ?carton__of__milk.n.01_1 ?electric_refrigerator.n.01) 
+                )
+            )
+            (not
+                (open car.n.01_1)
+            )
+            (not
+                (open electric_refrigerator.n.01_1)
+            )
+        )
+    )
+)

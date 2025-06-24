@@ -1,0 +1,35 @@
+(define (problem packing_documents_into_car-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        driveway.n.01_1 - driveway.n.01
+        book.n.02_1 - book.n.02
+        carton.n.02_1 - carton.n.02
+        legal_document.n.01_1 legal_document.n.01_2 legal_document.n.01_3 - legal_document.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden) 
+        (ontop carton.n.02_1 driveway.n.01_1) 
+        (inside legal_document.n.01_1 carton.n.02_1) 
+        (inside legal_document.n.01_3 carton.n.02_1) 
+        (inside legal_document.n.01_2 carton.n.02_1) 
+        (inside book.n.02_1 carton.n.02_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?legal_document.n.01 - legal_document.n.01)
+                (inside ?legal_document.n.01 ?car.n.01_1)
+            )
+            (inside ?book.n.02_1 ?car.n.01_1)
+        )
+    )
+)

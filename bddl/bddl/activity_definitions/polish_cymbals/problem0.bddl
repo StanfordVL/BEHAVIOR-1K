@@ -1,0 +1,48 @@
+(define (problem polish_cymbals-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        cymbal.n.01_1 cymbal.n.01_2 - cymbal.n.01
+        floor.n.01_1 - floor.n.01
+        bowl.n.01_1 - bowl.n.01
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        polish.n.03_1 - polish.n.03
+        polish__bottle.n.01_1 - polish__bottle.n.01
+        rag.n.01_1 - rag.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered cymbal.n.01_1 stain.n.01_1) 
+        (ontop cymbal.n.01_1 floor.n.01_1) 
+        (ontop cymbal.n.01_2 floor.n.01_1) 
+        (ontop bowl.n.01_1 floor.n.01_1) 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (ontop lemon_juice__bottle.n.01_1 floor.n.01_1) 
+        (ontop vinegar__bottle.n.01_1 floor.n.01_1) 
+        (filled polish__bottle.n.01_1 polish.n.03_1)
+        (ontop polish__bottle.n.01_1 floor.n.01_1)
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 empty_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?cymbal.n.01 - cymbal.n.01)
+                (and
+                    (not 
+                        (covered ?cymbal.n.01 ?stain.n.01_1)
+                    )
+                    (covered ?cymbal.n.01 ?polish.n.03_1)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,28 @@
+(define (problem buy_a_air_conditioner-0)
+    (:domain omnigibson)
+
+    (:objects
+        money.n.01_1 - money.n.01
+        air_conditioner.n.01_1 - air_conditioner.n.01
+        shopping_cart.n.01_1 - shopping_cart.n.01
+        checkout.n.03_1 - checkout.n.03
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside money.n.01_1 shopping_cart.n.01_1) 
+        (ontop air_conditioner.n.01_1 floor.n.01_1) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (inroom shopping_cart.n.01_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?money.n.01_1 ?checkout.n.03_1) 
+            (ontop ?air_conditioner.n.01_1 ?checkout.n.03_1) 
+        )
+    )
+)

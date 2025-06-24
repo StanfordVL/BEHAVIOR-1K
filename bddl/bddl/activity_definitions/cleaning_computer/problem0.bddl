@@ -1,0 +1,29 @@
+(define (problem cleaning_computer-0)
+    (:domain omnigibson)
+
+    (:objects
+        dust.n.01_1 - dust.n.01
+        desktop_computer.n.01_1 - desktop_computer.n.01
+        rag.n.01_1 - rag.n.01
+        desk.n.01_1 - desk.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered desktop_computer.n.01_1 dust.n.01_1) 
+        (ontop desktop_computer.n.01_1 desk.n.01_1) 
+        (ontop rag.n.01_1 desk.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom desk.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?desktop_computer.n.01_1 ?dust.n.01_1)
+            ) 
+        )
+    )
+)

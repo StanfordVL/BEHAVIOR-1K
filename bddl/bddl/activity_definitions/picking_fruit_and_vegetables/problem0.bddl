@@ -1,0 +1,84 @@
+(define (problem picking_fruit_and_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        shopping_basket.n.01_1 - shopping_basket.n.01
+        pineapple.n.02_1 - pineapple.n.02
+        mango.n.02_1 mango.n.02_2 - mango.n.02
+        half__mango.n.01_1 - half__mango.n.01
+        cantaloup.n.02_1 - cantaloup.n.02
+        eggplant.n.01_1 eggplant.n.01_2 - eggplant.n.01
+        zucchini.n.02_1 zucchini.n.02_2 zucchini.n.02_3 - zucchini.n.02
+        stain.n.01_1 - stain.n.01
+        grocery_shelf.n.01_1 - grocery_shelf.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop half__mango.n.01_1 mango.n.02_1)
+        (covered zucchini.n.02_3 stain.n.01_1)
+        (covered eggplant.n.01_2 stain.n.01_1)
+        (ontop shopping_basket.n.01_1 floor.n.01_1) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop pineapple.n.02_1 grocery_shelf.n.01_1)
+        (ontop mango.n.02_1 grocery_shelf.n.01_1)
+        (ontop mango.n.02_2 grocery_shelf.n.01_1)
+        (ontop cantaloup.n.02_1 grocery_shelf.n.01_1)
+        (ontop zucchini.n.02_1 grocery_shelf.n.01_1)
+        (ontop zucchini.n.02_2 grocery_shelf.n.01_1)
+        (ontop zucchini.n.02_3 grocery_shelf.n.01_1)
+        (ontop eggplant.n.01_1 grocery_shelf.n.01_1)
+        (ontop eggplant.n.01_2 grocery_shelf.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?pineapple.n.02_1 ?shopping_basket.n.01_1)
+            (forall 
+                (?eggplant.n.01 - eggplant.n.01)
+                (and 
+                    (imply 
+                        (not 
+                            (covered ?eggplant.n.01 ?stain.n.01_1)
+                        )
+                        (inside ?eggplant.n.01 ?shopping_basket.n.01_1)
+                    )
+                    (imply 
+                        (covered ?eggplant.n.01_1 ?stain.n.01_1)
+                        (not 
+                            (inside ?eggplant.n.01 ?shopping_basket.n.01_1)
+                        )
+                    )
+                )
+            )
+            (forall 
+                (?zucchini.n.02 - zucchini.n.02)
+                (and 
+                    (imply 
+                        (not 
+                            (covered ?zucchini.n.02 ?stain.n.01_1)
+                        )
+                        (inside ?zucchini.n.02 ?shopping_basket.n.01_1)
+                    )
+                    (imply 
+                        (covered ?zucchini.n.02 ?stain.n.01_1)
+                        (not 
+                            (inside ?zucchini.n.02 ?shopping_basket.n.01_1)
+                        )
+                    )
+                )
+            )
+            (forall 
+                (?mango.n.02 - mango.n.02)
+                (inside ?mango.n.02 ?shopping_basket.n.01_1)
+            )
+            (not 
+                (inside ?half__mango.n.01_1 ?shopping_basket.n.01_1)
+            )
+            (inside ?cantaloup.n.02_1 ?shopping_basket.n.01_1)
+        )
+    )
+)

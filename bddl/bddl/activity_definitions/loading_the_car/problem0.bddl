@@ -1,0 +1,35 @@
+(define (problem loading_the_car-0)
+    (:domain omnigibson)
+
+    (:objects
+     	car.n.01_1 - car.n.01
+    	container.n.01_1 - container.n.01
+        tennis_racket.n.01_1 - tennis_racket.n.01
+        digital_camera.n.01_1 - digital_camera.n.01
+        table.n.02_1 - table.n.02
+    	floor.n.01_1 floor.n.01_2 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garage) 
+        (ontop container.n.01_1 floor.n.01_2) 
+        (ontop tennis_racket.n.01_1 table.n.02_1) 
+        (ontop digital_camera.n.01_1 table.n.02_1)
+        (inroom table.n.02_1 living_room)
+        (inroom floor.n.01_1 garage) 
+        (inroom floor.n.01_2 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?container.n.01_1 ?car.n.01_1) 
+            (inside ?digital_camera.n.01_1 ?container.n.01_1)
+            (inside ?tennis_racket.n.01_1 ?car.n.01_1)
+        )
+        (not 
+            (open ?car.n.01_1)
+        )
+    )
+)

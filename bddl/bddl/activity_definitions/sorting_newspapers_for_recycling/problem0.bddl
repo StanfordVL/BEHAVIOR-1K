@@ -1,0 +1,49 @@
+(define (problem sorting_newspapers_for_recycling-0)
+    (:domain omnigibson)
+
+    (:objects
+        newspaper.n.03_1 newspaper.n.03_2 newspaper.n.03_3 newspaper.n.03_4 newspaper.n.03_5 - newspaper.n.03
+        bookcase.n.01_1 - bookcase.n.01
+        recycling_bin.n.01_1 - recycling_bin.n.01
+        floor.n.01_1 - floor.n.01
+        magazine.n.02_1 magazine.n.02_2 - magazine.n.02
+        mail.n.04_1 mail.n.04_2 - mail.n.04
+        comic_book.n.01_1 - comic_book.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside mail.n.04_2 bookcase.n.01_1) 
+        (ontop newspaper.n.03_1 mail.n.04_2) 
+        (ontop newspaper.n.03_2 newspaper.n.03_1) 
+        (ontop comic_book.n.01_1 newspaper.n.03_2) 
+        (ontop newspaper.n.03_3 comic_book.n.01_1) 
+        (ontop magazine.n.02_1 newspaper.n.03_3) 
+        (ontop newspaper.n.03_4 magazine.n.02_1) 
+        (ontop newspaper.n.03_5 newspaper.n.03_4) 
+        (ontop magazine.n.02_2 newspaper.n.03_5) 
+        (ontop mail.n.04_1 magazine.n.02_2) 
+        (ontop recycling_bin.n.01_1 floor.n.01_1) 
+        (inroom bookcase.n.01_1 private_office) 
+        (inroom floor.n.01_1 private_office) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?newspaper.n.03 - newspaper.n.03) 
+                (inside ?newspaper.n.03 ?recycling_bin.n.01_1)
+            ) 
+            (forall 
+                (?magazine.n.02 - magazine.n.02) 
+                (inside ?magazine.n.02 ?bookcase.n.01_1)
+            ) 
+            (forall 
+                (?mail.n.04 - mail.n.04) 
+                (inside ?mail.n.04 ?bookcase.n.01_1)
+            ) 
+            (ontop ?comic_book.n.01_1 ?bookcase.n.01_1) 
+        )
+    )
+)

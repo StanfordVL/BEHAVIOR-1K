@@ -1,0 +1,1573 @@
+[
+    {
+        "object": "shampoo-dvrzmy",
+        "complaint": "conditioner but idk if it really matters...it is a tube of ...",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2654
+    },
+    {
+        "object": "shampoo-dvrzmy",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2655
+    },
+    {
+        "object": "shampoo-hlkpwd",
+        "complaint": "tube of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2656
+    },
+    {
+        "object": "shampoo-hlkpwd",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2657
+    },
+    {
+        "object": "bottle_of_shampoo-hlkpwd",
+        "complaint": "\u001b[6~\u001b[6~\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: bottle__of__shampoo.n.01 (custom synset)\nDefinition: (hypernyms: grocery.n.02): (usually plural) consumer goods sold by a grocer\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2658
+    },
+    {
+        "object": "clothes_dryer-smcyys",
+        "complaint": "33",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: clothes_dryer.n.01\nDefinition: a dryer that dries clothes wet from washing\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2659
+    },
+    {
+        "object": "clothes_dryer-xsuyua",
+        "complaint": "the opening is a bit smaller than what it should be. maybe hand annotate",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2660
+    },
+    {
+        "object": "clothes_dryer-zlmnfg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2661
+    },
+    {
+        "object": "clothes_dryer-zlmnfg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2662
+    },
+    {
+        "object": "floor_lamp-fanocp",
+        "complaint": "dont know how the physics would work",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2663
+    },
+    {
+        "object": "floor_lamp-fanocp",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2664
+    },
+    {
+        "object": "floor_lamp-fanocp",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2665
+    },
+    {
+        "object": "floor_lamp-imgsrd",
+        "complaint": "don't know how the physics would work",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2666
+    },
+    {
+        "object": "floor_lamp-imgsrd",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2667
+    },
+    {
+        "object": "floor_lamp-imgsrd",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2668
+    },
+    {
+        "object": "floor_lamp-jcbvfi",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2669
+    },
+    {
+        "object": "floor_lamp-jcbvfi",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2670
+    },
+    {
+        "object": "floor_lamp-jqsuky",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2671
+    },
+    {
+        "object": "floor_lamp-jqsuky",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2672
+    },
+    {
+        "object": "floor_lamp-lqdmym",
+        "complaint": "can't see parts of it",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2673
+    },
+    {
+        "object": "floor_lamp-lqdmym",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2674
+    },
+    {
+        "object": "floor_lamp-lqdmym",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2675
+    },
+    {
+        "object": "floor_lamp-pfuqec",
+        "complaint": "bad object center",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2676
+    },
+    {
+        "object": "floor_lamp-pfuqec",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2677
+    },
+    {
+        "object": "floor_lamp-pfuqec",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 2678
+    },
+    {
+        "object": "floor_lamp-pfuqec",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2679
+    },
+    {
+        "object": "floor_lamp-vdxlda",
+        "complaint": "\u001b[6~",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: floor_lamp.n.01\nDefinition: a lamp that stands on the floor\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2680
+    },
+    {
+        "object": "floor_lamp-vdxlda",
+        "complaint": "See message",
+        "processed": true,
+        "new": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object is a lamp object. Those objects might have a tendency to tip over because the automatically generated center of mass does not represent the heavy base. Consider annotating a center of mass.",
+        "id": 2681
+    },
+    {
+        "object": "floor_lamp-vdxlda",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2682
+    },
+    {
+        "object": "sink-ejooms",
+        "complaint": "looks like connected to a table",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2683
+    },
+    {
+        "object": "sink-ejooms",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2684
+    },
+    {
+        "object": "sink-ejooms",
+        "complaint": "furniture_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2685
+    },
+    {
+        "object": "multi_station_furniture_sink-ejooms",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2686
+    },
+    {
+        "object": "sink-yfaufu",
+        "complaint": "connected toa cabinet",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sink.n.01\nDefinition: plumbing fixture consisting of a water basin fixed to a wall or floor and having a drainpipe\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2687
+    },
+    {
+        "object": "sink-yfaufu",
+        "complaint": "connected to  acabinet multiple",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2688
+    },
+    {
+        "object": "sink-yfaufu",
+        "complaint": "multiple_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2689
+    },
+    {
+        "object": "multi_station_furniture_sink-yfaufu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2690
+    },
+    {
+        "object": "walker-cmfdmv",
+        "complaint": "shoe n.01",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2691
+    },
+    {
+        "object": "walker-dgewyj",
+        "complaint": "shoe ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2692
+    },
+    {
+        "object": "walker-dgewyj",
+        "complaint": "two",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2693
+    },
+    {
+        "object": "walker-dgewyj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2694
+    },
+    {
+        "object": "walker-dlwoej",
+        "complaint": "x100",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n27.10m, 10.34m, 11.17m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 2695
+    },
+    {
+        "object": "walker-dlwoej",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2696
+    },
+    {
+        "object": "walker-fdklhj",
+        "complaint": "x100",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n24.74m, 7.95m, 11.97m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.\nIf the scale is off, please let us know by a factor of how much (for example, 1000 if something\nthat's supposed to be 1mm is 1m instead) in your complaint note.",
+        "id": 2697
+    },
+    {
+        "object": "walker-fdklhj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2698
+    },
+    {
+        "object": "walker-glrsok",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2699
+    },
+    {
+        "object": "walker-glrsok",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2700
+    },
+    {
+        "object": "walker-ndexvs",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2701
+    },
+    {
+        "object": "walker-scbatq",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2702
+    },
+    {
+        "object": "walker-txpihh",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2703
+    },
+    {
+        "object": "walker-txpihh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2704
+    },
+    {
+        "object": "walker-xnpimz",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2705
+    },
+    {
+        "object": "walker-xnpimz",
+        "complaint": "two",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2706
+    },
+    {
+        "object": "walker-ykjauh",
+        "complaint": "shoe",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: walker.n.01\nDefinition: New Zealand runner who in 1975 became the first person to run a mile in less that 3 minutes and 50 seconds (born in 1952)\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2707
+    },
+    {
+        "object": "sink-wzpabm",
+        "complaint": "some have a base some don't",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sink.n.01\nDefinition: plumbing fixture consisting of a water basin fixed to a wall or floor and having a drainpipe\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2708
+    },
+    {
+        "object": "sink-wzpabm",
+        "complaint": "some have abase some dont",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2709
+    },
+    {
+        "object": "sink-bnpjjy",
+        "complaint": "tabletop_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2710
+    },
+    {
+        "object": "furniture_sink-bnpjjy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2711
+    },
+    {
+        "object": "sink-czyfhq",
+        "complaint": "furniture_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2712
+    },
+    {
+        "object": "furniture_sink-czyfhq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2713
+    },
+    {
+        "object": "furniture_sink-czyfhq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2714
+    },
+    {
+        "object": "sink-xiybkb",
+        "complaint": "some have a bas some dont",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sink.n.01\nDefinition: plumbing fixture consisting of a water basin fixed to a wall or floor and having a drainpipe\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2715
+    },
+    {
+        "object": "sink-xiybkb",
+        "complaint": "connected to a base",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2716
+    },
+    {
+        "object": "sink-xiybkb",
+        "complaint": "furniture_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2717
+    },
+    {
+        "object": "sink-xiybkb",
+        "complaint": "doors on cabinets underneat should be articulated?",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2718
+    },
+    {
+        "object": "sink-zexzrc",
+        "complaint": "connected to a base",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sink.n.01\nDefinition: plumbing fixture consisting of a water basin fixed to a wall or floor and having a drainpipe\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2719
+    },
+    {
+        "object": "sink-zexzrc",
+        "complaint": "connected to a base",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2720
+    },
+    {
+        "object": "sink-zexzrc",
+        "complaint": "furniture_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2721
+    },
+    {
+        "object": "furniture_sink-zexzrc",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2722
+    },
+    {
+        "object": "microwave-abzvij",
+        "complaint": "wrong microwave",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2723
+    },
+    {
+        "object": "microwave-abzvij",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2724
+    },
+    {
+        "object": "microwave-bfbeeb",
+        "complaint": "wrong microwave",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2725
+    },
+    {
+        "object": "microwave-bfbeeb",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2726
+    },
+    {
+        "object": "microwave-bfbeeb",
+        "complaint": "Handle not represented",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2727
+    },
+    {
+        "object": "microwave-bfbeeb",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2728
+    },
+    {
+        "object": "microwave-hjjxmi",
+        "complaint": " wro",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2729
+    },
+    {
+        "object": "microwave-hjjxmi",
+        "complaint": "missing front",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2730
+    },
+    {
+        "object": "microwave-hjjxmi",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2731
+    },
+    {
+        "object": "microwave-rtfebu",
+        "complaint": "wrong microwave",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2732
+    },
+    {
+        "object": "microwave-rtfebu",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2733
+    },
+    {
+        "object": "microwave-snsqrt",
+        "complaint": "wrong microwave",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2734
+    },
+    {
+        "object": "microwave-snsqrt",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2735
+    },
+    {
+        "object": "microwave-vuezel",
+        "complaint": "wrong microwvae",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: microwave.n.01\nDefinition: a short electromagnetic wave (longer than infrared but shorter than radio waves); used for radar and microwave ovens and for transmitting telephone, facsimile, video and data\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2736
+    },
+    {
+        "object": "microwave-vuezel",
+        "complaint": "missing rfont",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2737
+    },
+    {
+        "object": "microwave-vuezel",
+        "complaint": "Auto-generated 2025",
+        "processed": false,
+        "type": "appearance",
+        "additional_info": "GLASS: This window object does not have a glass-tagged mesh associated with it. Please check the object's meshes.",
+        "id": 2738
+    },
+    {
+        "object": "notebook-ffdjzp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2739
+    },
+    {
+        "object": "notebook-umxsmd",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2740
+    },
+    {
+        "object": "spoon-kwyoqh",
+        "complaint": "more like a spatula?",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: spoon.n.01\nDefinition: a piece of cutlery with a shallow bowl-shaped container and a handle; used to stir or serve or take up food\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2741
+    },
+    {
+        "object": "pasta_server-kwyoqh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2742
+    },
+    {
+        "object": "sink-ksecxq",
+        "complaint": "pedestal_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2743
+    },
+    {
+        "object": "shampoo-kkbhzw",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2744
+    },
+    {
+        "object": "shampoo_dispenser-kkbhzw",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2745
+    },
+    {
+        "object": "spoon-pxwpuw",
+        "complaint": "spatula",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: spoon.n.01\nDefinition: a piece of cutlery with a shallow bowl-shaped container and a handle; used to stir or serve or take up food\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2746
+    },
+    {
+        "object": "standing_tv-bkyguk",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2747
+    },
+    {
+        "object": "standing_tv-bkyguk",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2748
+    },
+    {
+        "object": "standing_tv-bkyguk",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2749
+    },
+    {
+        "object": "standing_tv-blyapt",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2750
+    },
+    {
+        "object": "standing_tv-blyapt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2751
+    },
+    {
+        "object": "standing_tv-blyapt",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2752
+    },
+    {
+        "object": "standing_tv-ghxsoy",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2753
+    },
+    {
+        "object": "standing_tv-ghxsoy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2754
+    },
+    {
+        "object": "standing_tv-ghxsoy",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2755
+    },
+    {
+        "object": "standing_tv-gjlztf",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2756
+    },
+    {
+        "object": "standing_tv-gjlztf",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2757
+    },
+    {
+        "object": "standing_tv-gjlztf",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2758
+    },
+    {
+        "object": "standing_tv-lkpsai",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2759
+    },
+    {
+        "object": "standing_tv-lkpsai",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2760
+    },
+    {
+        "object": "standing_tv-lkpsai",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2761
+    },
+    {
+        "object": "standing_tv-sbxgwj",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2762
+    },
+    {
+        "object": "standing_tv-sbxgwj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2763
+    },
+    {
+        "object": "standing_tv-sbxgwj",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2764
+    },
+    {
+        "object": "standing_tv-udotid",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2765
+    },
+    {
+        "object": "standing_tv-udotid",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2766
+    },
+    {
+        "object": "standing_tv-udotid",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2767
+    },
+    {
+        "object": "standing_tv-wbkvxr",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2768
+    },
+    {
+        "object": "standing_tv-wbkvxr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2769
+    },
+    {
+        "object": "standing_tv-wbkvxr",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "unknown",
+        "additional_info": "",
+        "id": 2770
+    },
+    {
+        "object": "standing_tv-wbkvxr",
+        "complaint": "Auto-generated 2025",
+        "processed": true,
+        "type": "centerofmass",
+        "additional_info": "CENTEROFMASS: This object belongs to a category that frequently has stability issues. Please check the object's center of mass.",
+        "id": 2771
+    },
+    {
+        "object": "tablespoon-huudhe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2772
+    },
+    {
+        "object": "medicine-egondf",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2773
+    },
+    {
+        "object": "medicine-egondf",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2774
+    },
+    {
+        "object": "medicine-fmfwng",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2775
+    },
+    {
+        "object": "medicine-fmfwng",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2776
+    },
+    {
+        "object": "medicine-hvocpc",
+        "complaint": "box of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2777
+    },
+    {
+        "object": "medicine-hvocpc",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2778
+    },
+    {
+        "object": "medicine-kasbsy",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2779
+    },
+    {
+        "object": "medicine-kasbsy",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2780
+    },
+    {
+        "object": "medicine-kqkwoq",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2781
+    },
+    {
+        "object": "medicine-kqkwoq",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2782
+    },
+    {
+        "object": "medicine-qqsukh",
+        "complaint": "bottle of ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2783
+    },
+    {
+        "object": "medicine-qqsukh",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2784
+    },
+    {
+        "object": "medicine-syfpak",
+        "complaint": "bottle of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2785
+    },
+    {
+        "object": "medicine-syfpak",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2786
+    },
+    {
+        "object": "medicine-zfbnjh",
+        "complaint": "bottle of ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: medicine.n.01\nDefinition: the branches of medical science that deal with nonsurgical techniques\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2787
+    },
+    {
+        "object": "medicine-zfbnjh",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2788
+    },
+    {
+        "object": "shampoo-bclpiq",
+        "complaint": "shampoo box",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2789
+    },
+    {
+        "object": "shampoo-bclpiq",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2790
+    },
+    {
+        "object": "box_of_shampoo-bclpiq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2791
+    },
+    {
+        "object": "shampoo-jccyom",
+        "complaint": "box of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2792
+    },
+    {
+        "object": "shampoo-jccyom",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2793
+    },
+    {
+        "object": "box_of_shampoo-jccyom",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2794
+    },
+    {
+        "object": "shampoo-nijidu",
+        "complaint": "box of ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2795
+    },
+    {
+        "object": "shampoo-nijidu",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2796
+    },
+    {
+        "object": "box_of_shampoo-nijidu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2797
+    },
+    {
+        "object": "shampoo-tzghev",
+        "complaint": "box of brand",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: shampoo.n.01\nDefinition: cleansing agent consisting of soaps or detergents used for washing the hair\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2798
+    },
+    {
+        "object": "shampoo-tzghev",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2799
+    },
+    {
+        "object": "box_of_shampoo-tzghev",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2800
+    },
+    {
+        "object": "canned_food-acgdtc",
+        "complaint": "maybe tomato sauce jar?",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2801
+    },
+    {
+        "object": "canned_food-acgdtc",
+        "complaint": "giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.05m, 1.07m, 1.22m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2802
+    },
+    {
+        "object": "canned_food-acgdtc",
+        "complaint": "none of these when it comes to the jarjust stainable dustyable and openable (maybe an extra part for the cap)",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2803
+    },
+    {
+        "object": "canned_food-cbmndg",
+        "complaint": "it's jam jar",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2804
+    },
+    {
+        "object": "canned_food-cbmndg",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n48.88cm, 49.23cm, 67.41cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2805
+    },
+    {
+        "object": "canned_food-cbmndg",
+        "complaint": "none of these are true about the jar only stainable dustyable and maybe attached to extra part as the cap",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2806
+    },
+    {
+        "object": "canned_food-foetdd",
+        "complaint": "don't know what it is but canned food is too braod",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2807
+    },
+    {
+        "object": "canned_food-foetdd",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n50.80cm, 50.79cm, 1.39m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2808
+    },
+    {
+        "object": "canned_food-foetdd",
+        "complaint": "none are true about the jar maybe stainable dustyable and attach a cap",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2809
+    },
+    {
+        "object": "canned_food-mzoaia",
+        "complaint": "jar of olives",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2810
+    },
+    {
+        "object": "canned_food-mzoaia",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n64.18cm, 64.15cm, 93.58cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2811
+    },
+    {
+        "object": "canned_food-mzoaia",
+        "complaint": "none are true about the jar, maybe dustyable stainable and attach the cap",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2812
+    },
+    {
+        "object": "canned_food-mzoaia",
+        "complaint": "\\",
+        "processed": true,
+        "type": "metalink",
+        "additional_info": "Confirm object meta links:\nMake sure these match mechanisms you expect from this object.",
+        "id": 2813
+    },
+    {
+        "object": "canned_food-mzoaia",
+        "complaint": "can has label going through it",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2814
+    },
+    {
+        "object": "canned_food-pkopdw",
+        "complaint": "looks like a jar of olives",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2815
+    },
+    {
+        "object": "canned_food-pkopdw",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n96.47cm, 87.56cm, 1.12m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2816
+    },
+    {
+        "object": "canned_food-pkopdw",
+        "complaint": "none are true about the jar, maybe stainable dustyable and add an extra part as the cap",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2817
+    },
+    {
+        "object": "canned_food-zfmfje",
+        "complaint": "looks like a ajar of pickles ",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: canned_food.n.01\nDefinition: food preserved by canning\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2818
+    },
+    {
+        "object": "canned_food-zfmfje",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n66.24cm, 66.24cm, 1.04m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2819
+    },
+    {
+        "object": "canned_food-zfmfje",
+        "complaint": "none aretrue about the jar maybe dustyable stainable and a separate cap",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2820
+    },
+    {
+        "object": "fridge-dszchb",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2821
+    },
+    {
+        "object": "fridge-jtqazu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2822
+    },
+    {
+        "object": "fridge-xyejdx",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2823
+    },
+    {
+        "object": "fridge-xyejdx",
+        "complaint": "Handle not grabbable",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2824
+    },
+    {
+        "object": "stove-dusebh",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2825
+    },
+    {
+        "object": "stove-dwhqap",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2826
+    },
+    {
+        "object": "stove-igwqpj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2827
+    },
+    {
+        "object": "stove-igwqpj",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2828
+    },
+    {
+        "object": "stove-kfhkqp",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2829
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2830
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "Automated complaint: None was marked in original pass - please review.",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2831
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "handle",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2832
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "handle not great",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2833
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2834
+    },
+    {
+        "object": "stove-qbjiva",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2835
+    },
+    {
+        "object": "stove-rgpphy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2836
+    },
+    {
+        "object": "stove-rgpphy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "joint",
+        "additional_info": "",
+        "id": 2837
+    },
+    {
+        "object": "stove-rgpphy",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2838
+    },
+    {
+        "object": "stove-yhjzwg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2839
+    },
+    {
+        "object": "stove-yhjzwg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2840
+    },
+    {
+        "object": "sink-vbquye",
+        "complaint": "wall_sink",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: sink\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2841
+    }
+]

@@ -1,0 +1,59 @@
+(define (problem cook_corn-0)
+    (:domain omnigibson)
+
+    (:objects
+        sweet_corn.n.02_1 sweet_corn.n.02_2 sweet_corn.n.02_3 sweet_corn.n.02_4 - sweet_corn.n.02
+        stove.n.01_1 - stove.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside sweet_corn.n.02_1 electric_refrigerator.n.01_1) 
+        (inside sweet_corn.n.02_2 electric_refrigerator.n.01_1) 
+        (inside sweet_corn.n.02_3 electric_refrigerator.n.01_1) 
+        (inside sweet_corn.n.02_4 electric_refrigerator.n.01_1) 
+        (inside butter.n.01_1 tupperware.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (ontop stockpot.n.01_1 stove.n.01_1) 
+        (not 
+            (cooked sweet_corn.n.02_1)
+        ) 
+        (not 
+            (cooked sweet_corn.n.02_2)
+        ) 
+        (not 
+            (cooked sweet_corn.n.02_3)
+        ) 
+        (not 
+            (cooked sweet_corn.n.02_4)
+        ) 
+        (future melted__butter.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sweet_corn.n.02 - sweet_corn.n.02) 
+                (and 
+                    (cooked ?sweet_corn.n.02)
+                    (covered ?sweet_corn.n.02 ?melted__butter.n.01_1)
+                )
+            )
+            (real ?melted__butter.n.01_1)
+        )
+    )
+)

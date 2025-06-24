@@ -1,0 +1,48 @@
+#usda 1.0
+(
+    defaultPrim = "HumanFemale_Group"
+    upAxis = "Z"
+)
+
+def Xform "HumanFemale_Group" (
+    kind = "assembly"
+)
+{
+    def Xform "HumanFemale" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/HumanFemale>
+    )
+    {
+    }
+    def Xform "HumanFemaleHair" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/HumanFemaleHair>
+    )    
+    {
+    }
+    def Xform "KidThinButtonDown" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/KidThinButtonDown>
+    )
+    {
+    }
+    def Xform "KidThinLeggings" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/KidThinLeggings>
+    )
+    {
+    }
+
+    def Xform "KidThinSkirt" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/KidThinSkirt>
+    )
+    {
+    }
+    def Xform "ShoesHumanFlats" (
+        kind = "component"
+        payload = @./HumanFemale.low_payload.usd@</HumanFemale_Group/ShoesHumanFlats>
+    )
+    {
+    }
+}

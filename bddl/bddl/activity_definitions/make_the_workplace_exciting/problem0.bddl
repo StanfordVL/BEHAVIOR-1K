@@ -1,0 +1,35 @@
+(define (problem make_the_workplace_exciting-0)
+    (:domain omnigibson)
+
+    (:objects
+        poster.n.01_1 - poster.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        board_game.n.01_1 - board_game.n.01
+        floor.n.01_1 - floor.n.01
+        coffee_maker.n.01_1 - coffee_maker.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        conference_table.n.01_1 - conference_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop poster.n.01_1 conference_table.n.01_1)
+        (inside board_game.n.01_1 carton.n.02_2) 
+        (inside coffee_maker.n.01_1 carton.n.02_1)
+        (ontop carton.n.02_1 floor.n.01_1) 
+        (ontop carton.n.02_2 floor.n.01_1) 
+        (inroom wall_nail.n.01_1 meeting_room) 
+        (inroom conference_table.n.01_1 meeting_room) 
+        (inroom floor.n.01_1 meeting_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?board_game.n.01_1 ?conference_table.n.01_1)
+            (ontop ?board_game.n.01_1 ?conference_table.n.01_1)
+            (ontop ?coffee_maker.n.01_1 ?conference_table.n.01_1)
+            (attached ?poster.n.01_1 ?wall_nail.n.01_1)
+        )
+    )
+)

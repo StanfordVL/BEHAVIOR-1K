@@ -1,0 +1,50 @@
+(define (problem clean_a_kitchen_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        chopping_board.n.01_1 - chopping_board.n.01
+        cooking_oil.n.01_1 - cooking_oil.n.01
+        sink.n.01_1 - sink.n.01
+        dust.n.01_1 - dust.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        rag.n.01_1 - rag.n.01
+        crumb.n.03_1 - crumb.n.03
+        water.n.06_1 - water.n.06
+        table.n.02_1 - table.n.02
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chopping_board.n.01_1 table.n.02_1) 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (covered table.n.02_1 dust.n.01_1)
+        (covered chopping_board.n.01_1 cooking_oil.n.01_1)
+        (covered table.n.02_1 crumb.n.03_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 countertop.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen)
+        (inroom table.n.02_1 dining_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not
+                (covered ?table.n.02_1 ?dust.n.01_1)
+            )
+            (not
+                (covered ?table.n.02_1 ?crumb.n.03_1)
+            )
+            (or
+                (inside ?chopping_board.n.01_1 ?sink.n.01_1)
+                (ontop ?chopping_board.n.01_1 ?sink.n.01_1)
+            )
+        )
+    )
+)

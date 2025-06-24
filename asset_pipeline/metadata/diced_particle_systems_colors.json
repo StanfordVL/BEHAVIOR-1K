@@ -1,0 +1,1047 @@
+{
+    "diced__agave": {
+        "color": "#82A79C",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__apricot": {
+        "color": "#F19B24",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.7
+    },
+    "diced__arepa": {
+        "color": "#EFD19D",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__artichoke": {
+        "color": "#A0A96F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__arugula": {
+        "color": "#6F9E3B",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__asparagus": {
+        "color": "#7CAB2E",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__auricularia": {
+        "color": "#AF6C66",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__bacon": {
+        "color": "#732B12",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__bagel": {
+        "color": "#E8A46A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__bagel_dough": {
+        "color": "#BFB19C",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__baguet": {
+        "color": "#E9D2B7",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__banana": {
+        "color": "#F7E9CD",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__banana_bread": {
+        "color": "#BDA781",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__bay_leaf": {
+        "color": "#BFB783",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__bean_curd": {
+        "color": "#EDE6D1",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__blackberry": {
+        "color": "#281A1F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.65
+    },
+    "diced__bleu": {
+        "color": "#8FA096",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__bok_choy": {
+        "color": "#B5CB75",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__branch": {
+        "color": "#A37D5A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__bratwurst": {
+        "color": "#CA9358",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__brisket": {
+        "color": "#B7837A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__broccoli": {
+        "color": "#B9D160",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__broccoli_rabe": {
+        "color": "#6DB367",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__broccolini": {
+        "color": "#498033",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__brownie": {
+        "color": "#583A34",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__brussels_sprouts": {
+        "color": "#A3C163",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__burrito": {
+        "color": "#D7A368",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__butter": {
+        "color": "#EFD9AC",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__butter_cookie": {
+        "color": "#DA971E",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__buttermilk_pancake": {
+        "color": "#FFDB6F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__butternut_squash": {
+        "color": "#FCAE37",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__cantaloup": {
+        "color": "#FDC475",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__carne_asada": {
+        "color": "#E68981",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__cauliflower": {
+        "color": "#E4DBB2",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__celery": {
+        "color": "#C3DC72",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__chanterelle": {
+        "color": "#D4A75C",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chard": {
+        "color": "#4A734B",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__cheese_tart": {
+        "color": "#FEF383",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.625
+    },
+    "diced__cheesecake": {
+        "color": "#FBEDC1",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__cherry": {
+        "color": "#BC2934",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__cherry_tomato": {
+        "color": "#C42A08",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chestnut": {
+        "color": "#E88D26",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chicken_breast": {
+        "color": "#F1D8C2",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__biscuit_dough": {
+        "color": "#DAD1C2",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__chicken_leg": {
+        "color": "#EDCDBC",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 3.0
+    },
+    "diced__chicken_tender": {
+        "color": "#FDDFBE",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 1.0
+    },
+    "diced__chicken_wing": {
+        "color": "#FDDFBD",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 1.0
+    },
+    "diced__chives": {
+        "color": "#609C30",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chocolate_biscuit": {
+        "color": "#76392D",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chocolate_cake": {
+        "color": "#76392D",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__chocolate_chip_cookie": {
+        "color": "#76392D",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__chocolate_cookie_dough": {
+        "color": "#825D55",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__chorizo": {
+        "color": "#B2553B",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__cinnamon_roll": {
+        "color": "#B27F57",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__club_sandwich": {
+        "color": "#F5D8A3",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__coconut": {
+        "color": "#F8F3E1",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__cold_cuts": {
+        "color": "#FDC2BD",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__cookie_dough": {
+        "color": "#F7DABB",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__crab": {
+        "color": "#D9BE90",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__crayfish": {
+        "color": "#856C45",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__crescent_roll": {
+        "color": "#EBAE3A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__cupcake": {
+        "color": "#F4B844",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__danish": {
+        "color": "#AE7335",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__date": {
+        "color": "#702D28",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__doughnut": {
+        "color": "#EFBA81",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__dried_apricot": {
+        "color": "#E17D11",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__duck": {
+        "color": "#EEDFD4",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__durian": {
+        "color": "#FFE593",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__edible_cookie_dough": {
+        "color": "#DFBE93",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__eggplant": {
+        "color": "#E1DAD1",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__enchilada": {
+        "color": "#EDC895",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__entire_leaf": {
+        "color": "#589613",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__fennel": {
+        "color": "#F9F9D7",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__fillet": {
+        "color": "#D9B5AE",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__frank": {
+        "color": "#E5A583",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.375
+    },
+    "diced__frankfurter_bun": {
+        "color": "#D2AD62",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__french_fries": {
+        "color": "#EED188",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.6
+    },
+    "diced__french_toast": {
+        "color": "#EAAA24",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__fruitcake": {
+        "color": "#D3D5D2",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__garlic_bread": {
+        "color": "#D1B93D",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__gelatin": {
+        "color": "#C1AC62",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__ginger": {
+        "color": "#FAEDB0",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__gingerbread": {
+        "color": "#BF7C36",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__gooseberry": {
+        "color": "#B9BC63",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__gourd": {
+        "color": "#E0E0AF",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__granola_bar": {
+        "color": "#FBC874",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.7
+    },
+    "diced__grapefruit": {
+        "color": "#EC5A4C",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__green_bean": {
+        "color": "#C2D56E",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__ham_hock": {
+        "color": "#AF513A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__hamburger": {
+        "color": "#F5D193",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__hamburger_bun": {
+        "color": "#E8CE9D",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__hard_boiled_egg": {
+        "color": "#E7E8C9",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__hazelnut": {
+        "color": "#F3D2B6",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__head_cabbage": {
+        "color": "#AFC260",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__hip": {
+        "color": "#E43038",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.65
+    },
+    "diced__hotdog": {
+        "color": "#D19544",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__huitre": {
+        "color": "#A79B8B",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__kabob": {
+        "color": "#62362E",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__kale": {
+        "color": "#355837",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__kielbasa": {
+        "color": "#CD9088",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__lamb": {
+        "color": "#CA6C72",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__leek": {
+        "color": "#C6CF67",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__lemon_peel": {
+        "color": "#E5CA1B",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__lime": {
+        "color": "#C3DD44",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__lobster": {
+        "color": "#794F3F",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__macaroon": {
+        "color": "#F3B6C9",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__marshmallow": {
+        "color": "#E4E4DA",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__meat_loaf": {
+        "color": "#D3B29D",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__meatball": {
+        "color": "#A16F3F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__melon": {
+        "color": "#D53235",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__mozzarella": {
+        "color": "#E5DEDA",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__muffin": {
+        "color": "#D3B17A",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__mushroom": {
+        "color": "#EFE2CE",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__mustard": {
+        "color": "#165115",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__nectarine": {
+        "color": "#FCB64E",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__olive": {
+        "color": "#461F24",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__omelet": {
+        "color": "#E5BA54",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__onion": {
+        "color": "#D4A4B3",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__orange": {
+        "color": "#F2A62B",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__papaya": {
+        "color": "#F66831",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__parsley": {
+        "color": "#8FD761",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__parsnip": {
+        "color": "#D6C8AC",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__pastry": {
+        "color": "#E0B876",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.65
+    },
+    "diced__peach": {
+        "color": "#FDCF5E",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__pear": {
+        "color": "#EDDCD0",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__peppermint": {
+        "color": "#6B9440",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pepperoni": {
+        "color": "#AE2F35",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pickle": {
+        "color": "#CCC057",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pieplant": {
+        "color": "#A11A18",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.625
+    },
+    "diced__pita": {
+        "color": "#FFE2B6",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pizza": {
+        "color": "#EBCD79",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__pizza_dough": {
+        "color": "#EAE5D9",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__plum": {
+        "color": "#FBCD70",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__pomegranate": {
+        "color": "#511A2E",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pomelo": {
+        "color": "#EDC790",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__pork": {
+        "color": "#DC8F78",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__porkchop": {
+        "color": "#FF555A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__prawn": {
+        "color": "#7A6644",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pretzel": {
+        "color": "#9E462A",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__prosciutto": {
+        "color": "#E36847",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__pumpkin": {
+        "color": "#E65722",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__quail": {
+        "color": "#CB8643",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__quiche": {
+        "color": "#C96413",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__radish": {
+        "color": "#F5B3B9",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__ramen": {
+        "color": "#F6D393",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__rib": {
+        "color": "#FA9E6B",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__roast_beef": {
+        "color": "#D86A66",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__roll_dough": {
+        "color": "#E8CE97",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__rutabaga": {
+        "color": "#EBD083",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__salmon": {
+        "color": "#EB6A37",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__scone": {
+        "color": "#D8AA68",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__shiitake": {
+        "color": "#8B563F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__snapper": {
+        "color": "#A3846C",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__sour_bread": {
+        "color": "#D1B185",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__spice_cookie": {
+        "color": "#CF915A",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 1.0
+    },
+    "diced__spice_cookie_dough": {
+        "color": "#CF915A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__squid": {
+        "color": "#D3A34F",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__steak": {
+        "color": "#B76F56",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__strawberry": {
+        "color": "#E73F2B",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__sugar_cookie": {
+        "color": "#F7DECF",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__sugar_cookie_dough": {
+        "color": "#F7DECF",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__sunflower": {
+        "color": "#FECF21",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__sushi": {
+        "color": "#E2DAD1",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__sweet_corn": {
+        "color": "#DBAB2A",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__swiss_cheese": {
+        "color": "#FEDF8E",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.65
+    },
+    "diced__taco": {
+        "color": "#D5A74E",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__tenderloin": {
+        "color": "#DB6965",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__tiramisu": {
+        "color": "#9B6043",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__toast": {
+        "color": "#DC8F38",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__tofu": {
+        "color": "#F9F9F1",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__tomato": {
+        "color": "#FC4A38",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__tortilla": {
+        "color": "#EDD0A4",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__tortilla_chip": {
+        "color": "#E0B124",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__trout": {
+        "color": "#9C8964",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__tulip": {
+        "color": "#E76078",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__tuna": {
+        "color": "#FFFEF9",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__turkey": {
+        "color": "#FAD99A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__turkey_leg": {
+        "color": "#FAD99A",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__vanilla": {
+        "color": "#FCF6DE",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__veal": {
+        "color": "#685250",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__venison": {
+        "color": "#8D3632",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__waffle": {
+        "color": "#E1A251",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.5
+    },
+    "diced__walnut": {
+        "color": "#A76428",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__white_turnip": {
+        "color": "#E4DED8",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__whole_garlic": {
+        "color": "#FEF6D6",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__yam": {
+        "color": "#E8EEE6",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__apple": {
+        "color": "#fffcb3",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__avocado": {
+        "color": "#b7e86d",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__beefsteak_tomato": {
+        "color": "#ff7070",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__beet": {
+        "color": "#ff007b",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.5
+    },
+    "diced__bell_pepper": {
+        "color": "#198f37",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.875
+    },
+    "diced__carrot": {
+        "color": "#ff7300",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__cheddar": {
+        "color": "#fef69f",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__chicken": {
+        "color": "#ffc6b3",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__chili": {
+        "color": "#ff622e",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__clove": {
+        "color": "#ffffe5",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.75
+    },
+    "diced__cucumber": {
+        "color": "#c3ffb3",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__feta": {
+        "color": "#ffffff",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.625
+    },
+    "diced__kiwi": {
+        "color": "#99f73b",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__lemon": {
+        "color": "#fef848",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__lettuce": {
+        "color": "#67ea4d",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__mango": {
+        "color": "#ffec1f",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 1.75
+    },
+    "diced__pineapple": {
+        "color": "#fff700",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__potato": {
+        "color": "#ede092",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__spinach": {
+        "color": "#248609",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__vidalia_onion": {
+        "color": "#fef4e1",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.5
+    },
+    "diced__virginia_ham": {
+        "color": "#fedce3",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.0
+    },
+    "diced__watermelon": {
+        "color": "#ff5286",
+        "option": "Coarse (5cm)",
+        "llm_size_cm": 2.25
+    },
+    "diced__zucchini": {
+        "color": "#e0ffb3",
+        "option": "Fine (1cm)",
+        "llm_size_cm": 0.65
+    }
+}

@@ -1,0 +1,8 @@
+sphinx-markdown-tables~=0.0.15
+sphinx~=3.5.3
+recommonmark~=0.7.1
+sphinx-rtd-theme~=1.0.0
+myst-parser>=0.15.2
+gspread~=5.8.0
+pandas~=1.4.3
+numpy<2.0.0

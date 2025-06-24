@@ -1,0 +1,54 @@
+(define (problem buy_used_gardening_equipment-0)
+    (:domain omnigibson)
+
+    (:objects
+        cash_register.n.01_1 - cash_register.n.01
+        checkout.n.03_1 - checkout.n.03
+        money.n.01_1 money.n.01_2 - money.n.01
+        glove.n.02_1 glove.n.02_2 - glove.n.02
+        grocery_shelf.n.01_1 grocery_shelf.n.01_2 grocery_shelf.n.01_3 - grocery_shelf.n.01
+        trowel.n.01_1 - trowel.n.01
+        watering_can.n.01_1 - watering_can.n.01
+        pruner.n.02_1 - pruner.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom cash_register.n.01_1 grocery_store)
+        (ontop money.n.01_1 checkout.n.03_1) 
+        (ontop money.n.01_2 checkout.n.03_1) 
+        (ontop glove.n.02_1 grocery_shelf.n.01_1) 
+        (ontop glove.n.02_2 grocery_shelf.n.01_2) 
+        (ontop trowel.n.01_1 grocery_shelf.n.01_2) 
+        (ontop watering_can.n.01_1 grocery_shelf.n.01_3) 
+        (ontop pruner.n.02_1 grocery_shelf.n.01_2) 
+        (inroom floor.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_2 grocery_store) 
+        (inroom grocery_shelf.n.01_3 grocery_store) 
+        (inroom checkout.n.03_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?money.n.01 - money.n.01) 
+                (nextto ?money.n.01 ?cash_register.n.01_1)
+    
+            )
+            (ontop ?trowel.n.01_1 ?checkout.n.03_1) 
+            (ontop ?watering_can.n.01_1 ?checkout.n.03_1) 
+            (ontop ?pruner.n.02_1 ?checkout.n.03_1) 
+            (forall 
+                (?glove.n.02 - glove.n.02) 
+                (ontop ?glove.n.02 ?checkout.n.03_1)
+    
+            )
+    
+        )
+    
+    )
+)

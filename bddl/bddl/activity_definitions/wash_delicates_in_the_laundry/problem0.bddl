@@ -1,0 +1,46 @@
+(define (problem wash_delicates_in_the_laundry-0)
+    (:domain omnigibson)
+
+    (:objects
+        washer.n.03_1 - washer.n.03
+        undergarment.n.01_1 undergarment.n.01_2 undergarment.n.01_3 undergarment.n.01_4 - undergarment.n.01
+        stain.n.01_1 - stain.n.01
+        dust.n.01_1 - dust.n.01
+        detergent.n.02_1 - detergent.n.02
+        detergent__bottle.n.01_1 - detergent__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        bed.n.01_1 - bed.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop undergarment.n.01_1 bed.n.01_1) 
+        (covered undergarment.n.01_1 stain.n.01_1) 
+        (ontop undergarment.n.01_2 bed.n.01_1) 
+        (covered undergarment.n.01_2 stain.n.01_1) 
+        (ontop undergarment.n.01_3 bed.n.01_1) 
+        (covered undergarment.n.01_3 dust.n.01_1) 
+        (ontop undergarment.n.01_4 bed.n.01_1) 
+        (covered undergarment.n.01_4 dust.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 washer.n.03_1)
+        (inroom floor.n.01_1 bedroom) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom bed.n.01_1 bedroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?undergarment.n.01 - undergarment.n.01)
+                (not
+                    (covered ?undergarment.n.01 ?stain.n.01_1)
+                )
+            )
+        )
+    
+    )
+)

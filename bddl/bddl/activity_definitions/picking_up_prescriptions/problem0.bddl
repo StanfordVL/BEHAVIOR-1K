@@ -1,0 +1,45 @@
+(define (problem picking_up_prescriptions-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        pill_bottle.n.01_1 pill_bottle.n.01_2 - pill_bottle.n.01
+        bottle__of__antihistamines.n.01_1 bottle__of__antihistamines.n.01_2 - bottle__of__antihistamines.n.01
+        grocery_shelf.n.01_1 grocery_shelf.n.01_2 - grocery_shelf.n.01
+        sack.n.01_1 - sack.n.01
+        checkout.n.03_1 - checkout.n.03
+        printer.n.03_1 - printer.n.03
+        desktop_computer.n.01_1 - desktop_computer.n.01
+        sheet.n.02_1 - sheet.n.02
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (inside pill_bottle.n.01_1 grocery_shelf.n.01_1)
+        (inside pill_bottle.n.01_2 grocery_shelf.n.01_1)
+        (inside bottle__of__antihistamines.n.01_1 grocery_shelf.n.01_2)
+        (inside bottle__of__antihistamines.n.01_2 grocery_shelf.n.01_2)
+        (ontop sack.n.01_1 checkout.n.03_1)
+        (ontop printer.n.03_1 checkout.n.03_1)
+        (ontop desktop_computer.n.01_1 checkout.n.03_1)
+        (ontop sheet.n.02_1 printer.n.03_1)
+        (inroom checkout.n.03_1 grocery_store)
+        (inroom floor.n.01_1 grocery_store)
+        (inroom grocery_shelf.n.01_1 grocery_store)
+        (inroom grocery_shelf.n.01_2 grocery_store)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (forall
+                (?pill_bottle.n.01 - pill_bottle.n.01)
+                (inside ?pill_bottle.n.01 ?sack.n.01_1)
+            )
+            (forall
+                (?bottle__of__antihistamines.n.01 - bottle__of__antihistamines.n.01)
+                (inside ?bottle__of__antihistamines.n.01 ?sack.n.01_1)
+            )
+        )
+    )
+)

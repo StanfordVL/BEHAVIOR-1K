@@ -1,0 +1,30 @@
+(define (problem fertilize_plants-0)
+    (:domain omnigibson)
+
+    (:objects
+        pot_plant.n.01_1 pot_plant.n.01_2 pot_plant.n.01_3 - pot_plant.n.01
+        floor.n.01_1 - floor.n.01
+        fertilizer.n.01_1 - fertilizer.n.01
+        bucket.n.01_1 - bucket.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop pot_plant.n.01_1 floor.n.01_1) 
+        (ontop pot_plant.n.01_2 floor.n.01_1) 
+        (ontop pot_plant.n.01_3 floor.n.01_1) 
+        (filled bucket.n.01_1 fertilizer.n.01_1) 
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (forall
+                (?pot_plant.n.01 - pot_plant.n.01)
+                (covered ?pot_plant.n.01 ?fertilizer.n.01_1)
+            )
+        )
+    )
+)

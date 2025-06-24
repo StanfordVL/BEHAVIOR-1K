@@ -1,0 +1,13 @@
+# keep in alphabetical order
+# for development
+black
+flake8
+flake8-docstrings
+isort
+ipdb
+jupyterlab
+mypy
+neovim
+pyright
+pytest
+python-lsp-server[all]

@@ -1,0 +1,17 @@
+{
+  "ceiling-fagehw-0": "coacd-t_0.05-pr_100-c_8",
+  "ceilings-cyncaf-0": "bbox",
+  "ceilings-nyewww-0-Tglass": "coacd-t_0.05-pr_100-c_8",
+  "curtain-svschs-0": "vhacd-r_1000000-d_20-f_flood-e_10-p_true-l_2-v60-h4",
+  "floors-nbzwbf-0": "bbox",
+  "pillar-keesuv-0": "coacd-t_0.05-pr_100-c_8",
+  "spotlight-wtrjoa-0": "chull",
+  "walls-atjaxs-0": "bbox",
+  "walls-dpponz-0": "coacd-t_0.05-pr_100-c_32",
+  "walls-kiagzh-0": "coacd-t_0.05-pr_100-c_8",
+  "walls-lsfzjg-0": "coacd-t_0.05-pr_100-c_32",
+  "walls-mezeys-0": "bbox",
+  "walls-nyrdyc-0": "coacd-t_0.05-pr_100-c_32",
+  "window-cggyho-0": "bbox",
+  "window-cggyho-0-glass-base_link-F-lower-Tglass": "bbox"
+}

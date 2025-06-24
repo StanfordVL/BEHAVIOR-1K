@@ -1,0 +1,33 @@
+(define (problem taking_fish_out_of_freezer-0)
+    (:domain omnigibson)
+
+    (:objects
+     	salmon.n.03_1 salmon.n.03_2 salmon.n.03_3 - salmon.n.03
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	shopping_cart.n.01_1 - shopping_cart.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside salmon.n.03_1 electric_refrigerator.n.01_1) 
+        (frozen salmon.n.03_1)
+        (inside salmon.n.03_2 electric_refrigerator.n.01_1) 
+        (frozen salmon.n.03_2)
+        (inside salmon.n.03_3 electric_refrigerator.n.01_1) 
+        (frozen salmon.n.03_3)
+        (inroom shopping_cart.n.01_1 grocery_store) 
+        (inroom electric_refrigerator.n.01_1 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?salmon.n.03 - salmon.n.03)
+                (inside ?salmon.n.03 ?shopping_cart.n.01_1)
+            )
+        )
+    )
+)

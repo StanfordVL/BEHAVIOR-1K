@@ -1,0 +1,55 @@
+(define (problem cleaning_tools_and_equipment-0)
+    (:domain omnigibson)
+
+    (:objects
+        drill.n.01_1 - drill.n.01
+        washer.n.03_1 - washer.n.03
+        adhesive_material.n.01_1 - adhesive_material.n.01
+        rag.n.01_1 - rag.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        dust.n.01_1 - dust.n.01
+        floor.n.01_1 - floor.n.01
+        toothbrush.n.01_1 - toothbrush.n.01
+        sink.n.01_1 - sink.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        mud.n.03_1 - mud.n.03
+        bucket.n.01_1 - bucket.n.01
+        trowel.n.01_1 - trowel.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop drill.n.01_1 washer.n.03_1) 
+        (covered drill.n.01_1 adhesive_material.n.01_1) 
+        (covered drill.n.01_1 dust.n.01_1) 
+        (inside rag.n.01_1 cabinet.n.01_1) 
+        (ontop toothbrush.n.01_1 sink.n.01_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (inside liquid_soap__bottle.n.01_1 cabinet.n.01_1)
+        (ontop bucket.n.01_1 floor.n.01_1) 
+        (ontop trowel.n.01_1 floor.n.01_1) 
+        (covered trowel.n.01_1 mud.n.03_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 utility_room) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (inroom sink.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?drill.n.01_1 ?adhesive_material.n.01_1)
+            ) 
+            (not 
+                (covered ?drill.n.01_1 ?dust.n.01_1)
+            )
+            (not 
+                (covered ?trowel.n.01_1 ?mud.n.03_1)
+            )
+        )
+    )
+)

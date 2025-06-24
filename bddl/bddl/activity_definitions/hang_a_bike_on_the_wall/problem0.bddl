@@ -1,0 +1,25 @@
+(define (problem hang_a_bike_on_the_wall-0)
+    (:domain omnigibson)
+
+    (:objects
+        bicycle.n.01_1 - bicycle.n.01
+        bicycle_rack.n.01_1 - bicycle_rack.n.01
+        floor.n.01_1 - floor.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bicycle.n.01_1 floor.n.01_1)
+        (attached bicycle_rack.n.01_1 wall_nail.n.01_1) 
+        (inroom floor.n.01_1 garage) 
+        (inroom wall_nail.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?bicycle.n.01_1 ?bicycle_rack.n.01_1)
+        )
+    )
+)

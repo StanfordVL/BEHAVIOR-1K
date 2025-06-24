@@ -1,0 +1,36 @@
+(define (problem make_cinnamon_sugar-0)
+    (:domain omnigibson)
+
+    (:objects
+        cinnamon.n.03_1 - cinnamon.n.03
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        cinnamon_sugar.n.01_1 - cinnamon_sugar.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        cinnamon__shaker.n.01_1 - cinnamon__shaker.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        countertop.n.01_1 - countertop.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource cinnamon__shaker.n.01_1 cinnamon.n.03_1) 
+        (ontop cinnamon__shaker.n.01_1 countertop.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (future cinnamon_sugar.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cinnamon_sugar.n.01_1) 
+            (contains ?mixing_bowl.n.01_1 ?cinnamon_sugar.n.01_1)
+        )
+    )
+)

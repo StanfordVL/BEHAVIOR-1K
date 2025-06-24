@@ -1,0 +1,42 @@
+(define (problem clean_apples-0)
+    (:domain omnigibson)
+
+    (:objects
+        apple.n.01_1 apple.n.01_2 - apple.n.01
+        sink.n.01_1 - sink.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        rag.n.01_1 - rag.n.01
+        dirt.n.02_1 - dirt.n.02
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop apple.n.01_1 countertop.n.01_1) 
+        (ontop apple.n.01_2 countertop.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1)
+        (ontop vinegar__bottle.n.01_1 countertop.n.01_1)
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (covered apple.n.01_1 dirt.n.02_1) 
+        (covered apple.n.01_2 dirt.n.02_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?apple.n.01 - apple.n.01) 
+                (not 
+                    (covered ?apple.n.01 ?dirt.n.02_1)
+                )
+            ) 
+        )
+    )
+)

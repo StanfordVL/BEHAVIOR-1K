@@ -1,0 +1,33 @@
+(define (problem laying_paving_stones-0)
+    (:domain omnigibson)
+
+    (:objects
+     	paving_stone.n.01_1 paving_stone.n.01_2 paving_stone.n.01_3 - paving_stone.n.01
+    	floor.n.01_1 - floor.n.01
+    	sealant.n.01_1 - sealant.n.01
+        sealant__atomizer.n.01_1 - sealant__atomizer.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop paving_stone.n.01_1 floor.n.01_1) 
+        (ontop paving_stone.n.01_2 paving_stone.n.01_1) 
+        (ontop paving_stone.n.01_3 paving_stone.n.01_2) 
+        (ontop sealant__atomizer.n.01_1 floor.n.01_1)
+        (insource sealant__atomizer.n.01_1 sealant.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?paving_stone.n.01 - paving_stone.n.01) 
+                (and 
+                    (ontop ?paving_stone.n.01_1 ?floor.n.01_1)
+                    (covered ?paving_stone.n.01_1 ?sealant.n.01_1)
+                )
+            )
+        )
+    )
+)

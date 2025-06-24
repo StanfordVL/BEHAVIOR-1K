@@ -1,0 +1,91 @@
+(define (problem sorting_volunteer_materials-0)
+    (:domain omnigibson)
+
+    (:objects
+        packing_box.n.02_1 packing_box.n.02_2 packing_box.n.02_3 - packing_box.n.02
+        floor.n.01_1 - floor.n.01
+        notebook.n.01_1 notebook.n.01_2 - notebook.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        catalog.n.01_1 catalog.n.01_2 - catalog.n.01
+        rubber_boot.n.01_1 rubber_boot.n.01_2 - rubber_boot.n.01
+        apron.n.01_1 apron.n.01_2 - apron.n.01
+        glove.n.02_1 glove.n.02_2 - glove.n.02
+        backpack.n.01_1 backpack.n.01_2 - backpack.n.01
+        water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop packing_box.n.02_1 floor.n.01_1) 
+        (ontop packing_box.n.02_2 floor.n.01_1) 
+        (ontop packing_box.n.02_3 floor.n.01_1) 
+        (ontop notebook.n.01_1 breakfast_table.n.01_1) 
+        (ontop notebook.n.01_2 notebook.n.01_1) 
+        (ontop catalog.n.01_1 breakfast_table.n.01_1) 
+        (ontop catalog.n.01_2 catalog.n.01_1)
+        (ontop rubber_boot.n.01_1 floor.n.01_1) 
+        (ontop rubber_boot.n.01_2 floor.n.01_1) 
+        (ontop apron.n.01_2 floor.n.01_1) 
+        (ontop glove.n.02_1 catalog.n.01_2) 
+        (ontop glove.n.02_2 catalog.n.01_2) 
+        (ontop backpack.n.01_1 floor.n.01_1) 
+        (ontop backpack.n.01_2 floor.n.01_1) 
+        (ontop water_bottle.n.01_1 breakfast_table.n.01_1) 
+        (ontop water_bottle.n.01_2 breakfast_table.n.01_1) 
+        (ontop apron.n.01_1 floor.n.01_1) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (and
+                    (forall 
+                        (?notebook.n.01 - notebook.n.01)
+                        (inside ?notebook.n.01 ?packing_box.n.02)
+                    )
+                    (forall 
+                        (?catalog.n.01 - catalog.n.01) 
+                        (inside ?catalog.n.01 ?packing_box.n.02)
+                    ) 
+                )
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (and
+                    (forall 
+                        (?apron.n.01 - apron.n.01) 
+                        (and
+                            (inside ?apron.n.01 ?packing_box.n.02)
+                            (folded ?apron.n.01)
+                        )
+                    ) 
+                    (forall 
+                        (?glove.n.02 - glove.n.02) 
+                        (inside ?glove.n.02 ?packing_box.n.02)
+                    ) 
+                )
+            )
+            (exists
+                (?packing_box.n.02 - packing_box.n.02)
+                (and
+                    (forall 
+                        (?rubber_boot.n.01 - rubber_boot.n.01) 
+                        (inside ?rubber_boot.n.01 ?packing_box.n.02)
+                    ) 
+                    (forall 
+                        (?backpack.n.01 - backpack.n.01) 
+                        (inside ?backpack.n.01 ?packing_box.n.02)
+                    ) 
+                    (forall 
+                        (?water_bottle.n.01 - water_bottle.n.01) 
+                        (inside ?water_bottle.n.01 ?packing_box.n.02)
+                    ) 
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,35 @@
+(define (problem emptying_ashtray-0)
+    (:domain omnigibson)
+
+    (:objects
+        cigarette.n.01_1 - cigarette.n.01
+        ashtray.n.01_1 - ashtray.n.01
+        ash.n.01_1 - ash.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tissue.n.02_1 - tissue.n.02
+        ashcan.n.01_1 - ashcan.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside cigarette.n.01_1 ashtray.n.01_1) 
+        (filled ashtray.n.01_1 ash.n.01_1) 
+        (ontop ashtray.n.01_1 breakfast_table.n.01_1) 
+        (ontop tissue.n.02_1 breakfast_table.n.01_1)
+        (ontop ashcan.n.01_1 floor.n.01_2)
+        (inroom floor.n.01_1 dining_room) 
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_2 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not
+                (filled ?ashtray.n.01_1 ?ash.n.01_1)
+            )
+            (inside ?cigarette.n.01_1 ?ashcan.n.01_1)
+        )
+    )
+)

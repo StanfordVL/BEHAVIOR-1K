@@ -1,0 +1,74 @@
+(define (problem make_macaroni_and_cheese-0)
+    (:domain omnigibson)
+
+    (:objects
+        cream_cheese.n.01_1 - cream_cheese.n.01
+        butter.n.01_1 - butter.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        grated_cheese.n.01_1 - grated_cheese.n.01
+        parmesan.n.01_1 - parmesan.n.01
+        salt.n.02_1 - salt.n.02
+        saucepan.n.01_1 - saucepan.n.01
+        noodle.n.01_1 - noodle.n.01
+        breadcrumb.n.01_1 - breadcrumb.n.01
+        macaroni_and_cheese.n.01_1 - macaroni_and_cheese.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        oven.n.01_1 - oven.n.01
+        casserole.n.02_1 - casserole.n.02
+        cream_cheese__box.n.01_1 - cream_cheese__box.n.01
+        bowl.n.01_1 bowl.n.01_2 bowl.n.01_3 - bowl.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        noodle__jar.n.01_1 - noodle__jar.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        cup.n.01_1 - cup.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        water.n.06_1 - water.n.06
+        stove.n.01_1 - stove.n.01
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled cream_cheese__box.n.01_1 cream_cheese.n.01_1) 
+        (inside cream_cheese__box.n.01_1 electric_refrigerator.n.01_1) 
+        (inside butter.n.01_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled bowl.n.01_2 grated_cheese.n.01_1) 
+        (inside bowl.n.01_2 electric_refrigerator.n.01_1) 
+        (filled bowl.n.01_3 parmesan.n.01_1) 
+        (inside bowl.n.01_3 electric_refrigerator.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop saucepan.n.01_1 countertop.n.01_1) 
+        (filled noodle__jar.n.01_1 noodle.n.01_1) 
+        (ontop noodle__jar.n.01_1 countertop.n.01_2) 
+        (ontop wooden_spoon.n.02_1 countertop.n.01_1)
+        (filled cup.n.01_1 breadcrumb.n.01_1) 
+        (ontop cup.n.01_1 countertop.n.01_2) 
+        (inroom oven.n.01_1 kitchen) 
+        (ontop casserole.n.02_1 countertop.n.01_2)
+        (ontop stockpot.n.01_1 countertop.n.01_2) 
+        (insource sink.n.01_1 water.n.06_1)
+        (future macaroni_and_cheese.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?macaroni_and_cheese.n.01_1) 
+            (cooked ?macaroni_and_cheese.n.01_1) 
+            (inside ?macaroni_and_cheese.n.01_1 ?casserole.n.02_1)
+        )
+    )
+)

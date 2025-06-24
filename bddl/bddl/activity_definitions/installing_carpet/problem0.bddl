@@ -1,0 +1,28 @@
+(define (problem installing_carpet-0)
+    (:domain omnigibson)
+
+    (:objects
+        rug.n.01_1 rug.n.01_2 rug.n.01_3 - rug.n.01
+        table.n.02_1 table.n.02_2 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rug.n.01_1 table.n.02_1) 
+        (ontop rug.n.01_2 table.n.02_1)
+        (ontop rug.n.01_3 table.n.02_2)
+        (inroom floor.n.01_1 living_room) 
+        (inroom table.n.02_1 living_room)
+        (inroom table.n.02_2 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?rug.n.01_1 ?floor.n.01_1) 
+            (ontop ?rug.n.01_2 ?floor.n.01_1) 
+            (ontop ?rug.n.01_3 ?floor.n.01_1) 
+        )
+    )
+)

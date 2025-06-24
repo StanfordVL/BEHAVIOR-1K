@@ -1,0 +1,52 @@
+(define (problem unpacking_hobby_equipment-0)
+    (:domain omnigibson)
+
+    (:objects
+        rug.n.01_1 - rug.n.01
+        floor.n.01_1 - floor.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        sofa.n.01_1 - sofa.n.01
+        laptop.n.01_1 - laptop.n.01
+        videodisk.n.01_1 videodisk.n.01_2 - videodisk.n.01
+        battery.n.02_1 - battery.n.02
+        book.n.02_1 - book.n.02
+        bookcase.n.01_1 - bookcase.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init 
+        (ontop rug.n.01_1 floor.n.01_1) 
+        (open carton.n.02_1) 
+        (ontop carton.n.02_1 floor.n.01_1)
+        (inside laptop.n.01_1 carton.n.02_1) 
+        (inside videodisk.n.01_1 carton.n.02_1) 
+        (inside videodisk.n.01_2 carton.n.02_1)
+        (ontop carton.n.02_2 floor.n.01_1)
+        (inside battery.n.02_1 carton.n.02_1)
+        (inside book.n.02_1 carton.n.02_1)
+        (inroom floor.n.01_1 living_room) 
+        (inroom sofa.n.01_1 living_room) 
+        (inroom bookcase.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?laptop.n.01_1 ?bookcase.n.01_1) 
+            (exists 
+                (?videodisk.n.01 - videodisk.n.01)
+                (ontop ?videodisk.n.01 ?bookcase.n.01_1)
+            )
+            (exists 
+                (?videodisk.n.01 - videodisk.n.01)
+                (or
+                    (ontop ?videodisk.n.01 ?videodisk.n.01_1)
+                    (ontop ?videodisk.n.01 ?videodisk.n.01_2)
+                )
+            )
+            (ontop ?battery.n.02_1 ?bookcase.n.01_1)
+            (ontop ?book.n.02_1 ?bookcase.n.01_1)
+        )
+    
+    )
+)

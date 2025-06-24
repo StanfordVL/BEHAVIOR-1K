@@ -1,0 +1,57 @@
+(define (problem setting_the_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        cupcake.n.01_1 cupcake.n.01_2 - cupcake.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tablefork.n.01_1 tablefork.n.01_2 - tablefork.n.01
+        table_knife.n.01_1 table_knife.n.01_2 - table_knife.n.01
+        plate.n.04_1 plate.n.04_2 - plate.n.04
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside cupcake.n.01_1 electric_refrigerator.n.01_1) 
+        (inside cupcake.n.01_2 electric_refrigerator.n.01_1) 
+        (ontop tablefork.n.01_1 sink.n.01_1) 
+        (ontop tablefork.n.01_2 sink.n.01_1) 
+        (ontop table_knife.n.01_1 sink.n.01_1) 
+        (ontop table_knife.n.01_2 sink.n.01_1) 
+        (inside plate.n.04_1 cabinet.n.01_1)
+        (inside plate.n.04_2 cabinet.n.01_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?plate.n.04 - plate.n.04) 
+                (ontop ?plate.n.04 ?breakfast_table.n.01_1)
+            )
+            (forpairs 
+                (?plate.n.04 - plate.n.04) 
+                (?cupcake.n.01 - cupcake.n.01) 
+                (ontop ?cupcake.n.01 ?plate.n.04)
+            ) 
+            (forpairs
+                (?tablefork.n.01 - tablefork.n.01)
+                (?plate.n.04 - plate.n.04)
+                (nextto ?tablefork.n.01 ?plate.n.04)
+            ) 
+            (forpairs
+                (?table_knife.n.01 - table_knife.n.01)
+                (?plate.n.04 - plate.n.04)
+                (nextto ?table_knife.n.01 ?plate.n.04)
+            )
+        )
+    )
+)

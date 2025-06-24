@@ -1,0 +1,30 @@
+(define (problem make_microwave_popcorn-0)
+    (:domain omnigibson)
+
+    (:objects
+        popcorn.n.02_1 - popcorn.n.02
+        cooked__popcorn.n.01_1 - cooked__popcorn.n.01
+        popcorn__bag.n.01_1 - popcorn__bag.n.01
+        microwave.n.02_1 - microwave.n.02
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (filled popcorn__bag.n.01_1 popcorn.n.02_1)
+        (ontop popcorn__bag.n.01_1 countertop.n.01_1)
+        (inroom microwave.n.02_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
+        (future cooked__popcorn.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (real ?cooked__popcorn.n.01_1)
+            (contains ?popcorn__bag.n.01_1 ?cooked__popcorn.n.01_1)
+        )
+    )
+)

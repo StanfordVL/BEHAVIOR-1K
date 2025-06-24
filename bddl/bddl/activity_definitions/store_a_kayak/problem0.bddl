@@ -1,0 +1,33 @@
+(define (problem store_a_kayak-0)
+    (:domain omnigibson)
+
+    (:objects
+        kayak.n.01_1 - kayak.n.01
+        kayak_rack.n.01_1 - kayak_rack.n.01
+        floor.n.01_1 - floor.n.01
+        water.n.06_1 - water.n.06
+        bath_towel.n.01_1 - bath_towel.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop kayak.n.01_1 floor.n.01_1)
+        (ontop kayak_rack.n.01_1 floor.n.01_1)
+        (covered kayak.n.01_1 water.n.06_1)
+        (ontop bath_towel.n.01_1 floor.n.01_1)
+        (inroom wall_nail.n.01_1 garage) 
+        (inroom floor.n.01_1 garage) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?kayak.n.01_1 ?kayak_rack.n.01_1)
+            (attached ?kayak_rack.n.01_1 ?wall_nail.n.01_1)
+            (not
+                (covered ?kayak.n.01_1 ?water.n.06_1)
+            )
+        )
+    )
+)

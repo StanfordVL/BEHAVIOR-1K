@@ -1,0 +1,30 @@
+(define (problem clean_up_broken_glass-0)
+    (:domain omnigibson)
+
+    (:objects
+        broken__glass.n.01_1 broken__glass.n.01_2 broken__glass.n.01_3 - broken__glass.n.01
+        floor.n.01_1 - floor.n.01
+        broom.n.01_1 - broom.n.01
+        ashcan.n.01_1 - ashcan.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop broken__glass.n.01_1 floor.n.01_1)
+        (ontop broken__glass.n.01_2 floor.n.01_1)
+        (ontop broken__glass.n.01_3 floor.n.01_1)
+        (ontop broom.n.01_1 floor.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (ontop ashcan.n.01_1 floor.n.01_1)
+        (inroom floor.n.01_1 kitchen)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?broken__glass.n.01 - broken__glass.n.01) 
+                (inside ?broken__glass.n.01 ?ashcan.n.01_1)
+            )
+        )
+    )
+)

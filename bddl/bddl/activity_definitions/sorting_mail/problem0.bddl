@@ -1,0 +1,42 @@
+(define (problem sorting_mail-0)
+    (:domain omnigibson)
+
+    (:objects
+        mail.n.04_1 mail.n.04_2 mail.n.04_3 - mail.n.04
+        floor.n.01_1 - floor.n.01
+        table.n.02_1 - table.n.02
+        newspaper.n.03_1 newspaper.n.03_2 - newspaper.n.03
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mail.n.04_1 table.n.02_1)
+        (ontop mail.n.04_2 table.n.02_1)
+        (ontop mail.n.04_3 table.n.02_1)
+        (ontop newspaper.n.03_1 table.n.02_1)
+        (ontop newspaper.n.03_2 table.n.02_1)
+        (inroom table.n.02_1 living_room)
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?mail.n.04 - mail.n.04) 
+                (or 
+                    (touching ?mail.n.04 ?mail.n.04_1) 
+                    (touching ?mail.n.04 ?mail.n.04_2) 
+                    (touching ?mail.n.04 ?mail.n.04_3) 
+                )
+            ) 
+            (forall 
+                (?newspaper.n.03 - newspaper.n.03) 
+                (or 
+                    (touching ?newspaper.n.03 ?newspaper.n.03_1) 
+                    (touching ?newspaper.n.03 ?newspaper.n.03_2) 
+                )
+            )
+        )
+    )
+)

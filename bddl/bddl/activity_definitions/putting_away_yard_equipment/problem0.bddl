@@ -1,0 +1,35 @@
+(define (problem putting_away_yard_equipment-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        hoe.n.01_1 - hoe.n.01
+        rake.n.03_1 - rake.n.03
+        shears.n.01_1 - shears.n.01
+        trowel.n.01_1 - trowel.n.01
+        shovel.n.01_1 - shovel.n.01
+        toolbox.n.01_1 - toolbox.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop hoe.n.01_1 floor.n.01_1) 
+        (ontop rake.n.03_1 floor.n.01_1) 
+        (ontop shears.n.01_1 floor.n.01_1) 
+        (ontop trowel.n.01_1 floor.n.01_1) 
+        (ontop shovel.n.01_1 floor.n.01_1) 
+        (ontop toolbox.n.01_1 floor.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (nextto ?hoe.n.01_1 ?toolbox.n.01_1) 
+            (nextto ?rake.n.03_1 ?toolbox.n.01_1) 
+            (nextto ?shovel.n.01_1 ?toolbox.n.01_1)
+            (inside ?shears.n.01_1 ?toolbox.n.01_1) 
+            (inside ?trowel.n.01_1 ?toolbox.n.01_1) 
+        )
+    )
+)

@@ -1,0 +1,41 @@
+(define (problem clean_pennies-0)
+    (:domain omnigibson)
+
+    (:objects
+        penny.n.02_1 - penny.n.02
+        sink.n.01_1 - sink.n.01
+        rag.n.01_1 - rag.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        bowl.n.01_1 - bowl.n.01
+        salt.n.02_1 - salt.n.02
+        hand_towel.n.01_1 - hand_towel.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        stain.n.01_1 - stain.n.01
+        water.n.06_1 - water.n.06
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop penny.n.02_1 sink.n.01_1) 
+        (ontop rag.n.01_1 sink.n.01_1)
+        (filled bowl.n.01_1 vinegar.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop bowl.n.01_1 sink.n.01_1)
+        (ontop salt__shaker.n.01_1 sink.n.01_1)
+        (ontop hand_towel.n.01_1 sink.n.01_1) 
+        (covered penny.n.02_1 stain.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 bathroom) 
+        (inroom floor.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?penny.n.02_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

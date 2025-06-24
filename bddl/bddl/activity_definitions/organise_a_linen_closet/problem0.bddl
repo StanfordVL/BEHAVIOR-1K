@@ -1,0 +1,65 @@
+(define (problem organise_a_linen_closet-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        cedar_chest.n.01_1 cedar_chest.n.01_2 - cedar_chest.n.01
+        sheet.n.03_1 sheet.n.03_2 sheet.n.03_3 - sheet.n.03
+        bath_towel.n.01_1 bath_towel.n.01_2 - bath_towel.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sheet.n.03_1 floor.n.01_1) 
+        (ontop sheet.n.03_2 floor.n.01_1) 
+        (ontop sheet.n.03_3 floor.n.01_1) 
+        (unfolded sheet.n.03_2) 
+        (unfolded sheet.n.03_1) 
+        (unfolded sheet.n.03_3) 
+        (ontop bath_towel.n.01_1 floor.n.01_1)
+        (ontop bath_towel.n.01_2 floor.n.01_1)
+        (unfolded bath_towel.n.01_1)
+        (unfolded bath_towel.n.01_2)
+        (inroom floor.n.01_1 closet) 
+        (ontop cedar_chest.n.01_1 floor.n.01_1) 
+        (ontop cedar_chest.n.01_2 floor.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sheet.n.03 - sheet.n.03)
+                (folded ?sheet.n.03)
+            )
+            (exists
+                (?cedar_chest.n.01 - cedar_chest.n.01)
+                (and
+                    (forall 
+                        (?sheet.n.03 - sheet.n.03)
+                        (inside ?sheet.n.03 ?cedar_chest.n.01)
+                    )
+                    (not 
+                        (inside ?bath_towel.n.01_1 ?cedar_chest.n.01)
+                    )
+                )
+            )
+            (forall 
+                (?bath_towel.n.01 - bath_towel.n.01)
+                (folded ?bath_towel.n.01)
+            )
+            (exists
+                (?cedar_chest.n.01 - cedar_chest.n.01)
+                (and
+                    (forall 
+                        (?bath_towel.n.01 - bath_towel.n.01)
+                        (inside ?bath_towel.n.01 ?cedar_chest.n.01)
+                    )
+                    (not 
+                        (inside ?sheet.n.03_1 ?cedar_chest.n.01)
+                    )
+                )
+            )
+        )
+    )
+)

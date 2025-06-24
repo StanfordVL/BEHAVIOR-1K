@@ -1,0 +1,42 @@
+(define (problem clean_a_pizza_stone-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        crumb.n.03_1 - crumb.n.03
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        water.n.06_1 - water.n.06
+        rag.n.01_1 - rag.n.01
+        sink.n.01_1 - sink.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered cookie_sheet.n.01_1 stain.n.01_1) 
+        (covered cookie_sheet.n.01_1 crumb.n.03_1) 
+        (ontop cookie_sheet.n.01_1 sink.n.01_1) 
+        (ontop rag.n.01_1 countertop.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?cookie_sheet.n.01_1 ?stain.n.01_1)
+            ) 
+            (not 
+                (covered ?cookie_sheet.n.01_1 ?crumb.n.03_1)
+            ) 
+        )
+    )
+)

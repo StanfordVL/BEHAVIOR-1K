@@ -1,0 +1,1077 @@
+[
+    {
+        "object": "tape-sklkyc",
+        "complaint": "maybe we can have roll of tape? idk",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: tape.n.01\nDefinition: a long thin piece of cloth or paper as used for binding or fastening\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2842
+    },
+    {
+        "object": "tape-budhaz",
+        "complaint": "also tape holder",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: tape.n.01\nDefinition: a long thin piece of cloth or paper as used for binding or fastening\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2843
+    },
+    {
+        "object": "tape-budhaz",
+        "complaint": "multiple objects",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2844
+    },
+    {
+        "object": "cellulose_tape-budhaz",
+        "complaint": "cellulose_tape_dispenser.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: cellulose_tape.n.01\nDefinition: transparent or semitransparent adhesive tape (trade names Scotch tape and Sellotape) used for sealing or attaching or mending\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2845
+    },
+    {
+        "object": "cellulose_tape-budhaz",
+        "complaint": "cellulose_tape_dispenser",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: cellulose_tape\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2846
+    },
+    {
+        "object": "cellulose_tape_dispenser-budhaz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2847
+    },
+    {
+        "object": "tape-fetnry",
+        "complaint": "also tape holder",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: tape.n.01\nDefinition: a long thin piece of cloth or paper as used for binding or fastening\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2848
+    },
+    {
+        "object": "tape-fetnry",
+        "complaint": "more than one obj",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2849
+    },
+    {
+        "object": "cellulose_tape-fetnry",
+        "complaint": "cellulose_tape_dispenser.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: cellulose_tape.n.01\nDefinition: transparent or semitransparent adhesive tape (trade names Scotch tape and Sellotape) used for sealing or attaching or mending\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2850
+    },
+    {
+        "object": "cellulose_tape-fetnry",
+        "complaint": "cellulose_tape_dispenser",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: cellulose_tape\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2851
+    },
+    {
+        "object": "tape-yyekns",
+        "complaint": "tape holder too",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: tape.n.01\nDefinition: a long thin piece of cloth or paper as used for binding or fastening\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2852
+    },
+    {
+        "object": "tape-yyekns",
+        "complaint": "two objects",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2853
+    },
+    {
+        "object": "cellulose_tape-yyekns",
+        "complaint": "cellulose_tape_dispenser.n.01",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: cellulose_tape.n.01\nDefinition: transparent or semitransparent adhesive tape (trade names Scotch tape and Sellotape) used for sealing or attaching or mending\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2854
+    },
+    {
+        "object": "cellulose_tape-yyekns",
+        "complaint": "cellulose_tape_dispenser",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: cellulose_tape\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2855
+    },
+    {
+        "object": "chopping_board-ktxcvz",
+        "complaint": "too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n14.22cm, 22.24cm, 1.32cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2856
+    },
+    {
+        "object": "chopping_board-mwmzzv",
+        "complaint": "too small",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n14.22cm, 22.23cm, 1.33cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2857
+    },
+    {
+        "object": "ottoman-mysfnz",
+        "complaint": "stool",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: ottoman\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2858
+    },
+    {
+        "object": "ottoman-sghekm",
+        "complaint": "stool",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "CATEGORY: Confirm object category assignment.\n\nObject assigned to category: ottoman\n\nIf the object is not compatible with the rest of the objects in this category,\n(e.g. tabletop sink vs regular sink), change the category here.\nConfirm that the object is the same kind of object as the rest of the objects\nin this category.\n\nIf the category is wrong, please type in the correct category.",
+        "id": 2859
+    },
+    {
+        "object": "lid-ugfmpq",
+        "complaint": " lid not eyelid",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: eyelid.n.01\nDefinition: either of two folds of skin that can be moved to cover or open the eye\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2860
+    },
+    {
+        "object": "lid-ugfmpq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2861
+    },
+    {
+        "object": "lid-zkderg",
+        "complaint": " lid not eyelid",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: eyelid.n.01\nDefinition: either of two folds of skin that can be moved to cover or open the eye\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2862
+    },
+    {
+        "object": "lid-zkderg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2863
+    },
+    {
+        "object": "tape-vpgzne",
+        "complaint": "maybe we can have roll of tape",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: tape.n.01\nDefinition: a long thin piece of cloth or paper as used for binding or fastening\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2864
+    },
+    {
+        "object": "pedestal_table-poukwl",
+        "complaint": "coffee table?",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pedestal_table.n.01\nDefinition: a table supported by a single central column\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2865
+    },
+    {
+        "object": "pedestal_table-poukwl",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-eric",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2866
+    },
+    {
+        "object": "foot_rule-ckywbx",
+        "complaint": "it's a ruler",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: foot_rule.n.01\nDefinition: a ruler one foot long\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2867
+    },
+    {
+        "object": "foot_rule-rutqab",
+        "complaint": "ruler.n.02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: foot_rule.n.01\nDefinition: a ruler one foot long\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2868
+    },
+    {
+        "object": "foot_rule-ujizkx",
+        "complaint": "ruler",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: foot_rule.n.01\nDefinition: a ruler one foot long\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2869
+    },
+    {
+        "object": "foot_rule-vmnaih",
+        "complaint": "ruler",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: foot_rule.n.01\nDefinition: a ruler one foot long\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2870
+    },
+    {
+        "object": "foot_rule-swlgkg",
+        "complaint": "triangle.n.04",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: foot_rule.n.01\nDefinition: a ruler one foot long\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2871
+    },
+    {
+        "object": "protein_powder-rbvrrp",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2872
+    },
+    {
+        "object": "protein_powder-rbvrrp",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2873
+    },
+    {
+        "object": "protein_powder-ysgesq",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2874
+    },
+    {
+        "object": "protein_powder-ysgesq",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2875
+    },
+    {
+        "object": "cereal-hcwbzw",
+        "complaint": "box of cereal",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cereal.n.01\nDefinition: grass whose starchy grains are used as food: wheat; rice; rye; oats; maize; buckwheat; millet\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2876
+    },
+    {
+        "object": "cereal-hcwbzw",
+        "complaint": "giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.64m, 13.34m, 18.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2877
+    },
+    {
+        "object": "cereal-hcwbzw",
+        "complaint": "openable? not sure",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2878
+    },
+    {
+        "object": "cereal-iucshm",
+        "complaint": "box of cereal",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cereal.n.01\nDefinition: grass whose starchy grains are used as food: wheat; rice; rye; oats; maize; buckwheat; millet\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2879
+    },
+    {
+        "object": "cereal-iucshm",
+        "complaint": "giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.64m, 13.34m, 18.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2880
+    },
+    {
+        "object": "cereal-iucshm",
+        "complaint": "not sure",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2881
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "cereal box",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cereal.n.01\nDefinition: grass whose starchy grains are used as food: wheat; rice; rye; oats; maize; buckwheat; millet\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2882
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "can",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2883
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "cereal box",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cereal.n.01\nDefinition: grass whose starchy grains are used as food: wheat; rice; rye; oats; maize; buckwheat; millet\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2884
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "not sure if the brand is real can't see that side of the object",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2885
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "gianrt",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.64m, 13.34m, 18.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2886
+    },
+    {
+        "object": "cereal-surzft",
+        "complaint": "not sure",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2887
+    },
+    {
+        "object": "cereal-tiykku",
+        "complaint": "cereal box",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: cereal.n.01\nDefinition: grass whose starchy grains are used as food: wheat; rice; rye; oats; maize; buckwheat; millet\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2888
+    },
+    {
+        "object": "cereal-tiykku",
+        "complaint": "not sure about the brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2889
+    },
+    {
+        "object": "cereal-tiykku",
+        "complaint": "giant",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n3.64m, 13.34m, 18.58m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2890
+    },
+    {
+        "object": "cereal-tiykku",
+        "complaint": "not sure",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2891
+    },
+    {
+        "object": "paint-gjjugj",
+        "complaint": "paint bucket",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: paint.n.01\nDefinition: a substance used as a coating to protect or decorate a surface (especially a mixture of pigment suspended in a liquid); dries to form a hard coating\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2892
+    },
+    {
+        "object": "paint-mxyrzd",
+        "complaint": "bucket of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: paint.n.01\nDefinition: a substance used as a coating to protect or decorate a surface (especially a mixture of pigment suspended in a liquid); dries to form a hard coating\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2893
+    },
+    {
+        "object": "paint-qbqche",
+        "complaint": "bucket of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: paint.n.01\nDefinition: a substance used as a coating to protect or decorate a surface (especially a mixture of pigment suspended in a liquid); dries to form a hard coating\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2894
+    },
+    {
+        "object": "paint-qbqche",
+        "complaint": "idk about the pourage",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2895
+    },
+    {
+        "object": "bucket_of_paint-qbqche",
+        "complaint": "texture is bad",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2896
+    },
+    {
+        "object": "bucket_of_paint-qbqche",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2897
+    },
+    {
+        "object": "paint-ycnaho",
+        "complaint": "bucket of",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: paint.n.01\nDefinition: a substance used as a coating to protect or decorate a surface (especially a mixture of pigment suspended in a liquid); dries to form a hard coating\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2898
+    },
+    {
+        "object": "bucket_of_paint-ycnaho",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2899
+    },
+    {
+        "object": "console_table-emeeke",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2900
+    },
+    {
+        "object": "console_table-emeeke",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2901
+    },
+    {
+        "object": "console_table-fihyuz",
+        "complaint": "looks openable",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2902
+    },
+    {
+        "object": "console_table-fihyuz",
+        "complaint": "looks openable ",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2903
+    },
+    {
+        "object": "console_table-fihyuz",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2904
+    },
+    {
+        "object": "console_table-fihyuz",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2905
+    },
+    {
+        "object": "console_table-tvhett",
+        "complaint": "looks openable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2906
+    },
+    {
+        "object": "console_table-tvhett",
+        "complaint": "has grey line on top of table. minor, otherwise looks fine",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2907
+    },
+    {
+        "object": "console_table-tvhett",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2908
+    },
+    {
+        "object": "console_table-tvhett",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2909
+    },
+    {
+        "object": "console_table-xqlxni",
+        "complaint": "looks like a desk maybe? not sure",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: console_table.n.01\nDefinition: a small table fixed to a wall or designed to stand against a wall\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2910
+    },
+    {
+        "object": "console_table-xqlxni",
+        "complaint": "openable llooks like",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- dustyable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2911
+    },
+    {
+        "object": "console_table-xqlxni",
+        "complaint": "nth-quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "nth-metalink",
+        "additional_info": "",
+        "id": 2912
+    },
+    {
+        "object": "dishtowel-dtfspn",
+        "complaint": "dk if we need folded towels",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dishtowel.n.01\nDefinition: a towel for drying dishes\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2913
+    },
+    {
+        "object": "dishtowel-dtfspn",
+        "complaint": "cloth is folded",
+        "processed": true,
+        "new": true,
+        "type": "substanceness",
+        "additional_info": "SUBSTANCE: Confirm if object should be a rigid body, cloth, or substance.\nIf it's marked softBody or rope, that means it will be a rigid body for now, which is OK.\n\nCurrently, it is annotated as: cloth.\n\nEnter one of \"rigidBody\", \"liquid\", \"macroPhysicalSubstance\", \"microPhysicalSubstance\", \"visualSubstance\", \"cloth\", \"softBody\", \"rope\" to change.",
+        "id": 2914
+    },
+    {
+        "object": "dishtowel-dtfspn",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 2915
+    },
+    {
+        "object": "dishtowel-ltydgg",
+        "complaint": "folded?",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: dishtowel.n.01\nDefinition: a towel for drying dishes\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2916
+    },
+    {
+        "object": "dishtowel-ltydgg",
+        "complaint": "cloth is folded",
+        "processed": true,
+        "new": true,
+        "type": "substanceness",
+        "additional_info": "SUBSTANCE: Confirm if object should be a rigid body, cloth, or substance.\nIf it's marked softBody or rope, that means it will be a rigid body for now, which is OK.\n\nCurrently, it is annotated as: cloth.\n\nEnter one of \"rigidBody\", \"liquid\", \"macroPhysicalSubstance\", \"microPhysicalSubstance\", \"visualSubstance\", \"cloth\", \"softBody\", \"rope\" to change.",
+        "id": 2917
+    },
+    {
+        "object": "dishtowel-ltydgg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": false,
+        "new": true,
+        "type": "clothappearance",
+        "additional_info": "",
+        "id": 2918
+    },
+    {
+        "object": "kettle-bzisss",
+        "complaint": "no lid",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2919
+    },
+    {
+        "object": "kettle-vjbldp",
+        "complaint": "no lid",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2920
+    },
+    {
+        "object": "pitcher-tsyims",
+        "complaint": "wrong pitcher",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pitcher.n.01\nDefinition: (baseball) the person who does the pitching\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2921
+    },
+    {
+        "object": "pitcher-tsyims",
+        "complaint": "looks transparent",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2922
+    },
+    {
+        "object": "pitcher-tzbnmh",
+        "complaint": "wrong pitcher",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: pitcher.n.01\nDefinition: (baseball) the person who does the pitching\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2923
+    },
+    {
+        "object": "pitcher-tzbnmh",
+        "complaint": "looks transparent",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2924
+    },
+    {
+        "object": "washer-dobgmu",
+        "complaint": "wrong washer",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2925
+    },
+    {
+        "object": "washer-dobgmu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2926
+    },
+    {
+        "object": "washer-dobgmu",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "",
+        "id": 2927
+    },
+    {
+        "object": "washer-jgyzhv",
+        "complaint": "wrong wahser",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2928
+    },
+    {
+        "object": "washer-jgyzhv",
+        "complaint": "no thickness",
+        "processed": true,
+        "type": "collision",
+        "additional_info": "Was at least one of the collision mesh candidates acceptable?",
+        "id": 2929
+    },
+    {
+        "object": "washer-jgyzhv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2930
+    },
+    {
+        "object": "washer-mrgspe",
+        "complaint": "wrong washer",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2931
+    },
+    {
+        "object": "washer-mrgspe",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2932
+    },
+    {
+        "object": "washer-omeuop",
+        "complaint": "wrong waher",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2933
+    },
+    {
+        "object": "washer-omeuop",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2934
+    },
+    {
+        "object": "washer-xusefg",
+        "complaint": "wrong washr",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2935
+    },
+    {
+        "object": "washer-xusefg",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2936
+    },
+    {
+        "object": "washer-zgzvcv",
+        "complaint": "wrong washer",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: washer.n.01\nDefinition: someone who washes things for a living\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2937
+    },
+    {
+        "object": "washer-zgzvcv",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-hang",
+        "processed": true,
+        "new": true,
+        "type": "collision",
+        "additional_info": "",
+        "id": 2938
+    },
+    {
+        "object": "bell_pepper-ggurxn",
+        "complaint": "should be bell pepper 02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sweet_pepper.n.01\nDefinition: plant bearing large mild thick-walled usually bell-shaped fruits; the principal salad peppers\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2939
+    },
+    {
+        "object": "bell_pepper-ggurxn",
+        "complaint": "little too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n8.77cm, 8.32cm, 11.92cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2940
+    },
+    {
+        "object": "bell_pepper-ggurxn",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2941
+    },
+    {
+        "object": "bell_pepper-ihctxa",
+        "complaint": "should be bell pepper 02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sweet_pepper.n.01\nDefinition: plant bearing large mild thick-walled usually bell-shaped fruits; the principal salad peppers\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2942
+    },
+    {
+        "object": "bell_pepper-ihctxa",
+        "complaint": "little too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n8.77cm, 8.32cm, 11.92cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2943
+    },
+    {
+        "object": "bell_pepper-ihctxa",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2944
+    },
+    {
+        "object": "bell_pepper-ukkycp",
+        "complaint": "should be bell pepper 02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sweet_pepper.n.01\nDefinition: plant bearing large mild thick-walled usually bell-shaped fruits; the principal salad peppers\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2945
+    },
+    {
+        "object": "bell_pepper-ukkycp",
+        "complaint": "little too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n8.77cm, 8.32cm, 11.92cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2946
+    },
+    {
+        "object": "bell_pepper-ukkycp",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2947
+    },
+    {
+        "object": "bell_pepper-uqcenz",
+        "complaint": "must be bell pepper 02",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: sweet_pepper.n.01\nDefinition: plant bearing large mild thick-walled usually bell-shaped fruits; the principal salad peppers\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2948
+    },
+    {
+        "object": "bell_pepper-uqcenz",
+        "complaint": "way too big order of m",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.33m, 1.21m, 1.02m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2949
+    },
+    {
+        "object": "bell_pepper-uqcenz",
+        "complaint": "sliceable",
+        "processed": true,
+        "type": "property",
+        "additional_info": "Confirm object properties:\n- burnable\n- cookable\n- freezable\n- stainable\nFull list of iGibson abilities: burnable, cleaningTool, coldSource, cookable, dustyable, freezable, heatSource, liquid, openable, sliceable, slicer, soakable, stainable, toggleable, waterSource\nCheck incorrect or missing properties, especially liquid property\n",
+        "id": 2950
+    },
+    {
+        "object": "briefcase-fdpjtj",
+        "complaint": "not sure what it is",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: briefcase.n.01\nDefinition: a case with a handle; for carrying papers or files or books\nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2951
+    },
+    {
+        "object": "briefcase-fdpjtj",
+        "complaint": "not sure but looks like there are gaps",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2952
+    },
+    {
+        "object": "briefcase-fdpjtj",
+        "complaint": "way too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.41m, 1.09m, 21.60cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2953
+    },
+    {
+        "object": "briefcase-fdpjtj",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2954
+    },
+    {
+        "object": "briefcase-lwbctq",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n57.81cm, 1.57m, 1.28m\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2955
+    },
+    {
+        "object": "briefcase-lwbctq",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "handle",
+        "additional_info": "",
+        "id": 2956
+    },
+    {
+        "object": "briefcase-ohelib",
+        "complaint": "not sure but looks like missing a handle",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2957
+    },
+    {
+        "object": "briefcase-ohelib",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.37m, 1.13m, 26.43cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2958
+    },
+    {
+        "object": "briefcase-ohelib",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2959
+    },
+    {
+        "object": "briefcase-rxvbea",
+        "complaint": "too big",
+        "processed": true,
+        "type": "scale",
+        "additional_info": "Confirm reasonable bounding box size:\n1.25m, 1.25m, 40.34cm\nMake sure these sizes are within the same order of magnitude you expect from this object IRL.",
+        "id": 2960
+    },
+    {
+        "object": "briefcase-rxvbea",
+        "complaint": "openable",
+        "processed": true,
+        "new": true,
+        "type": "metalink",
+        "additional_info": "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\nAbilities to evaluate (subset of all abilities): \n    cloth: False\n    coldSource: False\n    fillable: False\n    heatSource: False\n    openable: False\n    particleApplier: False\n    particleRemover: False\n    particleSink: False\n    particleSource: False\n    toggleable: False\n\nIf this object looks like it should have some of these abilities flipped, please\nlist the abilities that we should flip for this object as a comma separated list.\nFor example, for an unopenable window you would put in 'openable'.",
+        "id": 2961
+    },
+    {
+        "object": "briefcase-rxvbea",
+        "complaint": "texture has artifacts",
+        "processed": true,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "APPEARANCE: Confirm object visual appearance.\nRequirements:\n- make sure the object has a valid texture or appearance (e.g., texture not black,\n       transparency rendered correctly, etc).\n- make sure any glass parts are transparent (would this object contain glass? e.g.\n       wall pictures, clocks, etc. - anything wrong)\n- compare the object against the 3ds Max image that should open up now.",
+        "id": 2962
+    },
+    {
+        "object": "guitar-gysapt",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "",
+        "id": 2963
+    },
+    {
+        "object": "guitar-wjohag",
+        "complaint": "quick complaint added during qa-2025 batch qa-2025-josiah",
+        "processed": false,
+        "new": true,
+        "type": "appearance",
+        "additional_info": "",
+        "id": 2964
+    },
+    {
+        "object": "protein_powder-rikjwx",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2965
+    },
+    {
+        "object": "protein_powder-rikjwx",
+        "complaint": "brand",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2966
+    },
+    {
+        "object": "protein_powder-tpcsve",
+        "complaint": "no def",
+        "processed": true,
+        "type": "category",
+        "additional_info": "Confirm object synset assignment.\nObject assigned to synset: \nDefinition: \nReminder: synset should match the object and not its contents.\n(e.g. orange juice bottle needs to match orange_juice__bottle.n.01\nand not orange_juice.n.01)",
+        "id": 2967
+    },
+    {
+        "object": "protein_powder-tpcsve",
+        "complaint": "bradn",
+        "processed": true,
+        "type": "appearance",
+        "additional_info": "Confirm object visual appearance.\nRequirements:\n- make sure there is only one rigid body.\n- make sure the object has a valid texture or appearance.\n- make sure the object has all parts necessary.",
+        "id": 2968
+    },
+    {
+        "object": "platter-ekjpdj",
+        "complaint": "\u001b[A\u001b[A",
+        "processed": true,
+        "new": true,
+        "type": "category",
+        "additional_info": "SYNSET: Confirm object synset assignment.\n\nObject assigned to synset: platter.n.01\nDefinition: a large shallow dish used for serving food\n\nReminder: synset should match the object and not its contents.\n(e.g., orange_juice.n.01 is the fluid orange juice and not a bottle).\nFor containers, note that usable containers (e.g. ones that have an open cap and\ncan be filled should be assigned to x__bottle.n.01 etc. synsets/categories while\nnon-usable containers should be assigned to bottle__of__x.n.01 etc. synsets/categories).\n\nIf the synset is wrong, please type in the name of the correct synset the object\nshould be assigned to. In the next question also type in the correct category.",
+        "id": 2969
+    },
+    {
+        "id": 7975,
+        "object": "washer-mrgspe",
+        "type": "material",
+        "complaint": "Automatic complaint: object has bad material (non-VRay) in 3ds Max, which causes baking to fail. Investigate & replace the material.",
+        "additional_info": "Our current baking stack only permits the baking of VRay materials. This object has another kind of material, likely scanline. Follow information on the materials.md guide to fix it.",
+        "new": true,
+        "processed": false
+    }
+]

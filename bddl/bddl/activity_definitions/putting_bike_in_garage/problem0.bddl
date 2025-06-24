@@ -1,0 +1,24 @@
+(define (problem putting_bike_in_garage-0)
+    (:domain omnigibson)
+
+    (:objects
+        bicycle.n.01_1 - bicycle.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        door.n.01_1 - door.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bicycle.n.01_1 floor.n.01_2) 
+        (inroom floor.n.01_1 garage) 
+        (inroom door.n.01_1 garage) 
+        (inroom floor.n.01_2 garden)
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?bicycle.n.01_1 ?floor.n.01_1) 
+        )
+    )
+)

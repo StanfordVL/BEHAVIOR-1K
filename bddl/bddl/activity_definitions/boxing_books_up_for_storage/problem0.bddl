@@ -1,0 +1,36 @@
+(define (problem boxing_books_up_for_storage-0)
+    (:domain omnigibson)
+
+    (:objects
+     	book.n.02_1 book.n.02_2 book.n.02_3 book.n.02_4 book.n.02_5 book.n.02_6 - book.n.02
+    	floor.n.01_1 - floor.n.01
+    	bookcase.n.01_1 bookcase.n.01_2 bookcase.n.01_3 bookcase.n.01_4 - bookcase.n.01
+    	box.n.01_1 - box.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside book.n.02_1 bookcase.n.01_1)
+        (inside book.n.02_2 bookcase.n.01_1)
+        (inside book.n.02_3 bookcase.n.01_2)
+        (inside book.n.02_4 bookcase.n.01_2)
+        (inside book.n.02_5 bookcase.n.01_3)
+        (inside book.n.02_6 bookcase.n.01_4) 
+        (ontop box.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom bookcase.n.01_1 living_room) 
+        (inroom bookcase.n.01_2 living_room)
+        (inroom bookcase.n.01_3 living_room)
+        (inroom bookcase.n.01_4 living_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?book.n.02 - book.n.02) 
+                (inside ?book.n.02 ?box.n.01_1)
+            )
+        )
+    )
+)

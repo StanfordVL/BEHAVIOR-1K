@@ -1,0 +1,45 @@
+(define (problem organizing_skating_stuff-0)
+    (:domain omnigibson)
+
+    (:objects
+        ice_skate.n.01_1 ice_skate.n.01_2 - ice_skate.n.01
+        lace.n.01_1 lace.n.01_2 - lace.n.01
+        floor.n.01_1 - floor.n.01
+        bed.n.01_1 - bed.n.01
+        hockey_stick.n.01_1 - hockey_stick.n.01
+        helmet.n.01_1 - helmet.n.01
+        toy_box.n.01_1 - toy_box.n.01
+        puck.n.02_1 - puck.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop lace.n.01_1 bed.n.01_1) 
+        (ontop lace.n.01_2 bed.n.01_1) 
+        (ontop ice_skate.n.01_1 floor.n.01_1) 
+        (ontop ice_skate.n.01_2 floor.n.01_1) 
+        (ontop hockey_stick.n.01_1 floor.n.01_1) 
+        (ontop helmet.n.01_1 bed.n.01_1) 
+        (ontop toy_box.n.01_1 floor.n.01_1) 
+        (ontop puck.n.02_1 floor.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?lace.n.01 - lace.n.01)
+                (inside ?lace.n.01 ?toy_box.n.01_1)
+            )
+            (forall 
+                (?ice_skate.n.01 - ice_skate.n.01)
+                (inside ?ice_skate.n.01 ?toy_box.n.01_1)
+            )
+            (inside ?helmet.n.01_1 ?toy_box.n.01_1)
+            (inside ?puck.n.02_1 ?toy_box.n.01_1)
+            (nextto ?hockey_stick.n.01_1 ?toy_box.n.01_1)
+        )
+    )
+)

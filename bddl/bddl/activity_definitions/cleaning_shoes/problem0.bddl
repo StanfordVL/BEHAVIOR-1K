@@ -1,0 +1,53 @@
+(define (problem cleaning_shoes-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        dust.n.01_1 - dust.n.01
+     	bar_soap.n.01_1 - bar_soap.n.01
+    	bed.n.01_1 - bed.n.01
+    	floor.n.01_1 - floor.n.01
+    	rag.n.01_1 - rag.n.01
+    	towel.n.01_1 - towel.n.01
+    	gym_shoe.n.01_1 gym_shoe.n.01_2 gym_shoe.n.01_3 gym_shoe.n.01_4 - gym_shoe.n.01
+        sink.n.01_1 - sink.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bar_soap.n.01_1 bed.n.01_1) 
+        (ontop rag.n.01_1 bed.n.01_1) 
+        (ontop towel.n.01_1 floor.n.01_1) 
+        (ontop gym_shoe.n.01_1 bed.n.01_1) 
+        (ontop gym_shoe.n.01_2 bed.n.01_1) 
+        (ontop gym_shoe.n.01_3 bed.n.01_1) 
+        (ontop gym_shoe.n.01_4 bed.n.01_1) 
+        (covered gym_shoe.n.01_1 stain.n.01_1) 
+        (covered gym_shoe.n.01_2 stain.n.01_1) 
+        (covered gym_shoe.n.01_3 dust.n.01_1) 
+        (covered gym_shoe.n.01_4 dust.n.01_1) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom) 
+        (inroom sink.n.01_1 bathroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (not 
+                    (covered ?gym_shoe.n.01 stain.n.01_1)
+                )
+            ) 
+            (forall 
+                (?gym_shoe.n.01 - gym_shoe.n.01) 
+                (not 
+                    (covered ?gym_shoe.n.01 dust.n.01_1)
+                )
+            ) 
+            (ontop ?towel.n.01_1 ?floor.n.01_1)
+        )
+    )
+)
+

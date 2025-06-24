@@ -1,0 +1,67 @@
+(define (problem preparing_food_for_adult-0)
+    (:domain omnigibson)
+
+    (:objects
+        whiskey.n.01_1 - whiskey.n.01
+        whiskey__bottle.n.01_1 - whiskey__bottle.n.01
+        raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01
+        bowl.n.01_1 - bowl.n.01
+        steak.n.01_1 - steak.n.01
+        diced__potato.n.01_1 - diced__potato.n.01
+        cooked__diced__potato.n.01_1 - cooked__diced__potato.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        frying_pan.n.01_1 - frying_pan.n.01
+        oven.n.01_1 - oven.n.01
+        stove.n.01_1 - stove.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled whiskey__bottle.n.01_1 whiskey.n.01_1) 
+        (inside whiskey__bottle.n.01_1 cabinet.n.01_1) 
+        (inside raw_egg.n.01_1 plate.n.04_2)
+        (inside raw_egg.n.01_2 plate.n.04_2)
+        (not
+            (cooked raw_egg.n.01_1)
+        )
+        (not
+            (cooked raw_egg.n.01_2)
+        )
+        (inside plate.n.04_2 electric_refrigerator.n.01_1)
+        (inside plate.n.04_3 electric_refrigerator.n.01_1)
+        (ontop steak.n.01_1 plate.n.04_3)
+        (not 
+            (cooked steak.n.01_1)
+        )
+        (filled bowl.n.01_1 diced__potato.n.01_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (inside plate.n.04_1 cabinet.n.01_1) 
+        (inside frying_pan.n.01_1 cabinet.n.01_1)
+        (future cooked__diced__potato.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__diced__potato.n.01_1)
+            (cooked ?steak.n.01_1) 
+            (forall 
+                (?raw_egg.n.01 - raw_egg.n.01)
+                (and
+                    (cooked ?raw_egg.n.01)
+                    (ontop ?raw_egg.n.01 ?plate.n.04_1)
+                )
+            )
+            (ontop ?steak.n.01_1 ?plate.n.04_1) 
+            (contains ?plate.n.04_1 ?cooked__diced__potato.n.01_1)
+        )
+    )
+)

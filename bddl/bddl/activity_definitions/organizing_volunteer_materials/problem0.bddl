@@ -1,0 +1,57 @@
+(define (problem organizing_volunteer_materials-0)
+    (:domain omnigibson)
+
+    (:objects
+        dress.n.01_1 dress.n.01_2 - dress.n.01
+        packing_box.n.02_1 packing_box.n.02_2 - packing_box.n.02
+        floor.n.01_1 - floor.n.01
+        walker.n.04_1 walker.n.04_2 - walker.n.04
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop dress.n.01_1 floor.n.01_1) 
+        (unfolded dress.n.01_1)
+        (ontop dress.n.01_2 floor.n.01_1) 
+        (unfolded dress.n.01_1)
+        (ontop walker.n.04_1 floor.n.01_1) 
+        (ontop walker.n.04_2 floor.n.01_1) 
+        (ontop packing_box.n.02_1 floor.n.01_1)
+        (ontop packing_box.n.02_2 floor.n.01_1)
+        (inroom floor.n.01_1 empty_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?dress.n.01 - dress.n.01)
+                (folded ?dress.n.01_1)
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?dress.n.01 - dress.n.01)
+                    (and
+                        (inside ?dress.n.01 ?packing_box.n.02)
+                        (not 
+                            (inside ?walker.n.04_1 ?packing_box.n.02)
+                        )
+                    )
+                )
+            )
+            (exists 
+                (?packing_box.n.02 - packing_box.n.02)
+                (forall 
+                    (?walker.n.04 - walker.n.04)
+                    (and
+                        (inside ?walker.n.04 ?packing_box.n.02)
+                        (not 
+                            (inside ?dress.n.01_1 ?packing_box.n.02)
+                        )
+                    )
+                )
+            )
+        )
+    )
+)

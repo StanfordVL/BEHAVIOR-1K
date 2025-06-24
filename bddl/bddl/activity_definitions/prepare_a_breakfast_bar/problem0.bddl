@@ -1,0 +1,90 @@
+(define (problem prepare_a_breakfast_bar-0)
+    (:domain omnigibson)
+
+    (:objects
+        tray.n.01_1 tray.n.01_2 tray.n.01_3 tray.n.01_4 - tray.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        carton__of__orange_juice.n.01_1 - carton__of__orange_juice.n.01
+        platter.n.01_1 platter.n.01_2 platter.n.01_3 - platter.n.01
+        buttermilk_pancake.n.01_1 buttermilk_pancake.n.01_2 - buttermilk_pancake.n.01
+        waffle.n.01_1 waffle.n.01_2 - waffle.n.01
+        scone.n.01_1 - scone.n.01
+        muffin.n.01_1 - muffin.n.01
+        toast.n.01_1 - toast.n.01
+        danish.n.02_1 - danish.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop tray.n.01_1 countertop.n.01_1)
+        (inside carton__of__orange_juice.n.01_1 electric_refrigerator.n.01_1)
+        (inside platter.n.01_1 cabinet.n.01_1)
+        (inside platter.n.01_2 cabinet.n.01_1)
+        (inside platter.n.01_3 cabinet.n.01_1)
+        (ontop buttermilk_pancake.n.01_1 tray.n.01_4)
+        (ontop buttermilk_pancake.n.01_2 tray.n.01_4)
+        (ontop tray.n.01_4 breakfast_table.n.01_1)
+        (ontop waffle.n.01_1 tray.n.01_2)
+        (ontop waffle.n.01_2 tray.n.01_2)
+        (inside tray.n.01_2 electric_refrigerator.n.01_1)
+        (ontop scone.n.01_1 tray.n.01_3)
+        (ontop muffin.n.01_1 tray.n.01_3)
+        (ontop toast.n.01_1 tray.n.01_3)
+        (ontop danish.n.02_1 tray.n.01_3)
+        (inside tray.n.01_3 cabinet.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?carton__of__orange_juice.n.01_1 ?breakfast_table.n.01_1)
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (forall
+                    (?buttermilk_pancake.n.01 - buttermilk_pancake.n.01)
+                    (ontop ?buttermilk_pancake.n.01 ?platter.n.01)
+                )
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (forall
+                    (?waffle.n.01 - waffle.n.01)
+                    (ontop ?waffle.n.01 ?platter.n.01)
+                )
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?muffin.n.01_1 ?platter.n.01)
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?toast.n.01_1 ?platter.n.01)
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?danish.n.02_1 ?platter.n.01)
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?scone.n.01_1 ?platter.n.01)
+            )
+            (forall
+                (?platter.n.01 - platter.n.01)
+                (or
+                    (ontop ?platter.n.01 ?tray.n.01_1)
+                    (ontop ?platter.n.01 ?breakfast_table.n.01_1)
+                )
+            )
+            (ontop ?tray.n.01_1 ?breakfast_table.n.01_1)
+        )
+    )
+)

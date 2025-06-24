@@ -1,0 +1,58 @@
+(define (problem make_a_mojito-0)
+    (:domain omnigibson)
+
+    (:objects
+        soda_water__bottle.n.01_1 - soda_water__bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        soda_water.n.03_1 - soda_water.n.03
+        rum.n.01_1 - rum.n.01
+        rum__bottle.n.01_1 - rum__bottle.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        granulated_sugar__sack.n.01_1 - granulated_sugar__sack.n.01
+        goblet.n.01_1 - goblet.n.01
+        mint.n.04_1 - mint.n.04
+        lime.n.06_1 - lime.n.06
+        carving_knife.n.01_1 - carving_knife.n.01
+        half__lime.n.01_1 half__lime.n.01_2 - half__lime.n.01
+        ice_cube.n.01_1 ice_cube.n.01_2 - ice_cube.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside soda_water__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled soda_water__bottle.n.01_1 soda_water.n.03_1)
+        (filled rum__bottle.n.01_1 rum.n.01_1) 
+        (inside rum__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled granulated_sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop granulated_sugar__sack.n.01_1 countertop.n.01_1)
+        (inside mint.n.04_1 electric_refrigerator.n.01_1) 
+        (inside lime.n.06_1 electric_refrigerator.n.01_1) 
+        (inside ice_cube.n.01_1 goblet.n.01_1) 
+        (inside ice_cube.n.01_2 goblet.n.01_1) 
+        (ontop goblet.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (future half__lime.n.01_1)
+        (future half__lime.n.01_2)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?half__lime.n.01_1)
+            (real ?half__lime.n.01_2)
+            (filled ?goblet.n.01_1 ?soda_water.n.03_1)
+            (contains ?goblet.n.01_1 ?rum.n.01_1)
+            (contains ?goblet.n.01_1 ?granulated_sugar.n.01_1)
+            (forall 
+                (?half__lime.n.01 - half__lime.n.01)
+                (inside ?half__lime.n.01 ?goblet.n.01_1)
+            )
+            (inside ?mint.n.04_1 ?goblet.n.01_1)
+        )
+    )
+)

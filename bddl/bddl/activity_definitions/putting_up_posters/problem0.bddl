@@ -1,0 +1,25 @@
+(define (problem putting_up_posters-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        poster.n.01_1 - poster.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        bed.n.01_1 - bed.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop poster.n.01_1 bed.n.01_1) 
+        (inroom wall_nail.n.01_1 bedroom) 
+        (inroom floor.n.01_1 bedroom) 
+        (inroom bed.n.01_1 bedroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached poster.n.01_1 wall_nail.n.01_1)
+        )
+    )
+)

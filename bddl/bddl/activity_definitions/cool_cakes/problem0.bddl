@@ -1,0 +1,32 @@
+(define (problem cool_cakes-0)
+    (:domain omnigibson)
+
+    (:objects
+        fruitcake.n.02_1 - fruitcake.n.02
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside fruitcake.n.02_1 oven.n.01_1) 
+        (hot fruitcake.n.02_1) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (toggled_on oven.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (hot ?fruitcake.n.02_1)
+            ) 
+            (ontop ?fruitcake.n.02_1 ?cookie_sheet.n.01_1)
+        )
+    )
+)

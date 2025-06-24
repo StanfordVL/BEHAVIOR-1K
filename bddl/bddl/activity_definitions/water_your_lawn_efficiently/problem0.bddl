@@ -1,0 +1,28 @@
+(define (problem water_your_lawn_efficiently-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn.n.01_1 - lawn.n.01
+        floor.n.01_1 - floor.n.01
+        watering_can.n.01_1 - watering_can.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop watering_can.n.01_1 floor.n.01_1) 
+        (insource watering_can.n.01_1 water.n.06_1)
+        (not 
+            (covered lawn.n.01_1 water.n.06_1)
+        ) 
+        (inroom floor.n.01_1 garden) 
+        (inroom lawn.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?lawn.n.01_1 ?water.n.06_1)
+        )
+    )
+)

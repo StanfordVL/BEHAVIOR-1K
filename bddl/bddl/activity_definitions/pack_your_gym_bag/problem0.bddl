@@ -1,0 +1,42 @@
+(define (problem pack_your_gym_bag-0)
+    (:domain omnigibson)
+
+    (:objects
+     	muffin.n.01_1 - muffin.n.01
+    	coffee_table.n.01_1 - coffee_table.n.01
+    	tank_top.n.01_1 - tank_top.n.01
+    	carryall.n.01_1 - carryall.n.01
+    	floor.n.01_1 - floor.n.01
+    	gym_shoe.n.01_1 gym_shoe.n.01_2 - gym_shoe.n.01
+    	sock.n.01_1 sock.n.01_2 - sock.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop muffin.n.01_1 coffee_table.n.01_1) 
+        (ontop tank_top.n.01_1 coffee_table.n.01_1) 
+        (ontop carryall.n.01_1 floor.n.01_1) 
+        (ontop gym_shoe.n.01_2 floor.n.01_1) 
+        (ontop gym_shoe.n.01_1 floor.n.01_1) 
+        (ontop sock.n.01_2 floor.n.01_1) 
+        (ontop sock.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?muffin.n.01_1 ?carryall.n.01_1)
+            (inside ?tank_top.n.01_1 ?carryall.n.01_1)
+            (forall
+                (?gym_shoe.n.01 - gym_shoe.n.01)
+                (inside ?gym_shoe.n.01 ?carryall.n.01_1)
+            )
+            (forall
+                (?sock.n.01 - sock.n.01)
+                (inside ?sock.n.01 ?carryall.n.01_1)
+            )
+        )
+    )
+)

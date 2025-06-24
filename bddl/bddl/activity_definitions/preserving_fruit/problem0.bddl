@@ -1,0 +1,71 @@
+(define (problem preserving_fruit-0)
+    (:domain omnigibson)
+
+    (:objects
+        strawberry.n.01_1 strawberry.n.01_2 strawberry.n.01_3 strawberry.n.01_4 strawberry.n.01_5 strawberry.n.01_6 strawberry.n.01_7 - strawberry.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        saucepot.n.01_1 - saucepot.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        granulated_sugar__sack.n.01_1 - granulated_sugar__sack.n.01
+        sugar_syrup.n.01_1 - sugar_syrup.n.01
+        countertop.n.01_1 - countertop.n.01
+        stove.n.01_1 - stove.n.01
+        soup_ladle.n.01_1 - soup_ladle.n.01
+        hinged_jar.n.01_1 - hinged_jar.n.01
+        water.n.06_1 - water.n.06
+        mint.n.04_1 - mint.n.04
+        blender.n.01_1 - blender.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside strawberry.n.01_1 tupperware.n.01_1) 
+        (inside strawberry.n.01_2 tupperware.n.01_1) 
+        (inside strawberry.n.01_3 tupperware.n.01_1) 
+        (inside strawberry.n.01_4 tupperware.n.01_1) 
+        (inside strawberry.n.01_5 tupperware.n.01_1) 
+        (inside strawberry.n.01_6 tupperware.n.01_1) 
+        (inside strawberry.n.01_7 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (inside mint.n.04_1 electric_refrigerator.n.01_1)
+        (filled granulated_sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop granulated_sugar__sack.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 countertop.n.01_1)
+        (inside saucepot.n.01_1 cabinet.n.01_1) 
+        (inside soup_ladle.n.01_1 cabinet.n.01_1) 
+        (ontop hinged_jar.n.01_1 countertop.n.01_1) 
+        (open hinged_jar.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (future sugar_syrup.n.01_1)
+        (inroom sink.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real sugar_syrup.n.01_1)
+            (forall 
+                (?strawberry.n.01 - strawberry.n.01)
+                (and 
+                    (cooked ?strawberry.n.01)
+                    (inside ?strawberry.n.01 ?hinged_jar.n.01_1)
+                )
+            )
+            (contains ?hinged_jar.n.01_1 ?sugar_syrup.n.01_1)
+            (not
+                (open ?hinged_jar.n.01_1)
+            )
+        )
+    )
+)

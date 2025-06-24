@@ -1,0 +1,6 @@
+outs:
+- md5: 57c26394786066c15aa2276959bd1564.dir
+  size: 808846044
+  nfiles: 571
+  path: textures
+  hash: md5

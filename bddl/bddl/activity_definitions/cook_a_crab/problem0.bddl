@@ -1,0 +1,41 @@
+(define (problem cook_a_crab-0)
+    (:domain omnigibson)
+
+    (:objects
+        steamer.n.02_1 - steamer.n.02
+        stove.n.01_1 - stove.n.01
+        crab.n.05_1 - crab.n.05
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside steamer.n.02_1 cabinet.n.01_1) 
+        (not 
+            (cooked crab.n.05_1)
+        ) 
+        (inside butter.n.01_1 bowl.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (inside crab.n.05_1 electric_refrigerator.n.01_1) 
+        (future melted__butter.n.01_1)
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?melted__butter.n.01_1)
+            (covered ?crab.n.05_1 ?melted__butter.n.01_1) 
+            (inside ?crab.n.05_1 ?steamer.n.02_1) 
+            (cooked ?crab.n.05_1)
+        )
+    )
+)

@@ -1,0 +1,35 @@
+(define (problem clean_bok_choy-0)
+    (:domain omnigibson)
+
+    (:objects
+        chopping_board.n.01_1 - chopping_board.n.01
+        floor.n.01_1 - floor.n.01
+        paper_towel.n.01_1 - paper_towel.n.01
+        bok_choy.n.02_1 - bok_choy.n.02
+        countertop.n.01_1 - countertop.n.01
+        sink.n.01_1 - sink.n.01
+        water.n.06_1 - water.n.06
+        dirt.n.02_1 - dirt.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop paper_towel.n.01_1 countertop.n.01_1) 
+        (ontop bok_choy.n.02_1 chopping_board.n.01_1)
+        (covered bok_choy.n.02_1 dirt.n.02_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?bok_choy.n.02_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,40 @@
+(define (problem putting_leftovers_away-0)
+    (:domain omnigibson)
+
+    (:objects
+     	box__of__lasagna.n.01_1 box__of__lasagna.n.01_2 box__of__lasagna.n.01_3 box__of__lasagna.n.01_4 - box__of__lasagna.n.01
+    	floor.n.01_1 - floor.n.01
+    	jar__of__spaghetti_sauce.n.01_1 jar__of__spaghetti_sauce.n.01_2 jar__of__spaghetti_sauce.n.01_3 jar__of__spaghetti_sauce.n.01_4 - jar__of__spaghetti_sauce.n.01
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	countertop.n.01_1 - countertop.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop box__of__lasagna.n.01_1 countertop.n.01_1) 
+        (ontop box__of__lasagna.n.01_2 countertop.n.01_1) 
+        (ontop box__of__lasagna.n.01_3 countertop.n.01_1) 
+        (ontop box__of__lasagna.n.01_4 countertop.n.01_1) 
+        (ontop jar__of__spaghetti_sauce.n.01_1 countertop.n.01_1) 
+        (ontop jar__of__spaghetti_sauce.n.01_2 countertop.n.01_1) 
+        (ontop jar__of__spaghetti_sauce.n.01_3 countertop.n.01_1) 
+        (ontop jar__of__spaghetti_sauce.n.01_4 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?box__of__lasagna.n.01 - box__of__lasagna.n.01) 
+                (inside ?box__of__lasagna.n.01 ?electric_refrigerator.n.01_1)
+            ) 
+            (forall 
+                (?jar__of__spaghetti_sauce.n.01 - jar__of__spaghetti_sauce.n.01) 
+                (inside ?jar__of__spaghetti_sauce.n.01 ?electric_refrigerator.n.01_1)
+            )
+        )
+    )
+)

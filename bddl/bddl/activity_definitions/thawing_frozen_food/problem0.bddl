@@ -1,0 +1,43 @@
+(define (problem thawing_frozen_food-0)
+    (:domain omnigibson)
+
+    (:objects
+     	date.n.08_1 - date.n.08
+    	electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+    	olive.n.04_1 - olive.n.04
+    	lobster.n.01_1 lobster.n.01_2 - lobster.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside date.n.08_1 electric_refrigerator.n.01_1) 
+        (inside olive.n.04_1 electric_refrigerator.n.01_1) 
+        (inside lobster.n.01_1 electric_refrigerator.n.01_1) 
+        (inside lobster.n.01_2 electric_refrigerator.n.01_1) 
+        (frozen lobster.n.01_1) 
+        (frozen lobster.n.01_2)
+        (frozen date.n.08_1) 
+        (frozen olive.n.04_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?lobster.n.01 - lobster.n.01)
+                (not
+                    (frozen ?lobster.n.01)
+                )
+            )
+            (not
+                (frozen ?date.n.08_1)
+            )
+            (not
+                (frozen ?olive.n.04_1)
+            )
+        )
+    )
+)

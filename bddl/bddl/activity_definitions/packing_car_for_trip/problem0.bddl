@@ -1,0 +1,51 @@
+(define (problem packing_car_for_trip-0)
+    (:domain omnigibson)
+
+    (:objects
+        car.n.01_1 - car.n.01
+        driveway.n.01_1 - driveway.n.01
+        money.n.01_1 - money.n.01
+        bag.n.06_1 bag.n.06_2 bag.n.06_3 - bag.n.06
+        sunglasses.n.02_1 - sunglasses.n.02
+        laptop.n.01_1 - laptop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom car.n.01_1 garden) 
+        (ontop money.n.01_1 bag.n.06_1) 
+        (ontop bag.n.06_1 driveway.n.01_1) 
+        (ontop bag.n.06_2 driveway.n.01_1) 
+        (ontop bag.n.06_3 driveway.n.01_1)
+        (ontop sunglasses.n.02_1 bag.n.06_1)
+        (ontop laptop.n.01_1 bag.n.06_2) 
+        (inroom floor.n.01_1 garden) 
+        (inroom driveway.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (or
+                (inside ?money.n.01_1 ?bag.n.06_1) 
+                (inside ?money.n.01_1 ?bag.n.06_2) 
+                (inside ?money.n.01_1 ?bag.n.06_3)
+            )
+            (or
+                (inside ?laptop.n.01_1 ?bag.n.06_1) 
+                (inside ?laptop.n.01_1 ?bag.n.06_2) 
+                (inside ?laptop.n.01_1 ?bag.n.06_3)
+            )
+            (or
+                (inside ?sunglasses.n.02_1 ?bag.n.06_1)
+                (inside ?sunglasses.n.02_1 ?bag.n.06_2)
+                (inside ?sunglasses.n.02_1 ?bag.n.06_3)
+            )
+            (forall 
+                (?bag.n.06 - bag.n.06)
+                (inside ?bag.n.06 ?car.n.01_1)
+            )
+        )
+    )
+)

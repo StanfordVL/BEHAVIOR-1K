@@ -1,0 +1,6 @@
+outs:
+- md5: 45cffd8173c4d0dc51600e4532d66a40.dir
+  size: 881510261
+  nfiles: 75
+  path: proxy
+  hash: md5

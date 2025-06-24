@@ -1,0 +1,27 @@
+(define (problem hanging_outdoor_lights-0)
+    (:domain omnigibson)
+
+    (:objects
+        icicle_lights.n.01_1 - icicle_lights.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        floor.n.01_1 - floor.n.01
+        wall_nail.n.01_1 - wall_nail.n.01
+        tree.n.01_1 - tree.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop icicle_lights.n.01_1 coffee_table.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 garden) 
+        (inroom wall_nail.n.01_1 garden) 
+        (inroom tree.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?icicle_lights.n.01_1 ?wall_nail.n.01_1)
+        )
+    )
+)

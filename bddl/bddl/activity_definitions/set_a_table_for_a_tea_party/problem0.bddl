@@ -1,0 +1,88 @@
+(define (problem set_a_table_for_a_tea_party-0)
+    (:domain omnigibson)
+
+    (:objects
+        napkin.n.01_1 - napkin.n.01
+        console_table.n.01_1 console_table.n.01_2 console_table.n.01_3 console_table.n.01_4 - console_table.n.01
+        danish.n.02_1 - danish.n.02
+        diced__virginia_ham.n.01_1 - diced__virginia_ham.n.01
+        place_mat.n.01_1 - place_mat.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        tray.n.01_1 - tray.n.01
+        teacup.n.02_1 - teacup.n.02
+        teapot.n.01_1 - teapot.n.01
+        scone.n.01_1 - scone.n.01
+        jar__of__jam.n.01_1 - jar__of__jam.n.01
+        sugar_cookie.n.01_1 - sugar_cookie.n.01
+        jar__of__honey.n.01_1 - jar__of__honey.n.01
+        bowl.n.01_1 bowl.n.01_2 bowl.n.01_3 - bowl.n.01
+        plate.n.04_1 - plate.n.04
+        table_knife.n.01_1 table_knife.n.01_2 - table_knife.n.01
+        tablefork.n.01_1 - tablefork.n.01
+        teaspoon.n.02_1 - teaspoon.n.02
+        diced__cheddar.n.01_1 - diced__cheddar.n.01
+        diced__cucumber.n.01_1 - diced__cucumber.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop napkin.n.01_1 console_table.n.01_1)
+        (ontop teacup.n.02_1 console_table.n.01_1)
+        (ontop teapot.n.01_1 console_table.n.01_1)
+        (ontop jar__of__jam.n.01_1 console_table.n.01_1)
+        (ontop jar__of__honey.n.01_1 console_table.n.01_1)
+        (ontop tray.n.01_1 console_table.n.01_2)
+        (ontop danish.n.02_1 tray.n.01_1)
+        (ontop scone.n.01_1 tray.n.01_1)
+        (ontop sugar_cookie.n.01_1 tray.n.01_1)
+        (ontop bowl.n.01_1 console_table.n.01_3)
+        (ontop bowl.n.01_2 console_table.n.01_3)
+        (ontop bowl.n.01_3 console_table.n.01_3)
+        (filled bowl.n.01_1 diced__virginia_ham.n.01_1)
+        (filled bowl.n.01_2 diced__cheddar.n.01_1)
+        (filled bowl.n.01_3 diced__cucumber.n.01_1)
+        (ontop table_knife.n.01_1 console_table.n.01_4)
+        (ontop table_knife.n.01_2 console_table.n.01_4)
+        (ontop tablefork.n.01_1 console_table.n.01_4)
+        (ontop teaspoon.n.02_1 console_table.n.01_4)
+        (ontop plate.n.04_1 console_table.n.01_4)
+        (ontop place_mat.n.01_1 breakfast_table.n.01_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom console_table.n.01_1 dining_room)
+        (inroom console_table.n.01_2 dining_room)
+        (inroom console_table.n.01_3 dining_room)
+        (inroom console_table.n.01_4 dining_room)
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?place_mat.n.01_1 ?breakfast_table.n.01_1) 
+            (forall 
+                (?danish.n.02 - danish.n.02)
+                (ontop ?danish.n.02 ?tray.n.01_1)
+            )
+            (ontop ?scone.n.01_1 ?tray.n.01_1) 
+            (ontop ?sugar_cookie.n.01_1 ?tray.n.01_1) 
+            (ontop ?jar__of__honey.n.01_1 ?tray.n.01_1) 
+            (exists 
+                (?table_knife.n.01 - table_knife.n.01)
+                (touching ?table_knife.n.01 ?jar__of__honey.n.01_1)
+            )
+            (ontop ?jar__of__jam.n.01_1 ?tray.n.01_1) 
+            (exists 
+                (?table_knife.n.01 - table_knife.n.01)
+                (touching ?table_knife.n.01 ?jar__of__jam.n.01_1)
+            )
+            (ontop ?tray.n.01_1 ?breakfast_table.n.01_1)
+            (nextto ?teacup.n.02_1 ?plate.n.04_1) 
+            (ontop ?teapot.n.01_1 ?breakfast_table.n.01_1) 
+            (ontop ?plate.n.04_1 ?place_mat.n.01_1)
+            (nextto ?tablefork.n.01_1 ?plate.n.04_1) 
+            (overlaid ?napkin.n.01_1 ?plate.n.04_1) 
+            (nextto ?teaspoon.n.02_1 ?tablefork.n.01_1) 
+        )
+    )
+)

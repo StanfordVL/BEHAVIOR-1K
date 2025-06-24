@@ -1,0 +1,107 @@
+(define (problem stock_grocery_shelves-0)
+    (:domain omnigibson)
+
+    (:objects
+     	pack__of__bread.n.01_1 pack__of__bread.n.01_2 - pack__of__bread.n.01
+    	toilet_tissue.n.01_1 toilet_tissue.n.01_2 - toilet_tissue.n.01
+    	can__of__cat_food.n.01_1 can__of__cat_food.n.01_2 - can__of__cat_food.n.01
+    	floor.n.01_1 - floor.n.01
+    	water_bottle.n.01_1 water_bottle.n.01_2 - water_bottle.n.01
+    	pack__of__chocolate_bar.n.01_1 pack__of__chocolate_bar.n.01_2 - pack__of__chocolate_bar.n.01
+    	bottle__of__soda.n.01_1 bottle__of__soda.n.01_2 - bottle__of__soda.n.01
+    	bottle__of__cooking_oil.n.01_1 bottle__of__cooking_oil.n.01_2 - bottle__of__cooking_oil.n.01
+    	cigarette.n.01_1 cigarette.n.01_2 - cigarette.n.01
+        carton.n.02_1 carton.n.02_2 carton.n.02_3 carton.n.02_4 - carton.n.02
+    	grocery_shelf.n.01_1 grocery_shelf.n.01_2 grocery_shelf.n.01_3 - grocery_shelf.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside pack__of__bread.n.01_1 carton.n.02_1)
+        (inside pack__of__bread.n.01_2 carton.n.02_1)
+        (inside bottle__of__cooking_oil.n.01_1 carton.n.02_1) 
+        (inside bottle__of__cooking_oil.n.01_2 carton.n.02_1) 
+        (inside can__of__cat_food.n.01_1 carton.n.02_2) 
+        (inside can__of__cat_food.n.01_2 carton.n.02_2) 
+        (inside water_bottle.n.01_1 carton.n.02_3) 
+        (inside water_bottle.n.01_2 carton.n.02_3) 
+        (inside bottle__of__soda.n.01_1 carton.n.02_3)
+        (inside bottle__of__soda.n.01_2 carton.n.02_3)
+        (inside pack__of__chocolate_bar.n.01_1 carton.n.02_3)
+        (inside pack__of__chocolate_bar.n.01_2 carton.n.02_3)
+        (inside cigarette.n.01_1 carton.n.02_4) 
+        (inside cigarette.n.01_2 carton.n.02_4) 
+        (inside toilet_tissue.n.01_1 carton.n.02_4) 
+        (inside toilet_tissue.n.01_2 carton.n.02_4) 
+        (ontop carton.n.02_1 floor.n.01_1)
+        (ontop carton.n.02_2 floor.n.01_1)
+        (ontop carton.n.02_3 floor.n.01_1)
+        (ontop carton.n.02_4 floor.n.01_1)
+        (inroom grocery_shelf.n.01_1 grocery_store) 
+        (inroom grocery_shelf.n.01_2 grocery_store) 
+        (inroom grocery_shelf.n.01_3 grocery_store) 
+        (inroom floor.n.01_1 grocery_store) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?can__of__cat_food.n.01 - can__of__cat_food.n.01)
+                    (inside ?can__of__cat_food.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?pack__of__bread.n.01 - pack__of__bread.n.01)
+                    (inside ?pack__of__bread.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?bottle__of__soda.n.01 - bottle__of__soda.n.01)
+                    (inside ?bottle__of__soda.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?bottle__of__cooking_oil.n.01 - bottle__of__cooking_oil.n.01)
+                    (inside ?bottle__of__cooking_oil.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?cigarette.n.01 - cigarette.n.01)
+                    (inside ?cigarette.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?toilet_tissue.n.01 - toilet_tissue.n.01)
+                    (inside ?toilet_tissue.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?water_bottle.n.01 - water_bottle.n.01)
+                    (inside ?water_bottle.n.01 ?grocery_shelf.n.01)
+                )
+            )
+            (exists 
+                (?grocery_shelf.n.01 - grocery_shelf.n.01)
+                (forall
+                    (?pack__of__chocolate_bar.n.01 - pack__of__chocolate_bar.n.01)
+                    (inside ?pack__of__chocolate_bar.n.01 ?grocery_shelf.n.01)
+                )
+            )
+        )
+    )
+)

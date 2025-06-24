@@ -1,0 +1,60 @@
+(define (problem clean_snow_peas-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 - bowl.n.01
+        countertop.n.01_1 - countertop.n.01
+        colander.n.01_1 - colander.n.01
+        pea_pod.n.01_1 pea_pod.n.01_2 pea_pod.n.01_3 pea_pod.n.01_4 pea_pod.n.01_5 - pea_pod.n.01
+        dirt.n.02_1 - dirt.n.02
+        water.n.06_1 - water.n.06
+        scrub_brush.n.01_1 - scrub_brush.n.01
+        sponge.n.01_1 - sponge.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (ontop colander.n.01_1 countertop.n.01_1) 
+        (inside pea_pod.n.01_1 colander.n.01_1)
+        (inside pea_pod.n.01_2 colander.n.01_1)
+        (inside pea_pod.n.01_3 colander.n.01_1)
+        (inside pea_pod.n.01_4 colander.n.01_1)
+        (inside pea_pod.n.01_5 colander.n.01_1)
+        (covered pea_pod.n.01_1 dirt.n.02_1)
+        (covered pea_pod.n.01_2 dirt.n.02_1)
+        (covered pea_pod.n.01_3 dirt.n.02_1)
+        (covered pea_pod.n.01_4 dirt.n.02_1)
+        (covered pea_pod.n.01_5 dirt.n.02_1)
+        (ontop scrub_brush.n.01_1 countertop.n.01_1)
+        (ontop sponge.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?pea_pod.n.01 - pea_pod.n.01)
+                (not 
+                    (covered ?pea_pod.n.01 ?dirt.n.02_1)
+                )
+            ) 
+            (or 
+                (forall 
+                    (?pea_pod.n.01 - pea_pod.n.01)
+                    (inside ?pea_pod.n.01 ?bowl.n.01_1)
+                )
+                (forall 
+                    (?pea_pod.n.01 - pea_pod.n.01)
+                    (inside ?pea_pod.n.01 ?colander.n.01_1)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,32 @@
+(define (problem disposing_of_lawn_clippings-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn.n.01_1 - lawn.n.01
+        floor.n.01_1 - floor.n.01
+        gate.n.01_1 - gate.n.01
+        plastic_bag.n.01_1 - plastic_bag.n.01
+        bunchgrass.n.01_1 - bunchgrass.n.01
+        compost_bin.n.01_1 - compost_bin.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom lawn.n.01_1 garden)
+        (ontop plastic_bag.n.01_1 floor.n.01_1) 
+        (covered lawn.n.01_1 bunchgrass.n.01_1) 
+        (ontop compost_bin.n.01_1 lawn.n.01_1) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom gate.n.01_1 garden)
+    )
+    
+    (:goal 
+        (and 
+            (contains ?compost_bin.n.01_1 ?bunchgrass.n.01_1)
+            (not 
+                (covered ?compost_bin.n.01_1 ?bunchgrass.n.01_1)
+            )
+        )
+    )
+)

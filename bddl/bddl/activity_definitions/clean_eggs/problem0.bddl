@@ -1,0 +1,42 @@
+(define (problem clean_eggs-0)
+    (:domain omnigibson)
+
+    (:objects
+        egg.n.02_1 egg.n.02_2 egg.n.02_3 - egg.n.02
+        dust.n.01_1 - dust.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        countertop.n.01_1 - countertop.n.01
+        bowl.n.01_1 - bowl.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside egg.n.02_1 tupperware.n.01_1) 
+        (inside egg.n.02_2 tupperware.n.01_1) 
+        (inside egg.n.02_3 tupperware.n.01_1) 
+        (covered egg.n.02_1 dust.n.01_1)
+        (covered egg.n.02_2 dust.n.01_1)
+        (covered egg.n.02_3 dust.n.01_1)
+        (ontop tupperware.n.01_1 countertop.n.01_1) 
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?egg.n.02 - egg.n.02) 
+                (not
+                    (covered ?egg.n.02 ?dust.n.01_1)
+                )
+            ) 
+        )
+    )
+)

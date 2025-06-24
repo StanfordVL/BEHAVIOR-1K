@@ -1,0 +1,44 @@
+(define (problem glaze_a_ham-0)
+    (:domain omnigibson)
+
+    (:objects
+        maple_syrup.n.01_1 - maple_syrup.n.01
+        maple_syrup__jar.n.01_1 - maple_syrup__jar.n.01
+        glaze.n.01_1 - glaze.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        oven.n.01_1 - oven.n.01
+        virginia_ham.n.01_1 - virginia_ham.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        aluminum_foil.n.01_1 - aluminum_foil.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled maple_syrup__jar.n.01_1 maple_syrup.n.01_1) 
+        (filled mason_jar.n.01_1 glaze.n.01_1) 
+        (inside maple_syrup__jar.n.01_1 cabinet.n.01_1)
+        (inside mason_jar.n.01_1 cabinet.n.01_1)
+        (inside virginia_ham.n.01_1 stockpot.n.01_1)
+        (cooked virginia_ham.n.01_1)
+        (hot virginia_ham.n.01_1)
+        (inside aluminum_foil.n.01_1 cabinet.n.01_1) 
+        (ontop stockpot.n.01_1 oven.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?virginia_ham.n.01_1 ?maple_syrup.n.01_1)
+            (covered ?virginia_ham.n.01_1 ?glaze.n.01_1)
+            (overlaid ?aluminum_foil.n.01_1 ?virginia_ham.n.01_1)
+            (inside ?virginia_ham.n.01_1 ?stockpot.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,63 @@
+(define (problem washing_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        carrot.n.03_1 carrot.n.03_2 - carrot.n.03
+        cherry_tomato.n.02_1 cherry_tomato.n.02_2 cherry_tomato.n.02_3 cherry_tomato.n.02_4 cherry_tomato.n.02_5 cherry_tomato.n.02_6 cherry_tomato.n.02_7 - cherry_tomato.n.02
+        bowl.n.01_1 - bowl.n.01
+        colander.n.01_1 - colander.n.01
+        mud.n.03_1 - mud.n.03
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside carrot.n.03_1 electric_refrigerator.n.01_1) 
+        (inside carrot.n.03_2 electric_refrigerator.n.01_1) 
+        (covered carrot.n.03_1 mud.n.03_1)
+        (covered carrot.n.03_2 mud.n.03_1)
+        (inside cherry_tomato.n.02_1 bowl.n.01_1)
+        (inside cherry_tomato.n.02_2 bowl.n.01_1)
+        (inside cherry_tomato.n.02_3 bowl.n.01_1)
+        (inside cherry_tomato.n.02_4 bowl.n.01_1)
+        (inside cherry_tomato.n.02_5 bowl.n.01_1)
+        (inside cherry_tomato.n.02_6 bowl.n.01_1)
+        (inside cherry_tomato.n.02_7 bowl.n.01_1)
+        (covered cherry_tomato.n.02_1 mud.n.03_1)
+        (covered cherry_tomato.n.02_2 mud.n.03_1)
+        (covered cherry_tomato.n.02_3 mud.n.03_1)
+        (covered cherry_tomato.n.02_4 mud.n.03_1)
+        (covered cherry_tomato.n.02_5 mud.n.03_1)
+        (covered cherry_tomato.n.02_6 mud.n.03_1)
+        (covered cherry_tomato.n.02_7 mud.n.03_1)
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1)
+        (ontop colander.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?cherry_tomato.n.02 - cherry_tomato.n.02)
+                (not 
+                    (covered ?cherry_tomato.n.02 ?mud.n.03_1)
+                )
+            )
+            (forall 
+                (?carrot.n.03 - carrot.n.03)
+                (not 
+                    (covered ?carrot.n.03 ?mud.n.03_1)
+                )
+            )
+        )
+    )
+)

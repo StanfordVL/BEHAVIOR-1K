@@ -1,0 +1,46 @@
+(define (problem donating_clothing-0)
+    (:domain omnigibson)
+
+    (:objects
+        sweater.n.01_1 - sweater.n.01
+        bed.n.01_1 - bed.n.01
+        boot.n.01_1 boot.n.01_2 - boot.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        sandal.n.01_1 sandal.n.01_2 - sandal.n.01
+        dress.n.01_1 - dress.n.01
+        jersey.n.03_1 - jersey.n.03
+        carton.n.02_1 - carton.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inroom bed.n.01_1 bedroom)
+        (ontop sweater.n.01_1 bed.n.01_1)
+        (ontop boot.n.01_1 floor.n.01_1) 
+        (ontop boot.n.01_2 floor.n.01_1) 
+        (ontop sandal.n.01_1 floor.n.01_1) 
+        (ontop sandal.n.01_2 floor.n.01_1) 
+        (ontop dress.n.01_1 bed.n.01_1)
+        (ontop jersey.n.03_1 bed.n.01_1)
+        (ontop carton.n.02_1 floor.n.01_2)
+        (inroom floor.n.01_1 closet) 
+        (ontop agent.n.01_1 floor.n.01_2)
+        (inroom floor.n.01_2 bedroom)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?sweater.n.01_1 ?carton.n.02_1) 
+            (inside ?dress.n.01_1 ?carton.n.02_1) 
+            (forall 
+                (?boot.n.01 - boot.n.01)
+                (inside ?boot.n.01 ?carton.n.02_1)
+            )
+            (forall 
+                (?sandal.n.01 - sandal.n.01)
+                (inside ?sandal.n.01 ?carton.n.02_1)
+            )
+            (inside ?jersey.n.03_1 ?carton.n.02_1) 
+        )
+    )
+)

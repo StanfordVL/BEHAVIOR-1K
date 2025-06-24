@@ -1,0 +1,28 @@
+(define (problem putting_out_cat_food-0)
+    (:domain omnigibson)
+
+    (:objects
+        bowl.n.01_1 - bowl.n.01
+        table.n.02_1 - table.n.02
+        cat_food.n.01_1 - cat_food.n.01
+        cat_food__tin.n.01_1 - cat_food__tin.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bowl.n.01_1 table.n.02_1) 
+        (filled cat_food__tin.n.01_1 cat_food.n.01_1) 
+        (ontop cat_food__tin.n.01_1 table.n.02_1) 
+        (inroom floor.n.01_1 living_room)
+        (inroom table.n.02_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (filled ?bowl.n.01_1 ?cat_food.n.01_1) 
+            (ontop ?bowl.n.01_1 floor.n.01_1)
+        )
+    )
+)

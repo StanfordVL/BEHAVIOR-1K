@@ -1,0 +1,39 @@
+(define (problem turning_out_all_lights_before_sleep-0)
+    (:domain omnigibson)
+
+    (:objects
+        switch.n.01_1 switch.n.01_2 switch.n.01_3 switch.n.01_4 switch.n.01_5 switch.n.01_6 switch.n.01_7 - switch.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (toggled_on switch.n.01_1)
+        (toggled_on switch.n.01_2)
+        (toggled_on switch.n.01_3)
+        (toggled_on switch.n.01_4)
+        (toggled_on switch.n.01_5)
+        (toggled_on switch.n.01_6)
+        (toggled_on switch.n.01_7)
+        (inroom switch.n.01_1 kitchen)
+        (inroom switch.n.01_2 bedroom)
+        (inroom switch.n.01_3 utility_room)
+        (inroom switch.n.01_4 dining_room)
+        (inroom switch.n.01_5 childs_room)
+        (inroom switch.n.01_6 bathroom)
+        (inroom switch.n.01_7 corridor)
+        (inroom floor.n.01_1 corridor)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?switch.n.01 - switch.n.01)
+                (not 
+                    (toggled_on ?switch.n.01)
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,68 @@
+(define (problem make_cake_filling-0)
+    (:domain omnigibson)
+
+    (:objects
+        cherry.n.03_1 cherry.n.03_10 cherry.n.03_11 cherry.n.03_12 cherry.n.03_13 cherry.n.03_14 cherry.n.03_15 cherry.n.03_16 cherry.n.03_2 cherry.n.03_3 cherry.n.03_4 cherry.n.03_5 cherry.n.03_6 cherry.n.03_7 cherry.n.03_8 cherry.n.03_9 - cherry.n.03
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        cornstarch.n.01_1 - cornstarch.n.01
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        water.n.06_1 - water.n.06
+        cherry_filling.n.01_1 - cherry_filling.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        mixing_bowl.n.01_1 - mixing_bowl.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        cornstarch__jar.n.01_1 - cornstarch__jar.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sink.n.01_1 - sink.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside cherry.n.03_1 bowl.n.01_1) 
+        (inside cherry.n.03_2 bowl.n.01_1) 
+        (inside cherry.n.03_3 bowl.n.01_1) 
+        (inside cherry.n.03_4 bowl.n.01_1) 
+        (inside cherry.n.03_5 bowl.n.01_1) 
+        (inside cherry.n.03_6 bowl.n.01_1) 
+        (inside cherry.n.03_7 bowl.n.01_1) 
+        (inside cherry.n.03_8 bowl.n.01_1) 
+        (inside cherry.n.03_9 bowl.n.01_1) 
+        (inside cherry.n.03_10 bowl.n.01_1) 
+        (inside cherry.n.03_11 bowl.n.01_1) 
+        (inside cherry.n.03_12 bowl.n.01_1) 
+        (inside cherry.n.03_13 bowl.n.01_1) 
+        (inside cherry.n.03_14 bowl.n.01_1) 
+        (inside cherry.n.03_15 bowl.n.01_1) 
+        (inside cherry.n.03_16 bowl.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (filled cornstarch__jar.n.01_1 cornstarch.n.01_1) 
+        (ontop cornstarch__jar.n.01_1 countertop.n.01_1) 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (ontop lemon_juice__bottle.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (ontop mixing_bowl.n.01_1 countertop.n.01_2) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future cherry_filling.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cherry_filling.n.01_1) 
+            (contains ?mixing_bowl.n.01_1 ?cherry_filling.n.01_1)
+        )
+    )
+)

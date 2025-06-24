@@ -1,0 +1,124 @@
+(define (problem make_red_beans_and_rice-0)
+    (:domain omnigibson)
+
+    (:objects
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03
+        cooked__diced__clove.n.01_1 - cooked__diced__clove.n.01
+        kidney_bean.n.02_1 - kidney_bean.n.02
+        cooked__kidney_bean.n.01_1 - cooked__kidney_bean.n.01
+        beefsteak_tomato.n.01_1 - beefsteak_tomato.n.01
+        cooked__diced__beefsteak_tomato.n.01_1 - cooked__diced__beefsteak_tomato.n.01
+        salt.n.02_1 - salt.n.02
+        cooked__salt.n.01_1 - cooked__salt.n.01
+        marjoram.n.02_1 - marjoram.n.02
+        cooked__marjoram.n.01_1 - cooked__marjoram.n.01
+        black_pepper.n.02_1 - black_pepper.n.02
+        cooked__black_pepper.n.01_1 - cooked__black_pepper.n.01
+        pepper__shaker.n.01_1 - pepper__shaker.n.01
+        water.n.06_1 - water.n.06
+        white_rice.n.01_1 - white_rice.n.01
+        cooked__white_rice.n.01_1 - cooked__white_rice.n.01
+        turkey.n.04_1 - turkey.n.04
+        cooked__diced__turkey.n.01_1 - cooked__diced__turkey.n.01
+        vidalia_onion.n.01_1 - vidalia_onion.n.01
+        cooked__diced__vidalia_onion.n.01_1 - cooked__diced__vidalia_onion.n.01
+        bell_pepper.n.02_1 - bell_pepper.n.02
+        cooked__diced__bell_pepper.n.01_1 - cooked__diced__bell_pepper.n.01
+        stove.n.01_1 - stove.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        mason_jar.n.01_1 - mason_jar.n.01 
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        marjoram__shaker.n.01_1 - marjoram__shaker.n.01
+        white_rice__sack.n.01_1 - white_rice__sack.n.01
+        chopping_board.n.01_1 chopping_board.n.01_2 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+        sink.n.01_1 - sink.n.01
+    )
+
+    (:init
+        (ontop carving_knife.n.01_1 countertop.n.01_1)
+        (ontop clove.n.03_1 chopping_board.n.01_1)
+        (ontop clove.n.03_2 chopping_board.n.01_1)
+        (ontop clove.n.03_3 chopping_board.n.01_1)
+        (filled mason_jar.n.01_1 kidney_bean.n.02_1)
+        (ontop mason_jar.n.01_1 countertop.n.01_1)
+        (ontop beefsteak_tomato.n.01_1 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (insource marjoram__shaker.n.01_1 marjoram.n.02_1)
+        (ontop marjoram__shaker.n.01_1 countertop.n.01_1)
+        (insource pepper__shaker.n.01_1 black_pepper.n.02_1)
+        (ontop pepper__shaker.n.01_1 countertop.n.01_1)
+        (filled white_rice__sack.n.01_1 white_rice.n.01_1)
+        (ontop white_rice__sack.n.01_1 countertop.n.01_2)
+        (ontop turkey.n.04_1 chopping_board.n.01_2)
+        (ontop vidalia_onion.n.01_1 countertop.n.01_2)
+        (ontop bell_pepper.n.02_1 chopping_board.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_2)
+        (ontop chopping_board.n.01_2 countertop.n.01_2)
+        (ontop stockpot.n.01_1 countertop.n.01_2)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom stove.n.01_1 kitchen)
+        (inroom sink.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom countertop.n.01_2 kitchen)
+        (future cooked__white_rice.n.01_1)
+        (future cooked__kidney_bean.n.01_1)
+        (future cooked__diced__vidalia_onion.n.01_1)
+        (future cooked__diced__beefsteak_tomato.n.01_1)
+        (future cooked__diced__turkey.n.01_1)
+        (future cooked__diced__bell_pepper.n.01_1)
+        (future cooked__diced__clove.n.01_1)
+        (future cooked__salt.n.01_1)
+        (future cooked__marjoram.n.01_1)
+        (future cooked__black_pepper.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+
+    (:goal
+        (and
+            (real ?cooked__white_rice.n.01_1)
+            (real ?cooked__kidney_bean.n.01_1)
+            (real ?cooked__diced__vidalia_onion.n.01_1)
+            (real ?cooked__diced__beefsteak_tomato.n.01_1)
+            (real ?cooked__diced__turkey.n.01_1)
+            (real ?cooked__diced__bell_pepper.n.01_1)
+            (real ?cooked__diced__clove.n.01_1)
+            (or 
+                (real ?cooked__salt.n.01_1)
+                (real ?salt.n.02_1)
+            )
+            (or
+                (real ?cooked__marjoram.n.01_1)
+                (real ?marjoram.n.02_1)
+            )
+            (or 
+                (real ?cooked__black_pepper.n.01_1)
+                (real ?black_pepper.n.02_1)
+            )
+            (contains ?stockpot.n.01_1 ?cooked__white_rice.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__kidney_bean.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__diced__vidalia_onion.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__diced__beefsteak_tomato.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__diced__turkey.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__diced__bell_pepper.n.01_1)
+            (contains ?stockpot.n.01_1 ?cooked__diced__clove.n.01_1)
+            (or 
+                (contains ?stockpot.n.01_1 ?salt.n.02_1)
+                (contains ?stockpot.n.01_1 ?cooked__salt.n.01_1)
+            )
+            (or
+                (contains ?stockpot.n.01_1 ?marjoram.n.02_1)
+                (contains ?stockpot.n.01_1 ?cooked__marjoram.n.01_1)
+            )
+            (or
+                (contains ?stockpot.n.01_1 ?black_pepper.n.02_1)
+                (contains ?stockpot.n.01_1 ?cooked__black_pepper.n.01_1)
+            )
+        )
+    )
+)

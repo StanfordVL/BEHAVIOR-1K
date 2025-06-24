@@ -1,0 +1,70 @@
+(define (problem make_a_steak-0)
+    (:domain omnigibson)
+
+    (:objects
+        olive_oil.n.01_1 - olive_oil.n.01
+        salt.n.02_1 - salt.n.02
+        black_pepper.n.02_1 - black_pepper.n.02
+        steak.n.01_1 steak.n.01_2 - steak.n.01
+        clove.n.03_1 clove.n.03_2 - clove.n.03
+        stove.n.01_1 - stove.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        pepper_mill.n.01_1 - pepper_mill.n.01
+        chopping_board.n.01_1 chopping_board.n.01_2 - chopping_board.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+
+    (:init
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1)
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (insource pepper_mill.n.01_1 black_pepper.n.02_1)
+        (ontop pepper_mill.n.01_1 countertop.n.01_1)
+        (not
+            (cooked steak.n.01_1)
+        )
+        (not
+            (cooked steak.n.01_2)
+        )
+        (ontop steak.n.01_1 chopping_board.n.01_1)
+        (ontop steak.n.01_2 chopping_board.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop clove.n.03_1 chopping_board.n.01_2)
+        (ontop clove.n.03_2 chopping_board.n.01_2)
+        (ontop chopping_board.n.01_2 countertop.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+        (inroom stove.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom countertop.n.01_2 kitchen)
+        (ontop frying_pan.n.01_1 countertop.n.01_2)
+    )
+
+    (:goal
+        (and
+            (forall 
+                (?steak.n.01 - steak.n.01)
+                (and
+                    (cooked ?steak.n.01)
+                    (covered ?steak.n.01 ?salt.n.02_1)
+                    (covered ?steak.n.01 ?black_pepper.n.02_1)
+                    (covered ?steak.n.01 ?olive_oil.n.01_1)
+                )
+            )
+            (forall
+                (?clove.n.03 - clove.n.03)
+                (cooked ?clove.n.03)
+            )
+            (forpairs
+                (?steak.n.01 - steak.n.01)
+                (?clove.n.03 - clove.n.03)
+                (ontop ?clove.n.03 ?steak.n.01)
+            )
+        )
+    )
+)

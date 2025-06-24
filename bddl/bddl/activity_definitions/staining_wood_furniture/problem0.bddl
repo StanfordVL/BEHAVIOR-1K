@@ -1,0 +1,30 @@
+(define (problem staining_wood_furniture-0)
+    (:domain omnigibson)
+
+    (:objects
+        ink.n.01_1 - ink.n.01
+        paintbrush.n.01_1 - paintbrush.n.01
+        ink__bottle.n.01_1 - ink__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled ink__bottle.n.01_1 ink.n.01_1) 
+        (ontop ink__bottle.n.01_1 coffee_table.n.01_1)
+        (ontop paintbrush.n.01_1 coffee_table.n.01_1) 
+        (not 
+            (covered coffee_table.n.01_1 ink.n.01_1)
+        ) 
+        (inroom coffee_table.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?coffee_table.n.01_1 ?ink.n.01_1) 
+        )
+    )
+)

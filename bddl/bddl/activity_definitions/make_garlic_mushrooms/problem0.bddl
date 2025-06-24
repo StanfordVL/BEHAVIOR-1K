@@ -1,0 +1,157 @@
+(define (problem make_garlic_mushrooms-0)
+    (:domain omnigibson)
+
+    (:objects
+        stove.n.01_1 - stove.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        cooked__olive_oil.n.01_1 - cooked__olive_oil.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03
+        mushroom.n.05_1 mushroom.n.05_10 mushroom.n.05_11 mushroom.n.05_12 mushroom.n.05_13 mushroom.n.05_14 mushroom.n.05_2 mushroom.n.05_3 mushroom.n.05_4 mushroom.n.05_5 mushroom.n.05_6 mushroom.n.05_7 mushroom.n.05_8 mushroom.n.05_9 - mushroom.n.05
+        half__mushroom.n.01_1 half__mushroom.n.01_10 half__mushroom.n.01_11 half__mushroom.n.01_12 half__mushroom.n.01_13 half__mushroom.n.01_14 half__mushroom.n.01_15 half__mushroom.n.01_16 half__mushroom.n.01_17 half__mushroom.n.01_18 half__mushroom.n.01_19 half__mushroom.n.01_2 half__mushroom.n.01_20 half__mushroom.n.01_21 half__mushroom.n.01_22 half__mushroom.n.01_23 half__mushroom.n.01_24 half__mushroom.n.01_25 half__mushroom.n.01_26 half__mushroom.n.01_27 half__mushroom.n.01_28 half__mushroom.n.01_3 half__mushroom.n.01_4 half__mushroom.n.01_5 half__mushroom.n.01_6 half__mushroom.n.01_7 half__mushroom.n.01_8 half__mushroom.n.01_9 - half__mushroom.n.01
+        green_onion.n.01_1 green_onion.n.01_2 - green_onion.n.01
+        cooked__diced__clove.n.01_1 - cooked__diced__clove.n.01
+        cooked__diced__green_onion.n.01_1 - cooked__diced__green_onion.n.01
+        salt.n.02_1 - salt.n.02
+        cooked__salt.n.01_1 - cooked__salt.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        tupperware.n.01_1 tupperware.n.01_2 - tupperware.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        floor.n.01_1 - floor.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside frying_pan.n.01_1 cabinet.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (inside olive_oil__bottle.n.01_1 cabinet.n.01_1)
+        (inside clove.n.03_1 tupperware.n.01_1) 
+        (inside clove.n.03_2 tupperware.n.01_1) 
+        (inside clove.n.03_3 tupperware.n.01_1) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (inside mushroom.n.05_1 tupperware.n.01_2) 
+        (inside mushroom.n.05_2 tupperware.n.01_2) 
+        (inside mushroom.n.05_3 tupperware.n.01_2) 
+        (inside mushroom.n.05_4 tupperware.n.01_2) 
+        (inside mushroom.n.05_5 tupperware.n.01_2) 
+        (inside mushroom.n.05_6 tupperware.n.01_2) 
+        (inside mushroom.n.05_7 tupperware.n.01_2) 
+        (inside mushroom.n.05_8 tupperware.n.01_2) 
+        (inside mushroom.n.05_9 tupperware.n.01_2) 
+        (inside mushroom.n.05_10 tupperware.n.01_2) 
+        (inside mushroom.n.05_11 tupperware.n.01_2) 
+        (inside mushroom.n.05_12 tupperware.n.01_2) 
+        (inside mushroom.n.05_13 tupperware.n.01_2) 
+        (inside mushroom.n.05_14 tupperware.n.01_2) 
+        (inside tupperware.n.01_2 electric_refrigerator.n.01_1)
+        (inside green_onion.n.01_1 electric_refrigerator.n.01_1) 
+        (inside green_onion.n.01_2 electric_refrigerator.n.01_1) 
+        (ontop chopping_board.n.01_1 breakfast_table.n.01_1)
+        (inside carving_knife.n.01_1 cabinet.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 breakfast_table.n.01_1)
+        (inroom breakfast_table.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (future half__mushroom.n.01_1)
+        (future half__mushroom.n.01_2)
+        (future half__mushroom.n.01_3)
+        (future half__mushroom.n.01_4)
+        (future half__mushroom.n.01_5)
+        (future half__mushroom.n.01_6)
+        (future half__mushroom.n.01_7)
+        (future half__mushroom.n.01_8)
+        (future half__mushroom.n.01_9)
+        (future half__mushroom.n.01_10)
+        (future half__mushroom.n.01_11)
+        (future half__mushroom.n.01_12)
+        (future half__mushroom.n.01_13)
+        (future half__mushroom.n.01_14)
+        (future half__mushroom.n.01_15)
+        (future half__mushroom.n.01_16)
+        (future half__mushroom.n.01_17)
+        (future half__mushroom.n.01_18)
+        (future half__mushroom.n.01_19)
+        (future half__mushroom.n.01_20)
+        (future half__mushroom.n.01_21)
+        (future half__mushroom.n.01_22)
+        (future half__mushroom.n.01_23)
+        (future half__mushroom.n.01_24)
+        (future half__mushroom.n.01_25)
+        (future half__mushroom.n.01_26)
+        (future half__mushroom.n.01_27)
+        (future half__mushroom.n.01_28)
+        (future cooked__olive_oil.n.01_1)
+        (future cooked__diced__green_onion.n.01_1)
+        (future cooked__diced__clove.n.01_1)
+        (future cooked__salt.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?half__mushroom.n.01_1)
+            (real ?half__mushroom.n.01_2)
+            (real ?half__mushroom.n.01_3)
+            (real ?half__mushroom.n.01_4)
+            (real ?half__mushroom.n.01_5)
+            (real ?half__mushroom.n.01_6)
+            (real ?half__mushroom.n.01_7)
+            (real ?half__mushroom.n.01_8)
+            (real ?half__mushroom.n.01_9)
+            (real ?half__mushroom.n.01_10)
+            (real ?half__mushroom.n.01_11)
+            (real ?half__mushroom.n.01_12)
+            (real ?half__mushroom.n.01_13)
+            (real ?half__mushroom.n.01_14)
+            (real ?half__mushroom.n.01_15)
+            (real ?half__mushroom.n.01_16)
+            (real ?half__mushroom.n.01_17)
+            (real ?half__mushroom.n.01_18)
+            (real ?half__mushroom.n.01_19)
+            (real ?half__mushroom.n.01_20)
+            (real ?half__mushroom.n.01_21)
+            (real ?half__mushroom.n.01_22)
+            (real ?half__mushroom.n.01_23)
+            (real ?half__mushroom.n.01_24)
+            (real ?half__mushroom.n.01_25)
+            (real ?half__mushroom.n.01_26)
+            (real ?half__mushroom.n.01_27)
+            (real ?half__mushroom.n.01_28)
+            (real ?cooked__diced__green_onion.n.01_1)
+            (real ?cooked__diced__clove.n.01_1)
+            (or
+                (real ?olive_oil.n.01_1)
+                (real ?cooked__olive_oil.n.01_1)
+            )
+            (or 
+                (real ?salt.n.02_1)
+                (real ?cooked__salt.n.01_1)
+            )
+            (forall 
+                (?half__mushroom.n.01 - half__mushroom.n.01)
+                (and
+                    (cooked ?half__mushroom.n.01)
+                    (inside ?half__mushroom.n.01 ?frying_pan.n.01_1)
+                )
+            )
+            (contains ?frying_pan.n.01_1 ?cooked__diced__clove.n.01_1)
+            (contains ?frying_pan.n.01_1 ?cooked__diced__green_onion.n.01_1)
+            (or 
+                (contains ?frying_pan.n.01_1 ?olive_oil.n.01_1)
+                (contains ?frying_pan.n.01_1 ?cooked__olive_oil.n.01_1)
+            )
+            (or 
+                (contains ?frying_pan.n.01_1 ?salt.n.02_1)
+                (contains ?frying_pan.n.01_1 ?cooked__salt.n.01_1)
+            )
+        )
+    )
+)

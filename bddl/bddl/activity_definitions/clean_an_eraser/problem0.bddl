@@ -1,0 +1,29 @@
+(define (problem clean_an_eraser-0)
+    (:domain omnigibson)
+
+    (:objects
+        eraser.n.01_1 - eraser.n.01
+        desk.n.01_1 - desk.n.01
+        rag.n.01_1 - rag.n.01
+        dust.n.01_1 - dust.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop eraser.n.01_1 desk.n.01_1) 
+        (ontop rag.n.01_1 desk.n.01_1) 
+        (covered eraser.n.01_1 dust.n.01_1) 
+        (inroom floor.n.01_1 classroom) 
+        (inroom desk.n.01_1 classroom)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?eraser.n.01_1 ?dust.n.01_1)
+            )
+        )
+    )
+)

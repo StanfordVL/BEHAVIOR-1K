@@ -1,0 +1,28 @@
+(define (problem composting_waste-0)
+    (:domain omnigibson)
+
+    (:objects
+        countertop.n.01_1 - countertop.n.01
+        banana.n.02_1 - banana.n.02
+        apple.n.01_1 - apple.n.01
+        compost_bin.n.01_1 - compost_bin.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop banana.n.02_1 countertop.n.01_1) 
+        (ontop apple.n.01_1 countertop.n.01_1) 
+        (ontop compost_bin.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?banana.n.02_1 ?compost_bin.n.01_1) 
+            (inside ?apple.n.01_1 ?compost_bin.n.01_1) 
+        )
+    )
+)

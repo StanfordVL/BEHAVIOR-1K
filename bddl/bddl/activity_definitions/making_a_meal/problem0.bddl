@@ -1,0 +1,78 @@
+(define (problem making_a_meal-0)
+    (:domain omnigibson)
+
+    (:objects
+        microwave.n.02_1 - microwave.n.02
+        penne.n.01_1 - penne.n.01
+        cooked__penne.n.01_1 - cooked__penne.n.01
+        pasta__box.n.01_1 - pasta__box.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        stockpot.n.01_1 - stockpot.n.01
+        bowl.n.01_1 - bowl.n.01
+        meatball.n.01_1 meatball.n.01_2 meatball.n.01_3 meatball.n.01_4 - meatball.n.01
+        marinara.n.01_1 - marinara.n.01
+        cooked__marinara.n.01_1 - cooked__marinara.n.01
+        marinara__jar.n.01_1 - marinara__jar.n.01
+        water.n.06_1 - water.n.06
+        countertop.n.01_1 - countertop.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        sink.n.01_1 - sink.n.01
+        stove.n.01_1 - stove.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled pasta__box.n.01_1 penne.n.01_1) 
+        (inside pasta__box.n.01_1 cabinet.n.01_1)
+        (inside meatball.n.01_1 tupperware.n.01_1)
+        (not 
+            (cooked meatball.n.01_1)
+        )
+        (inside meatball.n.01_2 tupperware.n.01_1)
+        (not 
+            (cooked meatball.n.01_2)
+        )
+        (inside meatball.n.01_3 tupperware.n.01_1)
+        (not 
+            (cooked meatball.n.01_3)
+        )
+        (inside meatball.n.01_4 tupperware.n.01_1)
+        (not 
+            (cooked meatball.n.01_4)
+        )
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (filled marinara__jar.n.01_1 marinara.n.01_1)
+        (inside marinara__jar.n.01_1 electric_refrigerator.n.01_1)
+        (inside bowl.n.01_1 cabinet.n.01_1) 
+        (inside stockpot.n.01_1 cabinet.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom microwave.n.02_1 kitchen) 
+        (future cooked__penne.n.01_1)
+        (future cooked__marinara.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__marinara.n.01_1)
+            (real ?cooked__penne.n.01_1)
+            (forall 
+                (?meatball.n.01 - meatball.n.01)
+                (and
+                    (cooked ?meatball.n.01)
+                    (inside ?meatball.n.01 ?bowl.n.01_1)
+                )
+            )
+            (contains ?bowl.n.01_1 ?cooked__penne.n.01_1)
+            (contains ?bowl.n.01_1 ?cooked__marinara.n.01_1)
+        )
+    )
+)

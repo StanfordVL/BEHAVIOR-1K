@@ -1,0 +1,44 @@
+(define (problem make_lemon_stain_remover-0)
+    (:domain omnigibson)
+
+    (:objects
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        sodium_carbonate.n.01_1 - sodium_carbonate.n.01
+        lemon_stain_remover.n.01_1 - lemon_stain_remover.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        carboy.n.01_1 - carboy.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        wooden_spoon.n.02_1 - wooden_spoon.n.02
+        cabinet.n.01_1 - cabinet.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (inside lemon_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (inside vinegar__bottle.n.01_1 cabinet.n.01_1) 
+        (filled sodium_carbonate__jar.n.01_1 sodium_carbonate.n.01_1) 
+        (inside sodium_carbonate__jar.n.01_1 cabinet.n.01_1) 
+        (ontop carboy.n.01_1 countertop.n.01_1) 
+        (ontop wooden_spoon.n.02_1 countertop.n.01_1)
+        (future lemon_stain_remover.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?lemon_stain_remover.n.01_1) 
+            (contains ?carboy.n.01_1 ?lemon_stain_remover.n.01_1)
+        )
+    )
+)

@@ -1,0 +1,30 @@
+(define (problem adding_fabric_softener-0)
+    (:domain omnigibson)
+
+    (:objects
+        wrinkle.n.01_1 - wrinkle.n.01
+        washer.n.03_1 - washer.n.03
+        sheet.n.03_1 - sheet.n.03
+        floor.n.01_1 - floor.n.01
+        fabric_softener.n.01_1 - fabric_softener.n.01
+        fabric_softener__bottle.n.01_1 - fabric_softener__bottle.n.01 
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered sheet.n.03_1 wrinkle.n.01_1) 
+        (ontop sheet.n.03_1 floor.n.01_1) 
+        (filled fabric_softener__bottle.n.01_1 fabric_softener.n.01_1) 
+        (ontop fabric_softener__bottle.n.01_1 floor.n.01_1) 
+        (inroom washer.n.03_1 utility_room) 
+        (inroom floor.n.01_1 utility_room)
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (inside ?sheet.n.03_1 ?washer.n.03_1)
+            (contains ?washer.n.03_1 ?fabric_softener.n.01_1)
+        )
+    )
+)

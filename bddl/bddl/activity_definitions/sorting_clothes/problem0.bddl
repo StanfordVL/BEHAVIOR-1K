@@ -1,0 +1,76 @@
+(define (problem sorting_clothes-0)
+    (:domain omnigibson)
+
+    (:objects
+        trouser.n.01_1 trouser.n.01_2 - trouser.n.01
+        bed.n.01_1 - bed.n.01
+        blouse.n.01_1 blouse.n.01_2 - blouse.n.01
+        wardrobe.n.01_1 wardrobe.n.01_2 - wardrobe.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop trouser.n.01_1 bed.n.01_1)
+        (ontop trouser.n.01_2 bed.n.01_1)
+        (ontop blouse.n.01_1 bed.n.01_1) 
+        (ontop blouse.n.01_2 bed.n.01_1) 
+        (inroom bed.n.01_1 bedroom) 
+        (inroom wardrobe.n.01_1 closet) 
+        (inroom wardrobe.n.01_2 closet) 
+        (inroom floor.n.01_1 bedroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (exists 
+                (?trouser.n.01 - trouser.n.01)
+                (and
+                    (inside ?trouser.n.01 ?wardrobe.n.01_2)
+                    (folded ?trouser.n.01)
+                )
+            ) 
+            (forn
+                (2)
+                (?trouser.n.01 - trouser.n.01)
+                (or 
+                    (nextto ?trouser.n.01 ?trouser.n.01_1)
+                    (nextto ?trouser.n.01 ?trouser.n.01_2)
+                )
+            )
+            (exists 
+                (?blouse.n.01 - blouse.n.01) 
+                (and
+                    (inside ?blouse.n.01 ?wardrobe.n.01_2)
+                    (folded ?blouse.n.01)
+                )
+            ) 
+            (exists
+                (?blouse.n.01 - blouse.n.01)
+                (or 
+                    (nextto ?blouse.n.01 ?blouse.n.01_1)
+                    (nextto ?blouse.n.01 ?blouse.n.01_2)
+                )
+            )
+            (exists 
+                (?wardrobe.n.01 - wardrobe.n.01)
+                (and 
+                    (inside ?trouser.n.01_1 ?wardrobe.n.01)
+                    (not 
+                        (inside ?blouse.n.01_1 ?wardrobe.n.01)
+                    )
+                )
+            )
+            (exists 
+                (?wardrobe.n.01 - wardrobe.n.01)
+                (and
+                    (inside ?blouse.n.01_1 ?wardrobe.n.01)
+                    (not 
+                        (inside ?trouser.n.01_1 ?wardrobe.n.01)
+                    )
+                )
+            )
+        )
+    )
+)

@@ -1,0 +1,48 @@
+(define (problem make_gift_bags_for_baby_showers-0)
+    (:domain omnigibson)
+
+    (:objects
+        floor.n.01_1 - floor.n.01
+        doll.n.01_1 doll.n.01_2 doll.n.01_3 - doll.n.01
+        bookcase.n.01_1 - bookcase.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        wafer.n.02_1 wafer.n.02_2 wafer.n.02_3 - wafer.n.02
+        sack.n.01_1 sack.n.01_2 sack.n.01_3 - sack.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside doll.n.01_1 bookcase.n.01_1) 
+        (inside doll.n.01_2 bookcase.n.01_1) 
+        (inside doll.n.01_3 bookcase.n.01_1) 
+        (inside wafer.n.02_1 cabinet.n.01_1) 
+        (inside wafer.n.02_2 cabinet.n.01_1) 
+        (inside wafer.n.02_3 cabinet.n.01_1) 
+        (inside sack.n.01_1 cabinet.n.01_1) 
+        (inside sack.n.01_2 cabinet.n.01_1) 
+        (inside sack.n.01_3 cabinet.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom cabinet.n.01_1 living_room) 
+        (inroom bookcase.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?sack.n.01 - sack.n.01) 
+                (ontop ?sack.n.01 ?floor.n.01_1)
+            ) 
+            (forpairs 
+                (?doll.n.01 - doll.n.01) 
+                (?sack.n.01 - sack.n.01) 
+                (inside ?doll.n.01 ?sack.n.01)
+            ) 
+            (forpairs 
+                (?wafer.n.02 - wafer.n.02) 
+                (?sack.n.01 - sack.n.01) 
+                (inside ?wafer.n.02 ?sack.n.01)
+            ) 
+        )
+    )
+)

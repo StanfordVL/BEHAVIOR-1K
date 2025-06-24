@@ -1,0 +1,81 @@
+(define (problem set_a_fancy_table-0)
+    (:domain omnigibson)
+
+    (:objects
+        napkin.n.01_1 - napkin.n.01
+        breakfast_table.n.01_1 - breakfast_table.n.01
+        place_mat.n.01_1 - place_mat.n.01
+        wineglass.n.01_1 - wineglass.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        teaspoon.n.02_1 - teaspoon.n.02
+        table_knife.n.01_1 - table_knife.n.01
+        tablefork.n.01_1 - tablefork.n.01
+        plate.n.04_1 - plate.n.04
+        wine_bottle.n.01_1 - wine_bottle.n.01
+        saucer.n.02_1 - saucer.n.02
+        console_table.n.01_1 console_table.n.01_2 console_table.n.01_3 console_table.n.01_4 console_table.n.01_5 - console_table.n.01
+        vase.n.01_1 - vase.n.01
+        water_glass.n.02_1 - water_glass.n.02
+        candlestick.n.01_1 - candlestick.n.01
+        dip.n.07_1 dip.n.07_2 dip.n.07_3 - dip.n.07
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop napkin.n.01_1 place_mat.n.01_1)
+        (unfolded napkin.n.01_1)
+        (ontop place_mat.n.01_1 console_table.n.01_1) 
+        (ontop wineglass.n.01_1 console_table.n.01_2)
+        (ontop wine_bottle.n.01_1 console_table.n.01_2)
+        (ontop tablespoon.n.02_1 console_table.n.01_3)
+        (ontop teaspoon.n.02_1 console_table.n.01_3)
+        (ontop table_knife.n.01_1 console_table.n.01_3)
+        (ontop tablefork.n.01_1 console_table.n.01_3)
+        (ontop saucer.n.02_1 console_table.n.01_4)
+        (ontop plate.n.04_1 console_table.n.01_4)
+        (ontop vase.n.01_1 console_table.n.01_4)
+        (ontop water_glass.n.02_1 console_table.n.01_5)
+        (ontop candlestick.n.01_1 console_table.n.01_5)
+        (ontop dip.n.07_1 console_table.n.01_5)
+        (ontop dip.n.07_2 console_table.n.01_5)
+        (ontop dip.n.07_3 console_table.n.01_5)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom console_table.n.01_1 dining_room)
+        (inroom console_table.n.01_2 dining_room)
+        (inroom console_table.n.01_3 dining_room)
+        (inroom console_table.n.01_4 dining_room)
+        (inroom console_table.n.01_5 dining_room)
+        (inroom floor.n.01_1 dining_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and
+            (ontop ?place_mat.n.01_1 ?breakfast_table.n.01_1)
+            (ontop ?plate.n.04_1 ?place_mat.n.01_1)
+            (ontop ?napkin.n.01_1 ?plate.n.04_1)
+            (folded ?napkin.n.01_1)
+            (ontop ?tablespoon.n.02_1 ?place_mat.n.01_1)
+            (nextto ?tablespoon.n.02_1 ?plate.n.04_1)
+            (ontop ?teaspoon.n.02_1 ?place_mat.n.01_1)
+            (nextto ?teaspoon.n.02_1 ?tablespoon.n.02_1) 
+            (ontop ?tablefork.n.01_1 ?place_mat.n.01_1)
+            (nextto ?tablefork.n.01_1 ?plate.n.04_1)
+            (not
+                (nextto ?tablefork.n.01_1 ?tablespoon.n.02_1)
+            )
+            (ontop ?saucer.n.02_1 ?place_mat.n.01_1)
+            (ontop ?table_knife.n.01_1 ?saucer.n.02_1)
+            (ontop ?wine_bottle.n.01_1 ?breakfast_table.n.01_1) 
+            (nextto ?wineglass.n.01_1 ?plate.n.04_1)
+            (nextto ?water_glass.n.02_1 ?wineglass.n.01_1)
+            (ontop ?vase.n.01_1 ?breakfast_table.n.01_1)
+            (nextto ?candlestick.n.01_1 ?vase.n.01_1)
+            (forall 
+                (?dip.n.07 - dip.n.07)
+                (attached ?dip.n.07 ?candlestick.n.01_1)
+            )
+        )
+    )
+)

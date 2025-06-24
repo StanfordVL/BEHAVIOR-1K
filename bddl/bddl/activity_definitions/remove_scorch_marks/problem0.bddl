@@ -1,0 +1,37 @@
+(define (problem remove_scorch_marks-0)
+    (:domain omnigibson)
+
+    (:objects
+        emery_paper.n.01_1 - emery_paper.n.01
+        sink.n.01_1 - sink.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        jersey.n.03_1 - jersey.n.03
+        stain.n.01_1 - stain.n.01
+        water.n.06_1 - water.n.06
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside emery_paper.n.01_1 cabinet.n.01_1) 
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1)
+        (inside vinegar__bottle.n.01_1 cabinet.n.01_1) 
+        (ontop jersey.n.03_1 floor.n.01_1) 
+        (covered jersey.n.03_1 stain.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom cabinet.n.01_1 utility_room) 
+        (inroom sink.n.01_1 utility_room) 
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?jersey.n.03_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

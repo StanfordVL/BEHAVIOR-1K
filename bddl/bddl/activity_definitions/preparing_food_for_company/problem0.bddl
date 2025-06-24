@@ -1,0 +1,69 @@
+(define (problem preparing_food_for_company-0)
+    (:domain omnigibson)
+
+    (:objects
+        chicken.n.01_1 - chicken.n.01
+        cooked__diced__chicken.n.01_1 - cooked__diced__chicken.n.01
+        marinara.n.01_1 - marinara.n.01
+        cooked__marinara.n.01_1 - cooked__marinara.n.01
+        marinara__jar.n.01_1 - marinara__jar.n.01
+        platter.n.01_1 - platter.n.01
+        salad.n.01_1 salad.n.01_2 - salad.n.01
+        crock_pot.n.01_1 - crock_pot.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        water.n.06_1 - water.n.06
+        carving_knife.n.01_1 - carving_knife.n.01
+        stove.n.01_1 - stove.n.01
+        sink.n.01_1 - sink.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        noodle.n.01_1 - noodle.n.01
+        cooked__noodle.n.01_1 - cooked__noodle.n.01
+        pasta__box.n.01_1 - pasta__box.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop chicken.n.01_1 countertop.n.01_1)
+        (inside salad.n.01_1 electric_refrigerator.n.01_1)
+        (inside salad.n.01_2 electric_refrigerator.n.01_1)
+        (ontop crock_pot.n.01_1 stove.n.01_1) 
+        (inside platter.n.01_1 electric_refrigerator.n.01_1) 
+        (filled marinara__jar.n.01_1 marinara.n.01_1)
+        (inside marinara__jar.n.01_1 electric_refrigerator.n.01_1)
+        (filled pasta__box.n.01_1 noodle.n.01_1) 
+        (inside pasta__box.n.01_1 cabinet.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom stove.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (future cooked__diced__chicken.n.01_1)
+        (future cooked__noodle.n.01_1)
+        (future cooked__marinara.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__noodle.n.01_1)
+            (real ?cooked__diced__chicken.n.01_1)
+            (or
+                (real ?marinara.n.01_1)
+                (real ?cooked__marinara.n.01_1)
+            )
+            (contains ?platter.n.01_1 ?cooked__noodle.n.01_1)
+            (contains ?platter.n.01_1 ?cooked__diced__chicken.n.01_1)
+            (or
+                (contains ?platter.n.01_1 ?cooked__marinara.n.01_1)
+                (contains ?platter.n.01_1 ?marinara.n.01_1)
+            )
+        )
+    )
+)

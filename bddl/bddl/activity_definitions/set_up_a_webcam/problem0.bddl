@@ -1,0 +1,29 @@
+(define (problem set_up_a_webcam-0)
+    (:domain omnigibson)
+
+    (:objects
+        monitor.n.04_1 - monitor.n.04
+        desk.n.01_1 - desk.n.01
+        mouse.n.04_1 - mouse.n.04
+        keyboard.n.01_1 - keyboard.n.01
+        webcam.n.02_1 - webcam.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop monitor.n.04_1 desk.n.01_1) 
+        (ontop mouse.n.04_1 desk.n.01_1) 
+        (ontop keyboard.n.01_1 desk.n.01_1) 
+        (ontop webcam.n.02_1 desk.n.01_1)
+        (inroom desk.n.01_1 shared_office) 
+        (inroom floor.n.01_1 shared_office) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (attached ?webcam.n.02_1 ?monitor.n.04_1)
+        )
+    )
+)

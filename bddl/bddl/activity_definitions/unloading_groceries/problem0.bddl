@@ -1,0 +1,42 @@
+(define (problem unloading_groceries-0)
+    (:domain omnigibson)
+
+    (:objects
+        sour_bread.n.01_1 - sour_bread.n.01
+        sack.n.01_1 - sack.n.01
+        box__of__corn_flakes.n.01_1 - box__of__corn_flakes.n.01
+        cup__of__yogurt.n.01_1 - cup__of__yogurt.n.01
+        egg.n.02_1 - egg.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside sour_bread.n.01_1 sack.n.01_1)
+        (inside box__of__corn_flakes.n.01_1 sack.n.01_1)
+        (inside cup__of__yogurt.n.01_1 sack.n.01_1)
+        (inside egg.n.02_1 sack.n.01_1)
+        (ontop sack.n.01_1 floor.n.01_1)
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?sour_bread.n.01_1 ?cabinet.n.01_1) 
+            (inside ?box__of__corn_flakes.n.01_1 ?cabinet.n.01_1) 
+            (inside ?cup__of__yogurt.n.01_1 ?electric_refrigerator.n.01_1)
+            (inside ?egg.n.02_1 ?electric_refrigerator.n.01_1)
+            (not
+                (open ?electric_refrigerator.n.01_1)
+            )
+            (not
+                (open ?cabinet.n.01_1)
+            )
+        )
+    )
+)

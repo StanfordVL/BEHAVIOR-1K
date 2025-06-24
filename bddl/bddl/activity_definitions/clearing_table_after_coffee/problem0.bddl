@@ -1,0 +1,35 @@
+(define (problem clearing_table_after_coffee-0)
+    (:domain omnigibson)
+
+    (:objects
+        countertop.n.01_1 - countertop.n.01
+        mug.n.04_1 mug.n.04_2 - mug.n.04
+        drip_coffee.n.01_1 - drip_coffee.n.01
+        dishwasher.n.01_1 - dishwasher.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop mug.n.04_1 countertop.n.01_1)
+        (ontop mug.n.04_2 countertop.n.01_1)
+        (filled mug.n.04_1 drip_coffee.n.01_1)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?mug.n.04 - mug.n.04)
+                (not
+                    (filled ?mug.n.04 ?drip_coffee.n.01_1)
+                )
+            )
+            (inside ?mug.n.04_1 ?dishwasher.n.01_1)
+            (inside ?mug.n.04_2 ?dishwasher.n.01_1)
+        )
+    )
+)

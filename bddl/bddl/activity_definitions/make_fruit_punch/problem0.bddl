@@ -1,0 +1,42 @@
+(define (problem make_fruit_punch-0)
+    (:domain omnigibson)
+
+    (:objects
+        lemon.n.01_1 - lemon.n.01
+        strawberry.n.01_1 - strawberry.n.01
+        orange.n.01_1 - orange.n.01
+        apple.n.01_1 - apple.n.01
+        fruit_punch.n.01_1 - fruit_punch.n.01
+        blender.n.01_1 - blender.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        water_glass.n.02_1 - water_glass.n.02
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (inside lemon.n.01_1 electric_refrigerator.n.01_1) 
+        (inside strawberry.n.01_1 electric_refrigerator.n.01_1) 
+        (inside orange.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop apple.n.01_1 countertop.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_1) 
+        (ontop water_glass.n.02_1 countertop.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop carving_knife.n.01_1 chopping_board.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future fruit_punch.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?fruit_punch.n.01_1) 
+            (contains ?water_glass.n.02_1 ?fruit_punch.n.01_1)
+        )
+    )
+)

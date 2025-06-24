@@ -1,0 +1,42 @@
+(define (problem make_stewed_fruit-0)
+    (:domain omnigibson)
+
+    (:objects
+        plum.n.02_1 - plum.n.02
+        countertop.n.01_1 - countertop.n.01
+        pear.n.01_1 - pear.n.01
+        apple.n.01_1 - apple.n.01
+        bowl.n.01_1 - bowl.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop plum.n.02_1 countertop.n.01_1)
+        (not 
+            (cooked plum.n.02_1)
+        )
+        (ontop pear.n.01_1 countertop.n.01_1) 
+        (not 
+            (cooked pear.n.01_1)
+        )
+        (ontop apple.n.01_1 countertop.n.01_1) 
+        (not 
+            (cooked apple.n.01_1)
+        )
+        (ontop bowl.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (cooked ?pear.n.01_1)
+            (cooked ?plum.n.02_1)
+            (cooked ?apple.n.01_1)
+        )
+    )
+)

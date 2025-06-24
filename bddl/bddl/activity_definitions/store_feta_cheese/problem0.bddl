@@ -1,0 +1,31 @@
+(define (problem store_feta_cheese-0)
+    (:domain omnigibson)
+
+    (:objects
+        feta.n.01_1 - feta.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        plastic_wrap.n.01_1 - plastic_wrap.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop feta.n.01_1 tupperware.n.01_1) 
+        (ontop plastic_wrap.n.01_1 countertop.n.01_1) 
+        (ontop tupperware.n.01_1 countertop.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?feta.n.01_1 ?tupperware.n.01_1) 
+            (overlaid ?plastic_wrap.n.01_1 ?feta.n.01_1) 
+            (inside ?tupperware.n.01_1 ?electric_refrigerator.n.01_1)
+        )
+    )
+)

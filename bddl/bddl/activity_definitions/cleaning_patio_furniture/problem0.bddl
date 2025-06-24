@@ -1,0 +1,51 @@
+(define (problem cleaning_patio_furniture-0)
+    (:domain omnigibson)
+
+    (:objects
+        lawn_chair.n.01_1 lawn_chair.n.01_2 lawn_chair.n.01_3 lawn_chair.n.01_4 - lawn_chair.n.01
+        floor.n.01_1 - floor.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        bucket.n.01_1 - bucket.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        rag.n.01_1 - rag.n.01
+        dirt.n.02_1 - dirt.n.02
+        mildew.n.02_1 - mildew.n.02
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop lawn_chair.n.01_1 floor.n.01_1)
+        (ontop lawn_chair.n.01_2 floor.n.01_1)
+        (ontop lawn_chair.n.01_3 floor.n.01_1)
+        (ontop lawn_chair.n.01_4 floor.n.01_1)
+        (ontop bucket.n.01_1 coffee_table.n.01_1)
+        (filled bucket.n.01_1 water.n.06_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 coffee_table.n.01_1)
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (covered coffee_table.n.01_1 dirt.n.02_1) 
+        (covered lawn_chair.n.01_1 mildew.n.02_1)
+        (covered lawn_chair.n.01_2 mildew.n.02_1)
+        (covered lawn_chair.n.01_3 mildew.n.02_1)
+        (covered lawn_chair.n.01_4 mildew.n.02_1)
+        (ontop agent.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 garden) 
+        (inroom coffee_table.n.01_1 garden) 
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?lawn_chair.n.01 - lawn_chair.n.01)
+                (not
+                    (covered ?lawn_chair.n.01 ?mildew.n.02_1)
+                )
+            )
+            (not 
+                (covered ?coffee_table.n.01_1 ?dirt.n.02_1)
+            )
+        )
+    )
+)

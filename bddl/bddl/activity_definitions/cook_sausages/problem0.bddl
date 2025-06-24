@@ -1,0 +1,47 @@
+(define (problem cook_sausages-0)
+    (:domain omnigibson)
+
+    (:objects
+        stove.n.01_1 - stove.n.01
+        bratwurst.n.01_1 bratwurst.n.01_2 - bratwurst.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        olive_oil.n.01_1 - olive_oil.n.01
+        olive_oil__bottle.n.01_1 - olive_oil__bottle.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (cooked bratwurst.n.01_1)
+        ) 
+        (not 
+            (cooked bratwurst.n.01_2)
+        ) 
+        (inside bratwurst.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bratwurst.n.01_2 electric_refrigerator.n.01_1) 
+        (ontop frying_pan.n.01_1 countertop.n.01_1) 
+        (filled olive_oil__bottle.n.01_1 olive_oil.n.01_1) 
+        (ontop olive_oil__bottle.n.01_1 countertop.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?bratwurst.n.01 - bratwurst.n.01)
+                (and 
+                    (inside ?bratwurst.n.01 ?frying_pan.n.01_1)
+                    (cooked ?bratwurst.n.01)
+                )
+            )
+            (contains ?frying_pan.n.01_1 ?olive_oil.n.01_1)
+        )
+    )
+)

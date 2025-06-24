@@ -1,0 +1,42 @@
+(define (problem make_green_tea_latte-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        green_tea.n.01_1 - green_tea.n.01
+        mason_jar.n.01_1 - mason_jar.n.01
+        cup.n.01_1 - cup.n.01
+        low-fat_milk.n.01_1 - low-fat_milk.n.01
+        green_tea_latte.n.01_1 - green_tea_latte.n.01
+        whisk.n.01_1 - whisk.n.01
+        mug.n.04_1 - mug.n.04
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        carafe.n.01_1 carafe.n.01_2 - carafe.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled carafe.n.01_1 water.n.06_1) 
+        (ontop carafe.n.01_1 countertop.n.01_1) 
+        (filled mason_jar.n.01_1 green_tea.n.01_1)
+        (ontop mason_jar.n.01_1 countertop.n.01_1)
+        (ontop cup.n.01_1 countertop.n.01_1) 
+        (filled carafe.n.01_2 low-fat_milk.n.01_1) 
+        (ontop carafe.n.01_2 countertop.n.01_1) 
+        (ontop whisk.n.01_1 countertop.n.01_2) 
+        (ontop mug.n.04_1 countertop.n.01_2)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future green_tea_latte.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?green_tea_latte.n.01_1) 
+            (contains ?mug.n.04_1 ?green_tea_latte.n.01_1)
+        )
+    )
+)

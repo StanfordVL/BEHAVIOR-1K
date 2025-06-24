@@ -1,0 +1,12 @@
+*.max
+*.zip
+__pycache__
+*.pyc
+.ipynb_checkpoints
+gha-creds-*.json
+*.sqsh
+b1k_pipeline/docker/data/
+b1k_pipeline/docker/isaac_cache/
+b1k_pipeline/docker/scheduler-logs/
+tmp/
+logs/

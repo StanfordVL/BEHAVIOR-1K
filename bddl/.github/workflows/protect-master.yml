@@ -1,0 +1,22 @@
+name: Disallow PRs to master branch
+
+on: [pull_request]
+
+jobs:
+  protect-master:
+    name: Disallow PRs to master branch
+    runs-on: ubuntu-latest
+    if: ${{ github.base_ref == 'master' }}
+
+    steps:
+    - name: Comment on PR
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        message: |
+          Hi, research friend! :wave:
+          It looks like you are trying to merge a PR to the `master` branch.
+          This branch is for released code only. **Please PR your code onto `develop` instead.**
+          Thank you!
+
+    - name: Fail
+      run: exit 1

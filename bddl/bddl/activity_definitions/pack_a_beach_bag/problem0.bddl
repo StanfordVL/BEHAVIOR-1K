@@ -1,0 +1,36 @@
+(define (problem pack_a_beach_bag-0)
+    (:domain omnigibson)
+
+    (:objects
+        bottle__of__sunscreen.n.01_1 - bottle__of__sunscreen.n.01
+        floor.n.01_1 - floor.n.01
+        carryall.n.01_1 - carryall.n.01
+        bath_towel.n.01_1 - bath_towel.n.01
+        door.n.01_1 - door.n.01
+        club_sandwich.n.01_1 - club_sandwich.n.01
+        watermelon.n.02_1 - watermelon.n.02
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop carryall.n.01_1 floor.n.01_1) 
+        (ontop bath_towel.n.01_1 floor.n.01_1) 
+        (ontop club_sandwich.n.01_1 carryall.n.01_1) 
+        (ontop bottle__of__sunscreen.n.01_1 floor.n.01_1) 
+        (ontop watermelon.n.02_1 club_sandwich.n.01_1) 
+        (inroom floor.n.01_1 empty_room) 
+        (inroom door.n.01_1 empty_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (folded ?bath_towel.n.01_1)
+            (inside ?bath_towel.n.01_1 ?carryall.n.01_1)
+            (inside ?club_sandwich.n.01_1 ?carryall.n.01_1)
+            (inside ?bottle__of__sunscreen.n.01_1 ?carryall.n.01_1)
+            (inside ?watermelon.n.02_1 ?carryall.n.01_1)
+            (nextto ?carryall.n.01_1 ?door.n.01_1)
+        )
+    )
+)

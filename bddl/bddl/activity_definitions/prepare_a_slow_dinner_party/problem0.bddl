@@ -1,0 +1,72 @@
+(define (problem prepare_a_slow_dinner_party-0)
+    (:domain omnigibson)
+
+    (:objects
+        wineglass.n.01_1 wineglass.n.01_2 wineglass.n.01_3 - wineglass.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        turkey.n.04_1 - turkey.n.04
+        platter.n.01_1 platter.n.01_2 - platter.n.01
+        countertop.n.01_1 - countertop.n.01
+        plate.n.04_1 plate.n.04_2 plate.n.04_3 - plate.n.04
+        salad.n.01_1 - salad.n.01
+        table.n.02_1 - table.n.02
+        wine_bottle.n.01_1 - wine_bottle.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        microwave.n.02_1 - microwave.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside wineglass.n.01_1 cabinet.n.01_1) 
+        (inside wineglass.n.01_2 cabinet.n.01_1) 
+        (inside wineglass.n.01_3 cabinet.n.01_1)
+        (inside turkey.n.04_1 electric_refrigerator.n.01_1)
+        (cooked turkey.n.04_1)
+        (ontop platter.n.01_1 countertop.n.01_1) 
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (ontop plate.n.04_2 countertop.n.01_1)
+        (ontop plate.n.04_3 countertop.n.01_1)
+        (inside wine_bottle.n.01_1 cabinet.n.01_1)
+        (inside salad.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop platter.n.01_2 countertop.n.01_1) 
+        (inside carving_knife.n.01_1 cabinet.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom microwave.n.02_1 kitchen)
+        (inroom floor.n.01_1 kitchen) 
+        (inroom table.n.02_1 dining_room)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs
+                (?wineglass.n.01 - wineglass.n.01)
+                (?plate.n.04 - plate.n.04)
+                (and
+                    (nextto ?wineglass.n.01 ?plate.n.04)
+                    (ontop ?wineglass.n.01 ?table.n.02_1)
+                    (ontop ?plate.n.04 ?table.n.02_1)
+                )
+            )
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?turkey.n.04_1 ?platter.n.01)
+            )
+            (hot ?turkey.n.04_1)
+            (nextto ?carving_knife.n.01_1 ?turkey.n.04_1)
+            (exists
+                (?platter.n.01 - platter.n.01)
+                (ontop ?salad.n.01_1 ?platter.n.01)
+            )    
+            (forall 
+                (?platter.n.01 - platter.n.01)
+                (ontop ?platter.n.01 ?table.n.02_1)
+            )
+            (ontop ?wine_bottle.n.01_1 ?table.n.02_1)
+        )
+    )
+)

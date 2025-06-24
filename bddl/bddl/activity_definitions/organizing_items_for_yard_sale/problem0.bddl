@@ -1,0 +1,51 @@
+(define (problem organizing_items_for_yard_sale-0)
+    (:domain omnigibson)
+
+    (:objects
+        sweater.n.01_1 sweater.n.01_2 - sweater.n.01
+        floor.n.01_1 - floor.n.01
+        hanger.n.02_1 hanger.n.02_2 - hanger.n.02
+        book.n.02_1 book.n.02_2 book.n.02_3 book.n.02_4 book.n.02_5 - book.n.02
+        sofa.n.01_1 - sofa.n.01
+        vase.n.01_1 - vase.n.01
+        coatrack.n.01_1 - coatrack.n.01
+        coffee_table.n.01_1 - coffee_table.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop sweater.n.01_1 floor.n.01_1) 
+        (ontop sweater.n.01_2 floor.n.01_1) 
+        (ontop hanger.n.02_1 floor.n.01_1) 
+        (ontop hanger.n.02_2 floor.n.01_1)
+        (ontop book.n.02_1 sofa.n.01_1) 
+        (ontop book.n.02_2 sofa.n.01_1) 
+        (ontop book.n.02_3 sofa.n.01_1) 
+        (ontop book.n.02_4 sofa.n.01_1) 
+        (ontop book.n.02_5 floor.n.01_1) 
+        (ontop vase.n.01_1 floor.n.01_1) 
+        (ontop coatrack.n.01_1 floor.n.01_1) 
+        (inroom floor.n.01_1 living_room) 
+        (inroom sofa.n.01_1 living_room) 
+        (inroom coffee_table.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs
+                (?sweater.n.01 - sweater.n.01)
+                (?hanger.n.02 - hanger.n.02)   
+                (and 
+                    (draped ?sweater.n.01 ?hanger.n.02)
+                    (attached ?hanger.n.02 ?coatrack.n.01_1)
+                )         
+            )
+            (forall 
+                (?book.n.02 - book.n.02)
+                (ontop ?book.n.02 ?coffee_table.n.01_1)
+            )
+            (nextto ?coatrack.n.01_1 ?coffee_table.n.01_1)
+        )
+    )
+)

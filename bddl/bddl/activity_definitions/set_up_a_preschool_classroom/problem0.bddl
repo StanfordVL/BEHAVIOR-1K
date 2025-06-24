@@ -1,0 +1,115 @@
+(define (problem set_up_a_preschool_classroom-0)
+    (:domain omnigibson)
+
+    (:objects
+        blackboard_eraser.n.01_1 - blackboard_eraser.n.01
+        floor.n.01_1 - floor.n.01
+        teddy.n.01_1 teddy.n.01_2 teddy.n.01_3 teddy.n.01_4 - teddy.n.01
+        notebook.n.01_1 notebook.n.01_2 - notebook.n.01
+        pencil.n.01_1 pencil.n.01_2 - pencil.n.01
+        globe.n.03_1 - globe.n.03
+        pen.n.01_1 pen.n.01_2 - pen.n.01
+        computer.n.01_1 - computer.n.01
+        backpack.n.01_1 backpack.n.01_2 backpack.n.01_3 backpack.n.01_4 - backpack.n.01
+        carton.n.02_1 carton.n.02_2 - carton.n.02
+        mat.n.03_1 - mat.n.03
+        blackboard.n.01_1 - blackboard.n.01
+        table.n.02_1 table.n.02_10 table.n.02_2 table.n.02_3 table.n.02_4 table.n.02_5 table.n.02_6 table.n.02_7 table.n.02_8 table.n.02_9 - table.n.02
+        wall_clock.n.01_1 - wall_clock.n.01
+        chair.n.01_1 chair.n.01_10 chair.n.01_2 chair.n.01_3 chair.n.01_4 chair.n.01_5 chair.n.01_6 chair.n.01_7 chair.n.01_8 chair.n.01_9 - chair.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop blackboard_eraser.n.01_1 floor.n.01_1) 
+        (ontop teddy.n.01_1 floor.n.01_1) 
+        (ontop teddy.n.01_2 floor.n.01_1) 
+        (ontop teddy.n.01_3 floor.n.01_1) 
+        (ontop teddy.n.01_4 floor.n.01_1) 
+        (inside notebook.n.01_1 carton.n.02_2) 
+        (inside notebook.n.01_2 carton.n.02_2)
+        (ontop carton.n.02_2 floor.n.01_1)
+        (inside pencil.n.01_1 carton.n.02_1) 
+        (inside pencil.n.01_2 carton.n.02_1)
+        (ontop carton.n.02_1 floor.n.01_1)
+        (ontop globe.n.03_1 floor.n.01_1) 
+        (inside pen.n.01_1 carton.n.02_1) 
+        (inside pen.n.01_2 carton.n.02_1) 
+        (ontop computer.n.01_1 floor.n.01_1) 
+        (ontop backpack.n.01_1 floor.n.01_1) 
+        (ontop backpack.n.01_2 floor.n.01_1) 
+        (ontop backpack.n.01_3 floor.n.01_1) 
+        (ontop backpack.n.01_4 floor.n.01_1) 
+        (ontop mat.n.03_1 floor.n.01_1) 
+        (inroom blackboard.n.01_1 classroom) 
+        (inroom table.n.02_1 classroom) 
+        (inroom table.n.02_2 classroom) 
+        (inroom table.n.02_3 classroom) 
+        (inroom table.n.02_4 classroom) 
+        (inroom table.n.02_5 classroom) 
+        (inroom table.n.02_6 classroom) 
+        (inroom table.n.02_7 classroom) 
+        (inroom table.n.02_8 classroom) 
+        (inroom table.n.02_9 classroom) 
+        (inroom table.n.02_10 classroom) 
+        (inroom wall_clock.n.01_1 classroom) 
+        (inroom chair.n.01_1 classroom)
+        (inroom chair.n.01_2 classroom)
+        (inroom chair.n.01_3 classroom)
+        (inroom chair.n.01_4 classroom)
+        (inroom chair.n.01_5 classroom)
+        (inroom chair.n.01_6 classroom)
+        (inroom chair.n.01_7 classroom)
+        (inroom chair.n.01_8 classroom)
+        (inroom chair.n.01_9 classroom)
+        (inroom chair.n.01_10 classroom)
+        (inroom floor.n.01_1 classroom) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forpairs 
+                (?notebook.n.01 - notebook.n.01) 
+                (?table.n.02 - table.n.02)
+                (ontop ?notebook.n.01 ?table.n.02)
+            ) 
+            (touching ?blackboard_eraser.n.01_1 ?blackboard.n.01_1) 
+            (forpairs 
+                (?pencil.n.01 - pencil.n.01) 
+                (?table.n.02 - table.n.02)
+                (ontop ?pencil.n.01 ?table.n.02)
+            ) 
+            (forpairs 
+                (?pen.n.01 - pen.n.01) 
+                (?table.n.02 - table.n.02)
+                (ontop ?pen.n.01 ?table.n.02_4)
+            ) 
+            (exists 
+                (?table.n.02 - table.n.02)
+                (ontop ?globe.n.03_1 ?table.n.02) 
+            )
+            (forall 
+                (?backpack.n.01 - backpack.n.01) 
+                (and
+                    (ontop ?backpack.n.01 ?floor.n.01_1)
+                    (or
+                        (nextto ?backpack.n.01 ?backpack.n.01_1)
+                        (nextto ?backpack.n.01 ?backpack.n.01_2)
+                        (nextto ?backpack.n.01 ?backpack.n.01_3)
+                        (nextto ?backpack.n.01 ?backpack.n.01_4)
+                    )
+                )
+            ) 
+            (exists 
+                (?table.n.02 - table.n.02)
+                (ontop ?computer.n.01_1 ?table.n.02) 
+            )
+            (forall 
+                (?teddy.n.01 - teddy.n.01) 
+                (ontop ?teddy.n.01 ?mat.n.03_1)
+            ) 
+            (ontop ?mat.n.03_1 ?floor.n.01_1)
+        )
+    )
+)

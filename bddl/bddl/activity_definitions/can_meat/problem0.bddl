@@ -1,0 +1,57 @@
+(define (problem can_meat-0)
+    (:domain omnigibson)
+
+    (:objects
+        hinged_jar.n.01_1 hinged_jar.n.01_2 - hinged_jar.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        countertop.n.01_1 - countertop.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        bratwurst.n.01_1 bratwurst.n.01_2 bratwurst.n.01_3 bratwurst.n.01_4 - bratwurst.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside hinged_jar.n.01_1 cabinet.n.01_1) 
+        (inside hinged_jar.n.01_2 cabinet.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (ontop bratwurst.n.01_1 chopping_board.n.01_1) 
+        (ontop bratwurst.n.01_2 chopping_board.n.01_1) 
+        (ontop bratwurst.n.01_3 chopping_board.n.01_1) 
+        (ontop bratwurst.n.01_4 chopping_board.n.01_1) 
+        (cooked bratwurst.n.01_1)
+        (cooked bratwurst.n.01_2)
+        (cooked bratwurst.n.01_3)
+        (cooked bratwurst.n.01_4)
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?hinged_jar.n.01 - hinged_jar.n.01) 
+                (inside ?hinged_jar.n.01 ?cabinet.n.01_1)
+            ) 
+            (forall 
+                (?hinged_jar.n.01 - hinged_jar.n.01)
+                (not
+                    (open ?hinged_jar.n.01)
+                )
+            )
+            (forall 
+                (?hinged_jar.n.01 - hinged_jar.n.01) 
+                (forn
+                    (2)
+                    (?bratwurst.n.01 - bratwurst.n.01)
+                    (inside ?bratwurst.n.01 ?hinged_jar.n.01)
+                )
+            )
+            (not
+                (open ?cabinet.n.01_1)
+            )
+        )
+    )
+)

@@ -1,0 +1,28 @@
+(define (problem adding_chemicals_to_hot_tub-0)
+    (:domain omnigibson)
+
+    (:objects
+        water.n.06_1 - water.n.06
+        hot_tub.n.02_1 - hot_tub.n.02
+        chlorine.n.01_1 - chlorine.n.01
+        chlorine__bottle.n.01_1 - chlorine__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled hot_tub.n.02_1 water.n.06_1)
+        (filled chlorine__bottle.n.01_1 chlorine.n.01_1) 
+        (ontop chlorine__bottle.n.01_1 floor.n.01_1) 
+        (ontop hot_tub.n.02_1 floor.n.01_1)
+        (inroom floor.n.01_1 garden) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (contains ?hot_tub.n.02_1 ?chlorine.n.01_1)
+            (filled ?hot_tub.n.02_1 ?water.n.06_1)
+        )
+    )
+)

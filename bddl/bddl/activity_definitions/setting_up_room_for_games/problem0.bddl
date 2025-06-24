@@ -1,0 +1,31 @@
+(define (problem setting_up_room_for_games-0)
+    (:domain omnigibson)
+
+    (:objects
+     	die.n.01_1 - die.n.01
+    	cabinet.n.01_1 - cabinet.n.01
+    	board_game.n.01_1 - board_game.n.01
+    	jigsaw_puzzle.n.01_1 - jigsaw_puzzle.n.01
+    	floor.n.01_1 - floor.n.01
+    	table.n.02_1 - table.n.02
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside die.n.01_1 cabinet.n.01_1) 
+        (inside board_game.n.01_1 cabinet.n.01_1) 
+        (inside jigsaw_puzzle.n.01_1 cabinet.n.01_1) 
+        (inroom floor.n.01_1 childs_room) 
+        (inroom cabinet.n.01_1 childs_room) 
+        (inroom table.n.02_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (ontop ?die.n.01_1 ?table.n.02_1) 
+            (ontop ?board_game.n.01_1 ?table.n.02_1) 
+            (ontop ?jigsaw_puzzle.n.01_1 ?table.n.02_1)
+        )
+    )
+)

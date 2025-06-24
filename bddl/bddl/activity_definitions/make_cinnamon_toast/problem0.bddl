@@ -1,0 +1,42 @@
+(define (problem make_cinnamon_toast-0)
+    (:domain omnigibson)
+
+    (:objects
+     	french_toast.n.01_1 - french_toast.n.01
+    	oven.n.01_1 - oven.n.01
+    	plate.n.04_1 - plate.n.04
+    	breakfast_table.n.01_1 - breakfast_table.n.01
+    	maple_syrup.n.01_1 - maple_syrup.n.01
+    	maple_syrup__jar.n.01_1 - maple_syrup__jar.n.01
+    	cinnamon.n.03_1 - cinnamon.n.03
+        cinnamon__shaker.n.01_1 - cinnamon__shaker.n.01 
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not 
+            (cooked french_toast.n.01_1)
+        ) 
+        (inside french_toast.n.01_1 oven.n.01_1) 
+        (ontop plate.n.04_1 breakfast_table.n.01_1) 
+        (filled maple_syrup__jar.n.01_1 maple_syrup.n.01_1) 
+        (ontop maple_syrup__jar.n.01_1 breakfast_table.n.01_1) 
+        (insource cinnamon__shaker.n.01_1 cinnamon.n.03_1)
+        (ontop cinnamon__shaker.n.01_1 breakfast_table.n.01_1)
+        (inroom breakfast_table.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (cooked ?french_toast.n.01_1) 
+            (ontop ?french_toast.n.01_1 ?plate.n.04_1) 
+            (covered ?french_toast.n.01_1 ?maple_syrup.n.01_1) 
+            (covered ?french_toast.n.01_1 ?cinnamon.n.03_1) 
+            (ontop ?plate.n.04_1 ?breakfast_table.n.01_1)
+        )
+    )
+)

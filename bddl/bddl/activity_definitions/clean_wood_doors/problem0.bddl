@@ -1,0 +1,35 @@
+(define (problem clean_wood_doors-0)
+    (:domain omnigibson)
+
+    (:objects
+        rag.n.01_1 - rag.n.01
+        floor.n.01_1 - floor.n.01
+        sink.n.01_1 - sink.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        stain.n.01_1 - stain.n.01
+        door.n.01_1 - door.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop rag.n.01_1 floor.n.01_1) 
+        (covered door.n.01_1 stain.n.01_1) 
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1) 
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom floor.n.01_1 bathroom) 
+        (inroom door.n.01_1 bathroom) 
+        (inroom sink.n.01_1 bathroom) 
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?door.n.01_1 ?stain.n.01_1)
+            )
+        )
+    )
+)

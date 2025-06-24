@@ -1,0 +1,92 @@
+(define (problem prepare_and_cook_prawns-0)
+    (:domain omnigibson)
+
+    (:objects
+        stove.n.01_1 - stove.n.01
+        prawn.n.01_1 prawn.n.01_2 prawn.n.01_3 prawn.n.01_4 prawn.n.01_5 prawn.n.01_6 - prawn.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        butter.n.01_1 - butter.n.01
+        clove.n.03_1 clove.n.03_2 clove.n.03_3 - clove.n.03
+        chopping_board.n.01_1 - chopping_board.n.01
+        carving_knife.n.01_1 - carving_knife.n.01
+        countertop.n.01_1 - countertop.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        plate.n.04_1 - plate.n.04
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (not
+            (toggled_on stove.n.01_1)
+        )
+        (inside prawn.n.01_1 electric_refrigerator.n.01_1)
+        (inside prawn.n.01_2 electric_refrigerator.n.01_1)
+        (inside prawn.n.01_3 electric_refrigerator.n.01_1)
+        (inside prawn.n.01_4 electric_refrigerator.n.01_1)
+        (inside prawn.n.01_5 electric_refrigerator.n.01_1)
+        (inside prawn.n.01_6 electric_refrigerator.n.01_1)
+        (frozen prawn.n.01_1)
+        (frozen prawn.n.01_2)
+        (frozen prawn.n.01_3)
+        (frozen prawn.n.01_4)
+        (frozen prawn.n.01_5)
+        (frozen prawn.n.01_6)
+        (not
+            (cooked prawn.n.01_1)
+        )
+        (not
+            (cooked prawn.n.01_2)
+        )
+        (not
+            (cooked prawn.n.01_3)
+        )
+        (not
+            (cooked prawn.n.01_4)
+        )
+        (not
+            (cooked prawn.n.01_5)
+        )
+        (not
+            (cooked prawn.n.01_6)
+        )
+        (inside butter.n.01_1 electric_refrigerator.n.01_1)
+        (inside clove.n.03_1 electric_refrigerator.n.01_1)
+        (inside clove.n.03_2 electric_refrigerator.n.01_1)
+        (inside clove.n.03_3 electric_refrigerator.n.01_1)
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (ontop chopping_board.n.01_1 countertop.n.01_1)
+        (ontop carving_knife.n.01_1 countertop.n.01_1)
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (ontop frying_pan.n.01_1 countertop.n.01_1)
+        (inroom electric_refrigerator.n.01_1 kitchen)
+        (inroom stove.n.01_1 kitchen)
+        (inroom countertop.n.01_1 kitchen)
+        (inroom floor.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall
+                (?prawn.n.01 - prawn.n.01)
+                (and
+                    (cooked ?prawn.n.01)
+                    (ontop ?prawn.n.01 ?plate.n.04_1)
+                    (covered ?prawn.n.01 ?salt.n.02_1)
+                )
+            )
+            (forall
+                (?clove.n.03 - clove.n.03)
+                (and
+                    (cooked ?clove.n.03)
+                    (ontop ?clove.n.03 ?plate.n.04_1)
+                )
+            )
+            (ontop ?butter.n.01_1 ?plate.n.04_1)
+        )
+    )
+)

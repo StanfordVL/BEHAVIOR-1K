@@ -1,0 +1,121 @@
+(define (problem saute_vegetables-0)
+    (:domain omnigibson)
+
+    (:objects
+        asparagus.n.02_1 asparagus.n.02_2 asparagus.n.02_3 asparagus.n.02_4 asparagus.n.02_5 asparagus.n.02_6 asparagus.n.02_7 asparagus.n.02_8 asparagus.n.02_9 - asparagus.n.02
+        tupperware.n.01_1 - tupperware.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        green_bean.n.01_1 green_bean.n.01_2 green_bean.n.01_3 green_bean.n.01_4 green_bean.n.01_5 green_bean.n.01_6 green_bean.n.01_7 - green_bean.n.01
+        sack.n.01_1 - sack.n.01
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        rosemary.n.02_1 - rosemary.n.02
+        rosemary__shaker.n.01_1 - rosemary__shaker.n.01
+        stove.n.01_1 - stove.n.01
+        spatula.n.01_1 - spatula.n.01
+        cabinet.n.01_1 - cabinet.n.01
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside asparagus.n.02_1 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_1)
+        ) 
+        (inside asparagus.n.02_2 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_2)
+        ) 
+        (inside asparagus.n.02_3 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_3)
+        ) 
+        (inside asparagus.n.02_4 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_4)
+        ) 
+        (inside asparagus.n.02_5 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_5)
+        ) 
+        (inside asparagus.n.02_6 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_6)
+        ) 
+        (inside asparagus.n.02_7 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_7)
+        ) 
+        (inside asparagus.n.02_8 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_8)
+        ) 
+        (inside asparagus.n.02_9 tupperware.n.01_1) 
+        (not 
+            (cooked asparagus.n.02_9)
+        ) 
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (inside green_bean.n.01_1 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_1)
+        ) 
+        (inside green_bean.n.01_2 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_2)
+        ) 
+        (inside green_bean.n.01_3 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_3)
+        ) 
+        (inside green_bean.n.01_4 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_4)
+        ) 
+        (inside green_bean.n.01_5 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_5)
+        ) 
+        (inside green_bean.n.01_6 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_6)
+        ) 
+        (inside green_bean.n.01_7 sack.n.01_1) 
+        (not 
+            (cooked green_bean.n.01_7)
+        ) 
+        (inside sack.n.01_1 electric_refrigerator.n.01_1)
+        (inside butter.n.01_1 electric_refrigerator.n.01_1) 
+        (insource rosemary__shaker.n.01_1 rosemary.n.02_1) 
+        (inside rosemary__shaker.n.01_1 cabinet.n.01_1)
+        (ontop frying_pan.n.01_1 stove.n.01_1) 
+        (inside spatula.n.01_1 cabinet.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom cabinet.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (future melted__butter.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?melted__butter.n.01_1)
+            (forall 
+                (?asparagus.n.02 - asparagus.n.02) 
+                (and
+                    (cooked ?asparagus.n.02)
+                    (covered ?asparagus.n.02 ?rosemary.n.02_1)
+                )
+            ) 
+            (forall 
+                (?green_bean.n.01 - green_bean.n.01) 
+                (and
+                    (cooked ?green_bean.n.01)
+                    (covered ?green_bean.n.01 ?melted__butter.n.01_1)
+                )
+            ) 
+        )
+    )
+)

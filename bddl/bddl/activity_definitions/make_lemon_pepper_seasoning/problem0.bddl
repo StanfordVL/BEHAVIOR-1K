@@ -1,0 +1,44 @@
+(define (problem make_lemon_pepper_seasoning-0)
+    (:domain omnigibson)
+
+    (:objects
+        black_pepper.n.02_1 - black_pepper.n.02
+        lemon_peel.n.01_1 - lemon_peel.n.01
+        salt.n.02_1 - salt.n.02
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        lemon-pepper_seasoning.n.01_1 - lemon-pepper_seasoning.n.01
+        blender.n.01_1 - blender.n.01
+        pepper__shaker.n.01_1 - pepper__shaker.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        chopping_board.n.01_1 - chopping_board.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (insource pepper__shaker.n.01_1 black_pepper.n.02_1)
+        (ontop pepper__shaker.n.01_1 countertop.n.01_1)
+        (ontop lemon_peel.n.01_1 chopping_board.n.01_1) 
+        (ontop chopping_board.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1) 
+        (inside lemon_juice__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop blender.n.01_1 countertop.n.01_2) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future lemon-pepper_seasoning.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?lemon-pepper_seasoning.n.01_1)
+        )
+    )
+)

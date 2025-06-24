@@ -1,0 +1,76 @@
+(define (problem make_bagels-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        salt.n.02_1 - salt.n.02
+        honey.n.01_1 - honey.n.01
+        yeast.n.01_1 - yeast.n.01
+        water.n.06_1 - water.n.06
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        bagel.n.01_1 bagel.n.01_2 bagel.n.01_3 bagel.n.01_4 - bagel.n.01
+        raw_egg.n.01_1 - raw_egg.n.01
+        sesame_seed.n.01_1 - sesame_seed.n.01
+        oven.n.01_1 - oven.n.01
+        sink.n.01_1 - sink.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        honey__jar.n.01_1 - honey__jar.n.01
+        yeast__jar.n.01_1 - yeast__jar.n.01
+        sesame_seed__shaker.n.01_1 - sesame_seed__shaker.n.01
+        countertop.n.01_1 countertop.n.01_2 countertop.n.01_3 - countertop.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled honey__jar.n.01_1 honey.n.01_1) 
+        (ontop honey__jar.n.01_1 countertop.n.01_1) 
+        (filled yeast__jar.n.01_1 yeast.n.01_1) 
+        (ontop yeast__jar.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inside raw_egg.n.01_1 bowl.n.01_1) 
+        (insource sesame_seed__shaker.n.01_1 sesame_seed.n.01_1) 
+        (ontop sesame_seed__shaker.n.01_1 countertop.n.01_3) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (inroom countertop.n.01_3 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_3) 
+        (future bagel.n.01_1) 
+        (future bagel.n.01_3) 
+        (future bagel.n.01_2) 
+        (future bagel.n.01_4) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?bagel.n.01_1) 
+            (real ?bagel.n.01_2) 
+            (real ?bagel.n.01_3) 
+            (real ?bagel.n.01_4) 
+            (forall 
+                (?bagel.n.01 - bagel.n.01) 
+                (and 
+                    (ontop ?bagel.n.01 ?cookie_sheet.n.01_1) 
+                    (cooked ?bagel.n.01)
+                )
+            )
+        )
+    )
+)

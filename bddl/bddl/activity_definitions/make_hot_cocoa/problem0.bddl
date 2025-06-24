@@ -1,0 +1,61 @@
+(define (problem make_hot_cocoa-0)
+    (:domain omnigibson)
+
+    (:objects
+        cocoa.n.01_1 - cocoa.n.01
+        whole_milk.n.01_1 - whole_milk.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        marshmallow.n.01_1 marshmallow.n.01_2 marshmallow.n.01_3 - marshmallow.n.01
+        vanilla.n.02_1 - vanilla.n.02
+        saucepan.n.01_1 - saucepan.n.01
+        mug.n.04_1 - mug.n.04
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        sack.n.01_1 - sack.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        teaspoon.n.02_1 - teaspoon.n.02
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        milk__carton.n.01_1 - milk__carton.n.01
+        vanilla__bottle.n.01_1 - vanilla__bottle.n.01
+        stove.n.01_1 - stove.n.01
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (ontop cocoa_powder__jar.n.01_1 countertop.n.01_1) 
+        (filled milk__carton.n.01_1 whole_milk.n.01_1) 
+        (inside milk__carton.n.01_1 electric_refrigerator.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (inside marshmallow.n.01_1 sack.n.01_1) 
+        (inside marshmallow.n.01_2 sack.n.01_1) 
+        (inside marshmallow.n.01_3 sack.n.01_1) 
+        (inside sack.n.01_1 electric_refrigerator.n.01_1) 
+        (insource vanilla__bottle.n.01_1 vanilla.n.02_1)
+        (inside vanilla__bottle.n.01_1 electric_refrigerator.n.01_1) 
+        (ontop saucepan.n.01_1 countertop.n.01_2) 
+        (ontop mug.n.04_1 countertop.n.01_2)
+        (ontop teaspoon.n.02_1 countertop.n.01_2)
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (future cocoa.n.01_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cocoa.n.01_1) 
+            (contains ?mug.n.04_1 ?cocoa.n.01_1)
+            (forall 
+                (?marshmallow.n.01 - marshmallow.n.01) 
+                (inside ?marshmallow.n.01 ?mug.n.04_1)
+            )
+        )
+    )
+)

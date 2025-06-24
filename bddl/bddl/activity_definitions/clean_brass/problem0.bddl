@@ -1,0 +1,29 @@
+(define (problem clean_brass-0)
+    (:domain omnigibson)
+
+    (:objects
+        brass.n.02_1 - brass.n.02
+        bookcase.n.01_1 - bookcase.n.01
+        rag.n.01_1 - rag.n.01
+        polish.n.03_1 - polish.n.03
+        polish__bottle.n.01_1 - polish__bottle.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside brass.n.02_1 bookcase.n.01_1) 
+        (inside rag.n.01_1 bookcase.n.01_1) 
+        (filled polish__bottle.n.01_1 polish.n.03_1) 
+        (inside polish__bottle.n.01_1 bookcase.n.01_1)
+        (inroom bookcase.n.01_1 living_room) 
+        (inroom floor.n.01_1 living_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (covered ?brass.n.02_1 ?polish.n.03_1)
+        )
+    )
+)

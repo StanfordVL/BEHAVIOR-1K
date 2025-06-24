@@ -1,0 +1,31 @@
+(define (problem store_beer-0)
+    (:domain omnigibson)
+
+    (:objects
+        beer_bottle.n.01_1 beer_bottle.n.01_2 beer_bottle.n.01_3 beer_bottle.n.01_4 - beer_bottle.n.01
+        countertop.n.01_1 - countertop.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop beer_bottle.n.01_1 countertop.n.01_1) 
+        (ontop beer_bottle.n.01_2 countertop.n.01_1) 
+        (ontop beer_bottle.n.01_3 countertop.n.01_1) 
+        (ontop beer_bottle.n.01_4 countertop.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?beer_bottle.n.01 - beer_bottle.n.01)
+                (inside ?beer_bottle.n.01 ?electric_refrigerator.n.01_1)
+            )
+        )
+    )
+)

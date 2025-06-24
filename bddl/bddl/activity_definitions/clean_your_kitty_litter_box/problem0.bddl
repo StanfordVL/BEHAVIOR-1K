@@ -1,0 +1,41 @@
+(define (problem clean_your_kitty_litter_box-0)
+    (:domain omnigibson)
+
+    (:objects
+        hand_towel.n.01_1 - hand_towel.n.01
+        litter_box.n.01_1 - litter_box.n.01
+        floor.n.01_1 floor.n.01_2 - floor.n.01
+        dust.n.01_1 - dust.n.01
+        fecal_matter.n.01_1 - fecal_matter.n.01
+        liquid_soap.n.01_1 - liquid_soap.n.01
+        liquid_soap__bottle.n.01_1 - liquid_soap__bottle.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop hand_towel.n.01_1 floor.n.01_1) 
+        (ontop litter_box.n.01_1 floor.n.01_1) 
+        (covered litter_box.n.01_1 dust.n.01_1) 
+        (covered litter_box.n.01_1 fecal_matter.n.01_1)
+        (filled liquid_soap__bottle.n.01_1 liquid_soap.n.01_1)
+        (ontop liquid_soap__bottle.n.01_1 floor.n.01_2)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 bedroom)
+        (inroom floor.n.01_2 bathroom)
+        (inroom sink.n.01_1 bathroom)
+        (ontop agent.n.01_1 floor.n.01_1) 
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?litter_box.n.01_1 ?dust.n.01_1)
+            )
+            (not 
+                (covered ?litter_box.n.01_1 ?fecal_matter.n.01_1)
+            )
+        )
+    )
+)

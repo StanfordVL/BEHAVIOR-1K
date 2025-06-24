@@ -1,0 +1,60 @@
+(define (problem wash_baby_bottles-0)
+    (:domain omnigibson)
+
+    (:objects
+        bottle.n.03_1 bottle.n.03_2 bottle.n.03_3 bottle.n.03_4 bottle.n.03_5 - bottle.n.03
+        floor.n.01_1 - floor.n.01
+        disinfectant.n.01_1 - disinfectant.n.01
+        dishwasher.n.01_1 - dishwasher.n.01
+        disinfectant__bottle.n.01_1 - disinfectant__bottle.n.01
+        sink.n.01_1 - sink.n.01
+        countertop.n.01_1 - countertop.n.01
+        scrub_brush.n.01_1 - scrub_brush.n.01
+        water.n.06_1 - water.n.06
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bottle.n.03_1 countertop.n.01_1) 
+        (not 
+            (covered bottle.n.03_1 disinfectant.n.01_1)
+        ) 
+        (ontop bottle.n.03_2 countertop.n.01_1) 
+        (not 
+            (covered bottle.n.03_2 disinfectant.n.01_1)
+        ) 
+        (ontop bottle.n.03_3 sink.n.01_1)
+        (not 
+            (covered bottle.n.03_3 disinfectant.n.01_1)
+        ) 
+        (ontop bottle.n.03_4 countertop.n.01_1) 
+        (not 
+            (covered bottle.n.03_4 disinfectant.n.01_1)
+        ) 
+        (ontop bottle.n.03_5 countertop.n.01_1) 
+        (not 
+            (covered bottle.n.03_5 disinfectant.n.01_1)
+        ) 
+        (filled disinfectant__bottle.n.01_1 disinfectant.n.01_1)
+        (ontop disinfectant__bottle.n.01_1 countertop.n.01_1)
+        (ontop scrub_brush.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?bottle.n.03 - bottle.n.03) 
+                (and
+                    (inside ?bottle.n.03 ?dishwasher.n.01_1)
+                    (covered ?bottle.n.03 ?disinfectant.n.01_1)
+                )
+            ) 
+        )
+    )
+)

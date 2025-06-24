@@ -1,0 +1,43 @@
+(define (problem clean_copper_wire-0)
+    (:domain omnigibson)
+
+    (:objects
+        copper_wire.n.01_1 - copper_wire.n.01
+        countertop.n.01_1 - countertop.n.01
+        salt.n.02_1 - salt.n.02
+        salt__shaker.n.01_1 - salt__shaker.n.01
+        cornstarch.n.01_1 - cornstarch.n.01
+        cornstarch__jar.n.01_1 - cornstarch__jar.n.01
+        lemon_juice.n.01_1 - lemon_juice.n.01
+        lemon_juice__bottle.n.01_1 - lemon_juice__bottle.n.01
+        rust.n.01_1 - rust.n.01
+        water.n.06_1 - water.n.06
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered copper_wire.n.01_1 rust.n.01_1)
+        (ontop copper_wire.n.01_1 countertop.n.01_1) 
+        (insource salt__shaker.n.01_1 salt.n.02_1)
+        (ontop salt__shaker.n.01_1 countertop.n.01_1)
+        (filled cornstarch__jar.n.01_1 cornstarch.n.01_1)
+        (ontop cornstarch__jar.n.01_1 countertop.n.01_1)
+        (filled lemon_juice__bottle.n.01_1 lemon_juice.n.01_1)
+        (ontop lemon_juice__bottle.n.01_1 countertop.n.01_1)
+        (insource sink.n.01_1 water.n.06_1) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (not 
+                (covered ?copper_wire.n.01_1 ?rust.n.01_1)
+            )
+        )
+    )
+)

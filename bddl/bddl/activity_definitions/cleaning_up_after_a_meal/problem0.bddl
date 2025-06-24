@@ -1,0 +1,92 @@
+(define (problem cleaning_up_after_a_meal-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+     	bowl.n.01_1 bowl.n.01_2 - bowl.n.01
+    	table.n.02_1 - table.n.02
+    	sack.n.01_1 - sack.n.01
+    	chair.n.01_1 chair.n.01_2 - chair.n.01
+    	plate.n.04_1 plate.n.04_2 plate.n.04_3 plate.n.04_4 - plate.n.04
+    	cup.n.01_1 cup.n.01_2 - cup.n.01
+    	hamburger.n.01_1 hamburger.n.01_2 - hamburger.n.01
+    	floor.n.01_1 floor.n.01_2 - floor.n.01
+    	detergent.n.02_1 - detergent.n.02
+    	detergent__bottle.n.01_1 - detergent__bottle.n.01
+    	dishwasher.n.01_1 - dishwasher.n.01
+        sink.n.01_1 - sink.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop bowl.n.01_1 table.n.02_1) 
+        (ontop bowl.n.01_2 table.n.02_1) 
+        (covered bowl.n.01_1 stain.n.01_1) 
+        (covered bowl.n.01_2 stain.n.01_1) 
+        (ontop sack.n.01_1 table.n.02_1) 
+        (ontop plate.n.04_1 table.n.02_1) 
+        (ontop plate.n.04_2 table.n.02_1) 
+        (ontop plate.n.04_3 table.n.02_1) 
+        (ontop plate.n.04_4 table.n.02_1) 
+        (covered plate.n.04_1 stain.n.01_1) 
+        (covered plate.n.04_2 stain.n.01_1) 
+        (covered plate.n.04_3 stain.n.01_1) 
+        (covered plate.n.04_4 stain.n.01_1) 
+        (ontop cup.n.01_1 table.n.02_1) 
+        (ontop cup.n.01_2 table.n.02_1) 
+        (covered cup.n.01_1 stain.n.01_1) 
+        (covered cup.n.01_2 stain.n.01_1) 
+        (ontop hamburger.n.01_1 chair.n.01_2)
+        (ontop hamburger.n.01_2 floor.n.01_1)
+        (filled detergent__bottle.n.01_1 detergent.n.02_1)
+        (ontop detergent__bottle.n.01_1 floor.n.01_1)
+        (covered chair.n.01_1 stain.n.01_1)
+        (covered chair.n.01_2 stain.n.01_1)
+        (covered table.n.02_1 stain.n.01_1) 
+        (inroom dishwasher.n.01_1 kitchen) 
+        (inroom floor.n.01_1 dining_room) 
+        (inroom floor.n.01_2 kitchen) 
+        (inroom table.n.02_1 dining_room) 
+        (inroom chair.n.01_1 dining_room)
+        (inroom chair.n.01_2 dining_room)
+        (inroom sink.n.01_1 kitchen)
+        (ontop agent.n.01_1 floor.n.01_2)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?bowl.n.01 - bowl.n.01) 
+                (not 
+                    (covered ?bowl.n.01 ?stain.n.01_1)
+                )
+            ) 
+            (forall 
+                (?plate.n.04 - plate.n.04) 
+                (not 
+                    (covered ?plate.n.04 ?stain.n.01_1)
+                )
+            ) 
+            (forall 
+                (?cup.n.01 - cup.n.01) 
+                (not 
+                    (covered ?cup.n.01 ?stain.n.01_1)
+                )
+            ) 
+            (forall 
+                (?hamburger.n.01 - hamburger.n.01) 
+                (inside ?hamburger.n.01 ?sack.n.01_1)
+            ) 
+            (ontop ?sack.n.01_1 ?floor.n.01_1) 
+            (not 
+                (covered ?table.n.02_1 ?stain.n.01_1)
+            ) 
+            (forall
+                (?chair.n.01 - chair.n.01)
+                (not
+                    (covered ?chair.n.01 ?stain.n.01_1)
+                 )
+            )        
+        )
+    )
+)

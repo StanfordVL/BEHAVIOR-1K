@@ -1,0 +1,74 @@
+(define (problem make_chocolate_biscuits-0)
+    (:domain omnigibson)
+
+    (:objects
+        flour.n.01_1 - flour.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        granulated_sugar.n.01_1 - granulated_sugar.n.01
+        raw_egg.n.01_1 raw_egg.n.01_2 - raw_egg.n.01
+        cocoa_powder.n.01_1 - cocoa_powder.n.01
+        chocolate_bar.n.01_1 - chocolate_bar.n.01
+        electric_mixer.n.01_1 - electric_mixer.n.01
+        chocolate_biscuit.n.01_1 chocolate_biscuit.n.01_2 chocolate_biscuit.n.01_3 chocolate_biscuit.n.01_4 chocolate_biscuit.n.01_5 chocolate_biscuit.n.01_6 - chocolate_biscuit.n.01
+        oven.n.01_1 - oven.n.01
+        cookie_sheet.n.01_1 - cookie_sheet.n.01
+        flour__sack.n.01_1 - flour__sack.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        sugar__sack.n.01_1 - sugar__sack.n.01
+        cocoa_powder__jar.n.01_1 - cocoa_powder__jar.n.01
+        countertop.n.01_1 countertop.n.01_2 - countertop.n.01
+        bowl.n.01_1 - bowl.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        tablespoon.n.02_1 - tablespoon.n.02
+        agent.n.01_1 - agent.n.01
+        floor.n.01_1 - floor.n.01
+    )
+    
+    (:init 
+        (filled flour__sack.n.01_1 flour.n.01_1) 
+        (ontop flour__sack.n.01_1 countertop.n.01_1) 
+        (filled tupperware.n.01_1 melted__butter.n.01_1) 
+        (ontop tupperware.n.01_1 countertop.n.01_1) 
+        (filled sugar__sack.n.01_1 granulated_sugar.n.01_1) 
+        (ontop sugar__sack.n.01_1 countertop.n.01_1) 
+        (ontop tablespoon.n.02_1 countertop.n.01_1) 
+        (inside raw_egg.n.01_1 bowl.n.01_1) 
+        (inside raw_egg.n.01_2 bowl.n.01_1) 
+        (filled cocoa_powder__jar.n.01_1 cocoa_powder.n.01_1) 
+        (ontop cocoa_powder__jar.n.01_1 countertop.n.01_2) 
+        (ontop electric_mixer.n.01_1 countertop.n.01_2) 
+        (inside chocolate_bar.n.01_1 electric_refrigerator.n.01_1) 
+        (inside bowl.n.01_1 electric_refrigerator.n.01_1) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (inroom oven.n.01_1 kitchen) 
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom countertop.n.01_2 kitchen) 
+        (ontop cookie_sheet.n.01_1 countertop.n.01_2) 
+        (future chocolate_biscuit.n.01_3) 
+        (future chocolate_biscuit.n.01_6) 
+        (future chocolate_biscuit.n.01_5) 
+        (future chocolate_biscuit.n.01_1) 
+        (future chocolate_biscuit.n.01_4) 
+        (future chocolate_biscuit.n.01_2) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?chocolate_biscuit.n.01_1) 
+            (real ?chocolate_biscuit.n.01_2) 
+            (real ?chocolate_biscuit.n.01_3) 
+            (real ?chocolate_biscuit.n.01_4) 
+            (real ?chocolate_biscuit.n.01_5) 
+            (real ?chocolate_biscuit.n.01_6) 
+            (forall 
+                (?chocolate_biscuit.n.01 - chocolate_biscuit.n.01) 
+                (and 
+                    (cooked ?chocolate_biscuit.n.01) 
+                    (ontop ?chocolate_biscuit.n.01 ?cookie_sheet.n.01_1)
+                )
+            )
+        )
+    )
+)

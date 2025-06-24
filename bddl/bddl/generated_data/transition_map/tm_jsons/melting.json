@@ -1,0 +1,236 @@
+[
+    {
+        "rule_name": "bleu.n.01-melting",
+        "input_synsets": {
+            "bleu.n.01": 1
+        },
+        "output_synsets": {
+            "melted__bleu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "butter.n.01-melting",
+        "input_synsets": {
+            "butter.n.01": 1
+        },
+        "output_synsets": {
+            "melted__butter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cane_sugar.n.02-melting",
+        "input_synsets": {
+            "cane_sugar.n.02": 1
+        },
+        "output_synsets": {
+            "melted__cane_sugar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "cheddar.n.02-melting",
+        "input_synsets": {
+            "cheddar.n.02": 1
+        },
+        "output_synsets": {
+            "melted__cheddar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chocolate_bar.n.01-melting",
+        "input_synsets": {
+            "chocolate_bar.n.01": 1
+        },
+        "output_synsets": {
+            "melted__chocolate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "chocolate_kiss.n.01-melting",
+        "input_synsets": {
+            "chocolate_kiss.n.01": 1
+        },
+        "output_synsets": {
+            "melted__chocolate.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__bleu.n.01-melting",
+        "input_synsets": {
+            "diced__bleu.n.01": 1
+        },
+        "output_synsets": {
+            "melted__bleu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__butter.n.01-melting",
+        "input_synsets": {
+            "diced__butter.n.01": 1
+        },
+        "output_synsets": {
+            "melted__butter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__cheddar.n.01-melting",
+        "input_synsets": {
+            "diced__cheddar.n.01": 1
+        },
+        "output_synsets": {
+            "melted__cheddar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__feta.n.01-melting",
+        "input_synsets": {
+            "diced__feta.n.01": 1
+        },
+        "output_synsets": {
+            "melted__feta.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__mozzarella.n.01-melting",
+        "input_synsets": {
+            "diced__mozzarella.n.01": 1
+        },
+        "output_synsets": {
+            "melted__mozzarella.n.01": 1
+        }
+    },
+    {
+        "rule_name": "diced__swiss_cheese.n.01-melting",
+        "input_synsets": {
+            "diced__swiss_cheese.n.01": 1
+        },
+        "output_synsets": {
+            "melted__swiss_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "granulated_sugar.n.01-melting",
+        "input_synsets": {
+            "granulated_sugar.n.01": 1
+        },
+        "output_synsets": {
+            "melted__granulated_sugar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "grated_cheese.n.01-melting",
+        "input_synsets": {
+            "grated_cheese.n.01": 1
+        },
+        "output_synsets": {
+            "melted__grated_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__bleu.n.01-melting",
+        "input_synsets": {
+            "half__bleu.n.01": 1
+        },
+        "output_synsets": {
+            "melted__bleu.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__butter.n.01-melting",
+        "input_synsets": {
+            "half__butter.n.01": 1
+        },
+        "output_synsets": {
+            "melted__butter.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__cheddar.n.01-melting",
+        "input_synsets": {
+            "half__cheddar.n.01": 1
+        },
+        "output_synsets": {
+            "melted__cheddar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__feta.n.01-melting",
+        "input_synsets": {
+            "half__feta.n.01": 1
+        },
+        "output_synsets": {
+            "melted__feta.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__mozzarella.n.01-melting",
+        "input_synsets": {
+            "half__mozzarella.n.01": 1
+        },
+        "output_synsets": {
+            "melted__mozzarella.n.01": 1
+        }
+    },
+    {
+        "rule_name": "half__swiss_cheese.n.01-melting",
+        "input_synsets": {
+            "half__swiss_cheese.n.01": 1
+        },
+        "output_synsets": {
+            "melted__swiss_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "ice_cube.n.01-melting",
+        "input_synsets": {
+            "ice_cube.n.01": 1
+        },
+        "output_synsets": {
+            "water.n.06": 1
+        }
+    },
+    {
+        "rule_name": "lump_sugar.n.01-melting",
+        "input_synsets": {
+            "lump_sugar.n.01": 1
+        },
+        "output_synsets": {
+            "melted__granulated_sugar.n.01": 1
+        }
+    },
+    {
+        "rule_name": "mozzarella.n.01-melting",
+        "input_synsets": {
+            "mozzarella.n.01": 1
+        },
+        "output_synsets": {
+            "melted__mozzarella.n.01": 1
+        }
+    },
+    {
+        "rule_name": "parmesan.n.01-melting",
+        "input_synsets": {
+            "parmesan.n.01": 1
+        },
+        "output_synsets": {
+            "melted__parmesan.n.01": 1
+        }
+    },
+    {
+        "rule_name": "swiss_cheese.n.01-melting",
+        "input_synsets": {
+            "swiss_cheese.n.01": 1
+        },
+        "output_synsets": {
+            "melted__swiss_cheese.n.01": 1
+        }
+    },
+    {
+        "rule_name": "white_chocolate.n.01-melting",
+        "input_synsets": {
+            "white_chocolate.n.01": 1
+        },
+        "output_synsets": {
+            "melted__white_chocolate.n.01": 1
+        }
+    }
+]

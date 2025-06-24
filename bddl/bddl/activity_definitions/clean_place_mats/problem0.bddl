@@ -1,0 +1,62 @@
+(define (problem clean_place_mats-0)
+    (:domain omnigibson)
+
+    (:objects
+     	place_mat.n.01_1 place_mat.n.01_2 place_mat.n.01_3 place_mat.n.01_4 - place_mat.n.01
+        breadcrumb.n.01_1 - breadcrumb.n.01
+    	breakfast_table.n.01_1 - breakfast_table.n.01
+        clothes_dryer.n.01_1 - clothes_dryer.n.01
+        washer.n.03_1 - washer.n.03
+    	water.n.06_1 - water.n.06
+    	detergent.n.02_1 - detergent.n.02
+    	detergent__bottle.n.01_1 - detergent__bottle.n.01
+    	adhesive_material.n.01_1 - adhesive_material.n.01
+    	floor.n.01_1 - floor.n.01
+    	agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop place_mat.n.01_1 breakfast_table.n.01_1) 
+        (ontop place_mat.n.01_2 breakfast_table.n.01_1) 
+        (ontop place_mat.n.01_3 breakfast_table.n.01_1) 
+        (ontop place_mat.n.01_4 breakfast_table.n.01_1)
+        (covered place_mat.n.01_1 adhesive_material.n.01_1) 
+        (covered place_mat.n.01_2 adhesive_material.n.01_1) 
+        (covered place_mat.n.01_3 adhesive_material.n.01_1) 
+        (covered place_mat.n.01_4 adhesive_material.n.01_1) 
+        (covered place_mat.n.01_1 breadcrumb.n.01_1) 
+        (covered place_mat.n.01_2 breadcrumb.n.01_1) 
+        (covered place_mat.n.01_3 breadcrumb.n.01_1) 
+        (covered place_mat.n.01_4 breadcrumb.n.01_1) 
+        (filled detergent__bottle.n.01_1 detergent.n.02_1) 
+        (ontop detergent__bottle.n.01_1 clothes_dryer.n.01_1)
+        (inroom breakfast_table.n.01_1 dining_room) 
+        (inroom washer.n.03_1 utility_room)
+        (inroom clothes_dryer.n.01_1 utility_room)
+        (inroom floor.n.01_1 utility_room) 
+        (ontop agent.n.01_1 floor.n.01_1)
+        (future water.n.06_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?place_mat.n.01 - place_mat.n.01)
+                (and 
+                    (not 
+                        (covered ?place_mat.n.01 ?breadcrumb.n.01_1)
+                    )
+                    (not 
+                        (covered ?place_mat.n.01 ?water.n.06_1)
+                    )
+                    (not 
+                        (saturated ?place_mat.n.01 ?water.n.06_1)
+                    )
+                    (not 
+                        (covered ?place_mat.n.01 ?adhesive_material.n.01_1)
+                    )
+                )
+            )
+        )
+    )
+)

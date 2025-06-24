@@ -1,0 +1,110 @@
+(define (problem make_chicken_and_waffles-0)
+    (:domain omnigibson)
+
+    (:objects
+        chicken.n.01_1 - chicken.n.01
+        fritter_batter.n.01_1 - fritter_batter.n.01
+        cooked__fritter_batter.n.01_1 - cooked__fritter_batter.n.01
+        breadcrumb.n.01_1 - breadcrumb.n.01
+        cooked__breadcrumb.n.01_1 - cooked__breadcrumb.n.01
+        frying_pan.n.01_1 - frying_pan.n.01
+        waffle.n.01_1 waffle.n.01_2 - waffle.n.01
+        stove.n.01_1 - stove.n.01
+        butter.n.01_1 - butter.n.01
+        melted__butter.n.01_1 - melted__butter.n.01
+        countertop.n.01_1 - countertop.n.01
+        cooking_oil.n.01_1 - cooking_oil.n.01
+        cooked__cooking_oil.n.01_1 - cooked__cooking_oil.n.01
+        cooking_oil__bottle.n.01_1 - cooking_oil__bottle.n.01
+        hot_sauce.n.01_1 - hot_sauce.n.01
+        hot_sauce__bottle.n.01_1 - hot_sauce__bottle.n.01
+        maple_syrup.n.01_1 - maple_syrup.n.01
+        maple_syrup__jar.n.01_1 - maple_syrup__jar.n.01
+        toaster_oven.n.01_1 - toaster_oven.n.01
+        tupperware.n.01_1 - tupperware.n.01
+        bowl.n.01_1 - bowl.n.01
+        plate.n.04_1 - plate.n.04
+        floor.n.01_1 - floor.n.01
+        electric_refrigerator.n.01_1 - electric_refrigerator.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (inside chicken.n.01_1 electric_refrigerator.n.01_1) 
+        (not 
+            (cooked chicken.n.01_1)
+        )
+        (inside waffle.n.01_1 electric_refrigerator.n.01_1)
+        (inside waffle.n.01_2 electric_refrigerator.n.01_1)
+        (frozen waffle.n.01_1) 
+        (not
+            (cooked waffle.n.01_1)
+        )
+        (frozen waffle.n.01_2) 
+        (not 
+            (cooked waffle.n.01_2)
+        )
+        (ontop toaster_oven.n.01_1 countertop.n.01_1)
+        (ontop frying_pan.n.01_1 stove.n.01_1) 
+        (inside butter.n.01_1 electric_refrigerator.n.01_1) 
+        (filled cooking_oil__bottle.n.01_1 cooking_oil.n.01_1)
+        (ontop cooking_oil__bottle.n.01_1 countertop.n.01_1) 
+        (filled maple_syrup__jar.n.01_1 maple_syrup.n.01_1)
+        (inside maple_syrup__jar.n.01_1 electric_refrigerator.n.01_1)
+        (insource hot_sauce__bottle.n.01_1 hot_sauce.n.01_1)
+        (inside hot_sauce__bottle.n.01_1 electric_refrigerator.n.01_1)
+        (ontop plate.n.04_1 countertop.n.01_1)
+        (filled tupperware.n.01_1 fritter_batter.n.01_1)
+        (inside tupperware.n.01_1 electric_refrigerator.n.01_1)
+        (filled bowl.n.01_1 breadcrumb.n.01_1)
+        (ontop bowl.n.01_1 countertop.n.01_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom stove.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (inroom electric_refrigerator.n.01_1 kitchen) 
+        (future melted__butter.n.01_1)
+        (future cooked__fritter_batter.n.01_1)
+        (future cooked__breadcrumb.n.01_1)
+        (future cooked__cooking_oil.n.01_1)
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (real ?cooked__fritter_batter.n.01_1)
+            (or 
+                (real ?cooked__breadcrumb.n.01_1)
+                (real ?breadcrumb.n.01_1)
+            )
+            (or 
+                (real ?cooked__cooking_oil.n.01_1)
+                (real ?cooking_oil.n.01_1)
+            )
+            (real ?melted__butter.n.01_1)
+            (cooked ?chicken.n.01_1)
+            (covered ?chicken.n.01_1 ?cooked__fritter_batter.n.01_1)
+            (or
+                (covered ?chicken.n.01_1 ?cooked__breadcrumb.n.01_1)
+                (covered ?chicken.n.01_1 ?breadcrumb.n.01_1)
+            )
+            (or 
+                (covered ?chicken.n.01_1 ?cooked__cooking_oil.n.01_1)
+                (covered ?chicken.n.01_1 ?cooking_oil.n.01_1)
+            )
+            (covered ?chicken.n.01_1 ?melted__butter.n.01_1)
+            (covered ?chicken.n.01_1 ?maple_syrup.n.01_1)
+            (covered ?chicken.n.01_1 ?hot_sauce.n.01_1)
+            (ontop ?chicken.n.01_1 ?plate.n.04_1)
+            (forall 
+                (?waffle.n.01 - waffle.n.01)
+                (and 
+                    (cooked ?waffle.n.01)
+                    (covered ?waffle.n.01 ?melted__butter.n.01_1)
+                    (ontop ?waffle.n.01 ?plate.n.04_1)
+                    (covered ?waffle.n.01_1 ?hot_sauce.n.01_1)
+                    (covered ?waffle.n.01_1 ?maple_syrup.n.01_1)
+                )
+            )
+        )
+    )
+)

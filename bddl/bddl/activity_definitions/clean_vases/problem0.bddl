@@ -1,0 +1,48 @@
+(define (problem clean_vases-0)
+    (:domain omnigibson)
+
+    (:objects
+        stain.n.01_1 - stain.n.01
+        vase.n.01_1 vase.n.01_2 vase.n.01_3 - vase.n.01
+        countertop.n.01_1 - countertop.n.01
+        sodium_carbonate.n.01_1 - sodium_carbonate.n.01
+        sodium_carbonate__jar.n.01_1 - sodium_carbonate__jar.n.01
+        vinegar.n.01_1 - vinegar.n.01
+        vinegar__bottle.n.01_1 - vinegar__bottle.n.01
+        water.n.06_1 - water.n.06
+        toothbrush.n.01_1 - toothbrush.n.01
+        sink.n.01_1 - sink.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (covered vase.n.01_1 stain.n.01_1) 
+        (covered vase.n.01_2 stain.n.01_1) 
+        (covered vase.n.01_3 stain.n.01_1) 
+        (ontop vase.n.01_1 countertop.n.01_1) 
+        (ontop vase.n.01_2 countertop.n.01_1) 
+        (ontop vase.n.01_3 countertop.n.01_1) 
+        (filled sodium_carbonate__jar.n.01_1 sodium_carbonate.n.01_1) 
+        (ontop sodium_carbonate__jar.n.01_1 countertop.n.01_1)
+        (filled vinegar__bottle.n.01_1 vinegar.n.01_1) 
+        (ontop vinegar__bottle.n.01_1 countertop.n.01_1)
+        (ontop toothbrush.n.01_1 countertop.n.01_1) 
+        (insource sink.n.01_1 water.n.06_1)
+        (inroom countertop.n.01_1 kitchen) 
+        (inroom sink.n.01_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (forall 
+                (?vase.n.01 - vase.n.01) 
+                (not 
+                    (covered ?vase.n.01 ?stain.n.01_1)
+                )
+            ) 
+        )
+    )
+)

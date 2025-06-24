@@ -1,0 +1,27 @@
+(define (problem pour_a_glass_of_wine-0)
+    (:domain omnigibson)
+
+    (:objects
+        red_wine.n.01_1 - red_wine.n.01
+        wine_bottle.n.01_1 - wine_bottle.n.01
+        wineglass.n.01_1 - wineglass.n.01
+        countertop.n.01_1 - countertop.n.01
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (filled wine_bottle.n.01_1 red_wine.n.01_1) 
+        (ontop wineglass.n.01_1 countertop.n.01_1) 
+        (ontop wine_bottle.n.01_1 countertop.n.01_1) 
+        (inroom countertop.n.01_1 bar) 
+        (inroom floor.n.01_1 bar) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (filled ?wineglass.n.01_1 ?red_wine.n.01_1)
+        )
+    )
+)
