@@ -7,11 +7,11 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='bddl',
-    version='3.6.0',
+    version='3.7.0-alpha',
     author='Stanford University',
     long_description_content_type='text/markdown',
     long_description=long_description,
-    url='https://github.com/StanfordVL/bddl',
+    url='https://github.com/StanfordVL/BEHAVIOR-1K',
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
