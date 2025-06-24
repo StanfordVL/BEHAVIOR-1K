@@ -20,24 +20,23 @@ def generate_prop_state(proprio_data):
     return prop_state
 
 
-class OpenPIWrapper():
+class OpenPi():
+    """
+    Pi-0 policy from Physical Intelligence https://www.physicalintelligence.company/download/pi0.pdf
+    """
     def __init__(
         self, 
         host, 
         port, 
-        text_prompt : str = "put the white cup on the coffee machine",
+        text_prompt : str,
         control_mode : str = "temporal_ensemble",
     ) -> None:
         """
         Args:
-            model_ckpt_folder: str, path to the model checkpoint folder
-            ckpt_id: int, checkpoint id
-            device: str, device to run the model on
-            text_prompt: str, text prompt to use for the model
-        Example:
-        model_ckpt_folder = "/home/mfu/research/openpi/checkpoints/pi0_fast_yumi/pi0_fast_yumi_finetune"
-        ckpt_id = 29999
-        device = "cuda"
+            host (str): Host address of the OpenPi server.
+            port (int): Port number of the OpenPi server.
+            text_prompt (str): Text prompt to guide the policy's actions.
+            control_mode (str): Control mode for the policy. Options are 'receeding_temporal', 'receeding_horizon', or 'temporal_ensemble'.
         """
         # Create a trained policy.
         self.policy = _websocket_client_policy.WebsocketClientPolicy(

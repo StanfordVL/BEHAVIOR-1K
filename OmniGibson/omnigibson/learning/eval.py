@@ -36,21 +36,6 @@ logger = logging.getLogger("evaluator")
 logger.setLevel(20)  # info
 
 
-def load_openpi_model():
-
-    from omnigibson.learning.policies.eval_b1k_wrapper import OpenPIWrapper
-
-    # need to launch the openpi server first
-    openpi_policy = OpenPIWrapper(
-        host="10.79.12.59",
-        port=8000,
-        text_prompt="pick up the trash",
-        control_mode="receeding_temporal"
-    )
-
-    return openpi_policy
-
-
 def load_task_instance_for_env(env, instance_id: int) -> None:
     scene_model = env.task.scene_name
     tro_filename = env.task.get_cached_activity_scene_filename(
@@ -149,11 +134,7 @@ class Evaluator:
         return robot
 
     def load_policy(self) -> Any:
-        if self.cfg.policy_name == 'pi0':
-            policy = load_openpi_model()
-        else:
-            policy = call(self.cfg.eval)
-            policy.eval()
+        policy = call(self.cfg.eval)
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Loaded policy: {self.cfg.policy_name}")
@@ -167,7 +148,7 @@ class Evaluator:
         """
         obs = self._preprocess_obs(self.obs)
         self.robot_action = self.policy.forward(obs={"obs": obs})
-        #concatenate the three camera images into one and save to obs_buffer
+        # concatenate the three camera images into one and save to obs_buffer
         all_obs = torch.cat(
             [
                 obs["robot_r1::robot_r1:zed_link:Camera:0::rgb"],
