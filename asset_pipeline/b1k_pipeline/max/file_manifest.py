@@ -6,7 +6,7 @@ from pymxs import runtime as rt
 from tqdm import tqdm
 
 import sys
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.max.prebake_textures import hash_object
 

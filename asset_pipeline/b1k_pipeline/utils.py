@@ -190,7 +190,7 @@ def create_docker_container(cl, hostname:str, i: int):
             },
             mounts=[
                 docker.types.Mount(source="/scr", target="/scr", type="bind"),
-                docker.types.Mount(source="/scr/ig_pipeline/b1k_pipeline/docker/data", target="/data", type="bind", read_only=True),
+                docker.types.Mount(source="/scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker/data", target="/data", type="bind", read_only=True),
                 docker.types.Mount(source="/scr/OmniGibson", target="/omnigibson-src", type="bind", read_only=True),
             ],
             device_requests=[
@@ -206,7 +206,7 @@ def launch_cluster(worker_count):
     dask_client = Client(n_workers=0, host="", scheduler_port=8786)
     hostname = subprocess.run('hostname', shell=True, check=True, stdout=subprocess.PIPE).stdout.decode('utf-8').strip()
     if CLUSTER_MODE == "enroot":
-        subprocess.run(f'cd /scr/ig_pipeline/b1k_pipeline/docker; ./run_worker_local.sh {worker_count} {hostname}:8786', shell=True, check=True)
+        subprocess.run(f'cd /scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker; ./run_worker_local.sh {worker_count} {hostname}:8786', shell=True, check=True)
     elif CLUSTER_MODE == "slurm":
         subprocess.run('ssh sc.stanford.edu "cd /cvgl2/u/cgokmen/ig_pipeline/b1k_pipeline/docker; sbatch --parsable run_worker_slurm.sh {hostname}:8786"', shell=True, check=True)
     elif CLUSTER_MODE == "docker":
@@ -230,4 +230,4 @@ def run_in_env(python_cmd, omnigibson_env=False):
     if omnigibson_env:
         subcmd = "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + cmd
     cmd = ["micromamba", "run", "-n", env, "/bin/bash", "-c", subcmd]
-    return subprocess.run(cmd, capture_output=True, check=True, cwd="/scr/ig_pipeline")
+    return subprocess.run(cmd, capture_output=True, check=True, cwd="/scr/BEHAVIOR-1K/asset_pipeline")

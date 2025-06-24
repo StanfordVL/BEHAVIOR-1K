@@ -32,7 +32,7 @@ def distance_from_grayscale_stats(filename):
 
 
 def main():
-    files = list(pathlib.Path(r"/scr/ig_pipeline").glob("cad/*/*/bakery/*Reflection*.png"))
+    files = list(pathlib.Path(r"/scr/BEHAVIOR-1K/asset_pipeline").glob("cad/*/*/bakery/*Reflection*.png"))
     print("Total files:", len(files))
 
     # Go through all the files and get all the unique colors in each of them

@@ -1,7 +1,7 @@
 import re
 import sys
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import glob
 import json
@@ -23,8 +23,8 @@ rt = pymxs.runtime
 CONFIRM_EACH = False
 INTERACTIVE_MODE = True
 IN_DATASET_ROOT = r"C:\Users\Cem\research\iGibson-dev\igibson\data\ig_dataset"
-OUTPUT_ROOT = r"D:\ig_pipeline\cad\objects"
-RECORD_PATH = os.path.join(r"D:\ig_pipeline\metadata\patched_rotations.json")
+OUTPUT_ROOT = r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects"
+RECORD_PATH = os.path.join(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\patched_rotations.json")
 TRANSLATION_PATH = os.path.join(IN_DATASET_ROOT, "metadata", "model_rename.yaml")
 with open(TRANSLATION_PATH, "r") as f:
     TRANSLATION_DICT = yaml.load(f, Loader=yaml.SafeLoader)

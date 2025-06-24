@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.utils import parse_name
 

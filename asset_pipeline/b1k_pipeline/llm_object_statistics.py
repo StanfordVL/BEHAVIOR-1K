@@ -32,7 +32,7 @@ messages = [
         "content": [
             {
                 "type": "video",
-                "video": "file:///scr/ig_pipeline/frames/out.mp4",
+                "video": "file:///scr/BEHAVIOR-1K/asset_pipeline/frames/out.mp4",
                 # "max_pixels": 360 * 420,
                 "fps": fps,
             },

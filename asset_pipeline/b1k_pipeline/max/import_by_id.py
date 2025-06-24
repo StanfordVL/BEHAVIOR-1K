@@ -14,7 +14,7 @@ import_list = [
 'ykujyn',
 ]
 
-for fn in tqdm.tqdm(glob.glob(r"D:\ig_pipeline\cad\*\*\processed.max")):
+for fn in tqdm.tqdm(glob.glob(r"D:\BEHAVIOR-1K\asset_pipeline\cad\*\*\processed.max")):
     # Get the object list from the file
     f_objects = rt.getMAXFileObjectNames(fn, quiet=True)
     

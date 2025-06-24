@@ -21,7 +21,7 @@ PRECHECK_COLLISION = False
 PRECHECK_EMPTY = False
 
 def bin_files():
-    max_files = glob.glob(r"D:\ig_pipeline\cad\objects\*\processed.max")
+    max_files = glob.glob(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\*\processed.max")
     max_files = sorted([pathlib.Path(x) for x in max_files if "legacy_" not in x and "batch-" not in x])
 
     # Deterministic shuffle
@@ -47,7 +47,7 @@ def bin_files():
     }
     for d, tgt in displacements.items():
         # Convert d to its path form
-        p = pathlib.Path(r"D:\ig_pipeline\cad\objects") / d / "processed.max"
+        p = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects") / d / "processed.max"
 
         # Remove d from the bin it shows up in
         for bin in bins:
@@ -96,7 +96,7 @@ def bin_files():
                     providers = [x for h in hashes for x in hash_to_file[i][(basename, h)]]
                     print("Texture collision for", basename, "between", providers, "in bin", i)
                     for provider in providers[1:]:
-                        relpath = provider.relative_to(r"D:\ig_pipeline\cad\objects")
+                        relpath = provider.relative_to(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects")
                         needs_removal.add(relpath.parts[0])
                     any_collision = True
 
@@ -122,7 +122,7 @@ def bin_files():
         rt.resetMaxFile(rt.name("noPrompt"))
 
         # Create the directory
-        file_root = pathlib.Path(r"D:\ig_pipeline\cad\objects\batch-%02d" % i)
+        file_root = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\batch-%02d" % i)
         max_path = file_root / "processed.max"
         if max_path.exists():
             continue

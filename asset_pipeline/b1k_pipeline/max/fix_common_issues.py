@@ -7,7 +7,7 @@ import sys
 
 import numpy as np
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import glob
 import pathlib
@@ -34,7 +34,7 @@ from b1k_pipeline.max.merge_collision import merge_collision
 rt = pymxs.runtime
 
 PASS_FILENAME = "done-vrayconversionagain.success"
-VRAY_LOG_FILENAME = pathlib.Path(r"D:/ig_pipeline/mtlconvert.log")
+VRAY_LOG_FILENAME = pathlib.Path(r"D:/BEHAVIOR-1K/asset_pipeline/mtlconvert.log")
 RENDER_PRESET_FILENAME = str(
     (b1k_pipeline.utils.PIPELINE_ROOT / "render_presets" / "objrender.rps").absolute()
 )
@@ -910,7 +910,7 @@ def processFile(filename: pathlib.Path):
 def fix_common_issues_in_all_files():
     candidates = [
         x
-        for x in pathlib.Path(r"D:\ig_pipeline").glob("cad/*/*/processed.max")
+        for x in pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline").glob("cad/*/*/processed.max")
     ]
 
     for i, f in enumerate(tqdm.tqdm(candidates)):

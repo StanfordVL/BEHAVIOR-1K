@@ -4,7 +4,7 @@ ADD environment.yml /tmp/environment.yml
 
 SHELL ["/bin/bash", "-c"]
 
-# Create the ig_pipeline environment
+# Create the pipeline environment
 RUN micromamba env create --file /tmp/environment.yml
 
 # Install CoACD, open3d

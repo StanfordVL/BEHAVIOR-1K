@@ -9,7 +9,7 @@ rt = pymxs.runtime
 
 import sys
 
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.utils import parse_name
 
@@ -48,11 +48,11 @@ def fix_maps():
     providers = {
         k.split("-")[-1]: v
         for k, v in 
-        json.loads(pathlib.Path(r"D:\ig_pipeline\artifacts\pipeline\object_inventory.json").read_text())["providers"].items()
+        json.loads(pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\artifacts\pipeline\object_inventory.json").read_text())["providers"].items()
     }
     current_target = "/".join(pathlib.Path(rt.maxFilePath).parts[-2:])
-    current_target_bakery = pathlib.Path(r"D:\ig_pipeline\cad") / current_target / "bakery"
-    current_target_textures = pathlib.Path(r"D:\ig_pipeline\cad") / current_target / "textures"
+    current_target_bakery = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "bakery"
+    current_target_textures = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "textures"
     for obj in rt.objects:
         all_texmaps = get_maps(obj.material)
 
@@ -98,7 +98,7 @@ def fix_maps():
                 # Use os.path.abspath which normalizes + absolutifies the paths but does not resolve symlinks unlike pathlib (problem with dvc)
                 map_filename = texmap_filename.name
                 map_directory = "bakery" if "bakery" in texmap_filename.parts else "textures"
-                orig_map_path = pathlib.Path(r"D:\ig_pipeline\cad") / original_provider / map_directory / map_filename
+                orig_map_path = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / original_provider / map_directory / map_filename
             if not orig_map_path.exists():
                 print(
                     f"Map {texmap_filename} does not exist at {orig_map_path}. Skipping.",
@@ -112,7 +112,7 @@ def fix_maps():
             # Generate a brand new path for the map file. Prefix the filename with the hash if it's not in the bakery directory.
             new_map_directory = "bakery" if "bakery" in orig_map_path.parts else "textures"
             new_map_filename = f"{map_hash}_{orig_map_path.name}" if new_map_directory == "textures" else orig_map_path.name
-            new_map_path = pathlib.Path(r"D:\ig_pipeline\cad") / current_target / new_map_directory / new_map_filename
+            new_map_path = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / new_map_directory / new_map_filename
 
             if not new_map_path.exists():
                 print("Copying map from", orig_map_path, "to", new_map_path)
