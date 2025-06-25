@@ -460,7 +460,7 @@ def download_assets():
         with tempfile.TemporaryDirectory() as td:
             tmp_file = os.path.join(td, "og_assets.tar.gz")
             os.makedirs(gm.ASSET_PATH, exist_ok=True)
-            path = "https://storage.googleapis.com/gibson_scenes/og_assets_1_1_0.tar.gz"
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets_3_7_0rc1.tar.gz"
             log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
             assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
             assert (
@@ -607,7 +607,7 @@ def download_og_dataset(accept_license=False):
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(gm.DATASET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_1_2_0rc21.tar.gz"
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_3_7_0rc21.tar.gz"
         log.info(f"Downloading and decompressing OmniGibson dataset from {path}")
         assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
         assert (
