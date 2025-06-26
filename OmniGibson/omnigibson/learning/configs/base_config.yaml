@@ -3,84 +3,12 @@ defaults:
   - policy: ???
   - task: ???
 
-run_name: "${policy_name}_${task.name}"
-exp_root_dir: .
 policy_name: ???  # filled by policy
 headless: true
-# ====== main cfg ======
-seed: -1
-gpus: 1
-num_nodes: 1
-bs: 256
-vbs: ${bs}
-data_dir: ???
-eval_interval: 10
-rollout_eval: false
-# ------ logging ------
-use_wandb: true
-wandb_project: B1K
-wandb_group: ???
-wandb_run_name: ${run_name}
 
-# ------ module ------
-module:
-  _target_: ???  # filled by policy
-  eval:
-    eval_on_validation: false
-    env: ${env}
-    task: ${task}
-    robot: ${robot}
-
-data_module:
-  _target_: ???
-  data_path: ${data_dir}
-  batch_size: ${bs}
-  val_batch_size: ${vbs}
-  val_split_ratio: 0.1
-  seed: ${seed}
-  dataloader_num_workers: 4
-  max_num_demos: null 
-
-trainer:
-  accelerator: "gpu"
-  devices: ${gpus}
-  num_nodes: ${num_nodes}
-  precision: 32
-  strategy: ddp
-  benchmark: true  # enables cudnn.benchmark
-  accumulate_grad_batches: 1
-  num_sanity_val_steps: 1
-  max_epochs: 999999999
-  val_check_interval: null
-  check_val_every_n_epoch: ${eval_interval}
-  gradient_clip_val: 1.0
-  fast_dev_run: false
-  checkpoint:  # this sub-dict will be popped to send to ModelCheckpoint as args
-  - filename: "epoch{epoch}-train_loss{train/loss:.5f}"
-    save_on_train_epoch_end: true  # this is a training metric, so we save it at the end of training epoch
-    save_top_k: 100
-    save_last: true
-    monitor: "train/loss"
-    mode: min
-    auto_insert_metric_name: false  # prevent creating subfolder caused by the slash
-  - filename: "epoch{epoch}-val_l1_{val/l1:.5f}"
-    save_top_k: -1
-    save_last: true
-    monitor: "val/l1"
-    mode: min
-    auto_insert_metric_name: false  # prevent creating subfolder caused by the slash
-  callbacks:
-    - _target_: pytorch_lightning.callbacks.LearningRateMonitor
-      logging_interval: step
-    - _target_: pytorch_lightning.callbacks.RichModelSummary
-
-
-# ------------- Resume training ---------------
-resume:
-  ckpt_path: null
-  full_state: false  # if true, resume all states including optimizer, amp, lightning callbacks
-  strict: true
-
-# ------------- Evaluation ---------------------
 eval: ??? # filled by policy
 log_path: ???
+
+robot:
+  type: R1Pro
+  controllers:

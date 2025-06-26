@@ -134,7 +134,7 @@ class Evaluator:
         return robot
 
     def load_policy(self) -> Any:
-        policy = call(self.cfg.eval)
+        policy = call(self.cfg.model)
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Loaded policy: {self.cfg.policy_name}")
@@ -147,7 +147,7 @@ class Evaluator:
         Single step of the task
         """
         obs = self._preprocess_obs(self.obs)
-        self.robot_action = self.policy.forward(obs={"obs": obs})
+        self.robot_action = self.policy.forward(obs=obs)
         # concatenate the three camera images into one and save to obs_buffer
         all_obs = torch.cat(
             [
@@ -222,15 +222,14 @@ if __name__ == "__main__":
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
-        
-    from omnigibson.macros import gm
-    gm.HEADLESS = True
-
     
     video_path = Path(config.log_path)
     video_path.mkdir(parents=True, exist_ok=True)
             
     OmegaConf.resolve(config)
+
+    from omnigibson.macros import gm
+    gm.HEADLESS = config.headless
 
     instances_to_run = config.task.train_indices if config.task.train else config.task.test_indices
     episodes_per_instance = config.task.episodes_per_instance

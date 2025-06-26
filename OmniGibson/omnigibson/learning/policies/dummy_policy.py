@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 from omnigibson.learning.policies.policy_base import BasePolicy
-from typing import Any
-from pytorch_lightning.utilities.types import OptimizerLRScheduler
 
 
 class DummyPolicy(BasePolicy):
@@ -33,20 +31,8 @@ class DummyPolicy(BasePolicy):
     def reset(self) -> None:
         pass
 
-    def configure_optimizers(self) -> OptimizerLRScheduler:
-        return torch.optim.AdamW(
-            params=[self.dummy_param],
-            lr=1e-9,  # very small learning rate to avoid updates
-        )
-
-    def policy_training_step(self, batch, batch_idx) -> Any:
-        pass
-
-    def policy_evaluation_step(self, batch, batch_idx) -> Any:
-        pass
-
-    def process_data(self, data_batch: dict, extract_action: bool = False) -> Any:
+    def process_obs(self, obs: dict) -> dict:
         """
         Directly return the observation without processing.
         """
-        return data_batch
+        return obs

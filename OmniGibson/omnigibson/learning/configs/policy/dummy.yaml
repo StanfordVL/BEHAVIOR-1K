@@ -3,12 +3,11 @@
 env: omnigibson
 policy_name: dummy 
 log_path: /home/svl/Documents/logs/dummy
-module:
+
+model:
   _target_: omnigibson.learning.policies.DummyPolicy
 
-eval:
-  _target_: omnigibson.learning.policies.DummyPolicy.load
-
+headless: false
 robot:
   type: R1Pro
   controllers:

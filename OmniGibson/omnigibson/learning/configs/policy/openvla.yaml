@@ -2,11 +2,9 @@
 
 env: omnigibson
 policy_name: openvla 
-module:
-  _target_: omnigibson.learning.policies.OpenVLA
 
-eval:
-  _target_: omnigibson.learning.policies.OpenVLA.load
+model:
+  _target_: omnigibson.learning.policies.OpenVLA
 
 robot:
   type: R1Pro
