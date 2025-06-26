@@ -172,8 +172,9 @@ class MacroParticleSystem(BaseSystem):
             for particle, scale in zip(self.particles.values(), state["scales"]):
                 particle.scale = scale
 
-        # Set particle counter
-        self._particle_counter = state["particle_counter"]
+        # Set counter to next available ID, or 0 if no particles exist
+        # TODO: remove particle counter from dump and load state after data collection
+        self._particle_counter = max(self.particle_idns) + 1 if self.particle_idns else 0
 
     def serialize(self, state):
         # Run super first
