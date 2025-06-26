@@ -1,4 +1,4 @@
-# ig_pipeline
+# BEHAVIOR-1K Asset Pipeline
 
 This repository contains a DVC-based pipeline for converting 3D assets, primarily from the BEHAVIOR-1K project's 3ds Max format, into USD format suitable for OmniGibson simulation. It also includes data pointers to fetch the raw 3ds Max files.
 
@@ -13,7 +13,7 @@ This repository contains a DVC-based pipeline for converting 3D assets, primaril
 
 **Installation Steps**:
 
-1.  **Clone Repository:** Clone this repository to `D:\ig_pipeline`. **Note:** This path might be hardcoded in some scripts.
+1.  **Clone Repository:** Clone this repository to `D:\BEHAVIOR-1K\asset_pipeline`. **Note:** This path might be hardcoded in some scripts.
 2.  **Create Conda Environment:** Open PowerShell and run:
     ```powershell
     conda env create --file environment.yml
@@ -43,7 +43,7 @@ This pipeline is primarily designed for the BEHAVIOR-1K 3ds Max files.
 ## Repository Structure
 
 ```
-ig_pipeline/
+asset_pipeline/
 ├── b1k_pipeline/                #-> Core pipeline scripts 
 │   ├── max/                     #-> Scripts run within 3ds Max 
 │   ├── usd_conversion/          #-> Scripts for URDF to USD conversion 

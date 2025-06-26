@@ -1577,8 +1577,9 @@ class EntityPrim(XFormPrim):
             return
         self.set_linear_velocity(velocity=th.zeros(3))
         self.set_angular_velocity(velocity=th.zeros(3))
-        for joint in self._joints.values():
-            joint.keep_still()
+        if self.initialized:
+            for joint in self._joints.values():
+                joint.keep_still()
         # Make sure object is awake
         self.wake()
 

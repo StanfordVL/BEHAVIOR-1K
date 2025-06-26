@@ -10,7 +10,7 @@ from scipy.spatial.transform import Rotation as R
 import tqdm
 
 import igibson
-igibson.ig_dataset_path = "/scr/ig_pipeline/tmp/fedafr"
+igibson.ig_dataset_path = "/scr/BEHAVIOR-1K/asset_pipeline/tmp/fedafr"
 
 from igibson.simulator import Simulator
 from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
@@ -25,7 +25,7 @@ def main():
     scene = EmptyScene()
     s.import_scene(scene)
 
-    fillable_models = json.loads(pathlib.Path("/scr/ig_pipeline/artifacts/pipeline/fillable_ids.json").read_text())
+    fillable_models = json.loads(pathlib.Path("/scr/BEHAVIOR-1K/asset_pipeline/artifacts/pipeline/fillable_ids.json").read_text())
     fillable_paths = sorted([
         path
         for fm in fillable_models

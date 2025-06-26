@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Loop through all .mp4 files in the current directory
-for input_file in /scr/ig_pipeline/artifacts/pipeline/object_images/*.mp4; do
+for input_file in /scr/BEHAVIOR-1K/asset_pipeline/artifacts/pipeline/object_images/*.mp4; do
   # Define the output filename. This example adds "_h264" before the extension
   # and places it in the 'reencoded_h264' subdirectory.
   output_file="${input_file%.mp4}_h264.mp4"

@@ -21,7 +21,7 @@ case $1 in
 esac
 
 
-SCRIPT_DIR="/scr/ig_pipeline/b1k_pipeline/docker"
+SCRIPT_DIR="/scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker"
 DATA_PATH="${SCRIPT_DIR}/data"
 SQSH_SOURCE="${SCRIPT_DIR}/ig_pipeline.sqsh"
 
@@ -40,7 +40,7 @@ done
 declare -A MOUNTS=(
     [${SCR_DIR}]=/scr
     [${DATA_PATH}]=/data
-    ["/scr/OmniGibson"]=/omnigibson-src
+    ["/scr/BEHAVIOR-1K/OmniGibson"]=/omnigibson-src
     ["/scr/bddl"]=/bddl-src
 )
 

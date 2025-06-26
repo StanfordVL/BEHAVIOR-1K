@@ -18,9 +18,9 @@ MAX_TIME_PER_PROCESS = 60 * 60  # 1 hour
 def run_on_scene(dataset_path, scene):
     python_cmd = ["python", "-m", "b1k_pipeline.usd_conversion.usdify_scenes_process", dataset_path, scene]
     cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
-    with open(f"/scr/ig_pipeline/logs/{scene}.log", "w") as f, open(f"/scr/ig_pipeline/logs/{scene}.err", "w") as ferr:
+    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err", "w") as ferr:
         try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/ig_pipeline", start_new_session=True)
+            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
             p.wait(timeout=MAX_TIME_PER_PROCESS)
         except subprocess.TimeoutExpired:
             ferr.write(f'\nTimeout for {scene} ({MAX_TIME_PER_PROCESS}s) expired. Killing\n')

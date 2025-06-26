@@ -49,7 +49,7 @@ def get_unique_coords(p):
     return unique_coords
 
 def process_scene(scene_name):
-    path_new = os.path.join(f'd:/ig_pipeline/cad/scenes/{scene_name}/artifacts/scene/urdf/{scene_name}_best.urdf')
+    path_new = os.path.join(f'D:/BEHAVIOR-1K/asset_pipeline/cad/scenes/{scene_name}/artifacts/scene/urdf/{scene_name}_best.urdf')
     path_old = os.path.join(f'C:/Users/Cem/research/iGibson-dev/igibson/data/ig_dataset/scenes/{scene_name}/urdf/{scene_name}_best.urdf')
     unique_new = get_unique_coords(path_new)
     # print("new keys", unique_new.keys())

@@ -4,7 +4,7 @@ import pymxs
 rt = pymxs.runtime
 
 import sys
-sys.path.append(r"D:\ig_pipeline")
+sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import b1k_pipeline.utils
 
@@ -139,7 +139,7 @@ def generate_container(cat, label, base_model, last_seen_id):
     return [obj for _, obj, _ in base_copies + children_copies]
         
 def main():
-    with open(r"D:\ig_pipeline\metadata\container_generation.csv") as f:
+    with open(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\container_generation.csv") as f:
         containers = []
         last_seen_id = collections.defaultdict(int)
         for row in tqdm.tqdm(list(csv.DictReader(f))):

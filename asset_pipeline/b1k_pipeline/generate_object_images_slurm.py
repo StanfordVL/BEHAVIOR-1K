@@ -24,9 +24,9 @@ def run_on_batch(dataset_path, out_path, batch):
     python_cmd = ["python", "-m", "b1k_pipeline.generate_object_images_og", dataset_path, out_path] + batch
     cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
     obj = batch[0].split("/")[-1]
-    with open(f"/scr/ig_pipeline/logs/{obj}.log", "w") as f, open(f"/scr/ig_pipeline/logs/{obj}.err", "w") as ferr:
+    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr:
         try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/ig_pipeline", start_new_session=True)
+            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
             return p.wait(timeout=MAX_TIME_PER_PROCESS)
         except subprocess.TimeoutExpired:
             print(f'Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing', file=sys.stderr)
