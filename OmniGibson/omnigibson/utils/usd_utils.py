@@ -1891,6 +1891,12 @@ def delete_or_deactivate_prim(prim_path):
     # Otherwise, we can only deactivate it, which essentially serves the same purpose.
     # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
     else:
+        # Clear all default attributes before deactivating the prim to ensure clean reactivation.
+        # Note: Prim deactivation preserves attribute values, so we must explicitly clear defaults
+        # to prevent stale custom values from persisting when the prim is reactivated later.
+        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+        for attr in prim.GetAttributes():
+            assert attr.ClearDefault()
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True
@@ -1905,13 +1911,6 @@ def activate_prim_and_children(prim_path):
     """
     current_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
     current_prim.SetActive(True)
-    # TODO: we make two strong assumptions here:
-    # 1) that this is only called on prims that were deleted because of transition rules
-    # 2) that the prims and all its children have a scale of 1.0 initially
-    # This is a temporary fix to unblock data collection, but we should eventually
-    # remove this and find a better way to handle scale.
-    if current_prim.HasAttribute("xformOp:scale") and current_prim.GetTypeName() == "Xform":
-        current_prim.GetAttribute("xformOp:scale").Set(lazy.pxr.Gf.Vec3d(1.0, 1.0, 1.0))
     # Use GetAllChildren to also find those that are inactive
     for child in current_prim.GetAllChildren():
         activate_prim_and_children(child.GetPath().pathString)
