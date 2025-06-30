@@ -602,7 +602,7 @@ class OGRobotServer:
                                         if not isinstance(obj, BaseSystem)
                                         and obj.category != "agent" 
                                         and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES]
-            should_highlight = not any(beacon.visible for beacon in self.object_beacons.values())
+            should_highlight = not any(self.object_beacons[key].visible for key in current_task_relevant_objects if key in self.object_beacons)
             for entity in self.env.task.object_scope.values():
                 entity_obj = entity.wrapped_obj
                 entity_unwrapped = entity.unwrapped
