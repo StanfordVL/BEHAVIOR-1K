@@ -1440,23 +1440,31 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         return isinstance(self.root_link, RigidKinematicPrim)
+    
+    @property
+    def collision_points_world(self):
+        """Get all collision points in world coordinates.
+        
+        For cloth objects, returns particle positions.
+        For rigid objects, returns collision boundary points from all links.
+        """
+        if self._prim_type == PrimType.CLOTH:
+            return self.root_link.compute_particle_positions()
+        else:
+            points_world = [link.collision_boundary_points_world for link in self._links.values()]
+            return th.cat([p for p in points_world if p is not None], dim=0)
 
     @property
     def aabb(self):
-        # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
-        # normal method for computing bounding box
+        """Compute axis-aligned bounding box from collision mesh points."""
+        points = self.collision_points_world
         if self._prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
-            particle_positions = self.root_link.compute_particle_positions()
-            aabb_lo, aabb_hi = (
-                th.min(particle_positions, dim=0).values - particle_contact_offset,
-                th.max(particle_positions, dim=0).values + particle_contact_offset,
-            )
+            aabb_lo = th.min(points, dim=0).values - particle_contact_offset
+            aabb_hi = th.max(points, dim=0).values + particle_contact_offset
         else:
-            points_world = [link.collision_boundary_points_world for link in self._links.values()]
-            all_points = th.cat([p for p in points_world if p is not None], dim=0)
-            aabb_lo = th.min(all_points, dim=0).values
-            aabb_hi = th.max(all_points, dim=0).values
+            aabb_lo = th.min(points, dim=0).values
+            aabb_hi = th.max(points, dim=0).values
         return aabb_lo, aabb_hi
 
     @property

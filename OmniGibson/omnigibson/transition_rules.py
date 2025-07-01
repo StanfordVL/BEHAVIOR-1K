@@ -789,9 +789,9 @@ class WasherDryerRule(BaseTransitionRule):
         Returns:
             dict: Keyword-mapped global rule information
         """
-        # Compute all obj
-        obj_positions = th.stack([obj.aabb_center for obj in self.scene.objects])
-        return dict(obj_positions=obj_positions)
+        # Compute all obj collision points (handles both cloth and rigid objects)
+        obj_collision_points = [obj.collision_points_world for obj in self.scene.objects]
+        return dict(obj_collision_points=obj_collision_points)
 
     def _compute_container_info(self, object_candidates, container, global_info):
         """
@@ -809,10 +809,17 @@ class WasherDryerRule(BaseTransitionRule):
             dict: Keyword-mapped container information
         """
         del object_candidates
-        obj_positions = global_info["obj_positions"]
-        in_volume = container.states[ContainedParticles].link.check_points_in_volume(obj_positions)
-
-        in_volume_objs = [obj for obj, is_in_volume in zip(self.scene.objects, in_volume) if is_in_volume]
+        obj_collision_points = global_info["obj_collision_points"]
+        
+        # Check each object's collision points
+        in_volume_objs = []
+        for obj, collision_points in zip(self.scene.objects, obj_collision_points):
+            # Check if any of the collision points is in volume
+            points_in_volume = container.states[ContainedParticles].link.check_points_in_volume(collision_points)
+            # If any point is in volume, include this object
+            if th.any(points_in_volume):
+                in_volume_objs.append(obj)
+        
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)
