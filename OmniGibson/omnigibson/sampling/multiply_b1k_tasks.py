@@ -133,7 +133,7 @@ def main():
     # Store the state without any particles
     initial_state = og.sim.dump_state()
 
-    num_trials = 30
+    num_trials = 50
     for activity_instance_id in range(args.start_idx, args.end_idx + 1):
         for i in range(num_trials):
             og.sim.load_state(initial_state)
@@ -145,6 +145,13 @@ def main():
             if error_msg is not None:
                 print(f"instance {activity_instance_id} trial {i} sampling failed: {error_msg}")
                 continue
+
+            for _ in range(10):
+                og.sim.step()
+
+            for obj in env._task.object_scope.values():
+                if isinstance(obj, DatasetObject):
+                    obj.keep_still()
 
             for _ in range(10):
                 og.sim.step()
