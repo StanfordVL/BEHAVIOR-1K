@@ -1,4 +1,4 @@
-name: Sync Google Sheets data
+name: Sync asset pipeline Google Sheets data
 
 on:
   schedule:
@@ -37,6 +37,7 @@ jobs:
 
     - name: Refresh sheets data
       run: python -m b1k_pipeline.sync_sheets
+      working-directory: asset_pipeline
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
