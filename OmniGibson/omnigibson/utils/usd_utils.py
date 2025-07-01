@@ -1891,6 +1891,12 @@ def delete_or_deactivate_prim(prim_path):
     # Otherwise, we can only deactivate it, which essentially serves the same purpose.
     # All objects that are originally in the scene are ancestral because we add the pre-build scene to the stage.
     else:
+        # Clear all default attributes before deactivating the prim to ensure clean reactivation.
+        # Note: Prim deactivation preserves attribute values, so we must explicitly clear defaults
+        # to prevent stale custom values from persisting when the prim is reactivated later.
+        prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
+        for attr in prim.GetAttributes():
+            assert attr.ClearDefault()
         lazy.omni.usd.commands.DeletePrimsCommand([prim_path], destructive=False).do()
 
     return True

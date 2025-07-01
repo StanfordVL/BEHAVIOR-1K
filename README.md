@@ -17,11 +17,21 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 
 For most users, we recommend the full installation with a new conda environment:
 
+### Linux
 ```bash
 git clone https://github.com/StanfordVL/BEHAVIOR-1K
 cd BEHAVIOR-1K
 . ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
 ```
+
+### Windows
+```powershell
+git clone https://github.com/StanfordVL/BEHAVIOR-1K
+cd BEHAVIOR-1K
+.\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+```
+
+> **Note**: Run PowerShell as Administrator and set execution policy if needed: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
 ## Installation Options
 
@@ -47,15 +57,3 @@ To see all available options:
 ```bash
 . ./setup.sh --help
 ```
-
-## Windows Installation
-
-For Windows users, use the PowerShell script:
-
-```powershell
-git clone https://github.com/StanfordVL/BEHAVIOR-1K
-cd BEHAVIOR-1K
-.\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
-```
-
-> **Note**: Run PowerShell as Administrator and set execution policy if needed: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`

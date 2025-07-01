@@ -15,6 +15,7 @@ from omnigibson.robots.r1pro import R1Pro
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
+from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states import Filled
@@ -290,7 +291,7 @@ class OGRobotServer:
             
             # Get task-relevant objects
             task_objects = [bddl_obj.wrapped_obj for bddl_obj in self.env.task.object_scope.values() 
-                            if bddl_obj.wrapped_obj is not None]
+                            if bddl_obj.wrapped_obj is not None and bddl_obj.exists]
             
             self.task_relevant_objects = [obj for obj in task_objects 
                                           if not isinstance(obj, BaseSystem)
@@ -595,22 +596,43 @@ class OGRobotServer:
         if button_a_state and not self._button_toggled_state["a"]:
             for obj in self.task_irrelevant_objects:
                 obj.visible = not obj.visible
-            for obj in self.task_relevant_objects:
-                obj.highlighted = not obj.highlighted
-                beacon = self.object_beacons[obj]
-                beacon.set_position_orientation(
-                    position=obj.aabb_center + th.tensor([0, 0, BEACON_LENGTH / 2.0]),
-                    orientation=T.euler2quat(th.tensor([0, 0, 0])),
-                    frame="world"
-                )
-                beacon.visible = not beacon.visible
-                if obj.fixed_base and obj.articulated:
-                    for name, link in obj.links.items():
-                        if not 'meta' in name and link != obj.root_link:
-                            link.visible = not obj.highlighted
-                for vis_list in self.task_visualizers.values():
-                    for vis in vis_list:
-                        vis.visible = obj.highlighted
+            task_objects = [bddl_obj.wrapped_obj for bddl_obj in self.env.task.object_scope.values() 
+                            if bddl_obj.wrapped_obj is not None and bddl_obj.exists]
+            current_task_relevant_objects = [obj for obj in task_objects 
+                                        if not isinstance(obj, BaseSystem)
+                                        and obj.category != "agent" 
+                                        and obj.category not in EXTRA_TASK_RELEVANT_CATEGORIES]
+            should_highlight = not any(self.object_beacons[key].visible for key in current_task_relevant_objects if key in self.object_beacons)
+            for entity in self.env.task.object_scope.values():
+                entity_obj = entity.wrapped_obj
+                entity_unwrapped = entity.unwrapped
+                
+                # Handle objects
+                if entity_obj in current_task_relevant_objects:
+                    obj = entity_obj
+                    obj.highlighted = not obj.highlighted
+                    if obj in self.object_beacons:
+                        beacon = self.object_beacons[obj]
+                        beacon.set_position_orientation(
+                            position=obj.aabb_center + th.tensor([0, 0, BEACON_LENGTH / 2.0]),
+                            orientation=T.euler2quat(th.tensor([0, 0, 0])),
+                            frame="world"
+                        )
+                        beacon.visible = not beacon.visible
+                    if obj.fixed_base and obj.articulated:
+                        for name, link in obj.links.items():
+                            if not 'meta' in name and link != obj.root_link:
+                                link.visible = not obj.highlighted
+                    for vis_list in self.task_visualizers.values():
+                        for vis in vis_list:
+                            vis.visible = obj.highlighted
+                
+                # Handle visual particle systems - infer action from beacon visibility
+                elif isinstance(entity_unwrapped, MacroVisualParticleSystem) and entity_unwrapped.initialized:
+                    if should_highlight:
+                        entity_unwrapped.particle_object.material.enable_highlight(highlight_color=[1.0, 0.1, 0.92], highlight_intensity=10000.0)
+                    else:
+                        entity_unwrapped.particle_object.material.disable_highlight()
         self._button_toggled_state["a"] = button_a_state
 
         # If capture is toggled from OFF -> ON, breakpoint
