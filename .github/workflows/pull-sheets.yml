@@ -4,9 +4,9 @@ on:
   schedule:
     - cron: "0 10 * * *"  # Every day at 10am
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
   pull-sheets:
