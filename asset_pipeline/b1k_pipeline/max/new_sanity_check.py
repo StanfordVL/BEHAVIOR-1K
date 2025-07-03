@@ -260,7 +260,7 @@ class SanityCheck:
 
     def get_recorded_vertex_and_face_count(self, model_id):
         # Look the provider up from the inventory file
-        provider = self._providers.get(model_id, None)
+        provider = self.providers.get(model_id, None)
         self.expect(
             provider is not None,
             f"{model_id} has no provider in the inventory file.",
