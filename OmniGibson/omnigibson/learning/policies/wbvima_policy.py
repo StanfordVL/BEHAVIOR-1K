@@ -5,7 +5,7 @@ from hydra.utils import instantiate
 from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat, any_slice
-from omnigibson.learning.utils.pcd_utils import process_fused_point_cloud
+from OmniGibson.omnigibson.learning.utils.obs_utils import process_fused_point_cloud
 from omegaconf import DictConfig
 
 

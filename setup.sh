@@ -104,7 +104,7 @@ fi
 # Create conda environment if requested
 if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Creating conda environment 'behavior'..."
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
+    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" av "setuptools<=79" -c pytorch -c nvidia -c conda-forge -y
     
     if [ $? -ne 0 ] ; then
         echo "[ERROR] Failed to create conda environment"

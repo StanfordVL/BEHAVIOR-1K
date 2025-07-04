@@ -24,10 +24,7 @@ source /vision/u/wsai/miniconda3/bin/activate omnigibson
 echo "File to process: $1/raw/$2"
 
 echo "Running replay_obs.py on $1/raw/$2"
-OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2"
-
-echo "Replay observation script finished! Now converting rgbd to pcd."
-OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/rgbd_to_pcd.py -o --files "$1/rgbd/$2"
+OMNIGIBSON_HEADLESS=1 python omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2" --rgbd --pcd --seg
 
 echo "Job finished."
 exit 0

@@ -189,7 +189,7 @@ try {
 if ($NewEnv) {
     Write-Step "ENV" "Creating conda environment 'behavior'..."
     
-    $condaCmd = "conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CudaVersion `"numpy<2`" -c pytorch -c nvidia -y"
+    $condaCmd = "conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CudaVersion `"numpy<2`" av `"setuptools<=79"` -c pytorch -c nvidia -c conda-forge -y"
     
     try {
         Invoke-Expression $condaCmd

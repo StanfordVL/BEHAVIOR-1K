@@ -4,8 +4,8 @@ from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
 
+import av
 import h5py
-import imageio
 import torch as th
 
 import omnigibson as og
@@ -16,7 +16,8 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
-from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
+from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
+from omnigibson.learning.utils.obs_utils import quantize_depth
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -30,11 +31,12 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, overwrite=True, only_successes=True, flush_every_n_traj=10):
+    def __init__(self, env, output_path, compression=dict(), overwrite=True, only_successes=True, flush_every_n_traj=10):
         """
         Args:
             env (Environment): The environment to wrap
             output_path (str): path to store hdf5 data file
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
@@ -53,6 +55,7 @@ class DataWrapper(EnvironmentWrapper):
         self.only_successes = only_successes
         self.flush_every_n_traj = flush_every_n_traj
         self.current_obs = None
+        self.compression = compression
 
         self.current_traj_history = []
 
@@ -207,10 +210,10 @@ class DataWrapper(EnvironmentWrapper):
             if k in nested_keys:
                 obs_grp = traj_grp.create_group(k)
                 for mod, traj_mod_data in dat.items():
-                    obs_grp.create_dataset(mod, data=th.stack(traj_mod_data, dim=0).cpu())
+                    obs_grp.create_dataset(mod, data=th.stack(traj_mod_data, dim=0).cpu(), **self.compression)
             else:
                 traj_data = th.stack(dat, dim=0) if isinstance(dat[0], th.Tensor) else th.tensor(dat)
-                traj_grp.create_dataset(k, data=traj_data)
+                traj_grp.create_dataset(k, data=traj_data, **self.compression)
 
         return traj_grp
 
@@ -655,6 +658,7 @@ class DataPlaybackWrapper(DataWrapper):
         cls,
         input_path,
         output_path,
+        compression=dict(),
         robot_obs_modalities=tuple(),
         robot_proprio_keys=None,
         robot_sensor_config=None,
@@ -681,6 +685,7 @@ class DataPlaybackWrapper(DataWrapper):
             input_path (str): Absolute path to the input hdf5 file containing the relevant collected data to playback
             output_path (str): Absolute path to the output hdf5 file that will contain the recorded observations from
                 the replayed data
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
                 the robot_cfg (`obs_modalities` kwarg) when spawning the robot
             robot_proprio_keys (None or list of str): If specified, a list of proprioception keys to use for the robot.
@@ -798,6 +803,7 @@ class DataPlaybackWrapper(DataWrapper):
             env=env,
             input_path=input_path,
             output_path=output_path,
+            compression=compression,
             n_render_iterations=n_render_iterations,
             overwrite=overwrite,
             only_successes=only_successes,
@@ -810,6 +816,7 @@ class DataPlaybackWrapper(DataWrapper):
         env,
         input_path,
         output_path,
+        compression=dict(),
         n_render_iterations=5,
         overwrite=True,
         only_successes=False,
@@ -821,6 +828,7 @@ class DataPlaybackWrapper(DataWrapper):
             env (Environment): The environment to wrap
             input_path (str): path to input hdf5 collected data file
             output_path (str): path to store output hdf5 data file
+            compression (dict): If specified, the compression arguments to use for the hdf5 file.
             n_render_iterations (int): Number of rendering iterations to use when loading each stored frame from the
                 recorded data
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
@@ -849,6 +857,7 @@ class DataPlaybackWrapper(DataWrapper):
         super().__init__(
             env=env,
             output_path=output_path,
+            compression=compression,
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
@@ -875,7 +884,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_rgb_keys=None):
+    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_keys=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -883,15 +892,15 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
-            video_writers (None or list of imageio.Writer): If specified, writer objects that RGB frames will be written to
-            video_rgb_keys (None or list of str): If specified, observation keys representing the RGB frames to write to video.
+            video_writers (None or list of (container, stream)): If specified, writer objects that RGB frames will be written to
+            video_keys (None or list of str): If specified, observation keys representing the frames to write to video.
                 If @video_writers is specified, this must also be specified!
         """
-        # Validate video_writers and video_rgb_keys
+        # Validate video_writers and video_keys
         if video_writers is not None:
-            assert video_rgb_keys is not None, "If video_writers is specified, video_rgb_keys must also be specified!"
+            assert video_keys is not None, "If video_writers is specified, video_rgb_keys must also be specified!"
             assert len(video_writers) == len(
-                video_rgb_keys
+                video_keys
             ), "video_writers and video_rgb_keys must have the same length!"
 
         data_grp = self.input_hdf5["data"]
@@ -933,13 +942,18 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If record, record initial observations
         if record_data:
-            init_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
-            step_data = {"obs": self._process_obs(obs=init_obs, info=init_info)}
+            self.current_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
+            # If writing to video, write desired frame
+            if video_writers is not None:
+                self.write_videos(video_writers=video_writers, video_keys=video_keys)
+            step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
         for i, (a, s, ss, r, te, tr) in enumerate(
             zip(action, state[1:], state_size[1:], reward, terminated, truncated)
         ):
+            if i % 500 == 0:
+                log.info(f"Playing back episode {episode_id}: {i} / {len(action)} steps...")
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -963,6 +977,10 @@ class DataPlaybackWrapper(DataWrapper):
             og.sim.load_state(s[: int(ss)], serialized=True)
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
+            # If writing to video, write desired frame
+            if video_writers is not None:
+                self.write_videos(video_writers=video_writers, video_keys=video_keys)
+
             # If recording, record data
             if record_data:
                 step_data = self._parse_step_data(
@@ -975,25 +993,19 @@ class DataPlaybackWrapper(DataWrapper):
                 )
                 self.current_traj_history.append(step_data)
 
-            # If writing to video, write desired frame
-            if video_writers is not None:
-                for writer, rgb_key in zip(video_writers, video_rgb_keys):
-                    assert_valid_key(rgb_key, self.current_obs.keys(), "video_rgb_key")
-                    writer.append_data(self.current_obs[rgb_key][:, :, :3].numpy())
-
             self.step_count += 1
 
         if record_data:
             self.flush_current_traj()
 
-    def playback_dataset(self, record_data=False, video_writers=None, video_rgb_keys=None):
+    def playback_dataset(self, record_data=False, video_writers=None, video_keys=None):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record_data (bool): Whether to record data during playback or not
-            video_writers (None or list of imageio.Writer): If specified, writer object that RGB frames will be written to
-            video_rgb_keys (None or list of str): If specified, observation key representing the RGB frames to write to video.
+            video_writers (None or list of (container, stream)): If specified, writer object that frames will be written to
+            video_keys (None or list of str): If specified, observation key representing the frames to write to video.
                 If @video_writer is specified, this must also be specified!
         """
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
@@ -1001,19 +1013,54 @@ class DataPlaybackWrapper(DataWrapper):
                 episode_id=episode_id,
                 record_data=record_data,
                 video_writers=video_writers,
-                video_rgb_keys=video_rgb_keys,
+                video_keys=video_keys,
             )
 
-    def create_video_writer(self, fpath, fps=30):
+    def create_video_writer(self, fpath, resolution, codec_name="libx264", rate=30, context_options=None, pix_fmt="yuv420p"):
         """
-        Creates a video writer to write video frames to when playing back the dataset
+        Creates a video writer to write video frames to when playing back the dataset using PyAV
 
         Args:
-            fpath (str): Absolute path that the generated video writer will write to. Should end in .mp4
-            fps (int): Desired frames per second when generating video
-
+            fpath (str): Absolute path that the generated video writer will write to. Should end in .mp4 or .mkv
+            resolution (tuple): Resolution of the video frames to write (height, width)
+            codec_name (str): Codec to use for the video writer. Default is "libx264"
+            rate (int): Frame rate of the video writer. Default is 30
+            context_options (dict): Additional context options to pass to the video writer. Default is None
+            pix_fmt (str): Pixel format to use for the video writer. Default is "yuv420p"
         Returns:
-            imageio.Writer: Generated video writer
+            av.Container: PyAV container object that can be used to write video frames
+            av.Stream: PyAV stream object that can be used to write video frames
         """
-        assert fpath.endswith(".mp4"), f"Video writer fpath must end with .mp4! Got: {fpath}"
-        return imageio.get_writer(fpath, fps=fps)
+        assert fpath.endswith(".mp4") or fpath.endswith(".mkv"), f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
+        container = av.open(fpath, mode='w')
+        stream = container.add_stream(codec_name, rate=rate)
+        stream.height = resolution[0]
+        stream.width = resolution[1]
+        stream.pix_fmt = pix_fmt
+        if context_options is not None:
+            stream.codec_context.options = context_options
+        return container, stream
+
+    def write_videos(self, video_writers, video_keys) -> None:
+        """
+        Writes videos to the specified video writers using the current trajectory history
+
+        Args:
+            video_writers (list of (container, stream)): List of PyAV container and stream objects to write video frames to
+            video_keys (list of str): List of observation keys representing the frames to write to video
+        """
+        for video_writer, video_key in zip(video_writers, video_keys):
+            container, stream = video_writer
+            if "rgb" in video_key:
+                height, width = self.current_obs[video_key].shape[:2]
+                frame = av.VideoFrame.from_ndarray(self.current_obs[video_key][:, :, :3].numpy(), format="rgb24")
+                frame = frame.reformat(width=width, height=height, format="yuv420p")
+            elif "depth" in video_key:
+                quantized_depth = quantize_depth(self.current_obs[video_key])
+                frame = av.VideoFrame.from_ndarray(quantized_depth.numpy(), format='gray16le')
+            else:
+                raise ValueError(
+                    f"Unsupported video_rgb_key: {video_key}. Only 'rgb' and 'depth' keys are supported!"
+                )
+            for packet in stream.encode(frame):
+                container.mux(packet)

@@ -10,7 +10,7 @@ import random
 import sys
 from pathlib import Path
 
-import imageio
+import av
 import matplotlib.path as mpath
 import torch as th
 from IPython import embed
@@ -432,7 +432,11 @@ class CameraMover:
 
         # Make sure save path directory exists, and then create the video writer
         Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
-        video_writer = imageio.get_writer(fpath, fps=fps)
+        video_writer = av.open(fpath, fps=fps)
+        stream = video_writer.add_stream("libx264", rate=fps)
+        stream.width = self.cam.get_obs()[0]["rgb"].shape[1]
+        stream.height = self.cam.get_obs()[0]["rgb"].shape[0]
+        stream.pix_fmt = "yuv420p"
 
         # Iterate through all desired poses, and record the trajectory
         for i, (pos, quat) in enumerate(poses):
@@ -440,8 +444,13 @@ class CameraMover:
             og.sim.step()
             if i % steps_per_frame == 0:
                 video_writer.append_data(self.get_image())
-
-        # Close writer
+                frame = av.VideoFrame.from_ndarray(self.get_image()[:, :, :3].numpy(), format="rgb24")
+                for packet in stream.encode(frame):
+                    video_writer.mux(packet)
+        # Flush any remaining packets
+        for packet in stream.encode():
+            video_writer.mux(packet)
+        # Close the writer
         video_writer.close()
         og.log.info(f"Saved camera trajectory video to {fpath}.")
 

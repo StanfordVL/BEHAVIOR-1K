@@ -37,8 +37,6 @@ setup(
         "bddl~=3.7.0-alpha",
         "opencv-python>=4.8.1",
         "nest_asyncio>=1.5.6",
-        "imageio>=2.33.1",
-        "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
         "pymeshlab~=2022.2",
@@ -51,6 +49,8 @@ setup(
         "numba>=0.59.1",
         "cffi>=1.16.0",
         "pillow~=11.0.0",
+        "open3d>=0.19.0",
+        "fpsample>=0.3.3"
     ],
     extras_require={
         "dev": [
@@ -74,10 +74,8 @@ setup(
         ],
         "learning": [
             "dm_tree",
-            "fpsample",
             "hydra-core",
-            "mediapy",
-            "open3d",
+            # "mediapy",
             # conda install -c conda-forge ffmpeg=4.2.2 needed to get mediapy working
         ]
     },
