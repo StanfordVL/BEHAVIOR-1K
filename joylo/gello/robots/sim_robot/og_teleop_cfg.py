@@ -66,7 +66,7 @@ VALIDATED_TASKS = [
     "storing_food",
     "clearing_food_from_table_into_fridge",
     "assembling_gift_baskets",
-    "setting_the_table", # TODO: replace this with dishwasher task?
+    "sorting_household_items",
     "getting_organized_for_work",
     "clean_up_your_desk",
     "setting_the_fire",

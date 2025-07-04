@@ -1,12 +1,12 @@
-name: Sync Google Sheets data
+name: Sync asset pipeline Google Sheets data
 
 on:
   schedule:
     - cron: "0 10 * * *"  # Every day at 10am
   workflow_dispatch:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
   pull-sheets:
@@ -37,6 +37,7 @@ jobs:
 
     - name: Refresh sheets data
       run: python -m b1k_pipeline.sync_sheets
+      working-directory: asset_pipeline
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:

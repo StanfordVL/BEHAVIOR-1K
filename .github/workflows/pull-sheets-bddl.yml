@@ -1,12 +1,12 @@
-name: Sync Google Sheets data
+name: Sync bddl Google Sheets data
 
 on:
   schedule:
-    - cron: "0 10 * * *"  # Every day at 10am
+    - cron: "0 9 * * *"  # Every day at 9am
   workflow_dispatch:
-  push:
-    branches:
-      - develop
+  # push:
+  #   branches:
+  #     - main
 
 jobs:
   pull-sheets:
@@ -14,18 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Clone BDDL repo
+    - name: Checkout code
       uses: actions/checkout@v3
-      with:
-        path: bddl
-        ref: develop
-
-    - name: Clone ig pipeline repo
-      uses: actions/checkout@v3
-      with:
-        repository: StanfordVL/ig_pipeline
-        path: ig_pipeline
-        token: ${{ secrets.REPO_TOKEN }}
     
     - name: Setup python
       uses: actions/setup-python@v2
@@ -38,15 +28,19 @@ jobs:
       with:
         credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
 
-    # See if we need to re-pull any ig_pipeline data from DVC.
-    - name: Check cache for ig_pipeline data
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: ${{ secrets.SHEETS_DEPLOY_KEY }}
+
+    # See if we need to re-pull any asset_pipeline data from DVC.
+    - name: Check cache for pipeline data
       id: cache-pipeline
       uses: actions/cache@v3
       with:
-        key: ig_pipeline-${{ hashFiles('ig_pipeline/dvc.lock') }}
+        key: asset_pipeline-${{ hashFiles('asset_pipeline/dvc.lock') }}
         path: |
-          ig_pipeline/artifacts/pipeline/combined_room_object_list.json
-          ig_pipeline/artifacts/pipeline/object_inventory.json
+          asset_pipeline/artifacts/pipeline/combined_room_object_list.json
+          asset_pipeline/artifacts/pipeline/object_inventory.json
 
     - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
       name: Install dvc
@@ -54,36 +48,22 @@ jobs:
 
     - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
       name: Pull dvc data
-      working-directory: ig_pipeline
+      working-directory: asset_pipeline
       run: dvc pull combined_room_object_list object_inventory
 
     - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
       name: Unprotect data
-      working-directory: ig_pipeline
+      working-directory: asset_pipeline
       run: dvc unprotect artifacts/pipeline/combined_room_object_list.json artifacts/pipeline/object_inventory.json
 
-    - name: Copy over ig_pipeline files
-      run: cp ig_pipeline/artifacts/pipeline/{combined_room_object_list,object_inventory}.json bddl/bddl/generated_data
+    - name: Copy over pipeline files
+      run: cp asset_pipeline/artifacts/pipeline/{combined_room_object_list,object_inventory}.json bddl/bddl/generated_data
 
-    - name: Combine complaint files from ig_pipeline
+    - name: Combine complaint files from asset_pipeline
       run: |
         python3 -c "
         import glob, json
-        files = glob.glob('ig_pipeline/cad/*/*/complaints.json')
-        combined = []
-        for file in files:
-            with open(file) as f:
-                combined.extend(json.load(f))
-        combined.sort(key=lambda x: (x['object'], x['type'], x['additional_info'], x['complaint'], x['processed']))
-        with open('bddl/bddl/generated_data/complaints.json', 'w') as f:
-            json.dump(combined, f, indent=2)
-        "
-
-    - name: Combine complaint files from ig_pipeline
-      run: |
-        python3 -c "
-        import glob, json
-        files = glob.glob('ig_pipeline/cad/*/*/complaints.json')
+        files = glob.glob('asset_pipeline/cad/*/*/complaints.json')
         combined = []
         for file in files:
             with open(file) as f:
@@ -116,5 +96,4 @@ jobs:
 
     - uses: stefanzweifel/git-auto-commit-action@v4
       with:
-        commit_message: "Sync Google Sheets data"
-        repository: bddl
+        commit_message: "Sync bddl Google Sheets data"

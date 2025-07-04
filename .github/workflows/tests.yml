@@ -42,6 +42,7 @@ jobs:
     defaults:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
+        working-directory: ${{ github.workspace }}/OmniGibson
 
     steps:
       - name: Checkout source
@@ -63,7 +64,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ github.run_id }}-tests-${{ matrix.test_file }}
-          path: ${{ matrix.test_file }}.xml
+          path: OmniGibson/${{ matrix.test_file }}.xml
 
       - name: Check for failures, errors, or missing XML
         run: |
@@ -91,17 +92,17 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
-          path: omnigibson-src
+          path: behavior1k-src
       - name: Pull reports
         uses: actions/download-artifact@v4
         with:
-          path: omnigibson-src
+          path: behavior1k-src/OmniGibson
           merge-multiple: true
       - name: Test Report0
         uses: dorny/test-reporter@v1
         with:
           name: Test Results
-          working-directory: omnigibson-src
+          working-directory: behavior1k-src/OmniGibson
           path: test_*.xml
           reporter: java-junit
           fail-on-error: 'false'

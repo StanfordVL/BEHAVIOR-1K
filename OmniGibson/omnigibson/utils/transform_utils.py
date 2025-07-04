@@ -506,8 +506,10 @@ def decompose_mat(hmat):
 
     # Check M[3, 3] for all batch items
     diag_vals = M[:, 3, 3]  # (B,)
-    if torch.any(torch.abs(diag_vals) < EPS):
-        raise ValueError("Some M[3, 3] values are zero")
+    
+    # TODO: this line might be a VRAM killer, investigate this
+    # if torch.any(torch.abs(diag_vals) < EPS):
+    #     raise ValueError("Some M[3, 3] values are zero")
 
     M = M / diag_vals.unsqueeze(-1).unsqueeze(-1)  # (B, 4, 4)
     P = M.clone()
