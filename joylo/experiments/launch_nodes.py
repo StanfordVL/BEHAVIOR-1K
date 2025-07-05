@@ -12,6 +12,7 @@ from gello.zmq_core.robot_node import ZMQServerRobot
 class Args:
     domain: str = "sim"     # Real or sim
     robot: str = "R1"       # OG robot class name
+    teleop: str = "JoyLo"   # Teleop controller type
     robot_port: int = 6001
     hostname: str = "127.0.0.1"
     robot_ip: str = "192.168.1.10"
@@ -33,6 +34,7 @@ def launch_robot_server(args: Args):
         from gello.robots.sim_robot.og_sim import OGRobotServer
         server = OGRobotServer(
             robot=args.robot,
+            teleop=args.teleop,
             port=port,
             host=args.hostname,
             recording_path=args.recording_path,

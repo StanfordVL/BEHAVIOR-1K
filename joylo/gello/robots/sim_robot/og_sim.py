@@ -2,7 +2,7 @@ import os
 import time
 import torch as th
 import numpy as np
-from typing import Dict, Optional
+from typing import Optional
 import json
 
 import omnigibson as og
@@ -17,26 +17,23 @@ from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
 from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
-from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjectViewAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 
-from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
+from gello.devices import DEVICE_LIB
 
 from gello.robots.sim_robot.og_teleop_cfg import *
 import gello.robots.sim_robot.og_teleop_utils as utils
-
-from bddl.activity import Conditions
 
 
 class OGRobotServer:
     def __init__(
         self,
         robot: str = ROBOT_TYPE,
+        teleop: str = "JoyLo",
         config: str = None,
         host: str = "127.0.0.1",
         port: int = 5556,
@@ -118,18 +115,12 @@ class OGRobotServer:
         self.event_queue = []
 
         # Set variables that are set during reset call
-        self._reset_max_arm_delta = DEFAULT_RESET_DELTA_SPEED * (np.pi / 180) * og.sim.get_sim_step_dt()
         self._resume_cooldown_time = None
         self._in_cooldown = False
-        self._current_trunk_translate = DEFAULT_TRUNK_TRANSLATE
-        self._current_trunk_tilt_offset = 0.0
-        self._current_trunk_tilt = 0.0
-        self._joint_state = None
-        self._joint_cmd = None
+
         self._waiting_to_resume = True
         self._should_update_checkpoint = False
         self._rollback_checkpoint_idx = None
-        self._grasp_action = {arm: 1 for arm in self.robot.arm_names}
         self._blink_frequency = 1.0 # Hz
 
         # Recording configuration
@@ -150,7 +141,6 @@ class OGRobotServer:
         self._prev_in_hand_status = {arm: False for arm in self.robot.arm_names}
         self._frame_counter = 0
         self._prev_base_motion = False
-        self._cam_switched = False
         self._button_toggled_state = {
             "x": False,
             "y": False,
@@ -159,23 +149,9 @@ class OGRobotServer:
             "left": False,
             "right": False,
         }
-        self._gripper_action_signal_detectors = {arm: utils.SignalChangeDetector(debounce_time=0.5) for arm in self.robot.arm_names}
 
-        # Set default active arm
-        self.active_arm = "right"
-        self._arm_shoulder_directions = {"left": -1.0, "right": 1.0}
-        self.obs = {}
-        
-        # Cache values
-        qpos_min, qpos_max = self.robot.joint_lower_limits, self.robot.joint_upper_limits
-        self._trunk_tilt_limits = {"lower": qpos_min[self.robot.trunk_control_idx][2],
-                                   "upper": qpos_max[self.robot.trunk_control_idx][2]}
-        self._arm_joint_limits = dict()
-        for arm in self.robot.arm_names:
-            self._arm_joint_limits[arm] = {
-                "lower": qpos_min[self.robot.arm_control_idx[arm]],
-                "upper": qpos_max[self.robot.arm_control_idx[arm]],
-            }
+        # Setup teleop controller
+        self.teleop_device = DEVICE_LIB[teleop](robot=self.robot, host=host, port=port)
 
         with og.sim.stopped():
             # # Set lower position iteration count for faster sim speed
@@ -244,9 +220,7 @@ class OGRobotServer:
                 scale = obj.states[ToggledOn].visual_marker.scale
                 obj.states[ToggledOn].visual_marker.scale = scale
 
-        # Create ZMQ server for communication
-        self._zmq_server = ZMQRobotServer(robot=self, host=host, port=port, verbose=False)
-        self._zmq_server_thread = ZMQServerThread(self._zmq_server)
+        assert teleop in DEVICE_LIB, f"Got invalid teleop type: {teleop}. Supported types: {list(DEVICE_LIB.keys())}"
 
     def _setup_teleop_support(self):
         """Set up cameras, visualizations, UI elements"""
@@ -367,111 +341,6 @@ class OGRobotServer:
             )
             self.vr_system.start()
 
-    def num_dofs(self) -> int:
-        """Return the number of degrees of freedom"""
-        return self.robot.n_joints
-
-    def get_joint_state(self) -> th.tensor:
-        """Get the current joint state"""
-        return self._joint_state
-
-    def command_joint_state(self, joint_state: th.tensor, component=None) -> None:
-        """
-        Command the robot to a joint state
-        
-        Args:
-            joint_state: Target joint state
-            component: Which component to control (optional)
-        """
-        # If R1, process manually
-        state = joint_state.clone()
-        if isinstance(self.robot, R1) and not isinstance(self.robot, R1Pro):
-            # [ 6DOF left arm, 6DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
-            start_idx = 0
-            for component, dim in zip(
-                    ("left_arm", "right_arm", "base", "trunk", "left_gripper", "right_gripper", "button_-", "button_+", "button_x", "button_y", "button_b", "button_a", "button_capture", "button_home", "button_left", "button_right"),
-                    (6, 6, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            ):
-                if start_idx >= len(state):
-                    break
-                self._joint_cmd[component] = state[start_idx: start_idx + dim]
-                start_idx += dim
-        elif isinstance(self.robot, R1Pro):
-            # [ 7DOF left arm, 7DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
-            start_idx = 0
-            for component, dim in zip(
-                    ("left_arm", "right_arm", "base", "trunk", "left_gripper", "right_gripper", "button_-", "button_+", "button_x", "button_y", "button_b", "button_a", "button_capture", "button_home", "button_left", "button_right"),
-                    (7, 7, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
-            ):
-                if start_idx >= len(state):
-                    break
-                self._joint_cmd[component] = state[start_idx: start_idx + dim]
-                start_idx += dim
-        else:
-            # Sort by component
-            if component is None:
-                component = self.active_arm
-            assert component in self._joint_cmd, \
-                f"Got invalid component joint cmd: {component}. Valid options: {self._joint_cmd.keys()}"
-            self._joint_cmd[component] = joint_state.clone()
-
-    def freedrive_enabled(self) -> bool:
-        """Check if freedrive mode is enabled"""
-        return True
-
-    def set_freedrive_mode(self, enable: bool):
-        """Set freedrive mode"""
-        pass
-
-    def get_observations(self) -> Dict[str, th.tensor]:
-        """Get the current observations"""
-        return self.obs
-
-    def _update_observations(self) -> Dict[str, th.tensor]:
-        """Update observations with current robot state"""
-        # Loop over all arms and grab relevant joint info
-        joint_pos = self.robot.get_joint_positions()
-        joint_vel = self.robot.get_joint_velocities()
-        finger_impulses = GripperRigidContactAPI.get_all_impulses(self.env.scene.idx) if INCLUDE_FINGER_CONTACT_OBS else None
-
-        obs = dict()
-        obs["active_arm"] = self.active_arm
-        obs["in_cooldown"] = self._in_cooldown
-        obs["base_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.non_floor_touching_base_links) if INCLUDE_BASE_CONTACT_OBS else False
-        obs["trunk_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.trunk_links) if INCLUDE_TRUNK_CONTACT_OBS else False
-        obs["reset_joints"] = bool(self._joint_cmd["button_y"][0].item())
-        obs["waiting_to_resume"] = self._waiting_to_resume
-
-        for i, arm in enumerate(self.robot.arm_names):
-            arm_control_idx = self.robot.arm_control_idx[arm]
-            obs[f"arm_{arm}_control_idx"] = arm_control_idx
-            obs[f"arm_{arm}_joint_positions"] = joint_pos[arm_control_idx]
-            # Account for tilt offset
-            obs[f"arm_{arm}_joint_positions"][0] -= self._current_trunk_tilt * self._arm_shoulder_directions[arm]
-            obs[f"arm_{arm}_joint_velocities"] = joint_vel[arm_control_idx]
-            obs[f"arm_{arm}_gripper_positions"] = joint_pos[self.robot.gripper_control_idx[arm]]
-            obs[f"arm_{arm}_ee_pos_quat"] = th.concatenate(self.robot.eef_links[arm].get_position_orientation())
-            # When using VR, this expansive check makes the view glitch
-            obs[f"arm_{arm}_contact"] = any(len(link.contact_list()) > 0 for link in self.robot.arm_links[arm]) if VIEWING_MODE != ViewingMode.VR and INCLUDE_ARM_CONTACT_OBS else False
-            obs[f"arm_{arm}_finger_max_contact"] = th.max(th.sum(th.square(finger_impulses[:, 2*i:2*(i+1), :]), dim=-1)).item() if INCLUDE_FINGER_CONTACT_OBS else 0.0
-
-            obs[f"{arm}_gripper"] = self._joint_cmd[f"{arm}_gripper"].item()
-
-        if INCLUDE_JACOBIAN_OBS:
-            for arm in self.robot.arm_names:
-                link_name = self.robot.eef_link_names[arm]
-
-                start_idx = 0 if self.robot.fixed_base else 6
-                link_idx = self.robot._articulation_view.get_body_index(link_name)
-                jacobian = ControllableObjectViewAPI.get_relative_jacobian(
-                    self.robot.articulation_root_path
-                )[-(self.robot.n_links - link_idx), :, start_idx : start_idx + self.robot.n_joints]
-                
-                jacobian = jacobian[:, self.robot.arm_control_idx[arm]]
-                obs[f"arm_{arm}_jacobian"] = jacobian
-
-        self.obs = obs
-
     def resume_control(self):
         """Resume control after waiting"""
         if self._waiting_to_resume:
@@ -483,10 +352,10 @@ class OGRobotServer:
 
     def serve(self) -> None:
         """Main serving loop"""
-        # Start the zmq server
-        self._zmq_server_thread.start()
-        
-        while True:
+        # start the teleop controller
+        self.teleop_device.start()
+
+        while self.teleop_device.is_running():
             self._update_observations()
 
             # Process button inputs
@@ -535,7 +404,10 @@ class OGRobotServer:
         # (a) begin receiving commands, if currently paused, or
         # (b) record checkpoint, if actively running, or
         # (c) rollback to checkpoint, if at least a single "Y" was pressed beforehand
-        button_x_state = self._joint_cmd["button_x"].item() != 0.0
+
+        button_cmd = self.teleop_device.get_button_input_cmd()
+
+        button_x_state = button_cmd["button_x"] != 0.0
         if button_x_state and not self._button_toggled_state["x"]:
             if self._waiting_to_resume:
                 self.resume_control()
@@ -550,15 +422,15 @@ class OGRobotServer:
 
                         # Extract trunk position values and calculate offsets
                         trunk_qpos = self.robot.get_joint_positions()[self.robot.trunk_control_idx]
-                        self._current_trunk_translate = utils.infer_trunk_translate_from_torso_qpos(trunk_qpos)
-                        base_trunk_pos = utils.infer_torso_qpos_from_trunk_translate(self._current_trunk_translate)
-                        self._current_trunk_tilt_offset = float(trunk_qpos[2] - base_trunk_pos[2])
+                        self.teleop_device.current_trunk_translate = utils.infer_trunk_translate_from_torso_qpos(trunk_qpos)
+                        base_trunk_pos = utils.infer_torso_qpos_from_trunk_translate(self.teleop_device.current_trunk_translate)
+                        self.teleop_device.current_trunk_tilt_offset = float(trunk_qpos[2] - base_trunk_pos[2])
                         
                         # Handle gripper actions
                         for arm in self.robot.arm_names:
                             gripper_goal = float(self.robot.controllers[f"gripper_{arm}"].goal["target"])
                             checkpoint_gripper_action = 1 if gripper_goal > 0 else -1
-                            self._grasp_action[arm] = checkpoint_gripper_action
+                            self.teleop_device.grasp_action[arm] = checkpoint_gripper_action
 
                         print("Finished rolling back!")
                         self._waiting_to_resume = True
@@ -569,7 +441,7 @@ class OGRobotServer:
         self._button_toggled_state["x"] = button_x_state
 
         # If Y is toggled from OFF -> ON, rollback to checkpoint
-        button_y_state = self._joint_cmd["button_y"].item() != 0.0
+        button_y_state = button_cmd["button_y"] != 0.0
         if button_y_state and not self._button_toggled_state["y"]:
             if self._recording_path is not None and len(self.env.checkpoint_states) > 0:
                 # Increment rollback counter -- this means that we will rollback next time "X" is pressed
@@ -581,7 +453,7 @@ class OGRobotServer:
         self._button_toggled_state["y"] = button_y_state
 
         # If B is toggled from OFF -> ON, toggle camera
-        button_b_state = self._joint_cmd["button_b"].item() != 0.0
+        button_b_state = button_cmd["button_b"] != 0.0
         if button_b_state and not self._button_toggled_state["b"]:
             self.active_camera_id = 1 - self.active_camera_id
             og.sim.viewer_camera.active_camera_path = self.camera_paths[self.active_camera_id]
@@ -592,7 +464,7 @@ class OGRobotServer:
         self._button_toggled_state["b"] = button_b_state
 
         # If A is toggled from OFF -> ON, toggle task-irrelevant object visibility
-        button_a_state = self._joint_cmd["button_a"].item() != 0.0
+        button_a_state = button_cmd["button_a"] != 0.0
         if button_a_state and not self._button_toggled_state["a"]:
             for obj in self.task_irrelevant_objects:
                 obj.visible = not obj.visible
@@ -636,17 +508,17 @@ class OGRobotServer:
         self._button_toggled_state["a"] = button_a_state
 
         # If capture is toggled from OFF -> ON, breakpoint
-        if self._joint_cmd["button_capture"].item() != 0.0:
+        if button_cmd["button_capture"] != 0.0:
             if not self._in_cooldown:
                 breakpoint()
 
         # If home is toggled from OFF -> ON, reset env
-        if self._joint_cmd["button_home"].item() != 0.0:
+        if button_cmd["button_home"] != 0.0:
             if not self._in_cooldown:
                 self.reset()
 
         # If left arrow is toggled from OFF -> ON, toggle flashlight on left eef
-        button_left_arrow_state = self._joint_cmd["button_left"].item() != 0.0
+        button_left_arrow_state = button_cmd["button_left"] != 0.0
         if button_left_arrow_state and not self._button_toggled_state["left"]:
             if self.flashlights["left"].GetVisibilityAttr().Get() == "invisible":
                 self.flashlights["left"].MakeVisible()
@@ -655,7 +527,7 @@ class OGRobotServer:
         self._button_toggled_state["left"] = button_left_arrow_state
         
         # If right arrow is toggled from OFF -> ON, toggle flashlight on right eef
-        button_right_arrow_state = self._joint_cmd["button_right"].item() != 0.0
+        button_right_arrow_state = button_cmd["button_right"] != 0.0
         if button_right_arrow_state and not self._button_toggled_state["right"]:
             if self.flashlights["right"].GetVisibilityAttr().Get() == "invisible":
                 self.flashlights["right"].MakeVisible()
@@ -698,14 +570,14 @@ class OGRobotServer:
         
         self._prev_base_motion = utils.update_reachability_visualizers(
             self.reachability_visualizers,
-            self._joint_cmd,
+            self.teleop_device.get_base_cmd(),
             self._prev_base_motion
         )
         
         utils.update_camera_blinking_visualizers(
             self.camera_blinking_visualizers,
             self.camera_paths[self.active_camera_id],
-            self.obs,
+            self.teleop_device.obs,
             self._blink_frequency,
         )
         
@@ -724,73 +596,17 @@ class OGRobotServer:
         Returns:
             torch.Tensor: Action for the robot
         """
-        # Start an empty action
-        action = th.zeros(self.robot.action_dim)
+        action = self.teleop_device.get_action(in_cooldown=self._in_cooldown)
 
-        # Apply arm action + extra dimension from base
-        if isinstance(self.robot, R1):
-            # Apply arm action
-            left_act = self._joint_cmd["left_arm"].clone().clip(self._arm_joint_limits["left"]["lower"], self._arm_joint_limits["left"]["upper"])
-            right_act = self._joint_cmd["right_arm"].clone().clip(self._arm_joint_limits["right"]["lower"], self._arm_joint_limits["right"]["upper"])
-
-            # If we're in cooldown, clip values based on max delta value
-            if self._in_cooldown:
-                robot_pos = self.robot.get_joint_positions()
-                robot_left_pos, robot_right_pos = [robot_pos[self.robot.arm_control_idx[arm]] for arm in ("left", "right")]
-                robot_left_delta = left_act - robot_left_pos
-                robot_right_delta = right_act - robot_right_pos
-                left_act = robot_left_pos + robot_left_delta.clip(-self._reset_max_arm_delta, self._reset_max_arm_delta)
-                right_act = robot_right_pos + robot_right_delta.clip(-self._reset_max_arm_delta, self._reset_max_arm_delta)
-
-            left_act[0] += self._current_trunk_tilt * self._arm_shoulder_directions["left"]
-            right_act[0] += self._current_trunk_tilt * self._arm_shoulder_directions["right"]
-            action[self.robot.arm_action_idx["left"]] = left_act
-            action[self.robot.arm_action_idx["right"]] = right_act
-
-            # Apply base action
-            action[self.robot.base_action_idx] = self._joint_cmd["base"].clone()
-
-            # Apply gripper action
-            for arm in self.robot.arm_names:
-                gripper_signal = self._joint_cmd[f"{arm}_gripper"].item()
-                gripper_changed = self._gripper_action_signal_detectors[arm].process_sample(gripper_signal)
-                if gripper_changed:
-                    self._grasp_action[arm] = -self._grasp_action[arm]
-                action[self.robot.gripper_action_idx[arm]] = self._grasp_action[arm]
-
-            # Apply trunk action
-            if SIMPLIFIED_TRUNK_CONTROL:
-                # Update trunk translation (height)
-                self._current_trunk_translate = float(th.clamp(
-                    th.tensor(self._current_trunk_translate, dtype=th.float) - 
-                    th.tensor(self._joint_cmd["trunk"][0].item() * og.sim.get_sim_step_dt(), dtype=th.float),
-                    0.0,
-                    2.0
-                ))
-                trunk_action = utils.infer_torso_qpos_from_trunk_translate(self._current_trunk_translate)
-                
-                # Update trunk tilt offset
-                self._current_trunk_tilt_offset = float(th.clamp(
-                    th.tensor(self._current_trunk_tilt_offset, dtype=th.float) + 
-                    th.tensor(self._joint_cmd["trunk"][1].item() * og.sim.get_sim_step_dt(), dtype=th.float),
-                    self._trunk_tilt_limits["lower"] - trunk_action[2],
-                    self._trunk_tilt_limits["upper"] - trunk_action[2]
-                ))
-                trunk_action[2] = trunk_action[2] + self._current_trunk_tilt_offset
-                
-                action[self.robot.trunk_action_idx] = trunk_action
-
-            # Update vertical visualizers
-            if USE_VERTICAL_VISUALIZERS:
-                for arm in ["left", "right"]:
-                    arm_position = self.robot.eef_links[arm].get_position_orientation(frame="world")[0]
-                    self.vertical_visualizers[arm].set_position_orientation(
-                        position=arm_position - th.tensor([0, 0, 1.0]), 
-                        orientation=th.tensor([0, 0, 0, 1.0]), 
-                        frame="world"
-                    )
-        else:
-            action[self.robot.arm_action_idx[self.active_arm]] = self._joint_cmd[self.active_arm].clone()
+        # Update vertical visualizers
+        if isinstance(self.robot, R1) and USE_VERTICAL_VISUALIZERS:
+            for arm in ["left", "right"]:
+                arm_position = self.robot.eef_links[arm].get_position_orientation(frame="world")[0]
+                self.vertical_visualizers[arm].set_position_orientation(
+                    position=arm_position - th.tensor([0, 0, 1.0]), 
+                    orientation=th.tensor([0, 0, 0, 1.0]), 
+                    frame="world"
+                )
 
         # Optionally update ghost robot
         if self.ghosting and self._frame_counter % GHOST_UPDATE_FREQ == 0:
@@ -804,10 +620,16 @@ class OGRobotServer:
 
         return action
 
+    def _update_observations(self) -> None:
+        self.teleop_device.update_observations()
+        # update cooldown and wait info
+        self.teleop_device.obs["in_cooldown"] = self._in_cooldown
+        self.teleop_device.obs["waiting_to_resume"] = self._waiting_to_resume
+
     def pause(self):
         self._waiting_to_resume = True
-        for detector in self._gripper_action_signal_detectors.values():
-            detector.reset()
+        self.teleop_device.pause()
+
 
     def reset(self, increment_instance=True):
         """
@@ -826,33 +648,11 @@ class OGRobotServer:
         self._ghost_appear_counter = {arm: 0 for arm in self.robot.arm_names}
         self._resume_cooldown_time = time.time() + N_COOLDOWN_SECS
         self._in_cooldown = True
-        self._current_trunk_translate = DEFAULT_TRUNK_TRANSLATE
-        self._current_trunk_tilt_offset = 0.0
-        self._current_trunk_tilt = 0.0
         self._waiting_to_resume = True
-        self._joint_state = self.robot.reset_joint_pos
-        self._joint_cmd = {
-            f"{arm}_arm": self._joint_state[self.robot.arm_control_idx[arm]] for arm in self.robot.arm_names
-        }
+
         self._should_update_checkpoint = False
-        self._grasp_action = {arm: 1 for arm in self.robot.arm_names}
-        for detector in self._gripper_action_signal_detectors.values():
-            detector.reset()
-        if isinstance(self.robot, (R1, R1Pro)):
-            for arm in self.robot.arm_names:
-                self._joint_cmd[f"{arm}_gripper"] = th.ones(len(self.robot.gripper_action_idx[arm]))
-                self._joint_cmd["base"] = self._joint_state[self.robot.base_control_idx]
-                self._joint_cmd["trunk"] = th.zeros(2)
-                self._joint_cmd["button_-"] = th.zeros(1)
-                self._joint_cmd["button_+"] = th.zeros(1)
-                self._joint_cmd["button_x"] = th.zeros(1)
-                self._joint_cmd["button_y"] = th.zeros(1)
-                self._joint_cmd["button_b"] = th.zeros(1)
-                self._joint_cmd["button_a"] = th.zeros(1)
-                self._joint_cmd["button_capture"] = th.zeros(1)
-                self._joint_cmd["button_home"] = th.zeros(1)
-                self._joint_cmd["button_left"] = th.zeros(1)
-                self._joint_cmd["button_right"] = th.zeros(1)
+        
+        self.teleop_device.reset()
 
         # Update the instance id / initial state if the instance ID is specified
         # We will manually update the task relevant objects (TRO) state
@@ -906,9 +706,7 @@ class OGRobotServer:
             self.env.add_metadata(group=group, name="instance_id", data=instance_id)
 
     def stop(self) -> None:
-        """Stop the server and clean up resources"""
-        self._zmq_server_thread.terminate()
-        self._zmq_server_thread.join()
+        """Stop the controller and clean up resources"""
         
         if self._recording_path is not None:
             # Sanity check if we are in the middle of an episode; always flush the current trajectory
@@ -919,6 +717,8 @@ class OGRobotServer:
         
         if VIEWING_MODE == ViewingMode.VR:
             self.vr_system.stop()
+        
+        self.teleop_device.stop()
         
         og.shutdown()
 
@@ -932,6 +732,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="OmniGibson Robot Server")
     parser.add_argument("--robot", type=str, default=ROBOT_TYPE, help="Robot type")
+    parser.add_argument("--teleop", type=str, default="JoyLo", help="Teleop type")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Server host")
     parser.add_argument("--port", type=int, default=5556, help="Server port")
     parser.add_argument("--recording-path", type=str, default=None, help="Path to save recordings")
@@ -942,6 +743,7 @@ if __name__ == "__main__":
     
     sim = OGRobotServer(
         robot=args.robot,
+        teleop=args.teleop,
         host=args.host,
         port=args.port,
         recording_path=args.recording_path,

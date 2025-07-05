@@ -1212,13 +1212,13 @@ def update_grasp_status(robot, eef_cylinder_geoms, prev_grasp_status):
     return updated_status
 
 
-def update_reachability_visualizers(reachability_visualizers, joint_cmd, prev_base_motion):
+def update_reachability_visualizers(reachability_visualizers, base_cmd, prev_base_motion):
     """
     Update the reachability visualizers based on base motion
     
     Args:
         reachability_visualizers: Reachability visualizer objects
-        joint_cmd: Joint command dictionary
+        base_cmd: Base command dictionary
         prev_base_motion: Previous base motion state
         
     Returns:
@@ -1228,7 +1228,7 @@ def update_reachability_visualizers(reachability_visualizers, joint_cmd, prev_ba
         return prev_base_motion
 
     # Show visualizers only when there's nonzero base motion
-    has_base_motion = th.any(th.abs(joint_cmd["base"]) > 1e-3)
+    has_base_motion = th.any(th.abs(base_cmd) > 1e-3)
     
     if has_base_motion != prev_base_motion:
         for edge in reachability_visualizers.values():
