@@ -326,37 +326,37 @@ def replay_hdf5_file(
             # reload observation space
             env.load_observation_space()
 
-        # Create a list to store video writers and RGB keys
-        video_writers = []
-        video_keys = []
-
-        if generate_rgbd:
-            rgbd_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgbd", demo_name)
-            os.makedirs(rgbd_dir, exist_ok=True)
-            # Create video writer for robot cameras
-            for camera_name in camera_names:
-                # RGB video writer
-                video_writers.append(env.create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4",
-                    resolution=WRIST_RESOLUTION,
-                    codec_name="libx265",
-                    context_options={"crf": "18"},
-                ))
-                video_keys.append(f"{camera_name}::rgb")
-                # Depth video writer
-                video_writers.append(env.create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4",
-                    resolution=WRIST_RESOLUTION,
-                    codec_name="libx265",
-                    pix_fmt="yuv420p10le",    
-                ))
-                video_keys.append(f"{camera_name}::depth_linear")
-
 
         # Playback the dataset with all video writers
         # We avoid calling playback_dataset and call playback_episode individually in order to manually
         # aggregate per-episode metrics
         for episode_id in range(env.input_hdf5["data"].attrs["n_episodes"]):
+            # Create a list to store video writers and RGBD keys
+            video_writers = []
+            video_keys = []
+
+            if generate_rgbd:
+                rgbd_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgbd", demo_name, f"demo_{episode_id}")
+                os.makedirs(rgbd_dir, exist_ok=True)
+                # Create video writer for robot cameras
+                for camera_name in camera_names:
+                    # RGB video writer
+                    video_writers.append(env.create_video_writer(
+                        fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4",
+                        resolution=WRIST_RESOLUTION,
+                        codec_name="libx265",
+                        context_options={"crf": "18"},
+                    ))
+                    video_keys.append(f"{camera_name}::rgb")
+                    # Depth video writer
+                    video_writers.append(env.create_video_writer(
+                        fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4",
+                        resolution=WRIST_RESOLUTION,
+                        codec_name="libx265",
+                        pix_fmt="yuv420p10le",    
+                    ))
+                    video_keys.append(f"{camera_name}::depth_linear")
+
             print(f" >>> Replaying episode {episode_id}")
 
             env.playback_episode(
@@ -368,13 +368,13 @@ def replay_hdf5_file(
                 segmentation_output_path=segmentation_output_path
             )
 
-        # Close all video writers
-        for container, stream in video_writers:
-            # Flush any remaining packets
-            for packet in stream.encode():
-                container.mux(packet)
-            # Close the container
-            container.close()
+            # Close all video writers
+            for container, stream in video_writers:
+                # Flush any remaining packets
+                for packet in stream.encode():
+                    container.mux(packet)
+                # Close the container
+                container.close()
 
         print("Playback complete. Saving data...")
         env.save_data()
