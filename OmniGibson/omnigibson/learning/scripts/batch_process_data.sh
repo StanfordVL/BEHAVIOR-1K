@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OMNIGIBSON_DIR="/vision/u/wsai/OmniGibson"
+OMNIGIBSON_DIR="/vision/u/wsai/BEHAVIOR-1K/OmniGibson"
 
 # batch process data for a giving task
 # get the task name from the first argument

@@ -23,10 +23,10 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
-mkdir -p /vision/u/wsai/OmniGibson/outputs/sc
+mkdir -p /vision/u/wsai/BEHAVIOR-1K/OmniGibson/outputs/sc
 source /vision/u/wsai/miniconda3/bin/activate omnigibson
 
-OMNIGIBSON_HEADLESS=1 python omnigibson/learning/train.py policy=wbvima task=picking_up_trash data_dir=/vision/u/wsai/behavior/picking_up_trash/pcd
+OMNIGIBSON_HEADLESS=1 python Omnigibson/omnigibson/learning/train.py policy=wbvima task=picking_up_trash data_dir=/vision/u/wsai/behavior/picking_up_trash
 
 echo "Job finished."
 exit 0

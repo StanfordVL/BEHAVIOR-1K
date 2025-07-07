@@ -1,4 +1,4 @@
-base_dir=/home/svl/Documents/Files/OG
+base_dir=/home/svl/Documents/Files/behavior
 task_name=picking_up_trash
 
 task_dir="$base_dir/$task_name"

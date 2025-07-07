@@ -5,7 +5,6 @@ import omnigibson.utils.transform_utils as T
 import open3d as o3d
 import torch as th
 from scipy.spatial.transform import Rotation as R
-from tqdm import trange
 from typing import Dict, Tuple
 
 
@@ -67,6 +66,71 @@ def dequantize_depth(
     depth = th.clamp(th.exp(log_depth) - shift, min=min_depth, max=max_depth)
 
     return depth
+
+
+class VideoLoader:
+    def __init__(self, path: str, type: str = "rgb", streaming: bool = False):
+        """
+        Initialize VideoLoader for loading RGB or depth videos.
+        
+        Args:
+            path (str): Path to the video file
+            video_type (str): Either "rgb" or "depth"
+            streaming (bool): If True, load frames on demand. If False, load all frames at once.
+        """
+        self.path = path
+        self.type = type
+        self.streaming = streaming
+        
+        if not streaming:
+            # Load all frames at once
+            if type == "rgb":
+                self.frames = load_rgb_video(path)
+            elif type == "depth":
+                self.frames = load_depth_video(path)
+            else:
+                raise ValueError(f"Unsupported video type: {type}")
+        else:
+            # Initialize for streaming
+            self.container = av.open(path)
+            self.stream = self.container.streams.video[0]
+            self.frame_iterator = None
+    
+    def __iter__(self):
+        """Make the loader iterable for streaming mode."""
+        if not self.streaming:
+            # Return all frames as a single tensor
+            yield self.frames
+        else:
+            # Stream frames one by one
+            self.frame_iterator = self.container.demux(self.stream)
+            for packet in self.frame_iterator:
+                for frame in packet.decode():
+                    if self.type == "rgb":
+                        rgb = frame.to_ndarray(format="rgb24")
+                        yield th.from_numpy(rgb).float()
+                    elif self.type == "depth":
+                        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
+                        depth_frame = th.from_numpy(frame_gray16)
+                        yield dequantize_depth(depth_frame)
+    
+    def __len__(self):
+        """Return the number of frames."""
+        if not self.streaming:
+            return self.frames.shape[0]
+        else:
+            # For streaming, we need to count frames
+            if not hasattr(self, '_frame_count'):
+                temp_container = av.open(self.path)
+                temp_stream = temp_container.streams.video[0]
+                self._frame_count = temp_stream.frames
+                temp_container.close()
+            return self._frame_count
+    
+    def close(self):
+        """Close the video container (only needed for streaming mode)."""
+        if self.streaming and hasattr(self, 'container'):
+            self.container.close()
 
 
 def load_rgb_video(path: str) -> th.Tensor:
@@ -180,41 +244,49 @@ def process_fused_point_cloud(
     robot_name: str, 
     camera_intrinsics: Dict[str, np.ndarray],
     pcd_num_points: int = 4096
-) -> np.ndarray:
-    base_link_pose = obs[f"{robot_name}::robot_base_link_pose"][:]
-    data_size = base_link_pose.shape[0] if len(base_link_pose.shape) > 1 else 1
-    camera_depth, camera_rgb, camera_seg, camera_pose = dict(), dict(), dict(), dict()
-    for camera_name in camera_intrinsics.keys():
-        camera_depth[camera_name] = obs[f"{camera_name}::depth_linear"][:]
-        camera_rgb[camera_name] = obs[f"{camera_name}::rgb"][..., :3]
-        camera_seg[camera_name] = obs[f"{camera_name}::seg_semantic"][:]
-        camera_pose[camera_name] = obs[f"{camera_name}::pose"][:]
-    if data_size == 1:
-        rgb_pcd, seg_pcd = [], []
-        for camera_name, intrinsics in camera_intrinsics.items():
-            pcd = depth_to_pcd(camera_depth[camera_name], camera_pose[camera_name], base_link_pose, K=intrinsics)
-            rgb_pcd.append(
-                np.concatenate([camera_rgb[camera_name] / 255.0, pcd], axis=-1).reshape(-1, 6)
-            )  # shape (H*W, 6) 
-            seg_pcd.append(camera_seg[camera_name]).reshape(-1) # shape (H*W)
-        # Fuse all point clouds and downsample
-        fused_pcd_all = np.concatenate(rgb_pcd, axis=0)
-        fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points).astype(np.float32)
-        fused_seg = np.concatenate(seg_pcd, axis=0)[sampled_idx]
-    else:
-        fused_pcd = np.zeros((data_size, pcd_num_points, 6), dtype=np.float32)  # Initialize empty point cloud
-        fused_seg = np.zeros((data_size, pcd_num_points), dtype=np.uint32)
-        for i in trange(data_size):
-            rgb_pcd, seg_pcd = [], []
-            for camera_name, intrinsics in camera_intrinsics.items():
-                pcd = depth_to_pcd(camera_depth[camera_name][i], camera_pose[camera_name][i], base_link_pose[i], K=intrinsics)
-                rgb_pcd.append(
-                    np.concatenate([camera_rgb[camera_name][i] / 255.0, pcd], axis=-1).reshape(-1, 6)
-                )  # shape (H*W, 6) 
-                seg_pcd.append(camera_seg[camera_name][i].reshape(-1)) # shape (H*W) 
-            # Fuse all point clouds and downsample
-            fused_pcd_all = np.concatenate(rgb_pcd, axis=0)
-            fused_pcd[i], sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points)
-            fused_seg[i] = np.concatenate(seg_pcd, axis=0)[sampled_idx]
+) -> Tuple[np.ndarray, np.ndarray]:
+	base_link_pose = obs[f"{robot_name}::robot_base_link_pose"]
+	data_size = base_link_pose.shape[0] if len(base_link_pose.shape) > 1 else 1
+	camera_depth, camera_rgb, camera_seg, camera_pose = dict(), dict(), dict(), dict()
+	if data_size == 1:
+		for camera_name in camera_intrinsics.keys():
+			camera_depth[camera_name] = obs[f"{camera_name}::depth_linear"]
+			camera_rgb[camera_name] = obs[f"{camera_name}::rgb"]
+			camera_seg[camera_name] = obs[f"{camera_name}::seg_semantic"]
+			camera_pose[camera_name] = obs[f"{camera_name}::pose"]
+		rgb_pcd, seg_pcd = [], []
+		for camera_name, intrinsics in camera_intrinsics.items():
+			pcd = depth_to_pcd(camera_depth[camera_name][:], camera_pose[camera_name][:], base_link_pose[:], K=intrinsics)
+			rgb_pcd.append(
+				np.concatenate([camera_rgb[camera_name][..., :3] / 255.0, pcd], axis=-1).reshape(-1, 6)
+			)  # shape (H*W, 6) 
+			seg_pcd.append(camera_seg[camera_name][:].reshape(-1)) # shape (H*W)
+		# Fuse all point clouds and downsample
+		fused_pcd_all = np.concatenate(rgb_pcd, axis=0)
+		fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points)
+		fused_pcd = fused_pcd.astype(np.float32)
+		fused_seg = np.concatenate(seg_pcd, axis=0)[sampled_idx].astype(np.uint32)
+	else:
+		for camera_name in camera_intrinsics.keys():
+			camera_depth[camera_name] = iter(obs[f"{camera_name}::depth_linear"])
+			camera_rgb[camera_name] = iter(obs[f"{camera_name}::rgb"])
+			camera_seg[camera_name] = obs[f"{camera_name}::seg_semantic"]
+			camera_pose[camera_name] = obs[f"{camera_name}::pose"]
+		fused_pcd = np.zeros((data_size, pcd_num_points, 6), dtype=np.float32)  # Initialize empty point cloud
+		fused_seg = np.zeros((data_size, pcd_num_points), dtype=np.uint32)
+		for i in range(data_size):
+			if i % 500 == 0:
+				print(f"Processing frame {i} of {data_size}")
+			rgb_pcd, seg_pcd = [], []
+			for camera_name, intrinsics in camera_intrinsics.items():
+				pcd = depth_to_pcd(next(camera_depth[camera_name]), camera_pose[camera_name][i], base_link_pose[i], K=intrinsics)
+				rgb_pcd.append(
+					np.concatenate([next(camera_rgb[camera_name]) / 255.0, pcd], axis=-1).reshape(-1, 6)
+				)  # shape (H*W, 6) 
+				seg_pcd.append(camera_seg[camera_name][i].reshape(-1)) # shape (H*W) 
+			# Fuse all point clouds and downsample
+			fused_pcd_all = np.concatenate(rgb_pcd, axis=0)
+			fused_pcd[i], sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points)
+			fused_seg[i] = np.concatenate(seg_pcd, axis=0)[sampled_idx]
 
-    return fused_pcd, fused_seg
+	return fused_pcd, fused_seg
