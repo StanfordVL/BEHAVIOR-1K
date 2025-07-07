@@ -1,6 +1,6 @@
 #!/bin/bash
 
-OMNIGIBSON_DIR="/vision/u/wsai/BEHAVIOR-1K/OmniGibson"
+BEHAVIOR_DIR="/vision/u/wsai/BEHAVIOR-1K"
 
 # batch process data for a giving task
 # get the task name from the first argument
@@ -33,14 +33,14 @@ else
     echo "Found number of hdf5 files: $(echo "$filenames" | wc -l)"
 fi
 
-cd $OMNIGIBSON_DIR
+cd $BEHAVIOR_DIR
 
 # only process the first 2 files for testing
 # filenames=$(echo "$filenames" | head -n 2)
 
 # loop through all the files in the directory
 for file in $filenames; do
-    sbatch omnigibson/learning/scripts/process_data.sbatch.sh "$base_dir" "$file"
+    sbatch OmniGibson/omnigibson/learning/scripts/process_data.sbatch.sh "$base_dir" "$file"
 done
 
 echo "All files submitted for processing."

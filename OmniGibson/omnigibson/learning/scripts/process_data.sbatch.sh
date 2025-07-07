@@ -18,8 +18,8 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
-mkdir -p /vision/u/wsai/BEHAVIOR-1K/OmniGibson/outputs/sc
-source /vision/u/wsai/miniconda3/bin/activate omnigibson
+mkdir -p /vision/u/wsai/BEHAVIOR-1K/outputs/sc
+source /vision/u/wsai/miniconda3/bin/activate behavior
 
 echo "File to process: $1/raw/$2"
 
