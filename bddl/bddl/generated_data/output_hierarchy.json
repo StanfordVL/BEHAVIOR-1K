@@ -24697,6 +24697,13 @@
                                       ]
                                     },
                                     {
+                                      "name": "ping_pong_ball.n.01",
+                                      "hasModel": true,
+                                      "categories": [
+                                        "ping_pong_ball"
+                                      ]
+                                    },
+                                    {
                                       "name": "pool_ball.n.01",
                                       "hasModel": true,
                                       "categories": [
@@ -24797,6 +24804,13 @@
                                         "volleyball_net"
                                       ]
                                     }
+                                  ]
+                                },
+                                {
+                                  "name": "ping_pong_table.n.01",
+                                  "hasModel": true,
+                                  "categories": [
+                                    "ping_pong_table"
                                   ]
                                 },
                                 {
@@ -25406,6 +25420,13 @@
                                       ]
                                     },
                                     {
+                                      "name": "ping_pong_table.n.01",
+                                      "hasModel": true,
+                                      "categories": [
+                                        "ping_pong_table"
+                                      ]
+                                    },
+                                    {
                                       "name": "pool_table.n.01",
                                       "hasModel": true,
                                       "categories": [
@@ -25708,6 +25729,13 @@
                                   "name": "racket.n.04",
                                   "hasModel": true,
                                   "children": [
+                                    {
+                                      "name": "ping_pong_paddle.n.01",
+                                      "hasModel": true,
+                                      "categories": [
+                                        "ping_pong_paddle"
+                                      ]
+                                    },
                                     {
                                       "name": "tennis_racket.n.01",
                                       "hasModel": true,

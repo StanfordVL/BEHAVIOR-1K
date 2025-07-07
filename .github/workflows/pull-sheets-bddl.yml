@@ -1,0 +1,99 @@
+name: Sync bddl Google Sheets data
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  # Every day at 9am
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  pull-sheets:
+    name: Sync Google Sheets data
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.10"
+        architecture: x64
+
+    - name: Authenticate on Google Cloud
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: ${{ secrets.SHEETS_DEPLOY_KEY }}
+
+    # See if we need to re-pull any asset_pipeline data from DVC.
+    - name: Check cache for pipeline data
+      id: cache-pipeline
+      uses: actions/cache@v3
+      with:
+        key: asset_pipeline-${{ hashFiles('asset_pipeline/dvc.lock') }}
+        path: |
+          asset_pipeline/artifacts/pipeline/combined_room_object_list.json
+          asset_pipeline/artifacts/pipeline/object_inventory.json
+
+    - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
+      name: Install dvc
+      run: pip install dvc[gs]
+
+    - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
+      name: Pull dvc data
+      working-directory: asset_pipeline
+      run: dvc pull combined_room_object_list object_inventory
+
+    - if: ${{ steps.cache-pipeline.outputs.cache-hit != 'true' }}
+      name: Unprotect data
+      working-directory: asset_pipeline
+      run: dvc unprotect artifacts/pipeline/combined_room_object_list.json artifacts/pipeline/object_inventory.json
+
+    - name: Copy over pipeline files
+      run: cp asset_pipeline/artifacts/pipeline/{combined_room_object_list,object_inventory}.json bddl/bddl/generated_data
+
+    - name: Combine complaint files from asset_pipeline
+      run: |
+        python3 -c "
+        import glob, json
+        files = glob.glob('asset_pipeline/cad/*/*/complaints.json')
+        combined = []
+        for file in files:
+            with open(file) as f:
+                combined.extend(json.load(f))
+        combined.sort(key=lambda x: (x['object'], x['type'], x['additional_info'], x['complaint'], x['processed']))
+        with open('bddl/bddl/generated_data/complaints.json', 'w') as f:
+            json.dump(combined, f, indent=2)
+        "
+
+    - name: Install BDDL
+      working-directory: bddl
+      run: pip install -e .
+
+    - name: Install dev requirements
+      working-directory: bddl
+      run: pip install -r requirements-dev.txt
+
+    - name: Refresh sheets data
+      working-directory: bddl
+      run: python -m bddl.data_generation.pull_sheets
+
+    - name: Refresh derivative data
+      working-directory: bddl
+      run: python -m bddl.data_generation.generate_datafiles
+
+    # We want to check if the knowledgebase imports correctly, and if not, we want to NOT do the pull
+    # because it will result in a permamently broken knowledgebase that blocks sampling and website.
+    - name: Test if knowledgebase loads OK
+      run: python -c "from bddl.knowledge_base import *"
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Sync bddl Google Sheets data"

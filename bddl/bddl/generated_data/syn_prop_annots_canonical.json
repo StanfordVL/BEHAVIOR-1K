@@ -19443,6 +19443,22 @@
         "wrinkleable": {},
         "disinfectable": {}
     },
+    "ping_pong_table.n.01": {
+        "sceneObject": {},
+        "rigidBody": {},
+        "nonSubstance": {},
+        "wetable": {},
+        "stickyable": {},
+        "dustyable": {},
+        "grassyable": {},
+        "scratchable": {},
+        "stainable": {},
+        "tarnishable": {},
+        "moldyable": {},
+        "rustable": {},
+        "wrinkleable": {},
+        "disinfectable": {}
+    },
     "popcorn__bag.n.01": {
         "fillable": {},
         "flammable": {},
@@ -24274,7 +24290,37 @@
         "wrinkleable": {},
         "disinfectable": {}
     },
+    "ping_pong_ball.n.01": {
+        "rigidBody": {},
+        "nonSubstance": {},
+        "wetable": {},
+        "stickyable": {},
+        "dustyable": {},
+        "grassyable": {},
+        "scratchable": {},
+        "stainable": {},
+        "tarnishable": {},
+        "moldyable": {},
+        "rustable": {},
+        "wrinkleable": {},
+        "disinfectable": {}
+    },
     "tennis_racket.n.01": {
+        "rigidBody": {},
+        "nonSubstance": {},
+        "wetable": {},
+        "stickyable": {},
+        "dustyable": {},
+        "grassyable": {},
+        "scratchable": {},
+        "stainable": {},
+        "tarnishable": {},
+        "moldyable": {},
+        "rustable": {},
+        "wrinkleable": {},
+        "disinfectable": {}
+    },
+    "ping_pong_paddle.n.01": {
         "rigidBody": {},
         "nonSubstance": {},
         "wetable": {},

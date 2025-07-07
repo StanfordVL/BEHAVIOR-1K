@@ -1,0 +1,44 @@
+name: Sync asset pipeline Google Sheets data
+
+on:
+  schedule:
+    - cron: "0 10 * * *"  # Every day at 10am
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  pull-sheets:
+    name: Sync Google Sheets data
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Setup python
+      uses: actions/setup-python@v2
+      with:
+        python-version: "3.8"
+        architecture: x64
+
+    - name: Install requirements
+      run: pip install gspread pandas
+
+    - name: Authenticate on Google Cloud
+      uses: 'google-github-actions/auth@v1'
+      with:
+        credentials_json: '${{ secrets.GCP_CREDENTIALS }}'
+
+    - uses: webfactory/ssh-agent@v0.9.0
+      with:
+          ssh-private-key: ${{ secrets.SHEETS_DEPLOY_KEY }}
+
+    - name: Refresh sheets data
+      run: python -m b1k_pipeline.sync_sheets
+      working-directory: asset_pipeline
+
+    - uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Sync Google Sheets data"

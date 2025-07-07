@@ -15964,6 +15964,45 @@
         }
     },
     {
+        "rule_name": "ping_pong_ball.n.01-washer-cover",
+        "input_synsets": {},
+        "machine": {
+            "washer.n.03": 1
+        },
+        "washed_item": {
+            "ping_pong_ball.n.01": 1
+        },
+        "output_synsets": {
+            "water.n.06": 1
+        }
+    },
+    {
+        "rule_name": "ping_pong_paddle.n.01-washer-cover",
+        "input_synsets": {},
+        "machine": {
+            "washer.n.03": 1
+        },
+        "washed_item": {
+            "ping_pong_paddle.n.01": 1
+        },
+        "output_synsets": {
+            "water.n.06": 1
+        }
+    },
+    {
+        "rule_name": "ping_pong_table.n.01-washer-cover",
+        "input_synsets": {},
+        "machine": {
+            "washer.n.03": 1
+        },
+        "washed_item": {
+            "ping_pong_table.n.01": 1
+        },
+        "output_synsets": {
+            "water.n.06": 1
+        }
+    },
+    {
         "rule_name": "pipe.n.01-washer-cover",
         "input_synsets": {},
         "machine": {
