@@ -91,7 +91,7 @@ class MacroParticleSystem(BaseSystem):
         Returns:
             set: idn of all the particles across all groups.
         """
-        return {self.particle_name2idn(particle_name) for particle_name in self.particles}
+        return {self.particle_name2idn(particle_name) for particle_name in self.particles} if self.particles else set()
 
     @property
     def next_available_particle_idn(self):
