@@ -164,18 +164,30 @@ class VideoLoader:
 
 
 def load_rgb_video(path: str) -> th.Tensor:
+    """
+    Load RGB video with robust frame extraction.
+    
+    Args:
+        path (str): Path to the video file
+    Returns:
+        th.Tensor: (T, H, W, 3) RGB video tensor
+    """
     container = av.open(path)
     stream = container.streams.video[0]
     
     frames = []
-    for packet in container.demux(stream):
-        for frame in packet.decode():
-            rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3), dtype=uint8
-            rgb = th.from_numpy(rgb).unsqueeze(0)  # (1, H, W, 3)
-            frames.append(rgb)
+    for frame in container.decode(stream):
+        rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3), dtype=uint8
+        rgb = th.from_numpy(rgb).unsqueeze(0)  # (1, H, W, 3)
+        frames.append(rgb)
     
     container.close()
-    return th.cat(frames, dim=0)
+    
+    if not frames:
+        raise ValueError(f"No frames found in video: {path}")
+    
+    video = th.cat(frames, dim=0)  # (T, H, W, 3)
+    return video
 
 
 def load_depth_video(path: str, min_depth: float=MIN_DEPTH, max_depth: float=MAX_DEPTH, shift: float=DEPTH_SHIFT) -> th.Tensor:
@@ -183,11 +195,10 @@ def load_depth_video(path: str, min_depth: float=MIN_DEPTH, max_depth: float=MAX
     stream = container.streams.video[0]
     
     frames = []
-    for packet in container.demux(stream):
-        for frame in packet.decode():
-            # Decode Y (luma) channel only; YUV420 → grayscale image
-            frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
-            frames.append(th.from_numpy(frame_gray16).unsqueeze(0))  # (1, H, W)
+    for frame in container.decode(stream):
+        # Decode Y (luma) channel only; YUV420 → grayscale image
+        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
+        frames.append(th.from_numpy(frame_gray16).unsqueeze(0))  # (1, H, W)
     
     container.close()
     video = th.cat(frames, dim=0)  # (T, H, W)
@@ -200,11 +211,10 @@ def load_seg_video(path: str) -> th.Tensor:
     stream = container.streams.video[0]
     
     frames = []
-    for packet in container.demux(stream):
-        for frame in packet.decode():
-            rgb = frame.to_ndarray(format="rgb24")
-            id = rgb_to_id_scrambled(rgb)
-            frames.append(th.from_numpy(id).unsqueeze(0))  # (1, H, W)
+    for frame in container.decode(stream):
+        rgb = frame.to_ndarray(format="rgb24")
+        id = rgb_to_id_scrambled(rgb)
+        frames.append(th.from_numpy(id).unsqueeze(0))  # (1, H, W)
     
     container.close()
     return th.cat(frames, dim=0)  # (T, H, W)

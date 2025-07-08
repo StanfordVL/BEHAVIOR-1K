@@ -3,6 +3,7 @@ import os
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+import logging
 
 import av
 import h5py
@@ -17,11 +18,12 @@ from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
-from omnigibson.learning.utils.obs_utils import quantize_depth
+from omnigibson.learning.utils.obs_utils import quantize_depth, id_to_rgb_scrambled
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+log.setLevel(logging.INFO)
 
 h5py.get_config().track_order = True
 
@@ -1016,7 +1018,16 @@ class DataPlaybackWrapper(DataWrapper):
                 video_keys=video_keys,
             )
 
-    def create_video_writer(self, fpath, resolution, codec_name="libx264", rate=30, context_options=None, pix_fmt="yuv420p"):
+    def create_video_writer(
+        self, 
+        fpath, 
+        resolution, 
+        codec_name="libx264", 
+        rate=30, 
+        pix_fmt="yuv420p",
+        stream_options=None,
+        context_options=None, 
+    ):
         """
         Creates a video writer to write video frames to when playing back the dataset using PyAV
 
@@ -1025,8 +1036,9 @@ class DataPlaybackWrapper(DataWrapper):
             resolution (tuple): Resolution of the video frames to write (height, width)
             codec_name (str): Codec to use for the video writer. Default is "libx264"
             rate (int): Frame rate of the video writer. Default is 30
-            context_options (dict): Additional context options to pass to the video writer. Default is None
             pix_fmt (str): Pixel format to use for the video writer. Default is "yuv420p"
+            stream_options (dict): Additional stream options to pass to the video writer. Default is None
+            context_options (dict): Additional context options to pass to the video writer. Default is None
         Returns:
             av.Container: PyAV container object that can be used to write video frames
             av.Stream: PyAV stream object that can be used to write video frames
@@ -1037,6 +1049,8 @@ class DataPlaybackWrapper(DataWrapper):
         stream.height = resolution[0]
         stream.width = resolution[1]
         stream.pix_fmt = pix_fmt
+        if stream_options is not None:
+            stream.options = stream_options
         if context_options is not None:
             stream.codec_context.options = context_options
         return container, stream
@@ -1054,13 +1068,16 @@ class DataPlaybackWrapper(DataWrapper):
             if "rgb" in video_key:
                 height, width = self.current_obs[video_key].shape[:2]
                 frame = av.VideoFrame.from_ndarray(self.current_obs[video_key][:, :, :3].numpy(), format="rgb24")
-                frame = frame.reformat(width=width, height=height, format="yuv420p")
+                # frame = frame.reformat(width=width, height=height, format="yuv420p")
             elif "depth" in video_key:
                 quantized_depth = quantize_depth(self.current_obs[video_key])
                 frame = av.VideoFrame.from_ndarray(quantized_depth.numpy(), format='gray16le')
+            elif "seg" in video_key:
+                rgb_id = id_to_rgb_scrambled(self.current_obs[video_key].cpu().numpy())
+                frame = av.VideoFrame.from_ndarray(rgb_id, format="rgb24")
             else:
                 raise ValueError(
-                    f"Unsupported video_rgb_key: {video_key}. Only 'rgb' and 'depth' keys are supported!"
+                    f"Unsupported video_rgb_key: {video_key}. Only 'rgb', 'depth' and 'seg' keys are supported!"
                 )
             for packet in stream.encode(frame):
                 container.mux(packet)
