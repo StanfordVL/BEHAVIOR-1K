@@ -432,7 +432,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                             if len(remove_idxs) > 0:
                                 system.remove_particles(remove_idxs)
 
-                    og.sim.step()
+                    # Make sure objects are settled
+                    for _ in range(10):
+                        og.sim.step()
 
                     task_final_state = env.scene.dump_state()
                     task_scene_dict = {"state": task_final_state}

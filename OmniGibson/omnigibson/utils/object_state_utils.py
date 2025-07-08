@@ -99,7 +99,7 @@ def sample_kinematics(
     max_trials=None,
     z_offset=0.05,
     skip_falling=False,
-    use_last_ditch_effort=True,
+    use_last_ditch_effort=False,
     use_trav_map=True,
 ):
     """
@@ -213,12 +213,13 @@ def sample_kinematics(
             rotated_diff = T.quat_apply(additional_quat, diff)
             pos = sampled_vector + rotated_diff
 
-            if use_trav_map:
+            from omnigibson.robots.robot_base import BaseRobot
+            if use_trav_map and not isinstance(objA, BaseRobot):
                 xy_map = trav_map.world_to_map(pos[:2])
                 if pos[2] > eef_z_max:
                     # We need to check if the sampled position is above the maximum z of the arm
                     pos = None
-                elif pos[2] < eef_z_min and predicate == "inside":
+                elif pos[2] < eef_z_min and predicate == "inside" and objB.fixed_base:
                     # If sampling inside an object, we need to check if the sampled position is above the minimum z of the arm
                     pos = None
                 elif predicate == "onTop" and objB.category in GROUND_CATEGORIES:
