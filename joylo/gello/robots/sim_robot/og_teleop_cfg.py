@@ -86,7 +86,7 @@ VALIDATED_TASKS = [
     "slicing_vegetables",
     "chopping_wood",
     "canning_food",
-    "can_beans",
+    "cook_hot_dogs",
     "cook_bacon",
     "freeze_pies",
 ]

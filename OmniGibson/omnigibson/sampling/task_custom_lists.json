@@ -2137,5 +2137,20 @@
             },
             "blacklist": {}
         }
+    },
+    "cook_hot_dogs": {
+        "room_types": [
+            "kitchen"
+        ],
+        "house_single_floor": {
+            "whitelist": {
+                "hotdog.n.02": {
+                    "hotdog": {
+                        "lsajfg": null
+                    }
+                }
+            },
+            "blacklist": {}
+        }
     }
 }
