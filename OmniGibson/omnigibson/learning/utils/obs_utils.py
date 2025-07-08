@@ -1,10 +1,11 @@
 import av
-import fpsample
+# from torch_cluster import fps
 import numpy as np
 import omnigibson.utils.transform_utils as T
 import open3d as o3d
 import torch as th
 from scipy.spatial.transform import Rotation as R
+from sympy import mod_inverse
 from typing import Dict, Tuple
 
 
@@ -68,6 +69,30 @@ def dequantize_depth(
     return depth
 
 
+PRIME = 2654435761  # Knuth's multiplicative hash
+MOD = 2**24
+PRIME_INV = int(mod_inverse(PRIME, MOD))
+
+def id_to_rgb_scrambled(id_map: np.ndarray) -> np.ndarray:
+    """Map uint32 instance IDs to uint8 RGB via reversible hash."""
+    id_map = id_map.astype(np.uint32)
+    hashed = (id_map * PRIME) % MOD
+    r = (hashed >> 16) & 0xFF
+    g = (hashed >> 8) & 0xFF
+    b = hashed & 0xFF
+    return np.stack([r, g, b], axis=-1).astype(np.uint8)
+
+
+def rgb_to_id_scrambled(rgb: np.ndarray) -> np.ndarray:
+    """Recover uint32 instance IDs from RGB."""
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    hashed = ((r.astype(np.uint32) << 16) |
+              (g.astype(np.uint32) << 8) |
+              b.astype(np.uint32))
+    ids = (hashed * PRIME_INV) % MOD
+    return ids.astype(np.uint32)
+
+
 class VideoLoader:
     def __init__(self, path: str, type: str = "rgb", streaming: bool = False):
         """
@@ -75,7 +100,7 @@ class VideoLoader:
         
         Args:
             path (str): Path to the video file
-            video_type (str): Either "rgb" or "depth"
+            video_type (str): Either "rgb", "depth" or "seg"
             streaming (bool): If True, load frames on demand. If False, load all frames at once.
         """
         self.path = path
@@ -88,6 +113,8 @@ class VideoLoader:
                 self.frames = load_rgb_video(path)
             elif type == "depth":
                 self.frames = load_depth_video(path)
+            elif type == "seg":
+                self.frames = load_seg_video(path)
             else:
                 raise ValueError(f"Unsupported video type: {type}")
         else:
@@ -113,6 +140,9 @@ class VideoLoader:
                         frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
                         depth_frame = th.from_numpy(frame_gray16)
                         yield dequantize_depth(depth_frame)
+                    elif self.type == "seg":
+                        rgb_id = frame.to_ndarray(format="rgb24")
+                        yield th.from_numpy(rgb_to_id_scrambled(rgb_id))
     
     def __len__(self):
         """Return the number of frames."""
@@ -145,7 +175,7 @@ def load_rgb_video(path: str) -> th.Tensor:
             frames.append(rgb)
     
     container.close()
-    return th.cat(frames, dim=0).float()  # (T, 3, H, W)
+    return th.cat(frames, dim=0)
 
 
 def load_depth_video(path: str, min_depth: float=MIN_DEPTH, max_depth: float=MAX_DEPTH, shift: float=DEPTH_SHIFT) -> th.Tensor:
@@ -165,6 +195,21 @@ def load_depth_video(path: str, min_depth: float=MIN_DEPTH, max_depth: float=MAX
     return depth
 
 
+def load_seg_video(path: str) -> th.Tensor:
+    container = av.open(path)
+    stream = container.streams.video[0]
+    
+    frames = []
+    for packet in container.demux(stream):
+        for frame in packet.decode():
+            rgb = frame.to_ndarray(format="rgb24")
+            id = rgb_to_id_scrambled(rgb)
+            frames.append(th.from_numpy(id).unsqueeze(0))  # (1, H, W)
+    
+    container.close()
+    return th.cat(frames, dim=0)  # (T, H, W)
+
+
 def color_pcd_vis(color_pcd):
     # visualize with open3D
     pcd = o3d.geometry.PointCloud()
@@ -176,44 +221,79 @@ def color_pcd_vis(color_pcd):
 
 
 def depth_to_pcd(
-    depth,
-    pose,
-    base_link_pose,
-    K,
+    depth: th.Tensor,  # (B, H, W) or (H, W)
+    pose: th.Tensor,   # (B, 7) or (7,)
+    base_link_pose: th.Tensor,  # (B, 7) or (7,)
+    K: th.Tensor,      # (B, 3, 3) or (3, 3)
     max_depth=20,
-):
-    # get the homogeneous transformation matrix from quaternion
-    pos = pose[:3]
-    quat = pose[3:]
-    rot = R.from_quat(quat)  # scipy expects [x, y, z, w]
-    rot_add = R.from_euler("x", np.pi).as_matrix()  # handle the cam_to_img transformation
-    rot_matrix = rot.as_matrix() @ rot_add  # 3x3 rotation matrix
-    world_to_cam_tf = np.eye(4)
-    world_to_cam_tf[:3, :3] = rot_matrix
-    world_to_cam_tf[:3, 3] = pos
+) -> th.Tensor:
+    """
+    Convert depth images to point clouds with batch processing support.
+    Args:
+        depth: (B, H, W) or (H, W) depth tensor
+        pose: (B, 7) or (7,) camera pose tensor [pos, quat]
+        base_link_pose: (B, 7) or (7,) robot base pose tensor [pos, quat]
+        K: (B, 3, 3) or (3, 3) camera intrinsics tensor
+        max_depth: maximum depth value to filter
+    Returns:
+        pc: (B, H, W, 3) or (H, W, 3) point cloud tensor
+    """
+    # Handle single vs batch inputs
+    is_batch = len(depth.shape) == 3
+    if not is_batch:
+        depth = depth.unsqueeze(0)
+        pose = pose.unsqueeze(0)
+        base_link_pose = base_link_pose.unsqueeze(0)
+        K = K.unsqueeze(0)
+    B, H, W = depth.shape
+    device = depth.device
 
-    # filter depth
+    # Get poses and convert to transformation matrices
+    pos = pose[:, :3]  # (B, 3)
+    quat = pose[:, 3:]  # (B, 4)
+    rot = T.quat2mat(quat)  # (B, 3, 3)
+    rot_add = T.euler2mat(th.tensor([np.pi, 0, 0], device=device))  # (3, 3)
+    rot_matrix = th.matmul(rot, rot_add)  # (B, 3, 3)
+
+    # Create world_to_cam transformation matrices
+    world_to_cam_tf = th.eye(4, device=device).unsqueeze(0).expand(B, 4, 4).clone()
+    world_to_cam_tf[:, :3, :3] = rot_matrix
+    world_to_cam_tf[:, :3, 3] = pos
+
+    # Filter depth
     mask = depth > max_depth
+    depth = depth.clone()
     depth[mask] = 0
-    h, w = depth.shape
-    y, x = np.meshgrid(np.arange(h), np.arange(w), indexing="ij", sparse=False)
-    assert depth.min() >= 0
-    u = x
-    v = y
-    uv = np.dstack((u, v, np.ones_like(u)))  # (img_width, img_height, 3)
 
-    Kinv = np.linalg.inv(K)
+    # Create pixel coordinates
+    y, x = th.meshgrid(th.arange(H, device=device), th.arange(W, device=device), indexing="ij")
+    u = x.unsqueeze(0).expand(B, H, W)
+    v = y.unsqueeze(0).expand(B, H, W)
+    uv = th.stack([u, v, th.ones_like(u)], dim=-1).float()  # (B, H, W, 3)
 
-    pc = depth.reshape(-1, 1) * (uv.reshape(-1, 3) @ Kinv.T)
-    pc = pc.reshape(h, w, 3)
-    pc = np.concatenate([pc.reshape(-1, 3), np.ones((h * w, 1))], axis=-1)  # shape (H*W, 4)
-    if isinstance(base_link_pose, np.ndarray):
-        base_link_pose = th.from_numpy(base_link_pose)
-    world_to_robot_tf = T.pose2mat((base_link_pose[:3], base_link_pose[3:])).numpy()
-    robot_to_world_tf = np.linalg.inv(world_to_robot_tf)
-    pc = (pc @ world_to_cam_tf.T @ robot_to_world_tf.T)[:, :3].reshape(h, w, 3)
+    # Compute inverse of camera intrinsics
+    Kinv = th.linalg.inv(K)  # (B, 3, 3)
 
-    return pc
+    # Convert to point cloud
+    pc = depth.unsqueeze(-1) * th.matmul(uv, Kinv.transpose(-2, -1))  # (B, H, W, 3)
+
+    # Add homogeneous coordinate
+    pc_homo = th.cat([pc, th.ones_like(pc[..., :1])], dim=-1)  # (B, H, W, 4)
+
+    # Transform to robot base frame
+    world_to_robot_tf = T.pose2mat((base_link_pose[:, :3], base_link_pose[:, 3:]))  # (B, 4, 4)
+    robot_to_world_tf = th.linalg.inv(world_to_robot_tf)
+
+    # Apply transformations
+    pc_homo_flat = pc_homo.view(B, -1, 4)  # (B, H*W, 4)
+    pc_cam = th.matmul(pc_homo_flat, world_to_cam_tf.transpose(-2, -1))  # (B, H*W, 4)
+    pc_transformed = th.matmul(pc_cam, robot_to_world_tf.transpose(-2, -1))  # (B, H*W, 4)
+    pc_transformed = pc_transformed[..., :3].view(B, H, W, 3)  # (B, H, W, 3)
+
+    # Return in original format
+    if not is_batch:
+        pc_transformed = pc_transformed.squeeze(0)
+    return pc_transformed
 
 
 def downsample_pcd(color_pcd, num_points) -> Tuple[np.ndarray, np.ndarray]:
@@ -221,22 +301,24 @@ def downsample_pcd(color_pcd, num_points) -> Tuple[np.ndarray, np.ndarray]:
     If the current number of point cloud is smaller than num_points, will downsample it
     Otherwise, randomly sample current points to reach num_points
     """
+    N = color_pcd.shape[0]
+    device = color_pcd.device
     if color_pcd.shape[0] > num_points:
-        pc = color_pcd[:, 3:]
-        color_img = color_pcd[:, :3]
-        kdline_fps_samples_idx = fpsample.bucket_fps_kdline_sampling(pc, num_points, h=5)
-        pc = pc[kdline_fps_samples_idx]
-        color_img = color_img[kdline_fps_samples_idx]
-        color_pcd = np.concatenate([color_img, pc], axis=-1)
-        sampled_idx = kdline_fps_samples_idx
+        # Use FPS on xyz
+        xyz = color_pcd[:, 3:6].contiguous()
+        # fps expects (N, 3) and returns indices
+        # ratio = num_points / N
+        batch = th.zeros(N, dtype=th.long, device=device)  # single batch
+        idx = fps(xyz, batch, ratio=float(num_points) / N, random_start=True)
+        if idx.shape[0] > num_points:
+            idx = idx[:num_points]
+        sampled = color_pcd[idx]
     else:
-        # randomly sample points
-        pad_number_of_points = num_points - color_pcd.shape[0]
-        random_idx = np.random.choice(color_pcd.shape[0], pad_number_of_points, replace=True)
-        pad_pcd = color_pcd[random_idx]
-        color_pcd = np.concatenate([color_pcd, pad_pcd], axis=0)
-        sampled_idx = np.concatenate([np.arange(color_pcd.shape[0]), random_idx])
-    return color_pcd, sampled_idx
+        # Pad with random samples
+        pad_num = num_points - N
+        idx = th.cat([th.arange(N, device=device), th.randint(0, N, (pad_num,), device=device)])
+        sampled = color_pcd[idx]
+    return sampled, idx
 
 
 def process_fused_point_cloud(
