@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # BEHAVIOR-1K Installation Script
-# Usage: ./setup.sh [OPTIONS]
+# Usage: . ./setup.sh [OPTIONS]
+
+# Enable strict error handling - exit on any command failure
+set -e
 
 # Read Arguments
 TEMP=`getopt -o h --long help,new-env,omnigibson,bddl,teleop,dataset,primitives,dev,cuda-version: -n 'setup.sh' -- "$@"`
@@ -80,8 +83,8 @@ if [ "$HELP" = true ] ; then
 fi
 
 # Check if we're in the right directory
-if [ ! -d "omnigibson" ] && [ ! -d "bddl" ] && [ ! -d "joylo" ] ; then
-    echo "[ERROR] Cannot find omnigibson, bddl, or joylo directories"
+if [ ! -d "OmniGibson" ] && [ ! -d "bddl" ] && [ ! -d "joylo" ] ; then
+    echo "[ERROR] Cannot find OmniGibson, bddl, or joylo directories"
     echo "[ERROR] Please run this script from the BEHAVIOR-1K root directory"
     return 1
 fi
@@ -104,29 +107,44 @@ fi
 # Create conda environment if requested
 if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Creating conda environment 'behavior'..."
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
     
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to create conda environment"
-        echo "[HELP] Try running: conda clean --all"
-        echo "[HELP] Or manually create environment: conda create -n behavior python=3.10"
+    # Initialize conda for this shell session
+    if ! command -v conda &> /dev/null; then
+        echo "[ERROR] Conda is not installed or not in PATH"
         return 1
     fi
     
+    # Source conda setup to enable conda activate
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+    
+    # Remove existing environment if it exists
+    if conda env list | grep -q "^behavior "; then
+        echo "[ENV] Removing existing 'behavior' environment..."
+        conda env remove -n behavior -y
+    fi
+    
+    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
+    
     echo "[ENV] Activating conda environment 'behavior'..."
     conda activate behavior
+    
+    # Verify environment activation
+    if [[ "$CONDA_DEFAULT_ENV" != "behavior" ]]; then
+        echo "[ERROR] Failed to activate conda environment 'behavior'"
+        return 1
+    fi
     
     # Verify environment
     PYTHON_VERSION=$(python --version)
     echo "[ENV] Python version: $PYTHON_VERSION"
     
     # Check PyTorch installation
-    PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
-    if [ $? -eq 0 ] ; then
-        CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())")
-        echo "[ENV] PyTorch version: $PYTORCH_VERSION, CUDA available: $CUDA_AVAILABLE"
+    if python -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available())" 2>/dev/null; then
+        echo "[ENV] PyTorch installation verified"
     else
-        echo "[WARNING] PyTorch not properly installed in conda environment"
+        echo "[ERROR] PyTorch not properly installed in conda environment"
+        return 1
     fi
 fi
 
@@ -139,15 +157,10 @@ if [ "$BDDL" = true ] ; then
         return 1
     fi
     
-    cd bddl
+    pushd bddl > /dev/null
     pip install -e .
+    popd > /dev/null
     
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install BDDL"
-        return 1
-    fi
-    
-    cd $WORKDIR
     echo "[BDDL] Installation completed successfully"
 fi
 
@@ -156,11 +169,11 @@ if [ "$OMNIGIBSON" = true ] ; then
     echo "[OMNIGIBSON] Installing OmniGibson..."
     
     if [ ! -d "OmniGibson" ] ; then
-        echo "[ERROR] omnigibson directory not found"
+        echo "[ERROR] OmniGibson directory not found"
         return 1
     fi
     
-    cd OmniGibson
+    pushd OmniGibson > /dev/null
     
     # Build extra requirements string
     EXTRAS=""
@@ -175,12 +188,7 @@ if [ "$OMNIGIBSON" = true ] ; then
     echo "[OMNIGIBSON] Installing with extras: $EXTRAS"
     pip install -e .$EXTRAS
     
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install OmniGibson"
-        return 1
-    fi
-    
-    cd $WORKDIR
+    popd > /dev/null
     
     # Run OmniGibson post-installation
     echo "[OMNIGIBSON] Running post-installation (Isaac Sim + assets)..."
@@ -190,12 +198,7 @@ if [ "$OMNIGIBSON" = true ] ; then
         python -m omnigibson.install --no-install-datasets
     fi
     
-    if [ $? -ne 0 ] ; then
-        echo "[WARNING] OmniGibson post-installation failed"
-        echo "[HELP] You may need to run 'python -m omnigibson.install' manually later"
-    else
-        echo "[OMNIGIBSON] Installation completed successfully"
-    fi
+    echo "[OMNIGIBSON] Installation completed successfully"
 fi
 
 # Install JoyLo (teleoperation)
@@ -207,15 +210,10 @@ if [ "$TELEOP" = true ] ; then
         return 1
     fi
     
-    cd joylo
+    pushd joylo > /dev/null
     pip install -e .
+    popd > /dev/null
     
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install JoyLo"
-        return 1
-    fi
-    
-    cd $WORKDIR
     echo "[TELEOP] Installation completed successfully"
 fi
 
