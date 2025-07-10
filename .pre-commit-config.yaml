@@ -9,20 +9,3 @@ repos:
       # Run the formatter.
       - id: ruff-format
         files: ^OmniGibson/
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
-    hooks:
-      - id: no-commit-to-branch
-        name: Check for numpy imports
-        entry: git grep -l "import numpy"
-        language: system
-        types: [python]
-        files: ^OmniGibson/
-        exclude: |
-          (?x)^(
-            \.pre-commit-config\.yaml|
-            OmniGibson/omnigibson/utils/deprecated_utils\.py| # Keep Numpy import for deprecated Omniverse utils
-            OmniGibson/omnigibson/utils/numpy_utils\.py|      # Utilities specifically for numpy operations and dtype
-            OmniGibson/tests/test_transform_utils\.py         # This test file uses Scipy and Numpy
-          )$
-        stages: [pre-commit]

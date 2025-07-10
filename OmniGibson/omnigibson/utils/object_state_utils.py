@@ -214,6 +214,7 @@ def sample_kinematics(
             pos = sampled_vector + rotated_diff
 
             from omnigibson.robots.robot_base import BaseRobot
+
             if use_trav_map and not isinstance(objA, BaseRobot):
                 xy_map = trav_map.world_to_map(pos[:2])
                 if pos[2] > eef_z_max:

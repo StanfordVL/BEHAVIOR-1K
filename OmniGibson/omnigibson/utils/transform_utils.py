@@ -506,7 +506,7 @@ def decompose_mat(hmat):
 
     # Check M[3, 3] for all batch items
     diag_vals = M[:, 3, 3]  # (B,)
-    
+
     # TODO: this line might be a VRAM killer, investigate this
     # if torch.any(torch.abs(diag_vals) < EPS):
     #     raise ValueError("Some M[3, 3] values are zero")
