@@ -17,7 +17,6 @@ TELEOP=false
 DATASET=false
 PRIMITIVES=false
 DEV=false
-CUDA_VERSION="12.1"
 ERROR=false
 
 # Show help if no arguments provided
@@ -36,7 +35,6 @@ while true ; do
         --dataset) DATASET=true ; shift ;;
         --primitives) PRIMITIVES=true ; shift ;;
         --dev) DEV=true ; shift ;;
-        --cuda-version) CUDA_VERSION="$2" ; shift 2 ;;
         --) shift ; break ;;
         *) ERROR=true ; break ;;
     esac
@@ -104,7 +102,7 @@ fi
 # Create conda environment if requested
 if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Creating conda environment 'behavior'..."
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" av "setuptools<=79" -c pytorch -c nvidia -c conda-forge -y
+    conda create -n behavior python=3.10 av "setuptools<=79" -c conda-forge -y
     
     if [ $? -ne 0 ] ; then
         echo "[ERROR] Failed to create conda environment"
@@ -121,6 +119,8 @@ if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Python version: $PYTHON_VERSION"
     
     # Check PyTorch installation
+    pip install torch==2.6.0+cu126 torchvision==0.21.0+cu126 torchaudio==2.6.0+cu126
+    pip install torch-cluster -f https://data.pyg.org/whl/torch-2.6.0+cu126.html
     PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
     if [ $? -eq 0 ] ; then
         CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())")

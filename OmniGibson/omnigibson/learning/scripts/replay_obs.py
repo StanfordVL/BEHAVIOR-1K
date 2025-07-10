@@ -4,13 +4,17 @@ import json
 import omnigibson as og
 import os
 import sys
+import numpy as np
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
 from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
-from omnigibson.learning.utils.obs_utils import process_fused_point_cloud, VideoLoader
+from omnigibson.learning.utils.obs_utils import (
+    create_video_writer, 
+    process_fused_point_cloud, 
+    write_video,
+)
 from omnigibson.macros import gm
-from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -33,11 +37,9 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
         robot = self.env.robots[0]
         for camera_name in ROBOT_CAMERA_NAMES:
-            # pop rgbd keys from obs
-            # obs.pop(f"{camera_name}::rgb", None)
-            # obs.pop(f"{camera_name}::depth_linear", None)
-            # obs.pop(f"{camera_name}::seg_instance_id", None)
-
+            # move seg maps to cpu
+            obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
+            obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose
             if camera_name.split("::")[1] in robot.sensors:
                 obs[f"{camera_name}::pose"] = th.concatenate(
@@ -55,15 +57,25 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         Args:
             traj_grp (h5py.Group): Trajectory group to postprocess
         """
+        # Store observations as videos
         # Add the list of task obs keys as attrs (this is list of strs)
         traj_grp["obs"]["task::low_dim"].attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
         # add instance mapping keys as attrs
         traj_grp["obs"].attrs["instance_name_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
-        traj_grp["obs"].attrs["instance_semantic_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
-        # add camera intrinsics as attrs
+        
         for name, sensor in self.env.robots[0].sensors.items():
             if f"robot_r1::{name}" in ROBOT_CAMERA_NAMES:
+                # add camera intrinsics as attrs
                 traj_grp["obs"].attrs[f"robot_r1::{name}::intrinsics"] = sensor.intrinsic_matrix
+
+                # add instance mapping keys as attrs
+                instance_map = th.from_numpy(traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"][:])
+                instance_appearances = {}
+                for i in range(instance_map.shape[0]):
+                    instance_appearances[i] = th.unique(instance_map[i]).tolist()
+                traj_grp["obs"].attrs[f"robot_r1::{name}::instance_appearances"] = json.dumps(instance_appearances)
+
+
 
 
 def replay_hdf5_file(
@@ -73,6 +85,7 @@ def replay_hdf5_file(
     generate_rgbd: bool=False, 
     generate_pcd: bool=False,
     generate_seg: bool=False,
+    generate_bbox: bool=False,
 ) -> None:
     """
     Replays a single HDF5 file and saves videos to a new folder
@@ -84,21 +97,15 @@ def replay_hdf5_file(
         generate_rgbd: If True, generates RGBD videos from the replayed data
         generate_pcd: If True, generates point cloud data from RGBD videos
         generate_seg: If True, generates segmentation data from the replayed data
+        generate_bbox: If True, generates bounding box data from the replayed data
     """
     # get processed folder path
     low_dim_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "low_dim")
-    seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg")
-    if generate_seg:
-        os.makedirs(seg_dir, exist_ok=True)
     os.makedirs(low_dim_dir, exist_ok=True)
     base_name = os.path.basename(hdf_input_path)
     demo_name = os.path.splitext(base_name)[0]
 
     if generate_low_dim:
-        # Define output paths
-        low_dim_output_path = os.path.join(low_dim_dir, base_name)
-        segmentation_output_path = os.path.join(seg_dir, base_name) if generate_seg else None
-
         # Define resolution for consistency
         WRIST_RESOLUTION = (240, 240)
         HEAD_RESOLUTION = (240, 240)
@@ -111,6 +118,9 @@ def replay_hdf5_file(
             modalities += ["rgb", "depth_linear"]
         if generate_seg:
             modalities += ["seg_semantic", "seg_instance_id"]
+        if generate_bbox:
+            pass
+            # modalities += ["bbox_2d_tight"]
         # Robot sensor configuration
         robot_sensor_config = {
             "VisionSensor": {
@@ -127,14 +137,15 @@ def replay_hdf5_file(
 
         env = BehaviorDataPlaybackWrapper.create_from_hdf5(
             input_path=hdf_input_path,
-            output_path=low_dim_output_path,
-            compression={"compression": "gzip", "compression_opts": 9},
+            output_path=os.path.join(low_dim_dir, base_name),
+            # compression={"compression": "gzip", "compression_opts": 1},
             robot_obs_modalities=["proprio"],
             robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
             robot_sensor_config=robot_sensor_config,
             external_sensors_config=dict(),
             n_render_iterations=1,
-            only_successes=True,
+            flush_every_n_traj=1,
+            flush_every_n_steps=500,
             additional_wrapper_configs=additional_wrapper_configs,
         )
 
@@ -146,61 +157,58 @@ def replay_hdf5_file(
             # reload observation space
             env.load_observation_space()
 
-
-        # Playback the dataset with all video writers
-        # We avoid calling playback_dataset and call playback_episode individually in order to manually
-        # aggregate per-episode metrics
+        # Replay the dataset
         for episode_id in range(env.input_hdf5["data"].attrs["n_episodes"]):
-            # Create a list to store video writers and RGBD keys
-            video_writers = []
-            video_keys = []
+            print(f" >>> Replaying episode {episode_id}")
+            env.playback_episode(
+                episode_id=episode_id,
+                record_data=True,
+            )
 
-            if generate_rgbd:
-                rgbd_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgbd", demo_name, f"demo_{episode_id}")
-                os.makedirs(rgbd_dir, exist_ok=True)
-                # Create video writer for robot cameras
-                for camera_name in camera_names:
+            # now store obs as videos
+            video_writers = []            
+            for camera_name in camera_names:
+                if generate_rgbd:
+                    rgbd_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgbd", demo_name, f"demo_{episode_id}")
+                    os.makedirs(rgbd_dir, exist_ok=True)
                     # RGB video writer
-                    video_writers.append(env.create_video_writer(
+                    video_writers.append(create_video_writer(
                         fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4",
                         resolution=WRIST_RESOLUTION,
-                        codec_name="libx264rgb",
-                        pix_fmt="rgb24",
-                        stream_options={"x264-params": "lossless=1"},
+                        codec_name="libx265",
+                        pix_fmt="yuv420p",
                     ))
-                    video_keys.append(f"{camera_name}::rgb")
+                    write_video(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"], video_writers[-1], mode="rgb")
                     # Depth video writer
-                    video_writers.append(env.create_video_writer(
+                    video_writers.append(create_video_writer(
                         fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4",
                         resolution=WRIST_RESOLUTION,
                         codec_name="libx265",
                         pix_fmt="yuv420p10le",    
                     ))  
-                    video_keys.append(f"{camera_name}::depth_linear")
-            if generate_seg:
-                seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg", demo_name, f"demo_{episode_id}")
-                os.makedirs(seg_dir, exist_ok=True)
-                # Create video writer for robot cameras
-                for camera_name in camera_names:
-                    # segmentation video writer
-                    video_writers.append(env.create_video_writer(
+                    write_video(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::depth_linear"], video_writers[-1], mode="depth")
+                if generate_seg:
+                    seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg", demo_name, f"demo_{episode_id}")
+                    os.makedirs(seg_dir, exist_ok=True)
+                    # Segmentation video writer
+                    sem_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_semantic"][:]
+                    sem_ids = th.unique(th.from_numpy(sem_seg_original))
+                    video_writers.append(create_video_writer(
+                        fpath=f"{seg_dir}/{camera_name}::seg_semantic.mp4",
+                        resolution=WRIST_RESOLUTION,
+                        codec_name="libx265",
+                        pix_fmt="yuv420p", 
+                    ))
+                    write_video(sem_seg_original, video_writers[-1], mode="seg", seg_ids=sem_ids)
+                    video_writers.append(create_video_writer(
                         fpath=f"{seg_dir}/{camera_name}::seg_instance_id.mp4",
                         resolution=WRIST_RESOLUTION,
-                        codec_name="libx264rgb",
-                        pix_fmt="rgb24",  
-                        stream_options={"x264-params": "lossless=1:qp=0"},
+                        codec_name="libx265",
+                        pix_fmt="yuv420p", 
                     ))
-                    video_keys.append(f"{camera_name}::seg_instance_id")
-
-            print(f" >>> Replaying episode {episode_id}")
-
-            env.playback_episode(
-                episode_id=episode_id,
-                record_data=True,
-                video_writers=video_writers,
-                video_keys=video_keys,
-            )
-
+                    ins_id_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]
+                    ins_id_ids = th.unique(th.from_numpy(ins_id_seg_original))
+                    write_video(ins_id_seg_original, video_writers[-1], mode="seg", seg_ids=ins_id_ids)
             # Close all video writers
             for container, stream in video_writers:
                 # Flush any remaining packets
@@ -219,13 +227,13 @@ def replay_hdf5_file(
     print(f"Successfully processed {hdf_input_path}")
 
 
-def rgbd_to_pcd(task_folder: str, base_name: str, robot_canera_names: list=ROBOT_CAMERA_NAMES):
+def rgbd_to_pcd(task_folder: str, base_name: str, robot_camera_names: list=ROBOT_CAMERA_NAMES):
     """
     Generate point cloud data from RGBD data in the specified task folder.
     Args:
         task_folder (str): Path to the task folder containing RGBD data.
         base_name (str): Base name of the HDF5 file to process (without file extension).
-        robot_canera_names (list): List of camera names to process.
+        robot_camera_names (list): List of camera names to process.
     """
     print(f"Generating point cloud data from RGBD for {base_name} in {task_folder}")
     assert os.path.exists(task_folder), f"Task folder {task_folder} does not exist."
@@ -233,48 +241,60 @@ def rgbd_to_pcd(task_folder: str, base_name: str, robot_canera_names: list=ROBOT
     os.makedirs(output_dir, exist_ok=True)
 
     with h5py.File(f"{task_folder}/low_dim/{base_name}.hdf5", "r") as low_dim_f:
-            obs = dict() # to store rgbd and pass into process_fused_point_cloud
-            # create a new hdf5 file to store the point cloud data
-            with h5py.File(f"{task_folder}/pcd/{base_name}.hdf5", "w") as out_f:
-                for demo_name in low_dim_f["data"]:
-                    low_dim_data = low_dim_f["data"][demo_name]["obs"]
+        # create a new hdf5 file to store the point cloud data
+        with h5py.File(f"{task_folder}/pcd/{base_name}.hdf5", "w") as out_f:
+            for demo_name in low_dim_f["data"]:
+                low_dim_data = low_dim_f["data"][demo_name]["obs"]
+                data_size = low_dim_data[f"robot_r1::robot_base_link_pose"].shape[0]
+                fused_pcd_dset = out_f.create_dataset(
+                    f"data/{demo_name}/robot_r1::fused_pcd", 
+                    shape=(data_size, 4096, 6),
+                    compression="gzip",
+                    compression_opts=9,
+                )
+                pcd_semantic_dset = out_f.create_dataset(
+                    f"data/{demo_name}/robot_r1::pcd_semantic", 
+                    shape=(data_size, 4096),
+                    compression="gzip",
+                    compression_opts=9,
+                )
+                # We batch process every 500 frames
+                print("data_size", data_size)
+                for i in range(0, data_size, 500):
+                    print("i", i)
+                    obs = dict() # to store rgbd and pass into process_fused_point_cloud
                     # get all camera intrinsics
                     camera_intrinsics = {}
-                    for robot_canera_name in robot_canera_names:
-                        camera_intrinsics[robot_canera_name] = low_dim_data.attrs[f"{robot_canera_name}::intrinsics"]
+                    for robot_camera_name in robot_camera_names:
+                        camera_intrinsics[robot_camera_name] = th.from_numpy(
+                            low_dim_data.attrs[f"{robot_camera_name}::intrinsics"][:]
+                            ).to(device="cuda")
                         # retrieve rgbd data from videos
-                        robot_name, camera_name = robot_canera_name.split("::")
-                        obs[f"{robot_name}::robot_base_link_pose"] = low_dim_data[f"{robot_name}::robot_base_link_pose"]
-                        obs[f"{robot_name}::{camera_name}::rgb"] = VideoLoader(
-                            path=f"{task_folder}/rgbd/{base_name}/{demo_name}/{robot_name}::{camera_name}::rgb.mp4",
-                            type="rgb",
-                            streaming=True
+                        robot_name, camera_name = robot_camera_name.split("::")
+                        obs[f"{robot_name}::robot_base_link_pose"] = th.from_numpy(
+                            low_dim_data[f"{robot_name}::robot_base_link_pose"][i:i+500]
+                        ).to(device="cuda")
+                        obs[f"{robot_name}::{camera_name}::rgb"] =  th.from_numpy(
+                            low_dim_data[f"{robot_name}::{camera_name}::rgb"][i:i+500]
+                        ).to(device="cuda")
+                        obs[f"{robot_name}::{camera_name}::depth_linear"] = th.from_numpy(
+                            low_dim_data[f"{robot_name}::{camera_name}::depth_linear"][i:i+500]
+                        ).to(device="cuda")
+                        obs[f"{robot_name}::{camera_name}::pose"] = th.from_numpy(
+                            low_dim_data[f"{robot_name}::{camera_name}::pose"][i:i+500]
+                        ).to(device="cuda")
+                        obs[f"{robot_name}::{camera_name}::seg_semantic"] = th.from_numpy(
+                            low_dim_data[f"{robot_name}::{camera_name}::seg_semantic"][i:i+500]
                         )
-                        obs[f"{robot_name}::{camera_name}::depth_linear"] = VideoLoader(
-                            path=f"{task_folder}/rgbd/{base_name}/{demo_name}/{robot_name}::{camera_name}::depth_linear.mp4",
-                            type="depth",
-                            streaming=True
-                        )
-                        obs[f"{robot_name}::{camera_name}::pose"] = low_dim_data[f"{robot_name}::{camera_name}::pose"]
-                        obs[f"{robot_name}::{camera_name}::seg_semantic"] = low_dim_f["data"][demo_name]["obs"][f"{robot_name}::{camera_name}::seg_semantic"]
                     # process the fused point cloud
                     pcd, seg = process_fused_point_cloud(
                         obs=obs,
                         robot_name=robot_name,
                         camera_intrinsics=camera_intrinsics
                     )
-                    out_f.create_dataset(
-                        f"data/{demo_name}/robot_r1::fused_pcd", 
-                        data=pcd,
-                        compression="gzip",
-                        compression_opts=9,
-                    )
-                    out_f.create_dataset(
-                        f"data/{demo_name}/robot_r1::pcd_semantic", 
-                        data=seg,
-                        compression="gzip",
-                        compression_opts=9,
-                    )
+                    fused_pcd_dset[i:i+500] = pcd
+                    pcd_semantic_dset[i:i+500] = seg
+                    print("i", i, "done")
 
     print(f"Point cloud data saved!")
 
@@ -287,6 +307,7 @@ def main():
     parser.add_argument("--rgbd", action="store_true", help="Include this flag to generate rgbd videos")
     parser.add_argument("--pcd", action="store_true", help="Include this flag to generate point cloud data from RGBD")
     parser.add_argument("--seg", action="store_true", help="Include this flag to generate segmentation maps" )
+    parser.add_argument("--bbox", action="store_true", help="Include this flag to generate bounding box data" )
 
     args = parser.parse_args()
 
@@ -323,7 +344,8 @@ def main():
             generate_low_dim=args.low_dim, 
             generate_rgbd=args.rgbd, 
             generate_pcd=args.pcd, 
-            generate_seg=args.seg
+            generate_seg=args.seg,
+            generate_bbox=args.bbox,
         )
 
     print("All done!")

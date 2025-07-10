@@ -50,7 +50,6 @@ setup(
         "cffi>=1.16.0",
         "pillow~=11.0.0",
         "open3d>=0.19.0",
-        "fpsample>=0.3.3"
     ],
     extras_require={
         "dev": [

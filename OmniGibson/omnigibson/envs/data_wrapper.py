@@ -7,6 +7,7 @@ import logging
 
 import av
 import h5py
+from open3d import data
 import torch as th
 
 import omnigibson as og
@@ -18,7 +19,7 @@ from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
-from omnigibson.learning.utils.obs_utils import quantize_depth, id_to_rgb_scrambled
+from omnigibson.learning.utils.obs_utils import quantize_depth
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -671,6 +672,7 @@ class DataPlaybackWrapper(DataWrapper):
         overwrite=True,
         only_successes=False,
         flush_every_n_traj=10,
+        flush_every_n_steps=0,
         include_env_wrapper=False,
         additional_wrapper_configs=None,
         full_scene_file=None,
@@ -714,6 +716,8 @@ class DataPlaybackWrapper(DataWrapper):
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
             flush_every_n_traj (int): How often to flush (write) current data to file
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             include_env_wrapper (bool): Whether to include environment wrapper stored in the underlying env config
             additional_wrapper_configs (None or list of dict): If specified, list of wrapper config(s) specifying
                 environment wrappers to wrap the internal environment class in
@@ -810,6 +814,7 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite=overwrite,
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
+            flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
         )
 
@@ -823,6 +828,7 @@ class DataPlaybackWrapper(DataWrapper):
         overwrite=True,
         only_successes=False,
         flush_every_n_traj=10,
+        flush_every_n_steps=0,
         full_scene_file=None,
     ):
         """
@@ -836,7 +842,9 @@ class DataPlaybackWrapper(DataWrapper):
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
-            flush_every_n_traj (int): How often to flush (write) current data to file
+            flush_every_n_traj (int): How often to flush (write) current data to file across episodes
+            flush_every_n_steps (int): How often to flush (write) current data to file within an episode.
+                If this is greater than 0, flush_every_n_traj must be set to 1.
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
@@ -854,6 +862,13 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Store additional variables
         self.n_render_iterations = n_render_iterations
+        if flush_every_n_steps > 0:
+            assert flush_every_n_traj == 1, "flush_every_n_traj must be 1 if flush_every_n_steps is greater than 0"
+        self.flush_every_n_steps = flush_every_n_steps
+
+        self.current_traj_grp = None
+        self.current_episode_step_count = 0
+        self.traj_dsets = dict()
 
         # Run super
         super().__init__(
@@ -886,7 +901,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_keys=None):
+    def playback_episode(self, episode_id, record_data=True):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -894,17 +909,7 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
-            video_writers (None or list of (container, stream)): If specified, writer objects that RGB frames will be written to
-            video_keys (None or list of str): If specified, observation keys representing the frames to write to video.
-                If @video_writers is specified, this must also be specified!
         """
-        # Validate video_writers and video_keys
-        if video_writers is not None:
-            assert video_keys is not None, "If video_writers is specified, video_rgb_keys must also be specified!"
-            assert len(video_writers) == len(
-                video_keys
-            ), "video_writers and video_rgb_keys must have the same length!"
-
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
         traj_grp = data_grp[f"demo_{episode_id}"]
@@ -945,17 +950,12 @@ class DataPlaybackWrapper(DataWrapper):
         # If record, record initial observations
         if record_data:
             self.current_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
-            # If writing to video, write desired frame
-            if video_writers is not None:
-                self.write_videos(video_writers=video_writers, video_keys=video_keys)
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
         for i, (a, s, ss, r, te, tr) in enumerate(
             zip(action, state[1:], state_size[1:], reward, terminated, truncated)
         ):
-            if i % 500 == 0:
-                log.info(f"Playing back episode {episode_id}: {i} / {len(action)} steps...")
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -979,10 +979,6 @@ class DataPlaybackWrapper(DataWrapper):
             og.sim.load_state(s[: int(ss)], serialized=True)
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
-            # If writing to video, write desired frame
-            if video_writers is not None:
-                self.write_videos(video_writers=video_writers, video_keys=video_keys)
-
             # If recording, record data
             if record_data:
                 step_data = self._parse_step_data(
@@ -993,91 +989,109 @@ class DataPlaybackWrapper(DataWrapper):
                     truncated=tr,
                     info=info,
                 )
+                if i == 0 and self.flush_every_n_steps > 0:
+                    self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(step_data, f"demo_{episode_id}", num_samples=len(action))
+                if i % self.flush_every_n_steps == 0:
+                    self.flush_partial_traj()
+                # append to current trajectory history
                 self.current_traj_history.append(step_data)
 
+            self.current_episode_step_count += 1
             self.step_count += 1
 
         if record_data:
+            self.flush_partial_traj()
             self.flush_current_traj()
 
-    def playback_dataset(self, record_data=False, video_writers=None, video_keys=None):
+    def playback_dataset(self, record_data=False):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
 
         Args:
             record_data (bool): Whether to record data during playback or not
-            video_writers (None or list of (container, stream)): If specified, writer object that frames will be written to
-            video_keys (None or list of str): If specified, observation key representing the frames to write to video.
-                If @video_writer is specified, this must also be specified!
         """
         for episode_id in range(self.input_hdf5["data"].attrs["n_episodes"]):
             self.playback_episode(
                 episode_id=episode_id,
                 record_data=record_data,
-                video_writers=video_writers,
-                video_keys=video_keys,
             )
 
-    def create_video_writer(
-        self, 
-        fpath, 
-        resolution, 
-        codec_name="libx264", 
-        rate=30, 
-        pix_fmt="yuv420p",
-        stream_options=None,
-        context_options=None, 
-    ):
+    def allocate_traj_to_hdf5(self, step_data, traj_grp_name, num_samples: int, nested_keys=("obs",), data_grp=None):
         """
-        Creates a video writer to write video frames to when playing back the dataset using PyAV
+        Allocate trajectory data space from @step_data given the number of samples @num_samples.
 
         Args:
-            fpath (str): Absolute path that the generated video writer will write to. Should end in .mp4 or .mkv
-            resolution (tuple): Resolution of the video frames to write (height, width)
-            codec_name (str): Codec to use for the video writer. Default is "libx264"
-            rate (int): Frame rate of the video writer. Default is 30
-            pix_fmt (str): Pixel format to use for the video writer. Default is "yuv420p"
-            stream_options (dict): Additional stream options to pass to the video writer. Default is None
-            context_options (dict): Additional context options to pass to the video writer. Default is None
+            step_data (dict): Keyword-mapped set of data for a single sim step
+            traj_grp_name (str): Name of the trajectory group to store
+            num_samples (int): Number of samples in the trajectory
+            nested_keys (list of str): Name of key(s) corresponding to nested data in @step_data. This specific data
+                is assumed to be its own keyword-mapped dictionary of numpy array values, and will be parsed
+                differently from the rest of the data.
+            data_grp (None or h5py.Group): If specified, the h5py Group under which a new group wtih name
+                @traj_grp_name will be created. If None, will default to "data" group
+
         Returns:
-            av.Container: PyAV container object that can be used to write video frames
-            av.Stream: PyAV stream object that can be used to write video frames
+            Tuple[h5py.Group, dict(str, hdf5.Dataset)]: Generated hdf5 group and datasets to store the trajectory data in the future
         """
-        assert fpath.endswith(".mp4") or fpath.endswith(".mkv"), f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
-        container = av.open(fpath, mode='w')
-        stream = container.add_stream(codec_name, rate=rate)
-        stream.height = resolution[0]
-        stream.width = resolution[1]
-        stream.pix_fmt = pix_fmt
-        if stream_options is not None:
-            stream.options = stream_options
-        if context_options is not None:
-            stream.codec_context.options = context_options
-        return container, stream
+        traj_dsets = dict()
+        nested_keys = set(nested_keys)
+        for k in nested_keys:
+            traj_dsets[k] = dict()
+        data_grp = self.hdf5_file.require_group("data") if data_grp is None else data_grp
+        traj_grp = data_grp.create_group(traj_grp_name)
+        traj_grp.attrs["num_samples"] = num_samples + 1 # +1 for the initial observation
 
-    def write_videos(self, video_writers, video_keys) -> None:
-        """
-        Writes videos to the specified video writers using the current trajectory history
-
-        Args:
-            video_writers (list of (container, stream)): List of PyAV container and stream objects to write video frames to
-            video_keys (list of str): List of observation keys representing the frames to write to video
-        """
-        for video_writer, video_key in zip(video_writers, video_keys):
-            container, stream = video_writer
-            if "rgb" in video_key:
-                height, width = self.current_obs[video_key].shape[:2]
-                frame = av.VideoFrame.from_ndarray(self.current_obs[video_key][:, :, :3].numpy(), format="rgb24")
-                # frame = frame.reformat(width=width, height=height, format="yuv420p")
-            elif "depth" in video_key:
-                quantized_depth = quantize_depth(self.current_obs[video_key])
-                frame = av.VideoFrame.from_ndarray(quantized_depth.numpy(), format='gray16le')
-            elif "seg" in video_key:
-                rgb_id = id_to_rgb_scrambled(self.current_obs[video_key].cpu().numpy())
-                frame = av.VideoFrame.from_ndarray(rgb_id, format="rgb24")
+        for k, dat in step_data.items():
+            if k in nested_keys:
+                obs_grp = traj_grp.create_group(k)
+                for mod, step_mod_data in dat.items():
+                   traj_dsets[k][mod] = obs_grp.create_dataset(
+                        mod, shape=(num_samples + 1, *step_mod_data.shape), dtype=step_mod_data.numpy().dtype, **self.compression
+                    )
             else:
-                raise ValueError(
-                    f"Unsupported video_rgb_key: {video_key}. Only 'rgb', 'depth' and 'seg' keys are supported!"
+                dat = th.tensor(dat)
+                traj_dsets[k] = traj_grp.create_dataset(
+                    k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression
                 )
-            for packet in stream.encode(frame):
-                container.mux(packet)
+
+        return traj_grp, traj_dsets
+
+    def flush_partial_traj(self):
+        """
+        Flush the current trajectory data to file.
+        If flush_every_n_steps is greater than 0, flush the current trajectory data to file every n steps.
+        """
+        log.info(f"Storing partial trajectory at step {self.current_episode_step_count}...")
+        assert self.flush_every_n_steps > 0, "flush_every_n_steps must be greater than 0 to flush partial trajectory"
+        data_length_to_flush = len(self.current_traj_history)
+        # At step 0, we only have observation data, so observation data will only have one more offset than others
+        if self.current_episode_step_count == 0:
+            assert data_length_to_flush == 1
+            for key, dat in self.current_traj_history[0].items():
+                for mod, dset in dat.items():
+                    self.traj_dsets[key][mod][0] = self.current_traj_history[0][key][mod]
+        else:
+            for key, dat in self.traj_dsets.items():
+                if isinstance(dat, dict):
+                    for mod, dset in dat.items():
+                        dset[self.current_episode_step_count-data_length_to_flush+1:self.current_episode_step_count+1] = th.stack([
+                            self.current_traj_history[i][key][mod] for i in range(len(self.current_traj_history))
+                        ], dim=0)   
+                else:
+                    dat[self.current_episode_step_count-data_length_to_flush:self.current_episode_step_count] = th.stack([
+                        self.current_traj_history[i][key] for i in range(len(self.current_traj_history))
+                    ], dim=0)
+        # Reset the current trajectory history
+        self.current_traj_history = []
+
+    def flush_current_traj(self):
+        """
+        Flush current trajectory data
+        For playback, we assume that all data needs to be stored. 
+        """
+        self.postprocess_traj_group(self.current_traj_grp)
+        self.flush_current_file()
+        # Clear trajectory and transition buffers
+        self.traj_count += 1
+        self.current_episode_step_count = 0
+        self.current_traj_history = []
