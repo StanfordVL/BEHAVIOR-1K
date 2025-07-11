@@ -2005,7 +2005,7 @@ def replace_collision_blocks(old_usd_path: str, new_usd_path: str, output_usd_pa
     with open(output_usd_path, "w") as f:
         f.write(new_usda_text)
 
-    print("Finished replacing all collision blocks.")
+    print(f"Finished replacing all {len(source_collision_blocks)} collision blocks.")
 
 
 @torch_compile

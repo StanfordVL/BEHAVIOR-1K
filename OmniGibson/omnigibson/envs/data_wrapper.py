@@ -1046,12 +1046,17 @@ class DataPlaybackWrapper(DataWrapper):
                 obs_grp = traj_grp.create_group(k)
                 for mod, step_mod_data in dat.items():
                    traj_dsets[k][mod] = obs_grp.create_dataset(
-                        mod, shape=(num_samples + 1, *step_mod_data.shape), dtype=step_mod_data.numpy().dtype, **self.compression
+                        mod, 
+                        shape=(num_samples + 1, *step_mod_data.shape), 
+                        dtype=step_mod_data.numpy().dtype, 
+                        **self.compression,
+                        chunks=(1, *step_mod_data.shape),
+                        shuffle=True,
                     )
             else:
                 dat = th.tensor(dat)
                 traj_dsets[k] = traj_grp.create_dataset(
-                    k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression
+                    k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression, shuffle=True
                 )
 
         return traj_grp, traj_dsets

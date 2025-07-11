@@ -4,8 +4,8 @@ import omnigibson.utils.transform_utils as T
 import open3d as o3d
 import torch as th
 from torch_cluster import fps
-from tqdm import trange, tqdm
-from typing import Dict, Tuple
+from tqdm import tqdm
+from typing import Dict, Optional, Tuple
 
 
 #==============================================
@@ -71,6 +71,10 @@ def dequantize_depth(
 
     return depth
 
+
+# ==============================================
+# Segmentation
+# ==============================================
 
 def generate_yuv_palette(num_ids: int) -> np.ndarray:
     """
@@ -313,9 +317,9 @@ def depth_to_pcd(
     return pc_transformed
 
 
-def downsample_pcd(color_pcd, num_points) -> Tuple[th.Tensor, th.Tensor]:
+def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.Tensor]:
     """
-    Downsample point clouds with true batch FPS processing.
+    Downsample point clouds with batch FPS processing or random sampling.
     
     Args:
         color_pcd: (B, N, 6) point cloud tensor [rgb, xyz] for each batch
@@ -324,31 +328,39 @@ def downsample_pcd(color_pcd, num_points) -> Tuple[th.Tensor, th.Tensor]:
         color_pcd: (B, num_points, 6) downsampled point cloud
         sampled_idx: (B, num_points) sampled indices
     """
+    print("Downsampling point clouds...")
     B, N, C = color_pcd.shape
     device = color_pcd.device
     
-    # Initialize output tensors
-    output_pcd = th.zeros(B, num_points, C, device=device, dtype=color_pcd.dtype)
-    output_idx = th.zeros(B, num_points, device=device, dtype=th.long)
-    
     if N > num_points:
-        # True batch FPS - process all batches together
-        xyz = color_pcd[:, :, 3:6].contiguous()  # (B, N, 3)
-        xyz_flat = xyz.view(-1, 3)  # (B*N, 3)
-        # Create batch indices for all points
-        batch_indices = th.arange(B, device=device).repeat_interleave(N)  # (B*N,)
-        # Single FPS call for all batches
-        idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
-        # Vectorized post-processing
-        local_idx = idx_flat % N   # Local index within each batch
-        batch_idx = idx_flat // N  # Which batch each index belongs to
-        for b in trange(B):
-            batch_mask = batch_idx == b
-            if batch_mask.sum() > 0:
-                batch_local_indices = local_idx[batch_mask][:num_points]
-                output_pcd[b, :len(batch_local_indices)] = color_pcd[b][batch_local_indices]
-                output_idx[b, :len(batch_local_indices)] = batch_local_indices
-            
+        if use_fps:
+            # Initialize output tensors
+            output_pcd = th.zeros(B, num_points, C, device=device, dtype=color_pcd.dtype)
+            output_idx = th.zeros(B, num_points, device=device, dtype=th.long)
+            # True batch FPS - process all batches together
+            xyz = color_pcd[:, :, 3:6].contiguous()  # (B, N, 3)
+            xyz_flat = xyz.view(-1, 3)  # (B*N, 3)
+            # Create batch indices for all points
+            batch_indices = th.arange(B, device=device).repeat_interleave(N)  # (B*N,)
+            # Single FPS call for all batches
+            idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
+            # Vectorized post-processing
+            batch_idx = idx_flat // N  # Which batch each index belongs to
+            local_idx = idx_flat % N   # Local index within each batch
+            for b in range(B):
+                batch_mask = batch_idx == b
+                if batch_mask.sum() > 0:
+                    batch_local_indices = local_idx[batch_mask][:num_points]
+                    output_pcd[b, :len(batch_local_indices)] = color_pcd[b][batch_local_indices]
+                    output_idx[b, :len(batch_local_indices)] = batch_local_indices
+        else:
+            # Randomly sample num_points indices without replacement for each batch
+            output_idx = th.stack([
+                th.randperm(N, device=device)[:num_points] for _ in range(B)
+            ], dim=0)  # (B, num_points)
+            # Use proper batch indexing
+            batch_indices = th.arange(B, device=device).unsqueeze(1).expand(B, num_points)
+            output_pcd = color_pcd[batch_indices, output_idx]  # (B, num_points, C)
     else:
         pad_num = num_points - N
         random_idx = th.randint(0, N, (B, pad_num), device=device)  # (B, pad_num)
@@ -365,34 +377,32 @@ def process_fused_point_cloud(
     obs: dict,
     robot_name: str, 
     camera_intrinsics: Dict[str, th.Tensor],
-    pcd_num_points: int = 4096
+    pcd_num_points: Optional[int] = None,
+    use_fps: bool=True,
 ) -> Tuple[th.Tensor, th.Tensor]:
-    base_link_pose = obs[f"{robot_name}::robot_base_link_pose"]
-    camera_depth, camera_rgb, camera_seg, camera_pose = dict(), dict(), dict(), dict()
-    for camera_name in camera_intrinsics.keys():
-        camera_depth[camera_name] = obs[f"{camera_name}::depth_linear"]
-        camera_rgb[camera_name] = obs[f"{camera_name}::rgb"]
-        camera_seg[camera_name] = obs[f"{camera_name}::seg_semantic"]
-        camera_pose[camera_name] = obs[f"{camera_name}::pose"]
+    print("Fusing point clouds...")
     rgb_pcd, seg_pcd = [], []
     for camera_name, intrinsics in camera_intrinsics.items():
         pcd = depth_to_pcd(
-            camera_depth[camera_name], 
-            camera_pose[camera_name], 
-            base_link_pose, 
+            obs[f"{camera_name}::depth_linear"], 
+            obs[f"{camera_name}::pose"], 
+            obs[f"{robot_name}::robot_base_link_pose"], 
             intrinsics
         )
         num_points = pcd.shape[0]
         rgb_pcd.append(
-            th.cat([camera_rgb[camera_name][..., :3] / 255.0, pcd], dim=-1).reshape(num_points, -1, 6)
+            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).reshape(num_points, -1, 6)
         )  # shape (N, H*W, 6) 
-        seg_pcd.append(camera_seg[camera_name].reshape(num_points, -1)) # shape (N, H*W)
+        seg_pcd.append(obs[f"{camera_name}::seg_semantic"].reshape(num_points, -1)) # shape (N, H*W)
     # Fuse all point clouds and downsample
-    fused_pcd_all = th.cat(rgb_pcd, dim=1)
-    fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points)
-    fused_pcd = fused_pcd.float().to(device="cpu")
-    sampled_idx = sampled_idx.to(device="cpu")
-    fused_seg = th.gather(th.cat(seg_pcd, dim=1), 1, sampled_idx)
+    fused_pcd_all = th.cat(rgb_pcd, dim=1).to(device="cuda")
+    if pcd_num_points is not None:
+        fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
+        fused_pcd = fused_pcd.float().cpu()
+        fused_seg = th.gather(th.cat(seg_pcd, dim=1), 1, sampled_idx.cpu()).cpu()
+    else:
+        fused_pcd = fused_pcd_all.float().cpu()
+        fused_seg = th.cat(seg_pcd, dim=1).cpu()
 
     return fused_pcd, fused_seg
 
