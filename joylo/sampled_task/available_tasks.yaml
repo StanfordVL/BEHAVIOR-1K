@@ -85,13 +85,13 @@ bringing_water:
 can_beans:
   0:
     robot_start_orientation:
-    - 0.0009045525803230703
-    - 0.00017038830264937133
-    - 0.966588020324707
-    - 0.2563331127166748
+    - -0.00016707053873687983
+    - -0.0009051887318491936
+    - 0.6171036958694458
+    - 0.7868812680244446
     robot_start_position:
-    - 6.3885498046875
-    - 2.0311279296875
+    - 6.508941650390625
+    - 2.22998046875
     - 0.0050048828125
     scene_model: house_double_floor_lower
 can_meat:
@@ -334,6 +334,18 @@ cook_eggplant:
     - -0.953521728515625
     - 0.0037841796875
     scene_model: house_single_floor
+cook_hot_dogs:
+  0:
+    robot_start_orientation:
+    - 0.0008374275639653206
+    - 0.0003818359400611371
+    - -0.6459619402885437
+    - 0.7633689641952515
+    robot_start_position:
+    - 6.429229736328125
+    - -0.8603515625
+    - 0.0050048828125
+    scene_model: house_single_floor
 cool_cakes:
   0:
     robot_start_orientation:
@@ -493,13 +505,13 @@ make_microwave_popcorn:
 make_pizza:
   0:
     robot_start_orientation:
-    - 0.0005452295881696045
-    - 0.0007415420259349048
-    - -0.5078128576278687
-    - 0.8614668846130371
+    - -0.0003707160067278892
+    - -0.0008425143896602094
+    - -0.997943103313446
+    - 0.06409911811351776
     robot_start_position:
-    - 2.05828857421875
-    - 3.17779541015625
+    - 6.25030517578125
+    - 1.922271728515625
     - 0.0050048828125
     scene_model: house_double_floor_lower
 moving_boxes_to_storage:
