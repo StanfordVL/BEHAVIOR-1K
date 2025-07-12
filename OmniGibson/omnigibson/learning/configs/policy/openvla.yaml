@@ -2,20 +2,11 @@
 
 env: omnigibson
 policy_name: openvla 
+log_path: /home/evans/logs/b1k_baselines/OmniGibson/logs/openvla
 
 model:
   _target_: omnigibson.learning.policies.OpenVLA
-
-robot:
-  type: R1Pro
-  controllers:
-    arm_left: 
-      name: InverseKinematicsController
-      mode: pose_delta_ori
-    arm_right:
-      name: InverseKinematicsController
-      mode: pose_delta_ori
-    trunk:
-      name: JointController
-      pos_kp: 150
-      use_delta_commands: True
+  host: 0.0.0.0
+  port: 8777
+  text_prompt: pick up the trash
+  control_mode: receeding_temporal
