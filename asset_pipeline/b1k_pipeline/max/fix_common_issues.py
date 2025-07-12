@@ -659,16 +659,16 @@ def update_texture_paths():
                 assert (
                     map_path.exists()
                 ), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
-                bakery_path = pathlib.Path(
-                    os.path.abspath(os.path.join(rt.maxFilePath, "bakery"))
-                )
+                bakery_path = b1k_pipeline.utils.PIPELINE_ROOT / "bakery"
 
                 if bakery_path in map_path.parents:
                     # This is the correct bakery path, so ignore this object
                     continue
 
-                # Otherwise, we need to update the path. First, get the correct path and copy the file there.
+                # Otherwise, we need to update the path.
                 correct_path = bakery_path / map_path.name
+
+                # The below is for actually moving the files around. Here we don't need to do that.
                 if correct_path.exists():
                     # If the path already exists, check that it's the same file.
                     with open(map_path, "rb") as f:

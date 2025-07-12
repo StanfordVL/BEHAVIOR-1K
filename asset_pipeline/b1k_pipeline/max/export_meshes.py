@@ -233,7 +233,13 @@ class ObjectExporter:
                     f"Object {obj.name} baked material map {sub_texmap_slot_name} has unexpected type {rt.classOf(sub_texmap)}"
                 
                 # Use os.path.abspath which normalizes + absolutifies the paths but does not resolve symlinks unlike pathlib (problem with dvc)
-                map_path = pathlib.Path(os.path.abspath(sub_texmap.filename))
+                map_path_str = os.path.abspath(sub_texmap.filename)
+                # Fix legacy-format paths
+                if "ig_pipeline" in map_path_str:
+                    map_path_str = map_path_str.replace(
+                        "ig_pipeline", "BEHAVIOR-1K/asset_pipeline"
+                    )
+                map_path = pathlib.Path(map_path_str)
                 assert map_path.exists(), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
                 bakery_path = pathlib.Path(os.path.abspath(os.path.join(rt.maxFilePath, "bakery")))
 
