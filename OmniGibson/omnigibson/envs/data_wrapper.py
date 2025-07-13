@@ -1054,7 +1054,6 @@ class DataPlaybackWrapper(DataWrapper):
                         shuffle=True,
                     )
             else:
-                dat = th.tensor(dat)
                 traj_dsets[k] = traj_grp.create_dataset(
                     k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression, shuffle=True
                 )

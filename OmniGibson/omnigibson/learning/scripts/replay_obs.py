@@ -19,7 +19,7 @@ from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
-log = create_module_logger(module_name=__name__)
+log = create_module_logger(module_name="omnigibson.learning.scripts.replay_obs")
 # set level to be info
 log.setLevel(20)
 
@@ -33,6 +33,8 @@ ROBOT_CAMERA_NAMES = [
     "robot_r1::robot_r1:zed_link:Camera:0",
 ]
 
+
+FLUSH_EVERY_N_STEPS = 500
 
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
@@ -58,6 +60,7 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         Args:
             traj_grp (h5py.Group): Trajectory group to postprocess
         """
+        log.info(f"Postprocessing trajectory group {traj_grp.name}")
         traj_grp.attrs["robot_type"] = "R1Pro"
         # Add the list of task obs keys as attrs (this is list of strs)
         traj_grp["obs"].attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
@@ -72,9 +75,14 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
                 # add camera intrinsics as attrs
                 traj_grp["obs"].attrs[f"robot_r1::{name}::intrinsics"] = sensor.intrinsic_matrix
                 # add unique instance ids as attrs
-                traj_grp["obs"].attrs[f"robot_r1::{name}::unique_ins_ids"] = th.unique(
-                    th.from_numpy(traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"][:])
-                ).to(th.uint32).tolist()
+                unique_ins_ids = set()
+                # batch process to avoid memory issues
+                for i in range(0, traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"].shape[0], FLUSH_EVERY_N_STEPS):
+                    unique_ins_ids.update(th.unique(
+                        th.from_numpy(traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"][i:i+FLUSH_EVERY_N_STEPS])
+                    ).to(th.uint32).tolist())
+                traj_grp["obs"].attrs[f"robot_r1::{name}::unique_ins_ids"] = list(unique_ins_ids)
+        log.info(f"Postprocessing trajectory group {traj_grp.name} done")
 
 
 def replay_hdf5_file(
@@ -83,6 +91,7 @@ def replay_hdf5_file(
     generate_rgbd: bool=False, 
     generate_seg: bool=False,   
     generate_bbox: bool=False,
+    flush_every_n_steps: int=500,
 ) -> None:
     """
     Replays a single HDF5 file and saves videos to a new folder
@@ -93,6 +102,7 @@ def replay_hdf5_file(
         generate_rgbd: If True, generates RGBD videos from the replayed data
         generate_seg: If True, generates segmentation data from the replayed data
         generate_bbox: If True, generates bounding box data from the replayed data
+        flush_every_n_steps: Number of steps to flush the data after
     """
     if generate_bbox:
         assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
@@ -138,7 +148,7 @@ def replay_hdf5_file(
         external_sensors_config=dict(),
         n_render_iterations=1,
         flush_every_n_traj=1,
-        flush_every_n_steps=500,
+        flush_every_n_steps=flush_every_n_steps,
         additional_wrapper_configs=additional_wrapper_configs,
     )
 
@@ -152,7 +162,7 @@ def replay_hdf5_file(
 
     # Replay the dataset
     for episode_id in range(env.input_hdf5["data"].attrs["n_episodes"]):
-        print(f" >>> Replaying episode {episode_id}")
+        log.info(f" >>> Replaying episode {episode_id}")
         env.playback_episode(
             episode_id=episode_id,
             record_data=True,
@@ -171,17 +181,30 @@ def replay_hdf5_file(
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p",
+                    stream_options={"x265-params": "log-level=none"},
                 ))
-                write_video(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"], video_writers[-1], mode="rgb")
+                write_video(
+                    env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"], 
+                    video_writer=video_writers[-1], 
+                    batch_size=flush_every_n_steps, 
+                    mode="rgb",
+                )
+                log.info(f"Saved rgb video for {camera_name}")
                 # Depth video writer
                 video_writers.append(create_video_writer(
                     fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4",
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p10le",    
-                    stream_options={"crf": "8"},
+                    stream_options={"crf": "8", "x265-params": "log-level=none"},
                 ))  
-                write_video(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::depth_linear"], video_writers[-1], mode="depth")
+                write_video(
+                    env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::depth_linear"], 
+                    video_writer=video_writers[-1], 
+                    batch_size=flush_every_n_steps, 
+                    mode="depth",
+                )
+                log.info(f"Saved depth video for {camera_name}")
             if generate_seg:
                 seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg", demo_name, f"demo_{episode_id}")
                 os.makedirs(seg_dir, exist_ok=True)
@@ -190,10 +213,18 @@ def replay_hdf5_file(
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p", 
+                    stream_options={"x265-params": "log-level=none"},
                 ))
                 ins_id_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]
                 ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs[f"{camera_name}::unique_ins_ids"]
-                write_video(ins_id_seg_original, video_writers[-1], mode="seg", seg_ids=ins_id_ids)
+                write_video(
+                    ins_id_seg_original, 
+                    video_writer=video_writers[-1], 
+                    batch_size=flush_every_n_steps, 
+                    mode="seg", 
+                    seg_ids=ins_id_ids,
+                )
+                log.info(f"Saved seg video for {camera_name}")
             if generate_bbox:
                 # We only generate bbox for head camera
                 if "zed" in camera_name:
@@ -204,24 +235,30 @@ def replay_hdf5_file(
                         resolution=resolution,
                         codec_name="libx265",
                         pix_fmt="yuv420p",
+                        stream_options={"x265-params": "log-level=none"},
                     ))
                     task_relevant_objs = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["task_relevant_objs"]
                     instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["ins_id_mapping"])
                     instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
-                    instance_seg, instance_mapping = instance_id_to_instance(
-                        th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]), 
-                        instance_id_mapping,
-                    )
-                    instance_mapping = {k: v for k, v in instance_mapping.items() if v in task_relevant_objs}
-                    bbox = instance_to_bbox(instance_seg, instance_mapping)
-                    write_video(
-                        th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][:]), 
-                        video_writers[-1], 
-                        mode="bbox",
-                        bbox=bbox,
-                        instance_mapping=instance_mapping,
-                        task_relevant_objects=task_relevant_objs,
-                    )
+                    unique_ins_ids = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs[f"{camera_name}::unique_ins_ids"]
+                    for i in range(0, env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"].shape[0], flush_every_n_steps):
+                        instance_seg, instance_mapping = instance_id_to_instance(
+                            th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][i:i+flush_every_n_steps]), 
+                            instance_id_mapping,
+                            unique_ins_ids,
+                        )
+                        instance_mapping = {k: v for k, v in instance_mapping.items() if v in task_relevant_objs}
+                        bbox = instance_to_bbox(instance_seg, instance_mapping, set(instance_mapping.keys()))
+                        write_video(
+                            th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][i:i+flush_every_n_steps]), 
+                            video_writer=video_writers[-1], 
+                            batch_size=flush_every_n_steps,
+                            mode="bbox",
+                            bbox=bbox,
+                            instance_mapping=instance_mapping,
+                            task_relevant_objects=task_relevant_objs,
+                        )
+                    log.info(f"Saved bbox video for {camera_name}")
         # Close all video writers
         for container, stream in video_writers:
             # Flush any remaining packets
@@ -230,10 +267,10 @@ def replay_hdf5_file(
             # Close the container
             container.close()
 
-        print("Playback complete. Saving data...")
+        log.info("Playback complete. Saving data...")
         env.save_data()
 
-    print(f"Successfully processed {hdf_input_path}")
+    log.info(f"Successfully processed {hdf_input_path}")
 
 
 def generate_low_dim_data(
@@ -294,16 +331,16 @@ def generate_low_dim_data(
                         compression_opts=9,
                         shuffle=True,
                     )
-    print(f"Successfully processed {task_folder}/replayed/{base_name}.hdf5")
+    log.info(f"Successfully processed {task_folder}/replayed/{base_name}.hdf5")
 
 
 def rgbd_to_pcd(
     task_folder: str, 
     base_name: str, 
     robot_camera_names: list=ROBOT_CAMERA_NAMES,
-    pcd_num_points: int=4096,
+    pcd_num_points: int=1e5,
     batch_size: int=500,
-    use_fps: bool=True,
+    use_fps: bool=False,
 ):
     """
     Generate point cloud data from RGBD data in the specified task folder.
@@ -314,7 +351,7 @@ def rgbd_to_pcd(
         pcd_num_points (int): Number of points to sample from the point cloud.
         batch_size (int): Number of frames to process in each batch.
     """
-    print(f"Generating point cloud data from RGBD for {base_name} in {task_folder}")
+    log.info(f"Generating point cloud data from RGBD for {base_name} in {task_folder}")
     assert os.path.exists(task_folder), f"Task folder {task_folder} does not exist."
     output_dir = os.path.join(task_folder, "pcd")
     os.makedirs(output_dir, exist_ok=True)
@@ -328,18 +365,16 @@ def rgbd_to_pcd(
                 fused_pcd_dset = out_f.create_dataset(
                     f"data/{demo_name}/robot_r1::fused_pcd", 
                     shape=(data_size, pcd_num_points, 6),
-                    # compression="gzip",
-                    # compression_opts=9,
+                    compression="lzf",
                 )
                 pcd_semantic_dset = out_f.create_dataset(
                     f"data/{demo_name}/robot_r1::pcd_semantic", 
                     shape=(data_size, pcd_num_points),
-                    # compression="gzip",
-                    # compression_opts=9,
+                    compression="lzf",
                 )
                 # We batch process every batch_size frames
                 for i in range(0, data_size, batch_size):
-                    print(f"Processing batch {i} of {data_size}...")
+                    log.info(f"Processing batch {i} of {data_size}...")
                     obs = dict() # to store rgbd and pass into process_fused_point_cloud
                     # get all camera intrinsics
                     camera_intrinsics = {}
@@ -371,12 +406,11 @@ def rgbd_to_pcd(
                         pcd_num_points=pcd_num_points,
                         use_fps=use_fps,
                     )
-                    print("Saving point cloud data...")
+                    log.info("Saving point cloud data...")
                     fused_pcd_dset[i:i+batch_size] = pcd
                     pcd_semantic_dset[i:i+batch_size] = seg
-                    print("i", i, "done")
 
-    print(f"Point cloud data saved!")
+    log.info(f"Point cloud data saved!")
 
 
 def main():
@@ -392,7 +426,7 @@ def main():
 
     # Process each file
     if not os.path.exists(args.file):
-        print(f"Error: File {args.file} does not exist", file=sys.stderr)
+        log.info(f"Error: File {args.file} does not exist", file=sys.stderr)
         return
     if args.rgbd or args.seg or args.bbox:
         replay_hdf5_file(
@@ -400,6 +434,7 @@ def main():
             generate_rgbd=args.rgbd, 
             generate_seg=args.seg,
             generate_bbox=args.bbox,
+            flush_every_n_steps=FLUSH_EVERY_N_STEPS,
         )
 
     if args.low_dim:
@@ -412,12 +447,12 @@ def main():
             task_folder=os.path.dirname(os.path.dirname(args.file)),
             base_name=os.path.basename(args.file),
             robot_camera_names=ROBOT_CAMERA_NAMES,
-            pcd_num_points=4096,
+            pcd_num_points=61200,
             batch_size=200,
-            use_fps=True,
+            use_fps=False,
         )
 
-    print("All done!")
+    log.info("All done!")
     og.shutdown()
 
 

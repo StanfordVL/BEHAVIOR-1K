@@ -5,9 +5,11 @@ import open3d as o3d
 import cv2
 import torch as th
 from time import sleep
+from tqdm import trange
 from torch_cluster import fps
 from typing import Dict, Optional, Tuple, Generator, List
 from omnigibson.utils.constants import semantic_class_name_to_id
+
 
 #==============================================
 # Depth
@@ -113,7 +115,7 @@ def create_video_writer(
         stream.codec_context.options = context_options
     return container, stream
 
-def write_video(obs, video_writer, mode="rgb", **kwargs) -> None:
+def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> None:
     """
     Writes videos to the specified video writers using the current trajectory history
 
@@ -121,20 +123,24 @@ def write_video(obs, video_writer, mode="rgb", **kwargs) -> None:
         obs (torch.Tensor): Observation tensor
         video_writer (container, stream): PyAV container and stream objects to write video frames to
         mode (str): Mode to write video frames to. Only "rgb", "depth" and "seg" are supported.
+        batch_size (int): Batch size to write video frames to. If None, write video frames to the entire video.
         kwargs (dict): Additional keyword arguments to pass to the video writer.
     """
     container, stream = video_writer
+    batch_size = batch_size or obs.shape[0]
     if mode == "rgb":
-        for frame in obs[:]:
-            frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
-            for packet in stream.encode(frame):
-                container.mux(packet)
+        for i in range(0, obs.shape[0], batch_size):
+            for frame in obs[i:i+batch_size]:
+                frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
+                for packet in stream.encode(frame):
+                    container.mux(packet)
     elif mode == "depth":
-        quantized_depth = quantize_depth(obs[:])
-        for frame in quantized_depth:
-            frame = av.VideoFrame.from_ndarray(frame, format='gray16le')
-            for packet in stream.encode(frame):
-                container.mux(packet)
+        for i in range(0, obs.shape[0], batch_size):
+            quantized_depth = quantize_depth(obs[i:i+batch_size])
+            for frame in quantized_depth:
+                frame = av.VideoFrame.from_ndarray(frame, format='gray16le')
+                for packet in stream.encode(frame):
+                    container.mux(packet)
     elif mode == "seg":
         seg_ids = kwargs["seg_ids"]
         palette = th.from_numpy(generate_yuv_palette(len(seg_ids)))
@@ -142,24 +148,26 @@ def write_video(obs, video_writer, mode="rgb", **kwargs) -> None:
         max_id = seg_ids.max().item() + 1
         instance_id_to_idx = th.full((max_id,), -1, dtype=th.long)
         instance_id_to_idx[seg_ids] = th.arange(len(seg_ids))
-        seg_colored = palette[instance_id_to_idx[obs[:]]].numpy()
-        for frame in seg_colored:
-            frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
-            for packet in stream.encode(frame):
-                container.mux(packet)
+        for i in range(0, obs.shape[0], batch_size):
+            seg_colored = palette[instance_id_to_idx[obs[i:i+batch_size]]].numpy()
+            for frame in seg_colored:
+                frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
+                for packet in stream.encode(frame):
+                    container.mux(packet)
     elif mode == "bbox":
         bbox_2d_data = kwargs["bbox"]
-        for i, frame in enumerate(obs.numpy()):
-            # overlay bboxes with names
-            frame = overlay_bboxes_with_names(
-                frame, 
-                bbox_2d_data=bbox_2d_data[i], 
-                instance_mapping=kwargs["instance_mapping"], 
-                task_relevant_objects=kwargs["task_relevant_objects"]
-            )
-            frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
-            for packet in stream.encode(frame):
-                container.mux(packet)
+        for i in range(0, obs.shape[0], batch_size):
+            for j, frame in enumerate(obs[i:i+batch_size].numpy()):
+                # overlay bboxes with names
+                frame = overlay_bboxes_with_names(
+                    frame, 
+                    bbox_2d_data=bbox_2d_data[i+j], 
+                    instance_mapping=kwargs["instance_mapping"], 
+                    task_relevant_objects=kwargs["task_relevant_objects"]
+                )
+                frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
+                for packet in stream.encode(frame):
+                    container.mux(packet)
     else:
         raise ValueError(f"Unsupported video mode: {mode}.")
 
@@ -169,7 +177,7 @@ class VideoLoader:
         self, 
         path: str,
         batch_size: Optional[int]=None, 
-        sliding_window: bool=False, 
+        stride: int=1, 
         *args, 
         **kwargs
     ):
@@ -179,7 +187,8 @@ class VideoLoader:
         Args:
             path (str): Path to the video file
             batch_size (int): Batch size to load the video into memory. If None, load the entire video into memory.
-            sliding_window (bool): Whether to use a sliding window of frames for batching.
+            stride (int): Stride to load the video into memory.
+                i.e. if batch_size=3 and stride=1, __iter__ will return [0, 1, 2], [1, 2, 3], [2, 3, 4], ...
         Returns:
             th.Tensor: (T, H, W, 3) RGB video tensor
         """
@@ -187,7 +196,7 @@ class VideoLoader:
         self.stream = self.container.streams.video[0]
         self._frames = []
         self.batch_size = batch_size
-        self.sliding_window = sliding_window
+        self.stride = stride
         if not self.batch_size:
             self._frames = list(self.get_frames())[0]
             self.close()
@@ -234,7 +243,7 @@ class RGBVideoLoader(VideoLoader):
             frames.append(rgb)
             if self.batch_size and len(frames) == self.batch_size:
                 yield th.cat(frames, dim=0)
-                frames = frames[1:] if self.sliding_window else []
+                frames = frames[self.stride:]
         # Yield remaining frames if any
         if len(frames) > 0:
             yield th.cat(frames, dim=0)
@@ -273,7 +282,7 @@ class DepthVideoLoader(VideoLoader):
                     max_depth=self.max_depth,
                     shift=self.shift
                 )
-                frames = frames[1:] if self.sliding_window else []
+                frames = frames[self.stride:]
         # Yield remaining frames if any
         if len(frames) > 0:
             yield dequantize_depth(
@@ -317,8 +326,7 @@ class SegVideoLoader(VideoLoader):
             
             if self.batch_size and len(frames) == self.batch_size:
                 yield th.cat(frames, dim=0)
-                # Keep all frames except the first one for sliding window
-                frames = frames[1:]
+                frames = frames[self.stride:]
         # Yield remaining frames if any
         if len(frames) > 0:
             yield th.cat(frames, dim=0)
@@ -500,11 +508,11 @@ def process_fused_point_cloud(
     return fused_pcd, fused_seg
 
 
-def color_pcd_vis(color_pcd):
+def color_pcd_vis(color_pcd: np.ndarray):
     pcd = o3d.geometry.PointCloud()
     axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3, origin=[0, 0, 0])
     # visualize with open3D
-    if color_pcd.dim() == 2:
+    if color_pcd.ndim == 2:
         pcd.colors = o3d.utility.Vector3dVector(color_pcd[:, :3])
         pcd.points = o3d.utility.Vector3dVector(color_pcd[:, 3:])
         o3d.visualization.draw_geometries([pcd, axis])
@@ -515,10 +523,10 @@ def color_pcd_vis(color_pcd):
         vis = o3d.visualization.Visualizer()
         vis.create_window()
         vis.add_geometry(pcd)
-        for i in range(color_pcd.shape[0]):
+        for i in trange(color_pcd.shape[0]):
             pcd.colors = o3d.utility.Vector3dVector(color_pcd[i, :, :3])
             pcd.points = o3d.utility.Vector3dVector(color_pcd[i, :, 3:])
-            vis.update_geometry([pcd, axis])
+            vis.update_geometry(pcd)
             vis.poll_events()
             vis.update_renderer()
             sleep(0.03) 
@@ -548,7 +556,7 @@ def generate_yuv_palette(num_ids: int) -> np.ndarray:
     return np.array(palette[:num_ids], dtype=np.uint8)
 
 
-def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str]) -> Tuple[th.Tensor, Dict[int, str]]:
+def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str], unique_ins_ids: List[int]) -> Tuple[th.Tensor, Dict[int, str]]:
     """
     Instance_id segmentation map each unique visual meshes of objects (e.g. /World/scene_name/object_name/visual_mesh_0)
     This function merges all visual meshes of the same object instance to a single instance id.
@@ -560,8 +568,7 @@ def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str])
         instance_mapping (Dict[int, str]): Dict mapping instance ids to instance names
     """
     # trim the instance ids mapping to the valid instance ids
-    instance_ids = th.unique(obs)
-    instance_id_mapping = {k: v for k, v in instance_id_mapping.items() if k in instance_ids}
+    instance_id_mapping = {k: v for k, v in instance_id_mapping.items() if k in unique_ins_ids}
     # extract the actual instance name, which is located at /World/scene_name/object_name
     # Note that 0, 1 are special cases for background and unlabelled, respectivelly
     instance_id_to_instance = {k: v.split("/")[3] for k, v in instance_id_mapping.items() if k not in [0, 1]}
@@ -576,21 +583,27 @@ def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str])
     # Now, construct the instance segmentation
     instance_seg = th.zeros_like(obs)
     # Create lookup tensor for faster indexing
-    lookup = th.full((max(instance_ids) + 1,), -1, dtype=th.long, device=obs.device)
-    for instance_id in instance_ids.tolist():
+    lookup = th.full((max(unique_ins_ids) + 1,), -1, dtype=th.long, device=obs.device)
+    for instance_id in unique_ins_ids:
         lookup[instance_id] = reversed_instance_mapping[instance_id_to_instance[instance_id]]
     instance_seg = lookup[obs]
-    
+    # Note that now the returned instance mapping will be unique (i.e. no unused instance ids)
     return instance_seg, instance_mapping
 
 
-def instance_to_semantic(obs, instance_mapping: Dict[int, str], is_instance_id: bool=True) -> th.Tensor:
+def instance_to_semantic(obs, instance_mapping: Dict[int, str], unique_ins_ids: List[int], is_instance_id: bool=True) -> th.Tensor:
     """
     Convert instance / instance id segmentation to semantic segmentation.
+    Args:
+        obs (th.Tensor): (N, H, W) instance / instance_id segmentation
+        instance_mapping (Dict[int, str]): Dict mapping instance IDs to instance names
+        unique_ins_ids (List[int]): List of unique instance IDs
+        is_instance_id (bool): Whether the input is instance id segmentation
+    Returns:
+        semantic_seg (th.Tensor): (N, H, W) semantic segmentation
     """
     # trim the instance ids mapping to the valid instance ids
-    instance_ids = th.unique(obs)
-    instance_mapping = {k: v for k, v in instance_mapping.items() if k in instance_ids}
+    instance_mapping = {k: v for k, v in instance_mapping.items() if k in unique_ins_ids}
     # we remove 0: background, 1: unlabelled from the instance mapping for now
     instance_mapping.pop(0)
     instance_mapping.pop(1)
@@ -610,14 +623,14 @@ def instance_to_semantic(obs, instance_mapping: Dict[int, str], is_instance_id: 
     semantic_seg = th.zeros_like(obs)
     semantic_name_to_id = semantic_class_name_to_id()
     # Create lookup tensor for faster indexing
-    lookup = th.full((max(instance_ids) + 1,), -1, dtype=th.long, device=obs.device)
+    lookup = th.full((max(unique_ins_ids) + 1,), -1, dtype=th.long, device=obs.device)
     for instance_id in instance_mapping:
         lookup[instance_id] = semantic_name_to_id[instance_to_semantic[instance_id]]
     semantic_seg = lookup[obs]
     return semantic_seg
 
 
-def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str]) -> List[List[Tuple[int, int, int, int, int]]]:
+def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str], unique_ins_ids: List[int]) -> List[List[Tuple[int, int, int, int, int]]]:
     """
     Convert instance segmentation to bounding boxes.
     
@@ -625,6 +638,7 @@ def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str]) -> List[L
         obs (th.Tensor): (N, H, W) tensor of instance IDs
         instance_mapping (Dict[int, str]): Dict mapping instance IDs to instance names
             Note: this does not need to include all instance IDs, only the ones that we want to generate bbox for
+        unique_ins_ids (List[int]): List of unique instance IDs
     Returns:
         List of N lists, each containing tuples (x_min, y_min, x_max, y_max, instance_id) for each instance
     """
@@ -632,9 +646,7 @@ def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str]) -> List[L
         obs = obs.unsqueeze(0)  # Add batch dimension if single frame
     N = obs.shape[0]
     bboxes = [[] for _ in range(N)]
-    # Get unique instance IDs that exist in the mapping
-    unique_ids = th.unique(obs).tolist()
-    valid_ids = [id for id in instance_mapping if id in unique_ids]
+    valid_ids = [id for id in instance_mapping if id in unique_ins_ids]
     for instance_id in valid_ids:
         # Create mask for this instance
         mask = (obs == instance_id)  # (N, H, W)
