@@ -12,6 +12,8 @@ from omnigibson.learning.utils.obs_utils import (
     create_video_writer, 
     process_fused_point_cloud, 
     write_video,
+    instance_id_to_instance,
+    instance_to_bbox,
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -56,9 +58,12 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         Args:
             traj_grp (h5py.Group): Trajectory group to postprocess
         """
-        # Store observations as videos
+        traj_grp.attrs["robot_type"] = "R1Pro"
         # Add the list of task obs keys as attrs (this is list of strs)
-        traj_grp["obs"]["task::low_dim"].attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
+        traj_grp["obs"].attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
+        traj_grp["obs"].attrs["task_relevant_objs"] = [
+            obj.unwrapped.name for obj in self.env.task.object_scope.values() if obj.unwrapped.name != "robot_r1"
+        ]
         # add instance mapping keys as attrs
         traj_grp["obs"].attrs["ins_id_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
         
@@ -66,13 +71,18 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
             if f"robot_r1::{name}" in ROBOT_CAMERA_NAMES:
                 # add camera intrinsics as attrs
                 traj_grp["obs"].attrs[f"robot_r1::{name}::intrinsics"] = sensor.intrinsic_matrix
+                # add unique instance ids as attrs
+                traj_grp["obs"].attrs[f"robot_r1::{name}::unique_ins_ids"] = th.unique(
+                    th.from_numpy(traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"][:])
+                ).to(th.uint32).tolist()
 
 
 def replay_hdf5_file(
     hdf_input_path: str, 
     camera_names: list=ROBOT_CAMERA_NAMES,
     generate_rgbd: bool=False, 
-    generate_seg: bool=False,
+    generate_seg: bool=False,   
+    generate_bbox: bool=False,
 ) -> None:
     """
     Replays a single HDF5 file and saves videos to a new folder
@@ -82,7 +92,10 @@ def replay_hdf5_file(
         camera_names: List of camera names to process 
         generate_rgbd: If True, generates RGBD videos from the replayed data
         generate_seg: If True, generates segmentation data from the replayed data
+        generate_bbox: If True, generates bounding box data from the replayed data
     """
+    if generate_bbox:
+        assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
     # get processed folder path
     replay_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "replayed")
     os.makedirs(replay_dir, exist_ok=True)
@@ -179,8 +192,36 @@ def replay_hdf5_file(
                     pix_fmt="yuv420p", 
                 ))
                 ins_id_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]
-                ins_id_ids = th.unique(th.from_numpy(ins_id_seg_original))
+                ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs[f"{camera_name}::unique_ins_ids"]
                 write_video(ins_id_seg_original, video_writers[-1], mode="seg", seg_ids=ins_id_ids)
+            if generate_bbox:
+                # We only generate bbox for head camera
+                if "zed" in camera_name:
+                    bbox_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "bbox", demo_name, f"demo_{episode_id}")
+                    os.makedirs(bbox_dir, exist_ok=True)
+                    video_writers.append(create_video_writer(
+                        fpath=f"{bbox_dir}/{camera_name}::bbox.mp4",
+                        resolution=resolution,
+                        codec_name="libx265",
+                        pix_fmt="yuv420p",
+                    ))
+                    task_relevant_objs = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["task_relevant_objs"]
+                    instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["ins_id_mapping"])
+                    instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
+                    instance_seg, instance_mapping = instance_id_to_instance(
+                        th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]), 
+                        instance_id_mapping,
+                    )
+                    instance_mapping = {k: v for k, v in instance_mapping.items() if v in task_relevant_objs}
+                    bbox = instance_to_bbox(instance_seg, instance_mapping)
+                    write_video(
+                        th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][:]), 
+                        video_writers[-1], 
+                        mode="bbox",
+                        bbox=bbox,
+                        instance_mapping=instance_mapping,
+                        task_relevant_objects=task_relevant_objs,
+                    )
         # Close all video writers
         for container, stream in video_writers:
             # Flush any remaining packets
@@ -345,6 +386,7 @@ def main():
     parser.add_argument("--rgbd", action="store_true", help="Include this flag to generate rgbd videos")
     parser.add_argument("--pcd", action="store_true", help="Include this flag to generate point cloud data from RGBD")
     parser.add_argument("--seg", action="store_true", help="Include this flag to generate segmentation maps" )
+    parser.add_argument("--bbox", action="store_true", help="Include this flag to generate bounding box data" )
 
     args = parser.parse_args()
 
@@ -352,11 +394,12 @@ def main():
     if not os.path.exists(args.file):
         print(f"Error: File {args.file} does not exist", file=sys.stderr)
         return
-    if args.rgbd or args.seg:
+    if args.rgbd or args.seg or args.bbox:
         replay_hdf5_file(
             args.file, 
             generate_rgbd=args.rgbd, 
             generate_seg=args.seg,
+            generate_bbox=args.bbox,
         )
 
     if args.low_dim:
