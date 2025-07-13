@@ -2958,6 +2958,11 @@
         "white_turnip-nnvlrd": "objects/legacy_batch-12",
         "whiteboard-bqqmtc": "objects/legacy_batch-12",
         "wreath-rkrxno": "objects/legacy_batch-12",
+        "ping_pong_ball-eutewe": "objects/ping_pong-ab",
+        "ping_pong_ball-gsekwe": "objects/ping_pong-ab",
+        "ping_pong_ball-jrwhre": "objects/ping_pong-ab",
+        "ping_pong_paddle-xcyejf": "objects/ping_pong-ab",
+        "ping_pong_table-herems": "objects/ping_pong-ab",
         "acetone_atomizer-krtwsl": "objects/procedural-aa",
         "ammonia_water_atomizer-bnrlqd": "objects/procedural-aa",
         "baking_powder_jar-lgopij": "objects/procedural-aa",
@@ -19472,6 +19477,21 @@
         ],
         "wreath-rkrxno": [
             "objects/legacy_batch-12"
+        ],
+        "ping_pong_ball-eutewe": [
+            "objects/ping_pong-ab"
+        ],
+        "ping_pong_ball-gsekwe": [
+            "objects/ping_pong-ab"
+        ],
+        "ping_pong_ball-jrwhre": [
+            "objects/ping_pong-ab"
+        ],
+        "ping_pong_paddle-xcyejf": [
+            "objects/ping_pong-ab"
+        ],
+        "ping_pong_table-herems": [
+            "objects/ping_pong-ab"
         ],
         "acetone_atomizer-krtwsl": [
             "objects/procedural-aa"
@@ -50087,6 +50107,21 @@
         ],
         "wreath-rkrxno": [
             "attachment",
+            "collision"
+        ],
+        "ping_pong_ball-eutewe": [
+            "collision"
+        ],
+        "ping_pong_ball-gsekwe": [
+            "collision"
+        ],
+        "ping_pong_ball-jrwhre": [
+            "collision"
+        ],
+        "ping_pong_paddle-xcyejf": [
+            "collision"
+        ],
+        "ping_pong_table-herems": [
             "collision"
         ],
         "acetone_atomizer-krtwsl": [
@@ -88116,6 +88151,31 @@
             0.20020237731933593,
             0.1977774658203125,
             0.041735517501831056
+        ],
+        "eutewe": [
+            0.0064754047393798825,
+            0.006500139713287354,
+            0.006475404500961303
+        ],
+        "gsekwe": [
+            0.006454001903533935,
+            0.006500139713287354,
+            0.006454001665115356
+        ],
+        "jrwhre": [
+            0.006465890645980835,
+            0.006465888023376465,
+            0.006490198612213135
+        ],
+        "xcyejf": [
+            0.0377097171730602,
+            0.02146159553527832,
+            0.002882385969161987
+        ],
+        "herems": [
+            0.30513629150390625,
+            0.17928993225097656,
+            0.09448329544067383
         ],
         "krtwsl": [
             0.0812061996459961,
