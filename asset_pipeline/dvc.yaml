@@ -82,6 +82,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/meshes.zip
     - cad/objects/legacy_batch-11/artifacts/meshes.zip
     - cad/objects/legacy_batch-12/artifacts/meshes.zip
+    - cad/objects/ping_pong-ab/artifacts/meshes.zip
     - cad/objects/procedural-aa/artifacts/meshes.zip
     - cad/objects/school_objects-aa/artifacts/meshes.zip
     - cad/objects/substances-01/artifacts/meshes.zip
@@ -173,6 +174,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/object_list.json
     - cad/objects/legacy_batch-11/artifacts/object_list.json
     - cad/objects/legacy_batch-12/artifacts/object_list.json
+    - cad/objects/ping_pong-ab/artifacts/object_list.json
     - cad/objects/procedural-aa/artifacts/object_list.json
     - cad/objects/school_objects-aa/artifacts/object_list.json
     - cad/objects/substances-01/artifacts/object_list.json
@@ -277,6 +279,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/file_manifest.json
     - cad/objects/legacy_batch-11/artifacts/file_manifest.json
     - cad/objects/legacy_batch-12/artifacts/file_manifest.json
+    - cad/objects/ping_pong-ab/artifacts/file_manifest.json
     - cad/objects/procedural-aa/artifacts/file_manifest.json
     - cad/objects/school_objects-aa/artifacts/file_manifest.json
     - cad/objects/substances-01/artifacts/file_manifest.json
@@ -454,6 +457,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/export_meshes.json
     - cad/objects/legacy_batch-11/artifacts/export_meshes.json
     - cad/objects/legacy_batch-12/artifacts/export_meshes.json
+    - cad/objects/ping_pong-ab/artifacts/export_meshes.json
     - cad/objects/procedural-aa/artifacts/export_meshes.json
     - cad/objects/school_objects-aa/artifacts/export_meshes.json
     - cad/objects/substances-01/artifacts/export_meshes.json
@@ -551,6 +555,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/meshes.zip
     - cad/objects/legacy_batch-11/artifacts/meshes.zip
     - cad/objects/legacy_batch-12/artifacts/meshes.zip
+    - cad/objects/ping_pong-ab/artifacts/meshes.zip
     - cad/objects/procedural-aa/artifacts/meshes.zip
     - cad/objects/school_objects-aa/artifacts/meshes.zip
     - cad/objects/substances-01/artifacts/meshes.zip
@@ -642,6 +647,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/object_list.json
     - cad/objects/legacy_batch-11/artifacts/object_list.json
     - cad/objects/legacy_batch-12/artifacts/object_list.json
+    - cad/objects/ping_pong-ab/artifacts/object_list.json
     - cad/objects/procedural-aa/artifacts/object_list.json
     - cad/objects/school_objects-aa/artifacts/object_list.json
     - cad/objects/substances-01/artifacts/object_list.json
@@ -917,6 +923,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/object_list.json
     - cad/objects/legacy_batch-11/artifacts/object_list.json
     - cad/objects/legacy_batch-12/artifacts/object_list.json
+    - cad/objects/ping_pong-ab/artifacts/object_list.json
     - cad/objects/procedural-aa/artifacts/object_list.json
     - cad/objects/school_objects-aa/artifacts/object_list.json
     - cad/objects/substances-01/artifacts/object_list.json
@@ -1034,6 +1041,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/object_list.json
     - cad/objects/legacy_batch-11/artifacts/object_list.json
     - cad/objects/legacy_batch-12/artifacts/object_list.json
+    - cad/objects/ping_pong-ab/artifacts/object_list.json
     - cad/objects/procedural-aa/artifacts/object_list.json
     - cad/objects/school_objects-aa/artifacts/object_list.json
     - cad/objects/substances-01/artifacts/object_list.json
@@ -1139,6 +1147,7 @@ stages:
       - cad/${item}/processed.max
       - b1k_pipeline/max/new_sanity_check.py
       - artifacts/pipeline/object_list.success
+      - artifacts/pipeline/object_inventory.json
       outs:
       - cad/${item}/artifacts/sanitycheck.json
     foreach: ${combined}
@@ -1174,6 +1183,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/sanitycheck.json
     - cad/objects/legacy_batch-11/artifacts/sanitycheck.json
     - cad/objects/legacy_batch-12/artifacts/sanitycheck.json
+    - cad/objects/ping_pong-ab/artifacts/sanitycheck.json
     - cad/objects/procedural-aa/artifacts/sanitycheck.json
     - cad/objects/school_objects-aa/artifacts/sanitycheck.json
     - cad/objects/substances-01/artifacts/sanitycheck.json
@@ -1306,6 +1316,7 @@ stages:
     - cad/objects/legacy_batch-10/artifacts/object_list.json
     - cad/objects/legacy_batch-11/artifacts/object_list.json
     - cad/objects/legacy_batch-12/artifacts/object_list.json
+    - cad/objects/ping_pong-ab/artifacts/object_list.json
     - cad/objects/procedural-aa/artifacts/object_list.json
     - cad/objects/school_objects-aa/artifacts/object_list.json
     - cad/objects/substances-01/artifacts/object_list.json
