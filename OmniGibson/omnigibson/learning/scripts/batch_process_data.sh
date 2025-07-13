@@ -16,7 +16,7 @@ if [[ $confirm != "y" ]]; then
     echo "Aborting."
     exit 1
 fi
-base_dir=/vision/u/wsai/behavior/$task_name
+base_dir=/vision/u/wsai/data/behavior/$task_name
 # get all the files in the base directory
 # make sure the base directory exists
 if [ ! -d "$base_dir/raw" ]; then

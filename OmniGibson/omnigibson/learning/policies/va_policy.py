@@ -9,9 +9,9 @@ from OmniGibson.omnigibson.learning.utils.obs_utils import process_fused_point_c
 from omegaconf import DictConfig
 
 
-class WBVIMA(BasePolicy):
+class VisionActionILPolicy(BasePolicy):
     """
-    WB-VIMA policy from Jiang et al. https://arxiv.org/abs/2503.05652
+    Simple vision-action imitation learning policy
     """
 
     def __init__(

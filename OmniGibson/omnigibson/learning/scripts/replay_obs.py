@@ -107,7 +107,9 @@ def replay_hdf5_file(
     if generate_bbox:
         assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
     # get processed folder path
-    replay_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "replayed")
+    task_folder = os.path.dirname(os.path.dirname(hdf_input_path))
+    task_name = os.path.basename(task_folder)
+    replay_dir = os.path.join(task_folder, "replayed")
     os.makedirs(replay_dir, exist_ok=True)
     base_name = os.path.basename(hdf_input_path)
     demo_name = os.path.splitext(base_name)[0]
@@ -138,6 +140,16 @@ def replay_hdf5_file(
     # Create the environment
     additional_wrapper_configs = []
 
+    # get full scene file
+    task_scene_file_folder = os.path.join(
+        os.path.dirname(os.path.dirname(og.__path__[0])), "joylo", "sampled_task", task_name
+    )
+    full_scene_file = None
+    for file in os.listdir(task_scene_file_folder):
+        if file.endswith(".json") and "partial_rooms" not in file:
+            full_scene_file = os.path.join(task_scene_file_folder, file)
+    assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
+
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=hdf_input_path,
         output_path=os.path.join(replay_dir, base_name),
@@ -150,6 +162,7 @@ def replay_hdf5_file(
         flush_every_n_traj=1,
         flush_every_n_steps=flush_every_n_steps,
         additional_wrapper_configs=additional_wrapper_configs,
+        # full_scene_file=full_scene_file,
     )
 
     # Modify head camera
@@ -177,7 +190,7 @@ def replay_hdf5_file(
                 os.makedirs(rgbd_dir, exist_ok=True)
                 # RGB video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4",
+                    fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4".replace(":", "+"),
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p",
@@ -192,7 +205,7 @@ def replay_hdf5_file(
                 log.info(f"Saved rgb video for {camera_name}")
                 # Depth video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4",
+                    fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4".replace(":", "+"),
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p10le",    
@@ -209,7 +222,7 @@ def replay_hdf5_file(
                 seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg", demo_name, f"demo_{episode_id}")
                 os.makedirs(seg_dir, exist_ok=True)
                 video_writers.append(create_video_writer(
-                    fpath=f"{seg_dir}/{camera_name}::seg_instance_id.mp4",
+                    fpath=f"{seg_dir}/{camera_name}::seg_instance_id.mp4".replace(":", "+"),
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p", 
@@ -231,7 +244,7 @@ def replay_hdf5_file(
                     bbox_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "bbox", demo_name, f"demo_{episode_id}")
                     os.makedirs(bbox_dir, exist_ok=True)
                     video_writers.append(create_video_writer(
-                        fpath=f"{bbox_dir}/{camera_name}::bbox.mp4",
+                        fpath=f"{bbox_dir}/{camera_name}::bbox.mp4".replace(":", "+"),
                         resolution=resolution,
                         codec_name="libx265",
                         pix_fmt="yuv420p",

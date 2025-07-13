@@ -192,7 +192,7 @@ class VideoLoader:
         Returns:
             th.Tensor: (T, H, W, 3) RGB video tensor
         """
-        self.container = av.open(path)
+        self.container = av.open(path.replace(":", "+"))
         self.stream = self.container.streams.video[0]
         self._frames = []
         self.batch_size = batch_size
