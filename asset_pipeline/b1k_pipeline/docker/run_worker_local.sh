@@ -22,7 +22,7 @@ esac
 
 
 SCRIPT_DIR="/scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker"
-DATA_PATH="${SCRIPT_DIR}/data"
+DATA_PATH="/scr/og-docker-data/datasets"
 SQSH_SOURCE="${SCRIPT_DIR}/ig_pipeline.sqsh"
 
 # Define env kwargs to pass
@@ -40,8 +40,8 @@ done
 declare -A MOUNTS=(
     [${SCR_DIR}]=/scr
     [${DATA_PATH}]=/data
-    ["/scr/BEHAVIOR-1K/OmniGibson"]=/omnigibson-src
-    ["/scr/bddl"]=/bddl-src
+    ["/scr/OmniGibson_old"]=/omnigibson-src
+    ["/scr/BEHAVIOR-1K/bddl"]=/bddl-src
 )
 
 MOUNT_KWARGS=""
@@ -66,13 +66,13 @@ for ((i = 1 ; i <= $WORKER_CNT ; i++));
 do
     CONTAINER_NAME=ig_pipeline_${i}
     echo "Creating container ${CONTAINER_NAME}..."
-    enroot create --name ${CONTAINER_NAME} ${SQSH_SOURCE}
+    # enroot create --name ${CONTAINER_NAME} ${SQSH_SOURCE}
 
     if [ `expr $i % 2` == 0 ]
     then
         GPU=0
     else
-        GPU=0
+        GPU=1
     fi
 
     echo "Launching job"
