@@ -101,7 +101,7 @@ def replay_hdf5_file(
         camera_names: List of camera names to process 
         generate_rgbd: If True, generates RGBD videos from the replayed data
         generate_seg: If True, generates segmentation data from the replayed data
-        generate_bbox: If True, generates bounding box data from the replayed data
+        generate_bbox: If True, ge nerates bounding box data from the replayed data
         flush_every_n_steps: Number of steps to flush the data after
     """
     if generate_bbox:
@@ -186,11 +186,13 @@ def replay_hdf5_file(
         for camera_name in camera_names:
             resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
             if generate_rgbd:
-                rgbd_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgbd", demo_name, f"demo_{episode_id}")
-                os.makedirs(rgbd_dir, exist_ok=True)
+                rgb_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgb", demo_name, f"demo_{episode_id}")
+                depth_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "depth", demo_name, f"demo_{episode_id}")
+                os.makedirs(rgb_dir, exist_ok=True)
+                os.makedirs(depth_dir, exist_ok=True)
                 # RGB video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::rgb.mp4".replace(":", "+"),
+                    fpath=f"{rgb_dir}/{camera_name}::rgb.mp4".replace(":", "+"),
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p",
@@ -205,7 +207,7 @@ def replay_hdf5_file(
                 log.info(f"Saved rgb video for {camera_name}")
                 # Depth video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{rgbd_dir}/{camera_name}::depth_linear.mp4".replace(":", "+"),
+                    fpath=f"{depth_dir}/{camera_name}::depth_linear.mp4".replace(":", "+"),
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p10le",    

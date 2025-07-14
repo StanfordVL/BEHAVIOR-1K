@@ -230,7 +230,7 @@ class RGBVideoLoader(VideoLoader):
         **kwargs
     ):
         super().__init__(
-            path=f"{data_path}/rgbd/{base_name}/{demo_id}/{camera_name}::rgb.mp4",
+            path=f"{data_path}/rgb/{base_name}/{demo_id}/{camera_name}::rgb.mp4",
             *args, 
             **kwargs
         )
@@ -263,7 +263,7 @@ class DepthVideoLoader(VideoLoader):
         self.max_depth = kwargs.get("max_depth", MAX_DEPTH)
         self.shift = kwargs.get("shift", DEPTH_SHIFT)
         super().__init__(
-            path=f"{data_path}/rgbd/{base_name}/{demo_id}/{camera_name}::depth_linear.mp4",
+            path=f"{data_path}/depth/{base_name}/{demo_id}/{camera_name}::depth_linear.mp4",
             *args, 
             **kwargs
         )
