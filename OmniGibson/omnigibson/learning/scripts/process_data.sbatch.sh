@@ -18,13 +18,12 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
-mkdir -p /vision/u/wsai/BEHAVIOR-1K/outputs/sc
 source /vision/u/wsai/miniconda3/bin/activate behavior
 
 echo "File to process: $1/raw/$2"
 
 echo "Running replay_obs.py on $1/raw/$2"
-OMNIGIBSON_HEADLESS=1 python Omnigibson/omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2" --low_dim --rgbd --pcd --seg
+OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2" --low_dim --rgbd --pcd --seg
 
 echo "Job finished."
 exit 0

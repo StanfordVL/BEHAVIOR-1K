@@ -1,6 +1,7 @@
 #!/bin/bash
 
 BEHAVIOR_DIR="/vision/u/wsai/BEHAVIOR-1K"
+mkdir -p /vision/u/wsai/BEHAVIOR-1K/outputs/sc
 
 # batch process data for a giving task
 # get the task name from the first argument
@@ -10,12 +11,7 @@ if [ -z "$1" ]; then
 fi
 task_name=$1
 echo "Processing task: $task_name"
-# make sure the task is what the user wants with a confirmation
-read -p "Are you sure you want to process the task '$task_name'? (y/n) " confirm
-if [[ $confirm != "y" ]]; then
-    echo "Aborting."
-    exit 1
-fi
+
 base_dir=/vision/u/wsai/data/behavior/$task_name
 # get all the files in the base directory
 # make sure the base directory exists
@@ -34,6 +30,13 @@ else
 fi
 
 cd $BEHAVIOR_DIR
+
+# make sure the task is what the user wants with a confirmation
+read -p "Are you sure you want to process the task '$task_name'? (y/n) " confirm
+if [[ $confirm != "y" ]]; then
+    echo "Aborting."
+    exit 1
+fi
 
 # only process the first 2 files for testing
 # filenames=$(echo "$filenames" | head -n 2)
