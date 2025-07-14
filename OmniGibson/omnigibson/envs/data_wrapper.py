@@ -3,11 +3,10 @@ import os
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+from time import time
 import logging
 
-import av
 import h5py
-from open3d import data
 import torch as th
 
 import omnigibson as og
@@ -19,7 +18,6 @@ from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
-from omnigibson.learning.utils.obs_utils import quantize_depth
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -756,6 +754,10 @@ class DataPlaybackWrapper(DataWrapper):
             config["scene"]["scene_file"] = merge_scene_files(
                 scene_a=full_scene_json, scene_b=config["scene"]["scene_file"], keep_robot_from="b"
             )
+            # Overwrite rooms type to avoid loading room types from the hdf5 file
+            config["scene"]["load_room_types"] = None
+        else:
+            config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
 
         # Use dummy task if not loading task
         if not include_task:

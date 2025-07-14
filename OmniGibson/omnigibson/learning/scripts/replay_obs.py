@@ -162,7 +162,7 @@ def replay_hdf5_file(
         flush_every_n_traj=1,
         flush_every_n_steps=flush_every_n_steps,
         additional_wrapper_configs=additional_wrapper_configs,
-        # full_scene_file=full_scene_file,
+        full_scene_file=full_scene_file
     )
 
     # Modify head camera

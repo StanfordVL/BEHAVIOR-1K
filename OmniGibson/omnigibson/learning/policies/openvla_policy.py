@@ -41,11 +41,11 @@ class OpenVLA(BasePolicy):
 
     def __init__(
         self,
+        *args,
         host: str,
         port: int,
         text_prompt : str,
         control_mode : str = "temporal_ensemble",
-        *args,
         **kwargs
     ) -> None:
         super().__init__(*args, **kwargs)

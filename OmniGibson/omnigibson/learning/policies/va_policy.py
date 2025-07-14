@@ -6,7 +6,6 @@ from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat, any_slice
 from OmniGibson.omnigibson.learning.utils.obs_utils import process_fused_point_cloud
-from omegaconf import DictConfig
 
 
 class VisionActionILPolicy(BasePolicy):
@@ -16,12 +15,13 @@ class VisionActionILPolicy(BasePolicy):
 
     def __init__(
         self,
+        *args,
         # ====== policy model ======
-        policy: DictConfig,
+        host: str,
+        port: str,
         action_prediction_horizon: int,
         obs_window_size: int = 1,
         # ====== other args for base class ======
-        *args,
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
