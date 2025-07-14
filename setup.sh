@@ -119,7 +119,7 @@ if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Python version: $PYTHON_VERSION"
     
     # Check PyTorch installation
-    pip install torch==2.6.0+cu126 torchvision==0.21.0+cu126 torchaudio==2.6.0+cu126
+    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
     pip install torch-cluster -f https://data.pyg.org/whl/torch-2.6.0+cu126.html
     PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
     if [ $? -eq 0 ] ; then
