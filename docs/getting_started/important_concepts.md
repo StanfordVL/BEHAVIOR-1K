@@ -164,7 +164,7 @@ The BEHAVIOR ecosystem consists of four main components that work together to en
     - Investigate relationships between objects, synsets, categories
     - [**BEHAVIOR Knowledgebase Website**](https://behavior.stanford.edu/knowledgebase) 🌐
 
-=== ":material-robot: OmniGibson"
+=== ":material-robot-excited: OmniGibson"
 
     !!! abstract "Main Simulator"
         The primary software component built on NVIDIA Isaac Sim, successor to iGibson.
@@ -263,7 +263,7 @@ Understanding the relationship between OmniGibson and NVIDIA's technology stack.
     - 🎮 **Controllers**
     - ⚙️ **Mechanical constraints**
 
-=== ":material-robot-outline: Isaac Sim"
+=== ":material-robot-excited-outline: Isaac Sim"
 
     !!! abstract "Robotics Simulation App"
         Specialized Omniverse app designed for robotics simulation.

@@ -2,6 +2,6 @@
 icon: material/robot-industrial-outline
 ---
 
-# 🦾 **JoyLo**
+# :material-robot-industrial: **JoyLo**
 
 COMING SOON!

@@ -3,13 +3,13 @@ icon: material/laptop
 ---
 
 
-# 💻 **Examples**
+# :material-laptop: **Examples**
 
 **`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended as a set of building blocks enabling your research. Let's try them out!
 
 ***
 
-## ⚙️ **A quick word about macros**
+## :material-cog: **A quick word about macros**
 
 ??? question annotate "Why macros?"
 
@@ -33,7 +33,7 @@ Many of our examples set various `macros` settings at the beginning of the scrip
 
 ***
 
-## 🌎 **Environments**
+## :material-earth: **Environments**
 These examples showcase the full **`OmniGibson`** stack in use, and the types of environments immediately supported.
 
 ### **BEHAVIOR Task Demo**
@@ -72,7 +72,7 @@ This demo instantiates one of our navigation tasks in a fully-populated scene an
     --8<-- "examples/environments/navigation_env_demo.py"
     ```
 
-## 🧑‍🏫 **Learning**
+## :material-school: **Learning**
 These examples showcase how **`OmniGibson`** can be used to train embodied AI agents.
 
 ### **Reinforcement Learning Demo**
@@ -93,7 +93,7 @@ This demo loads a BEHAVIOR task with a `Fetch` robot, and trains / evaluates the
     --8<-- "examples/learning/navigation_policy_demo.py"
     ```
 
-## 🏔️ **Scenes**
+## :fontawesome-solid-mountain: **Scenes**
 These examples showcase how to leverage **`OmniGibson`**'s large-scale, diverse scenes shipped with the BEHAVIOR dataset.
 
 ### **Scene Selector Demo**
@@ -149,7 +149,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, and generates its c
     --8<-- "examples/scenes/traversability_map_example.py"
     ```
 
-## 🍎 **Objects**
+## :material-food-apple: **Objects**
 These examples showcase how to leverage objects in **`OmniGibson`**.
 
 ### **Load Object Demo**
@@ -229,7 +229,7 @@ This demo loads a door object and banana object, and partially obscures the bana
     --8<-- "examples/objects/draw_bounding_box.py"
     ```
 
-## 🌡️ **Object States**
+## :material-thermometer: **Object States**
 These examples showcase **`OmniGibson`**'s powerful object states functionality, which captures both individual and relational kinematic and non-kinematic states.
 
 ### **Slicing Demo**
@@ -476,7 +476,7 @@ This demo loads in a single object, and then dynamically modifies its state so t
     --8<-- "examples/object_states/object_state_texture_demo.py"
     ```
 
-## 🤖 **Robots**
+## :material-robot-excited: **Robots**
 These examples showcase how to interact and leverage robot objects in **`OmniGibson`**.
 
 ### **Robot Visualizer Demo**
@@ -552,7 +552,7 @@ This demo loads in `Fetch` robot and a IK solver to control the robot, and then 
     --8<-- "examples/robots/advanced/ik_example.py"
     ```
 
-## 🧰 **Simulator**
+## :material-wrench: **Simulator**
 These examples showcase useful functionality from **`OmniGibson`**'s monolithic `Simulator` object.
 
 ??? question "What's the difference between `Environment` and `Simulator`?"
@@ -588,7 +588,7 @@ This demo loads a stripped-down scene with the `Turtlebot` robot, and lets you i
     --8<-- "examples/simulator/sim_save_load_example.py"
     ```
 
-## 🖼️ **Rendering**
+## :material-image: **Rendering**
 These examples showcase how to change renderer settings in **`OmniGibson`**.
 
 ### **Renderer Settings Demo**

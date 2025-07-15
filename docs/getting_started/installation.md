@@ -2,9 +2,9 @@
 icon: material/hammer-wrench
 ---
 
-# 🛠️ **Installation**
+# :material-tools: **Installation**
 
-## 🗒️ **Requirements**
+## :material-note-text: **Requirements**
 
 Please make sure your system meets the following specs:
 
@@ -17,7 +17,7 @@ Please make sure your system meets the following specs:
     
     **`OmniGibson`** is built upon NVIDIA's [Omniverse](https://www.nvidia.com/en-us/omniverse/) and [Isaac Sim](https://developer.nvidia.com/isaac-sim) platforms, so we inherit their dependencies. For more information, please see [Isaac Sim's Requirements](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/requirements.html).
 
-## 💻 **Setup**
+## :material-laptop: **Setup**
 
 There are three ways to setup **`OmniGibson`**, all built upon different ways of installing NVIDIA Isaac Sim:
 
@@ -230,7 +230,7 @@ There are three ways to setup **`OmniGibson`**, all built upon different ways of
 
 
 
-## 🌎 **Explore `OmniGibson`!**
+## :material-earth: **Explore `OmniGibson`!**
 
 !!! warning annotate "Expect slowdown during first execution"
 
@@ -262,7 +262,7 @@ python -m omnigibson.examples.scenes.scene_selector # (1)!
 **Next:** Get quickly familiarized with **`OmniGibson`** from our [Quickstart Guide](./quickstart.md)!
 
 
-## 🧯 **Troubleshooting**
+## :material-fire-extinguisher: **Troubleshooting**
 
 ??? question "I cannot open Omniverse Launcher AppImage on Linux"
 

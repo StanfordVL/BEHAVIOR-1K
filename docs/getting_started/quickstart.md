@@ -2,7 +2,7 @@
 icon: octicons/rocket-16
 ---
 
-# 🚀 **Quickstart**
+# :material-rocket: **Quickstart**
 Let's quickly create an environment programmatically!
 
 **`OmniGibson`**'s workflow is straightforward: define the configuration of scene, object(s), robot(s), and task you'd like to load, and then instantiate our `Environment` class with that config.
@@ -20,7 +20,7 @@ cfg = dict()
 1. All python scripts should start with this line! This allows access to key global variables through the top-level package.
 2. Global macros (`gm`) can always be accessed directly and modified on the fly!
 
-## 🏔️ **Defining a scene**
+## :fontawesome-solid-mountain: **Defining a scene**
 Next, let's define a scene:
 
 ```{.python .annotate}
@@ -33,7 +33,7 @@ cfg["scene"] = {
 1. Our configuration gets parsed automatically and generates the appropriate class instance based on `type` (the string form of the class name). In this case, we're generating the most basic scene, which only consists of a floor plane. Check out [all of our available `Scene` classes](../reference/scenes/scene_base.md)!
 2. In addition to specifying `type`, the remaining keyword-arguments get passed directly into the class constructor. So for the base [`Scene`](../reference/scenes/scene_base.md) class, you could optionally specify `"use_floor_plane"` and `"floor_plane_visible"`, whereas for the more powerful [`InteractiveTraversableScene`](../reference/scenes/interactive_traversable_scene.md) class (which loads a curated, preconfigured scene) you can additionally specify options for filtering objects, such as `"load_object_categories"` and `"load_room_types"`. You can see all available keyword-arguments by viewing the [individual `Scene` class](../reference/scenes/scene_base.md) you'd like to load!
 
-## 🎾 **Defining objects**
+## :material-tennis-ball: **Defining objects**
 We can optionally define some objects to load into our scene:
 
 ```{.python .annotate}
@@ -95,7 +95,7 @@ cfg["objects"] = [ # (1)!
 17. `intensity` defines how bright the generated light source should be.
 18. `radius` is used by `Sphere` lights and determines their relative size.
 
-## 🤖 **Defining robots**
+## :material-robot-excited: **Defining robots**
 We can also optionally define robots to load into our scene:
 
 ```{.python .annotate}
@@ -112,7 +112,7 @@ cfg["robots"] = [ # (1)!
 2. **`OmniGibson`** supports multiple robot classes, where each class represents a specific robot model. Check out our [`robots`](../reference/robots/robot_base.md) to view all available robot classes!
 3. Execute `print(og.ALL_SENSOR_MODALITIES)` for a list of all available observation modalities!
 
-## 📋 **Defining a task**
+## :material-clipboard-text: **Defining a task**
 Lastly, we can optionally define a task to load into our scene. Since we're just getting started, let's load a "Dummy" task (which is the task that is loaded anyways even if we don't explicitly define a task in our config): 
 
 ```{.python .annotate}
@@ -127,7 +127,7 @@ cfg["task"] = {
 2. `termination_config` configures the termination conditions for this task. It maps specific [`TerminationCondition`](../reference/termination_conditions/termination_condition_base.md) arguments to their corresponding values to set.
 3. `reward_config` configures the reward functions for this task. It maps specific [`RewardFunction`](../reference/reward_functions/reward_function_base.md) arguments to their corresponding values to set.
 
-## 🌀 **Creating the environment**
+## :material-earth: **Creating the environment**
 We're all set! Let's load the config and create our environment:
 
 ```{.python .annotate}
@@ -227,7 +227,7 @@ obs, rew, terminated, truncated, info = env.step(env.action_space.sample())
     ```
 
 
-## 👀 **Looking around**
+## :material-eye: **Looking around**
 Look around by:
 
 * `Left-CLICK + Drag`: Tilt

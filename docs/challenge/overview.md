@@ -1,232 +1,93 @@
 ---
 icon: material/trophy
+hide:
+  - navigation
 ---
 
-# 🏆 **BEHAVIOR Challenge**
+# 🏆 **2025 BEHAVIOR Challenge**
 
-!!! info "Challenge Overview"
-    **BEHAVIOR** is a robotics challenge for everyday household tasks - the first of its kind that requires robots to demonstrate high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale environments.
+## :material-graph-outline: **Overview**
 
-!!! success "🎯 Challenge Focus"
-    This year's challenge features **50 carefully selected tasks** from our comprehensive benchmark of 1,000 everyday household activities, designed to test the full spectrum of household robotics capabilities.
+**BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that consists of three main components:
 
----
+1. **1,000 everyday household activities** task definitions
+2. **50 fully interactive scenes** and around 10,000 richly annotated objects  
+3. **OmniGibson**, a simulation environment capable of modeling complex interactions with rigid bodies, deformable objects, and fluids
 
-## :material-puzzle: **Challenge Components**
+BEHAVIOR is the first challenge of its kind that requires a robot's capability in high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale scenes. This year's challenge includes **50 tasks**.
 
-BEHAVIOR consists of three interconnected components that create the most comprehensive household robotics benchmark available:
+## :material-format-list-checks: **Challenge Components**
 
-=== ":material-format-list-checks: Task Definitions"
+### Task Definitions
 
-    !!! abstract "1,000 Everyday Household Activities"
-        Comprehensive task definitions covering the full spectrum of household activities that humans need help with most.
+The benchmark includes 1,000 everyday household activities covering diverse behaviors across: **rearrangement**, **cleaning/wiping**, **cooking/freezing**, **painting/spraying**, **hanging/installing**, **slicing/dicing**, **baking**, and **doing laundry**.
 
-    **📋 Task Categories Include:**
-    
-    - **🔄 Rearrangement** - Organizing and repositioning objects
-    - **🧽 Cleaning & Wiping** - Surface maintenance and hygiene
-    - **🍳 Cooking & Freezing** - Meal preparation and preservation
-    - **🎨 Painting & Spraying** - Surface treatment and decoration
-    - **🔧 Hanging & Installing** - Setup and mounting tasks
-    - **🔪 Slicing & Dicing** - Food preparation
-    - **🥖 Baking** - Complex cooking processes
-    - **👕 Laundry** - Cleaning and drying clothes
+### Interactive Environments
 
-    !!! tip "Human-Grounded Design"
-        All tasks are based on extensive surveys asking real people: **"What do you want robots to do for you?"**
+- 50 fully interactive scenes with house-scale layouts
+- 10,000+ richly annotated objects
 
-=== ":material-home-city: Interactive Environments"
+### OmniGibson Simulator
 
-    !!! abstract "50 Fully Interactive Scenes + 10,000 Objects"
-        Richly detailed household environments with thousands of interactive objects for realistic simulation.
+The simulation environment supports:
 
-    **🏠 Environment Features:**
-    
-    - **50 Complete Scenes** - Full house layouts with up to 26 rooms
-    - **10,000+ Objects** - Richly annotated with physical properties
-    - **Realistic Layouts** - Based on real-world household configurations
-    - **Interactive Elements** - Every object and furniture can be manipulated and interacted with
+- Rigid body physics
+- Deformable objects (cloth, fabric)
+- Fluid interactions (water, oils)
+- Object semantic states (e.g., open, filled, on-top, inside, etc.)
 
-    !!! success "Scale & Diversity"
-        House-scale environments requiring navigation, manipulation, and complex reasoning across multiple rooms and object types.
+## :material-database: **Data and Baselines**
 
-=== ":material-robot: OmniGibson Simulator"
+### Dataset
 
-    !!! abstract "Feature-CompletePhysics & Interaction Simulation"
-        State-of-the-art simulation environment capable of modeling complex real-world interactions.
+The benchmark includes **10,000 human-demonstrated trajectories** with diverse behaviors across all task categories. Each demonstration contains:
 
-    **⚙️ Simulation Capabilities:**
-    
-    - **🔧 Rigid Bodies** - Precise physics simulation
-    - **🧶 Deformable Objects** - Cloth, fabric, and flexible materials
-    - **💧 Fluids** - Water, oils, and liquid interactions
-    - **🌡️ Thermal Effects** - Heat transfer and temperature changes
-    - **🔥 Visual Effects** - Fire, smoke, and environmental effects
+- Synchronized RGBD observations
+- Object and part-level segmentation masks
+- Ground-truth object states  
+- Robot proprioception
+- Robot actions
+- Skill and subtask annotations
 
-    !!! info "Realism Focus"
-        OmniGibson enables unprecedented realism in household robotics simulation, bridging the gap between simulation and reality.
+### Available Baseline Methods
 
----
+Participants have access to training and evaluation pipelines for these baseline methods: **ACT**, **Diffusion Policy**, **BC-RNN**, **WB-VIMA**, **OpenVLA**, and **π0**.
 
-## :material-database: **Data & Baselines**
+## :material-chart-box: **Evaluation**
 
-### 📊 Human Demonstration Dataset
+### Metrics
 
-!!! success "Dataset Scale"
-    - **10,000 Trajectories** - Comprehensive coverage across task categories
-    - **1,500+ Hours** - Total human teleoperation data
-    - **Diverse Behaviors** - Spanning all major household activity types
+Agents are evaluated across three areas:
 
-### 📈 Rich Data Annotations
+1. **Task completion rate** (primary metric): Fraction of satisfied predicates in the goal condition of BDDL (BEHAVIOR Domain Definition Language) task definition
+2. **Agent efficiency**: Total distance traveled and energy expended during task execution
+3. **Data efficiency**: Total number of frames from demonstrations (IL) or simulator (RL) used during training
 
-Each demonstration trajectory contains comprehensive multi-modal data:
+### Reporting
 
-=== ":material-camera: Visual Data"
+- Results are reported with 95% confidence intervals
+- Primary ranking based on task completion rate
+- All metrics displayed on the leaderboard
+- EvalAI platform used for team registration, submission and leaderboard management
 
-    - **RGBD Observations** - Synchronized RGB and depth information
-    - **Object & Part Segmentation** - Object and part-level segmentation masks and bounding boxes
-    - **Point Clouds** - Ready-to-use point clouds
-    - **Multi-Camera Views** - Egocentric and wrist-mounted views
+## :octicons-person-add-16: **Resources and Participation**
 
-=== ":material-robot-outline: Robot Data"
+### Available Resources
 
-    - **Proprioceptive Information** - Joint angles, forces, and torques
-    - **Action Sequences** - Complete robot action trajectories
+All code, data, and documentation are open-source and available at [behavior.stanford.edu](https://behavior.stanford.edu/), including:
 
-=== ":material-cube-scan: State Information"
+- Tutorial on simulator installation
+- 3D asset downloads
+- Demonstration data download and visualization tools
+- Starter code for baseline methods
+- Challenge rules and protocols
 
-    - **Ground-Truth Object States** - Exact object positions and orientations
-    - **Scene Graph** - Coming soon!
+### How to Participate
 
-=== ":material-text-box-check: Dense Annotation"
+1. **Register** your team on the EvalAI platform
+2. **Install** the simulator and download the required data
+3. **Develop** your approach using the provided baselines and training pipelines
+4. **Submit** your results through EvalAI
+5. **Track** your progress on the leaderboard
 
-    - **Subtask and Skill Segmentation** - Coming soon!
-    - **Natural Language Annotation** - Coming soon!
-
-### 🤖 Baseline Methods
-
-We provide training and evaluation pipelines for popular state-of-the-art methods:
-
-!!! example "Available Baseline Methods"
-
-    | Method | Type | Description |
-    |--------|------|-------------|
-    | **BC-RNN** | Imitation Learning | Behavioral cloning with recurrent networks |
-    | **ACT** | Imitation Learning | Action Chunking with Transformers |
-    | **Diffusion Policy** | Imitation Learning | Diffusion-based policy learning |
-    | **WB-VIMA** | Imitation Learning | Kinematic-aware hierarchical policy learning |
-    | **OpenVLA** | Vision-Language-Action | Open-source VLA pretrained on Open X-Embodiment dataset|
-    | **π0** | Vision-Language-Action | General-purpose robot foundation model |
-
-!!! tip "Getting Started"
-    All baseline implementations are provided with complete training scripts, evaluation protocols, and documentation to help participants get started quickly.
-
----
-
-## :material-chart-line: **Evaluation Framework**
-
-### 📊 Evaluation Metrics
-
-We evaluate agents across three critical dimensions of household robotics performance:
-
-=== ":material-flag-checkered: Task Completion Rate"
-
-    !!! info "Primary Evaluation Metric"
-        **Definition:** Fraction of satisfied predicates in the goal condition of BDDL (BEHAVIOR Domain Definition Language) task definitions within the given time limit.
-
-=== ":material-speedometer: Agent Efficiency"
-
-    !!! info "Performance Optimization"
-        **Metrics:** Total distance traveled and energy expended during task execution.
-
-=== ":material-school: Data Efficiency"
-
-    !!! info "Learning Efficiency"
-        **Metrics:** Total number of frames used during training (demonstrations for IL, simulator steps for RL).
-
-### 📈 Reporting & Confidence
-
-!!! success "Statistical Rigor"
-    All results are reported with **95% confidence intervals** to ensure statistical significance and reproducibility.
-
-**Leaderboard Features:**
-
-- 🏆 **Primary Ranking** - Based on task completion rate
-- 📊 **Comprehensive Metrics** - All evaluation dimensions displayed
-- 📈 **Confidence Intervals** - Statistical significance reporting
-- 🔄 **Regular Updates** - Real-time submission processing
-
----
-
-## :material-web: **Resources & Participation**
-
-### 🌐 Open Source Ecosystem
-
-Everything you need to participate is freely available:
-
-=== ":material-code-tags: Code & Documentation"
-
-    **📁 Complete Codebase:**
-    
-    - 🔧 **Simulator Installation** - Step-by-step setup guides
-    - 📦 **3D Asset Downloads** - Complete object and scene libraries
-    - 👀 **Data Visualization** - Tools for exploring demonstrations
-    - 🚀 **Baseline Implementations** - Ready-to-use training code
-
-=== ":material-book-open: Learning Resources"
-
-    **📚 Comprehensive Tutorials:**
-    
-    - 🎯 **Getting Started** - From installation to first experiments
-    - 📊 **Data Handling** - Working with demonstration trajectories
-    - 🤖 **Baseline Training** - How to train and evaluate models
-    - 🏆 **Challenge Protocols** - Rules, submission guidelines, and best practices
-
-=== ":material-account-group: Community & Support"
-
-    **🤝 Participant Support:**
-    
-    - 💬 **Discord Community** - Real-time discussion and help
-    - 📧 **Technical Support** - Direct assistance for technical issues
-    - 📖 **Documentation** - Comprehensive guides and API references
-    - 🔄 **Regular Updates** - Challenge updates and announcements
-
-### 🎯 How to Participate
-
-!!! success "Ready to Join?"
-    
-    **1. 📝 Register Your Team**
-    
-    - Visit our **EvalAI** platform for team registration
-    - Complete participant information and agreements
-    - Receive access to submission systems
-
-    **2. 🔧 Set Up Your Environment**
-    
-    - Follow installation guides at [behavior.stanford.edu](https://behavior.stanford.edu/)
-    - Download datasets and 3D assets
-    - Verify setup with provided test scripts
-
-    **3. 🚀 Start Development**
-    
-    - Explore baseline implementations
-    - Develop your approach using our training pipelines
-    - Test on validation sets before submission
-
-    **4. 📊 Submit & Compete**
-    
-    - Submit results through EvalAI platform
-    - Track your progress on the leaderboard
-    - Iterate and improve based on feedback
-
----
-
-## :material-trophy: **What Makes BEHAVIOR Special**
-
-!!! quote "First-of-its-Kind Challenge"
-    BEHAVIOR is the **first robotics challenge** that requires the full spectrum of household robotics capabilities:
-    
-    - 🧠 **High-Level Reasoning** - Complex task planning and execution
-    - 🏃 **Long-Range Locomotion** - Navigation across house-scale environments  
-    - 🤲 **Dexterous Bimanual Manipulation** - Coordinated two-handed object handling
-    - 🏠 **House-Scale Complexity** - Real-world environmental challenges
+The challenge provides comprehensive documentation, tutorials, and baseline implementations to help participants get started with developing household robotics solutions.

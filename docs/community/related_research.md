@@ -4,8 +4,6 @@ icon: material/book-plus
 
 # Related Research
 
-## Related Projects
-
 ### 🦾 [BEHAVIOR Robot Suite](https://behavior-robot-suite.github.io/)
 
 BEHAVIOR Robot Suite (BRS) is a comprehensive framework for whole-body manipulation in household tasks, addressing key robotics challenges including bimanual coordination, stable navigation, and extensive reachability. Built on a bimanual wheeled robot with a 4-DoF torso, BRS integrates a cost-effective teleoperation interface for data collection and a novel algorithm for learning whole-body visuomotor policies.
@@ -20,7 +18,7 @@ BEHAVIOR Vision Suite is a synthetic data generator that addresses limitations i
 
 ## Previous BEHAVIOR Versions
 
-### 🛏️ [BEHAVIOR-100](https://behavior.stanford.edu/behavior-100)
+### 🛏️ [BEHAVIOR-100](../behavior_100/overview.md)
 
 BEHAVIOR-100 is the first generation of BEHAVIOR, a benchmark for embodied AI with 100 activities in simulation, spanning a range of everyday household chores such as cleaning, maintenance, and food preparation.
 

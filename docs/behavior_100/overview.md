@@ -2,9 +2,13 @@
 icon: material/graph-outline
 ---
 
-<iframe width="640" height="360" 
-        src="https://www.youtube-nocookie.com/embed/vvSS3zCWtHI?autoplay=1&loop=1&mute=1&controls=1&playlist=vvSS3zCWtHI&modestbranding=1&rel=0"
-        frameborder="0" allowfullscreen>
+<iframe 
+  src="https://player.vimeo.com/video/1101627941?badge=0&autopause=0&autoplay=1&muted=1&loop=1&title=0&byline=0&portrait=0&controls=0" 
+  width="640" 
+  height="320" 
+  frameborder="0" 
+  allow="autoplay; fullscreen" 
+  allowfullscreen>
 </iframe>
 
 
@@ -35,7 +39,7 @@ Do you want to benchmark your solution? Follow the instructions [here](https://s
     Activities include cleaning, preparing food, tidying, polishing, installing elements, etc. The activities are obtained from the American Time Use Survey and approximate the real distribution of tasks performed by humans in their everyday lives.
     
     <iframe width="100%" height="281" style="max-width: 500px; border-radius: 8px; margin: 1rem 0;"
-            src="https://www.youtube-nocookie.com/embed/c3dJrIg-aL8?autoplay=1&loop=1&mute=1&controls=0&playlist=c3dJrIg-aL8&modestbranding=1&rel=0"
+            src="https://player.vimeo.com/video/1101630779?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
             frameborder="0" allowfullscreen>
     </iframe>
     
@@ -46,7 +50,7 @@ Do you want to benchmark your solution? Follow the instructions [here](https://s
     These long-horizon activities require that the robot understand the scene, plan a strategy, and execute it by controlling the motion of the embodied agent based on observations. We provide [three embodiments](https://stanfordvl.github.io/behavior/agents.html), both [a rich actuation space and a set of action primitives](https://stanfordvl.github.io/behavior/agents.html#embodiments-actuation-sensing-grasping), and [realistic RGB-D and proprioceptive signals](https://stanfordvl.github.io/behavior/agents.html#observations): as close as it gets to the challenges of real-world.
     
     <iframe width="100%" height="281" style="max-width: 500px; border-radius: 8px; margin: 1rem 0;"
-            src="https://www.youtube-nocookie.com/embed/8N2nffFzGdA?autoplay=1&loop=1&mute=1&controls=0&playlist=8N2nffFzGdA&modestbranding=1&rel=0"
+            src="https://player.vimeo.com/video/1101630792?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
             frameborder="0" allowfullscreen>
     </iframe>
     
@@ -57,7 +61,7 @@ Do you want to benchmark your solution? Follow the instructions [here](https://s
     Accomplishing the BEHAVIOR activities requires changing more than the position of the objects in the environment: they need to be cooked, frozen, soaked, cleaned, and more. All these new types of state changes are supported by the provided simulator, iGibson 2.0, and enable new and unique types of activities.
     
     <iframe width="100%" height="281" style="max-width: 500px; border-radius: 8px; margin: 1rem 0;"
-            src="https://www.youtube-nocookie.com/embed/f6VSPkxolqs?autoplay=1&loop=1&mute=1&controls=0&playlist=f6VSPkxolqs&modestbranding=1&rel=0"
+            src="https://player.vimeo.com/video/1101630897?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
             frameborder="0" allowfullscreen>
     </iframe>
     
