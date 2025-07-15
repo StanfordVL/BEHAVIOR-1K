@@ -265,7 +265,11 @@ body:has(.body-wrap) .md-main {
     background: rgba(21, 119, 216, 0.1);
     border: 1px solid #1577d8;
     border-radius: 8px;
-    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: nowrap;
 }
 
 .hero-announcement p {
@@ -273,12 +277,15 @@ body:has(.body-wrap) .md-main {
     color: #ffffff;
     font-size: 16px;
     font-weight: 500;
+    flex: 1;
 }
 
 .hero-announcement .button {
     position: relative;
     z-index: 1;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .hero-announcement .button-primary {
@@ -300,6 +307,15 @@ body:has(.body-wrap) .md-main {
 .hero-announcement a:not(.button):hover {
     color: #90caf9 !important;
     text-decoration: underline;
+}
+
+/* Responsive design for hero announcement */
+@media (max-width: 640px) {
+    .hero-announcement {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.75rem;
+    }
 }
 
 /* Introduction Section */
