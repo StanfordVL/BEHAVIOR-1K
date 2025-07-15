@@ -1,0 +1,434 @@
+{% extends "main.html" %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="dist/css/style.css">
+{% endblock %}
+
+{% block tabs %}
+  {{ super() }}
+  <div class="body-wrap">
+    <header class="site-header">
+      <section class="hero">
+        <div class="container">
+          <div class="hero-inner">
+            <div class="hero-copy">
+              <img src="assets/behavior_logo2.png" alt="BEHAVIOR-1K" class="hero-logo mt-0" />
+              <p class="hero-paragraph">a platform for accelerating embodied AI research</p>
+              <div class="hero-cta">
+                <a class="button button-primary" href="./getting_started/installation.html">Get Started</a>
+                <a class="button" href="https://github.com/StanfordVL/BEHAVIOR-1K">Source Code</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </header>
+    
+    <!-- Introduction Section -->
+    <section class="intro-section">
+      <div class="intro-container">
+        <p class="intro-text">
+          BEHAVIOR-1K is the first simulation benchmark grounded in real human needs. Based on extensive surveys asking "what do you want robots to do for you?", we present 1,000 household activities that people actually spend time on and want help with.
+        </p>
+        <p class="intro-text">
+          The benchmark introduces long-horizon mobile manipulation challenges in realistic environments, providing a crucial tool to help bridge the gap between current research and real-world, human-centric applications.
+        </p>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+      <div class="features-container">
+        <!-- Scenes and Objects -->
+        <div class="scenes-objects-section">
+          <h3 class="subsection-title">1,000 activities, instantiated in 50 fully interactive scenes with 10,000+ objects</h3>
+          <div class="scenes-objects-grid">
+            <div class="feature-card">
+              <div class="bg-scenes"></div>
+            </div>
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/r0xRnuadvAw?autoplay=1&loop=1&mute=1&controls=0&playlist=r0xRnuadvAw&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+            </div>
+          </div>
+        </div>
+        
+        <!-- OmniGibson Features -->
+        <div class="omnigibson-features-section">
+          <h3 class="subsection-title">OmniGibson: Realism in perception, physics, and interactions</h3>
+          <div class="features-grid">
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/H7qRT6BPwTk?autoplay=1&loop=1&mute=1&controls=0&playlist=H7qRT6BPwTk&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Fluids</h5>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/whpYdKTMS3w?autoplay=1&loop=1&mute=1&controls=0&playlist=whpYdKTMS3w&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Deformables</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/YoOZ1iqyfFw?autoplay=1&loop=1&mute=1&controls=0&playlist=YoOZ1iqyfFw&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Transparency</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/N1lJ6IJDKUo?autoplay=1&loop=1&mute=1&controls=0&playlist=N1lJ6IJDKUo&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Thermal effects</h5>
+              </div>
+            </div>
+
+                         <div class="feature-card">
+               <iframe class="feature-video" 
+                       src="https://www.youtube-nocookie.com/embed/YGp0AyiIL9E?autoplay=1&loop=1&mute=1&controls=0&playlist=YGp0AyiIL9E&modestbranding=1&rel=0"
+                       frameborder="0" allowfullscreen>
+               </iframe>
+               <div class="card-slate">
+                 <h5>Interact with fluids</h5>
+               </div>
+             </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/7IlG9I-3Zqo?autoplay=1&loop=1&mute=1&controls=0&playlist=7IlG9I-3Zqo&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Grasp cloth</h5>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/-Es6mbJ-PcA?autoplay=1&loop=1&mute=1&controls=0&playlist=-Es6mbJ-PcA&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Grasp rigid objects</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://www.youtube-nocookie.com/embed/OHLpZxie2tA?autoplay=1&loop=1&mute=1&controls=0&playlist=OHLpZxie2tA&modestbranding=1&rel=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Transitions</h5>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Team Section -->
+    <section class="team-section">
+      <div class="team-container">
+        <!-- Current Team -->
+        <div class="team-category">
+          <h4 class="team-title">The BEHAVIOR Team</h4>
+          <div class="team-grid">
+            <div class="team-member">
+              <a href="https://ai.stanford.edu/~zharu/" class="team-avatar">
+                <img alt="Ruohan Zhang" src="assets/people/ruohan_zhang_photo.jpeg">
+              </a>
+              <small class="team-name">Ruohan Zhang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://mxu34.github.io/" class="team-avatar">
+                <img alt="Mengdi Xu" src="assets/people/mengdi_xu.jpg">
+              </a>
+              <small class="team-name">Mengdi Xu</small>
+            </div>
+            <div class="team-member">
+              <a href="https://qingh097.github.io/" class="team-avatar">
+                <img alt="Raven Huang" src="assets/people/raven_huang.jpeg">
+              </a>
+              <small class="team-name">Raven Huang</small>
+            </div>
+            <div class="team-member">
+              <a href="http://jowo.me" class="team-avatar">
+                <img alt="Josiah Wong" src="assets/people/josiah_wong.jpg">
+              </a>
+              <small class="team-name">Josiah Wong</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.cemgokmen.com/" class="team-avatar">
+                <img alt="Cem Gokmen" src="assets/people/cemgokmen.jpg">
+              </a>
+              <small class="team-name">Cem Gokmen</small>
+            </div>
+            <div class="team-member">
+              <a href="https://hang-yin.github.io/portfolio/" class="team-avatar">
+                <img alt="Hang Yin" src="assets/people/hang_yin.png">
+              </a>
+              <small class="team-name">Hang Yin</small>
+            </div>
+            <div class="team-member">
+              <a href="http://wensi-ai.github.io/" class="team-avatar">
+                <img alt="Wensi Ai" src="assets/people/wensi_ai.jpg">
+              </a>
+              <small class="team-name">Wensi Ai</small>
+            </div>
+            <div class="team-member">
+              <a href="https://robertomartinmartin.com/" class="team-avatar">
+                <img alt="Roberto Martín-Martín" src="assets/people/roberto_martinmartin.jpg">
+              </a>
+              <small class="team-name">Roberto Martín-Martín</small>
+            </div>
+            <div class="team-member">
+              <a href="http://cvgl.stanford.edu/silvio/" class="team-avatar">
+                <img alt="Silvio Savarese" src="assets/people/silvio_savarese.jpg">
+              </a>
+              <small class="team-name">Silvio Savarese</small>
+            </div>
+            <div class="team-member">
+              <a href="https://web.stanford.edu/~hyo/Home.html" class="team-avatar">
+                <img alt="Hyowon Gweon" src="assets/people/hyowon_gweon.jpg">
+              </a>
+              <small class="team-name">Hyowon Gweon</small>
+            </div>
+            <div class="team-member">
+              <a href="https://ckllab.stanford.edu/c-karen-liu" class="team-avatar">
+                <img alt="Karen Liu" src="assets/people/Karen.png">
+              </a>
+              <small class="team-name">Karen Liu</small>
+            </div>
+            <div class="team-member">
+              <a href="https://jiajunwu.com/" class="team-avatar">
+                <img alt="Jiajun Wu" src="assets/people/jiajun_wu.jpg">
+              </a>
+              <small class="team-name">Jiajun Wu</small>
+            </div>
+            <div class="team-member">
+              <a href="https://engineering.stanford.edu/people/fei-fei-li" class="team-avatar">
+                <img alt="Li Fei-Fei" src="assets/people/li_fei_fei.jpg">
+              </a>
+              <small class="team-name">Li Fei-Fei</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Alumni -->
+        <div class="team-category">
+          <h4 class="team-title">Alumni</h4>
+          <div class="team-grid">
+            <div class="team-member">
+              <a href="http://chengshuli.me" class="team-avatar">
+                <img alt="Chengshu (Eric) Li" src="assets/people/chengshu.jpg">
+              </a>
+              <small class="team-name">Chengshu (Eric) Li</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/sanjana-srivastava5/" class="team-avatar">
+                <img alt="Sanjana Srivastava" src="assets/people/sanjana.jpg">
+              </a>
+              <small class="team-name">Sanjana Srivastava</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.chenwangjeremy.net/" class="team-avatar">
+                <img alt="Chen Wang" src="assets/people/chen_wang.jpeg">
+              </a>
+              <small class="team-name">Chen Wang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.gabrael.io/" class="team-avatar">
+                <img alt="Gabrael Levine" src="assets/people/gabrael.jpg">
+              </a>
+              <small class="team-name">Gabrael Levine</small>
+            </div>
+            <div class="team-member">
+              <a href="https://github.com/mjlbach/" class="team-avatar">
+                <img alt="Michael Lingelbach" src="assets/people/michael_lingelbach.jpg">
+              </a>
+              <small class="team-name">Michael Lingelbach</small>
+            </div>
+            <div class="team-member">
+              <a href="https://sujaygarlanka.com/" class="team-avatar">
+                <img alt="Sujay Garlanka" src="assets/people/sujay_garlanka.jpeg">
+              </a>
+              <small class="team-name">Sujay Garlanka</small>
+            </div>
+            <div class="team-member">
+              <a href="https://web.stanford.edu/~benjm/" class="team-avatar">
+                <img alt="Benjamin Martinez" src="assets/people/benjamin_martinez.png">
+              </a>
+              <small class="team-name">Benjamin Martinez</small>
+            </div>
+            <div class="team-member">
+              <a href="https://misoshiruseijin.github.io/" class="team-avatar">
+                <img alt="Ayano Hiranaka" src="assets/people/ayano_hiranaka.jpg">
+              </a>
+              <small class="team-name">Ayano Hiranaka</small>
+            </div>
+            <div class="team-member">
+              <a href="https://mj-hwang.github.io/" class="team-avatar">
+                <img alt="Minjune Hwang" src="assets/people/minjune.jpg">
+              </a>
+              <small class="team-name">Minjune Hwang</small>
+            </div>
+            <div class="team-member">
+              <a href="http://web.stanford.edu/~jksun/" class="team-avatar">
+                <img alt="Jiankai Sun" src="assets/people/jiankai.jpg">
+              </a>
+              <small class="team-name">Jiankai Sun</small>
+            </div>
+            <div class="team-member">
+              <a href="https://monaanvari.github.io/portfolio/" class="team-avatar">
+                <img alt="Mona Anvari" src="assets/people/mona.jpg">
+              </a>
+              <small class="team-name">Mona Anvari</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/arman-aydin-915035185/?trk=public_profile_like_view_actor-name" class="team-avatar">
+                <img alt="Arman Aydin" src="assets/people/arman.jpg">
+              </a>
+              <small class="team-name">Arman Aydin</small>
+            </div>
+            <div class="team-member">
+              <a href="http://emilyjin.me/" class="team-avatar">
+                <img alt="Emily Jin" src="assets/people/emily_jin.png">
+              </a>
+              <small class="team-name">Emily Jin</small>
+            </div>
+            <div class="team-member">
+              <a href="https://github.com/manasi-sharma" class="team-avatar">
+                <img alt="Manasi Sharma" src="assets/people/manasi.jpg">
+              </a>
+              <small class="team-name">Manasi Sharma</small>
+            </div>
+            <div class="team-member">
+              <a href="https://dhruvabansal.com/" class="team-avatar">
+                <img alt="Dhruva Bansal" src="assets/people/dhruva.jpg">
+              </a>
+              <small class="team-name">Dhruva Bansal</small>
+            </div>
+            <div class="team-member">
+              <a href="#" class="team-avatar">
+                <img alt="Samuel Hunter" src="assets/people/samuel.jpg">
+              </a>
+              <small class="team-name">Samuel Hunter</small>
+            </div>
+            <div class="team-member">
+              <a href="https://kykim0.github.io/" class="team-avatar">
+                <img alt="Kyu-Young Kim" src="assets/people/kyuyoung.jpg">
+              </a>
+              <small class="team-name">Kyu-Young Kim</small>
+            </div>
+            <div class="team-member">
+              <a href="https://icme.stanford.edu/people/alan-lou" class="team-avatar">
+                <img alt="Alan Lou" src="assets/people/alan_lou.jpg">
+              </a>
+              <small class="team-name">Alan Lou</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/caleb-matthews/" class="team-avatar">
+                <img alt="Caleb Matthews" src="assets/people/caleb_matthews.jpg">
+              </a>
+              <small class="team-name">Caleb Matthews</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/ivillare/" class="team-avatar">
+                <img alt="Ivan Villa-Renteria" src="assets/people/ivan_villa_renteria.jpg">
+              </a>
+              <small class="team-name">Ivan Villa-Renteria</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/jerry-tang-b37026162/" class="team-avatar">
+                <img alt="Jerry Tang" src="assets/people/jerry_tang.jpg">
+              </a>
+              <small class="team-name">Jerry Tang</small>
+            </div>
+            <div class="team-member">
+              <a href="#" class="team-avatar">
+                <img alt="Claire Tang" src="assets/people/claire_tang.png">
+              </a>
+              <small class="team-name">Claire Tang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://fxia22.github.io" class="team-avatar">
+                <img alt="Fei Xia" src="assets/people/fei_xia.png">
+              </a>
+              <small class="team-name">Fei Xia</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.linkedin.com/in/kent-vainio-4749b0145/?originalSubdomain=ch" class="team-avatar">
+                <img alt="Kent Vainio" src="assets/people/kent_vainio.jpg">
+              </a>
+              <small class="team-name">Kent Vainio</small>
+            </div>
+            <div class="team-member">
+              <a href="https://profiles.stanford.edu/zheng-lian" class="team-avatar">
+                <img alt="Zheng Lian" src="assets/people/zheng_lian.jpg">
+              </a>
+              <small class="team-name">Zheng Lian</small>
+            </div>
+            <div class="team-member">
+              <a href="https://cs.stanford.edu/~shyamal" class="team-avatar">
+                <img alt="Shyamal Buch" src="assets/people/shyamal.jpg">
+              </a>
+              <small class="team-name">Shyamal Buch</small>
+            </div>
+            <div class="team-member">
+              <a href="https://yunzhuli.github.io/" class="team-avatar">
+                <img alt="Yunzhu Li" src="assets/people/yunzhu.jpeg">
+              </a>
+              <small class="team-name">Yunzhu Li</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+{% endblock %}
+
+{% block content %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function updateHeaderState() {
+  const header = document.querySelector('.md-header');
+  const tabs = document.querySelector('.md-tabs');
+  
+  if (!header) return;
+  
+  if (window.scrollY > 100) {
+    header.classList.add('scrolled');
+    if (tabs) tabs.classList.add('scrolled');
+  } else {
+    header.classList.remove('scrolled');
+    if (tabs) tabs.classList.remove('scrolled');
+  }
+}
+
+// Event listeners for scroll state management
+document.addEventListener('DOMContentLoaded', updateHeaderState);
+window.addEventListener('scroll', updateHeaderState);
+window.addEventListener('resize', updateHeaderState);
+window.addEventListener('load', updateHeaderState);
+</script>
+{% endblock %}
