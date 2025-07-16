@@ -11,7 +11,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.macros import gm
+from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.utils.config_utils import TorchEncoder
@@ -830,6 +830,12 @@ class DataPlaybackWrapper(DataWrapper):
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
+        
+        # Stabilize skipped objects
+        # we can do this here because we know that whatever's skipped during load state must have been asleep during data collection
+        # which means they're not moving and we can safely keep them still
+        with macros.unlocked():
+            macros.utils.registry_utils.STABILIZE_SKIPPED_OBJECTS = True
 
         # Store scene file so we can restore the data upon each episode reset
         self.input_hdf5 = h5py.File(input_path, "r")
