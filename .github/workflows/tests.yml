@@ -4,7 +4,6 @@ on:
   pull_request: 
   push: 
     branches: 
-      - og-develop
       - main
 
 concurrency:
@@ -50,7 +49,11 @@ jobs:
         with:
           submodules: true
 
-      - name: Install
+      - name: Install BDDL
+        run: pip install -e .
+        working-directory: ${{ github.workspace }}/bddl
+
+      - name: Install OmniGibson
         run: pip install -e .[dev,primitives] --no-build-isolation
 
       - name: Print env

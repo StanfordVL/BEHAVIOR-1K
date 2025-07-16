@@ -239,9 +239,11 @@ class XFormPrim(BasePrim):
             xformable_prim = lazy.usdrt.Rt.Xformable(
                 lazy.isaacsim.core.utils.prims.get_prim_at_path(self.prim_path, fabric=True)
             )
-            # TODO: This is a temporary workaround, investigate why this happens for macro physical particles. 
+            # TODO: This is a temporary workaround, investigate why this happens for macro physical particles.
             if xformable_prim.HasWorldXform():
-                logger.warning("Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD.")
+                logger.warning(
+                    "Fabric's world pose is set for a non-rigid prim which is unexpected. Please report this. As a fallback, we will clear the world xform and set the local xform from USD."
+                )
                 xformable_prim.ClearWorldXform()
             xformable_prim.SetLocalXformFromUsd()
 

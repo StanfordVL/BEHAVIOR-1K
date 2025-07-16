@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.8.4
+    hooks:
+      # Run the linter.
+      - id: ruff
+        files: ^OmniGibson/
+      # Run the formatter.
+      - id: ruff-format
+        files: ^OmniGibson/

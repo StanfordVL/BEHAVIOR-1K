@@ -441,7 +441,9 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
         # Try each sampled position in the AABB.
         for j, (axis, is_top, start_point) in enumerate(samples):
             # Compute the ray's destination using the sampling & AABB information.
-            end_point = compute_ray_destination(axis, is_top, start_point, -half_extent, half_extent)
+            end_point = compute_ray_destination(
+                axis, is_top, start_point, -half_extent_with_offset, half_extent_with_offset
+            )
             start_points[i][j] = start_point
             end_points[i][j] = end_point
 
