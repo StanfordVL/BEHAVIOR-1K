@@ -74,8 +74,7 @@ setup(
         "learning": [
             "dm_tree",
             "hydra-core",
-            # "mediapy",
-            # conda install -c conda-forge ffmpeg=4.2.2 needed to get mediapy working
+            "lerobot @ git+https://github.com/huggingface/lerobot@main",
         ]
     },
     tests_require=[],
