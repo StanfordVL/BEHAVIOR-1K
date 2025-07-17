@@ -2,8 +2,27 @@ import numpy as np
 from collections import OrderedDict
 
 
-# TODO: Add camera intrinsics
-CAMERA_INTRINSTICS = {}
+ROBOT_CAMERA_NAMES = {
+    "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
+    "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
+    "head": "robot_r1::robot_r1:zed_link:Camera:0",
+}
+
+
+CAMERA_INTRINSTICS = {
+    "head": {
+        720: np.array([[306., 0., 360.], [0., 306., 360.], [0., 0., 1.]]),
+        180: np.array([[76.5, 0., 90.], [0., 76.5, 90.], [0., 0., 1.]]),
+    },
+    "left_wrist": {
+        480: np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]]),
+        120: np.array([[97.1660, 0., 60.], [0., 97.1660, 60.], [0., 0., 1.]]),
+    },
+    "right_wrist": {
+        480: np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]]),
+        120: np.array([[97.1660, 0., 60.], [0., 97.1660, 60.], [0., 0., 1.]]),
+    }
+}
 
 
 # Action indices

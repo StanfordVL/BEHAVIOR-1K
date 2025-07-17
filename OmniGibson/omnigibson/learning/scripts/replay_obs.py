@@ -8,7 +8,7 @@ import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES, ROBOT_CAMERA_NAMES
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer, 
     process_fused_point_cloud, 
@@ -29,13 +29,6 @@ log.setLevel(20)
 gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
-
-ROBOT_CAMERA_NAMES = {
-    "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
-    "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
-    "head": "robot_r1::robot_r1:zed_link:Camera:0",
-}
-
 
 FLUSH_EVERY_N_STEPS = 500
 
@@ -119,8 +112,8 @@ def replay_hdf5_file(
     demo_id = int(demo_name.split("_")[-1]) # 3 digit demo id
 
     # Define resolution for consistency
-    WRIST_RESOLUTION = (480, 480)
-    HEAD_RESOLUTION = (720, 720)
+    WRIST_RESOLUTION = (120, 120)
+    HEAD_RESOLUTION = (180, 180)
 
     # This flag is needed to run data playback wrapper
     gm.ENABLE_TRANSITION_RULES = False
