@@ -6,6 +6,12 @@ import numpy as np
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 
+TASK_INDICES = {
+    0: "turning_on_radio",
+    2: "can_meat",
+}
+
+
 class BehaviorLeRobotDataset(LeRobotDataset):
     def get_episodes_file_paths(self) -> list[str]:
         """
@@ -25,12 +31,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
 
 
 def generate_task_json(data_dir: str) -> int:
-    assert os.path.exists(f"{data_dir}/meta/episodes"), "Episode metadata directory does not exist!"
-    # Count the number of tasks
-    num_tasks = len(os.listdir(f"{data_dir}/meta/episodes"))
+    num_tasks = len(TASK_INDICES)
+    
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
-        for task_name in sorted(os.listdir(f"{data_dir}/meta/episodes")):
-            json.dump({"task_index": int(task_name.split("-")[-1]), "task": task_name}, f)
+        for task_index, task_name in TASK_INDICES.items():
+            json.dump({"task_index": task_index, "task": task_name}, f)
             f.write("\n")
     return num_tasks
 
@@ -45,19 +50,20 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
     with open(f"{data_dir}/meta/episodes.jsonl", "w") as out_f:
         with open(f"{data_dir}/meta/episodes_stats.jsonl", "w") as out_stats_f:
             for task_info in task_json:
+                task_index = task_info["task_index"]
                 task_name = task_info["task"]
-                for episode_name in sorted(os.listdir(f"{data_dir}/meta/episodes/{task_name}")):
-                    with open(f"{data_dir}/meta/episodes/{task_name}/{episode_name}", "r") as f:
+                for episode_name in sorted(os.listdir(f"{data_dir}/meta/episodes/task-{task_index:04d}")):
+                    with open(f"{data_dir}/meta/episodes/task-{task_index:04d}/{episode_name}", "r") as f:
                         episode_info = json.load(f)
                         episode_index = int(episode_name.split(".")[0].split("_")[-1])
                         episode_json = {
                             "episode_index": episode_index,
-                            "tasks": task_name,
+                            "tasks": [task_name],
                             "length": episode_info["num_samples"]
                         }
                         episode_stats_json = {
                             "episode_index": episode_index,
-                            "tasks": task_name,
+                            "tasks": [task_name],
                             "stats": {
                                 "obs": {
                                     "min": np.array([episode_info["num_samples"]]).tolist(),

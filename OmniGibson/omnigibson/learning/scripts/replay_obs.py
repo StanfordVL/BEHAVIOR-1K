@@ -18,6 +18,7 @@ from omnigibson.learning.utils.obs_utils import (
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.learning.utils.lerobot_utils import TASK_INDICES
 from typing import Dict
 
 
@@ -442,7 +443,8 @@ def main():
 
     args = parser.parse_args()
 
-    task_id = 2
+    task_indices_to_names = {v: k for k, v in TASK_INDICES.items()}
+    task_id = task_indices_to_names[os.path.basename(os.path.dirname(args.file))]
 
     # Process each file
     if not os.path.exists(args.file):
