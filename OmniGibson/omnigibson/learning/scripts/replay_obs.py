@@ -1,9 +1,10 @@
 import argparse
 import h5py
 import json
+import numpy as np
 import omnigibson as og
 import os
-import sys
+import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
@@ -17,6 +18,8 @@ from omnigibson.learning.utils.obs_utils import (
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
+from typing import Dict
+
 
 # Create module logger
 log = create_module_logger(module_name="omnigibson.learning.scripts.replay_obs")
@@ -27,11 +30,11 @@ gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
-ROBOT_CAMERA_NAMES = [
-    "robot_r1::robot_r1:left_realsense_link:Camera:0",
-    "robot_r1::robot_r1:right_realsense_link:Camera:0",
-    "robot_r1::robot_r1:zed_link:Camera:0",
-]
+ROBOT_CAMERA_NAMES = {
+    "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
+    "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
+    "head": "robot_r1::robot_r1:zed_link:Camera:0",
+}
 
 
 FLUSH_EVERY_N_STEPS = 500
@@ -39,7 +42,7 @@ FLUSH_EVERY_N_STEPS = 500
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
         robot = self.env.robots[0]
-        for camera_name in ROBOT_CAMERA_NAMES:
+        for camera_name in ROBOT_CAMERA_NAMES.values():
             # move seg maps to cpu
             obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
             obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
@@ -63,17 +66,16 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         log.info(f"Postprocessing trajectory group {traj_grp.name}")
         traj_grp.attrs["robot_type"] = "R1Pro"
         # Add the list of task obs keys as attrs (this is list of strs)
-        traj_grp["obs"].attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
-        traj_grp["obs"].attrs["task_relevant_objs"] = [
+        traj_grp.attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
+        traj_grp.attrs["task_relevant_objs"] = [
             obj.unwrapped.name for obj in self.env.task.object_scope.values() if obj.unwrapped.name != "robot_r1"
         ]
         # add instance mapping keys as attrs
-        traj_grp["obs"].attrs["ins_id_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
+        traj_grp.attrs["ins_id_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
         
-        for name, sensor in self.env.robots[0].sensors.items():
-            if f"robot_r1::{name}" in ROBOT_CAMERA_NAMES:
-                # add camera intrinsics as attrs
-                traj_grp["obs"].attrs[f"robot_r1::{name}::intrinsics"] = sensor.intrinsic_matrix
+        camera_names = set(ROBOT_CAMERA_NAMES.values())
+        for name in self.env.robots[0].sensors:
+            if f"robot_r1::{name}" in camera_names:
                 # add unique instance ids as attrs
                 unique_ins_ids = set()
                 # batch process to avoid memory issues
@@ -81,13 +83,14 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
                     unique_ins_ids.update(th.unique(
                         th.from_numpy(traj_grp["obs"][f"robot_r1::{name}::seg_instance_id"][i:i+FLUSH_EVERY_N_STEPS])
                     ).to(th.uint32).tolist())
-                traj_grp["obs"].attrs[f"robot_r1::{name}::unique_ins_ids"] = list(unique_ins_ids)
+                traj_grp.attrs[f"robot_r1::{name}::unique_ins_ids"] = list(unique_ins_ids)
         log.info(f"Postprocessing trajectory group {traj_grp.name} done")
 
 
 def replay_hdf5_file(
     hdf_input_path: str, 
-    camera_names: list=ROBOT_CAMERA_NAMES,
+    task_id: int,
+    camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
     generate_rgbd: bool=False, 
     generate_seg: bool=False,   
     generate_bbox: bool=False,
@@ -97,8 +100,8 @@ def replay_hdf5_file(
     Replays a single HDF5 file and saves videos to a new folder
 
     Args:
-        hdf_input_path: Path to the HDF5 file to replay
-        camera_names: List of camera names to process 
+        hdf_input_path: Path to the HDF5 raw data file to replay
+        camera_names: Dict of camera names to process 
         generate_rgbd: If True, generates RGBD videos from the replayed data
         generate_seg: If True, generates segmentation data from the replayed data
         generate_bbox: If True, ge nerates bounding box data from the replayed data
@@ -107,12 +110,13 @@ def replay_hdf5_file(
     if generate_bbox:
         assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
     # get processed folder path
-    task_folder = os.path.dirname(os.path.dirname(hdf_input_path))
-    task_name = os.path.basename(task_folder)
-    replay_dir = os.path.join(task_folder, "replayed")
+    data_folder = os.path.dirname(os.path.dirname(os.path.dirname(hdf_input_path)))
+    task_name = os.path.basename(os.path.dirname(hdf_input_path))
+    replay_dir = os.path.join(data_folder, "replayed")
     os.makedirs(replay_dir, exist_ok=True)
     base_name = os.path.basename(hdf_input_path)
     demo_name = os.path.splitext(base_name)[0]
+    demo_id = int(demo_name.split("_")[-1]) # 3 digit demo id
 
     # Define resolution for consistency
     WRIST_RESOLUTION = (480, 480)
@@ -183,16 +187,16 @@ def replay_hdf5_file(
 
         # now store obs as videos
         video_writers = []            
-        for camera_name in camera_names:
+        for camera_id, camera_name in camera_names.items():
             resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
             if generate_rgbd:
-                rgb_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "rgb", demo_name, f"demo_{episode_id}")
-                depth_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "depth", demo_name, f"demo_{episode_id}")
+                rgb_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}")
+                depth_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.depth.{camera_id}")
                 os.makedirs(rgb_dir, exist_ok=True)
                 os.makedirs(depth_dir, exist_ok=True)
                 # RGB video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{rgb_dir}/{camera_name}::rgb.mp4".replace(":", "+"),
+                    fpath=f"{rgb_dir}/episode_{task_id:04d}{demo_id:03d}.mp4",
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p",
@@ -207,7 +211,7 @@ def replay_hdf5_file(
                 log.info(f"Saved rgb video for {camera_name}")
                 # Depth video writer
                 video_writers.append(create_video_writer(
-                    fpath=f"{depth_dir}/{camera_name}::depth_linear.mp4".replace(":", "+"),
+                    fpath=f"{depth_dir}/episode_{task_id:04d}{demo_id:03d}.mp4",
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p10le",    
@@ -221,17 +225,17 @@ def replay_hdf5_file(
                 )
                 log.info(f"Saved depth video for {camera_name}")
             if generate_seg:
-                seg_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "seg", demo_name, f"demo_{episode_id}")
+                seg_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.seg_instance_id.{camera_id}")
                 os.makedirs(seg_dir, exist_ok=True)
                 video_writers.append(create_video_writer(
-                    fpath=f"{seg_dir}/{camera_name}::seg_instance_id.mp4".replace(":", "+"),
+                    fpath=f"{seg_dir}/episode_{task_id:04d}{demo_id:03d}.mp4",
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p", 
                     stream_options={"x265-params": "log-level=none"},
                 ))
                 ins_id_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][:]
-                ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs[f"{camera_name}::unique_ins_ids"]
+                ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}"].attrs[f"{camera_name}::unique_ins_ids"]
                 write_video(
                     ins_id_seg_original, 
                     video_writer=video_writers[-1], 
@@ -242,20 +246,20 @@ def replay_hdf5_file(
                 log.info(f"Saved seg video for {camera_name}")
             if generate_bbox:
                 # We only generate bbox for head camera
-                if "zed" in camera_name:
-                    bbox_dir = os.path.join(os.path.dirname(os.path.dirname(hdf_input_path)), "bbox", demo_name, f"demo_{episode_id}")
+                if "zed" in camera_name: 
+                    bbox_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.bbox.{camera_id}")
                     os.makedirs(bbox_dir, exist_ok=True)
                     video_writers.append(create_video_writer(
-                        fpath=f"{bbox_dir}/{camera_name}::bbox.mp4".replace(":", "+"),
+                        fpath=f"{bbox_dir}/episode_{task_id:04d}{demo_id:03d}.mp4",
                         resolution=resolution,
                         codec_name="libx265",
                         pix_fmt="yuv420p",
                         stream_options={"x265-params": "log-level=none"},
                     ))
-                    task_relevant_objs = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["task_relevant_objs"]
-                    instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs["ins_id_mapping"])
+                    task_relevant_objs = env.hdf5_file[f"data/demo_{episode_id}"].attrs["task_relevant_objs"]
+                    instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                     instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
-                    unique_ins_ids = env.hdf5_file[f"data/demo_{episode_id}/obs"].attrs[f"{camera_name}::unique_ins_ids"]
+                    unique_ins_ids = env.hdf5_file[f"data/demo_{episode_id}"].attrs[f"{camera_name}::unique_ins_ids"]
                     for i in range(0, env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"].shape[0], flush_every_n_steps):
                         instance_seg, instance_mapping = instance_id_to_instance(
                             th.from_numpy(env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"][i:i+flush_every_n_steps]), 
@@ -289,70 +293,69 @@ def replay_hdf5_file(
 
 
 def generate_low_dim_data(
-    task_folder: str,
+    data_folder: str,
+    task_id: int,
     base_name: str,
-    camera_names: list=ROBOT_CAMERA_NAMES,
+    camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
 ):
     """
-    Post-process the replayed data.
+    Post-process the replayed low-dimensional data (proprio, action, task-info, etc) to parquet.
     """
-    os.makedirs(f"{task_folder}/low_dim", exist_ok=True)
-    with h5py.File(f"{task_folder}/replayed/{base_name}", "r") as replayed_f:
-        # First, construct low dim observations:
-        with h5py.File(f"{task_folder}/low_dim/{base_name}", "w") as low_dim_f:
-            # create data group
-            low_dim_f.create_group("data")
-            # copy attrs
+    os.makedirs(f"{data_folder}/data/task-{task_id:04d}", exist_ok=True)
+    os.makedirs(f"{data_folder}/meta/episodes/task-{task_id:04d}", exist_ok=True)
+    demo_id = int(base_name.split("_")[-1].split(".")[0]) # 3 digit demo id
+    with h5py.File(f"{data_folder}/replayed/{base_name}", "r") as replayed_f:
+        for episode_id in range(replayed_f["data"].attrs["n_episodes"]):
+            actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
+            proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
+            task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32) 
+            # check if the data is valid
+            assert actions.shape[0] == proprio.shape[0] == task_info.shape[0], \
+                "Action, proprio, and task-info must have the same length"
+            T = len(actions)
+            
+            data = {
+                "index": np.arange(T, dtype=np.int64),
+                "episode_index": np.zeros(T, dtype=np.int64) + episode_id,
+                "task_index": np.zeros(T, dtype=np.int64),
+                "timestamp": np.arange(T, dtype=np.float64) / 30.0,  # 30 fps
+                "observation.state": list(proprio),
+                "action": list(actions),
+                "observation.task_info": list(task_info),
+            }
+            for camera_id, camera_name in camera_names.items():
+                data.update({
+                    f"observation.camera_pose.{camera_id}": \
+                        list(np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"][f"{camera_name}::pose"], dtype=np.float32)),
+                })
+            df = pd.DataFrame(data)
+            df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{task_id:04d}{demo_id:03d}.parquet", index=False)
+            
+        
+            task_metadata = {}
             for attr_name in replayed_f["data"].attrs:
-                low_dim_f["data"].attrs[attr_name] = replayed_f["data"].attrs[attr_name]
-            # copy datasets
-            for demo_name in replayed_f["data"]:
-                # create demo group
-                low_dim_f["data"].create_group(demo_name)
-                # copy all attrs from replayed_f to low_dim_f
-                for attr_name in replayed_f["data"][demo_name].attrs:
-                    low_dim_f["data"][demo_name].attrs[attr_name] = replayed_f["data"][demo_name].attrs[attr_name]
-                # copy action from replayed_f to low_dim_f
-                low_dim_f.create_dataset(
-                    f"data/{demo_name}/action", 
-                    data=replayed_f["data"][demo_name]["action"],
-                    compression="gzip",
-                    compression_opts=9,
-                    shuffle=True,
-                )
-                # create obs group
-                low_dim_f["data"][demo_name].create_group("obs")
-                # copy low dim obs:
-                robot_name = camera_names[0].split("::")[0]
-                low_dim_f.create_dataset(
-                    f"data/{demo_name}/obs/task::low_dim", 
-                    data=replayed_f["data"][demo_name]["obs"]["task::low_dim"],
-                    compression="gzip",
-                    compression_opts=9,
-                    shuffle=True,
-                )
-                low_dim_f.create_dataset(
-                    f"data/{demo_name}/obs/{robot_name}::proprio", 
-                    data=replayed_f["data"][demo_name]["obs"][f"{robot_name}::proprio"],
-                    compression="gzip",
-                    compression_opts=9,
-                    shuffle=True,
-                )
-                for camera_name in camera_names:
-                    low_dim_f.create_dataset(
-                        f"data/{demo_name}/obs/{camera_name}::pose", 
-                        data=replayed_f["data"][demo_name]["obs"][f"{camera_name}::pose"],
-                        compression="gzip",
-                        compression_opts=9,
-                        shuffle=True,
-                    )
-    log.info(f"Successfully processed {task_folder}/replayed/{base_name}.hdf5")
+                if isinstance(replayed_f["data"].attrs[attr_name], np.int64):
+                    task_metadata[attr_name] = int(replayed_f["data"].attrs[attr_name])
+                elif isinstance(replayed_f["data"].attrs[attr_name], np.ndarray):
+                    task_metadata[attr_name] = replayed_f["data"].attrs[attr_name].tolist()
+                else:
+                    task_metadata[attr_name] = replayed_f["data"].attrs[attr_name]
+            for attr_name in replayed_f["data"][f"demo_{episode_id}"].attrs:
+                if isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.int64):
+                    task_metadata[attr_name] = int(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name])
+                elif isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.ndarray):
+                    task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name].tolist()
+                else:
+                    task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name]
+            with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{task_id:04d}{demo_id:03d}.json", "w") as f:
+                json.dump(task_metadata, f, indent=4)
+    log.info(f"Successfully processed {data_folder}/replayed/{base_name}")
 
 
 def rgbd_to_pcd(
     task_folder: str, 
     base_name: str, 
-    robot_camera_names: list=ROBOT_CAMERA_NAMES,
+    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
     pcd_num_points: int=1e5,
     batch_size: int=500,
     use_fps: bool=False,
@@ -362,7 +365,7 @@ def rgbd_to_pcd(
     Args:
         task_folder (str): Path to the task folder containing RGBD data.
         base_name (str): Base name of the HDF5 file to process (without file extension).
-        robot_camera_names (list): List of camera names to process.
+        robot_camera_names (dict): Dict of camera names to process.
         pcd_num_points (int): Number of points to sample from the point cloud.
         batch_size (int): Number of frames to process in each batch.
     """
@@ -393,7 +396,7 @@ def rgbd_to_pcd(
                     obs = dict() # to store rgbd and pass into process_fused_point_cloud
                     # get all camera intrinsics
                     camera_intrinsics = {}
-                    for robot_camera_name in robot_camera_names:
+                    for robot_camera_name in robot_camera_names.values():
                         camera_intrinsics[robot_camera_name] = th.from_numpy(
                             data.attrs[f"{robot_camera_name}::intrinsics"][:]
                             )
@@ -439,13 +442,16 @@ def main():
 
     args = parser.parse_args()
 
+    task_id = 2
+
     # Process each file
     if not os.path.exists(args.file):
-        log.info(f"Error: File {args.file} does not exist", file=sys.stderr)
+        log.info(f"Error: File {args.file} does not exist")
         return
     if args.rgbd or args.seg or args.bbox:
         replay_hdf5_file(
             args.file, 
+            task_id=task_id,
             generate_rgbd=args.rgbd, 
             generate_seg=args.seg,
             generate_bbox=args.bbox,
@@ -454,7 +460,8 @@ def main():
 
     if args.low_dim:
         generate_low_dim_data(
-            task_folder=os.path.dirname(os.path.dirname(args.file)),
+            data_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
+            task_id=task_id,
             base_name=os.path.basename(args.file),
         )
     if args.pcd:

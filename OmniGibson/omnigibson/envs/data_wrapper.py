@@ -951,7 +951,7 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If record, record initial observations
         if record_data:
-            self.current_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations)
+            self.current_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations + 10)
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
@@ -1041,7 +1041,7 @@ class DataPlaybackWrapper(DataWrapper):
             traj_dsets[k] = dict()
         data_grp = self.hdf5_file.require_group("data") if data_grp is None else data_grp
         traj_grp = data_grp.create_group(traj_grp_name)
-        traj_grp.attrs["num_samples"] = num_samples + 1 # +1 for the initial observation
+        traj_grp.attrs["num_samples"] = num_samples
 
         for k, dat in step_data.items():
             if k in nested_keys:
@@ -1049,7 +1049,7 @@ class DataPlaybackWrapper(DataWrapper):
                 for mod, step_mod_data in dat.items():
                    traj_dsets[k][mod] = obs_grp.create_dataset(
                         mod, 
-                        shape=(num_samples + 1, *step_mod_data.shape), 
+                        shape=(num_samples, *step_mod_data.shape), 
                         dtype=step_mod_data.numpy().dtype, 
                         **self.compression,
                         chunks=(1, *step_mod_data.shape),
@@ -1080,12 +1080,15 @@ class DataPlaybackWrapper(DataWrapper):
             for key, dat in self.traj_dsets.items():
                 if isinstance(dat, dict):
                     for mod, dset in dat.items():
+                        obs_data_length = data_length_to_flush if self.current_episode_step_count < dset.shape[0] else data_length_to_flush - 1
                         dset[self.current_episode_step_count-data_length_to_flush+1:self.current_episode_step_count+1] = th.stack([
-                            self.current_traj_history[i][key][mod] for i in range(len(self.current_traj_history))
-                        ], dim=0)   
+                            self.current_traj_history[i][key][mod] for i in range(obs_data_length)
+                        ], dim=0)
+                        if self.current_episode_step_count == 0:
+                            dset[0] = self.current_traj_history[0][key][mod]
                 else:
                     dat[self.current_episode_step_count-data_length_to_flush:self.current_episode_step_count] = th.stack([
-                        self.current_traj_history[i][key] for i in range(len(self.current_traj_history))
+                        self.current_traj_history[i][key] for i in range(data_length_to_flush)
                     ], dim=0)
         # Reset the current trajectory history
         self.current_traj_history = []

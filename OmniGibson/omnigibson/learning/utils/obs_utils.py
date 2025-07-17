@@ -197,23 +197,53 @@ class VideoLoader:
         self._frames = []
         self.batch_size = batch_size
         self.stride = stride
-        if not self.batch_size:
-            self._frames = list(self.get_frames())[0]
-            self.close()
+        self._frame_iter = None
+        self._done = False
 
-    def get_frames(self) -> Generator[th.Tensor, None, None]:
-        raise NotImplementedError("Subclasses must implement this method")
-    
     def __iter__(self) -> Generator[th.Tensor, None, None]:
-        return self.get_frames()
+        self.container.seek(0)
+        self._frame_iter = self.container.decode(self.stream)
+        self._frames = []
+        self._done = False
+        return self
+
+    def __next__(self):
+        if self._done:
+            raise StopIteration
+        try:
+            while True:
+                frame = next(self._frame_iter)  # may raise StopIteration
+                processed_frame = self._process_single_frame(frame)
+                self._frames.append(processed_frame)
+                if self.batch_size and len(self._frames) == self.batch_size:
+                    batch = th.cat(self._frames, dim=0)
+                    self._frames = self._frames[self.stride:]
+                    return batch
+        except StopIteration:
+            self._done = True
+            if len(self._frames) > 0:
+                batch = th.cat(self._frames, dim=0)
+                self._frames = []
+                return batch
+            else:
+                raise
+        except Exception as e:
+            self._done = True
+            raise e
+
+    def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+        raise NotImplementedError("Subclasses must implement this method")
 
     def reset(self):
         self.container.seek(0)
 
     @property
     def frames(self) -> th.Tensor:
-        assert not self.batch_size, "Frames are not loaded into memory. Use __iter__() to get frames."
-        return self._frames
+        """
+        Return all frames at once.
+        """
+        assert not self.batch_size, "Cannot get all frames at once when batch_size is set"
+        return next(iter(self))
 
     def close(self):
         self.container.close()
@@ -235,18 +265,9 @@ class RGBVideoLoader(VideoLoader):
             **kwargs
         )
 
-    def get_frames(self) -> Generator[th.Tensor, None, None]:
-        frames = []
-        for frame in self.container.decode(self.stream):
-            rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3), dtype=uint8
-            rgb = th.from_numpy(rgb).unsqueeze(0)  # (1, H, W, 3)
-            frames.append(rgb)
-            if self.batch_size and len(frames) == self.batch_size:
-                yield th.cat(frames, dim=0)
-                frames = frames[self.stride:]
-        # Yield remaining frames if any
-        if len(frames) > 0:
-            yield th.cat(frames, dim=0)
+    def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+        rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3), dtype=uint8
+        return th.from_numpy(rgb).unsqueeze(0)  # (1, H, W, 3)
 
 
 class DepthVideoLoader(VideoLoader):
@@ -268,30 +289,18 @@ class DepthVideoLoader(VideoLoader):
             **kwargs
         )
 
-    def get_frames(self) -> Generator[th.Tensor, None, None]:
-        frames = []
-        for frame in self.container.decode(self.stream):
-            # Decode Y (luma) channel only; YUV420 → grayscale image
-            frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
-            frames.append(th.from_numpy(frame_gray16).unsqueeze(0))  # (1, H, W)
-            
-            if self.batch_size and len(frames) == self.batch_size:
-                yield dequantize_depth(
-                    th.cat(frames, dim=0),
-                    min_depth=self.min_depth,
-                    max_depth=self.max_depth,
-                    shift=self.shift
-                )
-                frames = frames[self.stride:]
-        # Yield remaining frames if any
-        if len(frames) > 0:
-            yield dequantize_depth(
-                th.cat(frames, dim=0),
-                min_depth=self.min_depth,
-                max_depth=self.max_depth,
-                shift=self.shift
-            )
-
+    def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+        # Decode Y (luma) channel only; YUV420 → grayscale image
+        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
+        frame_gray16 = th.from_numpy(frame_gray16).unsqueeze(0)  # (1, H, W)
+        depth = dequantize_depth(
+            frame_gray16,
+            min_depth=self.min_depth,
+            max_depth=self.max_depth,
+            shift=self.shift
+        )
+        return depth
+        
 
 class SegVideoLoader(VideoLoader):
     def __init__(
@@ -313,23 +322,14 @@ class SegVideoLoader(VideoLoader):
             **kwargs
         )
 
-    def get_frames(self) -> Generator[th.Tensor, None, None]:
-        frames = []
-        for frame in self.container.decode(self.stream):
-            rgb = th.from_numpy(frame.to_ndarray(format="rgb24")).float().to(device="cuda")  # (H, W, 3)
-            rgb_flat = rgb.reshape(-1, 3)  # (H*W, 3)
-            # For each rgb pixel, find the index of the nearest color in the equidistant bins
-            distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
-            ids = th.argmin(distances, dim=-1)  # (H*W,)
-            ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
-            frames.append(ids.unsqueeze(0).cpu())  # (1, H, W)
-            
-            if self.batch_size and len(frames) == self.batch_size:
-                yield th.cat(frames, dim=0)
-                frames = frames[self.stride:]
-        # Yield remaining frames if any
-        if len(frames) > 0:
-            yield th.cat(frames, dim=0)
+    def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+        rgb = th.from_numpy(frame.to_ndarray(format="rgb24")).float().to(device="cuda")  # (H, W, 3)
+        rgb_flat = rgb.reshape(-1, 3)  # (H*W, 3)
+        # For each rgb pixel, find the index of the nearest color in the equidistant bins
+        distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
+        ids = th.argmin(distances, dim=-1)  # (H*W,)
+        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
+        return ids.unsqueeze(0).cpu()  # (1, H, W)
 
 
 OBS_LOADER_MAP = {

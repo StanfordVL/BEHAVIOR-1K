@@ -12,6 +12,10 @@ ROBOT_NAME = "robot_r1"
 RESOLUTION = [240, 240]  # Resolution for RGB and depth images
 
 
+CAMERA_INTRINSTICS = {}
+
+
+
 # Action indices
 ACTION_QPOS_INDICES = {
     "R1Pro": OrderedDict(
