@@ -1,8 +1,4 @@
----
-icon: octicons/rocket-16
----
-
-# :material-rocket: **Quickstart**
+# :octicons-rocket-16: **Quickstart**
 Let's quickly create an environment programmatically!
 
 **`OmniGibson`**'s workflow is straightforward: define the configuration of scene, object(s), robot(s), and task you'd like to load, and then instantiate our `Environment` class with that config.

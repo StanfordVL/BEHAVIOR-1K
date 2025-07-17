@@ -1,8 +1,4 @@
----
-icon: material/file-question
----
-
-# **Frequently Asked Questions**
+# :material-file-question: **Frequently Asked Questions**
 
 ## **What is the relationship between BEHAVIOR-1K and OmniGibson?**
 

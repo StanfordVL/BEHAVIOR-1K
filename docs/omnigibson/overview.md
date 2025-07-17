@@ -1,8 +1,4 @@
----
-icon: material/graph-outline
----
-
-# **Overview**
+# :material-graph-outline: **Overview**
 
 <figure markdown="span">
   ![OmniGibson architecture overview](../assets/architecture_overview.png){ width="100%" }

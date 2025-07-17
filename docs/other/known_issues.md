@@ -1,8 +1,4 @@
----
-icon: octicons/question-16
----
-
-# **Known Issues & Troubleshooting**
+# :octicons-question-16: **Known Issues & Troubleshooting**
 
 ## 🤔 **Known Issues**
 

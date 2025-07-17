@@ -1,8 +1,4 @@
----
-icon: material/magic-staff
----
-
-# 🪄 **Transition Rules**
+# :material-magic-staff: **Transition Rules**
 
 ## Description
 

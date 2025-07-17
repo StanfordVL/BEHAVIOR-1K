@@ -1,8 +1,4 @@
----
-icon: material/water-outline
----
-
-# 💧 **Systems**
+# :material-water-outline: **Systems**
 
 ## Description
 

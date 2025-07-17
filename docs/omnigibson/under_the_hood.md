@@ -1,8 +1,4 @@
----
-icon: material/car-wrench
----
-
-# Under the Hood: Isaac Sim Details
+# :material-car-wrench: **Under the Hood: Isaac Sim Details**
 In this page, we discuss the particulars of certain Isaac Sim features and behaviors.
 
 ## Sources of Truth: USD, PhysX and Fabric

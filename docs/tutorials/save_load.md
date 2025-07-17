@@ -1,8 +1,4 @@
----
-icon: material/zip-disk
----
-
-# 💾 **Saving and Loading Simulation State**
+# :material-zip-disk: **Saving and Loading Simulation State**
 
 ## Memory
 

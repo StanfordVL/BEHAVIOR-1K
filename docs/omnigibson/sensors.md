@@ -1,8 +1,4 @@
----
-icon: material/camera-outline
----
-
-# 📷 **Sensor**
+# :material-camera-outline: **Sensor**
 
 ## Description
 

@@ -1,8 +1,4 @@
----
-icon: material/repeat
----
-
-# 🔁 **Simulator**
+# :material-repeat: **Simulator**
 
 ## Description
 

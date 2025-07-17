@@ -1,9 +1,3 @@
----
-icon: material/trophy
-hide:
-  - navigation
----
-
 # 🏆 **2025 BEHAVIOR Challenge**
 
 ## :material-graph-outline: **Overview**

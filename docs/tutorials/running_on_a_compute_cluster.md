@@ -1,8 +1,4 @@
----
-icon: material/server-network
----
-
-# 🔌 **Running on a Compute Cluster**
+# :material-server-network: **Running on a Compute Cluster**
 
 _This documentation is a work in progress._
 

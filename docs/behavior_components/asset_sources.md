@@ -1,8 +1,4 @@
----
-icon: material/toy-brick
----
-
-# :material-cube: **3D Assets**
+# :material-cube: **Asset Sources**
 
 !!! info "Dataset Source Information"
     The objects in the BEHAVIOR-1K dataset were sourced mainly through **TurboSquid** and edited to match the requirements of robotics simulation.

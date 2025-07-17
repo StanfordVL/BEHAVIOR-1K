@@ -1,8 +1,4 @@
----
-icon: octicons/rocket-16
----
-
-# 🕹️ **Speed Optimization**
+# :octicons-rocket-16: **Speed Optimization**
 
 This is an Ad Hoc page for tips & tricks about speed optimization. The page is currently under construction. 
 

@@ -1,7 +1,3 @@
----
-icon: material/silverware-fork-knife
----
-
 # :material-silverware-fork-knife: **BEHAVIOR Tasks**
 
 [`BehaviorTask`](../reference/tasks/behavior_task.md) represents a family of **1000 long-horizon household activities** that humans benefit the most from robots' help based on our survey results.

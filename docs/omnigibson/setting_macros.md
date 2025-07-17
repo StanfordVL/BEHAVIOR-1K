@@ -1,8 +1,4 @@
----
-icon: octicons/gear-24
----
-
-# ⚙️ **Setting Macros**
+# :octicons-gear-24: **Setting Macros**
 
 Macros are a global set of hard-coded, "magic" numbers that are used as default values across **OmniGibson**. These values can have significant implications that broadly impact **OmniGibson**'s runtime (such as setting `HEADLESS` or `DEFAULT_PHYSICS_FREQ`), or can have a much more narrow scope that impacts only a specific module within **OmniGibson** (such as `FIRE_EMITTER_HEIGHT_RATIO`).
 

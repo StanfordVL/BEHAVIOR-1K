@@ -1,8 +1,4 @@
----
-icon: material/wrench-outline
----
-
-# 🔧 **Customizing Robots**
+# :material-wrench-outline: **Customizing Robots**
 
 [Robots](../omnigibson/robots.md) can have both their action spaces (types of control commands) and observation spaces (types of sensor modalities) customized to suit specific use-cases. This can be done both prior to import time (via a config) or dynamically during runtime. Below, we describe a recommended workflow for modifying both sets of these properties.
 

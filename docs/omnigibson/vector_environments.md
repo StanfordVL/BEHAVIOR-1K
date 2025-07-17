@@ -1,8 +1,4 @@
----
-icon: octicons/stack-16
----
-
-# 🌌 **Vector Environments**
+# :octicons-stack-16: **Vector Environments**
 
 ## Description
 

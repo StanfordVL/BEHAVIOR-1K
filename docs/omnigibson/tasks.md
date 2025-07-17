@@ -1,8 +1,4 @@
----
-icon: material/list-box
----
-
-# 📑 **Tasks**
+# :material-list-box: **Tasks**
 
 ## Description
 

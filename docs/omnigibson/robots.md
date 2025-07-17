@@ -1,8 +1,4 @@
----
-icon: material/robot-outline
----
-
-# 🤖 **Robots**
+# :material-robot-outline: **Robots**
 
 ![Robot Family](../assets/robots/robot_family.png)
 

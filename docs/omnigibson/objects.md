@@ -1,8 +1,4 @@
----
-icon: material/food-apple-outline
----
-
-# 🍎 **Object**
+# :material-food-apple-outline: **Object**
 
 ## Description
 

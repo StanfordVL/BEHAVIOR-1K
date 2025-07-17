@@ -1,8 +1,4 @@
----
-icon: material/robot-industrial
----
-
-# 🕹️ **Importing a Custom Robot**
+# :material-robot-industrial: **Importing a Custom Robot**
 
 While OmniGibson assets includes a set of commonly-used robots, users might still want to import robot model of there own. This tutorial introduces users 
 

@@ -1,8 +1,4 @@
----
-icon: material/cube-outline
----
-
-# 🧱 **Prim**
+# :material-cube-outline: **Prim**
 
 ## Description
 

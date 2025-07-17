@@ -1,8 +1,4 @@
----
-icon: material/monitor
----
-
-# 🖥️ **Remote Streaming through WebRTC**
+# :material-monitor: **Remote Streaming through WebRTC**
 
 This page describes the steps required to set up and troubleshoot remote streaming for Omnigibson using WebRTC. The feature allows users to run Omnigibson on a remote server and view it locally through a browser.
 

@@ -1,7 +1,3 @@
----
-icon: material/hammer-wrench
----
-
 # :material-tools: **Installation**
 
 ## :material-note-text: **Requirements**

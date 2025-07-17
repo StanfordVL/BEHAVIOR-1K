@@ -1,8 +1,4 @@
----
-icon: material/earth
----
-
-# 🌎 **Environment**
+# :material-earth: **Environment**
 
 ## Description
 

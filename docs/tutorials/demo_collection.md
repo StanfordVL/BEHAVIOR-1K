@@ -1,8 +1,4 @@
----
-icon: material/controller
----
-
-# 🎮 **Collecting Demonstrations**
+# :material-controller: **Collecting Demonstrations**
 
 
 ## Devices

@@ -1,8 +1,4 @@
----
-icon: material/arm-flex
----
-
-# **Contribution Guidelines**
+# :material-arm-flex: **Contribution Guidelines**
 
 We sincerely welcome contributions of any form to OmniGibson, as our aim is to make it a more robust and useful resource for the community. We have always held the belief that a collective effort from the community is essential to tailor BEHAVIOR/OmniGibson to meet diverse needs and unlock its full potential. 
 

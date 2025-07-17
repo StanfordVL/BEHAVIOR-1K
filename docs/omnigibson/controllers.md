@@ -1,8 +1,4 @@
----
-icon: material/knob
----
-
-# 🎛️ **Controllers**
+# :material-knob: **Controllers**
 
 ## Description
 

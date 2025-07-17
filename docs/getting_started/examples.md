@@ -1,8 +1,3 @@
----
-icon: material/laptop
----
-
-
 # :material-laptop: **Examples**
 
 **`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended as a set of building blocks enabling your research. Let's try them out!

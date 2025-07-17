@@ -1,8 +1,4 @@
----
-icon: material/thermometer
----
-
-# 🌡️ **Object States**
+# :material-thermometer: **Object States**
 
 ## Description
 
