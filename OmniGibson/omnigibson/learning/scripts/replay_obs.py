@@ -8,7 +8,7 @@ import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer, 
     process_fused_point_cloud, 
@@ -18,7 +18,6 @@ from omnigibson.learning.utils.obs_utils import (
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.learning.utils.lerobot_utils import TASK_INDICES
 from typing import Dict
 
 

@@ -1,26 +1,16 @@
 import numpy as np
-import torch as th
 from collections import OrderedDict
 
 
-# Robot parameters
-SUPPORTED_ROBOTS = ["R1Pro"]
-DEFAULT_ROBOT_TYPE = (
-    "R1Pro"  # This should always be our robot generally since GELLO is designed for this specific robot
-)
-ROBOT_NAME = "robot_r1"
-RESOLUTION = [240, 240]  # Resolution for RGB and depth images
-
-
+# TODO: Add camera intrinsics
 CAMERA_INTRINSTICS = {}
-
 
 
 # Action indices
 ACTION_QPOS_INDICES = {
     "R1Pro": OrderedDict(
         {
-            "mobile_base": np.s_[0:3],
+            "base": np.s_[0:3],
             "torso": np.s_[3:7],
             "left_arm": np.s_[7:14],
             "left_gripper": np.s_[14:15],
@@ -89,112 +79,58 @@ PROPRIO_QPOS_INDICES = {
     )
 }
 
-# Controller configuration for R1 robot
-DEFAULT_CONTROLLER_CONFIG = {
+
+# Joint limits
+JOINT_RANGE = {
     "R1Pro": {
-        "arm_left": {
-            "name": "JointController",
-            "motor_type": "position",
-            "pos_kp": 150,
-            "command_input_limits": None,
-            "command_output_limits": None,
-            "use_impedances": False,
-            "use_delta_commands": False,
-        },
-        "arm_right": {
-            "name": "JointController",
-            "motor_type": "position",
-            "pos_kp": 150,
-            "command_input_limits": None,
-            "command_output_limits": None,
-            "use_impedances": False,
-            "use_delta_commands": False,
-        },
-        "gripper_left": {
-            "name": "MultiFingerGripperController",
-            "mode": "smooth",
-            "command_input_limits": "default",
-            "command_output_limits": "default",
-        },
-        "gripper_right": {
-            "name": "MultiFingerGripperController",
-            "mode": "smooth",
-            "command_input_limits": "default",
-            "command_output_limits": "default",
-        },
-        "base": {
-            "name": "HolonomicBaseJointController",
-            "motor_type": "velocity",
-            "vel_kp": 150,
-            "command_input_limits": [-th.ones(3), th.ones(3)],
-            "command_output_limits": [-th.tensor([0.75, 0.75, 1.0]), th.tensor([0.75, 0.75, 1.0])],
-            "use_impedances": False,
-        },
-        "trunk": {
-            "name": "JointController",
-            "motor_type": "position",
-            "pos_kp": 150,
-            "command_input_limits": None,
-            "command_output_limits": None,
-            "use_impedances": False,
-            "use_delta_commands": False,
-        },
-        "camera": {
-            "name": "NullJointController",
-        },
+        "base": (
+            np.array([-0.75, -0.75, -1.0], dtype=np.float32),
+            np.array([0.75, 0.75, 1.0], dtype=np.float32)
+        ),
+        "torso": (
+            np.array([-1.1345, -2.7925, -1.8326, -3.0543], dtype=np.float32),
+            np.array([1.8326, 2.5307, 1.5708, 3.0543], dtype=np.float32)
+        ),
+        "left_arm": (
+            np.array([-4.4506, -0.1745, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=np.float32),
+            np.array([1.3090, 3.1416, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=np.float32)
+        ),
+        "right_arm": (
+            np.array([-4.4506, -3.1416, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=np.float32),
+            np.array([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=np.float32)
+        ),
+        "left_gripper": (
+            np.array([-1], dtype=np.float32),
+            np.array([1], dtype=np.float32)
+        ),
+        "right_gripper": (
+            np.array([-1], dtype=np.float32),
+            np.array([1], dtype=np.float32)
+        ),
     }
 }
 
 
-# External camera parameters
-EXTERNAL_CAMERA_CONFIGS = {
-    "external_sensor0": {
-        "position": [-0.4, 0, 2.0],
-        "orientation": [0.2706, -0.2706, -0.6533, 0.6533],
-    }
+# PCD range
+PCD_RANGE = (
+    np.array([-0.5, -0.5, -0.5]),
+    np.array([0.5, 0.5, 0.5])
+)
+
+
+TASK_INDICES = {
+    0: "turning_on_radio",
+    2: "can_meat",
 }
 
 
-def get_camera_config(name, relative_prim_path, position, orientation, resolution, modalities):
-    """
-    Generate a camera configuration dictionary
-
-    Args:
-        name (str): Camera name
-        relative_prim_path (str): Relative path to camera in the scene
-        position (List[float]): Camera position [x, y, z]
-        orientation (List[float]): Camera orientation [x, y, z, w]
-        resolution (List[int]): Camera resolution [height, width]
-        modalities (List[str]): List of modalities for the camera
-
-    Returns:
-        dict: Camera configuration dictionary
-    """
-    return {
-        "sensor_type": "VisionSensor",
-        "name": name,
-        "relative_prim_path": relative_prim_path,
-        "modalities": modalities,
-        "sensor_kwargs": {
-            "viewport_name": "Viewport",
-            "image_height": resolution[0],
-            "image_width": resolution[1],
-        },
-        "position": position,
-        "orientation": orientation,
-        "pose_frame": "parent",
-        "include_in_obs": True,
-    }
-
-
-def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=DEFAULT_ROBOT_TYPE):
+def generate_basic_environment_config(task_name, task_cfg):
     """
     Generate a basic environment configuration
 
     Args:
-        task_name (str): Name of the task (optional)
-        task_cfg: Dictionary of task config (optional)
-        robot_type (str): Type of the robot, default is DEFAULT_ROBOT_TYPE
+        task_name (str): Name of the task 
+        task_cfg: Dictionary of task config 
 
     Returns:
         dict: Environment configuration
@@ -204,30 +140,15 @@ def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=
             "action_frequency": 30,
             "rendering_frequency": 30,
             "physics_frequency": 120,
-            "external_sensors": [
-                get_camera_config(
-                    name="external_sensor0",
-                    relative_prim_path=f"/controllable__{robot_type.lower()}__{ROBOT_NAME}/base_link/external_sensor0",
-                    position=EXTERNAL_CAMERA_CONFIGS["external_sensor0"]["position"],
-                    orientation=EXTERNAL_CAMERA_CONFIGS["external_sensor0"]["orientation"],
-                    resolution=RESOLUTION,
-                    modalities=["rgb", "depth_linear"],
-                ),
-            ],
         },
-    }
-
-    if task_name is not None and task_cfg is not None:
-        # Load the environment for a particular task
-        cfg["scene"] = {
+        "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": task_cfg["scene_model"],
             "load_room_types": None,
             "load_room_instances": task_cfg.get("load_room_instances", None),
             "include_robots": False,
-        }
-
-        cfg["task"] = {
+        },
+        "task": {
             "type": "BehaviorTask",
             "activity_name": task_name,
             "activity_definition_id": 0,
@@ -237,7 +158,6 @@ def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=
             "debug_object_sampling": False,
             "highlight_task_relevant_objects": False,
             "termination_config": {
-                # "max_steps": 50000,
                 "max_steps": 5000,
             },
             "reward_config": {
@@ -245,66 +165,8 @@ def generate_basic_environment_config(task_name=None, task_cfg=None, robot_type=
             },
             "include_obs": False,
         }
-    return cfg
-
-
-def generate_robot_config(
-    task_name=None, task_cfg=None, robot_type: str = DEFAULT_ROBOT_TYPE, overwrite_controller_cfg=None
-):
-    """
-    Generate robot configuration
-
-    Args:
-        task_name: Name of the task (optional)
-        task_cfg: Dictionary of task config (optional)
-        robot_type (str): Type of the robot, default is DEFAULT_ROBOT_TYPE
-        overwrite_controller_cfg: Controller configuration (optional)
-
-    Returns:
-        dict: Robot configuration
-    """
-    # Create a copy of the controller config to avoid modifying the original
-    controller_config = {k: v.copy() for k, v in DEFAULT_CONTROLLER_CONFIG[robot_type].items()}
-    if overwrite_controller_cfg is not None:
-        controller_config.update(overwrite_controller_cfg)
-    robot_config = {
-        "type": robot_type,
-        "name": ROBOT_NAME,
-        "action_normalize": False,
-        "controller_config": controller_config,
-        "self_collisions": True,
-        "obs_modalities": ["proprio", "rgb", "depth_linear"],
-        "proprio_obs": list(PROPRIOCEPTION_INDICES[robot_type].keys()),
-        "position": [0.0, 0.0, 0.0],
-        "orientation": [0.0, 0.0, 0.0, 1.0],
-        "grasping_mode": "assisted",
-        "sensor_config": {
-            "VisionSensor": {
-                "sensor_kwargs": {
-                    "image_height": RESOLUTION[0],
-                    "image_width": RESOLUTION[1],
-                },
-            },
-        },
     }
-
-    # Override position and orientation for tasks
-    if task_name is not None and task_cfg is not None:
-        robot_config["position"] = task_cfg["robot_start_position"]
-        robot_config["orientation"] = task_cfg["robot_start_orientation"]
-
-    # Add reset joint positions
-    joint_pos = th.zeros(28, dtype=th.float32)
-
-    # Fingers MUST start open
-    joint_pos[-4:] = 0.05
-
-    # Update trunk qpos as well
-    # Calculated from infer_torso_qpos_from_trunk_translate(DEFAULT_TRUNK_TRANSLATE), see og-gello repo for details
-    joint_pos[6:10] = th.tensor([1.0250, -1.4500, -0.4700, 0.0000])
-    robot_config["reset_joint_pos"] = joint_pos
-
-    return robot_config
+    return cfg
 
 
 def flatten_obs_dict(obs: dict, parent_key: str = "") -> dict:

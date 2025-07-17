@@ -151,7 +151,7 @@ def print_color(*args, color=None, attrs=(), **kwargs):
     print(*args, **kwargs)
 
 
-def get_camera_config(name, relative_prim_path, position, orientation, resolution):
+def get_camera_config(name, relative_prim_path, position, orientation, resolution, modalities=[]):
     """
     Generate a camera configuration dictionary
     
@@ -161,6 +161,7 @@ def get_camera_config(name, relative_prim_path, position, orientation, resolutio
         position (List[float]): Camera position [x, y, z]
         orientation (List[float]): Camera orientation [x, y, z, w]
         resolution (List[int]): Camera resolution [height, width]
+        modalities (List[str]): List of modalities for the camera
         
     Returns:
         dict: Camera configuration dictionary
@@ -169,7 +170,7 @@ def get_camera_config(name, relative_prim_path, position, orientation, resolutio
         "sensor_type": "VisionSensor",
         "name": name,
         "relative_prim_path": relative_prim_path,
-        "modalities": [],
+        "modalities": modalities,
         "sensor_kwargs": {
             "viewport_name": "Viewport",
             "image_height": resolution[0],

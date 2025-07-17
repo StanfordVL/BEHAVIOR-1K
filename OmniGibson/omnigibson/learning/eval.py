@@ -8,12 +8,12 @@ import traceback
 from gello.robots.sim_robot.og_teleop_utils import load_available_tasks, get_task_relevant_room_types, augment_rooms
 from hydra.utils import call
 from inspect import getsourcefile
+from joylo.gello.robots.sim_robot.og_teleop_cfg import SUPPORTED_ROBOTS
+from joylo.gello.robots.sim_robot.og_teleop_utils import generate_robot_config
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
-    SUPPORTED_ROBOTS,
     generate_basic_environment_config,
-    generate_robot_config,
     flatten_obs_dict,
 )
 from omnigibson.macros import gm
@@ -106,17 +106,15 @@ class Evaluator:
             # Load the seed instance by default
             task_cfg = available_tasks[task_name][0]
             robot_type = self.cfg.robot.type
-            robot_controller_cfg = self.cfg.robot.controllers
             assert robot_type in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_type}"
             cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg, robot_type=robot_type)
             cfg["robots"] = [
                 generate_robot_config(
                     task_name=task_name,
                     task_cfg=task_cfg,
-                    robot_type=robot_type,
-                    overwrite_controller_cfg=robot_controller_cfg,
                 )
             ]
+            cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
             cfg["task"]['termination_config']["max_steps"] = self.cfg.task.max_steps
             relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
             relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)

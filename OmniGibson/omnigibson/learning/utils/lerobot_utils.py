@@ -6,12 +6,6 @@ import numpy as np
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
 
-TASK_INDICES = {
-    0: "turning_on_radio",
-    2: "can_meat",
-}
-
-
 class BehaviorLeRobotDataset(LeRobotDataset):
     def get_episodes_file_paths(self) -> list[str]:
         """
