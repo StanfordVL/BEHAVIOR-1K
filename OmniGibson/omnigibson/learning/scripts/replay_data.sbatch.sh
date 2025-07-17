@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name="process_data"
+#SBATCH --job-name="replay_data"
 #SBATCH --account=vision
 #SBATCH --partition=svl
 #SBATCH --nodes=1
@@ -7,8 +7,8 @@
 #SBATCH --mem=60G
 #SBATCH --cpus-per-task=8
 #SBATCH --time=0-2:00:00
-#SBATCH --output=outputs/sc/process_data_%j.out
-#SBATCH --error=outputs/sc/process_data_%j.err
+#SBATCH --output=outputs/sc/replay_data_%j.out
+#SBATCH --error=outputs/sc/replay_data_%j.err
 
 # list out some useful information
 echo "SLURM_JOBID="$SLURM_JOBID
@@ -20,10 +20,10 @@ echo "working directory = "$SLURM_SUBMIT_DIR
 
 source /vision/u/wsai/miniconda3/bin/activate behavior
 
-echo "File to process: $1/raw/$2"
+echo "File to process: $1"
 
-echo "Running replay_obs.py on $1/raw/$2"
-OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py --files "$1/raw/$2" --low_dim --rgbd --pcd --seg
+echo "Running replay_obs.py on $1"
+OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py --file $1 --low_dim --rgbd --seg --bbox
 
 echo "Job finished."
 exit 0
