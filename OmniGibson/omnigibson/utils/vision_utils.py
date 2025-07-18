@@ -1,4 +1,7 @@
 import colorsys
+from typing import Dict, List, Tuple
+import cv2
+import numpy as np
 
 import torch as th
 from PIL import Image, ImageDraw
@@ -285,3 +288,205 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
     return th.tensor(rgb)
+
+def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str], unique_ins_ids: List[int]) -> List[Tuple[int, int, int, int, int]]:
+    """
+    Convert instance segmentation to bounding boxes.
+    
+    Args:
+        obs (th.Tensor): (H, W) tensor of instance IDs
+        instance_mapping (Dict[int, str]): Dict mapping instance IDs to instance names
+            Note: this does not need to include all instance IDs, only the ones that we want to generate bbox for
+        unique_ins_ids (List[int]): List of unique instance IDs
+    Returns:
+        List of tuples (x_min, y_min, x_max, y_max, instance_id) for each instance
+    """
+    bboxes = []
+    valid_ids = [id for id in instance_mapping if id in unique_ins_ids]
+    for instance_id in valid_ids:
+        # Create mask for this instance
+        mask = (obs == instance_id)  # (H, W)
+        if not mask.any():
+            continue
+        # Find non-zero indices (where instance exists)
+        y_coords, x_coords = th.where(mask)
+        if len(y_coords) == 0:
+            continue
+        # Calculate bounding box
+        x_min = x_coords.min().item()
+        x_max = x_coords.max().item()
+        y_min = y_coords.min().item()
+        y_max = y_coords.max().item()
+        bboxes.append((x_min, y_min, x_max, y_max, instance_id))
+    
+    return bboxes
+
+def overlay_bboxes_with_names(
+    img: np.ndarray, 
+    bbox_2d_data: List[Tuple[int, int, int, int, int]],
+    instance_mapping: Dict[int, str],
+    task_relevant_objects: List[str],
+) -> np.ndarray:
+    """
+    Overlays bounding boxes with object names on the given image.
+
+    Args:
+        img (np.ndarray): The input image (RGB) to overlay on.
+        bbox_2d_data (List[Tuple[int, int, int, int, int]]): Bounding box data with format (x1, y1, x2, y2, instance_id)
+        instance_mapping (Dict[int, str]): Mapping from instance ID to object name
+        task_relevant_objects (List[str]): List of task relevant objects
+    Returns:
+        np.ndarray: The image with bounding boxes and object names overlaid.
+    """
+    # Create a copy of the image to draw on
+    overlay_img = img.copy()
+    img_height, img_width = img.shape[:2]
+
+    # Track occupied text regions to avoid overlap
+    occupied_text_regions = []
+
+    # Process each bounding box
+    for bbox in bbox_2d_data:
+        x1, y1, x2, y2, instance_id = bbox
+        object_name = instance_mapping[instance_id]
+        # Only overlay task relevant objects
+        if object_name not in task_relevant_objects:
+            continue
+
+        # Generate a consistent color based on instance_id
+        color = get_consistent_color(instance_id)
+
+        # Draw the bounding box
+        cv2.rectangle(overlay_img, (x1, y1), (x2, y2), color, 2)
+
+        # Draw the object name
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.5
+        font_thickness = 1
+        text_size = cv2.getTextSize(object_name, font, font_scale, font_thickness)[0]
+        # Find non-overlapping position for text
+        text_x, text_y, text_rect = find_non_overlapping_text_position(
+            x1, y1, x2, y2, text_size, occupied_text_regions, img_height, img_width
+        )
+        # Add this text region to occupied regions
+        occupied_text_regions.append(text_rect)
+
+        # Draw background rectangle for text
+        cv2.rectangle(
+            overlay_img, (int(text_rect[0]), int(text_rect[1])), (int(text_rect[2]), int(text_rect[3])), color, -1
+        )
+
+        # Draw the text
+        cv2.putText(
+            overlay_img,
+            object_name,
+            (text_x, text_y),
+            font,
+            font_scale,
+            (255, 255, 255),
+            font_thickness,
+            cv2.LINE_AA,
+        )
+
+    return overlay_img
+
+
+def get_consistent_color(instance_id):
+    import colorsys
+    colors = [
+        (52, 73, 94),  # Dark blue-gray
+        (142, 68, 173),  # Purple
+        (39, 174, 96),  # Emerald green
+        (230, 126, 34),  # Orange
+        (231, 76, 60),  # Red
+        (41, 128, 185),  # Blue
+        (155, 89, 182),  # Amethyst
+        (26, 188, 156),  # Turquoise
+        (241, 196, 15),  # Yellow (darker)
+        (192, 57, 43),  # Dark red
+        (46, 204, 113),  # Green
+        (52, 152, 219),  # Light blue
+        (155, 89, 182),  # Violet
+        (22, 160, 133),  # Dark turquoise
+        (243, 156, 18),  # Dark yellow
+        (211, 84, 0),  # Dark orange
+        (154, 18, 179),  # Dark purple
+        (31, 81, 255),  # Royal blue
+        (20, 90, 50),  # Forest green
+        (120, 40, 31),  # Maroon
+    ]
+
+    # Use hash to consistently select a color from the palette
+    hash_val = hash(str(instance_id))
+    base_color_idx = hash_val % len(colors)
+    base_color = colors[base_color_idx]
+
+    # Add slight variation while maintaining sophistication
+    # Convert to HSV for easier manipulation
+    r, g, b = [c / 255.0 for c in base_color]
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+
+    # Add small random variation to hue (�10 degrees) and saturation/value
+    hue_variation = ((hash_val >> 8) % 20 - 10) / 360.0  # �10 degrees
+    sat_variation = ((hash_val >> 16) % 20 - 10) / 200.0  # �5% saturation
+    val_variation = ((hash_val >> 24) % 20 - 10) / 200.0  # �5% value
+
+    # Apply variations with bounds checking
+    h = (h + hue_variation) % 1.0
+    s = max(0.4, min(0.9, s + sat_variation))  # Keep saturation between 40-90%
+    v = max(0.3, min(0.7, v + val_variation))  # Keep value between 30-70% (darker for contrast)
+
+    # Convert back to RGB
+    r, g, b = colorsys.hsv_to_rgb(h, s, v)
+
+    # Convert to 0-255 range
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
+def find_non_overlapping_text_position(x1, y1, x2, y2, text_size, occupied_regions, img_height, img_width):
+    """Find a text position that doesn't overlap with existing text."""
+    text_w, text_h = text_size
+    padding = 5
+
+    # Try different positions in order of preference
+    positions = [
+        # Above bbox
+        (x1, y1 - text_h - padding),
+        # Below bbox
+        (x1, y2 + text_h + padding),
+        # Right of bbox
+        (x2 + padding, y1 + text_h),
+        # Left of bbox
+        (x1 - text_w - padding, y1 + text_h),
+        # Inside bbox (top-left)
+        (x1 + padding, y1 + text_h + padding),
+        # Inside bbox (bottom-right)
+        (x2 - text_w - padding, y2 - padding),
+    ]
+
+    for text_x, text_y in positions:
+        # Check bounds
+        if text_x < 0 or text_y < text_h or text_x + text_w > img_width or text_y > img_height:
+            continue
+
+        # Check for overlap with existing text
+        text_rect = (text_x - padding, text_y - text_h - padding, text_x + text_w + padding, text_y + padding)
+
+        overlap = False
+        for occupied_rect in occupied_regions:
+            if (
+                text_rect[0] < occupied_rect[2]
+                and text_rect[2] > occupied_rect[0]
+                and text_rect[1] < occupied_rect[3]
+                and text_rect[3] > occupied_rect[1]
+            ):
+                overlap = True
+                break
+
+        if not overlap:
+            return text_x, text_y, text_rect
+
+    # Fallback: use the first position even if it overlaps
+    text_x, text_y = positions[0]
+    text_rect = (text_x - padding, text_y - text_h - padding, text_x + text_w + padding, text_y + padding)
+    return text_x, text_y, text_rect

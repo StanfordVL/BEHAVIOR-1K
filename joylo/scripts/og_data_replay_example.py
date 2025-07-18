@@ -2,6 +2,7 @@ from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.utils.config_utils import TorchEncoder
 import torch as th
 import os
+import csv
 import omnigibson as og
 from omnigibson.macros import gm
 import argparse
@@ -13,6 +14,7 @@ from gello.utils.b1k_utils import ALL_QA_METRICS, COMMON_QA_METRICS, TASK_QA_MET
 import inspect
 
 RUN_QA = True
+RUN_BBOX_ANNOTATION = True
 
 gm.RENDER_VIEWER_CAMERA = False
 gm.DEFAULT_VIEWER_WIDTH = 128
@@ -103,7 +105,7 @@ def replay_hdf5_file(hdf_input_path):
         "sensor_type": "VisionSensor",
         "name": f"external_sensor{idx}",
         "relative_prim_path": f"/controllable__r1pro__robot_r1/zed_link/external_sensor{idx}",
-        "modalities": ["rgb", "seg_instance_id"],
+        "modalities": ["rgb", "seg_instance", "seg_instance_id"],
         "sensor_kwargs": {
             "image_height": RESOLUTION_DEFAULT,
             "image_width": RESOLUTION_DEFAULT,
@@ -180,7 +182,21 @@ def replay_hdf5_file(hdf_input_path):
     # Create a list to store video writers and RGB keys
     video_writers = []
     video_rgb_keys = []
-    
+    annotation_config = None
+    if RUN_BBOX_ANNOTATION:
+        task_name = env.task.activity_name
+        task_relevant_names = []
+        with open(os.path.join(os.path.dirname(__file__), "task_relevant_instance_names.csv"), "r") as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if row[0] == task_name:
+                    task_relevant_names = row[1] + row[2]
+        annotation_config = {
+            "annotation_writer": env.create_video_writer(fpath=f"{video_dir}/bbox_annotation.mp4"),
+            "task_relevant_names": task_relevant_names,
+            "annotation_rgb_key": "external::external_sensor1::rgb",
+        }
+
     # Create video writer for robot cameras
     robot_camera_names = ['robot_r1::robot_r1:left_realsense_link:Camera:0::rgb', 
                         'robot_r1::robot_r1:right_realsense_link:Camera:0::rgb']
@@ -204,6 +220,7 @@ def replay_hdf5_file(hdf_input_path):
             record_data=False,
             video_writers=video_writers,
             video_rgb_keys=video_rgb_keys,
+            annotation_config=annotation_config,
         )
         episode_metrics = env.aggregate_metrics(flatten=True)
         for k, v in episode_metrics.items():
@@ -213,6 +230,9 @@ def replay_hdf5_file(hdf_input_path):
     # Close all video writers
     for writer in video_writers:
         writer.close()
+    
+    if RUN_BBOX_ANNOTATION:
+        annotation_config["annotation_writer"].close()
 
     env.save_data()
 

@@ -18,6 +18,7 @@ from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.vision_utils import instance_to_bbox, overlay_bboxes_with_names
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -878,7 +879,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_rgb_keys=None):
+    def playback_episode(self, episode_id, record_data=True, video_writers=None, video_rgb_keys=None, annotation_config=None):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -889,6 +890,10 @@ class DataPlaybackWrapper(DataWrapper):
             video_writers (None or list of imageio.Writer): If specified, writer objects that RGB frames will be written to
             video_rgb_keys (None or list of str): If specified, observation keys representing the RGB frames to write to video.
                 If @video_writers is specified, this must also be specified!
+            annotation_config (None or dict): If specified, config for annotation. Must contain the following keys:
+                - "task_relevant_names": List of instance names that are relevant to the task
+                - "annotation_writer": Writer object that annotation frames will be written to
+                - "annotation_rgb_key": Key of the RGB frame to write annotation to
         """
         # Validate video_writers and video_rgb_keys
         if video_writers is not None:
@@ -983,6 +988,31 @@ class DataPlaybackWrapper(DataWrapper):
                 for writer, rgb_key in zip(video_writers, video_rgb_keys):
                     assert_valid_key(rgb_key, self.current_obs.keys(), "video_rgb_key")
                     writer.append_data(self.current_obs[rgb_key][:, :, :3].numpy())
+
+            if annotation_config is not None:
+                # TODO: Grab rgb image (this is repetitive, but we do it here to unblock the annotation work)
+                rgb_img = self.current_obs[annotation_config["annotation_rgb_key"]][:, :, :3].numpy()
+                task_relevant_names = annotation_config["task_relevant_names"]
+
+                seg_instance_key = annotation_config["annotation_rgb_key"].replace("rgb", "seg_instance")
+                seg_instance = self.current_obs[seg_instance_key]
+                seg_instance_info = info["obs_info"]["external"]["external_sensor1"]["seg_instance"]
+                all_unique_ins_ids = set(seg_instance_info.keys())
+                # we loop through all unique instance ids and check if the instance name is in the task relevant names
+                # if it is, we add the instance id to the task relevant ids
+                task_relevant_ids = []
+                for ins_id in all_unique_ins_ids:
+                    ins_name = seg_instance_info[ins_id]
+                    if ins_name in task_relevant_names:
+                        task_relevant_ids.append(ins_id)
+                bboxes_2d = instance_to_bbox(obs=seg_instance, instance_mapping=seg_instance_info, unique_ins_ids=task_relevant_ids)
+                rgb_with_annotation = overlay_bboxes_with_names(
+                    rgb_img, 
+                    bbox_2d_data=bboxes_2d, 
+                    instance_mapping=seg_instance_info, 
+                    task_relevant_objects=task_relevant_names
+                )
+                annotation_config["annotation_writer"].append_data(rgb_with_annotation)
 
             self.step_count += 1
 
