@@ -1,5 +1,9 @@
 # 🏆 **2025 BEHAVIOR Challenge**
 
+**Join us and solve 50 full-length household tasks in the realistic BEHAVIOR-1K environment, with 10,000 teleoperated expert demonstrations (1000+ hours) available!** 🤖
+
+---
+
 ## :material-graph-outline: **Overview**
 
 **BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that consists of three main components:

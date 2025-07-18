@@ -41,6 +41,7 @@ theme:
 
 extra_css:
   - stylesheets/extra.css
+  - https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css
 
 extra_javascript:
   - assets/fold_api_reference.js
@@ -138,7 +139,7 @@ nav:
       - Contributing: other/contributing.md
     - API Reference: reference/*
     - Changelog: https://github.com/StanfordVL/OmniGibson/releases
-  - Knowledge Base: https://behavior.stanford.edu/knowledgebase/
+  - Knowledgebase: https://behavior.stanford.edu/knowledgebase/
   - Research: other/related_research.md
   - Workshops:
     - workshops/overview.md
@@ -148,7 +149,7 @@ nav:
     - behavior_100/overview.md
     - VR Dataset: behavior_100/dataset.md
     - Demo Gallery: behavior_100/demo_gallery.md
-  - Support: https://discord.gg/bccR5vGFEx
+  - <i class="fa-brands fa-discord"></i>  Support: https://discord.gg/bccR5vGFEx
 
 extra:
   analytics:

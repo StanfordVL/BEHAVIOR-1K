@@ -16,8 +16,14 @@
     mask-image: var(--md-admonition-icon--code);
 }
 
-/* Make the 2025 BEHAVIOR Challenge navigation item bold and yellow */
+/* Make the 2025 BEHAVIOR Challenge navigation item bold and golden */
 .md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
     font-weight: bold !important;
-    color: #e0c83d !important;
+    color: #B8860B !important;
+}
+
+/* Add spacing between FontAwesome icons and text in navigation */
+.md-nav__item i[class*="fa-"], 
+.md-tabs__item i[class*="fa-"] {
+    margin-right: 8px;
 }
