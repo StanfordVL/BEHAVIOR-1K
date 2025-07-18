@@ -1,17 +1,79 @@
+import functools
+import warnings
 from copy import deepcopy
 from omegaconf import OmegaConf
-from omnigibson.learning.utils.functional_utils import is_sequence, is_mapping, call_once
-from omnigibson.learning.utils.print_utils import to_scientific_str
+from typing import Literal
 
 
 _NO_INSTANTIATE = "__no_instantiate__"  # return config as-is
+
+
+def meta_decorator(decor):
+    """
+    a decorator decorator, allowing the wrapped decorator to be used as:
+    @decorator(*args, **kwargs)
+    def callable()
+      -- or --
+    @decorator  # without parenthesis, args and kwargs will use default
+    def callable()
+
+    Args:
+      decor: a decorator whose first argument is a callable (function or class
+        to be decorated), and the rest of the arguments can be omitted as default.
+        decor(f, ... the other arguments must have default values)
+
+    Warning:
+      decor can NOT be a function that receives a single, callable argument.
+      See stackoverflow: http://goo.gl/UEYbDB
+    """
+    single_callable = lambda args, kwargs: len(args) == 1 and len(kwargs) == 0 and callable(args[0])
+
+    @functools.wraps(decor)
+    def new_decor(*args, **kwargs):
+        if single_callable(args, kwargs):
+            # this is the double-decorated f.
+            # It should not run on a single callable.
+            return decor(args[0])
+        else:
+            # decorator arguments
+            return lambda real_f: decor(real_f, *args, **kwargs)
+
+    return new_decor
+
+
+@meta_decorator
+def call_once(func, on_second_call: Literal["noop", "raise", "warn"] = "noop"):
+    """
+    Decorator to ensure that a function is only called once.
+
+    Args:
+      on_second_call (str): what happens when the function is called a second time.
+    """
+    assert on_second_call in [
+        "noop",
+        "raise",
+        "warn",
+    ], "mode must be one of 'noop', 'raise', 'warn'"
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if wrapper._called:
+            if on_second_call == "raise":
+                raise RuntimeError(f"{func.__name__} has already been called. Can only call once.")
+            elif on_second_call == "warn":
+                warnings.warn(f"{func.__name__} has already been called. Should only call once.")
+        else:
+            wrapper._called = True
+            return func(*args, **kwargs)
+
+    wrapper._called = False
+    return wrapper
 
 
 @call_once(on_second_call="noop")
 def register_omegaconf_resolvers():
     import numpy as np
 
-    OmegaConf.register_new_resolver("scientific", lambda v, i=0: to_scientific_str(v, i))
     OmegaConf.register_new_resolver("_optional", lambda v: f"_{v}" if v else "")
     OmegaConf.register_new_resolver("optional_", lambda v: f"{v}_" if v else "")
     OmegaConf.register_new_resolver("_optional_", lambda v: f"_{v}_" if v else "")
@@ -47,28 +109,3 @@ def register_omegaconf_resolvers():
 
     OmegaConf.register_new_resolver("no_instantiate", _no_instantiate)
 
-
-def omegaconf_to_dict(cfg, resolve: bool = True, enum_to_str: bool = False):
-    """
-    Convert arbitrary nested omegaconf objects to primitive containers
-
-    WARNING: cannot use tree lib because it gets confused on DictConfig and ListConfig
-    """
-    kw = dict(resolve=resolve, enum_to_str=enum_to_str)
-    if OmegaConf.is_config(cfg):
-        return OmegaConf.to_container(cfg, **kw)
-    elif is_sequence(cfg):
-        return type(cfg)(omegaconf_to_dict(c, **kw) for c in cfg)
-    elif is_mapping(cfg):
-        return {k: omegaconf_to_dict(c, **kw) for k, c in cfg.items()}
-    else:
-        return cfg
-
-
-def omegaconf_save(cfg, *paths: str, resolve: bool = True):
-    """
-    Save omegaconf to yaml
-    """
-    from .file_utils import f_join
-
-    OmegaConf.save(cfg, f_join(*paths), resolve=resolve)

@@ -343,30 +343,23 @@ OBS_LOADER_MAP = {
 #==============================================
 
 def depth_to_pcd(
-    depth: th.Tensor,  # (B, H, W) or (H, W)
-    pose: th.Tensor,   # (B, 7) or (7,)
-    base_link_pose: th.Tensor,  # (B, 7) or (7,)
-    K: th.Tensor,      # (B, 3, 3) or (3, 3)
+    depth: th.Tensor,  # (B, H, W)
+    pose: th.Tensor,   # (B, 7) 
+    base_link_pose: th.Tensor,  # (B, 7) 
+    K: th.Tensor,      # (3, 3)
     max_depth=20,
 ) -> th.Tensor:
     """
     Convert depth images to point clouds with batch processing support.
     Args:
-        depth: (B, H, W) or (H, W) depth tensor
-        pose: (B, 7) or (7,) camera pose tensor [pos, quat]
-        base_link_pose: (B, 7) or (7,) robot base pose tensor [pos, quat]
-        K: (B, 3, 3) or (3, 3) camera intrinsics tensor
+        depth: (B, H, W) depth tensor
+        pose: (B, 7) camera pose tensor [pos, quat]
+        base_link_pose: (B, 7) robot base pose tensor [pos, quat]
+        K: (3, 3) camera intrinsics tensor
         max_depth: maximum depth value to filter
     Returns:
-        pc: (B, H, W, 3) or (H, W, 3) point cloud tensor
+        pc: (B, H, W, 3) point cloud tensor
     """
-    # Handle single vs batch inputs
-    is_batch = len(depth.shape) == 3
-    if not is_batch:
-        depth = depth.unsqueeze(0)
-        pose = pose.unsqueeze(0)
-        base_link_pose = base_link_pose.unsqueeze(0)
-        K = K.unsqueeze(0)
     B, H, W = depth.shape
     device = depth.device
 
@@ -394,7 +387,7 @@ def depth_to_pcd(
     uv = th.stack([u, v, th.ones_like(u)], dim=-1).float()  # (B, H, W, 3)
 
     # Compute inverse of camera intrinsics
-    Kinv = th.linalg.inv(K)  # (B, 3, 3)
+    Kinv = th.linalg.inv(K)  # (3, 3)
 
     # Convert to point cloud
     pc = depth.unsqueeze(-1) * th.matmul(uv, Kinv.transpose(-2, -1))  # (B, H, W, 3)
@@ -412,9 +405,6 @@ def depth_to_pcd(
     pc_transformed = th.matmul(pc_cam, robot_to_world_tf.transpose(-2, -1))  # (B, H*W, 4)
     pc_transformed = pc_transformed[..., :3].view(B, H, W, 3)  # (B, H, W, 3)
 
-    # Return in original format
-    if not is_batch:
-        pc_transformed = pc_transformed.squeeze(0)
     return pc_transformed
 
 
@@ -478,9 +468,11 @@ def process_fused_point_cloud(
     obs: dict,
     robot_name: str, 
     camera_intrinsics: Dict[str, th.Tensor],
+    pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
+    process_seg: bool=False,
     pcd_num_points: Optional[int] = None,
     use_fps: bool=True,
-) -> Tuple[th.Tensor, th.Tensor]:
+) -> Tuple[th.Tensor, Optional[th.Tensor]]:
     print("Fusing point clouds...")
     rgb_pcd, seg_pcd = [], []
     for camera_name, intrinsics in camera_intrinsics.items():
@@ -494,18 +486,21 @@ def process_fused_point_cloud(
         rgb_pcd.append(
             th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).reshape(num_points, -1, 6)
         )  # shape (N, H*W, 6) 
-        seg_pcd.append(obs[f"{camera_name}::seg_semantic"].reshape(num_points, -1)) # shape (N, H*W)
+        if process_seg:
+            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].reshape(num_points, -1)) # shape (N, H*W)
     # Fuse all point clouds and downsample
     fused_pcd_all = th.cat(rgb_pcd, dim=1).to(device="cuda")
     if pcd_num_points is not None:
         fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
         fused_pcd = fused_pcd.float().cpu()
-        fused_seg = th.gather(th.cat(seg_pcd, dim=1), 1, sampled_idx.cpu()).cpu()
+        if process_seg:
+            fused_seg = th.gather(th.cat(seg_pcd, dim=1), 1, sampled_idx.cpu()).cpu()
     else:
         fused_pcd = fused_pcd_all.float().cpu()
-        fused_seg = th.cat(seg_pcd, dim=1).cpu()
+        if process_seg:
+            fused_seg = th.cat(seg_pcd, dim=1).cpu()
 
-    return fused_pcd, fused_seg
+    return fused_pcd, fused_seg if process_seg else None
 
 
 def color_pcd_vis(color_pcd: np.ndarray):

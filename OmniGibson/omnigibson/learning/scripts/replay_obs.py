@@ -8,7 +8,7 @@ import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES, ROBOT_CAMERA_NAMES
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES, ROBOT_CAMERA_NAMES, CAMERA_INTRINSTICS
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer, 
     process_fused_point_cloud, 
@@ -18,7 +18,7 @@ from omnigibson.learning.utils.obs_utils import (
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
-from typing import Dict
+from typing import Dict, Tuple
 
 
 # Create module logger
@@ -112,8 +112,8 @@ def replay_hdf5_file(
     demo_id = int(demo_name.split("_")[-1]) # 3 digit demo id
 
     # Define resolution for consistency
-    WRIST_RESOLUTION = (120, 120)
-    HEAD_RESOLUTION = (180, 180)
+    WRIST_RESOLUTION = (480, 480)
+    HEAD_RESOLUTION = (720, 720)
 
     # This flag is needed to run data playback wrapper
     gm.ENABLE_TRANSITION_RULES = False
@@ -349,7 +349,10 @@ def rgbd_to_pcd(
     task_folder: str, 
     base_name: str, 
     robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
-    pcd_num_points: int=1e5,
+    downsample_ratio: int=4,
+    pcd_range: Tuple[float, float, float, float, float, float] = (-0.2, 1.0, -1.0, 1.0, -0.2, 1.5), # x_min, x_max, y_min, y_max, z_min, z_max
+    pcd_num_points: int=4096,
+    process_seg: bool=False,
     batch_size: int=500,
     use_fps: bool=False,
 ):
@@ -359,7 +362,10 @@ def rgbd_to_pcd(
         task_folder (str): Path to the task folder containing RGBD data.
         base_name (str): Base name of the HDF5 file to process (without file extension).
         robot_camera_names (dict): Dict of camera names to process.
+        downsample_ratio (int): Downsample ratio for the camera resolution.
+        pcd_range (tuple): Range of the point cloud.
         pcd_num_points (int): Number of points to sample from the point cloud.
+        process_seg (bool): Whether to process the segmentation map.
         batch_size (int): Number of frames to process in each batch.
     """
     log.info(f"Generating point cloud data from RGBD for {base_name} in {task_folder}")
@@ -389,33 +395,36 @@ def rgbd_to_pcd(
                     obs = dict() # to store rgbd and pass into process_fused_point_cloud
                     # get all camera intrinsics
                     camera_intrinsics = {}
-                    for robot_camera_name in robot_camera_names.values():
-                        camera_intrinsics[robot_camera_name] = th.from_numpy(
-                            data.attrs[f"{robot_camera_name}::intrinsics"][:]
-                            )
+                    for camera_id, robot_camera_name in robot_camera_names.items():
+                        # Calculate the downsampled camera intrinsics
+                        camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSTICS[camera_id]) / downsample_ratio
+                        camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                         robot_name, camera_name = robot_camera_name.split("::")
                         obs[f"{robot_name}::robot_base_link_pose"] = th.from_numpy(
                             data[f"{robot_name}::robot_base_link_pose"][i:i+batch_size]
                         )
                         obs[f"{robot_name}::{camera_name}::rgb"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::rgb"][i:i+batch_size]
+                            data[f"{robot_name}::{camera_name}::rgb"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
                         obs[f"{robot_name}::{camera_name}::depth_linear"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::depth_linear"][i:i+batch_size]
+                            data[f"{robot_name}::{camera_name}::depth_linear"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
                         obs[f"{robot_name}::{camera_name}::pose"] = th.from_numpy(
                             data[f"{robot_name}::{camera_name}::pose"][i:i+batch_size]
                         )
-                        obs[f"{robot_name}::{camera_name}::seg_semantic"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::seg_semantic"][i:i+batch_size]
-                        )
+                        if process_seg:
+                            obs[f"{robot_name}::{camera_name}::seg_semantic"] = th.from_numpy(
+                                data[f"{robot_name}::{camera_name}::seg_semantic"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
+                            )
                     # process the fused point cloud
                     pcd, seg = process_fused_point_cloud(
                         obs=obs,
                         robot_name=robot_name,
                         camera_intrinsics=camera_intrinsics,
+                        pcd_range=pcd_range,
                         pcd_num_points=pcd_num_points,
                         use_fps=use_fps,
+                        process_seg=process_seg,
                     )
                     log.info("Saving point cloud data...")
                     fused_pcd_dset[i:i+batch_size] = pcd
@@ -460,12 +469,13 @@ def main():
         )
     if args.pcd:
         rgbd_to_pcd(
-            task_folder=os.path.dirname(os.path.dirname(args.file)),
+            task_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
             base_name=os.path.basename(args.file),
             robot_camera_names=ROBOT_CAMERA_NAMES,
-            pcd_num_points=61200,
+            downsample_ratio=8,
+            pcd_num_points=4096,
             batch_size=200,
-            use_fps=False,
+            use_fps=True,
         )
 
     log.info("All done!")
