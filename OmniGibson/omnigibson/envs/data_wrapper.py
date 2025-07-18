@@ -1081,9 +1081,10 @@ class DataPlaybackWrapper(DataWrapper):
                 if isinstance(dat, dict):
                     for mod, dset in dat.items():
                         obs_data_length = data_length_to_flush if self.current_episode_step_count < dset.shape[0] else data_length_to_flush - 1
-                        dset[self.current_episode_step_count-data_length_to_flush+1:self.current_episode_step_count+1] = th.stack([
-                            self.current_traj_history[i][key][mod] for i in range(obs_data_length)
-                        ], dim=0)
+                        if obs_data_length > 0:
+                            dset[self.current_episode_step_count-data_length_to_flush+1:self.current_episode_step_count+1] = th.stack([
+                                self.current_traj_history[i][key][mod] for i in range(obs_data_length)
+                            ], dim=0)
                         if self.current_episode_step_count == 0:
                             dset[0] = self.current_traj_history[0][key][mod]
                 else:
