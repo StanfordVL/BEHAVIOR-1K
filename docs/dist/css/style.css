@@ -268,7 +268,7 @@ body:has(.body-wrap) .md-main {
 .hero-announcement {
     margin-top: 24px;
     padding: 16px 24px;
-    background: rgba(21, 119, 216, 0.1);
+    background: rgba(21, 119, 216, 0.5);
     border: 1px solid #1577d8;
     border-radius: 8px;
     display: flex;
@@ -459,7 +459,7 @@ body:has(.body-wrap) .md-main {
 
 /* Team Section */
 .team-section {
-    padding: 3rem 2rem;
+    padding: 2rem 2rem;
     background: #ffffff;
 }
 
@@ -469,7 +469,7 @@ body:has(.body-wrap) .md-main {
 }
 
 .team-category {
-    margin-bottom: 4rem;
+    margin-bottom: 2rem;
 }
 
 .team-category:last-child {
