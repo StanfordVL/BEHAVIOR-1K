@@ -3,12 +3,11 @@ from typing import Union, Tuple
 import copy
 import numpy as np
 import requests
-import json_numpy
 from collections import deque
 from PIL import Image
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, ACTION_QPOS_INDICES
-json_numpy.patch()
+
 
 RESIZE_SIZE = 224
 ACTION_DIM = 23
@@ -48,6 +47,8 @@ class OpenVLA(BasePolicy):
         control_mode : str = "temporal_ensemble",
         **kwargs
     ) -> None:
+        import json_numpy
+        json_numpy.patch()
         super().__init__(*args, **kwargs)
         # server endpoint for action generation from OpenVLA server
         self.policy_endpoint = f"http://{host}:{port}/act"

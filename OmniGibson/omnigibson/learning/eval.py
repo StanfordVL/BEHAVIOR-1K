@@ -1,31 +1,47 @@
-import os
-import json
+import cv2
 import hydra
+import json
 import logging
+import numpy as np
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
+import os
 import sys
+import torch as th
 import traceback
-from gello.robots.sim_robot.og_teleop_utils import load_available_tasks, get_task_relevant_room_types, augment_rooms
+from av.container import Container
+from av.stream import Stream
+from gello.robots.sim_robot.og_teleop_cfg import SUPPORTED_ROBOTS
+from gello.robots.sim_robot.og_teleop_utils import (
+    augment_rooms,
+    load_available_tasks, 
+    get_task_relevant_room_types,
+    generate_robot_config
+)
 from hydra.utils import call
 from inspect import getsourcefile
-from joylo.gello.robots.sim_robot.og_teleop_cfg import SUPPORTED_ROBOTS
-from joylo.gello.robots.sim_robot.og_teleop_utils import generate_robot_config
 from omegaconf import DictConfig, OmegaConf
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
+    HEAD_RESOLUTION,
+    WRIST_RESOLUTION,
+    ROBOT_CAMERA_NAMES,
+    PROPRIOCEPTION_INDICES,
     generate_basic_environment_config,
     flatten_obs_dict,
 )
+from omnigibson.learning.utils.obs_utils import (
+    create_video_writer,
+    write_video,
+)
 from omnigibson.macros import gm
 from omnigibson.robots import BaseRobot
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
 from typing import Any, Tuple
-import torch as th
-import torch
-import mediapy
+
+
 # set global variables to boost performance
 gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
@@ -91,7 +107,7 @@ class Evaluator:
         self.obs = self.env.reset()[0]
         # manually reset environment episode number
         self.env._current_episode = 0
-        self.obs_buffer = []
+        self._video_writer = None
 
     def load_env(self) -> og.Environment:
         """
@@ -107,14 +123,18 @@ class Evaluator:
             task_cfg = available_tasks[task_name][0]
             robot_type = self.cfg.robot.type
             assert robot_type in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_type}"
-            cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg, robot_type=robot_type)
+            cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
             cfg["robots"] = [
                 generate_robot_config(
                     task_name=task_name,
                     task_cfg=task_cfg,
                 )
             ]
-            cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
+            # Update observation modalities
+            cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb", "depth_linear"]
+            cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
+            if self.cfg.robot.controllers is not None:
+                cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
             cfg["task"]['termination_config']["max_steps"] = self.cfg.task.max_steps
             relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
             relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
@@ -127,6 +147,18 @@ class Evaluator:
     def load_robot(self) -> BaseRobot:
         if self.env_type == "omnigibson":
             robot = self.env.scene.object_registry("name", "robot_r1")
+            og.sim.step()
+            # Update robot sensors:
+            for camera_id, camera_name in ROBOT_CAMERA_NAMES.items():
+                sensor_name = camera_name.split("::")[1]
+                if camera_id == "head": 
+                    robot.sensors[sensor_name].horizontal_aperture = 40.0
+                    robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
+                    robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
+                else:
+                    robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
+                    robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
+            self.env.load_observation_space()
         else:
             raise ValueError(f"Invalid environment type {self.env_type}")
         return robot
@@ -144,18 +176,7 @@ class Evaluator:
         """
         Single step of the task
         """
-        obs = self._preprocess_obs(self.obs)
-        self.robot_action = self.policy.forward(obs=obs)
-        # concatenate the three camera images into one and save to obs_buffer
-        all_obs = torch.cat(
-            [
-                obs["robot_r1::robot_r1:zed_link:Camera:0::rgb"],
-                obs["robot_r1::robot_r1:left_realsense_link:Camera:0::rgb"],
-                obs["robot_r1::robot_r1:right_realsense_link:Camera:0::rgb"],
-            ],
-            dim=0,
-        )
-        self.obs_buffer.append(all_obs)
+        self.robot_action = self.policy.forward(obs=self.obs)
         
         self.obs, _, terminated, truncated, info = self.env.step(self.robot_action)
         # process obs
@@ -163,30 +184,68 @@ class Evaluator:
             self.n_trials += 1
             if info["done"]["success"]:
                 self.n_success_trials += 1
+
+        self.obs = self._preprocess_obs(self.obs)
         return terminated, truncated
+
+    @property
+    def video_writer(self) -> Tuple[Container, Stream]:
+        return self._video_writer
+
+    @video_writer.setter
+    def video_writer(self, video_writer: Tuple[Container, Stream]) -> None:
+        if self._video_writer is not None:
+            (container, stream) = self._video_writer
+            # Flush any remaining packets
+            for packet in stream.encode():
+                container.mux(packet)
+            # Close the container
+            container.close()
+        self._video_writer = video_writer
 
     def _preprocess_obs(self, obs: dict) -> dict:
         """
         Preprocess the observation dictionary before passing it to the policy.
         """
         obs = flatten_obs_dict(obs)
-        base_link_pose = th.concatenate(self.robot.get_position_orientation())
-        left_cam_pose = th.concatenate(
+        base_link_pose = th.cat(self.robot.get_position_orientation())
+        left_cam_pose = th.cat(
             self.robot.sensors["robot_r1:left_realsense_link:Camera:0"].get_position_orientation()
         )
-        right_cam_pose = th.concatenate(
+        right_cam_pose = th.cat(
             self.robot.sensors["robot_r1:right_realsense_link:Camera:0"].get_position_orientation()
         )
-        external_cam_pose = th.concatenate(self.env.external_sensors["external_sensor0"].get_position_orientation())
+        head_cam_pose = th.cat(
+            self.robot.sensors["robot_r1:zed_link:Camera:0"].get_position_orientation()
+        )
         # store the poses to obs
         obs["robot_r1::robot_base_link_pose"] = base_link_pose
-        obs["robot_r1::left_cam_pose"] = left_cam_pose
-        obs["robot_r1::right_cam_pose"] = right_cam_pose
-        obs["robot_r1::external_cam_pose"] = external_cam_pose
+        obs[f"{ROBOT_CAMERA_NAMES['left_wrist']}::pose"] = left_cam_pose
+        obs[f"{ROBOT_CAMERA_NAMES['right_wrist']}::pose"] = right_cam_pose
+        obs[f"{ROBOT_CAMERA_NAMES['head']}::pose"] = head_cam_pose
         return obs
 
+    def _write_video(self) -> None:
+        # concatenate obs
+        left_wrist_rgb = cv2.resize(
+            self.obs[ROBOT_CAMERA_NAMES["left_wrist"] + "::rgb"].numpy(),
+            (360, 360),
+        )
+        right_wrist_rgb = cv2.resize(
+            self.obs[ROBOT_CAMERA_NAMES["right_wrist"] + "::rgb"].numpy(),
+            (360, 360),
+        )
+        head_rgb = self.obs[ROBOT_CAMERA_NAMES["head"] + "::rgb"].numpy()
+        write_video(
+            np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
+            video_writer=self.video_writer,
+            batch_size=1,
+            mode="rgb",
+        )
+        
     def reset(self) -> None:
         self.obs = self.env.reset()[0]
+        self.obs = self._preprocess_obs(self.obs)
         self.policy.reset()
         self.n_success_trials, self.n_trials = 0, 0
 
@@ -206,6 +265,7 @@ class Evaluator:
         logger.info("")
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_value, exc_tb)
+        self.video_writer = None
         self.env.close()
 
     def _sigint_handler(self, signal_received, frame):
@@ -220,16 +280,14 @@ if __name__ == "__main__":
     # open yaml from task path
     with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
-    
-    video_path = Path(config.log_path)
-    video_path.mkdir(parents=True, exist_ok=True)
-            
     OmegaConf.resolve(config)
 
-    from omnigibson.macros import gm
     gm.HEADLESS = config.headless
 
-    instances_to_run = config.task.train_indices if config.task.train else config.task.test_indices
+    video_path = Path(config.log_path)
+    video_path.mkdir(parents=True, exist_ok=True)
+
+    instances_to_run = config.task.train_indices if config.task.test_on_train_indices else config.task.test_indices
     episodes_per_instance = config.task.episodes_per_instance
 
     with Evaluator(config) as evaluator:
@@ -241,35 +299,28 @@ if __name__ == "__main__":
                 for _ in range(10):
                     og.sim.render()
                 evaluator.reset()
-                assert len(evaluator.obs_buffer) == 0, "Observation buffer should be empty at the start of each episode."
                 done = False
-                video_name = str(video_path) + f'/video_{idx}_{epi}.mp4'
+                if config.write_video:
+                    video_name = str(video_path) + f'/video_{idx}_{epi}.mp4'
+                    evaluator.video_writer = create_video_writer(
+                        fpath=video_name,
+                        resolution=(720, 1080),
+                    )
                 while not done:
                     terminated, truncated = evaluator.step()
                     if terminated or truncated:
                         done = True
-                        
+                    if config.write_video:
+                       evaluator._write_video()
                     if evaluator.env._current_step % 1000 == 0:
                         logger.info(f"Current step: {evaluator.env._current_step}")
-                        mediapy.write_video(
-                            video_name,
-                            torch.stack(evaluator.obs_buffer).cpu().numpy()[...,:3],
-                            fps=30,
-                        )
-                        logger.info(f"Saved video to {video_name}")
-
                 logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
                 logger.info(f"Total trials: {evaluator.n_trials}")
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
                 
-                if len(evaluator.obs_buffer) > 0:
-                    mediapy.write_video(
-                        video_name,
-                        torch.stack(evaluator.obs_buffer).cpu().numpy()[...,:3],
-                        fps=30,
-                    )
-                    evaluator.obs_buffer = []
+                if config.write_video:
+                    evaluator.video_writer = None
                     logger.info(f"Saved video to {video_name}")
                 else:
                     logger.warning("No observations were recorded.")

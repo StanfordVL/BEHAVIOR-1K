@@ -1,11 +1,11 @@
-import numpy as np
-import torch
+import logging
+import torch as th
 from collections import deque
-from hydra.utils import instantiate
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat, any_slice
-from OmniGibson.omnigibson.learning.utils.obs_utils import process_fused_point_cloud
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES, JOINT_RANGE
+from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
+from typing import Optional
 
 
 class VisionActionILPolicy(BasePolicy):
@@ -17,30 +17,31 @@ class VisionActionILPolicy(BasePolicy):
         self,
         *args,
         # ====== policy model ======
-        host: str,
-        port: str,
+        use_websocket: bool = True,
+        host: Optional[str] = None,
+        port: Optional[int] = None,
         action_prediction_horizon: int,
         obs_window_size: int = 1,
         # ====== other args for base class ======
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.policy = instantiate(policy)
+        if use_websocket:
+            self.policy = WebsocketClientPolicy(host=host, port=port)
+            logging.info(f"Server metadata: {self.policy.get_server_metadata()}")
+        else:
+            self.policy = None
+            logging.info(f"Skipped creating websocket client policy")
         self.action_prediction_horizon = action_prediction_horizon
         self.obs_window_size = obs_window_size
         self._obs_history = deque(maxlen=obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
+        self.robot_type = "R1Pro"
+        self.device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
-    @classmethod
-    def load(cls, *args, **kwargs) -> "BasePolicy":
-        """
-        Load the policy (e.g. from a checkpoint given a file path).
-        """
-        return super().load_from_checkpoint(checkpoint_path=kwargs["ckpt_path"], strict=kwargs.get("strict", True))
-
-    def forward(self, obs: dict, *args, **kwargs) -> torch.Tensor:
-        obs = self.process_data(data_batch=obs, extract_action=False)
+    def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
+        obs = self.process_obs(obs=obs)
         if len(self._obs_history) == 0:
             for _ in range(self.obs_window_size):
                 self._obs_history.append(obs)
@@ -50,37 +51,33 @@ class VisionActionILPolicy(BasePolicy):
 
         need_inference = self._action_idx % self.action_prediction_horizon == 0
         if need_inference:
-            self._action_traj_pred = self.policy.act(obs)  # dict of (B = 1, T_A, ...)
-            self._action_traj_pred = {
-                k: v[0].detach().cpu() for k, v in self._action_traj_pred.items()
-            }  # dict of (T_A, ...)
+            self._action_traj_pred = self.policy.act({"obs": obs}).squeeze(0).detach().cpu() # (T_A, A)
             self._action_idx = 0
-        action = any_slice(self._action_traj_pred, np.s_[self._action_idx])
+        action = self._action_traj_pred[self._action_idx]
         self._action_idx += 1
-        return torch.cat(list(action.values()))
+        return action
 
     def reset(self) -> None:
-        pass
+        self.policy.reset()
+        self._obs_history = deque(maxlen=self.obs_window_size)
+        self._action_traj_pred = None
+        self._action_idx = 0
 
     def process_obs(self, obs: dict) -> dict:
-        # process observation data
-        proprio = obs["robot_r1::proprio"]
-        if proprio.ndim == 1:
-            # if proprio is 1D, we need to expand it to 3D
-            proprio = proprio[None, None, :].to(self.device)
-        if "robot_r1::fused_pcd" in obs:
-            fused_pcd = obs["robot_r1::fused_pcd"]
-        else:
-            fused_pcd = process_fused_point_cloud(obs)
-        # if fused_pcd is 1D, we need to expand it to 3D
-        if fused_pcd.ndim == 2:
-            fused_pcd = torch.from_numpy(fused_pcd[None, None, :]).to(self.device)
+        # Expand twice to get B and T_A dimensions
+        proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0).to(self.device)
         processed_obs = {
-            "pointcloud": {
-                "rgb": fused_pcd[..., :3],
-                "xyz": fused_pcd[..., 3:],
+            "qpos": {
+                key: (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - JOINT_RANGE[self.robot_type][key][0]) / 
+                (JOINT_RANGE[self.robot_type][key][1] - JOINT_RANGE[self.robot_type][key][0])
+                for key in PROPRIO_QPOS_INDICES[self.robot_type]
             },
-            "qpos": {key: proprio[..., PROPRIO_QPOS_INDICES["R1Pro"][key]] for key in PROPRIO_QPOS_INDICES["R1Pro"]},
-            "odom": {"base_velocity": proprio[..., PROPRIOCEPTION_INDICES["R1Pro"]["base_qvel"]]},
+            "odom": {
+                "base_velocity": (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - JOINT_RANGE[self.robot_type]["base"][0]) / 
+                (JOINT_RANGE[self.robot_type]["base"][1] - JOINT_RANGE[self.robot_type]["base"][0])
+            },
         }
+        processed_obs.update({
+            k: v[..., :3].unsqueeze(0).unsqueeze(0).to(self.device) for k, v in obs.items() if "rgb" in k
+        })
         return processed_obs

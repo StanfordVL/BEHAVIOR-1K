@@ -4,6 +4,7 @@ import logging
 import copy
 import torch
 from omnigibson.learning.policies.policy_base import BasePolicy
+from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
 
 RESIZE_SIZE = 224
 
@@ -45,8 +46,7 @@ class OpenPi(BasePolicy):
         from openpi_client.image_tools import resize_with_pad
         self._resize_with_pad = resize_with_pad
         # Create a trained policy.
-        from openpi_client import websocket_client_policy 
-        self.policy = websocket_client_policy.WebsocketClientPolicy(
+        self.policy = WebsocketClientPolicy(
             host=host,
             port=port,
         )
@@ -155,7 +155,7 @@ class OpenPi(BasePolicy):
             "prompt": self.text_prompt,
         }
         try:
-            action = self.policy.infer(batch) 
+            action = self.policy.act(batch) 
             self.last_action = action
         except:
             action = self.last_action
@@ -210,7 +210,7 @@ class OpenPi(BasePolicy):
             }
 
             try:
-                action = self.policy.infer(batch)
+                action = self.policy.act(batch)
                 self.last_action = action
             except:
                 action = self.last_action

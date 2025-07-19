@@ -1,6 +1,5 @@
 # @package _global_
 
-env: omnigibson
 policy_name: pi0 
 log_path: /svl/u/ravenh/b1k_baselines/OmniGibson/logs/pi0
 

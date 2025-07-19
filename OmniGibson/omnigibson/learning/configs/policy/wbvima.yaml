@@ -1,6 +1,5 @@
 # @package _global_
 
-env: omnigibson
 policy_name: wbvima
 
 # ====== Eval Config ======

@@ -6,7 +6,7 @@ defaults:
 policy_name: ???  # filled by policy
 headless: true
 
-eval: ??? # filled by policy
+write_video: true
 log_path: ???
 
 robot:

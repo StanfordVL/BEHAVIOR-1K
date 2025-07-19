@@ -8,7 +8,9 @@ ROBOT_CAMERA_NAMES = {
     "head": "robot_r1::robot_r1:zed_link:Camera:0",
 }
 
-
+# Camera resolutions and corresponding intrinstics
+HEAD_RESOLUTION = (720, 720)
+WRIST_RESOLUTION = (480, 480)
 CAMERA_INTRINSTICS = {
     "head": np.array([[306., 0., 360.], [0., 306., 360.], [0., 0., 1.]], dtype=np.float32), # 720x720
     "left_wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 480x480
@@ -105,19 +107,32 @@ JOINT_RANGE = {
             np.array([-4.4506, -0.1745, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=np.float32),
             np.array([1.3090, 3.1416, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=np.float32)
         ),
-        "right_arm": (
-            np.array([-4.4506, -3.1416, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=np.float32),
-            np.array([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=np.float32)
-        ),
         "left_gripper": (
             np.array([-1], dtype=np.float32),
             np.array([1], dtype=np.float32)
+        ),
+        "right_arm": (
+            np.array([-4.4506, -3.1416, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=np.float32),
+            np.array([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=np.float32)
         ),
         "right_gripper": (
             np.array([-1], dtype=np.float32),
             np.array([1], dtype=np.float32)
         ),
     }
+}
+JOINT_RANGE_ARRAY = {
+    robot_name: (
+        np.concatenate([
+            JOINT_RANGE[robot_name][part][0]
+            for part in ACTION_QPOS_INDICES[robot_name]
+        ]), 
+        np.concatenate([
+            JOINT_RANGE[robot_name][part][1]
+            for part in ACTION_QPOS_INDICES[robot_name]
+        ])
+    )
+    for robot_name in JOINT_RANGE
 }
 
 
@@ -128,10 +143,11 @@ PCD_RANGE = (
 )
 
 
-TASK_INDICES = {
-    0: "turning_on_radio",
-    2: "can_meat",
+TASK_NAMES_TO_INDICES = {
+    "turning_on_radio": 0,
+    "can_meat": 2,
 }
+TASK_INDICES_TO_NAMES = {v: k for k, v in TASK_NAMES_TO_INDICES.items()}
 
 
 def generate_basic_environment_config(task_name, task_cfg):

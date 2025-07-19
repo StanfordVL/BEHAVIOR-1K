@@ -1,6 +1,5 @@
 # @package _global_
 
-env: omnigibson
 policy_name: openvla 
 log_path: /home/evans/logs/b1k_baselines/OmniGibson/logs/openvla
 

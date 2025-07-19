@@ -1,6 +1,5 @@
 # @package _global_
 
-env: omnigibson
 policy_name: dummy 
 log_path: /home/svl/Documents/logs/dummy
 

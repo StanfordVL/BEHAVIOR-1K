@@ -4,6 +4,8 @@ import omnigibson.utils.transform_utils as T
 import open3d as o3d
 import cv2
 import torch as th
+from av.container import Container
+from av.stream import Stream
 from time import sleep
 from tqdm import trange
 from torch_cluster import fps
@@ -87,7 +89,7 @@ def create_video_writer(
     pix_fmt="yuv420p",
     stream_options=None,
     context_options=None, 
-):
+) -> Tuple[Container, Stream]:
     """
     Creates a video writer to write video frames to when playing back the dataset using PyAV
 
@@ -253,14 +255,14 @@ class RGBVideoLoader(VideoLoader):
     def __init__(
         self, 
         data_path: str, 
-        base_name: str,
+        task_id: int,
+        camera_id: str,
         demo_id: str,
-        camera_name: str,
         *args, 
         **kwargs
     ):
         super().__init__(
-            path=f"{data_path}/rgb/{base_name}/{demo_id}/{camera_name}::rgb.mp4",
+            path=f"{data_path}/videos/task-{task_id:04d}/observation.images.rgb.{camera_id}/episode_{demo_id}.mp4",
             *args, 
             **kwargs
         )
@@ -274,9 +276,9 @@ class DepthVideoLoader(VideoLoader):
     def __init__(
         self, 
         data_path: str, 
-        base_name: str,
+        task_id: int,
+        camera_id: str,
         demo_id: str,
-        camera_name: str,
         *args, 
         **kwargs
     ):
@@ -284,7 +286,7 @@ class DepthVideoLoader(VideoLoader):
         self.max_depth = kwargs.get("max_depth", MAX_DEPTH)
         self.shift = kwargs.get("shift", DEPTH_SHIFT)
         super().__init__(
-            path=f"{data_path}/depth/{base_name}/{demo_id}/{camera_name}::depth_linear.mp4",
+            path=f"{data_path}/videos/task-{task_id:04d}/observation.images.depth.{camera_id}/episode_{demo_id}.mp4",
             *args, 
             **kwargs
         )
@@ -306,9 +308,9 @@ class SegVideoLoader(VideoLoader):
     def __init__(
         self, 
         data_path: str, 
-        base_name: str,
+        task_id: int,
+        camera_id: str,
         demo_id: str,
-        camera_name: str,
         *args, 
         **kwargs
     ):
@@ -317,7 +319,7 @@ class SegVideoLoader(VideoLoader):
         self.id_list = self.id_list.to(device="cuda")  # (N_ids,)
         self.palette = th.from_numpy(generate_yuv_palette(len(self.id_list))).float().to(device="cuda")  # (N_ids, 3)
         super().__init__(
-            path=f"{data_path}/seg/{base_name}/{demo_id}/{camera_name}::seg_instance_id.mp4",
+            path=f"{data_path}/videos/task-{task_id:04d}/observation.images.seg_instance_id.{camera_id}/episode_{demo_id}.mp4",
             *args, 
             **kwargs
         )

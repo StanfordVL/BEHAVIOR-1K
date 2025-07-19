@@ -1,8 +1,6 @@
 import logging
-import torch
+import torch as th
 from abc import ABC, abstractmethod
-from typing import Any, Optional
-from omegaconf import DictConfig, OmegaConf
 
 
 logger = logging.getLogger("BasePolicy")
@@ -24,7 +22,7 @@ class BasePolicy(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def forward(self, obs: dict, *args, **kwargs) -> torch.Tensor:
+    def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         """
         Forward pass of the policy.
         This is used for inference and should return the action.

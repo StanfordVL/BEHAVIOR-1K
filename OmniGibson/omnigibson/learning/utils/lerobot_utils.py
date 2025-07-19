@@ -4,9 +4,32 @@ import os
 from typing import Tuple
 import numpy as np
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
+from omnigibson.learning.utils.eval_utils import TASK_INDICES_TO_NAMES
 
 
 class BehaviorLeRobotDataset(LeRobotDataset):
+    """
+    LeRobotDataset with the following customizations:
+        1. Custom chunking logic based on 
+    """
+    def __init__(
+        self,
+        *args,
+        tasks: list[str] = None,
+        video_backend: str = "pyav",
+        **kwargs,
+    ):
+        """
+        Args:
+            tasks: list of tasks to load. If None, all tasks will be loaded.
+            video_backend: video backend to use for decoding videos.
+        """
+        super().__init__(
+            *args,
+            video_backend=video_backend,
+            **kwargs,
+        )
+
     def get_episodes_file_paths(self) -> list[str]:
         """
         Overwrite the original method to use the episodes indices instead of range(self.meta.total_episodes)
@@ -25,10 +48,10 @@ class BehaviorLeRobotDataset(LeRobotDataset):
 
 
 def generate_task_json(data_dir: str) -> int:
-    num_tasks = len(TASK_INDICES)
+    num_tasks = len(TASK_INDICES_TO_NAMES)
     
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
-        for task_index, task_name in TASK_INDICES.items():
+        for task_index, task_name in TASK_INDICES_TO_NAMES.items():
             json.dump({"task_index": task_index, "task": task_name}, f)
             f.write("\n")
     return num_tasks

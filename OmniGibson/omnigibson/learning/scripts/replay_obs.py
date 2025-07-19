@@ -8,7 +8,14 @@ import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, TASK_INDICES, ROBOT_CAMERA_NAMES, CAMERA_INTRINSTICS
+from omnigibson.learning.utils.eval_utils import (
+    PROPRIOCEPTION_INDICES, 
+    TASK_NAMES_TO_INDICES, 
+    ROBOT_CAMERA_NAMES, 
+    CAMERA_INTRINSTICS,
+    HEAD_RESOLUTION,
+    WRIST_RESOLUTION,
+)
 from omnigibson.learning.utils.obs_utils import (
     create_video_writer, 
     process_fused_point_cloud, 
@@ -110,10 +117,6 @@ def replay_hdf5_file(
     base_name = os.path.basename(hdf_input_path)
     demo_name = os.path.splitext(base_name)[0]
     demo_id = int(demo_name.split("_")[-1]) # 3 digit demo id
-
-    # Define resolution for consistency
-    WRIST_RESOLUTION = (480, 480)
-    HEAD_RESOLUTION = (720, 720)
 
     # This flag is needed to run data playback wrapper
     gm.ENABLE_TRANSITION_RULES = False
@@ -444,8 +447,7 @@ def main():
 
     args = parser.parse_args()
 
-    task_indices_to_names = {v: k for k, v in TASK_INDICES.items()}
-    task_id = task_indices_to_names[os.path.basename(os.path.dirname(args.file))]
+    task_id = TASK_NAMES_TO_INDICES[os.path.basename(os.path.dirname(args.file))]
 
     # Process each file
     if not os.path.exists(args.file):
