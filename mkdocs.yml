@@ -1,0 +1,173 @@
+# yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+# The above line is included to enable intellisense for mkdocs.yml file in VSCode. It is not a valid
+# part of the mkdocs.yml file and should remain commented out.
+
+site_name: BEHAVIOR-1K
+repo_name: StanfordVL/BEHAVIOR-1K
+site_url: https://behavior.stanford.edu/omnigibson # TODO: move this to root
+repo_url: https://github.com/StanfordVL/BEHAVIOR-1K
+theme: 
+  name: material
+  logo: assets/behavior_logo3.png
+  favicon: assets/behavior_logo3.png
+  icon:
+    repo: fontawesome/brands/git-alt
+
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.tracking
+    - navigation.instant
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - toc.integrate
+    - content.code.copy
+
+  extra:
+    homepage: https://behavior.stanford.edu
+
+  custom_dir: docs/overrides
+
+  # color info
+  palette:
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      primary: white
+      accent: indigo
+      scheme: default
+
+extra_css:
+  - stylesheets/extra.css
+  - https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css
+
+extra_javascript:
+  - assets/fold_api_reference.js
+
+markdown_extensions:
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: OmniGibson/omnigibson
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+
+# extra plugins
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [OmniGibson/omnigibson]
+          options:
+            docstring_options:
+              returns_named_value: false
+  # - social
+  - gen-files:
+      scripts:
+      - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - offline
+
+nav:
+  - Home: index.md
+  - 🏆 2025 BEHAVIOR Challenge: challenge/overview.md
+  - Documentation:
+    - Installation: getting_started/installation.md
+    - Quickstart: getting_started/quickstart.md
+    - Important Concepts: getting_started/important_concepts.md
+    - Examples: getting_started/examples.md
+    - OmniGibson:
+      - Overview: omnigibson/overview.md
+      - Prims: omnigibson/prims.md
+      - Objects: omnigibson/objects.md
+      - Object States: omnigibson/object_states.md
+      - Robots: omnigibson/robots.md
+      - Controllers: omnigibson/controllers.md
+      - Sensors: omnigibson/sensors.md
+      - Systems: omnigibson/systems.md
+      - Scenes: omnigibson/scenes.md
+      - Transition Rules: omnigibson/transition_rules.md
+      - Simulator: omnigibson/simulator.md
+      - Tasks: omnigibson/tasks.md
+      - Environments: omnigibson/environments.md
+      - Vector Environments: omnigibson/vector_environments.md
+      - Setting Macros: omnigibson/setting_macros.md
+      - Under the Hood - Isaac Sim: omnigibson/under_the_hood.md
+    - Tutorials:
+      - Demo Collection: tutorials/demo_collection.md
+      - Running on a Compute Cluster: tutorials/running_on_a_compute_cluster.md
+      - Remote Streaming: tutorials/remote_streaming.md    
+      - Saving and Loading Simulation State: tutorials/save_load.md
+      - Customizing Robots: tutorials/customizing_robots.md
+      - Custom Robot Import: tutorials/custom_robot_import.md
+    - Components:
+      - BDDL:
+        - Task Definitions: behavior_components/behavior_tasks.md
+        - Noun Hierarchy: behavior_components/noun_hierarchy.md
+        - Knowledgebase: behavior_components/behavior_knowledgebase.md
+      - 3D Assets: 
+        - Scenes: behavior_components/scenes.md
+        - Objects: behavior_components/objects.md
+        - Annotation process: behavior_components/annotation_process.md
+        - Asset pipeline: behavior_components/asset_pipeline.md
+        - Asset sources: behavior_components/asset_sources.md
+      - Teleoperation: 
+        - JoyLo: behavior_components/joylo.md
+        - VR: behavior_components/vr.md
+    - Other:
+      - Speed Optimization: other/speed_optimization.md
+      - Roadmap: other/roadmap.md
+      - FAQ: other/faq.md
+      - Known Issues & Troubleshooting: other/known_issues.md
+      - Contributing: other/contributing.md
+    - API Reference: reference/*
+    - Changelog: https://github.com/StanfordVL/OmniGibson/releases
+  - Knowledgebase: https://behavior.stanford.edu/knowledgebase/
+  - Research: other/related_research.md
+  - Workshops:
+    - workshops/overview.md
+    - 1st BEHAVIOR Workshop @ ICCV 2021: workshops/iccv21.md
+    - 1st BEHAVIOR Tutorial @ ECCV 2022: workshops/eccv22.md
+  - BEHAVIOR-100:
+    - behavior_100/overview.md
+    - VR Dataset: behavior_100/dataset.md
+    - Demo Gallery: behavior_100/demo_gallery.md
+  - <i class="fa-brands fa-discord"></i>  Support: https://discord.gg/bccR5vGFEx
+
+extra:
+  analytics:
+    provider: google
+    property: G-6L1G6GMR63
+  generator: false
+  social:
+    - icon: material/web
+      link: https://svl.stanford.edu/
+      name: SVL
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/StanfordSVL
+      name: Twitter
+    - icon: fontawesome/brands/github
+      link: https://github.com/StanfordVL
+      name: GitHub
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/bccR5vGFEx
+      name: Discord
+
+copyright: © 2025 Stanford Vision and Learning Lab
