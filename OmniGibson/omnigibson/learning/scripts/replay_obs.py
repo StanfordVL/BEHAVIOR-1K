@@ -12,7 +12,7 @@ from omnigibson.learning.utils.eval_utils import (
     PROPRIOCEPTION_INDICES, 
     TASK_NAMES_TO_INDICES, 
     ROBOT_CAMERA_NAMES, 
-    CAMERA_INTRINSTICS,
+    CAMERA_INTRINSICS,
     HEAD_RESOLUTION,
     WRIST_RESOLUTION,
 )
@@ -400,7 +400,7 @@ def rgbd_to_pcd(
                     camera_intrinsics = {}
                     for camera_id, robot_camera_name in robot_camera_names.items():
                         # Calculate the downsampled camera intrinsics
-                        camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSTICS[camera_id]) / downsample_ratio
+                        camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
                         camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                         robot_name, camera_name = robot_camera_name.split("::")
                         obs[f"{robot_name}::robot_base_link_pose"] = th.from_numpy(

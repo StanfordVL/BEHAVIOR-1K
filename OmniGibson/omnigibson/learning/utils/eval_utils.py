@@ -12,7 +12,7 @@ ROBOT_CAMERA_NAMES = {
 # Camera resolutions and corresponding intrinstics
 HEAD_RESOLUTION = (720, 720)
 WRIST_RESOLUTION = (480, 480)
-CAMERA_INTRINSTICS = {
+CAMERA_INTRINSICS = {
     "head": np.array([[306., 0., 360.], [0., 306., 360.], [0., 0., 1.]], dtype=np.float32), # 720x720
     "left_wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 480x480
     "right_wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 480x480
