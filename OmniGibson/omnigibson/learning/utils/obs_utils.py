@@ -50,29 +50,29 @@ def quantize_depth(
 
 
 def dequantize_depth(
-    quantized_depth: th.Tensor, 
+    quantized_depth: np.ndarray, 
     min_depth: float = MIN_DEPTH, 
     max_depth: float = MAX_DEPTH, 
     shift: float=DEPTH_SHIFT
-) -> th.Tensor:
+) -> np.ndarray:
     """
     Dequantizes a 14-bit depth tensor back to the original depth values.
     
     Args:
-        quantized_depth (th.Tensor): Quantized depth tensor.
+        quantized_depth (np.ndarray): Quantized depth tensor.
         min_depth (float): Minimum depth value.
         max_depth (float): Maximum depth value.
         shift (float): Small value to shift depth to avoid log(0).
     Returns:
-        th.Tensor: Dequantized depth tensor.
+        np.ndarray: Dequantized depth tensor.
     """
     qmax = (1 << 14) - 1
-    log_min = th.log(th.tensor(min_depth + shift, dtype=th.float32, device=quantized_depth.device))
-    log_max = th.log(th.tensor(max_depth + shift, dtype=th.float32, device=quantized_depth.device))
+    log_min = np.log(min_depth + shift)
+    log_max = np.log(max_depth + shift)
 
-    log_norm = quantized_depth.to(th.float32) / qmax
+    log_norm = quantized_depth / qmax
     log_depth = log_norm * (log_max - log_min) + log_min
-    depth = th.clamp(th.exp(log_depth) - shift, min=min_depth, max=max_depth)
+    depth = np.clip(np.exp(log_depth) - shift, min_depth, max_depth)
 
     return depth
 
@@ -180,6 +180,7 @@ class VideoLoader:
         path: str,
         batch_size: Optional[int]=None, 
         stride: int=1, 
+        output_size: Tuple[int, int]=(128, 128),
         *args, 
         **kwargs
     ):
@@ -201,7 +202,8 @@ class VideoLoader:
         self.stride = stride
         self._frame_iter = None
         self._done = False
-
+        self.output_size = output_size
+        
     def __iter__(self) -> Generator[th.Tensor, None, None]:
         self.container.seek(0)
         self._frame_iter = self.container.decode(self.stream)
@@ -268,8 +270,9 @@ class RGBVideoLoader(VideoLoader):
         )
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
-        rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3), dtype=uint8
-        return th.from_numpy(rgb).unsqueeze(0)  # (1, H, W, 3)
+        rgb = frame.to_ndarray(format="rgb24").astype(np.float32) / 255.0  # (H, W, 3), dtype=float32
+        rgb = cv2.resize(rgb, self.output_size, interpolation=cv2.INTER_AREA)
+        return th.from_numpy(rgb).unsqueeze(0).to(th.float32)  # (1, H, W, 3)
 
 
 class DepthVideoLoader(VideoLoader):
@@ -293,15 +296,17 @@ class DepthVideoLoader(VideoLoader):
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         # Decode Y (luma) channel only; YUV420 → grayscale image
-        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()
-        frame_gray16 = th.from_numpy(frame_gray16).unsqueeze(0)  # (1, H, W)
+        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()  # (H, W)
         depth = dequantize_depth(
             frame_gray16,
             min_depth=self.min_depth,
             max_depth=self.max_depth,
             shift=self.shift
         )
-        return depth
+        depth = cv2.resize(depth, self.output_size, interpolation=cv2.INTER_AREA).astype(np.float32)
+        # normalize depth to [0, 1]
+        depth = (depth - self.min_depth) / (self.max_depth - self.min_depth)
+        return th.from_numpy(depth).unsqueeze(0).to(th.float32)  # (1, H, W)
         
 
 class SegVideoLoader(VideoLoader):
@@ -331,7 +336,8 @@ class SegVideoLoader(VideoLoader):
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
         ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
-        return ids.unsqueeze(0).cpu()  # (1, H, W)
+        ids = cv2.resize(ids.numpy(), self.output_size, interpolation=cv2.INTER_NEAREST)
+        return th.from_numpy(ids).unsqueeze(0).cpu().to(th.long)  # (1, H, W)
 
 
 OBS_LOADER_MAP = {

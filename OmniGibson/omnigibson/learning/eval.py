@@ -180,7 +180,7 @@ class Evaluator:
         
         self.obs, _, terminated, truncated, info = self.env.step(self.robot_action)
         # process obs
-        if terminated:
+        if terminated or truncated:
             self.n_trials += 1
             if info["done"]["success"]:
                 self.n_success_trials += 1
