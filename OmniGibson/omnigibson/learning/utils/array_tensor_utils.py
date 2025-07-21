@@ -44,12 +44,8 @@ def any_concat(xs: List, *, dim: int = 0):
 
 
 @make_recursive_func
-def any_slice(x, slice):
+def any_to_torch(tensor_struct, device: str = "cuda"):
     """
-    Args:
-        slice: you can use np.s_[...] to return the slice object
+    Converts all arrays/tensors in a nested structure to PyTorch tensors.
     """
-    if isinstance(x, (np.ndarray, th.Tensor)):
-        return x[slice]
-    else:
-        return x
+    return tree.map_structure(lambda x: th.tensor(x, dtype=th.float32).to(device), tensor_struct)

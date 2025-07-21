@@ -1,17 +1,25 @@
 """
 Adapted from https://github.com/Physical-Intelligence/openpi
 """
-
+import asyncio
 import functools
+import http
 import logging
 import msgpack
 import numpy as np
 import time
+import torch as th
+import traceback
 import websockets.sync.client
-from typing import Dict, Optional, Tuple
+import websockets.asyncio.server as _server
+from copy import deepcopy
+from typing import Any, Dict, Optional, Tuple
+from omnigibson.learning.utils.array_tensor_utils import any_to_torch
+
+logger = logging.getLogger(__name__)
 
 
-__all__ = ["WebsocketClientPolicy"]
+__all__ = ["WebsocketClientPolicy", "WebsocketPolicyServer"]
 
 
 class WebsocketClientPolicy:
@@ -45,17 +53,101 @@ class WebsocketClientPolicy:
                 logging.info("Still waiting for server...")
                 time.sleep(5)
 
-    def act(self, obs: Dict) -> Dict:  # noqa: UP006
+    def act(self, obs: Dict) -> th.Tensor:
         data = self._packer.pack(obs)
         self._ws.send(data)
         response = self._ws.recv()
         if isinstance(response, str):
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
-        return unpackb(response)
+        action_dict = unpackb(response)
+        action = th.from_numpy(action_dict["action"]).to(th.float32)
+        return action
 
     def reset(self) -> None:
         pass
+
+
+class WebsocketPolicyServer:
+    """Serves a policy using the websocket protocol. See websocket_client_policy.py for a client implementation.
+
+    Currently only implements the `load` and `infer` methods.
+    """
+
+    def __init__(
+        self,
+        policy: Any,
+        host: str = "0.0.0.0",
+        port: int | None = None,
+        metadata: dict | None = None,
+    ) -> None:
+        self._policy = policy
+        self._host = host
+        self._port = port
+        self._metadata = metadata or {}
+        logging.getLogger("websockets.server").setLevel(logging.INFO)
+
+    def serve_forever(self) -> None:
+        asyncio.run(self.run())
+
+    async def run(self):
+        async with _server.serve(
+            self._handler,
+            self._host,
+            self._port,
+            compression=None,
+            max_size=None,
+            process_request=_health_check,
+        ) as server:
+            await server.serve_forever()
+
+    async def _handler(self, websocket: _server.ServerConnection):
+        logger.info(f"Connection from {websocket.remote_address} opened")
+        packer = Packer()
+
+        await websocket.send(packer.pack(self._metadata))
+
+        prev_total_time = None
+        while True:
+            try:
+                start_time = time.monotonic()
+                obs = unpackb(await websocket.recv())
+                obs = any_to_torch(deepcopy(obs), device=self._policy.device)
+
+                infer_time = time.monotonic()
+                action = self._policy.act(obs)
+                infer_time = time.monotonic() - infer_time
+
+                action = {
+                    "action": action.cpu().numpy(),
+                }
+                action["server_timing"] = {
+                    "infer_ms": infer_time * 1000,
+                }
+                if prev_total_time is not None:
+                    # We can only record the last total time since we also want to include the send time.
+                    action["server_timing"]["prev_total_ms"] = prev_total_time * 1000
+
+                await websocket.send(packer.pack(action))
+                prev_total_time = time.monotonic() - start_time
+
+            except websockets.ConnectionClosed:
+                logger.info(f"Connection from {websocket.remote_address} closed")
+                break
+            except Exception:
+                await websocket.send(traceback.format_exc())
+                await websocket.close(
+                    code=websockets.frames.CloseCode.INTERNAL_ERROR,
+                    reason="Internal server error. Traceback included in previous frame.",
+                )
+                raise
+
+
+def _health_check(connection: _server.ServerConnection, request: _server.Request) -> _server.Response | None:
+    if request.path == "/healthz":
+        return connection.respond(http.HTTPStatus.OK, "OK\n")
+    # Continue with the normal request handling.
+    return None
 
 
 """

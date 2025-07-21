@@ -4,10 +4,10 @@ import torch as th
 import torch.nn.functional as F
 from collections import deque
 from omnigibson.learning.policies.policy_base import BasePolicy
-from omnigibson.learning.utils.array_tensor_utils import any_concat, any_slice
+from omnigibson.learning.utils.array_tensor_utils import any_concat
 from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES, JOINT_RANGE
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
-from typing import Optional, Tuple
+from typing import List, Optional
 
 
 class VisionActionILPolicy(BasePolicy):
@@ -24,7 +24,7 @@ class VisionActionILPolicy(BasePolicy):
         port: Optional[int] = None,
         action_prediction_horizon: int,
         obs_window_size: int = 1,
-        obs_output_size: Tuple[int, int] = (128, 128),
+        obs_output_size: List[int] = [128, 128],
         # ====== other args for base class ======
         **kwargs,
     ) -> None:
@@ -35,9 +35,16 @@ class VisionActionILPolicy(BasePolicy):
         else:
             self.policy = None
             logging.info(f"Skipped creating websocket client policy")
+        # post-processing func
+        if use_websocket:
+            # convert to numpy
+            self._post_processing_fn = lambda x: x.cpu().numpy()
+        else:
+            # move all tensor to self.device
+            self._post_processing_fn = lambda x: x.to(self.device)
         self.action_prediction_horizon = action_prediction_horizon
         self.obs_window_size = obs_window_size
-        self.obs_output_size = obs_output_size
+        self.obs_output_size = tuple(obs_output_size)
         self._obs_history = deque(maxlen=obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
@@ -73,18 +80,22 @@ class VisionActionILPolicy(BasePolicy):
         proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
         processed_obs = {
             "qpos": {
-                key: ((proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
-                (self.joint_range[key][1] - self.joint_range[key][0])).to(self.device)
+                key: self._post_processing_fn(
+                    (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
+                    (self.joint_range[key][1] - self.joint_range[key][0])
+                )
                 for key in PROPRIO_QPOS_INDICES[self.robot_type]
             },
             "odom": {
-                "base_velocity": ((proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
-                (self.joint_range["base"][1] - self.joint_range["base"][0])).to(self.device)
+                "base_velocity": self._post_processing_fn(
+                    (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
+                    (self.joint_range["base"][1] - self.joint_range["base"][0])
+                ),
             },
         }
         processed_obs.update({
-            k: F.interpolate(
+            k: self._post_processing_fn(F.interpolate(
                 v[..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32) / 255.0, self.obs_output_size, mode="area"
-            ).unsqueeze(0).to(self.device) for k, v in obs.items() if "rgb" in k
+            ).unsqueeze(0)) for k, v in obs.items() if "rgb" in k
         })
         return processed_obs
