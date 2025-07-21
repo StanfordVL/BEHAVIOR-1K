@@ -4,6 +4,7 @@ import json
 import numpy as np
 import omnigibson as og
 import os
+import omnigibson.utils.transform_utils as T
 import pandas as pd
 import torch as th
 from omnigibson.envs import DataPlaybackWrapper
@@ -42,17 +43,17 @@ FLUSH_EVERY_N_STEPS = 500
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
         robot = self.env.robots[0]
+        base_pose = robot.get_position_orientation()
+        cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES.values():
+            assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
             # move seg maps to cpu
             obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
             obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose
-            if camera_name.split("::")[1] in robot.sensors:
-                obs[f"{camera_name}::pose"] = th.concatenate(
-                    robot.sensors[camera_name.split("::")[1]].get_position_orientation()
-                )
-        # store the poses to obs
-        obs["robot_r1::robot_base_link_pose"] = th.concatenate(robot.get_position_orientation())
+            cam_pose = robot.sensors[camera_name.split("::")[1]].get_position_orientation()
+            cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
+        obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         return obs
 
     def postprocess_traj_group(self, traj_grp):
@@ -292,7 +293,6 @@ def generate_low_dim_data(
     data_folder: str,
     task_id: int,
     base_name: str,
-    camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
 ):
     """
     Post-process the replayed low-dimensional data (proprio, action, task-info, etc) to parquet.
@@ -304,7 +304,8 @@ def generate_low_dim_data(
         for episode_id in range(replayed_f["data"].attrs["n_episodes"]):
             actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
             proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
-            task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32) 
+            task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
+            cam_rel_poses = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::cam_rel_poses"][:], dtype=np.float32)
             # check if the data is valid
             assert actions.shape[0] == proprio.shape[0] == task_info.shape[0], \
                 "Action, proprio, and task-info must have the same length"
@@ -316,14 +317,10 @@ def generate_low_dim_data(
                 "task_index": np.zeros(T, dtype=np.int64),
                 "timestamp": np.arange(T, dtype=np.float64) / 30.0,  # 30 fps
                 "observation.state": list(proprio),
+                "observation.cam_rel_poses": list(cam_rel_poses),
                 "action": list(actions),
                 "observation.task_info": list(task_info),
             }
-            for camera_id, camera_name in camera_names.items():
-                data.update({
-                    f"observation.camera_pose.{camera_id}": \
-                        list(np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"][f"{camera_name}::pose"], dtype=np.float32)),
-                })
             df = pd.DataFrame(data)
             df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{task_id:04d}{demo_id:03d}.parquet", index=False)
             
@@ -381,7 +378,7 @@ def rgbd_to_pcd(
         with h5py.File(f"{output_dir}/{base_name}", "w") as out_f:
             for demo_name in in_f["data"]:
                 data = in_f["data"][demo_name]["obs"]
-                data_size = data[f"robot_r1::robot_base_link_pose"].shape[0]
+                data_size = data[f"robot_r1::cam_rel_poses"].shape[0]
                 fused_pcd_dset = out_f.create_dataset(
                     f"data/{demo_name}/robot_r1::fused_pcd", 
                     shape=(data_size, pcd_num_points, 6),
@@ -398,22 +395,19 @@ def rgbd_to_pcd(
                     obs = dict() # to store rgbd and pass into process_fused_point_cloud
                     # get all camera intrinsics
                     camera_intrinsics = {}
-                    for camera_id, robot_camera_name in robot_camera_names.items():
+                    for idx, (camera_id, robot_camera_name) in enumerate(robot_camera_names.items()):
                         # Calculate the downsampled camera intrinsics
                         camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
                         camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                         robot_name, camera_name = robot_camera_name.split("::")
-                        obs[f"{robot_name}::robot_base_link_pose"] = th.from_numpy(
-                            data[f"{robot_name}::robot_base_link_pose"][i:i+batch_size]
-                        )
                         obs[f"{robot_name}::{camera_name}::rgb"] = th.from_numpy(
                             data[f"{robot_name}::{camera_name}::rgb"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
                         obs[f"{robot_name}::{camera_name}::depth_linear"] = th.from_numpy(
                             data[f"{robot_name}::{camera_name}::depth_linear"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
-                        obs[f"{robot_name}::{camera_name}::pose"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::pose"][i:i+batch_size]
+                        obs[f"{robot_name}::{camera_name}::rel_pose"] = th.from_numpy(
+                            data[f"{robot_name}::cam_rel_poses"][i:i+batch_size, 7*idx:7*idx+7]
                         )
                         if process_seg:
                             obs[f"{robot_name}::{camera_name}::seg_semantic"] = th.from_numpy(
@@ -422,12 +416,11 @@ def rgbd_to_pcd(
                     # process the fused point cloud
                     pcd, seg = process_fused_point_cloud(
                         obs=obs,
-                        robot_name=robot_name,
                         camera_intrinsics=camera_intrinsics,
-                        pcd_range=pcd_range,
+                        # pcd_range=pcd_range,
+                        process_seg=process_seg,
                         pcd_num_points=pcd_num_points,
                         use_fps=use_fps,
-                        process_seg=process_seg,
                     )
                     log.info("Saving point cloud data...")
                     fused_pcd_dset[i:i+batch_size] = pcd
@@ -474,8 +467,8 @@ def main():
             task_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
             base_name=os.path.basename(args.file),
             robot_camera_names=ROBOT_CAMERA_NAMES,
-            downsample_ratio=8,
-            pcd_num_points=4096,
+            downsample_ratio=4,
+            pcd_num_points=61200,
             batch_size=200,
             use_fps=True,
         )

@@ -342,8 +342,8 @@ class SegVideoLoader(VideoLoader):
 
 OBS_LOADER_MAP = {
     "rgb": RGBVideoLoader,
-    "depth": DepthVideoLoader,
-    "seg": SegVideoLoader,
+    "depth_linear": DepthVideoLoader,
+    "seg_instance_id": SegVideoLoader,
 }
 
 #==============================================
@@ -352,8 +352,7 @@ OBS_LOADER_MAP = {
 
 def depth_to_pcd(
     depth: th.Tensor,  # (B, H, W)
-    pose: th.Tensor,   # (B, 7) 
-    base_link_pose: th.Tensor,  # (B, 7) 
+    rel_pose: th.Tensor,   # (B, 7) relative pose from camera to base [pos, quat]
     K: th.Tensor,      # (3, 3)
     max_depth=20,
 ) -> th.Tensor:
@@ -361,27 +360,28 @@ def depth_to_pcd(
     Convert depth images to point clouds with batch processing support.
     Args:
         depth: (B, H, W) depth tensor
-        pose: (B, 7) camera pose tensor [pos, quat]
-        base_link_pose: (B, 7) robot base pose tensor [pos, quat]
+        rel_pose: (B, 7) relative pose from camera to base tensor [pos, quat]
         K: (3, 3) camera intrinsics tensor
         max_depth: maximum depth value to filter
     Returns:
-        pc: (B, H, W, 3) point cloud tensor
+        pc: (B, H, W, 3) point cloud tensor in base frame
     """
     B, H, W = depth.shape
     device = depth.device
 
-    # Get poses and convert to transformation matrices
-    pos = pose[:, :3]  # (B, 3)
-    quat = pose[:, 3:]  # (B, 4)
-    rot = T.quat2mat(quat)  # (B, 3, 3)
+    # Get relative pose and convert to transformation matrix
+    rel_pos = rel_pose[:, :3]  # (B, 3)
+    rel_quat = rel_pose[:, 3:]  # (B, 4)
+    rel_rot = T.quat2mat(rel_quat)  # (B, 3, 3)
+    
+    # # Add camera coordinate system adjustment (180 degree rotation around X-axis)
     rot_add = T.euler2mat(th.tensor([np.pi, 0, 0], device=device))  # (3, 3)
-    rot_matrix = th.matmul(rot, rot_add)  # (B, 3, 3)
+    rel_rot_matrix = th.matmul(rel_rot, rot_add)  # (B, 3, 3)
 
-    # Create world_to_cam transformation matrices
-    world_to_cam_tf = th.eye(4, device=device).unsqueeze(0).expand(B, 4, 4).clone()
-    world_to_cam_tf[:, :3, :3] = rot_matrix
-    world_to_cam_tf[:, :3, 3] = pos
+    # Create camera_to_base transformation matrix
+    camera_to_base_tf = th.eye(4, device=device).unsqueeze(0).expand(B, 4, 4).clone()
+    camera_to_base_tf[:, :3, :3] = rel_rot_matrix
+    camera_to_base_tf[:, :3, 3] = rel_pos
 
     # Filter depth
     mask = depth > max_depth
@@ -397,23 +397,18 @@ def depth_to_pcd(
     # Compute inverse of camera intrinsics
     Kinv = th.linalg.inv(K)  # (3, 3)
 
-    # Convert to point cloud
-    pc = depth.unsqueeze(-1) * th.matmul(uv, Kinv.transpose(-2, -1))  # (B, H, W, 3)
+    # Convert to point cloud in camera frame
+    pc_camera = depth.unsqueeze(-1) * th.matmul(uv, Kinv.transpose(-2, -1))  # (B, H, W, 3)
 
     # Add homogeneous coordinate
-    pc_homo = th.cat([pc, th.ones_like(pc[..., :1])], dim=-1)  # (B, H, W, 4)
+    pc_camera_homo = th.cat([pc_camera, th.ones_like(pc_camera[..., :1])], dim=-1)  # (B, H, W, 4)
 
-    # Transform to robot base frame
-    world_to_robot_tf = T.pose2mat((base_link_pose[:, :3], base_link_pose[:, 3:])).to(device=device)  # (B, 4, 4)
-    robot_to_world_tf = th.linalg.inv(world_to_robot_tf)
+    # Transform from camera frame to base frame
+    pc_camera_homo_flat = pc_camera_homo.view(B, -1, 4)  # (B, H*W, 4)
+    pc_base = th.matmul(pc_camera_homo_flat, camera_to_base_tf.transpose(-2, -1))  # (B, H*W, 4)
+    pc_base = pc_base[..., :3].view(B, H, W, 3)  # (B, H, W, 3)
 
-    # Apply transformations
-    pc_homo_flat = pc_homo.view(B, -1, 4)  # (B, H*W, 4)
-    pc_cam = th.matmul(pc_homo_flat, world_to_cam_tf.transpose(-2, -1))  # (B, H*W, 4)
-    pc_transformed = th.matmul(pc_cam, robot_to_world_tf.transpose(-2, -1))  # (B, H*W, 4)
-    pc_transformed = pc_transformed[..., :3].view(B, H, W, 3)  # (B, H, W, 3)
-
-    return pc_transformed
+    return pc_base
 
 
 def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.Tensor]:
@@ -474,9 +469,8 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
 
 def process_fused_point_cloud(
     obs: dict,
-    robot_name: str, 
     camera_intrinsics: Dict[str, th.Tensor],
-    pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
+    # pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
     process_seg: bool=False,
     pcd_num_points: Optional[int] = None,
     use_fps: bool=True,
@@ -486,8 +480,7 @@ def process_fused_point_cloud(
     for camera_name, intrinsics in camera_intrinsics.items():
         pcd = depth_to_pcd(
             obs[f"{camera_name}::depth_linear"], 
-            obs[f"{camera_name}::pose"], 
-            obs[f"{robot_name}::robot_base_link_pose"], 
+            obs[f"{camera_name}::rel_pose"], 
             intrinsics
         )
         num_points = pcd.shape[0]
