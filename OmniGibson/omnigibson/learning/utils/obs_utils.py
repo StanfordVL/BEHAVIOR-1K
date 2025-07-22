@@ -270,9 +270,9 @@ class RGBVideoLoader(VideoLoader):
         )
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
-        rgb = frame.to_ndarray(format="rgb24").astype(np.float32) / 255.0  # (H, W, 3), dtype=float32
+        rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
         rgb = cv2.resize(rgb, self.output_size, interpolation=cv2.INTER_AREA)
-        return th.from_numpy(rgb).unsqueeze(0).to(th.float32)  # (1, H, W, 3)
+        return th.from_numpy(rgb).unsqueeze(0).to(th.uint8)  # (1, H, W, 3)
 
 
 class DepthVideoLoader(VideoLoader):
@@ -304,8 +304,6 @@ class DepthVideoLoader(VideoLoader):
             shift=self.shift
         )
         depth = cv2.resize(depth, self.output_size, interpolation=cv2.INTER_AREA).astype(np.float32)
-        # normalize depth to [0, 1]
-        depth = (depth - self.min_depth) / (self.max_depth - self.min_depth)
         return th.from_numpy(depth).unsqueeze(0).to(th.float32)  # (1, H, W)
         
 
@@ -336,7 +334,7 @@ class SegVideoLoader(VideoLoader):
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
         ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
-        ids = cv2.resize(ids.numpy(), self.output_size, interpolation=cv2.INTER_NEAREST)
+        ids = cv2.resize(ids.cpu().numpy(), self.output_size, interpolation=cv2.INTER_NEAREST)
         return th.from_numpy(ids).unsqueeze(0).cpu().to(th.long)  # (1, H, W)
 
 
@@ -351,10 +349,10 @@ OBS_LOADER_MAP = {
 #==============================================
 
 def depth_to_pcd(
-    depth: th.Tensor,  # (B, H, W)
-    rel_pose: th.Tensor,   # (B, 7) relative pose from camera to base [pos, quat]
+    depth: th.Tensor,  # (B, [T], H, W)
+    rel_pose: th.Tensor,   # (B, [T], 7) relative pose from camera to base [pos, quat]
     K: th.Tensor,      # (3, 3)
-    max_depth=20,
+    max_depth=10,
 ) -> th.Tensor:
     """
     Convert depth images to point clouds with batch processing support.
@@ -366,6 +364,9 @@ def depth_to_pcd(
     Returns:
         pc: (B, H, W, 3) point cloud tensor in base frame
     """
+    original_shape = depth.shape
+    depth = depth.view(-1, original_shape[-2], original_shape[-1])  # (B, H, W)
+    rel_pose = rel_pose.view(-1, 7)  # (B, 7)
     B, H, W = depth.shape
     device = depth.device
 
@@ -395,7 +396,7 @@ def depth_to_pcd(
     uv = th.stack([u, v, th.ones_like(u)], dim=-1).float()  # (B, H, W, 3)
 
     # Compute inverse of camera intrinsics
-    Kinv = th.linalg.inv(K)  # (3, 3)
+    Kinv = th.linalg.inv(K).to(device)  # (3, 3)
 
     # Convert to point cloud in camera frame
     pc_camera = depth.unsqueeze(-1) * th.matmul(uv, Kinv.transpose(-2, -1))  # (B, H, W, 3)
@@ -406,7 +407,7 @@ def depth_to_pcd(
     # Transform from camera frame to base frame
     pc_camera_homo_flat = pc_camera_homo.view(B, -1, 4)  # (B, H*W, 4)
     pc_base = th.matmul(pc_camera_homo_flat, camera_to_base_tf.transpose(-2, -1))  # (B, H*W, 4)
-    pc_base = pc_base[..., :3].view(B, H, W, 3)  # (B, H, W, 3)
+    pc_base = pc_base[..., :3].view(*original_shape, 3)  # (B, [T], H, W, 3)
 
     return pc_base
 
@@ -416,13 +417,15 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
     Downsample point clouds with batch FPS processing or random sampling.
     
     Args:
-        color_pcd: (B, N, 6) point cloud tensor [rgb, xyz] for each batch
+        color_pcd: (B, [T], N, 6) point cloud tensor [rgb, xyz] for each batch
         num_points: target number of points
     Returns:
         color_pcd: (B, num_points, 6) downsampled point cloud
         sampled_idx: (B, num_points) sampled indices
     """
     print("Downsampling point clouds...")
+    original_shape = color_pcd.shape
+    color_pcd = color_pcd.view(-1, original_shape[-2], original_shape[-1])  # (B, N, 6)
     B, N, C = color_pcd.shape
     device = color_pcd.device
     
@@ -464,6 +467,7 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
         output_pcd = color_pcd[batch_indices, full_idx]  # (B, num_points, C)
         output_idx = full_idx
     
+    output_pcd = output_pcd.view(*original_shape[:-2], num_points, C)  # (B, [T], num_points, 6)
     return output_pcd, output_idx
 
 
@@ -477,29 +481,28 @@ def process_fused_point_cloud(
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
     print("Fusing point clouds...")
     rgb_pcd, seg_pcd = [], []
-    for camera_name, intrinsics in camera_intrinsics.items():
+    for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         pcd = depth_to_pcd(
             obs[f"{camera_name}::depth_linear"], 
-            obs[f"{camera_name}::rel_pose"], 
+            obs["cam_rel_poses"][..., 7*idx:7*idx+7], 
             intrinsics
         )
-        num_points = pcd.shape[0]
         rgb_pcd.append(
-            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).reshape(num_points, -1, 6)
-        )  # shape (N, H*W, 6) 
+            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
+        )  # shape (B, [T], H*W, 6)
         if process_seg:
-            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].reshape(num_points, -1)) # shape (N, H*W)
+            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1)) # shape (B, [T], H*W)
     # Fuse all point clouds and downsample
-    fused_pcd_all = th.cat(rgb_pcd, dim=1).to(device="cuda")
+    fused_pcd_all = th.cat(rgb_pcd, dim=-2).to(device="cuda")
     if pcd_num_points is not None:
         fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
-        fused_pcd = fused_pcd.float().cpu()
+        fused_pcd = fused_pcd.float()
         if process_seg:
-            fused_seg = th.gather(th.cat(seg_pcd, dim=1), 1, sampled_idx.cpu()).cpu()
+            fused_seg = th.gather(th.cat(seg_pcd, dim=-1), 1, sampled_idx.cpu())
     else:
-        fused_pcd = fused_pcd_all.float().cpu()
+        fused_pcd = fused_pcd_all.float()
         if process_seg:
-            fused_seg = th.cat(seg_pcd, dim=1).cpu()
+            fused_seg = th.cat(seg_pcd, dim=1)
 
     return fused_pcd, fused_seg if process_seg else None
 
@@ -507,25 +510,35 @@ def process_fused_point_cloud(
 def color_pcd_vis(color_pcd: np.ndarray):
     pcd = o3d.geometry.PointCloud()
     axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3, origin=[0, 0, 0])
+
+    # Rotation matrices
+    Rz_90 = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, np.pi / 2])      # 90 deg about z
+    Rx_m90 = o3d.geometry.get_rotation_matrix_from_axis_angle([-np.pi / 2, 0, 0])    # -90 deg about x
+
     # visualize with open3D
     if color_pcd.ndim == 2:
-        pcd.colors = o3d.utility.Vector3dVector(color_pcd[:, :3])
-        pcd.points = o3d.utility.Vector3dVector(color_pcd[:, 3:])
+        colors = color_pcd[:, :3]
+        points = color_pcd[:, 3:]
+        points = (points @ Rz_90.T) @ Rx_m90.T
+        pcd.colors = o3d.utility.Vector3dVector(colors)
+        pcd.points = o3d.utility.Vector3dVector(points)
         o3d.visualization.draw_geometries([pcd, axis])
         print("number points", color_pcd.shape[0])
     else:
         # realtime streaming
-        # Create visualizer window
         vis = o3d.visualization.Visualizer()
         vis.create_window()
-        vis.add_geometry(pcd)
         for i in trange(color_pcd.shape[0]):
-            pcd.colors = o3d.utility.Vector3dVector(color_pcd[i, :, :3])
-            pcd.points = o3d.utility.Vector3dVector(color_pcd[i, :, 3:])
-            vis.update_geometry(pcd)
+            colors = color_pcd[i, :, :3]
+            points = color_pcd[i, :, 3:]
+            points = (points @ Rz_90.T) @ Rx_m90.T
+            pcd.colors = o3d.utility.Vector3dVector(colors)
+            pcd.points = o3d.utility.Vector3dVector(points)
+            vis.clear_geometries()
+            vis.add_geometry(pcd)
+            vis.add_geometry(axis)
             vis.poll_events()
             vis.update_renderer()
-            sleep(0.03) 
         vis.destroy_window()
 
 

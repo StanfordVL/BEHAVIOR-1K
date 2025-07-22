@@ -208,21 +208,14 @@ class Evaluator:
         Preprocess the observation dictionary before passing it to the policy.
         """
         obs = flatten_obs_dict(obs)
-        base_link_pose = th.cat(self.robot.get_position_orientation())
-        left_cam_pose = th.cat(
-            self.robot.sensors["robot_r1:left_realsense_link:Camera:0"].get_position_orientation()
-        )
-        right_cam_pose = th.cat(
-            self.robot.sensors["robot_r1:right_realsense_link:Camera:0"].get_position_orientation()
-        )
-        head_cam_pose = th.cat(
-            self.robot.sensors["robot_r1:zed_link:Camera:0"].get_position_orientation()
-        )
-        # store the poses to obs
-        obs["robot_r1::robot_base_link_pose"] = base_link_pose
-        obs[f"{ROBOT_CAMERA_NAMES['left_wrist']}::pose"] = left_cam_pose
-        obs[f"{ROBOT_CAMERA_NAMES['right_wrist']}::pose"] = right_cam_pose
-        obs[f"{ROBOT_CAMERA_NAMES['head']}::pose"] = head_cam_pose
+        base_pose = self.robot.get_position_orientation()
+        cam_rel_poses = []
+        for camera_name in ROBOT_CAMERA_NAMES.values():
+            assert camera_name.split("::")[1] in self.robot.sensors, f"Camera {camera_name} not found in robot sensors"
+            # store camera pose
+            cam_pose = self.robot.sensors[camera_name.split("::")[1]].get_position_orientation()
+            cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
+        obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         return obs
 
     def _write_video(self) -> None:

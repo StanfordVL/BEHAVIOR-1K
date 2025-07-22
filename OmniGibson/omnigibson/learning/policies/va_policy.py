@@ -77,25 +77,45 @@ class VisionActionILPolicy(BasePolicy):
 
     def process_obs(self, obs: dict) -> dict:
         # Expand twice to get B and T_A dimensions
-        proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
-        processed_obs = {
-            "qpos": {
-                key: self._post_processing_fn(
-                    (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
-                    (self.joint_range[key][1] - self.joint_range[key][0])
+        processed_obs = {}
+        for key in obs:
+            if "proprio" in key:
+                proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
+                processed_obs.update({
+                    "qpos": {
+                        key: self._post_processing_fn(
+                            (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
+                            (self.joint_range[key][1] - self.joint_range[key][0])
+                        )
+                        for key in PROPRIO_QPOS_INDICES[self.robot_type]
+                    },
+                    "odom": {
+                        "base_velocity": self._post_processing_fn(
+                            (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
+                            (self.joint_range["base"][1] - self.joint_range["base"][0])
+                        ),
+                    },
+                })
+            elif "rgb" in key:
+                processed_obs[key] = self._post_processing_fn(
+                    F.interpolate(
+                        obs[key][..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32), 
+                        self.obs_output_size, 
+                        mode="area"
+                    ).unsqueeze(0)
                 )
-                for key in PROPRIO_QPOS_INDICES[self.robot_type]
-            },
-            "odom": {
-                "base_velocity": self._post_processing_fn(
-                    (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
-                    (self.joint_range["base"][1] - self.joint_range["base"][0])
-                ),
-            },
-        }
-        processed_obs.update({
-            k: self._post_processing_fn(F.interpolate(
-                v[..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32) / 255.0, self.obs_output_size, mode="area"
-            ).unsqueeze(0)) for k, v in obs.items() if "rgb" in k
-        })
+            elif "depth" in key:
+                processed_obs[key] = self._post_processing_fn(
+                    F.interpolate(
+                        obs[key].unsqueeze(0).unsqueeze(0).to(th.float32), 
+                        self.obs_output_size, 
+                        mode="area"
+                    )
+                )
+            elif "cam_rel_poses" in key:
+                processed_obs["cam_rel_poses"] = self._post_processing_fn(
+                    obs[key].unsqueeze(0).unsqueeze(0).to(th.float32)
+                )
+            else:
+                processed_obs[key] = self._post_processing_fn(obs[key].unsqueeze(0).unsqueeze(0).to(th.float32))
         return processed_obs

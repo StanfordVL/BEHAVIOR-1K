@@ -384,34 +384,35 @@ def rgbd_to_pcd(
                     shape=(data_size, pcd_num_points, 6),
                     compression="lzf",
                 )
-                pcd_semantic_dset = out_f.create_dataset(
-                    f"data/{demo_name}/robot_r1::pcd_semantic", 
-                    shape=(data_size, pcd_num_points),
-                    compression="lzf",
-                )
+                if process_seg:
+                    pcd_semantic_dset = out_f.create_dataset(
+                        f"data/{demo_name}/robot_r1::pcd_semantic", 
+                        shape=(data_size, pcd_num_points),
+                        compression="lzf",
+                    )
                 # We batch process every batch_size frames
                 for i in range(0, data_size, batch_size):
                     log.info(f"Processing batch {i} of {data_size}...")
                     obs = dict() # to store rgbd and pass into process_fused_point_cloud
+                    obs["cam_rel_poses"] = th.from_numpy(
+                        data["robot_r1::cam_rel_poses"][i:i+batch_size]
+                    )
                     # get all camera intrinsics
                     camera_intrinsics = {}
-                    for idx, (camera_id, robot_camera_name) in enumerate(robot_camera_names.items()):
+                    for camera_id, robot_camera_name in robot_camera_names.items():
                         # Calculate the downsampled camera intrinsics
                         camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
                         camera_intrinsics[robot_camera_name][-1, -1] = 1.0
-                        robot_name, camera_name = robot_camera_name.split("::")
-                        obs[f"{robot_name}::{camera_name}::rgb"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::rgb"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
+                        obs[f"{robot_camera_name}::rgb"] = th.from_numpy(
+                            data[f"{robot_camera_name}::rgb"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
-                        obs[f"{robot_name}::{camera_name}::depth_linear"] = th.from_numpy(
-                            data[f"{robot_name}::{camera_name}::depth_linear"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
+                        obs[f"{robot_camera_name}::depth_linear"] = th.from_numpy(
+                            data[f"{robot_camera_name}::depth_linear"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                         )
-                        obs[f"{robot_name}::{camera_name}::rel_pose"] = th.from_numpy(
-                            data[f"{robot_name}::cam_rel_poses"][i:i+batch_size, 7*idx:7*idx+7]
-                        )
+                        
                         if process_seg:
-                            obs[f"{robot_name}::{camera_name}::seg_semantic"] = th.from_numpy(
-                                data[f"{robot_name}::{camera_name}::seg_semantic"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
+                            obs[f"{robot_camera_name}::seg_semantic"] = th.from_numpy(
+                                data[f"{robot_camera_name}::seg_semantic"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
                             )
                     # process the fused point cloud
                     pcd, seg = process_fused_point_cloud(
@@ -423,8 +424,9 @@ def rgbd_to_pcd(
                         use_fps=use_fps,
                     )
                     log.info("Saving point cloud data...")
-                    fused_pcd_dset[i:i+batch_size] = pcd
-                    pcd_semantic_dset[i:i+batch_size] = seg
+                    fused_pcd_dset[i:i+batch_size] = pcd.cpu()
+                    if process_seg:
+                        pcd_semantic_dset[i:i+batch_size] = seg.cpu()
 
     log.info(f"Point cloud data saved!")
 
@@ -469,7 +471,7 @@ def main():
             robot_camera_names=ROBOT_CAMERA_NAMES,
             downsample_ratio=4,
             pcd_num_points=61200,
-            batch_size=200,
+            batch_size=500,
             use_fps=True,
         )
 
