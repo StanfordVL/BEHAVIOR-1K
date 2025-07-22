@@ -178,7 +178,7 @@ class Evaluator:
         """
         self.robot_action = self.policy.forward(obs=self.obs)
         
-        self.obs, _, terminated, truncated, info = self.env.step(self.robot_action)
+        self.obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=3)
         # process obs
         if terminated or truncated:
             self.n_trials += 1

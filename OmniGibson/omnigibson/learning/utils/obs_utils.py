@@ -271,7 +271,7 @@ class RGBVideoLoader(VideoLoader):
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
-        rgb = cv2.resize(rgb, self.output_size, interpolation=cv2.INTER_AREA)
+        rgb = cv2.resize(rgb, self.output_size, interpolation=cv2.INTER_NEAREST_EXACT)
         return th.from_numpy(rgb).unsqueeze(0).to(th.uint8)  # (1, H, W, 3)
 
 
@@ -303,7 +303,7 @@ class DepthVideoLoader(VideoLoader):
             max_depth=self.max_depth,
             shift=self.shift
         )
-        depth = cv2.resize(depth, self.output_size, interpolation=cv2.INTER_AREA).astype(np.float32)
+        depth = cv2.resize(depth, self.output_size, interpolation=cv2.INTER_NEAREST_EXACT).astype(np.float32)
         return th.from_numpy(depth).unsqueeze(0).to(th.float32)  # (1, H, W)
         
 
@@ -334,7 +334,7 @@ class SegVideoLoader(VideoLoader):
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
         ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
-        ids = cv2.resize(ids.cpu().numpy(), self.output_size, interpolation=cv2.INTER_NEAREST)
+        ids = cv2.resize(ids.cpu().numpy(), self.output_size, interpolation=cv2.INTER_NEAREST_EXACT)
         return th.from_numpy(ids).unsqueeze(0).cpu().to(th.long)  # (1, H, W)
 
 
@@ -423,7 +423,6 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
         color_pcd: (B, num_points, 6) downsampled point cloud
         sampled_idx: (B, num_points) sampled indices
     """
-    print("Downsampling point clouds...")
     original_shape = color_pcd.shape
     color_pcd = color_pcd.view(-1, original_shape[-2], original_shape[-1])  # (B, N, 6)
     B, N, C = color_pcd.shape
@@ -479,7 +478,6 @@ def process_fused_point_cloud(
     pcd_num_points: Optional[int] = None,
     use_fps: bool=True,
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
-    print("Fusing point clouds...")
     rgb_pcd, seg_pcd = [], []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         pcd = depth_to_pcd(
