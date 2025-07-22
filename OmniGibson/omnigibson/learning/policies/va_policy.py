@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from collections import deque
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat
-from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES, JOINT_RANGE
+from omnigibson.learning.utils.eval_utils import PROPRIOCEPTION_INDICES, PROPRIO_QPOS_INDICES, JOINT_RANGE, ROBOT_CAMERA_NAMES
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
-from typing import List, Optional
+from typing import Dict, Optional, List
 
 
 class VisionActionILPolicy(BasePolicy):
@@ -22,9 +22,9 @@ class VisionActionILPolicy(BasePolicy):
         use_websocket: bool = True,
         host: Optional[str] = None,
         port: Optional[int] = None,
-        action_prediction_horizon: int,
+        deployed_action_steps: int,
         obs_window_size: int = 1,
-        obs_output_size: List[int] = [128, 128],
+        obs_output_size: Dict[str, List[int]],
         # ====== other args for base class ======
         **kwargs,
     ) -> None:
@@ -42,9 +42,9 @@ class VisionActionILPolicy(BasePolicy):
         else:
             # move all tensor to self.device
             self._post_processing_fn = lambda x: x.to(self.device)
-        self.action_prediction_horizon = action_prediction_horizon
+        self.deployed_action_steps = deployed_action_steps
         self.obs_window_size = obs_window_size
-        self.obs_output_size = tuple(obs_output_size)
+        self.obs_output_size = {k: tuple(v) for k, v in obs_output_size.items()}
         self._obs_history = deque(maxlen=obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
@@ -61,7 +61,7 @@ class VisionActionILPolicy(BasePolicy):
             self._obs_history.append(obs)
         obs = any_concat(self._obs_history, dim=1)
 
-        need_inference = self._action_idx % self.action_prediction_horizon == 0
+        need_inference = self._action_idx % self.deployed_action_steps == 0
         if need_inference:
             self._action_traj_pred = self.policy.act({"obs": obs}).squeeze(0).detach().cpu() # (T_A, A)
             self._action_idx = 0
@@ -78,44 +78,38 @@ class VisionActionILPolicy(BasePolicy):
     def process_obs(self, obs: dict) -> dict:
         # Expand twice to get B and T_A dimensions
         processed_obs = {}
-        for key in obs:
-            if "proprio" in key:
-                proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
-                processed_obs.update({
-                    "qpos": {
-                        key: self._post_processing_fn(
-                            (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
-                            (self.joint_range[key][1] - self.joint_range[key][0])
-                        )
-                        for key in PROPRIO_QPOS_INDICES[self.robot_type]
-                    },
-                    "odom": {
-                        "base_velocity": self._post_processing_fn(
-                            (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
-                            (self.joint_range["base"][1] - self.joint_range["base"][0])
-                        ),
-                    },
-                })
-            elif "rgb" in key:
-                processed_obs[key] = self._post_processing_fn(
-                    F.interpolate(
-                        obs[key][..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32), 
-                        self.obs_output_size, 
-                        mode="area"
-                    ).unsqueeze(0)
+        proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
+        processed_obs.update({
+            "qpos": {
+                key: self._post_processing_fn(
+                    (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
+                    (self.joint_range[key][1] - self.joint_range[key][0])
                 )
-            elif "depth" in key:
-                processed_obs[key] = self._post_processing_fn(
-                    F.interpolate(
-                        obs[key].unsqueeze(0).unsqueeze(0).to(th.float32), 
-                        self.obs_output_size, 
-                        mode="area"
-                    )
+                for key in PROPRIO_QPOS_INDICES[self.robot_type]
+            },
+            "odom": {
+                "base_velocity": self._post_processing_fn(
+                    (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
+                    (self.joint_range["base"][1] - self.joint_range["base"][0])
+                ),
+            },
+        })
+        for camera_id, camera in ROBOT_CAMERA_NAMES.items():
+            processed_obs[f"{camera}::rgb"] = self._post_processing_fn(
+                F.interpolate(
+                    obs[f"{camera}::rgb"][..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32), 
+                    self.obs_output_size[camera_id], 
+                    mode="area"
+                ).unsqueeze(0)
+            )
+            processed_obs[f"{camera}::depth_linear"] = self._post_processing_fn(
+                F.interpolate(
+                    obs[f"{camera}::depth_linear"].unsqueeze(0).unsqueeze(0).to(th.float32), 
+                    self.obs_output_size[camera_id], 
+                    mode="area"
                 )
-            elif "cam_rel_poses" in key:
-                processed_obs["cam_rel_poses"] = self._post_processing_fn(
-                    obs[key].unsqueeze(0).unsqueeze(0).to(th.float32)
-                )
-            else:
-                processed_obs[key] = self._post_processing_fn(obs[key].unsqueeze(0).unsqueeze(0).to(th.float32))
+            )
+            processed_obs["cam_rel_poses"] = self._post_processing_fn(
+                obs["robot_r1::cam_rel_poses"].unsqueeze(0).unsqueeze(0).to(th.float32)
+            )
         return processed_obs

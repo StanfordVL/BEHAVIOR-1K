@@ -211,8 +211,6 @@ class Evaluator:
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES.values():
-            assert camera_name.split("::")[1] in self.robot.sensors, f"Camera {camera_name} not found in robot sensors"
-            # store camera pose
             cam_pose = self.robot.sensors[camera_name.split("::")[1]].get_position_orientation()
             cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
