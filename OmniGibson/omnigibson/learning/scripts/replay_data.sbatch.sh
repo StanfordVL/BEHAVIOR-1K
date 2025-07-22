@@ -23,7 +23,7 @@ source /vision/u/wsai/miniconda3/bin/activate behavior
 echo "File to process: $1"
 
 echo "Running replay_obs.py on $1"
-OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py --file $1 --low_dim --rgbd --seg --bbox
+OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py --file $1 --low_dim --rgbd --seg --bbox --pcd
 
 echo "Job finished."
 exit 0

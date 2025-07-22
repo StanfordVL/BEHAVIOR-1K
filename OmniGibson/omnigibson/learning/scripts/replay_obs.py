@@ -7,6 +7,8 @@ import os
 import omnigibson.utils.transform_utils as T
 import pandas as pd
 import torch as th
+import torch.nn.functional as F
+import yaml
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
 from omnigibson.learning.utils.eval_utils import (
@@ -212,7 +214,7 @@ def replay_hdf5_file(
                     resolution=resolution,
                     codec_name="libx265",
                     pix_fmt="yuv420p10le",    
-                    stream_options={"crf": "8", "x265-params": "log-level=none"},
+                    stream_options={"x265-params": "lossless=1:log-level=none"},
                 ))  
                 write_video(
                     env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::depth_linear"], 
@@ -346,7 +348,8 @@ def generate_low_dim_data(
 
 
 def rgbd_to_pcd(
-    task_folder: str, 
+    task_folder: str,
+    task_id: int, 
     base_name: str, 
     robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
     downsample_ratio: int=4,
@@ -360,6 +363,7 @@ def rgbd_to_pcd(
     Generate point cloud data from RGBD data in the specified task folder.
     Args:
         task_folder (str): Path to the task folder containing RGBD data.
+        task_id (int): Task ID for the task being processed.
         base_name (str): Base name of the HDF5 file to process (without file extension).
         robot_camera_names (dict): Dict of camera names to process.
         downsample_ratio (int): Downsample ratio for the camera resolution.
@@ -370,12 +374,13 @@ def rgbd_to_pcd(
     """
     log.info(f"Generating point cloud data from RGBD for {base_name} in {task_folder}")
     assert os.path.exists(task_folder), f"Task folder {task_folder} does not exist."
-    output_dir = os.path.join(task_folder, "pcd")
+    output_dir = os.path.join(task_folder, "pcd", f"task-{task_id:04d}")
+    demo_id = int(base_name.split("_")[-1].split(".")[0]) # 3 digit demo id
     os.makedirs(output_dir, exist_ok=True)
 
     with h5py.File(f"{task_folder}/replayed/{base_name}", "r") as in_f:
         # create a new hdf5 file to store the point cloud data
-        with h5py.File(f"{output_dir}/{base_name}", "w") as out_f:
+        with h5py.File(f"{output_dir}/episode_{task_id:04d}{demo_id:03d}.hdf5", "w") as out_f:
             for demo_name in in_f["data"]:
                 data = in_f["data"][demo_name]["obs"]
                 data_size = data[f"robot_r1::cam_rel_poses"].shape[0]
@@ -400,28 +405,36 @@ def rgbd_to_pcd(
                     # get all camera intrinsics
                     camera_intrinsics = {}
                     for camera_id, robot_camera_name in robot_camera_names.items():
+                        resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
                         # Calculate the downsampled camera intrinsics
                         camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
                         camera_intrinsics[robot_camera_name][-1, -1] = 1.0
-                        obs[f"{robot_camera_name}::rgb"] = th.from_numpy(
-                            data[f"{robot_camera_name}::rgb"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
-                        )
-                        obs[f"{robot_camera_name}::depth_linear"] = th.from_numpy(
-                            data[f"{robot_camera_name}::depth_linear"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
-                        )
+                        obs[f"{robot_camera_name}::rgb"] = F.interpolate(
+                            th.from_numpy(data[f"{robot_camera_name}::rgb"][i:i+batch_size, :, :, :3]).movedim(-1, -3),
+                            size = (resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                            mode="nearest-exact"
+                        ).movedim(-3, -1)
+                        obs[f"{robot_camera_name}::depth_linear"] = F.interpolate(
+                            th.from_numpy(data[f"{robot_camera_name}::depth_linear"][i:i+batch_size]).unsqueeze(0),
+                            size = (resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                            mode="nearest-exact"
+                        ).squeeze(0)
                         
                         if process_seg:
-                            obs[f"{robot_camera_name}::seg_semantic"] = th.from_numpy(
-                                data[f"{robot_camera_name}::seg_semantic"][i:i+batch_size, ::downsample_ratio, ::downsample_ratio]
-                            )
+                            obs[f"{robot_camera_name}::seg_semantic"] = F.interpolate(
+                                th.from_numpy(data[f"{robot_camera_name}::seg_semantic"][i:i+batch_size]).unsqueeze,
+                                size = (resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                                mode="nearest-exact"
+                            ).squeeze(0)
                     # process the fused point cloud
                     pcd, seg = process_fused_point_cloud(
                         obs=obs,
                         camera_intrinsics=camera_intrinsics,
-                        # pcd_range=pcd_range,
-                        process_seg=process_seg,
+                        pcd_range=pcd_range,
                         pcd_num_points=pcd_num_points,
                         use_fps=use_fps,
+                        process_seg=process_seg,
+                        verbose=True
                     )
                     log.info("Saving point cloud data...")
                     fused_pcd_dset[i:i+batch_size] = pcd.cpu()
@@ -442,7 +455,8 @@ def main():
 
     args = parser.parse_args()
 
-    task_id = TASK_NAMES_TO_INDICES[os.path.basename(os.path.dirname(args.file))]
+    task_name = os.path.basename(os.path.dirname(args.file))
+    task_id = TASK_NAMES_TO_INDICES[task_name]
 
     # Process each file
     if not os.path.exists(args.file):
@@ -465,12 +479,16 @@ def main():
             base_name=os.path.basename(args.file),
         )
     if args.pcd:
+        with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/{task_name}.yaml") as f:
+            pcd_range = tuple(yaml.safe_load(f)["task"]["pcd_range"])
         rgbd_to_pcd(
             task_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
+            task_id=task_id,
             base_name=os.path.basename(args.file),
             robot_camera_names=ROBOT_CAMERA_NAMES,
+            pcd_range=pcd_range,
             downsample_ratio=4,
-            pcd_num_points=61200,
+            pcd_num_points=4096,
             batch_size=500,
             use_fps=True,
         )

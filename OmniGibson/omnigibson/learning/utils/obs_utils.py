@@ -2,11 +2,10 @@ import av
 import numpy as np
 import omnigibson.utils.transform_utils as T
 import open3d as o3d
-import cv2
 import torch as th
+import torch.nn.functional as F
 from av.container import Container
 from av.stream import Stream
-from time import sleep
 from tqdm import trange
 from torch_cluster import fps
 from typing import Dict, Optional, Tuple, Generator, List
@@ -271,8 +270,12 @@ class RGBVideoLoader(VideoLoader):
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
-        rgb = cv2.resize(rgb, self.output_size, interpolation=cv2.INTER_NEAREST_EXACT)
-        return th.from_numpy(rgb).unsqueeze(0).to(th.uint8)  # (1, H, W, 3)
+        rgb = F.interpolate(
+            th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), 
+            size=self.output_size, 
+            mode='nearest-exact'
+        ) 
+        return rgb  # (1, H, W, 3)
 
 
 class DepthVideoLoader(VideoLoader):
@@ -303,9 +306,9 @@ class DepthVideoLoader(VideoLoader):
             max_depth=self.max_depth,
             shift=self.shift
         )
-        depth = cv2.resize(depth, self.output_size, interpolation=cv2.INTER_NEAREST_EXACT).astype(np.float32)
-        return th.from_numpy(depth).unsqueeze(0).to(th.float32)  # (1, H, W)
-        
+        depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
+        depth = F.interpolate(depth, size=self.output_size, mode='nearest-exact')
+        return depth.squeeze(0)
 
 class SegVideoLoader(VideoLoader):
     def __init__(
@@ -333,9 +336,9 @@ class SegVideoLoader(VideoLoader):
         # For each rgb pixel, find the index of the nearest color in the equidistant bins
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
-        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1]))  # (H, W)
-        ids = cv2.resize(ids.cpu().numpy(), self.output_size, interpolation=cv2.INTER_NEAREST_EXACT)
-        return th.from_numpy(ids).unsqueeze(0).cpu().to(th.long)  # (1, H, W)
+        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0)  # (1, H, W)
+        ids = F.interpolate(ids.unsqueeze(0), size=self.output_size, mode='nearest-exact')
+        return ids.squeeze(0).cpu().to(th.long)  # (1, H, W)
 
 
 OBS_LOADER_MAP = {
@@ -352,7 +355,6 @@ def depth_to_pcd(
     depth: th.Tensor,  # (B, [T], H, W)
     rel_pose: th.Tensor,   # (B, [T], 7) relative pose from camera to base [pos, quat]
     K: th.Tensor,      # (3, 3)
-    max_depth=10,
 ) -> th.Tensor:
     """
     Convert depth images to point clouds with batch processing support.
@@ -383,11 +385,6 @@ def depth_to_pcd(
     camera_to_base_tf = th.eye(4, device=device).unsqueeze(0).expand(B, 4, 4).clone()
     camera_to_base_tf[:, :3, :3] = rel_rot_matrix
     camera_to_base_tf[:, :3, 3] = rel_pos
-
-    # Filter depth
-    mask = depth > max_depth
-    depth = depth.clone()
-    depth[mask] = 0
 
     # Create pixel coordinates
     y, x = th.meshgrid(th.arange(H, device=device), th.arange(W, device=device), indexing="ij")
@@ -473,11 +470,14 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
 def process_fused_point_cloud(
     obs: dict,
     camera_intrinsics: Dict[str, th.Tensor],
-    # pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
-    process_seg: bool=False,
+    pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: Optional[int] = None,
     use_fps: bool=True,
+    process_seg: bool=False,
+    verbose: bool=False
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
+    if verbose:
+        print("Processing fused point cloud from observations...")
     rgb_pcd, seg_pcd = [], []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         pcd = depth_to_pcd(
@@ -486,21 +486,33 @@ def process_fused_point_cloud(
             intrinsics
         )
         rgb_pcd.append(
-            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
+            th.cat([obs[f"{camera_name}::rgb"] / 255.0, pcd], dim=-1).flatten(-3, -2)
         )  # shape (B, [T], H*W, 6)
         if process_seg:
             seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1)) # shape (B, [T], H*W)
-    # Fuse all point clouds and downsample
+    # Fuse all point clouds together
     fused_pcd_all = th.cat(rgb_pcd, dim=-2).to(device="cuda")
+    # Now, clip the point cloud to the specified range
+    x_min, x_max, y_min, y_max, z_min, z_max = pcd_range
+    mask = (
+        (fused_pcd_all[..., 3] >= x_min) & (fused_pcd_all[..., 3] <= x_max) &
+        (fused_pcd_all[..., 4] >= y_min) & (fused_pcd_all[..., 4] <= y_max) &
+        (fused_pcd_all[..., 5] >= z_min) & (fused_pcd_all[..., 5] <= z_max)
+    )   
+    fused_pcd_all[~mask] = 0.0
+    if process_seg:
+        seg_pcd = th.cat(seg_pcd, dim=-1)
+        seg_pcd = seg_pcd[mask]  # shape (N, [T])
+    # Now, downsample the point cloud if needed
     if pcd_num_points is not None:
+        if verbose:
+            print(f"Downsampling point cloud to {pcd_num_points} points using {'FPS' if use_fps else 'random sampling'}")
         fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
         fused_pcd = fused_pcd.float()
         if process_seg:
-            fused_seg = th.gather(th.cat(seg_pcd, dim=-1), 1, sampled_idx.cpu())
+            fused_seg = th.gather(seg_pcd, 1, sampled_idx.cpu())
     else:
         fused_pcd = fused_pcd_all.float()
-        if process_seg:
-            fused_seg = th.cat(seg_pcd, dim=1)
 
     return fused_pcd, fused_seg if process_seg else None
 
