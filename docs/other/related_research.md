@@ -14,7 +14,7 @@ MoMaGen automatically generates diverse training datasets for bimanual mobile ma
 BEHAVIOR Robot Suite (BRS) provides the robot embodiment needed for complex household tasks. Built on a bimanual wheeled robot with a 4-DoF torso, BRS integrates a cost-effective teleoperation interface for data collection and a novel algorithm for learning whole-body visuomotor policies.
 
 <iframe width="100%" height="281" style="max-width: 500px; border-radius: 8px; margin: 1rem 0;"
-        src="https://player.vimeo.com/video/1101969680?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+        src="https://player.vimeo.com/video/1103938112?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
         frameborder="0" allowfullscreen>
 </iframe>
 
