@@ -1,4 +1,3 @@
-import cv2
 import logging
 import torch as th
 import torch.nn.functional as F
@@ -82,15 +81,15 @@ class VisionActionILPolicy(BasePolicy):
         processed_obs.update({
             "qpos": {
                 key: self._post_processing_fn(
-                    (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
-                    (self.joint_range[key][1] - self.joint_range[key][0])
+                    2 * (proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - self.joint_range[key][0]) / 
+                    (self.joint_range[key][1] - self.joint_range[key][0]) - 1
                 )
                 for key in PROPRIO_QPOS_INDICES[self.robot_type]
             },
             "odom": {
                 "base_velocity": self._post_processing_fn(
-                    (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
-                    (self.joint_range["base"][1] - self.joint_range["base"][0])
+                    2 * (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
+                    (self.joint_range["base"][1] - self.joint_range["base"][0]) - 1
                 ),
             },
         })
