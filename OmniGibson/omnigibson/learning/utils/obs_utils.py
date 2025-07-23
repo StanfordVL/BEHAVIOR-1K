@@ -1,4 +1,5 @@
 import av
+import cv2
 import numpy as np
 import omnigibson.utils.transform_utils as T
 import open3d as o3d
