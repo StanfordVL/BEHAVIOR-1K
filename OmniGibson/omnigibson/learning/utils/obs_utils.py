@@ -181,6 +181,9 @@ class VideoLoader:
         batch_size: Optional[int]=None, 
         stride: int=1, 
         output_size: Tuple[int, int]=(128, 128),
+        start_idx: int=0,
+        end_idx: Optional[int]=None,
+        fps: int=30,
         *args, 
         **kwargs
     ):
@@ -192,6 +195,11 @@ class VideoLoader:
             batch_size (int): Batch size to load the video into memory. If None, load the entire video into memory.
             stride (int): Stride to load the video into memory.
                 i.e. if batch_size=3 and stride=1, __iter__ will return [0, 1, 2], [1, 2, 3], [2, 3, 4], ...
+            output_size (Tuple[int, int]): Output size of the video frames to resize to.
+            start_idx (int): Frame to start loading the video from. Default is 0.
+            end_idx (Optional[int]): Frame to stop loading the video at. If None, will load until video end.
+                NOTE: end idx is not inclusive, i.e. if end_idx=10, the last frame will be 9.
+            fps (int): Frames per second of the video. Default is 30.
         Returns:
             th.Tensor: (T, H, W, 3) RGB video tensor
         """
@@ -203,10 +211,18 @@ class VideoLoader:
         self._frame_iter = None
         self._done = False
         self.output_size = output_size
-        
+        self._start_frame = start_idx
+        self._end_frame = end_idx if end_idx is not None else self.stream.frames
+        self._current_frame = start_idx
+        self._time_base = self.stream.time_base
+        self._fps = fps
+        # Note that we also set start_pts to be the frame preceding the start_frame if it's not 0,
+        # so we can return the correct iterator in reset()
+        self._start_pts = int(max(0, self._start_frame - 1) / self._fps / self._time_base)
+        self.reset()
+
     def __iter__(self) -> Generator[th.Tensor, None, None]:
-        self.container.seek(0)
-        self._frame_iter = self.container.decode(self.stream)
+        self.reset()
         self._frames = []
         self._done = False
         return self
@@ -218,8 +234,11 @@ class VideoLoader:
             while True:
                 frame = next(self._frame_iter)  # may raise StopIteration
                 processed_frame = self._process_single_frame(frame)
+                self._current_frame += 1
+                if self._current_frame == self._end_frame:
+                    self._done = True
                 self._frames.append(processed_frame)
-                if self.batch_size and len(self._frames) == self.batch_size:
+                if (self.batch_size and len(self._frames) == self.batch_size) or self._done:
                     batch = th.cat(self._frames, dim=0)
                     self._frames = self._frames[self.stride:]
                     return batch
@@ -239,7 +258,20 @@ class VideoLoader:
         raise NotImplementedError("Subclasses must implement this method")
 
     def reset(self):
-        self.container.seek(0)
+        self._current_frame = self._start_frame
+        self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
+        self._frame_iter = self.container.decode(self.stream)
+        if self._start_frame > 0:
+            # Decode forward until we find the start frame
+            for frame in self._frame_iter:
+                if frame.pts is None:
+                    continue
+                cur_frame = round(frame.pts * self._time_base * self._fps)
+                if cur_frame == self._start_frame - 1:
+                    return
+                elif cur_frame > self._start_frame - 1:
+                    raise ValueError(f"Start frame {self._start_frame} is beyond the video length. Current frame: {cur_frame}")
+
 
     @property
     def frames(self) -> th.Tensor:
