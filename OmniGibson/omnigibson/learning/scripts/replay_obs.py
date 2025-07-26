@@ -161,7 +161,7 @@ def replay_hdf5_file(
         robot_proprio_keys=list(PROPRIOCEPTION_INDICES["R1Pro"].keys()),
         robot_sensor_config=robot_sensor_config,
         external_sensors_config=dict(),
-        n_render_iterations=1,
+        n_render_iterations=3,
         flush_every_n_traj=1,
         flush_every_n_steps=flush_every_n_steps,
         additional_wrapper_configs=additional_wrapper_configs,
