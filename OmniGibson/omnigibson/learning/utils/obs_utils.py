@@ -216,9 +216,9 @@ class VideoLoader:
         self._current_frame = start_idx
         self._time_base = self.stream.time_base
         self._fps = fps
-        # Note that we also set start_pts to be two frames preceding the start_frame if it's not 0,
+        # Note that we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
-        self._start_pts = int(max(0, self._start_frame - 2) / self._fps / self._time_base)
+        self._start_pts = int(max(0, self._start_frame - 5) / self._fps / self._time_base)
         self.reset()
 
     def __iter__(self) -> Generator[th.Tensor, None, None]:
