@@ -12,7 +12,7 @@ from omnigibson.learning.utils.eval_utils import (
     CAMERA_INTRINSICS
 )
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
-from omnigibson.learning.utils.obs_utils import process_fused_point_cloud, color_pcd_vis
+from omnigibson.learning.utils.obs_utils import process_fused_point_cloud
 from typing import Dict, Optional, List
 
 
