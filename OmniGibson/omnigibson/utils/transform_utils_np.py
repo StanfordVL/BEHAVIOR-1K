@@ -239,6 +239,7 @@ def quat_inverse(quaternion):
 def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
+    Always returns the shorter rotation path.
 
     Args:
         quaternion1 (np.array): (x,y,z,w) quaternion
@@ -247,6 +248,11 @@ def quat_distance(quaternion1, quaternion0):
     Returns:
         np.array: (x,y,z,w) quaternion distance
     """
+    d = np.dot(quaternion0, quaternion1)
+    # If dot product is negative, negate one quaternion to get shorter path
+    if d < 0.0:
+        quaternion1 = -quaternion1
+    
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
