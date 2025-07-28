@@ -332,6 +332,144 @@ body:has(.body-wrap) .md-main {
     text-align: left;
 }
 
+/* Video Gallery Section */
+.video-gallery-section {
+    padding: 2rem 2rem;
+    background: #ffffff;
+}
+
+.video-gallery-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.video-gallery {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.video-gallery-display {
+    flex: 1;
+    position: relative;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.gallery-video-frame {
+    width: 100%;
+    height: 0;
+    padding-bottom: 28.125%; /* 16:4.5 aspect ratio for wide videos (3840:1080) */
+    position: relative;
+}
+
+.gallery-video-frame iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.gallery-nav {
+    background: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    color: #2c3e50;
+    flex-shrink: 0;
+}
+
+.gallery-nav:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.gallery-nav:active {
+    transform: scale(0.95);
+}
+
+.gallery-nav svg {
+    width: 20px;
+    height: 20px;
+}
+
+.video-gallery-caption {
+    text-align: center;
+    margin-top: 0.5rem;
+}
+
+.video-gallery-caption p {
+    font-size: 0.875rem;
+    font-weight: 400;
+    color: #6b7280;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.video-gallery-indicators {
+    display: flex;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+.gallery-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: none;
+    background: #d1d5db;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.gallery-indicator:hover {
+    background: #9ca3af;
+    transform: scale(1.2);
+}
+
+.gallery-indicator.active {
+    background: #1577d8;
+    transform: scale(1.3);
+}
+
+@media (max-width: 768px) {
+    .video-gallery {
+        gap: 0.5rem;
+    }
+    
+    .gallery-nav {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .gallery-nav svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .gallery-video-frame {
+        padding-bottom: 35%; /* Slightly taller on mobile for better viewing */
+    }
+}
+
 .intro-container {
     max-width: 1000px;
     margin: 0 auto;
@@ -544,6 +682,43 @@ body:has(.body-wrap) .md-main {
     .team-name {
         font-size: 0.8rem;
         max-width: 80px;
+    }
+}
+
+/* Alumni Section Styling */
+.alumni-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    line-height: 1.6;
+}
+
+.alumni-name {
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: #34495e;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    white-space: nowrap;
+}
+
+.alumni-name:hover {
+    color: #1577d8;
+    text-decoration: underline;
+}
+
+/* For non-linked names (spans) */
+span.alumni-name {
+    color: #5a6c7d;
+}
+
+@media (max-width: 768px) {
+    .alumni-list {
+        gap: 0.5rem 1rem;
+    }
+    
+    .alumni-name {
+        font-size: 0.85rem;
     }
 }
 

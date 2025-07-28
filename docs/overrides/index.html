@@ -40,6 +40,44 @@
       </div>
     </section>
 
+    <!-- Video Gallery Section -->
+    <section class="video-gallery-section">
+      <div class="video-gallery-container">
+        <div class="video-gallery">
+          <button class="gallery-nav gallery-nav-prev" onclick="changeVideo(-1)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <div class="video-gallery-display">
+            <div class="gallery-video-frame">
+              <iframe id="gallery-video"
+                      src="https://player.vimeo.com/video/1104802075?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+            </div>
+          </div>
+          
+          <button class="gallery-nav gallery-nav-next" onclick="changeVideo(1)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="video-gallery-caption">
+          <p id="gallery-caption">Single Family House 1</p>
+        </div>
+        
+        <div class="video-gallery-indicators">
+          <button class="gallery-indicator active" onclick="setVideo(0)"></button>
+          <button class="gallery-indicator" onclick="setVideo(1)"></button>
+          <button class="gallery-indicator" onclick="setVideo(2)"></button>
+        </div>
+      </div>
+    </section>
+
     <!-- Features Section -->
     <section class="features-section">
       <div class="features-container">
@@ -150,41 +188,10 @@
     <!-- Team Section -->
     <section class="team-section">
       <div class="team-container">
-        <!-- Leadership -->
+        <!-- Core Team -->
         <div class="team-category">
-          <h4 class="team-title">Leadership</h4>
+          <h4 class="team-title">Core Team</h4>
           <div class="team-grid">
-            <div class="team-member">
-              <a href="https://ai.stanford.edu/~zharu/" class="team-avatar">
-                <img alt="Ruohan Zhang" src="assets/people/ruohan_zhang.jpg">
-              </a>
-              <small class="team-name">Ruohan Zhang</small>
-            </div>
-            <div class="team-member">
-              <a href="https://qingh097.github.io/" class="team-avatar">
-                <img alt="Raven Huang" src="assets/people/raven_huang.png">
-              </a>
-              <small class="team-name">Raven Huang</small>
-            </div>
-            <div class="team-member">
-              <a href="https://jiajunwu.com/" class="team-avatar">
-                <img alt="Jiajun Wu" src="assets/people/jiajun_wu.jpg">
-              </a>
-              <small class="team-name">Jiajun Wu</small>
-            </div>
-            <div class="team-member">
-              <a href="https://engineering.stanford.edu/people/fei-fei-li" class="team-avatar">
-                <img alt="Li Fei-Fei" src="assets/people/li_fei_fei.jpg">
-              </a>
-              <small class="team-name">Li Fei-Fei</small>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Core Contributors -->
-        <div class="team-category">
-          <h4 class="team-title">Core Contributors</h4>
-          <div class="team-grid" style="margin-bottom: 2rem;">
             <div class="team-member">
               <a href="http://jowo.me" class="team-avatar">
                 <img alt="Josiah Wong" src="assets/people/josiah_wong.jpg">
@@ -209,44 +216,57 @@
               </a>
               <small class="team-name">Wensi Ai</small>
             </div>
-          </div>    
-          <div class="team-grid">
             <div class="team-member">
-            <a href="https://yunfanj.com/" class="team-avatar">
-              <img alt="Yunfan Jiang" src="assets/people/yunfan_jiang.jpg">
-            </a>
-            <small class="team-name">Yunfan Jiang</small>
+              <a href="https://yunfanj.com/" class="team-avatar">
+                <img alt="Yunfan Jiang" src="assets/people/yunfan_jiang.jpg">
+              </a>
+              <small class="team-name">Yunfan Jiang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://mxu34.github.io/" class="team-avatar">
+                <img alt="Mengdi Xu" src="assets/people/mengdi_xu.jpg">
+              </a>
+              <small class="team-name">Mengdi Xu</small>
+            </div>
+            <div class="team-member">
+              <a href="http://chengshuli.me" class="team-avatar">
+                <img alt="Chengshu (Eric) Li" src="assets/people/chengshu.jpg">
+              </a>
+              <small class="team-name">Chengshu (Eric) Li</small>
+            </div>
           </div>
-          <div class="team-member">
-            <a href="https://ai.stanford.edu/~zharu/" class="team-avatar">
-              <img alt="Ruohan Zhang" src="assets/people/ruohan_zhang.jpg">
-            </a>
-            <small class="team-name">Ruohan Zhang</small>
-          </div>
-          <div class="team-member">
-            <a href="https://qingh097.github.io/" class="team-avatar">
-              <img alt="Raven Huang" src="assets/people/raven_huang.png">
-            </a>
-            <small class="team-name">Raven Huang</small>
-          </div>
-          <div class="team-member">
-            <a href="https://mxu34.github.io/" class="team-avatar">
-              <img alt="Mengdi Xu" src="assets/people/mengdi_xu.jpg">
-            </a>
-            <small class="team-name">Mengdi Xu</small>
-          </div>
-          <div class="team-member">
-            <a href="http://chengshuli.me" class="team-avatar">
-              <img alt="Chengshu (Eric) Li" src="assets/people/chengshu.jpg">
-            </a>
-            <small class="team-name">Chengshu (Eric) Li</small>
-          </div>
+          <div class="team-grid" style="margin-bottom: 2rem;">
+            <div class="team-member">
+              <a href="https://ai.stanford.edu/~zharu/" class="team-avatar">
+                <img alt="Ruohan Zhang" src="assets/people/ruohan_zhang.jpg">
+              </a>
+              <small class="team-name">Ruohan Zhang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://qingh097.github.io/" class="team-avatar">
+                <img alt="Raven Huang" src="assets/people/raven_huang.png">
+              </a>
+              <small class="team-name">Raven Huang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://jiajunwu.com/" class="team-avatar">
+                <img alt="Jiajun Wu" src="assets/people/jiajun_wu.jpg">
+              </a>
+              <small class="team-name">Jiajun Wu</small>
+            </div>
+            <div class="team-member">
+              <a href="https://engineering.stanford.edu/people/fei-fei-li" class="team-avatar">
+                <img alt="Li Fei-Fei" src="assets/people/li_fei_fei.jpg">
+              </a>
+              <small class="team-name">Li Fei-Fei</small>
+            </div>
+          </div>    
         </div>
         
         <!-- Supporting Team -->
         <div class="team-category">
           <h4 class="team-title">Supporting Team</h4>
-          <div class="team-grid">
+          <div class="team-grid" style="margin-bottom: 2rem;">
             <div class="team-member">
               <a href="https://wenlong.page/" class="team-avatar">
                 <img alt="Wenlong Huang" src="assets/people/wenlong_huang.jpg">
@@ -290,11 +310,6 @@
               <small class="team-name">Weiyu Liu</small>
             </div>
           </div>
-        </div>
-        
-        <!-- Advisory Board -->
-        <div class="team-category">
-          <h4 class="team-title">Advisory Board</h4>
           <div class="team-grid">
             <div class="team-member">
               <a href="https://limanling.github.io/" class="team-avatar">
@@ -338,163 +353,33 @@
         <!-- Alumni -->
         <div class="team-category">
           <h4 class="team-title">Alumni</h4>
-          <div class="team-grid">
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/sanjana-srivastava5/" class="team-avatar">
-                <img alt="Sanjana Srivastava" src="assets/people/sanjana.jpg">
-              </a>
-              <small class="team-name">Sanjana Srivastava</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.chenwangjeremy.net/" class="team-avatar">
-                <img alt="Chen Wang" src="assets/people/chen_wang.jpeg">
-              </a>
-              <small class="team-name">Chen Wang</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.gabrael.io/" class="team-avatar">
-                <img alt="Gabrael Levine" src="assets/people/gabrael.jpg">
-              </a>
-              <small class="team-name">Gabrael Levine</small>
-            </div>
-            <div class="team-member">
-              <a href="https://github.com/mjlbach/" class="team-avatar">
-                <img alt="Michael Lingelbach" src="assets/people/michael_lingelbach.jpg">
-              </a>
-              <small class="team-name">Michael Lingelbach</small>
-            </div>
-            <div class="team-member">
-              <a href="https://sujaygarlanka.com/" class="team-avatar">
-                <img alt="Sujay Garlanka" src="assets/people/sujay_garlanka.jpeg">
-              </a>
-              <small class="team-name">Sujay Garlanka</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/benjamin-j-martinez/" class="team-avatar">
-                <img alt="Benjamin Martinez" src="assets/people/benjamin_martinez.png">
-              </a>
-              <small class="team-name">Benjamin Martinez</small>
-            </div>
-            <div class="team-member">
-              <a href="https://rogerdai1217.github.io/" class="team-avatar">
-                <img alt="Roger Dai" src="assets/people/roger_dai.png">
-              </a>
-              <small class="team-name">Roger Dai</small>
-            </div>
-            <div class="team-member">
-              <a href="https://misoshiruseijin.github.io/" class="team-avatar">
-                <img alt="Ayano Hiranaka" src="assets/people/ayano_hiranaka.jpg">
-              </a>
-              <small class="team-name">Ayano Hiranaka</small>
-            </div>
-            <div class="team-member">
-              <a href="https://mj-hwang.github.io/" class="team-avatar">
-                <img alt="Minjune Hwang" src="assets/people/minjune.jpg">
-              </a>
-              <small class="team-name">Minjune Hwang</small>
-            </div>
-            <div class="team-member">
-              <a href="http://web.stanford.edu/~jksun/" class="team-avatar">
-                <img alt="Jiankai Sun" src="assets/people/jiankai.jpg">
-              </a>
-              <small class="team-name">Jiankai Sun</small>
-            </div>
-            <div class="team-member">
-              <a href="https://monaanvari.github.io/portfolio/" class="team-avatar">
-                <img alt="Mona Anvari" src="assets/people/mona.jpg">
-              </a>
-              <small class="team-name">Mona Anvari</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/arman-aydin-915035185/?trk=public_profile_like_view_actor-name" class="team-avatar">
-                <img alt="Arman Aydin" src="assets/people/arman.jpg">
-              </a>
-              <small class="team-name">Arman Aydin</small>
-            </div>
-            <div class="team-member">
-              <a href="http://emilyjin.me/" class="team-avatar">
-                <img alt="Emily Jin" src="assets/people/emily_jin.png">
-              </a>
-              <small class="team-name">Emily Jin</small>
-            </div>
-            <div class="team-member">
-              <a href="https://github.com/manasi-sharma" class="team-avatar">
-                <img alt="Manasi Sharma" src="assets/people/manasi.jpg">
-              </a>
-              <small class="team-name">Manasi Sharma</small>
-            </div>
-            <div class="team-member">
-              <a href="https://dhruvabansal.com/" class="team-avatar">
-                <img alt="Dhruva Bansal" src="assets/people/dhruva.jpg">
-              </a>
-              <small class="team-name">Dhruva Bansal</small>
-            </div>
-            <div class="team-member">
-              <a href="#" class="team-avatar">
-                <img alt="Samuel Hunter" src="assets/people/samuel.jpg">
-              </a>
-              <small class="team-name">Samuel Hunter</small>
-            </div>
-            <div class="team-member">
-              <a href="https://kykim0.github.io/" class="team-avatar">
-                <img alt="Kyu-Young Kim" src="assets/people/kyuyoung.jpg">
-              </a>
-              <small class="team-name">Kyu-Young Kim</small>
-            </div>
-            <div class="team-member">
-              <a href="https://icme.stanford.edu/people/alan-lou" class="team-avatar">
-                <img alt="Alan Lou" src="assets/people/alan_lou.jpg">
-              </a>
-              <small class="team-name">Alan Lou</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/caleb-matthews/" class="team-avatar">
-                <img alt="Caleb Matthews" src="assets/people/caleb_matthews.jpg">
-              </a>
-              <small class="team-name">Caleb Matthews</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/ivillare/" class="team-avatar">
-                <img alt="Ivan Villa-Renteria" src="assets/people/ivan_villa_renteria.jpg">
-              </a>
-              <small class="team-name">Ivan Villa-Renteria</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/jerry-tang-b37026162/" class="team-avatar">
-                <img alt="Jerry Tang" src="assets/people/jerry_tang.jpg">
-              </a>
-              <small class="team-name">Jerry Tang</small>
-            </div>
-            <div class="team-member">
-              <a href="#" class="team-avatar">
-                <img alt="Claire Tang" src="assets/people/claire_tang.png">
-              </a>
-              <small class="team-name">Claire Tang</small>
-            </div>
-            <div class="team-member">
-              <a href="https://fxia22.github.io" class="team-avatar">
-                <img alt="Fei Xia" src="assets/people/fei_xia.png">
-              </a>
-              <small class="team-name">Fei Xia</small>
-            </div>
-            <div class="team-member">
-              <a href="https://www.linkedin.com/in/kent-vainio-4749b0145/?originalSubdomain=ch" class="team-avatar">
-                <img alt="Kent Vainio" src="assets/people/kent_vainio.jpg">
-              </a>
-              <small class="team-name">Kent Vainio</small>
-            </div>
-            <div class="team-member">
-              <a href="https://profiles.stanford.edu/zheng-lian" class="team-avatar">
-                <img alt="Zheng Lian" src="assets/people/zheng_lian.jpg">
-              </a>
-              <small class="team-name">Zheng Lian</small>
-            </div>
-            <div class="team-member">
-              <a href="https://cs.stanford.edu/~shyamal" class="team-avatar">
-                <img alt="Shyamal Buch" src="assets/people/shyamal.jpg">
-              </a>
-              <small class="team-name">Shyamal Buch</small>
-            </div>
+          <div class="alumni-list">
+            <a href="https://www.linkedin.com/in/sanjana-srivastava5/" class="alumni-name">Sanjana Srivastava</a>
+            <a href="https://www.chenwangjeremy.net/" class="alumni-name">Chen Wang</a>
+            <a href="https://www.gabrael.io/" class="alumni-name">Gabrael Levine</a>
+            <a href="https://github.com/mjlbach/" class="alumni-name">Michael Lingelbach</a>
+            <a href="https://sujaygarlanka.com/" class="alumni-name">Sujay Garlanka</a>
+            <a href="https://www.linkedin.com/in/benjamin-j-martinez/" class="alumni-name">Benjamin Martinez</a>
+            <a href="https://rogerdai1217.github.io/" class="alumni-name">Roger Dai</a>
+            <a href="https://misoshiruseijin.github.io/" class="alumni-name">Ayano Hiranaka</a>
+            <a href="https://mj-hwang.github.io/" class="alumni-name">Minjune Hwang</a>
+            <a href="http://web.stanford.edu/~jksun/" class="alumni-name">Jiankai Sun</a>
+            <a href="https://monaanvari.github.io/portfolio/" class="alumni-name">Mona Anvari</a>
+            <a href="https://www.linkedin.com/in/arman-aydin-915035185/?trk=public_profile_like_view_actor-name" class="alumni-name">Arman Aydin</a>
+            <a href="http://emilyjin.me/" class="alumni-name">Emily Jin</a>
+            <a href="https://github.com/manasi-sharma" class="alumni-name">Manasi Sharma</a>
+            <a href="https://dhruvabansal.com/" class="alumni-name">Dhruva Bansal</a>
+            <span class="alumni-name">Samuel Hunter</span>
+            <a href="https://kykim0.github.io/" class="alumni-name">Kyu-Young Kim</a>
+            <a href="https://icme.stanford.edu/people/alan-lou" class="alumni-name">Alan Lou</a>
+            <a href="https://www.linkedin.com/in/caleb-matthews/" class="alumni-name">Caleb Matthews</a>
+            <a href="https://www.linkedin.com/in/ivillare/" class="alumni-name">Ivan Villa-Renteria</a>
+            <a href="https://www.linkedin.com/in/jerry-tang-b37026162/" class="alumni-name">Jerry Tang</a>
+            <span class="alumni-name">Claire Tang</span>
+            <a href="https://fxia22.github.io" class="alumni-name">Fei Xia</a>
+            <a href="https://www.linkedin.com/in/kent-vainio-4749b0145/?originalSubdomain=ch" class="alumni-name">Kent Vainio</a>
+            <a href="https://profiles.stanford.edu/zheng-lian" class="alumni-name">Zheng Lian</a>
+            <a href="https://cs.stanford.edu/~shyamal" class="alumni-name">Shyamal Buch</a>
           </div>
         </div>
       </div>
@@ -503,3 +388,66 @@
 {% endblock %}
 
 {% block content %}{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Video Gallery functionality
+const videos = [
+  'https://player.vimeo.com/video/1104802075?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0',
+  'https://player.vimeo.com/video/1104802064?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0',
+  'https://player.vimeo.com/video/1104802056?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0'
+];
+
+const captions = [
+  'Single Family House 1',
+  'Single Family House 2',
+  'Hotel'
+];
+
+let currentVideoIndex = 0;
+
+function changeVideo(direction) {
+  currentVideoIndex += direction;
+  
+  if (currentVideoIndex >= videos.length) {
+    currentVideoIndex = 0;
+  } else if (currentVideoIndex < 0) {
+    currentVideoIndex = videos.length - 1;
+  }
+  
+  updateVideo();
+}
+
+function setVideo(index) {
+  currentVideoIndex = index;
+  updateVideo();
+}
+
+function updateVideo() {
+  const videoFrame = document.getElementById('gallery-video');
+  const captionElement = document.getElementById('gallery-caption');
+  const indicators = document.querySelectorAll('.gallery-indicator');
+  
+  // Update video source
+  videoFrame.src = videos[currentVideoIndex];
+  
+  // Update caption
+  captionElement.textContent = captions[currentVideoIndex];
+  
+  // Update indicators
+  indicators.forEach((indicator, index) => {
+    if (index === currentVideoIndex) {
+      indicator.classList.add('active');
+    } else {
+      indicator.classList.remove('active');
+    }
+  });
+}
+
+// Optional: Auto-advance videos every 10 seconds
+// setInterval(() => {
+//   changeVideo(1);
+// }, 10000);
+</script>
+{% endblock %}
