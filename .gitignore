@@ -2,3 +2,5 @@ gha-creds-*.json
 
 # training
 outputs/
+.vscode/
+test.ipynb
