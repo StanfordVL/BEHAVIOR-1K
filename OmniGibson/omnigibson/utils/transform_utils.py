@@ -248,6 +248,7 @@ def quat_inverse(quaternion: torch.Tensor) -> torch.Tensor:
 def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
+    Always returns the shorter rotation path.
 
     Args:
         quaternion1 (torch.tensor): (x,y,z,w) quaternion
@@ -256,6 +257,11 @@ def quat_distance(quaternion1, quaternion0):
     Returns:
         torch.tensor: (x,y,z,w) quaternion distance
     """
+    d = torch.dot(quaternion0, quaternion1)
+    # If dot product is negative, negate one quaternion to get shorter path
+    if d < 0.0:
+        quaternion1 = -quaternion1
+    
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
