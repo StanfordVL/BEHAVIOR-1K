@@ -997,10 +997,11 @@ class DataPlaybackWrapper(DataWrapper):
                     truncated=tr,
                     info=info,
                 )
-                if i == 0 and self.flush_every_n_steps > 0:
-                    self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(step_data, f"demo_{episode_id}", num_samples=len(action))
-                if i % self.flush_every_n_steps == 0:
-                    self.flush_partial_traj()
+                if self.flush_every_n_steps > 0:
+                    if i == 0:
+                        self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(step_data, f"demo_{episode_id}", num_samples=len(action))
+                    if i % self.flush_every_n_steps == 0:
+                        self.flush_partial_traj()
                 # append to current trajectory history
                 self.current_traj_history.append(step_data)
 
@@ -1008,7 +1009,8 @@ class DataPlaybackWrapper(DataWrapper):
             self.step_count += 1
 
         if record_data:
-            self.flush_partial_traj()
+            if self.flush_every_n_steps > 0:
+                self.flush_partial_traj()
             self.flush_current_traj()
 
     def playback_dataset(self, record_data=False):
@@ -1105,9 +1107,12 @@ class DataPlaybackWrapper(DataWrapper):
         Flush current trajectory data
         For playback, we assume that all data needs to be stored. 
         """
-        self.postprocess_traj_group(self.current_traj_grp)
-        self.flush_current_file()
-        # Clear trajectory and transition buffers
-        self.traj_count += 1
-        self.current_episode_step_count = 0
-        self.current_traj_history = []
+        if self.flush_every_n_steps == 0:
+            super().flush_current_traj()
+        else:
+            self.postprocess_traj_group(self.current_traj_grp)
+            self.flush_current_file()
+            # Clear trajectory and transition buffers
+            self.traj_count += 1
+            self.current_episode_step_count = 0
+            self.current_traj_history = []
