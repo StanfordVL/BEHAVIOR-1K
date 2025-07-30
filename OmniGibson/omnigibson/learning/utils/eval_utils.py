@@ -21,6 +21,12 @@ CAMERA_INTRINSICS = {
 
 # Action indices
 ACTION_QPOS_INDICES = {
+    "A1": OrderedDict(
+        {
+            "arm": np.s_[0:6],
+            "gripper": np.s_[6:7],
+        }
+    ),
     "R1Pro": OrderedDict(
         {
             "base": np.s_[0:3],
@@ -36,6 +42,20 @@ ACTION_QPOS_INDICES = {
 
 # Proprioception configuration
 PROPRIOCEPTION_INDICES = {
+    "A1": OrderedDict(
+        {
+            "joint_qpos": np.s_[0:8],
+            "joint_qpos_sin": np.s_[8:16],
+            "joint_qpos_cos": np.s_[16:24],
+            "joint_qvel": np.s_[24:32],
+            "joint_qeffort": np.s_[32:40],
+            "eef_0_pose": np.s_[40:43],
+            "eef_0_quat": np.s_[43:47],
+            "grasp_0": np.s_[47:48],
+            "gripper_0_qpos": np.s_[48:50],
+            "gripper_0_qvel": np.s_[50:52],
+        }
+    ),
     "R1Pro": OrderedDict(
         {
             "joint_qpos": np.s_[0:28],
@@ -81,6 +101,12 @@ PROPRIOCEPTION_INDICES = {
 
 # Proprioception indices
 PROPRIO_QPOS_INDICES = {
+    "A1": OrderedDict(
+        {
+            "arm": np.s_[0:6],
+            "gripper": np.s_[6:8],
+        }
+    ),
     "R1Pro": OrderedDict(
         {
             "torso": np.s_[6:10],
@@ -93,8 +119,18 @@ PROPRIO_QPOS_INDICES = {
 }
 
 
-# Joint limits
+# Joint limits (lower, upper)
 JOINT_RANGE = {
+    "A1": {
+        "arm": (
+            th.tensor([-2.8798, 0.0, -3.3161, -2.8798, -1.6581, -2.8798], dtype=th.float32),
+            th.tensor([2.8798, 3.1415, 0.0, 2.8798, 1.6581, 2.8798], dtype=th.float32)
+        ),
+        "gripper": (
+            th.tensor([-1], dtype=th.float32),
+            th.tensor([1], dtype=th.float32)
+        ),
+    },
     "R1Pro": {
         "base": (
             th.tensor([-0.75, -0.75, -1.0], dtype=th.float32),
@@ -135,13 +171,6 @@ JOINT_RANGE_ARRAY = {
     )
     for robot_name in JOINT_RANGE
 }
-
-
-# PCD range
-PCD_RANGE = (
-    np.array([-0.5, -0.5, -0.5]),
-    np.array([0.5, 0.5, 0.5])
-)
 
 
 TASK_NAMES_TO_INDICES = {
