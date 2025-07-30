@@ -127,8 +127,8 @@ JOINT_RANGE = {
             th.tensor([2.8798, 3.1415, 0.0, 2.8798, 1.6581, 2.8798], dtype=th.float32)
         ),
         "gripper": (
-            th.tensor([-1], dtype=th.float32),
-            th.tensor([1], dtype=th.float32)
+            th.tensor([0.00], dtype=th.float32),
+            th.tensor([0.03], dtype=th.float32)
         ),
     },
     "R1Pro": {
@@ -153,23 +153,10 @@ JOINT_RANGE = {
             th.tensor([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32)
         ),
         "right_gripper": (
-            th.tensor([-1], dtype=th.float32),
-            th.tensor([1], dtype=th.float32)
+            th.tensor([0.00], dtype=th.float32),
+            th.tensor([0.05], dtype=th.float32)
         ),
     }
-}
-JOINT_RANGE_ARRAY = {
-    robot_name: (
-        th.cat([
-            JOINT_RANGE[robot_name][part][0]
-            for part in ACTION_QPOS_INDICES[robot_name]
-        ]), 
-        th.cat([
-            JOINT_RANGE[robot_name][part][1]
-            for part in ACTION_QPOS_INDICES[robot_name]
-        ])
-    )
-    for robot_name in JOINT_RANGE
 }
 
 

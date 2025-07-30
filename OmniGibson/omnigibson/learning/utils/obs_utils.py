@@ -184,6 +184,7 @@ class VideoLoader:
         start_idx: int=0,
         end_idx: Optional[int]=None,
         fps: int=30,
+        downsample_factor: int=1,
         *args, 
         **kwargs
     ):
@@ -200,6 +201,7 @@ class VideoLoader:
             end_idx (Optional[int]): Frame to stop loading the video at. If None, will load until video end.
                 NOTE: end idx is not inclusive, i.e. if end_idx=10, the last frame will be 9.
             fps (int): Frames per second of the video. Default is 30.
+            downsample_factor (int): Factor to downsample the video frames by. Default is 1 (no downsampling).
         Returns:
             th.Tensor: (T, H, W, 3) RGB video tensor
         """
@@ -216,6 +218,7 @@ class VideoLoader:
         self._current_frame = start_idx
         self._time_base = self.stream.time_base
         self._fps = fps
+        self._downsample_factor = downsample_factor
         # Note that we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
         self._start_pts = int(max(0, self._start_frame - 5) / self._fps / self._time_base)
@@ -232,7 +235,10 @@ class VideoLoader:
             raise StopIteration
         try:
             while True:
-                frame = next(self._frame_iter)  # may raise StopIteration
+                # use downsample factor to skip frames
+                for _ in range(self._downsample_factor - 1):
+                    next(self._frame_iter)
+                frame = next(self._frame_iter) 
                 processed_frame = self._process_single_frame(frame)
                 self._current_frame += 1
                 if self._current_frame == self._end_frame:
