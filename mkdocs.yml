@@ -2,7 +2,7 @@
 # The above line is included to enable intellisense for mkdocs.yml file in VSCode. It is not a valid
 # part of the mkdocs.yml file and should remain commented out.
 
-site_name: BEHAVIOR-1K
+site_name: BEHAVIOR
 repo_name: StanfordVL/BEHAVIOR-1K
 site_url: https://behavior.stanford.edu/omnigibson # TODO: move this to root
 repo_url: https://github.com/StanfordVL/BEHAVIOR-1K
