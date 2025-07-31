@@ -14,6 +14,7 @@ gm.ENABLE_FLATCACHE = False
 gm.USE_GPU_DYNAMICS = True
 gm.USE_ENCRYPTED_ASSETS = True
 gm.FORCE_LIGHT_INTENSITY = None
+gm.ENABLE_TRANSITION_RULES = False
 
 import omnigibson as og
 import omnigibson.lazy as lazy

@@ -7,7 +7,7 @@
 set -e
 
 # Read Arguments
-TEMP=`getopt -o h --long help,new-env,omnigibson,bddl,teleop,dataset,primitives,dev,cuda-version: -n 'setup.sh' -- "$@"`
+TEMP=`getopt -o h --long help,new-env,omnigibson,bddl,teleop,dataset,primitives,asset-pipeline,dev,cuda-version: -n 'setup.sh' -- "$@"`
 
 eval set -- "$TEMP"
 
@@ -19,6 +19,7 @@ BDDL=false
 TELEOP=false
 DATASET=false
 PRIMITIVES=false
+ASSET_PIPELINE=false
 DEV=false
 CUDA_VERSION="12.1"
 ERROR=false
@@ -38,6 +39,7 @@ while true ; do
         --teleop) TELEOP=true ; shift ;;
         --dataset) DATASET=true ; shift ;;
         --primitives) PRIMITIVES=true ; shift ;;
+        --asset-pipeline) ASSET_PIPELINE=true ; shift ;;
         --dev) DEV=true ; shift ;;
         --cuda-version) CUDA_VERSION="$2" ; shift 2 ;;
         --) shift ; break ;;
@@ -64,6 +66,7 @@ if [ "$HELP" = true ] ; then
     echo "  --teleop                Install JoyLo (teleoperation interface)"
     echo "  --dataset               Download BEHAVIOR datasets (requires --omnigibson)"
     echo "  --primitives            Install OmniGibson with primitives support"
+    echo "  --asset-pipeline        Install the 3D scene and object asset pipeline"
     echo "  --dev                   Install development dependencies"
     echo "  --cuda-version VERSION  Specify CUDA version (default: 12.1)"
     echo ""
@@ -94,6 +97,11 @@ WORKDIR=$(pwd)
 echo "[SYSTEM] Working directory: $WORKDIR"
 
 # Validate dependencies
+if [ $OMNIGIBSON = true ] && [ "$BDDL" = false ] ; then
+    echo "[ERROR] --omnigibson requires --bddl"
+    return 1
+fi
+
 if [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] ; then
     echo "[ERROR] --dataset requires --omnigibson"
     return 1
@@ -217,6 +225,27 @@ if [ "$TELEOP" = true ] ; then
     echo "[TELEOP] Installation completed successfully"
 fi
 
+# Install asset pipeline
+if [ "$ASSET_PIPELINE" = true ] ; then
+    echo "[ASSET PIPELINE] Installing asset pipeline..."
+    
+    if [ ! -d "asset_pipeline" ] ; then
+        echo "[ERROR] asset_pipeline directory not found"
+        return 1
+    fi
+    
+    cd asset_pipeline
+    pip install -r requirements.txt
+    
+    if [ $? -ne 0 ] ; then
+        echo "[ERROR] Failed to install asset pipeline"
+        return 1
+    fi
+    
+    cd $WORKDIR
+    echo "[ASSET PIPELINE] Installation completed successfully"
+fi
+
 # Final summary
 echo ""
 echo "=== Installation Summary ==="
@@ -240,6 +269,9 @@ if [ "$BDDL" = true ] ; then
 fi
 if [ "$TELEOP" = true ] ; then
     echo "✓ Installed JoyLo (teleoperation)"
+fi
+if [ "$ASSET_PIPELINE" = true ] ; then
+    echo "✓ Installed asset pipeline"
 fi
 
 echo ""
