@@ -314,7 +314,7 @@ class RGBVideoLoader(VideoLoader):
             size=self.output_size, 
             mode='nearest-exact'
         ) 
-        return rgb  # (1, H, W, 3)
+        return rgb  # (1, 3, H, W)
 
 
 class DepthVideoLoader(VideoLoader):
@@ -347,7 +347,7 @@ class DepthVideoLoader(VideoLoader):
         )
         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
         depth = F.interpolate(depth, size=self.output_size, mode='nearest-exact')
-        return depth.squeeze(0)
+        return depth.squeeze(0) # (1, H, W)
 
 class SegVideoLoader(VideoLoader):
     def __init__(
