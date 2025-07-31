@@ -49,7 +49,7 @@ PROPRIOCEPTION_INDICES = {
             "joint_qpos_cos": np.s_[16:24],
             "joint_qvel": np.s_[24:32],
             "joint_qeffort": np.s_[32:40],
-            "eef_0_pose": np.s_[40:43],
+            "eef_0_pos": np.s_[40:43],
             "eef_0_quat": np.s_[43:47],
             "grasp_0": np.s_[47:48],
             "gripper_0_qpos": np.s_[48:50],
