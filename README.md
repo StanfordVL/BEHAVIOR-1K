@@ -51,7 +51,24 @@ cd BEHAVIOR-1K
 | **Datasets** | `--dataset` | Download BEHAVIOR datasets (requires `--omnigibson`) |
 | **Primitives** | `--primitives` | Install OmniGibson with action primitives support |
 | **Development** | `--dev` | Install development dependencies |
-| **CUDA Version** | `--cuda-version X.X` | Specify CUDA version (default: 12.1) |
+| **CUDA Version** | `--cuda-version X.X` | Specify CUDA version (default: 12.4) |
+
+### Terms of Service & License Acceptance
+
+BEHAVIOR-1K installation may require acceptance of various terms of service and license agreements. For interactive installation, you'll be prompted to accept these terms. For non-interactive/automated installation, use these flags:
+
+| Option | Flag | Description |
+|--------|------|-------------|
+| **Conda TOS** | `--accept-conda-tos` | Automatically accept Anaconda Terms of Service |
+| **NVIDIA EULA** | `--accept-nvidia-eula` | Automatically accept NVIDIA Isaac Sim End User License Agreement |
+| **Dataset License** | `--accept-dataset-tos` | Automatically accept BEHAVIOR Data Bundle License Agreement |
+
+For automated/CI environments, you can bypass all prompts:
+
+```bash
+./setup.sh --new-env --omnigibson --bddl --teleop --dataset \
+           --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
+```
 
 To see all available options:
 ```bash
