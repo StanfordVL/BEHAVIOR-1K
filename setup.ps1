@@ -8,7 +8,10 @@ param(
     [switch]$Dataset,
     [switch]$Primitives,
     [switch]$Dev,
-    [string]$CudaVersion = "12.4"
+    [string]$CudaVersion = "12.4",
+    [switch]$AcceptCondaTos,
+    [switch]$AcceptNvidiaEula,
+    [switch]$AcceptDatasetTos
 )
 
 # Set error action preference to stop on errors
@@ -30,8 +33,12 @@ Options:
   -Primitives             Install OmniGibson with primitives support
   -Dev                    Install development dependencies
   -CudaVersion VERSION    Specify CUDA version (default: 12.4)
+  -AcceptCondaTos         Automatically accept Conda Terms of Service
+  -AcceptNvidiaEula       Automatically accept NVIDIA Isaac Sim EULA
+  -AcceptDatasetTos       Automatically accept BEHAVIOR Dataset Terms
 
 Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptCondaTos -AcceptNvidiaEula -AcceptDatasetTos
 "@
     exit 0
 }
@@ -53,6 +60,98 @@ if ($Primitives -and -not $OmniGibson) {
 }
 
 $WorkDir = Get-Location
+
+# Function to prompt for terms acceptance
+function Prompt-ForTerms {
+    Write-Host ""
+    Write-Host "=== TERMS OF SERVICE AND LICENSING AGREEMENTS ==="
+    Write-Host ""
+    
+    # Check what terms need to be accepted
+    $NeedsCondaTos = $false
+    $NeedsNvidiaEula = $false
+    $NeedsDatasetTos = $false
+    
+    if ($NewEnv -and -not $AcceptCondaTos) {
+        $script:NeedsCondaTos = $true
+    }
+    
+    if ($OmniGibson -and -not $AcceptNvidiaEula) {
+        $script:NeedsNvidiaEula = $true
+    }
+    
+    if ($Dataset -and -not $AcceptDatasetTos) {
+        $script:NeedsDatasetTos = $true
+    }
+    
+    # If nothing needs acceptance, return early
+    if (-not $script:NeedsCondaTos -and -not $script:NeedsNvidiaEula -and -not $script:NeedsDatasetTos) {
+        return
+    }
+    
+    Write-Host "This installation requires acceptance of the following terms:"
+    Write-Host ""
+    
+    if ($script:NeedsCondaTos) {
+        Write-Host @"
+1. CONDA TERMS OF SERVICE
+   - Required for creating conda environment
+   - By accepting, you agree to Anaconda's Terms of Service
+   - See: https://legal.anaconda.com/policies/en/
+
+"@
+    }
+    
+    if ($script:NeedsNvidiaEula) {
+        Write-Host @"
+2. NVIDIA ISAAC SIM EULA
+   - Required for OmniGibson installation
+   - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
+   - See: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement
+
+"@
+    }
+    
+    if ($script:NeedsDatasetTos) {
+        Write-Host @"
+3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
+    Last revision: December 8, 2022
+    This License Agreement is for the BEHAVIOR Data Bundle ("Data"). It works with OmniGibson ("Software") which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. 
+    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images ("Third Party Content") from third parties with restrictions on redistribution. 
+    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
+    Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement ("Agreement"):
+        1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.
+        2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.
+        3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.
+        4. You may only use the Data within OmniGibson.
+        5. You may not redistribute the key or any other Data or elements in whole or part.
+        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+            IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.
+
+"@
+    }
+    
+    Write-Host "Do you accept ALL of the above terms? (y/N)"
+    $response = Read-Host
+    
+    if ($response -notmatch '^[Yy]$') {
+        Write-Host "Terms not accepted. Installation cancelled."
+        Write-Host "You can bypass these prompts by using -AcceptCondaTos, -AcceptNvidiaEula, and -AcceptDatasetTos flags."
+        exit 1
+    }
+    
+    # Set acceptance flags
+    if ($script:NeedsCondaTos) { $script:AcceptCondaTos = $true }
+    if ($script:NeedsNvidiaEula) { $script:AcceptNvidiaEula = $true }
+    if ($script:NeedsDatasetTos) { $script:AcceptDatasetTos = $true }
+    
+    Write-Host ""
+    Write-Host "✓ All terms accepted. Proceeding with installation..."
+    Write-Host ""
+}
+
+# Prompt for terms acceptance at the beginning
+Prompt-ForTerms
 
 # Helper function to check if conda environment exists
 function Test-CondaEnvironment {
@@ -97,6 +196,12 @@ if ($NewEnv) {
     catch {
         Write-Error "ERROR: Conda not found"
         exit 1
+    }
+    
+    # Set auto-accept environment variable if user agreed to TOS
+    if ($AcceptCondaTos) {
+        $env:CONDA_PLUGINS_AUTO_ACCEPT_TOS = "yes"
+        Write-Host "✓ Conda TOS auto-acceptance enabled"
     }
     
     # Remove existing environment if it exists
@@ -249,7 +354,13 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
     }
     
     # Isaac Sim installation via pip
-    $env:OMNI_KIT_ACCEPT_EULA = "YES"
+    if ($AcceptNvidiaEula) {
+        $env:OMNI_KIT_ACCEPT_EULA = "YES"
+    }
+    else {
+        Write-Error "ERROR: NVIDIA EULA not accepted. Cannot install Isaac Sim."
+        exit 1
+    }
     
     # Check if already installed
     $isaacInstalled = $false
@@ -262,7 +373,7 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
         Write-Host "Installing Isaac Sim via pip..."
     }
     
-    if (-not $isaacInstalled) {
+if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
             "omniverse_kit-106.5.0.162521", "isaacsim_kernel-4.5.0.0", "isaacsim_app-4.5.0.0",
@@ -328,6 +439,12 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
     if ($Dataset) {
         Write-Host "Installing datasets..."
         
+        # Determine if we should accept dataset license automatically
+        $DatasetAcceptFlag = "False"
+        if ($AcceptDatasetTos) {
+            $DatasetAcceptFlag = "True"
+        }
+        
         $pythonScript = @"
 import os
 os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
@@ -345,7 +462,7 @@ try:
         
         if not dataset_exists:
             print('Downloading dataset...')
-            download_og_dataset()
+            download_og_dataset(accept_license=$DatasetAcceptFlag)
         
         if not assets_exist:
             print('Downloading assets...')

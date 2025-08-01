@@ -11,6 +11,9 @@ DATASET=false
 PRIMITIVES=false
 DEV=false
 CUDA_VERSION="12.4"
+ACCEPT_CONDA_TOS=false
+ACCEPT_NVIDIA_EULA=false
+ACCEPT_DATASET_TOS=false
 
 [ "$#" -eq 0 ] && HELP=true
 
@@ -24,8 +27,11 @@ while [[ $# -gt 0 ]]; do
         --dataset) DATASET=true; shift ;;
         --primitives) PRIMITIVES=true; shift ;;
         --dev) DEV=true; shift ;;
-        --cuda-version) CUDA_VERSION="$2"; shift 2 ;;
-        *) echo "Unknown option: $1"; exit 1 ;;
+        --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
+        --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
+        --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
+        --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
+        *) echo "Unknown option: \$1"; exit 1 ;;
     esac
 done
 
@@ -44,8 +50,12 @@ Options:
   --primitives            Install OmniGibson with primitives support
   --dev                   Install development dependencies
   --cuda-version VERSION  Specify CUDA version (default: 12.4)
+  --accept-conda-tos      Automatically accept Conda Terms of Service
+  --accept-nvidia-eula    Automatically accept NVIDIA Isaac Sim EULA
+  --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
 
 Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 EOF
     exit 0
 fi
@@ -57,10 +67,108 @@ fi
 
 WORKDIR=$(pwd)
 
+# Function to prompt for terms acceptance
+prompt_for_terms() {
+    echo ""
+    echo "=== TERMS OF SERVICE AND LICENSING AGREEMENTS ==="
+    echo ""
+    
+    # Check what terms need to be accepted
+    NEEDS_CONDA_TOS=false
+    NEEDS_NVIDIA_EULA=false
+    NEEDS_DATASET_TOS=false
+    
+    if [ "$NEW_ENV" = true ] && [ "$ACCEPT_CONDA_TOS" = false ]; then
+        NEEDS_CONDA_TOS=true
+    fi
+    
+    if [ "$OMNIGIBSON" = true ] && [ "$ACCEPT_NVIDIA_EULA" = false ]; then
+        NEEDS_NVIDIA_EULA=true
+    fi
+    
+    if [ "$DATASET" = true ] && [ "$ACCEPT_DATASET_TOS" = false ]; then
+        NEEDS_DATASET_TOS=true
+    fi
+    
+    # If nothing needs acceptance, return early
+    if [ "$NEEDS_CONDA_TOS" = false ] && [ "$NEEDS_NVIDIA_EULA" = false ] && [ "$NEEDS_DATASET_TOS" = false ]; then
+        return 0
+    fi
+    
+    echo "This installation requires acceptance of the following terms:"
+    echo ""
+    
+    if [ "$NEEDS_CONDA_TOS" = true ]; then
+        cat << EOF
+1. CONDA TERMS OF SERVICE
+   - Required for creating conda environment
+   - By accepting, you agree to Anaconda's Terms of Service
+   - See: https://legal.anaconda.com/policies/en/
+
+EOF
+    fi
+    
+    if [ "$NEEDS_NVIDIA_EULA" = true ]; then
+        cat << EOF
+2. NVIDIA ISAAC SIM EULA
+   - Required for OmniGibson installation
+   - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
+   - See: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement
+
+EOF
+    fi
+    
+    if [ "$NEEDS_DATASET_TOS" = true ]; then
+        cat << EOF
+3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
+    Last revision: December 8, 2022
+    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. 
+    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
+    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
+    Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
+        1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.
+        2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.
+        3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.
+        4. You may only use the Data within OmniGibson.
+        5. You may not redistribute the key or any other Data or elements in whole or part.
+        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+            IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.
+
+EOF
+    fi
+    
+    echo "Do you accept ALL of the above terms? (y/N)"
+    read -r response
+    
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+        echo "Terms not accepted. Installation cancelled."
+        echo "You can bypass these prompts by using --accept-conda-tos, --accept-nvidia-eula, and --accept-dataset-tos flags."
+        exit 1
+    fi
+    
+    # Set acceptance flags
+    [ "$NEEDS_CONDA_TOS" = true ] && ACCEPT_CONDA_TOS=true
+    [ "$NEEDS_NVIDIA_EULA" = true ] && ACCEPT_NVIDIA_EULA=true
+    [ "$NEEDS_DATASET_TOS" = true ] && ACCEPT_DATASET_TOS=true
+    
+    echo ""
+    echo "✓ All terms accepted. Proceeding with installation..."
+    echo ""
+}
+
+# Prompt for terms acceptance at the beginning
+prompt_for_terms
+
 # Create conda environment
 if [ "$NEW_ENV" = true ]; then
     echo "Creating conda environment 'behavior'..."
     command -v conda >/dev/null || { echo "ERROR: Conda not found"; exit 1; }
+    
+    # Set auto-accept environment variable if user agreed to TOS
+    if [ "$ACCEPT_CONDA_TOS" = true ]; then
+        export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
+        echo "✓ Conda TOS auto-acceptance enabled"
+    fi
     
     source "$(conda info --base)/etc/profile.d/conda.sh"
     conda env list | grep -q "^behavior " && conda env remove -n behavior -y
@@ -69,7 +177,6 @@ if [ "$NEW_ENV" = true ]; then
     
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
 fi
-
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
@@ -114,7 +221,12 @@ if [ "$OMNIGIBSON" = true ]; then
     fi
     
     # Isaac Sim installation via pip
-    export OMNI_KIT_ACCEPT_EULA=YES
+    if [ "$ACCEPT_NVIDIA_EULA" = true ]; then
+        export OMNI_KIT_ACCEPT_EULA=YES
+    else
+        echo "ERROR: NVIDIA EULA not accepted. Cannot install Isaac Sim."
+        exit 1
+    fi
     
     # Check if already installed
     if python -c "import isaacsim" 2>/dev/null; then
@@ -188,6 +300,15 @@ if [ "$OMNIGIBSON" = true ]; then
     # Install datasets
     if [ "$DATASET" = true ]; then
         echo "Installing datasets..."
+        
+        # Determine if we should accept dataset license automatically
+        DATASET_ACCEPT_FLAG=""
+        if [ "$ACCEPT_DATASET_TOS" = true ]; then
+            DATASET_ACCEPT_FLAG="True"
+        else
+            DATASET_ACCEPT_FLAG="False"
+        fi
+        
         python -c "
 import os
 os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
@@ -205,7 +326,7 @@ try:
         
         if not dataset_exists:
             print('Downloading dataset...')
-            download_og_dataset()
+            download_og_dataset(accept_license=${DATASET_ACCEPT_FLAG})
         
         if not assets_exist:
             print('Downloading assets...')
