@@ -171,11 +171,32 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     source "$(conda info --base)/etc/profile.d/conda.sh"
-    conda env list | grep -q "^behavior " && conda env remove -n behavior -y
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
+    
+    # Check if environment already exists and exit with instructions
+    if conda env list | grep -q "^behavior "; then
+        echo ""
+        echo "ERROR: Conda environment 'behavior' already exists!"
+        echo ""
+        echo "Please remove or rename the existing environment and re-run this script."
+        echo ""
+        exit 1
+    fi
+    
+    # Create environment with just Python and numpy
+    conda create -n behavior python=3.10 "numpy<2" -y
     conda activate behavior
     
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
+    
+    # Install PyTorch via pip with CUDA support
+    echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
+    
+    # Determine the CUDA version string for pip URL (e.g., cu126, cu124, etc.)
+    CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.6 to 126
+    
+    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+    
+    echo "✓ PyTorch installation completed"
 fi
 # Install BDDL
 if [ "$BDDL" = true ]; then

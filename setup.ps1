@@ -204,16 +204,31 @@ if ($NewEnv) {
         Write-Host "✓ Conda TOS auto-acceptance enabled"
     }
     
-    # Remove existing environment if it exists
+    # Check if environment already exists and exit with instructions
     if (Test-CondaEnvironment "behavior") {
-        conda env remove -n behavior -y
+        Write-Host ""
+        Write-Host "ERROR: Conda environment 'behavior' already exists!"
+        Write-Host ""
+        Write-Host "Please remove or rename the existing environment and re-run this script."
+        Write-Host ""
+        exit 1
     }
     
-    # Create new environment
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CudaVersion "numpy<2" -c pytorch -c nvidia -y
+    # Create new environment with just Python and numpy
+    conda create -n behavior python=3.10 "numpy<2" -y
     
     # Activate environment
     Invoke-CondaActivate "behavior"
+    
+    # Install PyTorch via pip with CUDA support
+    Write-Host "Installing PyTorch with CUDA $CudaVersion support..."
+    
+    # Determine the CUDA version string for pip URL (e.g., cu126, cu118, etc.)
+    $CudaVerShort = $CudaVersion -replace '\.', ''  # Convert 12.4 to 124
+    
+    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
+    
+    Write-Host "✓ PyTorch installation completed"
 }
 
 # Setup Isaac Sim conda environment helper functions
