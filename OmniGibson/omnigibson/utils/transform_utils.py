@@ -251,16 +251,16 @@ def quat_distance(quaternion1, quaternion0):
     Always returns the shorter rotation path.
 
     Args:
-        quaternion1 (torch.tensor): (x,y,z,w) quaternion
-        quaternion0 (torch.tensor): (x,y,z,w) quaternion
+        quaternion1 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
+        quaternion0 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
 
     Returns:
-        torch.tensor: (x,y,z,w) quaternion distance
+        torch.tensor: (x,y,z,w) quaternion distance or (..., 4) batched quaternion distances
     """
-    d = torch.dot(quaternion0, quaternion1)
+    # Compute dot product along the last axis (quaternion components)
+    d = torch.sum(quaternion0 * quaternion1, dim=-1, keepdim=True)
     # If dot product is negative, negate one quaternion to get shorter path
-    if d < 0.0:
-        quaternion1 = -quaternion1
+    quaternion1 = torch.where(d < 0.0, -quaternion1, quaternion1)
 
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 

@@ -271,10 +271,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             if cond_type in cond_types and state_type not in obj.states:
                 return False, f"{cls.__name__} requires {state_type.__name__} state!"
 
-        system_name = list(conditions.keys())[0]
-        system = obj.scene.get_system(system_name, force_init=False)
-        if isinstance(system, MicroParticleSystem) and not gm.USE_GPU_DYNAMICS:
-            return False, f"{cls.__name__} requires gm.USE_GPU_DYNAMICS=True!"
+        if len(conditions) > 0:
+            system_name = list(conditions.keys())[0]
+            system = obj.scene.get_system(system_name, force_init=False)
+            if isinstance(system, MicroParticleSystem) and not gm.USE_GPU_DYNAMICS:
+                return False, f"{cls.__name__} requires gm.USE_GPU_DYNAMICS=True!"
 
         return True, None
 

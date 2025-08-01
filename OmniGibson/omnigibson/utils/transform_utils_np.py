@@ -242,16 +242,16 @@ def quat_distance(quaternion1, quaternion0):
     Always returns the shorter rotation path.
 
     Args:
-        quaternion1 (np.array): (x,y,z,w) quaternion
-        quaternion0 (np.array): (x,y,z,w) quaternion
+        quaternion1 (np.array): (x,y,z,w) quaternion or (..., 4) batched quaternions
+        quaternion0 (np.array): (x,y,z,w) quaternion or (..., 4) batched quaternions
 
     Returns:
-        np.array: (x,y,z,w) quaternion distance
+        np.array: (x,y,z,w) quaternion distance or (..., 4) batched quaternion distances
     """
-    d = np.dot(quaternion0, quaternion1)
+    # Compute dot product along the last axis (quaternion components)
+    d = np.sum(quaternion0 * quaternion1, axis=-1, keepdims=True)
     # If dot product is negative, negate one quaternion to get shorter path
-    if d < 0.0:
-        quaternion1 = -quaternion1
+    quaternion1 = np.where(d < 0.0, -quaternion1, quaternion1)
 
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
