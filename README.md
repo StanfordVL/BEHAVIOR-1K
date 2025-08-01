@@ -21,7 +21,7 @@ For most users, we recommend the full installation with a new conda environment:
 ```bash
 git clone https://github.com/StanfordVL/BEHAVIOR-1K
 cd BEHAVIOR-1K
-. ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+./setup.sh --new-env --omnigibson --bddl --teleop --dataset
 ```
 
 ### Windows
@@ -55,5 +55,5 @@ cd BEHAVIOR-1K
 
 To see all available options:
 ```bash
-. ./setup.sh --help
+./setup.sh --help
 ```
