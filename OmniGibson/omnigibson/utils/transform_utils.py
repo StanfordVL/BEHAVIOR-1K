@@ -261,7 +261,7 @@ def quat_distance(quaternion1, quaternion0):
     # If dot product is negative, negate one quaternion to get shorter path
     if d < 0.0:
         quaternion1 = -quaternion1
-    
+
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
