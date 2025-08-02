@@ -2,6 +2,8 @@
 
 <span style="color:red">We are in the process of merging BEHAVIOR-1K repos into a monorepo here. You can find the usual OmniGibson source code in OmniGibson/. Thanks for your patience as we sort this move out!</span>
 
+![BEHAVIOR-1K](./docs/assets/readme_splash_logo.png)
+
 # 🛠️ Installation
 
 BEHAVIOR-1K provides an installation script that handles all dependencies and components. The script supports modular installation, allowing you to install only the components you need.
