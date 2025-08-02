@@ -20,6 +20,7 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.systems.system_base import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     get_particle_positions_from_frame,
@@ -269,6 +270,12 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         for cond_type, state_type in zip((ParticleModifyCondition.TOGGLEDON,), (ToggledOn,)):
             if cond_type in cond_types and state_type not in obj.states:
                 return False, f"{cls.__name__} requires {state_type.__name__} state!"
+
+        if len(conditions) > 0:
+            system_name = list(conditions.keys())[0]
+            system = obj.scene.get_system(system_name, force_init=False)
+            if isinstance(system, MicroParticleSystem) and not gm.USE_GPU_DYNAMICS:
+                return False, f"{cls.__name__} requires gm.USE_GPU_DYNAMICS=True!"
 
         return True, None
 

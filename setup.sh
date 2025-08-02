@@ -1,14 +1,7 @@
 #!/bin/bash
+set -e
 
-# BEHAVIOR-1K Installation Script
-# Usage: ./setup.sh [OPTIONS]
-
-# Read Arguments
-TEMP=`getopt -o h --long help,new-env,omnigibson,bddl,teleop,dataset,primitives,dev,cuda-version: -n 'setup.sh' -- "$@"`
-
-eval set -- "$TEMP"
-
-# Initialize flags
+# Parse arguments
 HELP=false
 NEW_ENV=false
 OMNIGIBSON=false
@@ -17,235 +10,372 @@ TELEOP=false
 DATASET=false
 PRIMITIVES=false
 DEV=false
-CUDA_VERSION="12.1"
-ERROR=false
+CUDA_VERSION="12.4"
+ACCEPT_CONDA_TOS=false
+ACCEPT_NVIDIA_EULA=false
+ACCEPT_DATASET_TOS=false
 
-# Show help if no arguments provided
-if [ "$#" -eq 1 ] ; then
-    HELP=true
-fi
+[ "$#" -eq 0 ] && HELP=true
 
-# Parse arguments
-while true ; do
-    case "$1" in
-        -h|--help) HELP=true ; shift ;;
-        --new-env) NEW_ENV=true ; shift ;;
-        --omnigibson) OMNIGIBSON=true ; shift ;;
-        --bddl) BDDL=true ; shift ;;
-        --teleop) TELEOP=true ; shift ;;
-        --dataset) DATASET=true ; shift ;;
-        --primitives) PRIMITIVES=true ; shift ;;
-        --dev) DEV=true ; shift ;;
-        --cuda-version) CUDA_VERSION="$2" ; shift 2 ;;
-        --) shift ; break ;;
-        *) ERROR=true ; break ;;
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help) HELP=true; shift ;;
+        --new-env) NEW_ENV=true; shift ;;
+        --omnigibson) OMNIGIBSON=true; shift ;;
+        --bddl) BDDL=true; shift ;;
+        --teleop) TELEOP=true; shift ;;
+        --dataset) DATASET=true; shift ;;
+        --primitives) PRIMITIVES=true; shift ;;
+        --dev) DEV=true; shift ;;
+        --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
+        --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
+        --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
+        --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
+        *) echo "Unknown option: \$1"; exit 1 ;;
     esac
 done
 
-# Error handling
-if [ "$ERROR" = true ] ; then
-    echo "Error: Invalid argument"
-    HELP=true
-fi
+if [ "$HELP" = true ]; then
+    cat << EOF
+BEHAVIOR-1K Installation Script (Linux)
+Usage: ./setup.sh [OPTIONS]
 
-# Help message
-if [ "$HELP" = true ] ; then
-    echo "BEHAVIOR-1K Installation Script"
-    echo "Usage: setup.sh [OPTIONS]"
-    echo ""
-    echo "Options:"
-    echo "  -h, --help              Display this help message"
-    echo "  --new-env               Create a new conda environment 'behavior'"
-    echo "  --omnigibson            Install OmniGibson (core physics simulator)"
-    echo "  --bddl                  Install BDDL (Behavior Domain Definition Language)"
-    echo "  --teleop                Install JoyLo (teleoperation interface)"
-    echo "  --dataset               Download BEHAVIOR datasets (requires --omnigibson)"
-    echo "  --primitives            Install OmniGibson with primitives support"
-    echo "  --dev                   Install development dependencies"
-    echo "  --cuda-version VERSION  Specify CUDA version (default: 12.1)"
-    echo ""
-    echo "Common usage patterns:"
-    echo "  # Full installation with new environment"
-    echo "  ./setup.sh --new-env --omnigibson --bddl --teleop --dataset"
-    echo ""
-    echo "  # Development setup"
-    echo "  ./setup.sh --new-env --omnigibson --bddl --teleop --dev --primitives"
-    echo ""
-    echo "  # Minimal OmniGibson only"
-    echo "  ./setup.sh --omnigibson"
-    echo ""
-    echo "  # Teleoperation setup"
-    echo "  ./setup.sh --new-env --omnigibson --teleop --dataset"
-    return 0
-fi
+Options:
+  -h, --help              Display this help message
+  --new-env               Create a new conda environment 'behavior'
+  --omnigibson            Install OmniGibson (core physics simulator)
+  --bddl                  Install BDDL (Behavior Domain Definition Language)
+  --teleop                Install JoyLo (teleoperation interface)
+  --dataset               Download BEHAVIOR datasets (requires --omnigibson)
+  --primitives            Install OmniGibson with primitives support
+  --dev                   Install development dependencies
+  --cuda-version VERSION  Specify CUDA version (default: 12.4)
+  --accept-conda-tos      Automatically accept Conda Terms of Service
+  --accept-nvidia-eula    Automatically accept NVIDIA Isaac Sim EULA
+  --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
 
-# Check if we're in the right directory
-if [ ! -d "omnigibson" ] && [ ! -d "bddl" ] && [ ! -d "joylo" ] ; then
-    echo "[ERROR] Cannot find omnigibson, bddl, or joylo directories"
-    echo "[ERROR] Please run this script from the BEHAVIOR-1K root directory"
-    return 1
+Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
+EOF
+    exit 0
 fi
-
-# Get system information
-WORKDIR=$(pwd)
-echo "[SYSTEM] Working directory: $WORKDIR"
 
 # Validate dependencies
-if [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] ; then
-    echo "[ERROR] --dataset requires --omnigibson"
-    return 1
-fi
+[ "$OMNIGIBSON" = true ] && [ "$BDDL" = false ] && { echo "ERROR: --omnigibson requires --bddl"; exit 1; }
+[ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --dataset requires --omnigibson"; exit 1; }
+[ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --primitives requires --omnigibson"; exit 1; }
 
-if [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] ; then
-    echo "[ERROR] --primitives requires --omnigibson"
-    return 1
-fi
+WORKDIR=$(pwd)
 
-# Create conda environment if requested
-if [ "$NEW_ENV" = true ] ; then
-    echo "[ENV] Creating conda environment 'behavior'..."
-    conda create -n behavior python=3.10 pytorch torchvision torchaudio pytorch-cuda=$CUDA_VERSION "numpy<2" -c pytorch -c nvidia -y
+# Function to prompt for terms acceptance
+prompt_for_terms() {
+    echo ""
+    echo "=== TERMS OF SERVICE AND LICENSING AGREEMENTS ==="
+    echo ""
     
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to create conda environment"
-        echo "[HELP] Try running: conda clean --all"
-        echo "[HELP] Or manually create environment: conda create -n behavior python=3.10"
-        return 1
+    # Check what terms need to be accepted
+    NEEDS_CONDA_TOS=false
+    NEEDS_NVIDIA_EULA=false
+    NEEDS_DATASET_TOS=false
+    
+    if [ "$NEW_ENV" = true ] && [ "$ACCEPT_CONDA_TOS" = false ]; then
+        NEEDS_CONDA_TOS=true
     fi
     
-    echo "[ENV] Activating conda environment 'behavior'..."
+    if [ "$OMNIGIBSON" = true ] && [ "$ACCEPT_NVIDIA_EULA" = false ]; then
+        NEEDS_NVIDIA_EULA=true
+    fi
+    
+    if [ "$DATASET" = true ] && [ "$ACCEPT_DATASET_TOS" = false ]; then
+        NEEDS_DATASET_TOS=true
+    fi
+    
+    # If nothing needs acceptance, return early
+    if [ "$NEEDS_CONDA_TOS" = false ] && [ "$NEEDS_NVIDIA_EULA" = false ] && [ "$NEEDS_DATASET_TOS" = false ]; then
+        return 0
+    fi
+    
+    echo "This installation requires acceptance of the following terms:"
+    echo ""
+    
+    if [ "$NEEDS_CONDA_TOS" = true ]; then
+        cat << EOF
+1. CONDA TERMS OF SERVICE
+   - Required for creating conda environment
+   - By accepting, you agree to Anaconda's Terms of Service
+   - See: https://legal.anaconda.com/policies/en/
+
+EOF
+    fi
+    
+    if [ "$NEEDS_NVIDIA_EULA" = true ]; then
+        cat << EOF
+2. NVIDIA ISAAC SIM EULA
+   - Required for OmniGibson installation
+   - By accepting, you agree to NVIDIA Isaac Sim End User License Agreement
+   - See: https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-software-license-agreement
+
+EOF
+    fi
+    
+    if [ "$NEEDS_DATASET_TOS" = true ]; then
+        cat << EOF
+3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
+    Last revision: December 8, 2022
+    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. 
+    The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
+    It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
+    Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
+        1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.
+        2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.
+        3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.
+        4. You may only use the Data within OmniGibson.
+        5. You may not redistribute the key or any other Data or elements in whole or part.
+        6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+            IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.
+
+EOF
+    fi
+    
+    echo "Do you accept ALL of the above terms? (y/N)"
+    read -r response
+    
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+        echo "Terms not accepted. Installation cancelled."
+        echo "You can bypass these prompts by using --accept-conda-tos, --accept-nvidia-eula, and --accept-dataset-tos flags."
+        exit 1
+    fi
+    
+    # Set acceptance flags
+    [ "$NEEDS_CONDA_TOS" = true ] && ACCEPT_CONDA_TOS=true
+    [ "$NEEDS_NVIDIA_EULA" = true ] && ACCEPT_NVIDIA_EULA=true
+    [ "$NEEDS_DATASET_TOS" = true ] && ACCEPT_DATASET_TOS=true
+    
+    echo ""
+    echo "✓ All terms accepted. Proceeding with installation..."
+    echo ""
+}
+
+# Prompt for terms acceptance at the beginning
+prompt_for_terms
+
+# Create conda environment
+if [ "$NEW_ENV" = true ]; then
+    echo "Creating conda environment 'behavior'..."
+    command -v conda >/dev/null || { echo "ERROR: Conda not found"; exit 1; }
+    
+    # Set auto-accept environment variable if user agreed to TOS
+    if [ "$ACCEPT_CONDA_TOS" = true ]; then
+        export CONDA_PLUGINS_AUTO_ACCEPT_TOS=yes
+        echo "✓ Conda TOS auto-acceptance enabled"
+    fi
+    
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    
+    # Check if environment already exists and exit with instructions
+    if conda env list | grep -q "^behavior "; then
+        echo ""
+        echo "ERROR: Conda environment 'behavior' already exists!"
+        echo ""
+        echo "Please remove or rename the existing environment and re-run this script."
+        echo ""
+        exit 1
+    fi
+    
+    # Create environment with just Python and numpy
+    conda create -n behavior python=3.10 "numpy<2" -y
     conda activate behavior
     
-    # Verify environment
-    PYTHON_VERSION=$(python --version)
-    echo "[ENV] Python version: $PYTHON_VERSION"
+    [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
     
-    # Check PyTorch installation
-    PYTORCH_VERSION=$(python -c "import torch; print(torch.__version__)" 2>/dev/null)
-    if [ $? -eq 0 ] ; then
-        CUDA_AVAILABLE=$(python -c "import torch; print(torch.cuda.is_available())")
-        echo "[ENV] PyTorch version: $PYTORCH_VERSION, CUDA available: $CUDA_AVAILABLE"
-    else
-        echo "[WARNING] PyTorch not properly installed in conda environment"
-    fi
+    # Install PyTorch via pip with CUDA support
+    echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
+    
+    # Determine the CUDA version string for pip URL (e.g., cu126, cu124, etc.)
+    CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.6 to 126
+    
+    pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+    
+    echo "✓ PyTorch installation completed"
 fi
-
 # Install BDDL
-if [ "$BDDL" = true ] ; then
-    echo "[BDDL] Installing BDDL..."
-    
-    if [ ! -d "bddl" ] ; then
-        echo "[ERROR] bddl directory not found"
-        return 1
-    fi
-    
-    cd bddl
-    pip install -e .
-    
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install BDDL"
-        return 1
-    fi
-    
-    cd $WORKDIR
-    echo "[BDDL] Installation completed successfully"
+if [ "$BDDL" = true ]; then
+    echo "Installing BDDL..."
+    [ ! -d "bddl" ] && { echo "ERROR: bddl directory not found"; exit 1; }
+    pip install -e "$WORKDIR/bddl"
 fi
 
-# Install OmniGibson
-if [ "$OMNIGIBSON" = true ] ; then
-    echo "[OMNIGIBSON] Installing OmniGibson..."
+# Install OmniGibson with Isaac Sim
+if [ "$OMNIGIBSON" = true ]; then
+    echo "Installing OmniGibson..."
+    [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
     
-    if [ ! -d "OmniGibson" ] ; then
-        echo "[ERROR] omnigibson directory not found"
-        return 1
+    # Pre-installation checks
+    [ -z "$CONDA_PREFIX" ] && { echo "ERROR: Must run in conda environment"; exit 1; }
+    
+    # Check Python version
+    PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+    [ "$PYTHON_VERSION" != "3.10" ] && { echo "ERROR: Python 3.10 required, found $PYTHON_VERSION"; exit 1; }
+    
+    # Check for conflicting environment variables
+    if [[ -n "$EXP_PATH" || -n "$CARB_APP_PATH" || -n "$ISAAC_PATH" ]]; then
+        echo "ERROR: Found existing Isaac Sim environment variables."
+        echo "Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart."
+        exit 1
     fi
     
-    cd OmniGibson
-    
-    # Build extra requirements string
+    # Build extras
     EXTRAS=""
-    if [ "$DEV" = true ] && [ "$PRIMITIVES" = true ] ; then
-        EXTRAS="[dev,primitives]"
-    elif [ "$DEV" = true ] ; then
-        EXTRAS="[dev]"
-    elif [ "$PRIMITIVES" = true ] ; then
-        EXTRAS="[primitives]"
+    [ "$DEV" = true ] && [ "$PRIMITIVES" = true ] && EXTRAS="[dev,primitives]"
+    [ "$DEV" = true ] && [ "$PRIMITIVES" = false ] && EXTRAS="[dev]"
+    [ "$DEV" = false ] && [ "$PRIMITIVES" = true ] && EXTRAS="[primitives]"
+    
+    pip install -e "$WORKDIR/OmniGibson$EXTRAS"
+
+    # Install pre-commit for dev setup
+    if [ "$DEV" = true ]; then
+        echo "Setting up pre-commit..."
+        conda install -c conda-forge pre-commit -y
+        cd "$WORKDIR/OmniGibson"
+        pre-commit install
+        cd "$WORKDIR"
     fi
     
-    echo "[OMNIGIBSON] Installing with extras: $EXTRAS"
-    pip install -e .$EXTRAS
-    
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install OmniGibson"
-        return 1
-    fi
-    
-    cd $WORKDIR
-    
-    # Run OmniGibson post-installation
-    echo "[OMNIGIBSON] Running post-installation (Isaac Sim + assets)..."
-    if [ "$DATASET" = true ] ; then
-        python -m omnigibson.install
+    # Isaac Sim installation via pip
+    if [ "$ACCEPT_NVIDIA_EULA" = true ]; then
+        export OMNI_KIT_ACCEPT_EULA=YES
     else
-        python -m omnigibson.install --no-install-datasets
+        echo "ERROR: NVIDIA EULA not accepted. Cannot install Isaac Sim."
+        exit 1
     fi
     
-    if [ $? -ne 0 ] ; then
-        echo "[WARNING] OmniGibson post-installation failed"
-        echo "[HELP] You may need to run 'python -m omnigibson.install' manually later"
+    # Check if already installed
+    if python -c "import isaacsim" 2>/dev/null; then
+        echo "Isaac Sim already installed, skipping..."
     else
-        echo "[OMNIGIBSON] Installation completed successfully"
+        echo "Installing Isaac Sim via pip..."
+        
+        # Helper functions
+        check_glibc_old() {
+            ldd --version 2>&1 | grep -qE "2\.(31|32|33)"
+        }
+        
+        install_isaac_packages() {
+            local temp_dir=$(mktemp -d)
+            local packages=(
+                "omniverse_kit-106.5.0.162521" "isaacsim_kernel-4.5.0.0" "isaacsim_app-4.5.0.0"
+                "isaacsim_core-4.5.0.0" "isaacsim_gui-4.5.0.0" "isaacsim_utils-4.5.0.0"
+                "isaacsim_storage-4.5.0.0" "isaacsim_asset-4.5.0.0" "isaacsim_sensor-4.5.0.0"
+                "isaacsim_robot_motion-4.5.0.0" "isaacsim_robot-4.5.0.0" "isaacsim_benchmark-4.5.0.0"
+                "isaacsim_code_editor-4.5.0.0" "isaacsim_ros1-4.5.0.0" "isaacsim_cortex-4.5.0.0"
+                "isaacsim_example-4.5.0.0" "isaacsim_replicator-4.5.0.0" "isaacsim_rl-4.5.0.0"
+                "isaacsim_robot_setup-4.5.0.0" "isaacsim_ros2-4.5.0.0" "isaacsim_template-4.5.0.0"
+                "isaacsim_test-4.5.0.0" "isaacsim-4.5.0.0" "isaacsim_extscache_physics-4.5.0.0"
+                "isaacsim_extscache_kit-4.5.0.0" "isaacsim_extscache_kit_sdk-4.5.0.0"
+            )
+            
+            local wheel_files=()
+            for pkg in "${packages[@]}"; do
+                local pkg_name=${pkg%-*}
+                local filename="${pkg}-cp310-none-manylinux_2_34_x86_64.whl"
+                local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
+                local filepath="$temp_dir/$filename"
+                
+                echo "Downloading $pkg..."
+                if ! curl -sL "$url" -o "$filepath"; then
+                    echo "ERROR: Failed to download $pkg"
+                    rm -rf "$temp_dir"
+                    return 1
+                fi
+                
+                # Rename for older GLIBC
+                if check_glibc_old; then
+                    local new_filepath="${filepath/manylinux_2_34/manylinux_2_31}"
+                    mv "$filepath" "$new_filepath"
+                    filepath="$new_filepath"
+                fi
+                
+                wheel_files+=("$filepath")
+            done
+            
+            echo "Installing Isaac Sim packages..."
+            pip install "${wheel_files[@]}"
+            rm -rf "$temp_dir"
+            
+            # Verify installation
+            if ! python -c "import isaacsim" 2>/dev/null; then
+                echo "ERROR: Isaac Sim installation verification failed"
+                return 1
+            fi
+        }
+        
+        install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
+        
+        # Fix cryptography conflict - remove conflicting version
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
+            echo "Fixing cryptography conflict..."
+            rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
+        fi
     fi
+    
+    # Install datasets
+    if [ "$DATASET" = true ]; then
+        echo "Installing datasets..."
+        
+        # Determine if we should accept dataset license automatically
+        DATASET_ACCEPT_FLAG=""
+        if [ "$ACCEPT_DATASET_TOS" = true ]; then
+            DATASET_ACCEPT_FLAG="True"
+        else
+            DATASET_ACCEPT_FLAG="False"
+        fi
+        
+        python -c "
+import os
+os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
+try:
+    from omnigibson.macros import gm
+    from omnigibson.utils.asset_utils import download_assets, download_og_dataset
+    
+    dataset_exists = os.path.exists(gm.DATASET_PATH)
+    assets_exist = os.path.exists(gm.ASSET_PATH)
+    
+    if not (dataset_exists and assets_exist):
+        print(f'Installing data to:')
+        print(f'  Dataset (~25GB): {gm.DATASET_PATH}')
+        print(f'  Assets (~2.5GB): {gm.ASSET_PATH}')
+        
+        if not dataset_exists:
+            print('Downloading dataset...')
+            download_og_dataset(accept_license=${DATASET_ACCEPT_FLAG})
+        
+        if not assets_exist:
+            print('Downloading assets...')
+            download_assets()
+    else:
+        print('Datasets already exist, skipping download.')
+except Exception as e:
+    print(f'ERROR: Dataset installation failed: {e}')
+    exit(1)
+"
+    fi
+    
+    echo "OmniGibson installation completed successfully!"
 fi
 
-# Install JoyLo (teleoperation)
-if [ "$TELEOP" = true ] ; then
-    echo "[TELEOP] Installing JoyLo teleoperation interface..."
-    
-    if [ ! -d "joylo" ] ; then
-        echo "[ERROR] joylo directory not found"
-        return 1
-    fi
-    
-    cd joylo
-    pip install -e .
-    
-    if [ $? -ne 0 ] ; then
-        echo "[ERROR] Failed to install JoyLo"
-        return 1
-    fi
-    
-    cd $WORKDIR
-    echo "[TELEOP] Installation completed successfully"
+# Install JoyLo
+if [ "$TELEOP" = true ]; then
+    echo "Installing JoyLo..."
+    [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
+    pip install -e "$WORKDIR/joylo"
 fi
 
-# Final summary
 echo ""
-echo "=== Installation Summary ==="
-if [ "$NEW_ENV" = true ] ; then
-    echo "✓ Created conda environment 'behavior'"
-fi
-if [ "$OMNIGIBSON" = true ] ; then
-    echo "✓ Installed OmniGibson"
-    if [ "$PRIMITIVES" = true ] ; then
-        echo "  - With primitives support"
-    fi
-    if [ "$DEV" = true ] ; then
-        echo "  - With development dependencies"
-    fi
-    if [ "$DATASET" = true ] ; then
-        echo "  - With BEHAVIOR datasets"
-    fi
-fi
-if [ "$BDDL" = true ] ; then
-    echo "✓ Installed BDDL"
-fi
-if [ "$TELEOP" = true ] ; then
-    echo "✓ Installed JoyLo (teleoperation)"
-fi
-
+echo "=== Installation Complete! ==="
+[ "$NEW_ENV" = true ] && echo "✓ Created conda environment 'behavior'"
+[ "$OMNIGIBSON" = true ] && echo "✓ Installed OmniGibson + Isaac Sim"
+[ "$BDDL" = true ] && echo "✓ Installed BDDL"
+[ "$TELEOP" = true ] && echo "✓ Installed JoyLo"
+[ "$DATASET" = true ] && echo "✓ Downloaded datasets"
 echo ""
-echo "Installation completed! 🎉"
-if [ "$NEW_ENV" = true ] ; then
-    echo "To activate the environment: conda activate behavior"
-fi
+[ "$NEW_ENV" = true ] && echo "To activate: conda activate behavior"

@@ -248,14 +248,20 @@ def quat_inverse(quaternion: torch.Tensor) -> torch.Tensor:
 def quat_distance(quaternion1, quaternion0):
     """
     Returns distance between two quaternions, such that distance * quaternion0 = quaternion1
+    Always returns the shorter rotation path.
 
     Args:
-        quaternion1 (torch.tensor): (x,y,z,w) quaternion
-        quaternion0 (torch.tensor): (x,y,z,w) quaternion
+        quaternion1 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
+        quaternion0 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
 
     Returns:
-        torch.tensor: (x,y,z,w) quaternion distance
+        torch.tensor: (x,y,z,w) quaternion distance or (..., 4) batched quaternion distances
     """
+    # Compute dot product along the last axis (quaternion components)
+    d = torch.sum(quaternion0 * quaternion1, dim=-1, keepdim=True)
+    # If dot product is negative, negate one quaternion to get shorter path
+    quaternion1 = torch.where(d < 0.0, -quaternion1, quaternion1)
+
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
@@ -506,7 +512,7 @@ def decompose_mat(hmat):
 
     # Check M[3, 3] for all batch items
     diag_vals = M[:, 3, 3]  # (B,)
-    
+
     # TODO: this line might be a VRAM killer, investigate this
     # if torch.any(torch.abs(diag_vals) < EPS):
     #     raise ValueError("Some M[3, 3] values are zero")
