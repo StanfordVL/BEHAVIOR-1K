@@ -33,10 +33,11 @@ class VisionActionILPolicy(BasePolicy):
         obs_output_size: Dict[str, List[int]],
         visual_obs_types: List[str],
         pcd_range: List[float],
+        robot_type: str = "R1Pro",
         # ====== other args for base class ======
         **kwargs,
     ) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__(robot_type=robot_type, *args, **kwargs)
         if use_websocket:
             self.policy = WebsocketClientPolicy(host=host, port=port)
             logging.info(f"Server metadata: {self.policy.get_server_metadata()}")
@@ -55,8 +56,8 @@ class VisionActionILPolicy(BasePolicy):
         self.visual_obs_types = visual_obs_types
         # store camera intrinsics
         self.camera_intrinsics = dict()
-        for camera_id, camera_name in ROBOT_CAMERA_NAMES.items():
-            camera_intrinsics = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / 4.0
+        for camera_id, camera_name in ROBOT_CAMERA_NAMES[self.robot_type].items():
+            camera_intrinsics = th.from_numpy(CAMERA_INTRINSICS[self.robot_type][camera_id]) / 4.0
             camera_intrinsics[-1, -1] = 1.0  # make it homogeneous
             self.camera_intrinsics[camera_name] = camera_intrinsics
         self._pcd_range = tuple(pcd_range)
@@ -67,7 +68,7 @@ class VisionActionILPolicy(BasePolicy):
         self._obs_history = deque(maxlen=obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
-        self.robot_type = "R1Pro"
+        self._robot_name = None
         self.joint_range = JOINT_RANGE[self.robot_type]
         self.device = th.device("cuda" if th.cuda.is_available() else "cpu")
 
@@ -89,24 +90,28 @@ class VisionActionILPolicy(BasePolicy):
         return action
 
     def reset(self) -> None:
-        self.policy.reset()
+        if self.policy is not None:
+            self.policy.reset()
         self._obs_history = deque(maxlen=self.obs_window_size)
         self._action_traj_pred = None
         self._action_idx = 0
 
     def process_obs(self, obs: dict) -> dict:
         # Expand twice to get B and T_A dimensions
-        processed_obs = {}
-        proprio = obs["robot_r1::proprio"].unsqueeze(0).unsqueeze(0)
-        processed_obs.update({
-            "qpos": dict(),
-            "odom": {
+        processed_obs = {"qpos": dict()}
+        if self._robot_name is None:
+            for key in obs:
+                if "proprio" in key:
+                    self._robot_name = key.split("::")[0]
+                    break
+        proprio = obs[f"{self._robot_name}::proprio"].unsqueeze(0).unsqueeze(0)
+        if "base_qvel" in PROPRIOCEPTION_INDICES[self.robot_type]:
+            processed_obs["odom"] = {
                 "base_velocity": self._post_processing_fn(
                     2 * (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type]["base_qvel"]] - self.joint_range["base"][0]) / 
                     (self.joint_range["base"][1] - self.joint_range["base"][0]) - 1
                 ),
-            },
-        })
+            }
         for key in PROPRIO_QPOS_INDICES[self.robot_type]:
             if "gripper" in key:
                 # rectify gripper actions to {-1, 1}
@@ -119,7 +124,7 @@ class VisionActionILPolicy(BasePolicy):
                 processed_obs["qpos"][key] = self._post_processing_fn(2 * (
                     proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - JOINT_RANGE[self.robot_type][key][0]
                 ) / (JOINT_RANGE[self.robot_type][key][1] - JOINT_RANGE[self.robot_type][key][0]) - 1.0)
-        for camera_id, camera in ROBOT_CAMERA_NAMES.items():
+        for camera_id, camera in ROBOT_CAMERA_NAMES[self.robot_type].items():
             if "rgb" in self.visual_obs_types or "pcd" in self.visual_obs_types:
                 processed_obs[f"{camera}::rgb"] = self._post_processing_fn(
                     F.interpolate(
@@ -160,7 +165,7 @@ class VisionActionILPolicy(BasePolicy):
 
             )[0]
             processed_obs["pcd"] = fused_pcd
-            for camera_id, camera in ROBOT_CAMERA_NAMES.items():
+            for camera_id, camera in ROBOT_CAMERA_NAMES[self.robot_type].items():
                 if "rgb" not in self.visual_obs_types:
                     # pop rgb if not needed
                     processed_obs.pop(f"{camera}::rgb", None)

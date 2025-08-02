@@ -5,6 +5,7 @@ log_path: /home/evans/logs/b1k_baselines/OmniGibson/logs/openvla
 
 model:
   _target_: omnigibson.learning.policies.OpenVLA
+  robot_type: ${robot.type}
   host: 0.0.0.0
   port: 8777
   text_prompt: pick up the trash

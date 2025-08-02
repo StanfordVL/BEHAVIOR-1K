@@ -33,6 +33,7 @@ class OpenPi(BasePolicy):
         port: int, 
         text_prompt : str,
         control_mode : str = "temporal_ensemble",
+        robot_type: str = "R1Pro",
         **kwargs
     ) -> None:
         """
@@ -42,7 +43,7 @@ class OpenPi(BasePolicy):
             text_prompt (str): Text prompt to guide the policy's actions.
             control_mode (str): Control mode for the policy. Options are 'receeding_temporal', 'receeding_horizon', or 'temporal_ensemble'.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__(robot_type=robot_type, *args, **kwargs)
         from openpi_client.image_tools import resize_with_pad
         self._resize_with_pad = resize_with_pad
         # Create a trained policy.

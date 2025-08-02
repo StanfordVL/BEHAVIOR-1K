@@ -8,8 +8,8 @@ class DummyPolicy(BasePolicy):
     Dummy policy that always outputs zero delta action
     """
 
-    def __init__(self, action_dim: int = 21, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, action_dim: int = 21, robot_type: str = "R1Pro", *args, **kwargs) -> None:
+        super().__init__(robot_type=robot_type, *args, **kwargs)
         # setup a dummy parameter to avoid errors in the optimizer
         self.dummy_param = nn.Parameter(torch.zeros(1))
         self.action_dim = action_dim

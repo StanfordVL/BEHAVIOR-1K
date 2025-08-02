@@ -75,6 +75,7 @@ setup(
             "dm_tree>=0.1.9",
             "hydra-core>=1.3.2",
             "websockets>=15.0.1",
+            "msg_pack>=1.1.0",
             "lerobot @ git+https://github.com/huggingface/lerobot@main",
         ]
     },

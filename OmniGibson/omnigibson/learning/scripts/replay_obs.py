@@ -48,7 +48,7 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         robot = self.env.robots[0]
         base_pose = robot.get_position_orientation()
         cam_rel_poses = []
-        for camera_name in ROBOT_CAMERA_NAMES.values():
+        for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
             # move seg maps to cpu
             obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
@@ -77,7 +77,7 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         # add instance mapping keys as attrs
         traj_grp.attrs["ins_id_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
         
-        camera_names = set(ROBOT_CAMERA_NAMES.values())
+        camera_names = set(ROBOT_CAMERA_NAMES["R1Pro"].values())
         for name in self.env.robots[0].sensors:
             if f"robot_r1::{name}" in camera_names:
                 # add unique instance ids as attrs
@@ -94,7 +94,7 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
 def replay_hdf5_file(
     hdf_input_path: str, 
     task_id: int,
-    camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
+    camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
     generate_rgbd: bool=False, 
     generate_seg: bool=False,   
     generate_bbox: bool=False,
@@ -352,7 +352,7 @@ def rgbd_gt_to_pcd(
     task_folder: str,
     task_id: int, 
     base_name: str, 
-    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
+    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
     downsample_ratio: int=4,
     pcd_range: Tuple[float, float, float, float, float, float] = (-0.2, 1.0, -1.0, 1.0, -0.2, 1.5), # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int=4096,
@@ -409,7 +409,7 @@ def rgbd_gt_to_pcd(
                     for camera_id, robot_camera_name in robot_camera_names.items():
                         resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
                         # Calculate the downsampled camera intrinsics
-                        camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
+                        camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id]) / downsample_ratio
                         camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                         obs[f"{robot_camera_name}::rgb"] = F.interpolate(
                             th.from_numpy(data[f"{robot_camera_name}::rgb"][i:i+batch_size, :, :, :3]).movedim(-1, -3),
@@ -450,7 +450,7 @@ def rgbd_vid_to_pcd(
     task_folder: str,
     task_id: int, 
     base_name: str, 
-    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES,
+    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
     downsample_ratio: int=4,
     pcd_range: Tuple[float, float, float, float, float, float] = (-0.2, 1.0, -1.0, 1.0, -0.2, 1.5), # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int=4096,
@@ -527,7 +527,7 @@ def rgbd_vid_to_pcd(
             camera_intrinsics = {}
             for camera_id, robot_camera_name in robot_camera_names.items():
                 # Calculate the downsampled camera intrinsics
-                camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS[camera_id]) / downsample_ratio
+                camera_intrinsics[robot_camera_name] = th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id]) / downsample_ratio
                 camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                 obs[f"{robot_camera_name}::rgb"] = next(obs_loaders[f"{robot_camera_name}::rgb"]).movedim(-3, -1)
                 obs[f"{robot_camera_name}::depth_linear"] = next(obs_loaders[f"{robot_camera_name}::depth_linear"])
@@ -594,7 +594,7 @@ def main():
                 task_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
                 task_id=task_id,
                 base_name=os.path.basename(args.file),
-                robot_camera_names=ROBOT_CAMERA_NAMES,
+                robot_camera_names=ROBOT_CAMERA_NAMES["R1Pro"],
                 pcd_range=pcd_range,
                 downsample_ratio=4,
                 pcd_num_points=4096,
@@ -607,7 +607,7 @@ def main():
                 task_folder=os.path.dirname(os.path.dirname(os.path.dirname(args.file))),
                 task_id=task_id,
                 base_name=os.path.basename(args.file),
-                robot_camera_names=ROBOT_CAMERA_NAMES,
+                robot_camera_names=ROBOT_CAMERA_NAMES["R1Pro"],
                 pcd_range=pcd_range,
                 downsample_ratio=4,
                 pcd_num_points=4096,

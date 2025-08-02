@@ -42,8 +42,8 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         self.camera_names = set(cameras)
         assert self.modalities.issubset({"rgb", "depth", "seg_instance_id"}), \
             f"Modalities must be a subset of ['rgb', 'depth', 'seg_instance_id'], but got {self.modalities}"
-        assert self.camera_names.issubset(ROBOT_CAMERA_NAMES), \
-            f"Camera names must be a subset of {ROBOT_CAMERA_NAMES}, but got {self.camera_names}"
+        assert self.camera_names.issubset(ROBOT_CAMERA_NAMES["R1Pro"]), \
+            f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
 
     @property
     def features(self) -> dict[str, dict]:

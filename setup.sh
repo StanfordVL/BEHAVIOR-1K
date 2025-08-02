@@ -110,6 +110,7 @@ fi
 # Create conda environment if requested
 if [ "$NEW_ENV" = true ] ; then
     echo "[ENV] Creating conda environment 'behavior'..."
+    source "$(conda info --base)/etc/profile.d/conda.sh"
     conda create -n behavior python=3.10 av "setuptools<=79" -c conda-forge -y
     
     if [ $? -ne 0 ] ; then

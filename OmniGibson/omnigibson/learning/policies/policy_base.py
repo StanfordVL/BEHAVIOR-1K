@@ -11,8 +11,9 @@ class BasePolicy(ABC):
     Base class for policies that is used for training and rollout
     """
 
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, robot_type: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        self.robot_type = robot_type
 
     @classmethod
     def load(cls, *args, **kwargs) -> "BasePolicy":

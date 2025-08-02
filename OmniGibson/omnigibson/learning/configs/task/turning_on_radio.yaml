@@ -1,6 +1,6 @@
 # @package _global_
 
-env: omnigibson
+env_type: sim
 
 task:
   name: turning_on_radio

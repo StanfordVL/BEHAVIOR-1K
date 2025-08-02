@@ -5,6 +5,7 @@ log_path: /svl/u/ravenh/b1k_baselines/OmniGibson/logs/pi0
 
 model:
   _target_: omnigibson.learning.policies.OpenPi
+  robot_type: ${robot.type}
   host: 10.79.12.59
   port: 8000
   text_prompt: pick up the trash

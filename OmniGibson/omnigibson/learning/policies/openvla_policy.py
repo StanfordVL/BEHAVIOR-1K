@@ -45,11 +45,12 @@ class OpenVLA(BasePolicy):
         port: int,
         text_prompt : str,
         control_mode : str = "temporal_ensemble",
+        robot_type: str = "R1Pro",
         **kwargs
     ) -> None:
         import json_numpy
         json_numpy.patch()
-        super().__init__(*args, **kwargs)
+        super().__init__(robot_type=robot_type, *args, **kwargs)
         # server endpoint for action generation from OpenVLA server
         self.policy_endpoint = f"http://{host}:{port}/act"
         self._resize_obs = resize_image_for_openvla

@@ -5,6 +5,7 @@ log_path: /home/svl/Documents/logs/dummy
 
 model:
   _target_: omnigibson.learning.policies.DummyPolicy
+  robot_type: ${robot.type}
 
 headless: false
 robot:

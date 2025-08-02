@@ -98,7 +98,7 @@ class Evaluator:
         self.total_time = 0
         self.robot_action = dict()
         # fetch env type, currently only supports "omnigibson"
-        self.env_type = cfg.env
+        self.env_type = cfg.env_type
 
         self.policy = self.load_policy()
         self.env = self.load_env()
@@ -115,7 +115,7 @@ class Evaluator:
         The config file is located in the configs/envs directory.
         """
         # Load config file
-        if self.env_type == "omnigibson":
+        if self.env_type == "sim":
             available_tasks = load_available_tasks()
             task_name = self.cfg.task.name
             assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
@@ -145,11 +145,11 @@ class Evaluator:
         return env
 
     def load_robot(self) -> BaseRobot:
-        if self.env_type == "omnigibson":
+        if self.env_type == "sim":
             robot = self.env.scene.object_registry("name", "robot_r1")
             og.sim.step()
             # Update robot sensors:
-            for camera_id, camera_name in ROBOT_CAMERA_NAMES.items():
+            for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
                 sensor_name = camera_name.split("::")[1]
                 if camera_id == "head": 
                     robot.sensors[sensor_name].horizontal_aperture = 40.0
@@ -210,7 +210,7 @@ class Evaluator:
         obs = flatten_obs_dict(obs)
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
-        for camera_name in ROBOT_CAMERA_NAMES.values():
+        for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             cam_pose = self.robot.sensors[camera_name.split("::")[1]].get_position_orientation()
             cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
@@ -219,14 +219,14 @@ class Evaluator:
     def _write_video(self) -> None:
         # concatenate obs
         left_wrist_rgb = cv2.resize(
-            self.obs[ROBOT_CAMERA_NAMES["left_wrist"] + "::rgb"].numpy(),
+            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
             (360, 360),
         )
         right_wrist_rgb = cv2.resize(
-            self.obs[ROBOT_CAMERA_NAMES["right_wrist"] + "::rgb"].numpy(),
+            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["right_wrist"] + "::rgb"].numpy(),
             (360, 360),
         )
-        head_rgb = self.obs[ROBOT_CAMERA_NAMES["head"] + "::rgb"].numpy()
+        head_rgb = self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy()
         write_video(
             np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
             video_writer=self.video_writer,
