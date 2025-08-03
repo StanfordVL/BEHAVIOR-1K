@@ -4,6 +4,7 @@ env_type: sim
 
 task:
   name: picking_up_trash
+  pcd_range: [0.0, 3.0, -2.0, 2.0, 0.02, 1.25]
   test_on_train_indices: true
   episodes_per_instance: 1
   train_indices: [1, 2, 3, 4, 5, 6, 7, 8, 9] #episode 25

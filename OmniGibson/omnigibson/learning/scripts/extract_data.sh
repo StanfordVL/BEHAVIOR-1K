@@ -1,6 +1,6 @@
 base_dir=/home/svl/Documents/Files/behavior
 download_dir=/home/svl/Downloads
-task_name=can_meat
+task_name=picking_up_trash
 
 task_dir="${base_dir}/raw/${task_name}"
 echo "Task directory: $task_dir"

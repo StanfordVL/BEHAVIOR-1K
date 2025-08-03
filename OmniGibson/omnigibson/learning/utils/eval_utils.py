@@ -175,6 +175,7 @@ JOINT_RANGE = {
 
 TASK_NAMES_TO_INDICES = {
     "turning_on_radio": 0,
+    "picking_up_trash": 1,
     "can_meat": 2,
 }
 TASK_INDICES_TO_NAMES = {v: k for k, v in TASK_NAMES_TO_INDICES.items()}
