@@ -77,9 +77,9 @@ plugins:
             docstring_options:
               returns_named_value: false
   # - social
-  # - gen-files:
-  #     scripts:
-  #     - docs/gen_ref_pages.py
+  - gen-files:
+      scripts:
+      - docs/gen_ref_pages.py
   - literate-nav:
       nav_file: SUMMARY.md
   - section-index
