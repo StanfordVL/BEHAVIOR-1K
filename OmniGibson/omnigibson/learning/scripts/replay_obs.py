@@ -600,7 +600,7 @@ def main():
                 pcd_num_points=4096,
                 batch_size=500,
                 use_fps=True,
-                process_seg=args.seg,
+                process_seg=False,
             )
         if args.pcd_vid:
             rgbd_vid_to_pcd(
@@ -613,7 +613,7 @@ def main():
                 pcd_num_points=4096,
                 batch_size=500,
                 use_fps=True,
-                process_seg=args.seg,
+                process_seg=False,
             )
 
     log.info("All done!")
