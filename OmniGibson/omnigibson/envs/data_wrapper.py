@@ -317,6 +317,7 @@ class DataCollectionWrapper(DataWrapper):
         use_vr=False,
         obj_attr_keys=None,
         keep_checkpoint_rollback_data=False,
+        enable_dump_filters=True,
     ):
         """
         Args:
@@ -336,6 +337,7 @@ class DataCollectionWrapper(DataWrapper):
                 while the simulation is stopped.
             keep_checkpoint_rollback_data (bool): Whether to record any trajectory data pruned from rolling back to a
                 previous checkpoint
+            enable_dump_filters (bool): Whether to enable dump filters for optimized data collection. Defaults to True.
         """
         # Store additional variables needed for optimized data collection
 
@@ -384,6 +386,7 @@ class DataCollectionWrapper(DataWrapper):
         )
 
         # Configure the simulator to optimize for data collection
+        self._enable_dump_filters = enable_dump_filters
         self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
 
     def update_checkpoint(self):
@@ -395,7 +398,8 @@ class DataCollectionWrapper(DataWrapper):
         self.disable_dump_filters()
         self.checkpoint_states.append(self.scene.save(json_path=None, as_dict=True))
         self.checkpoint_step_idxs.append(len(self.current_traj_history))
-        self.enable_dump_filters()
+        if self._enable_dump_filters:
+            self.enable_dump_filters()
 
     def rollback_to_checkpoint(self, index=-1):
         """
@@ -521,7 +525,8 @@ class DataCollectionWrapper(DataWrapper):
 
         # Set the dump filter for better performance
         # TODO: Possibly remove this feature once we have fully tensorized state saving, which may be more efficient
-        self.enable_dump_filters()
+        if self._enable_dump_filters:
+            self.enable_dump_filters()
 
     def enable_dump_filters(self):
         """

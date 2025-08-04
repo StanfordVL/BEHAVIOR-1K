@@ -6,7 +6,7 @@
 #SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=60G
 #SBATCH --cpus-per-task=8
-#SBATCH --time=0-2:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --output=outputs/sc/replay_data_%j.out
 #SBATCH --error=outputs/sc/replay_data_%j.err
 
