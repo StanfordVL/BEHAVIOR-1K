@@ -14,8 +14,8 @@ from omnigibson.utils.constants import PrimType
 from bddl.activity import Conditions
 from utils import (
     ACTIVITY_TO_ROW,
-    create_stable_scene_json, 
-    validate_scene_can_be_sampled, 
+    create_stable_scene_json,
+    validate_scene_can_be_sampled,
     get_scene_compatible_activities,
     get_unsuccessful_activities,
     get_rooms,
