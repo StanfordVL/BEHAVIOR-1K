@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Transitions{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Transitions{% endif %}</h1>
+  <h3 class="text-center">Total count: {{ transition_rule_list | length }}</h3>
+  <br>
+  {% from "table_modules/transition_table.html" import render_transition_rule_table %}
+  {{ render_transition_rule_table(transition_rule_list) }}
+{% endblock %}
+

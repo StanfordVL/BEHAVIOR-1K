@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K QA Complaints{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        paging: false
+      });
+    });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K QA Complaints{% endif %}</h1>
+  <h4 class="text-center">Total count: {{ complaint_type_list | length }}</h4>
+  <br>
+  {% from "table_modules/complaint_type_table.html" import render_complaint_type_table %}
+  {{ render_complaint_type_table(complaint_type_list) }}
+{% endblock %}
