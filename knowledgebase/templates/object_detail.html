@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Object {{ object }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ object }}</h1>
+  <hr>
+  <h4 class="text-center">
+    {% if object.ready %}<span class="text-success">Ready</span>{% else %}<div class="text-warning">Has Unresolved Complaints</div>{% endif %}
+    {% if object.category %}
+    Category: <a href="{{ url_for('category_detail', name=object.category.name) }}">{{ object.category }}</a> |
+    {% elif object.particle_system %}
+    Particle System: <a href="{{ url_for('particle_system_detail', name=object.particle_system.name) }}">{{ object.particle_system }}</a> |
+    {% endif %}
+    Original category: {{ object.original_category_name }} | Provider: {{ object.provider }}
+  </h4>
+  <div class="text-center">
+    <b>Bounding Box Size:</b> {{ "%.2f"|format(object.bounding_box_size.0) }}, {{ "%.2f"|format(object.bounding_box_size.1) }}, {{ "%.2f"|format(object.bounding_box_size.2) }}
+  </div>
+
+  <div class="text-center mb-4">
+    <video autoplay muted loop playsinline src="{{ object.image_url }}" class="img-fluid" alt="{{ object }} photo"></video>
+    <!--<img class="img-fluid" src="{{ object.image_url }}" alt="{{ object }} photo" />-->
+  </div>
+
+  <h2>Meta Links</h2>
+  {% from "table_modules/meta_link_table.html" import render_meta_link_table %}
+  {{ render_meta_link_table(object.meta_links, enable_search=False, enable_csv=False) }}
+
+  <h2>Scene / Rooms</h2>
+  {% from "table_modules/room_object_table.html" import render_room_object_table %}
+  {{ render_room_object_table(object.roomobjects, enable_search=False, enable_csv=False) }}
+
+  <h2>Attachment Pairs - Female Role</h2>
+  {% from "table_modules/attachment_pair_table.html" import render_attachment_pair_table %}
+  {{ render_attachment_pair_table(object.female_attachment_pairs, enable_search=False, enable_csv=False) }}
+
+  <h2>Attachment Pairs - Male Role</h2>
+  {{ render_attachment_pair_table(object.male_attachment_pairs, enable_search=False, enable_csv=False) }}
+
+  <h2>Synsets</h2>
+  {% with G=object.owner.synset.subgraph, center_node=object.owner.synset %}
+    {% include "synset_graph_module.html" %}
+  {% endwith %}
+
+  {% from "table_modules/complaint_table.html" import render_complaint_table %}
+  {{ render_complaint_table(object.complaints, enable_search=False, enable_csv=False) }}
+{% endblock %}

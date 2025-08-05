@@ -1,0 +1,56 @@
+{% macro render_category_table(categories, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Synset</th>
+      <th>Objects</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for category in categories|sort %}
+    <tr>
+      <td><a href="{{ url_for('category_detail', name=category.name) }}">{{ category.name }}</a></td>
+      <td><a href="{% if category.synset.name %}{{ url_for('synset_detail', name=category.synset.name) }}{% else %}#{% endif %}">{{ category.synset.name }}</a></td>
+      <td>{{ category.objects | length }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [2]
+      },
+      columnDefs: [
+        {
+          searchPanes: {
+            options: [
+              {
+                label: 'Has Objects',
+                value: function(rowData, rowIdx) {return rowData[2] > 0;}
+              },
+              {
+                label: 'Has No Objects',
+                value: function(rowData, rowIdx) {return rowData[2] == 0;}
+              },
+            ]
+          },
+          targets: [2]
+        },
+      ],
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

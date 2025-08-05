@@ -1,0 +1,20 @@
+{% macro render_attachment_pair_table(attachment_pairs, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Female Objects Count</th>
+      <th>Male Objects Count</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pair in attachment_pairs %}
+    <tr>
+      <td><a href="{{ url_for('attachment_pair_detail', name=pair.name) }}">{{ pair.name }}</a></td>
+      <td>{{ pair.female_objects|length }}</td>
+      <td>{{ pair.male_objects|length }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}

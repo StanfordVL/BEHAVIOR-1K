@@ -1,0 +1,73 @@
+{% macro render_object_table(objects, enable_search=True, enable_csv=True, enable_images=False) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Object</th>
+      {% if enable_images %}
+      <th>Image</th>
+      {% endif %}
+      <th>Category or Particle System</th>
+      <th>Synset</th>
+      <th>Bounding Box Size</th>
+      <th>Meta Links</th>
+      <th>Used Rooms</th>
+      <th>Ready?</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for object in objects|sort %}
+    <tr>
+      <td><a href="{{ url_for('object_detail', name=object.name) }}">{{ object }}</a></td>
+      {% if enable_images %}
+      <td>
+        <video autoplay muted loop playsinline src="{{ object.image_url }}" alt="{{ object }} photo" style="max-width: 480px; height: auto;"></video>
+        <!--<img src="{{ object.image_url }}" alt="{{ object }} photo" style="max-width: 480px; height: auto;"/>-->
+      </td>
+      {% endif %}
+      <td>{{ object.owner.name }}</td>
+      <td>{{ object.owner.synset.name }}</td>
+      <td>{{ "%.2f"|format(object.bounding_box_size.0) }}, {{ "%.2f"|format(object.bounding_box_size.1) }}, {{ "%.2f"|format(object.bounding_box_size.2) }}</td>
+      <td>{% for ml in object.meta_links %} {{ ml.name }}, {% endfor %}</td>
+      <td>{{ object.roomobjects|length }}</td>
+      <td class="{% if object.ready %}bg-success{% else %}bg-warning|tocolor{% endif %}">{{ object.ready }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [2, 3]
+      },
+      columnDefs: [
+        {
+          searchPanes: {
+            options: [
+              {
+                label: 'Matched',
+                value: function(rowData, rowIdx) {return rowData[2] !== "";}
+              },
+              {
+                label: 'Unmatched',
+                value: function(rowData, rowIdx) {return rowData[2] === "";}
+              },
+            ]
+          },
+          targets: [2]
+        },
+      ],
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

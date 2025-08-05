@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Synset {{ synset.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ synset.name }}</h1>
+  <h4 class="text-center">Parents: {% for parent in synset.parents %}<a href="{{ url_for('synset_detail', name=parent.name) }}">{{ parent.name }}</a>, {% endfor %}</h4>
+  <p class="text-center">{{ synset.definition }}</p>
+  <hr/>
+  {% if synset.legal %} 
+  <div class="text-center">{{ synset.definition }}</div>
+  {% else %}
+  <div class="text-center">{{ Illegal }}</div>
+  {% endif %}
+
+  <br>
+
+  <h2>Directly Mapped Categories</h2>
+  {% from "table_modules/category_table.html" import render_category_table %}
+  {{ render_category_table(synset.categories, enable_search=False, enable_csv=False) }}
+  <br>
+  
+  <h2>Directly Mapped Objects</h2>
+  {% from "table_modules/object_table.html" import render_object_table %}
+  {{ render_object_table(synset.direct_matching_object, enable_search=False, enable_csv=False, enable_images=True) }}
+  <br>
+
+  <h2>All Descendant Objects (including Direct)</h2>
+  {{ render_object_table(synset.matching_objects, enable_search=False, enable_csv=False, enable_images=True) }}
+  <br>
+
+  <h2>Properties</h2>
+  {% from "table_modules/property_table.html" import render_property_table %}
+  {{ render_property_table(synset.properties, enable_search=False, enable_csv=False) }}
+  <h2>Uses</h2>
+  {% from "table_modules/usage_table.html" import render_usage_table %}
+  {{ render_usage_table(synset, enable_search=False, enable_csv=False) }}
+  <h2>Tasks</h2>
+  {% from "table_modules/task_table.html" import render_task_table %}
+  {{ render_task_table(synset.tasks, enable_search=False, enable_csv=False) }}
+  <br>
+
+  <h2>Transitions</h2>
+  {% from "table_modules/transition_table.html" import render_transition_rule_table %}
+  {{ render_transition_rule_table(synset.relevant_transitions, enable_search=False, enable_csv=False) }}
+  <br>
+
+  <h2>Transition Graph</h2>
+  <div class="mermaid">
+    graph TD;
+      {% for node in synset.transition_subgraph.nodes %}
+        {{ node|slugify }}({{ node }});
+      {% endfor %}
+      {% for edge in synset.transition_subgraph.edges %}
+        {{ edge.0|slugify }} --> {{ edge.1|slugify }};
+      {% endfor %}
+  </div>
+
+  <h2>Related Synsets</h2>
+  {% with G=synset.subgraph, center_node=synset %}
+    {% include "synset_graph_module.html" %}
+  {% endwith %}
+  <br>
+  
+  <h2>Ancestor Synsets</h2>
+  {% from "table_modules/synset_table.html" import render_synset_table %}
+  {{ render_synset_table(synset.ancestors, enable_search=False, enable_csv=False) }}
+
+  <h2>Parent Synsets</h2>
+  {{ render_synset_table(synset.parents, enable_search=False, enable_csv=False) }}
+
+  <h2>Children Synsets</h2>
+  {{ render_synset_table(synset.children, enable_search=False, enable_csv=False) }}
+{% endblock %}

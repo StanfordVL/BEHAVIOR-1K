@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Particle System {{ particle_system.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ particle_system.name }}</h1>
+  <h3 class="text-center">Synset: {% if particle_system.synset %}<a href="{{ url_for('synset_detail', name=particle_system.synset.name) }}"">{{ particle_system.synset.name }}</a>{% else %}None{% endif %}</h2>
+
+  <h2>Particle Model Images</h2>
+  <div class="container">
+    <div class="row">
+      {% for object in particle_system.particles %}
+      <div class="col-md-4 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <a href="{{ url_for('object_detail', name=object.name) }}">{{ object }}</a>
+          </div>
+          <video autoplay muted loop playsinline src="{{ object.image_url }}" class="card-img-bottom" alt="{{ object }} photo"></video>
+          <!--<img class="card-img-bottom" src="{{ object.image_url }}" alt="{{ object }} photo">-->
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12">
+        <div class="alert alert-info">No particle models found</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <h2>Particle Models</h2>
+  {% from "table_modules/object_table.html" import render_object_table %}
+  {{ render_object_table(particle_system.particles, enable_search=False, enable_csv=False) }}
+
+  <h2>Related Synsets</h2>
+  {% with G=particle_system.synset.subgraph, center_node=particle_system.synset %}
+    {% include "synset_graph_module.html" %}
+  {% endwith %}
+  <br>
+  
+  <h2>Ancestor Synsets</h2>
+  {% from "table_modules/synset_table.html" import render_synset_table %}
+  {{ render_synset_table(particle_system.synset.ancestors, enable_search=False, enable_csv=False) }}
+
+  <h2>Parent Synsets</h2>
+  {{ render_synset_table(particle_system.synset.parents, enable_search=False, enable_csv=False) }}
+
+  <h2>Children Synsets</h2>
+  {{ render_synset_table(particle_system.synset.children, enable_search=False, enable_csv=False) }}
+{% endblock %}

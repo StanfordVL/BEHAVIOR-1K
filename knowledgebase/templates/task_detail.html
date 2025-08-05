@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Task {{ task.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ task.name }}</h1>
+  <hr>
+  <h2>Required Synsets</h2>
+  {% from "table_modules/synset_table.html" import render_synset_table %}
+  {{ render_synset_table(task.synsets, enable_search=False, enable_csv=False) }}
+  
+  <h2>Transition Paths By Task Scope Objects</h2>
+  <div class="mermaid">
+    graph TD;
+      {% for node in task.transition_graph.nodes %}
+        {{ node|slugify }}({{ node }});
+      {% endfor %}
+      {% for edge in task.transition_graph.edges %}
+        {{ edge.0|slugify }} --> {{ edge.1|slugify }};
+      {% endfor %}
+  </div>
+  {% if not task.goal_is_reachable %}
+  <h2>Unreachable Goal Synsets</h2>
+  <ul>
+    {% for synset in task.unreachable_goal_synsets %}
+      <li><a class="font-weight-bold" href="{{ url_for('synset_detail', name=synset.name) }}">{{ synset.name }}</a></li>
+    {% else %}
+    <li>None</li>
+    {% endfor %}
+  {% endif %}
+  </ul>
+  <h2>Scene Matching Status</h2>
+  {% from "table_modules/scene_matching_table.html" import render_scene_matching_table %}
+  {{ render_scene_matching_table(task.scene_matching_dict, enable_search=False, enable_csv=False) }}
+  <h2>Full Definition</h2>
+  <pre>
+{{ task.definition | safe }}
+  </pre>
+  <h2>Debugging: All Possible Recipes Resulting in Future Synsets</h2>
+  <div class="mermaid">
+    graph TD;
+      {% for node in task.partial_transition_graph.nodes %}
+        {{ node|slugify }}({{ node }});
+      {% endfor %}
+      {% for edge in task.partial_transition_graph.edges %}
+        {{ edge.0|slugify }} --> {{ edge.1|slugify }};
+      {% endfor %}
+  </div>
+{% endblock %}

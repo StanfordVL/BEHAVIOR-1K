@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Complaint Type {{ complaint_type.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ complaint_type.name }}</h1>
+  <hr>
+
+  <h2>Complained Object Images</h2>
+  <div class="container">
+    <div class="row">
+      {% for complaint in complaint_type.complaints %}
+      <div class="col-md-4 mb-4">
+        <div class="card">
+          <div class="card-header">
+            <a href="{{ url_for('object_detail', name=complaint.object.name) }}">{{ complaint.object }}</a>
+          </div>
+          <video autoplay muted loop playsinline src="{{ complaint.object.image_url }}" class="card-img-bottom" alt="{{ complaint.object }} photo"></video>
+          <!--<img class="card-img-bottom" src="{{ complaint.object.image_url }}" alt="{{ complaint.object }} photo">-->
+        </div>
+      </div>
+      {% else %}
+      <div class="col-12">
+        <div class="alert alert-info">No objects found</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <h2>Complaints</h2>
+  {% from "table_modules/complaint_table.html" import render_complaint_table %}
+  {{ render_complaint_table(complaint_type.complaints, enable_search=False, enable_csv=False) }}
+{% endblock %}

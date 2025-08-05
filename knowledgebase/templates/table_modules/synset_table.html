@@ -1,0 +1,39 @@
+{% macro render_synset_table(synsets, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>State</th>
+      <th>Definition</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for synset in synsets|sort %}
+    <tr>
+      <td><a href="{{ url_for('synset_detail', name=synset.name) }}">{{ synset.name }}</a></td>
+      <td><span class="badge badge-{{ synset.state|tocolor }}">{{ synset.state|title }}</span></td>
+      <td>{{ synset.definition }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [1]
+      }
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

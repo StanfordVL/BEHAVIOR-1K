@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}BEHAVIOR-1K Knowledgebase{% endblock %}
+
+{% block customstyle %}
+<style>
+  .card:hover {
+    cursor: pointer;
+    text-decoration: none;
+    color: #8C1515;
+    border-color: #8C1515;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h1 class="text-center">BEHAVIOR-1K Knowledgebase Dashboard</h1>
+  <br>
+  <div class="row mt-4">
+    <div class="col-md-6">
+      <div class="card text-center mb-4">
+        <div class="card-header h5">Tasks</div>
+        <div class="row no-gutters">
+          <div class="col-sm-6 border-right border-bottom py-4">
+            <h6 class="text-success">Sampleable (Challenge):</h6>
+            <strong>{{ task_metadata.challenge_ready }}</strong>
+          </div>
+          <div class="col-sm-6 border-right border-bottom py-4">
+            <h6 class="text-primary">Total (Challenge):</h6>
+            <strong>{{ task_metadata.challenge }}</strong>
+          </div>
+          <div class="col-sm-6 border-right py-4">
+            <h6 class="text-success">Sampleable (All):</h6>
+            <strong>{{ task_metadata.total_ready }}</strong>
+          </div>
+          <div class="col-sm-6 border-right py-4">
+            <h6 class="text-primary">Total (All):</h6>
+            <strong>{{ task_metadata.total }}</strong>
+          </div>
+        </div>
+        <a href="{{ url_for('task_list') }}" class="stretched-link"></a>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card text-center mb-4">
+        <div class="card-header h5">Objects</div>
+        <div class="row no-gutters">
+          <div class="col-sm-4 border-right border-bottom py-4">
+            <h6 class="text-success">Ready:</h6>
+            <strong>{{ object_metadata.ready }}</strong>
+          </div>
+          <div class="col-sm-4 border-right border-bottom py-4">
+            <h6 class="text-warning">In Progress:</h6>
+            <strong>{{ object_metadata.planned }}</strong>
+          </div>
+          <div class="col-sm-4 border-bottom py-4">
+            <h6 class="text-primary">Total:</h6>
+            <strong>{{ object_metadata.total }}</strong>
+          </div>
+          <div class="col-sm-6 border-right py-4">
+            <h6 class="text-primary">Categories:</h6>
+            <strong>{{ object_metadata.categories }}</strong>
+          </div>
+          <div class="col-sm-6 py-4">
+            <h6 class="text-primary">Particle Systems:</h6>
+            <strong>{{ object_metadata.particle_systems }}</strong>
+          </div>
+        </div>
+        <a href="{{ url_for('object_list') }}" class="stretched-link"></a>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card text-center mb-4">
+        <div class="card-header h5">Synsets</div>
+        <div class="row no-gutters">
+          <div class="col-sm-6 border-right py-4">
+            <h6 class="text-success">Leaf Synsets:</h6>
+            <strong>{{ synset_metadata.leaf }}</strong>
+          </div>
+          <div class="col-sm-6 py-4">
+            <h6 class="text-primary">Total:</h6>
+            <strong>{{ synset_metadata.total }}</strong>
+          </div>
+        </div>
+        <a href="{{ url_for('synset_list') }}" class="stretched-link"></a>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card text-center mb-4">
+        <div class="card-header h5">Scenes</div>
+        <div class="row no-gutters">
+          <div class="col-sm-6 border-right py-4">
+            <h6 class="text-success">Challenge Scenes:</h6>
+            <strong>{{ scene_metadata.challenge }}</strong>
+          </div>
+          <div class="col-sm-6 py-4">
+            <h6 class="text-primary">Total:</h6>
+            <strong>{{ scene_metadata.total }}</strong>
+          </div>
+        </div>
+        <a href="{{ url_for('scene_list') }}" class="stretched-link"></a>
+      </div>
+    </div>
+  </div>
+  <div class="row mt-4">
+    <div class="col-sm-12">
+      <div class="card mb-4">
+        <div class="card-header text-center h5">Errors</div>
+        {% for error in error_views %}
+        <div class="row no-gutters border-bottom">
+          <div class="col-sm-10 text-center border-right py-2"><a href="{{ url_for(error.0) }}" class="text-dark">{{ error.1 }}</a></div>
+          <div class="col-sm-2 text-center py-2 {% if error.2 %}text-danger{% else %}text-success{% endif %}">{{ error.2 }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+</div>
+{% endblock %}
