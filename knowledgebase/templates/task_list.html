@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Tasks{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        paging: false,
+        searchPanes: {
+            viewTotal: true,
+            columns: [1, 2, 3, 4]
+        },
+        columnDefs: [
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Ready',
+                  value: function(rowData, rowIdx) {return rowData[1] === "";}
+                },
+                {
+                  label: 'Not Ready',
+                  value: function(rowData, rowIdx) {return rowData[1] !== "";}
+                },
+              ]
+            },
+            targets: [1]
+          },
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Required',
+                  value: function(rowData, rowIdx) {return rowData[3] !== "";}
+                },
+                {
+                  label: 'Not Required',
+                  value: function(rowData, rowIdx) {return rowData[3] === "";}
+                },
+              ]
+            },
+            targets: [3]
+          },
+        ],
+      });
+      table.searchPanes.container().prependTo(table.table().container());
+      table.searchPanes.resizePanes();
+  });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Tasks{% endif %}</h1>
+  <h3 class="text-center">Total count: {{ task_list | length }}</h3>
+  <br>
+  {% from "table_modules/task_table.html" import render_task_table %}
+  {{ render_task_table(task_list) }}
+{% endblock %}
+

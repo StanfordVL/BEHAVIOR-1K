@@ -1,0 +1,56 @@
+{% macro render_particle_system_table(particle_systems, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Synset</th>
+      <th>Particle Models</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for particle_system in particle_systems|sort %}
+    <tr>
+      <td><a href="{{ url_for('particle_system_detail', name=particle_system.name) }}">{{ particle_system.name }}</a></td>
+      <td><a href="{% if particle_system.synset.name %}{{ url_for('synset_detail', name=particle_system.synset.name) }}{% else %}#{% endif %}">{{ particle_system.synset.name }}</a></td>
+      <td>{{ particle_system.particles | length }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [2]
+      },
+      columnDefs: [
+        {
+          searchPanes: {
+            options: [
+              {
+                label: 'Has Objects',
+                value: function(rowData, rowIdx) {return rowData[2] > 0;}
+              },
+              {
+                label: 'Has No Objects',
+                value: function(rowData, rowIdx) {return rowData[2] == 0;}
+              },
+            ]
+          },
+          targets: [2]
+        },
+      ],
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

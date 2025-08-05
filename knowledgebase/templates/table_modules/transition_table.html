@@ -1,0 +1,53 @@
+{% macro render_transition_rule_table(transition_rules, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Transition Name</th>
+      <th>Input Synsets</th>
+      <th>Machine Synsets</th>
+      <th>Output Synsets</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for transition_rule in transition_rules|sort %}
+    <tr>
+      <td><a href="{{ url_for('transition_rule_detail', name=transition_rule.name) }}">{{ transition_rule.name }}</a></td>
+      <td>
+        {% for synset in transition_rule.input_synsets %}
+          {{ synset.name }}, 
+        {% endfor %}
+      </td>
+      <td>
+        {% for synset in transition_rule.machine_synsets %}
+          {{ synset.name }}, 
+        {% endfor %}
+      </td>
+      <td>
+        {% for synset in transition_rule.output_synsets %}
+          {{ synset.name }}, 
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [1, 2]
+      }
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

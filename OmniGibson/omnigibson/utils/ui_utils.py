@@ -7,7 +7,6 @@ import datetime
 import logging
 import math
 import random
-import sys
 from pathlib import Path
 
 import imageio
@@ -357,7 +356,7 @@ class CameraMover:
             for prim_child in prim.GetChildren():
                 for prim_child_child in prim_child.GetChildren():
                     if "Light" in prim_child_child.GetPrimTypeInfo().GetTypeName():
-                        prim_child_child.GetAttribute("intensity").Set(intensity)
+                        prim_child_child.GetAttribute("inputs:intensity").Set(intensity)
 
     def print_info(self):
         """
@@ -911,11 +910,12 @@ class KeyboardRobotController:
                     binary_gripper
                 ]
 
+        # TODO: this currently conflicts with omniverse logging and spams the window
         # Print out the user what is being pressed / controlled
-        sys.stdout.write("\033[K")
-        keypress_str = self.current_keypress.__str__().split(".")[-1]
-        print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
-        sys.stdout.write("\033[F")
+        # sys.stdout.write("\033[K")
+        # keypress_str = self.current_keypress.__str__().split(".")[-1]
+        # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
+        # sys.stdout.write("\033[F")
 
         # Return action
         return action

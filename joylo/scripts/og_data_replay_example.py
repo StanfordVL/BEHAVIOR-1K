@@ -205,10 +205,11 @@ def replay_hdf5_file(hdf_input_path):
             video_writers=video_writers,
             video_rgb_keys=video_rgb_keys,
         )
-        episode_metrics = env.aggregate_metrics(flatten=True)
-        for k, v in episode_metrics.items():
-            print(f"Metric [{k}]: {v}")
-        metrics[f"episode_{episode_id}"] = episode_metrics
+        if RUN_QA:
+            episode_metrics = env.aggregate_metrics(flatten=True)
+            for k, v in episode_metrics.items():
+                print(f"Metric [{k}]: {v}")
+            metrics[f"episode_{episode_id}"] = episode_metrics
     
     # Close all video writers
     for writer in video_writers:

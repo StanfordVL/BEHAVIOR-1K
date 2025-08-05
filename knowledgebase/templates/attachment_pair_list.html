@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Attachment Pairs{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        paging: false
+      });
+    });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Attachment Pairs{% endif %}</h1>
+  <h4 class="text-center">Total count: {{ attachment_pair_list | length }}</h4>
+  <br>
+  {% from "table_modules/attachment_pair_table.html" import render_attachment_pair_table %}
+  {{ render_attachment_pair_table(attachment_pair_list) }}
+{% endblock %}
