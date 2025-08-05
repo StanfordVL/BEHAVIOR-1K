@@ -183,7 +183,7 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     # Create environment with only the necessary packages
-    conda create -n behavior python=3.10 av "numpy<2" "setuptools<=79" -c conda-forge -y
+    conda create -n behavior python=3.10 "numpy<2" "setuptools<=79" -c conda-forge -y
     conda activate behavior
     
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }

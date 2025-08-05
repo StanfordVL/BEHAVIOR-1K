@@ -30,7 +30,6 @@ from utils import (
 )
 import numpy as np
 import random
-import logging
 
 
 # TASK_CUSTOM_LISTS = {
@@ -386,7 +385,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         print("white_list", whitelist)
         print("black_list", blacklist)
         assert whitelist is not None, "whitelist should not be None for manual sampling"
-        scene_instance = BehaviorTask.get_cached_activity_scene_filename(
+        BehaviorTask.get_cached_activity_scene_filename(
             scene_model=args.scene_model,
             activity_name=activity,
             activity_definition_id=0,
