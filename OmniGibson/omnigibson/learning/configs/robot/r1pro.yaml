@@ -2,13 +2,13 @@ type: R1Pro
 multi_view_cameras:
   left_wrist: 
     name: robot_r1::robot_r1:left_realsense_link:Camera:0
-    resolution: [120, 120]
+    resolution: [240, 240]
   right_wrist: 
     name: robot_r1::robot_r1:right_realsense_link:Camera:0
-    resolution: [120, 120]
+    resolution: [240, 240]
   head: 
     name: robot_r1::robot_r1:zed_link:Camera:0
-    resolution: [180, 180]
+    resolution: [240, 240]
 action_keys: [base, torso, left_arm, left_gripper, right_arm, right_gripper]
 action_key_dims:
   base: 3

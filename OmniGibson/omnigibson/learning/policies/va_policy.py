@@ -39,6 +39,10 @@ class VisionActionILPolicy(BasePolicy):
     ) -> None:
         super().__init__(robot_type=robot_type, *args, **kwargs)
         if use_websocket:
+            # create websocket client policy
+            assert host is not None, "Host must be specified when using websocket client policy!"
+            assert port is not None, "Port must be specified when using websocket client policy!"
+            logging.info(f"Creating websocket client policy with host: {host}, port: {port}")
             self.policy = WebsocketClientPolicy(host=host, port=port)
             logging.info(f"Server metadata: {self.policy.get_server_metadata()}")
         else:
@@ -124,26 +128,31 @@ class VisionActionILPolicy(BasePolicy):
                 processed_obs["qpos"][key] = self._post_processing_fn(2 * (
                     proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - JOINT_RANGE[self.robot_type][key][0]
                 ) / (JOINT_RANGE[self.robot_type][key][1] - JOINT_RANGE[self.robot_type][key][0]) - 1.0)
+        if "pcd" in self.visual_obs_types:
+            pcd_obs = dict()
         for camera_id, camera in ROBOT_CAMERA_NAMES[self.robot_type].items():
             if "rgb" in self.visual_obs_types or "pcd" in self.visual_obs_types:
-                processed_obs[f"{camera}::rgb"] = self._post_processing_fn(
-                    F.interpolate(
-                        obs[f"{camera}::rgb"][..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32), 
-                        self.obs_output_size[camera_id], 
-                        mode="nearest-exact"
-                    ).unsqueeze(0)
-                )
+                rgb_obs = F.interpolate(
+                    obs[f"{camera}::rgb"][..., :3].unsqueeze(0).movedim(-1, -3).to(th.float32),
+                    self.obs_output_size[camera_id],
+                    mode="nearest-exact"
+                ).unsqueeze(0)
                 if "pcd" in self.visual_obs_types:
                     # move rgb dim back
-                    processed_obs[f"{camera}::rgb"] = processed_obs[f"{camera}::rgb"].movedim(-3, -1)
+                    pcd_obs[f"{camera}::rgb"] = rgb_obs.movedim(-3, -1).to(self.device)
+                else:
+                    processed_obs[f"{camera}::rgb"] = self._post_processing_fn(rgb_obs)
             if "depth_linear" in self.visual_obs_types or "pcd" in self.visual_obs_types:
-                processed_obs[f"{camera}::depth_linear"] = self._post_processing_fn(
-                    F.interpolate(
-                        obs[f"{camera}::depth_linear"].unsqueeze(0).unsqueeze(0).to(th.float32), 
-                        self.obs_output_size[camera_id], 
-                        mode="nearest-exact"
-                    )
-            )
+                depth_obs = F.interpolate(
+                    obs[f"{camera}::depth_linear"].unsqueeze(0).unsqueeze(0).to(th.float32),
+                    self.obs_output_size[camera_id],    
+                    mode="nearest-exact"
+                )
+                if "pcd" in self.visual_obs_types:
+                    # move depth_linear dim back
+                    pcd_obs[f"{camera}::depth_linear"] = depth_obs.to(self.device)
+                else:
+                    processed_obs[f"{camera}::depth_linear"] = self._post_processing_fn(depth_obs)
             if "seg_instance_id" in self.visual_obs_types:
                 processed_obs[f"{camera}::seg_instance_id"] = self._post_processing_fn(
                     F.interpolate(
@@ -153,27 +162,13 @@ class VisionActionILPolicy(BasePolicy):
                     )
                 )
         if "pcd" in self.visual_obs_types:
-            processed_obs["cam_rel_poses"] = self._post_processing_fn(
-                obs["robot_r1::cam_rel_poses"].unsqueeze(0).unsqueeze(0).to(th.float32)
-            )
-            fused_pcd = process_fused_point_cloud(
-                obs=processed_obs,
+            pcd_obs["cam_rel_poses"] = obs["robot_r1::cam_rel_poses"].unsqueeze(0).unsqueeze(0).to(th.float32).to(self.device)
+            processed_obs["pcd"] = self._post_processing_fn(process_fused_point_cloud(
+                obs=pcd_obs,
                 camera_intrinsics=self.camera_intrinsics,
                 pcd_range=self._pcd_range,
                 pcd_num_points=4096,
                 use_fps=True,
-
-            )[0]
-            processed_obs["pcd"] = fused_pcd
-            for camera_id, camera in ROBOT_CAMERA_NAMES[self.robot_type].items():
-                if "rgb" not in self.visual_obs_types:
-                    # pop rgb if not needed
-                    processed_obs.pop(f"{camera}::rgb", None)
-                else:
-                    # move rgb dim forward
-                    processed_obs[f"{camera}::rgb"] = processed_obs[f"{camera}::rgb"].movedim(-1, -3)
-                if "depth_linear" not in self.visual_obs_types:
-                    # pop depth_linear if not needed
-                    processed_obs.pop(f"{camera}::depth_linear", None)
+            )[0])
             
         return processed_obs

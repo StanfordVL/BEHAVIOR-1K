@@ -100,8 +100,8 @@ class Evaluator:
         # fetch env type, currently only supports "omnigibson"
         self.env_type = cfg.env_type
 
-        self.policy = self.load_policy()
         self.env = self.load_env()
+        self.policy = self.load_policy()
         self.robot = self.load_robot()
 
         self.obs = self.env.reset()[0]
@@ -286,6 +286,7 @@ if __name__ == "__main__":
  
         for idx in instances_to_run:
             load_task_instance_for_env(evaluator.env, idx)
+            logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(episodes_per_instance):
                 for _ in range(10):
                     og.sim.render()

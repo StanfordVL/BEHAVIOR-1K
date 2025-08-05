@@ -2,13 +2,10 @@ defaults:
   - _self_  # all below configs will override this conf.yaml
   - policy: ???
   - task: ???
+  - robot: r1pro
 
 policy_name: ???  # filled by policy
 headless: true
 
-write_video: true
+write_video: true 
 log_path: ???
-
-robot:
-  type: R1Pro
-  controllers:

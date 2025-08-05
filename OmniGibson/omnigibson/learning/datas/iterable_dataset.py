@@ -291,7 +291,7 @@ class BehaviorIterableDataset(IterableDataset):
             "cam_rel_poses": torch.from_numpy(np.array(df["observation.cam_rel_poses"][::self._downsample_factor].tolist(), dtype=np.float32)),
         }
         if self._load_task_info:
-            ret["task::low_dim"] = torch.from_numpy(np.array(df["observation.task_info"][::self._downsample_factor].tolist(), dtype=np.float32))
+            ret["task"] = torch.from_numpy(np.array(df["observation.task_info"][::self._downsample_factor].tolist(), dtype=np.float32))
 
         return ret
 
