@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Scene {{ scene.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ scene.name }}</h1>
+  <hr>
+  <h2>Rooms</h2>
+  {% from "table_modules/room_table.html" import render_room_table %}
+  {{ render_room_table(scene.rooms, enable_search=False, enable_csv=False) }}
+{% endblock %}

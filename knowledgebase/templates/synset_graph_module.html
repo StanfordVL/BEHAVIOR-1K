@@ -1,0 +1,16 @@
+<div class="mermaid">
+graph TD;
+  classDef success fill:#28a745,color:#fff;
+  classDef warning fill:#ffc107,color:#fff;
+  classDef danger fill:#dc3545,color:#fff;
+  {% for edge in G.edges %}
+    {{ edge.0.name }} --> {{ edge.1.name }};
+  {% endfor %}
+  {% for synset in G.nodes %}
+    click {{synset.name}} "{{ url_for('synset_detail', name=synset.name) }}" "Synset details page";
+    class {{synset.name}} {{synset.state|tocolor}};
+  {% endfor %}
+  {% if center_node %}
+    style {{center_node.name}} stroke:#333,stroke-width:2px;
+  {% endif %}
+</div>

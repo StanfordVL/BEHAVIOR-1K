@@ -858,7 +858,7 @@ class DataPlaybackWrapper(DataWrapper):
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
-        
+
         # Stabilize skipped objects
         # we can do this here because we know that whatever's skipped during load state must have been asleep during data collection
         # which means they're not moving and we can safely keep them still

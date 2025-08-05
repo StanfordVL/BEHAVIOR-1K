@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Synsets{% endif %}{% endblock %}
+{% block customstyle %}
+  <script id="properties" type="application/json">
+  {}
+  </script>
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    const properties = JSON.parse(document.getElementById('properties').textContent);
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        paging: false,
+        searchPanes: {
+            viewTotal: true,
+            columns: [1, 2, 3, 9, 10, 11]
+        },
+        columnDefs: [
+          // {
+          //   searchPanes: {
+          //     options: properties.map(property => ({
+          //       label: property,
+          //       value: function(rowData, rowIdx) {return rowData[2].includes(property);}
+          //     }))
+          //   },
+          //   targets: [9]
+          // },
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Matched',
+                  value: function(rowData, rowIdx) {return rowData[9] > 0;}
+                },
+                {
+                  label: 'Unmatched',
+                  value: function(rowData, rowIdx) {return rowData[9] == 0;}
+                },
+              ]
+            },
+            targets: [9]
+          },
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Matched',
+                  value: function(rowData, rowIdx) {return rowData[10] > 0;}
+                },
+                {
+                  label: 'Unmatched',
+                  value: function(rowData, rowIdx) {return rowData[10] == 0;}
+                },
+              ]
+            },
+            targets: [10]
+          },
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Matched',
+                  value: function(rowData, rowIdx) {return rowData[11] > 0;}
+                },
+                {
+                  label: 'Unmatched',
+                  value: function(rowData, rowIdx) {return rowData[11] == 0;}
+                },
+              ]
+            },
+            targets: [11]
+          }
+        ]
+      });
+      table.searchPanes.container().prependTo(table.table().container());
+      table.searchPanes.resizePanes();
+  });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Synsets{% endif %}</h1>
+  <h4 class="text-center">Total count: {{ synset_list | length }}</h4>
+  <br>
+  <table class="table table-striped" id="datatable">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Synset State</th>
+        <th>Custom?</th>
+        <th>Leaf?</th>
+        <th>Definition</th>
+        <th>Parents</th>
+        <th>Children</th>
+        <th>Properties</th>
+        <th>Used as Predicates</th>
+        <th>Tasks</th>
+        <th>Direct Categories</th>
+        <th>Direct Objects</th>
+        <th>Total Objects</th>
+        <th>Requiring Task Count</th>
+      </tr>
+    </thead>
+    <tbody id="myTable">
+      {% for synset in synset_list %}
+      <tr>
+        <td><a href="{{ url_for('synset_detail', name=synset.name) }}">{{ synset.name }}</a></td>
+        <td class="bg-{{- synset.state|tocolor -}}">
+          {% if synset.state == SynsetState.MATCHED %}Ready
+          {% elif synset.state == SynsetState.PLANNED %}Planned
+          {% elif synset.state == SynsetState.UNMATCHED %}Not Ready
+          {% elif synset.state == SynsetState.SUBSTANCE %}Substance
+          {% else %}Illegal
+          {% endif %}
+        </td>
+        <td>{{ synset.is_custom }}</td>
+        <td>{% if synset.children|length == 0 %}True{% else %}False{% endif %}</td>
+        <td>{{ synset.definition }}</td>
+        <td>
+          {% for parent in synset.parents %}
+            <a href="{{ url_for('synset_detail', name=parent.name) }}">{{ parent.name }}, </a>
+          {% endfor %}
+        </td>
+        <td>
+          {% for child in synset.children %}
+            <a href="{{ url_for('synset_detail', name=child.name) }}">{{ child.name }}, </a>
+          {% endfor %}
+        </td>
+        <td>
+          {% for property in synset.property_names %}
+            {{ property }}, 
+          {% endfor %}
+        </td>
+        <td>
+          {% for predicate in synset.used_in_predicates %}
+            {{ predicate.name }},
+          {% endfor %}
+        </td>
+        <td>
+          {% for task in synset.tasks[:10] %}
+            <a href="{{ url_for('task_detail', name=task.name) }}">{{ task.name }}, </a>
+          {% endfor %}
+          {% if synset.tasks|length > 10 %}...{% endif %}
+        </td>
+        <td>
+          {% for category in synset.categories[:10] %}
+            <a href="{{ url_for('category_detail', name=category.name) }}">{{ category.name }}, </a>
+          {% endfor %}
+          {% if synset.categories|length > 10 %}...{% endif %}
+        </td>
+        <td>{{ synset.direct_matching_objects | length }}</td>
+        <td>{{ synset.matching_objects | length }}</td>
+        <td>{{ synset.n_task_required }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

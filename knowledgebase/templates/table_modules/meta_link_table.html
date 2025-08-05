@@ -1,0 +1,35 @@
+{% macro render_meta_link_table(meta_links, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Meta Link Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for meta_link in meta_links|sort %}
+    <tr>
+      <td>{{ meta_link.name }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td>No meta links found</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

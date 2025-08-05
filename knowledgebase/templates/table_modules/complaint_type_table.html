@@ -1,0 +1,18 @@
+{% macro render_complaint_type_table(complaint_types, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Unprocessed Objects Count</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ct in complaint_types %}
+    <tr>
+      <td><a href="{{ url_for('complaint_type_detail', name=ct.name) }}">{{ ct.name }}</a></td>
+      <td>{{ ct.objects|length }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}

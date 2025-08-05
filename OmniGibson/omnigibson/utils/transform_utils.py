@@ -13,7 +13,6 @@ from omnigibson.utils.python_utils import torch_compile
 import torch
 
 PI = math.pi
-EPS = torch.finfo(torch.float32).eps * 4.0
 
 # map axes strings to/from tuples of inner axis, parity, repetition, frame
 _AXES2TUPLE = {
@@ -251,17 +250,17 @@ def quat_distance(quaternion1, quaternion0):
     Always returns the shorter rotation path.
 
     Args:
-        quaternion1 (torch.tensor): (x,y,z,w) quaternion
-        quaternion0 (torch.tensor): (x,y,z,w) quaternion
+        quaternion1 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
+        quaternion0 (torch.tensor): (x,y,z,w) quaternion or (..., 4) batched quaternions
 
     Returns:
-        torch.tensor: (x,y,z,w) quaternion distance
+        torch.tensor: (x,y,z,w) quaternion distance or (..., 4) batched quaternion distances
     """
-    d = torch.dot(quaternion0, quaternion1)
+    # Compute dot product along the last axis (quaternion components)
+    d = torch.sum(quaternion0 * quaternion1, dim=-1, keepdim=True)
     # If dot product is negative, negate one quaternion to get shorter path
-    if d < 0.0:
-        quaternion1 = -quaternion1
-    
+    quaternion1 = torch.where(d < 0.0, -quaternion1, quaternion1)
+
     return quat_multiply(quaternion1, quat_inverse(quaternion0))
 
 
@@ -494,7 +493,7 @@ def mat2quat_batch(rmat: torch.Tensor) -> torch.Tensor:
     return mat2quat(rmat)
 
 
-@torch.compile
+@torch_compile
 def decompose_mat(hmat):
     """Batched decompose_mat function - assumes input is already batched
 
@@ -512,9 +511,9 @@ def decompose_mat(hmat):
 
     # Check M[3, 3] for all batch items
     diag_vals = M[:, 3, 3]  # (B,)
-    
+
     # TODO: this line might be a VRAM killer, investigate this
-    # if torch.any(torch.abs(diag_vals) < EPS):
+    # if torch.any(torch.abs(diag_vals) < 1e-6):
     #     raise ValueError("Some M[3, 3] values are zero")
 
     M = M / diag_vals.unsqueeze(-1).unsqueeze(-1)  # (B, 4, 4)
@@ -522,7 +521,7 @@ def decompose_mat(hmat):
     P[:, :, 3] = torch.tensor([0.0, 0.0, 0.0, 1.0], device=hmat.device, dtype=hmat.dtype).expand(batch_size, 4)
 
     det_P = torch.linalg.det(P[:, :3, :3])  # (B,)
-    if torch.any(torch.abs(det_P) < EPS):
+    if torch.any(torch.abs(det_P) < 1e-6):
         raise ValueError("Some matrices are singular and cannot be decomposed")
 
     if not torch.allclose(M[:, :3, 3], torch.tensor(0.0, device=hmat.device, dtype=hmat.dtype)):
@@ -571,7 +570,7 @@ def decompose_mat(hmat):
     return scale, shear, quat, translate
 
 
-@torch.compile
+@torch_compile
 def mat2pose(hmat):
     """
     Converts a homogeneous 4x4 matrix into pose.
@@ -590,7 +589,7 @@ def mat2pose(hmat):
     return translate.squeeze(0), quat.squeeze(0)
 
 
-@torch.compile
+@torch_compile
 def mat2pose_batched(hmat):
     """
     Converts batched homogeneous 4x4 matrices into poses.

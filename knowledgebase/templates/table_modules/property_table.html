@@ -1,0 +1,35 @@
+{% macro render_property_table(properties, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Property Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for property in properties|sort %}
+    <tr>
+      <td>{{ property.name }}</td>
+    </tr>
+    {% else %}
+    <tr>
+      <td>No properties found</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

@@ -82,6 +82,12 @@ export material VRayMtl(
     [[
         anno::in_group("Options"),
         anno::hidden()
+    ]],
+    float coat_amount = 1.f
+    [[
+        anno::in_group("Coat Parameters"),
+        anno::display_name("White coat amount"),
+        anno::hard_range(0.f, 1.f)
     ]]
 )
 [[
@@ -139,6 +145,26 @@ export material VRayMtl(
                 ),
             normal              : texmap_bump
         );
+
+    // coat
+    bsdf coat_bsdf =
+        df::fresnel_layer
+        (
+            ior     : 1.6f,
+            weight  : coat_amount,
+            layer   : df::simple_glossy_bsdf
+            (
+                tint        : color(1.f),
+                roughness_u : 1.f,
+                mode        : df::scatter_reflect
+            ),
+            base    : df::tint
+            (
+                tint    : color(1.f),
+                base    : surface_bsdf
+            ),
+            normal  : texmap_bump
+        );
             
 } 
 in material
@@ -147,7 +173,7 @@ in material
         thin_walled : thin_walled,
         surface     : material_surface
         (
-            scattering  : surface_bsdf, 
+            scattering  : coat_bsdf, 
             emission    : material_emission
             (
                 emission  : df::diffuse_edf(),

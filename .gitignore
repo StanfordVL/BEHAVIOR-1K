@@ -4,3 +4,4 @@ gha-creds-*.json
 outputs/
 .vscode/
 test.ipynb
+/site
