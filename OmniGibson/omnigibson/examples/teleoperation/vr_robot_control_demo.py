@@ -9,7 +9,9 @@ from omnigibson.utils.teleop_utils import OVXRSystem
 gm.ENABLE_OBJECT_STATES = False
 gm.ENABLE_TRANSITION_RULES = False
 gm.ENABLE_FLATCACHE = True
-gm.GUI_VIEWPORT_ONLY = True
+
+CONTROLLER_VISIBLE = True
+ENABLE_CAMERA_LIMITS = False
 
 
 def main():
@@ -75,12 +77,12 @@ def main():
     # start vrsys
     vrsys = OVXRSystem(
         robot=env.robots[0],
-        show_control_marker=True,
+        show_control_marker=CONTROLLER_VISIBLE,
         system="SteamVR",
         eef_tracking_mode="controller",
         align_anchor_to="camera",
         # roll, pitch, yaw
-        view_angle_limits=[180, 30, 30],
+        view_angle_limits=[180, 30, 30] if ENABLE_CAMERA_LIMITS else None,
     )
     vrsys.start()
 
@@ -92,7 +94,7 @@ def main():
 
     print("Cleaning up...")
     vrsys.stop()
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

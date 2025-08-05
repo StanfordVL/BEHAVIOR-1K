@@ -810,7 +810,7 @@ class WasherDryerRule(BaseTransitionRule):
         """
         del object_candidates
         obj_collision_points = global_info["obj_collision_points"]
-        
+
         # Check each object's collision points
         in_volume_objs = []
         for obj, collision_points in zip(self.scene.objects, obj_collision_points):
@@ -819,7 +819,7 @@ class WasherDryerRule(BaseTransitionRule):
             # If any point is in volume, include this object
             if th.any(points_in_volume):
                 in_volume_objs.append(obj)
-        
+
         # Remove the container itself
         if container in in_volume_objs:
             in_volume_objs.remove(container)

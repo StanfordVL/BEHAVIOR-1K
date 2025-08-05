@@ -115,9 +115,45 @@ class Remapper:
                 # If an object was previously unlabelled but now has a label, we need to update the key array
                 updated_ids.add(unlabelled_id)
         self.unlabelled_ids -= updated_ids
-        self.known_ids -= updated_ids
+
+        # For updated ids, we need to update their key_array entries and then mark them as known
+        for updated_id in updated_ids:
+            label = old_mapping[updated_id]
+            new_key = next((k for k, v in new_mapping.items() if v == label), None)
+            assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
+            self.key_array[updated_id] = new_key
+
+        # Add updated ids to known_ids since they now have valid mappings
+        self.known_ids.update(updated_ids)
+
+        # Check if any objects in known_ids have changed their labels and need updating
+        changed_known_ids = set()
+        for known_id in self.known_ids:
+            if known_id in old_mapping:
+                # Get the current label from old_mapping
+                current_label = old_mapping[known_id]
+                # Get the currently mapped value from key_array
+                current_mapped_value = self.key_array[known_id].item()
+                # Find what label this mapped value corresponds to
+                current_mapped_label = None
+                for k, v in new_mapping.items():
+                    if k == current_mapped_value:
+                        current_mapped_label = v
+                        break
+
+                # If the labels don't match, we need to update this known_id
+                if current_mapped_label != current_label:
+                    changed_known_ids.add(known_id)
+
+        # Update the key_array for changed known_ids
+        for changed_id in changed_known_ids:
+            label = old_mapping[changed_id]
+            new_key = next((k for k, v in new_mapping.items() if v == label), None)
+            assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
+            self.key_array[changed_id] = new_key
 
         new_keys = old_mapping.keys() - self.known_ids
+
         if new_keys:
             self.known_ids.update(new_keys)
             # Populate key_array with new keys

@@ -955,6 +955,7 @@ def setup_ghost_robot(scene, task_cfg=None):
     
     # Set ghost color
     for mat in ghost.materials:
+        mat.diffuse_texture = ""
         mat.diffuse_color_constant = th.tensor([0.8, 0.0, 0.0], dtype=th.float32)
     
     # Hide all links initially

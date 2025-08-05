@@ -1664,6 +1664,8 @@ class BDDLSampler:
                                 og.sim.play()
                                 og.sim.load_state(state, serialized=False)
                                 og.sim.step_physics()
+                            else:
+                                break
                         if not success:
                             # Update object registry because we just assigned in_rooms to newly imported objects
                             self._env.scene.object_registry.update(keys=["in_rooms"])
