@@ -2,7 +2,7 @@ import omnigibson as og
 from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
 import omnigibson.lazy as lazy
-from bddl.activity import Conditions, evaluate_state
+from bddl.activity import evaluate_state
 
 # import numpy as np
 import torch as th

@@ -1,6 +1,6 @@
 import argparse
 import omnigibson as og
-from omnigibson.macros import gm, macros
+from omnigibson.macros import gm
 from utils import *
 
 parser = argparse.ArgumentParser()
