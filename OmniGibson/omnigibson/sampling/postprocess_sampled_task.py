@@ -1,9 +1,9 @@
 import argparse
 import json
+import os
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.tasks import BehaviorTask
 from omnigibson.macros import gm
-from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")

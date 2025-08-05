@@ -4,8 +4,8 @@ import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
 from omnigibson.objects import DatasetObject
-from utils import *
 import numpy as np
+from utils import validate_task
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")
