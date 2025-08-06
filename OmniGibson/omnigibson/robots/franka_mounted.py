@@ -35,8 +35,8 @@ class FrankaMounted(FrankaPanda):
 
     @property
     def _assisted_grasp_start_points(self):
-        return None        # automatically inferred with this gripper
+        return None  # automatically inferred with this gripper
 
     @property
     def _assisted_grasp_end_points(self):
-        return None        # automatically inferred with this gripper
+        return None  # automatically inferred with this gripper
