@@ -1,30 +1,35 @@
 import logging
 import os
-import yaml
 import copy
-import time
 import argparse
-import bddl
-import pkgutil
 import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
-import csv
 import traceback
 from omnigibson.objects import DatasetObject
 from omnigibson.object_states import Contains
 from omnigibson.tasks import BehaviorTask
-from omnigibson.systems import MicroPhysicalParticleSystem
-from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
 from omnigibson.utils.python_utils import clear as clear_pu
-from omnigibson.utils.python_utils import create_object_from_init_info
-from omnigibson.utils.bddl_utils import OBJECT_TAXONOMY
 from omnigibson.utils.constants import PrimType
-from bddl.activity import Conditions, evaluate_state
-from utils import *
+from bddl.activity import Conditions
+from utils import (
+    ACTIVITY_TO_ROW,
+    create_stable_scene_json,
+    validate_scene_can_be_sampled,
+    get_scene_compatible_activities,
+    get_unsuccessful_activities,
+    get_rooms,
+    get_predicates,
+    get_valid_tasks,
+    hide_all_lights,
+    parse_task_mapping_new,
+    UNSUPPORTED_PREDICATES,
+    USER,
+    validate_task,
+    worksheet,
+)
 import numpy as np
 import random
-import logging
 
 
 # TASK_CUSTOM_LISTS = {
@@ -380,7 +385,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         print("white_list", whitelist)
         print("black_list", blacklist)
         assert whitelist is not None, "whitelist should not be None for manual sampling"
-        scene_instance = BehaviorTask.get_cached_activity_scene_filename(
+        BehaviorTask.get_cached_activity_scene_filename(
             scene_model=args.scene_model,
             activity_name=activity,
             activity_definition_id=0,

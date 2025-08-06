@@ -1,30 +1,11 @@
-import logging
 import os
-import yaml
-import copy
-import time
 import argparse
-import bddl
-import pkgutil
 import omnigibson as og
 from omnigibson.macros import gm, macros
 import json
-import csv
-import traceback
 from omnigibson.objects import DatasetObject
-from omnigibson.object_states import Contains
-from omnigibson.tasks import BehaviorTask
-from omnigibson.systems import MicroPhysicalParticleSystem
-from omnigibson.systems.system_base import PhysicalParticleSystem, VisualParticleSystem
-from omnigibson.utils.python_utils import clear as clear_pu
-from omnigibson.utils.python_utils import create_object_from_init_info
-from omnigibson.utils.bddl_utils import OBJECT_TAXONOMY
-from omnigibson.utils.constants import PrimType
-from bddl.activity import Conditions, evaluate_state
-from utils import *
 import numpy as np
-import random
-import logging
+from utils import validate_task
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")
