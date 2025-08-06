@@ -21,10 +21,6 @@ jobs:
   build:
     runs-on: [self-hosted, linux]
 
-    strategy:
-      matrix:
-        branch: [main, og-develop]
-
     defaults:
       run:
         shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
