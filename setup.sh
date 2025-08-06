@@ -9,6 +9,7 @@ BDDL=false
 TELEOP=false
 DATASET=false
 PRIMITIVES=false
+ASSET_PIPELINE=false
 DEV=false
 CUDA_VERSION="12.4"
 ACCEPT_CONDA_TOS=false
@@ -26,6 +27,7 @@ while [[ $# -gt 0 ]]; do
         --teleop) TELEOP=true; shift ;;
         --dataset) DATASET=true; shift ;;
         --primitives) PRIMITIVES=true; shift ;;
+        --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
         --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
@@ -48,6 +50,7 @@ Options:
   --teleop                Install JoyLo (teleoperation interface)
   --dataset               Download BEHAVIOR datasets (requires --omnigibson)
   --primitives            Install OmniGibson with primitives support
+  --asset-pipeline        Install the 3D scene and object asset pipeline
   --dev                   Install development dependencies
   --cuda-version VERSION  Specify CUDA version (default: 12.4)
   --accept-conda-tos      Automatically accept Conda Terms of Service
@@ -330,34 +333,25 @@ if [ "$OMNIGIBSON" = true ]; then
             DATASET_ACCEPT_FLAG="False"
         fi
         
-        python -c "
-import os
-os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
-try:
-    from omnigibson.macros import gm
-    from omnigibson.utils.asset_utils import download_assets, download_og_dataset
-    
-    dataset_exists = os.path.exists(gm.DATASET_PATH)
-    assets_exist = os.path.exists(gm.ASSET_PATH)
-    
-    if not (dataset_exists and assets_exist):
-        print(f'Installing data to:')
-        print(f'  Dataset (~25GB): {gm.DATASET_PATH}')
-        print(f'  Assets (~2.5GB): {gm.ASSET_PATH}')
+        export OMNI_KIT_ACCEPT_EULA=YES
         
-        if not dataset_exists:
-            print('Downloading dataset...')
-            download_og_dataset(accept_license=${DATASET_ACCEPT_FLAG})
+        echo "Installing data to:"
+        DATASET_PATH=$(python -c "from omnigibson.macros import gm; print(gm.DATASET_PATH)")
+        ASSET_PATH=$(python -c "from omnigibson.macros import gm; print(gm.ASSET_PATH)")
+        echo "  Dataset (~25GB): $DATASET_PATH"
+        echo "  Assets (~2.5GB): $ASSET_PATH"
         
-        if not assets_exist:
-            print('Downloading assets...')
-            download_assets()
-    else:
-        print('Datasets already exist, skipping download.')
-except Exception as e:
-    print(f'ERROR: Dataset installation failed: {e}')
-    exit(1)
-"
+        echo "Downloading dataset..."
+        python -c "from omnigibson.utils.asset_utils import download_og_dataset; download_og_dataset(accept_license=${DATASET_ACCEPT_FLAG})" || {
+            echo "ERROR: Dataset installation failed"
+            exit 1
+        }
+        
+        echo "Downloading assets..."
+        python -c "from omnigibson.utils.asset_utils import download_assets; download_assets()" || {
+            echo "ERROR: Assets installation failed"
+            exit 1
+        }
     fi
     
     echo "OmniGibson installation completed successfully!"
@@ -370,12 +364,20 @@ if [ "$TELEOP" = true ]; then
     pip install -e "$WORKDIR/joylo"
 fi
 
+# Install asset pipeline
+if [ "$ASSET_PIPELINE" = true ]; then
+    echo "Installing asset pipeline..."
+    [ ! -d "asset_pipeline" ] && { echo "ERROR: asset_pipeline directory not found"; exit 1; }
+    pip install -r "$WORKDIR/asset_pipeline/requirements.txt"
+fi
+
 echo ""
 echo "=== Installation Complete! ==="
 [ "$NEW_ENV" = true ] && echo "✓ Created conda environment 'behavior'"
 [ "$OMNIGIBSON" = true ] && echo "✓ Installed OmniGibson + Isaac Sim"
 [ "$BDDL" = true ] && echo "✓ Installed BDDL"
 [ "$TELEOP" = true ] && echo "✓ Installed JoyLo"
+[ "$ASSET_PIPELINE" = true ] && echo "✓ Installed asset pipeline"
 [ "$DATASET" = true ] && echo "✓ Downloaded datasets"
 echo ""
 [ "$NEW_ENV" = true ] && echo "To activate: conda activate behavior"
