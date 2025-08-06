@@ -1,7 +1,8 @@
 import argparse
+import os
 import omnigibson as og
-from omnigibson.macros import gm, macros
-from utils import *
+from omnigibson.macros import gm
+from utils import create_stable_scene_json
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")

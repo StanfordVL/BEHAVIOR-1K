@@ -37,7 +37,6 @@ from omnigibson.utils.python_utils import (
     create_object_from_init_info,
     get_uuid,
     recursively_convert_to_torch,
-    torch_compile,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger

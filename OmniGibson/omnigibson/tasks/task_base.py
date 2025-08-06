@@ -3,7 +3,6 @@ from copy import deepcopy
 
 import torch as th
 
-import omnigibson as og
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import Registerable, classproperty

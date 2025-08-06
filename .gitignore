@@ -5,3 +5,4 @@ outputs/
 .vscode/
 test.ipynb
 /site
+.vscode

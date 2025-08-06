@@ -2,7 +2,7 @@ import omnigibson as og
 from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
 import omnigibson.lazy as lazy
-from bddl.activity import Conditions, evaluate_state
+from bddl.activity import evaluate_state
 
 # import numpy as np
 import torch as th
@@ -431,7 +431,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                 active_obj_names.add(obj.name)
 
     # 1. Sanity check all object poses wrt their original pre-loaded poses
-    print(f"Step 1: Checking loaded task environment...")
+    print("Step 1: Checking loaded task environment...")
 
     def _validate_identical_object_kinematic_state(obj_name, default_obj_dict, obj_dict, check_vel=True):
         # Check root link state
@@ -510,7 +510,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
 
     # 2. Validate the native USDs jsons are stable and similar -- compare all object kinematics (poses, joint
     #       states) with respect to the native scene file
-    print(f"Step 2: Checking poses and joint states for non-task-relevant objects and velocities for all objects...")
+    print("Step 2: Checking poses and joint states for non-task-relevant objects and velocities for all objects...")
 
     # Sanity check all non-task-relevant object poses
     for obj_name, default_obj_info in default_scene_dict["state"]["registry"]["object_registry"].items():
@@ -547,7 +547,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # 3. Validate object set is consistent (no faulty transition rules occurring) -- we expect the number
     #       of active systems (and number of active particles) and the number of objects to be the same after
     #       taking a physics step, and also make sure init state is True
-    print(f"Step 3: Checking BehaviorTask initial conditions and scene stability...")
+    print("Step 3: Checking BehaviorTask initial conditions and scene stability...")
     # Take a single physics step
     og.sim.step()
     task_state_t1 = og.sim.dump_state(serialized=False)[0]
@@ -662,7 +662,7 @@ def validate_task(task, task_scene_dict, default_scene_dict):
     # 4. Validate longer-term stability -- take N=10 timesteps, and make sure all object positions and velocities
     #       are still stable (positions don't drift too much, and velocities are close to 0), as well as verifying
     #       that all BDDL conditions are satisfied
-    print(f"Step 4: Checking longer-term BehaviorTask initial conditions and scene stability...")
+    print("Step 4: Checking longer-term BehaviorTask initial conditions and scene stability...")
 
     # Take 10 steps
     for _ in range(10):
