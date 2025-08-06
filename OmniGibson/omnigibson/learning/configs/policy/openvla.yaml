@@ -1,7 +1,7 @@
 # @package _global_
 
 policy_name: openvla 
-log_path: /home/evans/logs/b1k_baselines/OmniGibson/logs/openvla
+log_path: ~/logs/b1k_baselines/OmniGibson/logs/openvla
 
 model:
   _target_: omnigibson.learning.policies.OpenVLA

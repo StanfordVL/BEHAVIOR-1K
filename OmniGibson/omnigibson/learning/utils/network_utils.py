@@ -11,7 +11,12 @@ import time
 import torch as th
 import traceback
 import websockets.sync.client
-import websockets.asyncio.server as _server
+import websockets
+try:
+    import websockets.asyncio.server as _server
+except ImportError:
+    # Fallback for websockets < 13.0
+    import websockets.server as _server
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple
 from omnigibson.learning.utils.array_tensor_utils import any_to_torch
@@ -101,7 +106,7 @@ class WebsocketPolicyServer:
         ) as server:
             await server.serve_forever()
 
-    async def _handler(self, websocket: _server.ServerConnection):
+    async def _handler(self, websocket):
         logger.info(f"Connection from {websocket.remote_address} opened")
         packer = Packer()
 
@@ -136,16 +141,25 @@ class WebsocketPolicyServer:
                 break
             except Exception:
                 await websocket.send(traceback.format_exc())
-                await websocket.close(
-                    code=websockets.frames.CloseCode.INTERNAL_ERROR,
-                    reason="Internal server error. Traceback included in previous frame.",
-                )
+                try:
+                    # Try new websockets API first
+                    await websocket.close(
+                        code=websockets.frames.CloseCode.INTERNAL_ERROR,
+                        reason="Internal server error. Traceback included in previous frame.",
+                    )
+                except AttributeError:
+                    # Fallback for older websockets versions
+                    await websocket.close(code=1011, reason="Internal server error")
                 raise
 
 
-def _health_check(connection: _server.ServerConnection, request: _server.Request) -> _server.Response | None:
-    if request.path == "/healthz":
-        return connection.respond(http.HTTPStatus.OK, "OK\n")
+def _health_check(connection, request) -> Optional[Any]:
+    if hasattr(request, 'path') and request.path == "/healthz":
+        if hasattr(connection, 'respond'):
+            return connection.respond(http.HTTPStatus.OK, "OK\n")
+        else:
+            # For older websockets versions, return a simple response
+            return http.HTTPStatus.OK, {"Content-Type": "text/plain"}, b"OK\n"
     # Continue with the normal request handling.
     return None
 

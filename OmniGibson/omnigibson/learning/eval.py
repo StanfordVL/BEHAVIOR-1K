@@ -275,7 +275,7 @@ if __name__ == "__main__":
 
     gm.HEADLESS = config.headless
 
-    video_path = Path(config.log_path)
+    video_path = Path(config.log_path).expanduser()
     video_path.mkdir(parents=True, exist_ok=True)
 
     instances_to_run = config.task.train_indices if config.task.test_on_train_indices else config.task.test_indices

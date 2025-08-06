@@ -1,7 +1,7 @@
 # @package _global_
 
 policy_name: dummy 
-log_path: /home/svl/Documents/logs/dummy
+log_path: ~/Documents/logs/dummy
 
 model:
   _target_: omnigibson.learning.policies.DummyPolicy
