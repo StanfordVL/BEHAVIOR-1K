@@ -10,4 +10,4 @@ action_keys: [arm, gripper]
 action_key_dims:
   arm: 6
   gripper: 1
-controllers:
+controllers:  # Can be overwritten by policy

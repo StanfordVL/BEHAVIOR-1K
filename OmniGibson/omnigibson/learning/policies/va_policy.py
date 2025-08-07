@@ -196,6 +196,6 @@ class VisionActionILPolicy(BasePolicy):
                         ).unsqueeze(0).unsqueeze(0).to(th.float32)
                     else:
                         # If no range is provided, just use the raw data
-                        processed_obs["task"] = obs[key].unsqueeze(0).unsqueeze(0).to(th.float32)
+                        processed_obs["task"] = self._post_processing_fn(obs[key].unsqueeze(0).unsqueeze(0).to(th.float32))
                     break
         return processed_obs
