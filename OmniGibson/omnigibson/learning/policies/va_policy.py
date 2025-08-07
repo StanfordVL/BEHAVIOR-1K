@@ -2,6 +2,7 @@ import logging
 import torch as th
 import torch.nn.functional as F
 from collections import deque
+from omegaconf import OmegaConf, ListConfig
 from omnigibson.learning.policies.policy_base import BasePolicy
 from omnigibson.learning.utils.array_tensor_utils import any_concat
 from omnigibson.learning.utils.eval_utils import (
@@ -9,7 +10,8 @@ from omnigibson.learning.utils.eval_utils import (
     PROPRIO_QPOS_INDICES, 
     JOINT_RANGE, 
     ROBOT_CAMERA_NAMES, 
-    CAMERA_INTRINSICS
+    CAMERA_INTRINSICS,
+    EEF_POSITION_RANGE
 )
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
 from omnigibson.learning.utils.obs_utils import process_fused_point_cloud
@@ -32,6 +34,8 @@ class VisionActionILPolicy(BasePolicy):
         obs_window_size: int = 1,
         obs_output_size: Dict[str, List[int]],
         visual_obs_types: List[str],
+        use_task_info: bool = False,
+        task_info_range: Optional[ListConfig] = None,
         pcd_range: List[float],
         robot_type: str = "R1Pro",
         # ====== other args for base class ======
@@ -58,6 +62,8 @@ class VisionActionILPolicy(BasePolicy):
         assert set(visual_obs_types).issubset({"rgb", "depth_linear", "seg_instance_id", "pcd"}), \
             "visual_obs_types must be a subset of {'rgb', 'depth_linear', 'seg_instance_id', 'pcd'}!"
         self.visual_obs_types = visual_obs_types
+        self._use_task_info = use_task_info
+        self._task_info_range = th.tensor(OmegaConf.to_container(task_info_range)) if task_info_range is not None else None
         # store camera intrinsics
         self.camera_intrinsics = dict()
         for camera_id, camera_name in ROBOT_CAMERA_NAMES[self.robot_type].items():
@@ -102,7 +108,7 @@ class VisionActionILPolicy(BasePolicy):
 
     def process_obs(self, obs: dict) -> dict:
         # Expand twice to get B and T_A dimensions
-        processed_obs = {"qpos": dict()}
+        processed_obs = {"qpos": dict(), "eef": dict()}
         if self._robot_name is None:
             for key in obs:
                 if "proprio" in key:
@@ -128,6 +134,15 @@ class VisionActionILPolicy(BasePolicy):
                 processed_obs["qpos"][key] = self._post_processing_fn(2 * (
                     proprio[..., PROPRIO_QPOS_INDICES[self.robot_type][key]] - JOINT_RANGE[self.robot_type][key][0]
                 ) / (JOINT_RANGE[self.robot_type][key][1] - JOINT_RANGE[self.robot_type][key][0]) - 1.0)
+        for key in EEF_POSITION_RANGE[self.robot_type]:
+            processed_obs["eef"][f"{key}_pos"] = self._post_processing_fn(
+                2 * (proprio[..., PROPRIOCEPTION_INDICES[self.robot_type][f"eef_{key}_pos"]] - EEF_POSITION_RANGE[self.robot_type][key][0]) /
+                (EEF_POSITION_RANGE[self.robot_type][key][1] - EEF_POSITION_RANGE[self.robot_type][key][0]) - 1.0
+            )
+            # don't normalize the eef orientation
+            processed_obs["eef"][f"{key}_quat"] = self._post_processing_fn(
+                proprio[..., PROPRIOCEPTION_INDICES[self.robot_type][f"eef_{key}_quat"]]
+            )
         if "pcd" in self.visual_obs_types:
             pcd_obs = dict()
         for camera_id, camera in ROBOT_CAMERA_NAMES[self.robot_type].items():
@@ -170,5 +185,12 @@ class VisionActionILPolicy(BasePolicy):
                 pcd_num_points=4096,
                 use_fps=True,
             )[0])
-            
+        if self._use_task_info:
+            processed_obs["task"] = dict()
+            for key in obs:
+                if key.startswith("task::"):
+                    processed_obs["task"] = self._post_processing_fn(2 * (obs[key] - self._task_info_range[0]) /
+                        (self._task_info_range[1] - self._task_info_range[0]) - 1.0
+                    ).unsqueeze(0).unsqueeze(0).to(th.float32)
+                    break
         return processed_obs

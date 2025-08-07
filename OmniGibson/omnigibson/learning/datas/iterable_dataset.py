@@ -2,7 +2,7 @@ import h5py
 import numpy as np
 import os
 import pandas as pd
-import torch
+import torch as th
 import torch.distributed as dist
 from copy import deepcopy
 from omnigibson.learning.utils.array_tensor_utils import (
@@ -14,8 +14,9 @@ from omnigibson.learning.utils.array_tensor_utils import (
     sequential_sum_balanced_partitioning
 )
 from torch.utils.data import IterableDataset, get_worker_info
+from omegaconf import OmegaConf, ListConfig
 from omnigibson.learning.utils.eval_utils import (
-    ACTION_QPOS_INDICES, JOINT_RANGE, PROPRIO_QPOS_INDICES, PROPRIOCEPTION_INDICES, TASK_NAMES_TO_INDICES
+    ACTION_QPOS_INDICES, JOINT_RANGE, PROPRIO_QPOS_INDICES, PROPRIOCEPTION_INDICES, TASK_NAMES_TO_INDICES, EEF_POSITION_RANGE
 )
 from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
@@ -51,7 +52,8 @@ class BehaviorIterableDataset(IterableDataset):
         downsample_factor: int = 1,
         visual_obs_types: List[str],
         multi_view_cameras: Optional[Dict[str, Any]] = None,
-        load_task_info: bool = False,
+        use_task_info: bool = False,
+        task_info_range: Optional[ListConfig] = None,
         seed: int = 42,
         shuffle: bool = True,
         # dataset parameters
@@ -77,7 +79,8 @@ class BehaviorIterableDataset(IterableDataset):
             visual_obs_types (List[str]): List of visual observation types to load.
                 Valid options are: "rgb", "depth", "seg".
             multi_view_cameras (Optional[Dict[str, Any]]): Dict of id-camera pairs to load obs from.
-            load_task_info (bool): Whether to load privileged task information.
+            use_task_info (bool): Whether to load privileged task information.
+            task_info_range (Optional[ListConfig]): Range of the task information (for normalization).
             seed (int): Random seed.
             shuffle (bool): Whether to shuffle the dataset.
             use_gt_pcd (bool): Whether to use ground truth point clouds (as opposed to video-generated ones).
@@ -95,7 +98,8 @@ class BehaviorIterableDataset(IterableDataset):
             "action_prediction_horizon must be provided if use_action_chunks is True!"
         self._downsample_factor = downsample_factor
         assert self._downsample_factor >= 1, "downsample_factor must be >= 1!"
-        self._load_task_info = load_task_info
+        self._use_task_info = use_task_info
+        self._task_info_range = th.tensor(OmegaConf.to_container(task_info_range)) if task_info_range is not None else None
         self._seed = seed
         self._shuffle = shuffle
         self._epoch = 0
@@ -128,9 +132,9 @@ class BehaviorIterableDataset(IterableDataset):
         self._epoch = epoch
         if self._shuffle:
             # deterministically shuffle the demos
-            g = torch.Generator()
+            g = th.Generator()
             g.manual_seed(epoch + self._seed)
-            self._demo_indices = torch.randperm(len(self._demo_keys), generator=g).tolist()
+            self._demo_indices = th.randperm(len(self._demo_keys), generator=g).tolist()
 
     def __iter__(self) -> Generator[Dict[str, Any], None, None]:
         global_worker_id, total_global_workers = self._get_global_worker_id()
@@ -205,7 +209,7 @@ class BehaviorIterableDataset(IterableDataset):
             demo (dict): Preloaded demo.
         """
         demo = dict()
-        demo["obs"] = {"qpos": dict()}
+        demo["obs"] = {"qpos": dict(), "eef": dict()}
         # load low_dim data
         action_dict = dict()
         low_dim_data = self._extract_low_dim_data(demo_key)
@@ -221,8 +225,8 @@ class BehaviorIterableDataset(IterableDataset):
                 for key in PROPRIO_QPOS_INDICES[self._robot_type]:
                     if "gripper" in key:
                         # rectify gripper actions to {-1, 1}
-                        demo["obs"]["qpos"][key] = torch.mean(data[..., PROPRIO_QPOS_INDICES[self._robot_type][key]], dim=-1, keepdim=True)
-                        demo["obs"]["qpos"][key] = torch.where(
+                        demo["obs"]["qpos"][key] = th.mean(data[..., PROPRIO_QPOS_INDICES[self._robot_type][key]], dim=-1, keepdim=True)
+                        demo["obs"]["qpos"][key] = th.where(
                             demo["obs"]["qpos"][key] > (JOINT_RANGE[self._robot_type][key][0] + JOINT_RANGE[self._robot_type][key][1]) / 2, 1.0, -1.0
                         )
                     else:
@@ -230,13 +234,19 @@ class BehaviorIterableDataset(IterableDataset):
                         demo["obs"]["qpos"][key] = 2 * (
                             data[..., PROPRIO_QPOS_INDICES[self._robot_type][key]] - JOINT_RANGE[self._robot_type][key][0]
                         ) / (JOINT_RANGE[self._robot_type][key][1] - JOINT_RANGE[self._robot_type][key][0]) - 1.0
+                for key in EEF_POSITION_RANGE[self._robot_type]:
+                    demo["obs"]["eef"][f"{key}_pos"] = 2 * (
+                        data[..., PROPRIOCEPTION_INDICES[self._robot_type][f"eef_{key}_pos"]] - EEF_POSITION_RANGE[self._robot_type][key][0]
+                    ) / (EEF_POSITION_RANGE[self._robot_type][key][1] - EEF_POSITION_RANGE[self._robot_type][key][0]) - 1.0
+                    # don't normalize the eef orientation
+                    demo["obs"]["eef"][f"{key}_quat"] = data[..., PROPRIOCEPTION_INDICES[self._robot_type][f"eef_{key}_quat"]]
             elif key == "action":
                 # Note that we need to take the action at the timestamp before the next observation
                 # First pad the action array so that it is divisible by the downsample factor
                 if data.shape[0] % self._downsample_factor != 0:
                     pad_size = self._downsample_factor - (data.shape[0] % self._downsample_factor)
                     # pad with the last action
-                    data = torch.cat([data, data[-1:].repeat(pad_size, 1)], dim=0)
+                    data = th.cat([data, data[-1:].repeat(pad_size, 1)], dim=0)
                 # Now downsample the action array
                 data = data[self._downsample_factor - 1::self._downsample_factor]
                 for key, indices in ACTION_QPOS_INDICES[self._robot_type].items():
@@ -258,8 +268,8 @@ class BehaviorIterableDataset(IterableDataset):
                         pad_size = self._action_prediction_horizon - action_chunk_size
                         mask = any_concat(
                             [
-                                torch.ones((action_chunk_size,), dtype=torch.bool),
-                                torch.zeros((pad_size,), dtype=torch.bool),
+                                th.ones((action_chunk_size,), dtype=th.bool),
+                                th.zeros((pad_size,), dtype=th.bool),
                             ],
                             dim=0,
                         )  # (L_pred_horizon,)
@@ -273,29 +283,30 @@ class BehaviorIterableDataset(IterableDataset):
                         action_chunks.append(action_chunk)
                         action_chunk_masks.append(mask)
                     action_chunks = any_stack(action_chunks, dim=0)  # (T, L_pred_horizon, A)
-                    action_chunk_masks = torch.stack(action_chunk_masks, dim=0)  # (T, L_pred_horizon)
+                    action_chunk_masks = th.stack(action_chunk_masks, dim=0)  # (T, L_pred_horizon)
                     demo["actions"] = action_chunks
                     demo["action_masks"] = action_chunk_masks
                 else:
                     demo["actions"] = action_dict
+            elif key == "task":
+                demo["obs"]["task"] = 2 * (data - self._task_info_range[0]) / (self._task_info_range[1] - self._task_info_range[0]) - 1.0
             else:
+                # For other keys, just store the data as is
                 demo["obs"][key] = data
-
         return demo
 
-    def _extract_low_dim_data(self, demo_key: Any) -> Dict[str, torch.Tensor]:
+    def _extract_low_dim_data(self, demo_key: Any) -> Dict[str, th.Tensor]:
         df = pd.read_parquet(os.path.join(self._data_path, "data", f"task-{self._task_id:04d}", f"episode_{demo_key}.parquet"))
         ret = {
-            "proprio": torch.from_numpy(np.array(df["observation.state"][::self._downsample_factor].tolist(), dtype=np.float32)),
-            "action": torch.from_numpy(np.array(df["action"].tolist(), dtype=np.float32)),
-            "cam_rel_poses": torch.from_numpy(np.array(df["observation.cam_rel_poses"][::self._downsample_factor].tolist(), dtype=np.float32)),
+            "proprio": th.from_numpy(np.array(df["observation.state"][::self._downsample_factor].tolist(), dtype=np.float32)),
+            "action": th.from_numpy(np.array(df["action"].tolist(), dtype=np.float32)),
+            "cam_rel_poses": th.from_numpy(np.array(df["observation.cam_rel_poses"][::self._downsample_factor].tolist(), dtype=np.float32)),
         }
-        if self._load_task_info:
-            ret["task"] = torch.from_numpy(np.array(df["observation.task_info"][::self._downsample_factor].tolist(), dtype=np.float32))
-
+        if self._use_task_info:
+            ret["task"] = th.from_numpy(np.array(df["observation.task_info"][::self._downsample_factor].tolist(), dtype=np.float32))
         return ret
 
-    def _chunk_demo(self, demo_ptr: int, start_idx: int, end_idx: int) -> Generator[Tuple[dict, torch.Tensor], None, None]:
+    def _chunk_demo(self, demo_ptr: int, start_idx: int, end_idx: int) -> Generator[Tuple[dict, th.Tensor], None, None]:
         demo = self._all_demos[demo_ptr]
         # split obs into chunks
         for chunk_idx in range(start_idx, end_idx):
@@ -319,9 +330,9 @@ class BehaviorIterableDataset(IterableDataset):
                             + [any_ones_like(any_slice(data[k], np.s_[0:1]))] * pad_size,
                             dim=0,
                         )
-                        mask = torch.cat([
-                            torch.ones((action_chunk_size,), dtype=torch.bool),
-                            torch.zeros((pad_size,), dtype=torch.bool),
+                        mask = th.cat([
+                            th.ones((action_chunk_size,), dtype=th.bool),
+                            th.zeros((pad_size,), dtype=th.bool),
                         ], dim=0)
                 elif k != "action_masks":
                     data[k] = any_slice(demo[k], s)
@@ -344,9 +355,9 @@ class BehaviorIterableDataset(IterableDataset):
             total_global_workers = worker_info.num_workers if worker_info else 1
         return global_worker_id, total_global_workers
     
-    def _h5_window_generator(self, df: h5py.Dataset, start_idx: int, end_idx: int) -> Generator[torch.Tensor, None, None]:
+    def _h5_window_generator(self, df: h5py.Dataset, start_idx: int, end_idx: int) -> Generator[th.Tensor, None, None]:
         for i in range(start_idx, end_idx):
-            yield torch.from_numpy(
+            yield th.from_numpy(
                 df[i * self._downsample_factor : (i + self._obs_window_size) * self._downsample_factor : self._downsample_factor]
             )
 

@@ -173,6 +173,26 @@ JOINT_RANGE = {
 }
 
 
+EEF_POSITION_RANGE = {
+    "A1": {
+        "0": (
+            th.tensor([0.0, -0.7, 0.0], dtype=th.float32),
+            th.tensor([0.7, 0.7, 0.7], dtype=th.float32)
+        ),
+    },
+    "R1Pro": {
+        "left": (
+            th.tensor([0.0, -0.65, 0.0], dtype=th.float32),
+            th.tensor([0.65, 0.65, 2.5], dtype=th.float32)
+        ),
+        "right": (
+            th.tensor([0.0, -0.65, 0.0], dtype=th.float32),
+            th.tensor([0.65, 0.65, 2.5], dtype=th.float32)
+        ),
+    }
+}
+
+
 TASK_NAMES_TO_INDICES = {
     "turning_on_radio": 0,
     "picking_up_trash": 1,
