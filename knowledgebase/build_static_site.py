@@ -180,7 +180,8 @@ def collect_model_pages(model, pages_to_generate):
             'view': {'model': model}
         }
         pk_value = getattr(obj, pk)
-        output_path = f'{model_plural}/{pk_value}.html'
+        # Ensure output path includes knowledgebase/ prefix to match URL structure
+        output_path = f'knowledgebase/{model_plural}/{pk_value}.html'
         pages_to_generate.append(
             (f'{model_snake}_detail', f'{model_snake}_detail.html', detail_context, output_path)
         )
@@ -210,7 +211,8 @@ def collect_custom_views(pages_to_generate):
                 
                 # Determine template
                 template_name = f'{model_snake}_list.html'
-                output_path = f'{view_name}_{model_plural}/index.html'
+                # Ensure output path includes knowledgebase/ prefix to match URL structure
+                output_path = f'knowledgebase/{view_name}_{model_plural}/index.html'
                 
                 pages_to_generate.append(
                     (f'{view_name}_{model_plural}', template_name, context, output_path)
@@ -253,9 +255,15 @@ def generate_page(page_info: tuple, env: Environment) -> Tuple[str, str]:
     """Generate a single page."""
     if len(page_info) == 3:
         endpoint, template_name, context = page_info
-        output_path = url_for(endpoint).replace('/knowledgebase/', '')
+        # Convert URL path to file path, keeping the /knowledgebase/ prefix
+        url_path = url_for(endpoint)
+        # Keep the knowledgebase/ prefix in the file path
+        output_path = url_path.replace('/knowledgebase/', 'knowledgebase/')
     else:
         endpoint, template_name, context, output_path = page_info
+        # Ensure output path is consistent with knowledgebase/ structure
+        if not output_path.startswith('knowledgebase/'):
+            output_path = f'knowledgebase/{output_path}'
     
     # Render template
     template = env.get_template(template_name)
@@ -304,7 +312,7 @@ def generate_searchable_items() -> Tuple[str, str]:
                 'url': url_for(f'{model_snake}_detail', **{pk: pk_value})
             })
     
-    return 'searchable_items.json', json.dumps(items, indent=2)
+    return 'knowledgebase/searchable_items.json', json.dumps(items, indent=2)
 
 def generate_profile_assets():
     """Generate profile badge and plot."""
@@ -314,7 +322,7 @@ def generate_profile_assets():
     try:
         badge_svg = get_profile_badge_svg()
         if badge_svg:
-            assets.append(('profile/badge.svg', badge_svg))
+            assets.append(('knowledgebase/profile/badge.svg', badge_svg))
     except Exception as e:
         print(f"Warning: Could not generate profile badge: {e}")
     
@@ -322,7 +330,7 @@ def generate_profile_assets():
     try:
         plot_png = get_profile_plot_png()
         if plot_png:
-            assets.append(('profile/plot.png', plot_png))
+            assets.append(('knowledgebase/profile/plot.png', plot_png))
     except Exception as e:
         print(f"Warning: Could not generate profile plot: {e}")
     
