@@ -9,4 +9,5 @@ model:
   host: 10.79.12.59
   port: 8000
   text_prompt: pick up the trash
+  use_task_info: false
   control_mode: receeding_temporal

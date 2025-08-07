@@ -17,4 +17,5 @@ model:
     right_wrist: [120, 120]
     head: [180, 180]
   visual_obs_types: ["rgb"]
+  use_task_info: false
   pcd_range: ${task.pcd_range}

@@ -1,8 +1,8 @@
 defaults:
   - _self_  # all below configs will override this conf.yaml
+  - robot: r1pro
   - policy: ???
   - task: ???
-  - robot: r1pro
 
 policy_name: ???  # filled by policy
 headless: true

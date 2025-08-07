@@ -9,4 +9,5 @@ model:
   host: 0.0.0.0
   port: 8777
   text_prompt: pick up the trash
+  use_task_info: false
   control_mode: receeding_temporal

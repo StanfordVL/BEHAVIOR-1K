@@ -189,8 +189,13 @@ class VisionActionILPolicy(BasePolicy):
             processed_obs["task"] = dict()
             for key in obs:
                 if key.startswith("task::"):
-                    processed_obs["task"] = self._post_processing_fn(2 * (obs[key] - self._task_info_range[0]) /
-                        (self._task_info_range[1] - self._task_info_range[0]) - 1.0
-                    ).unsqueeze(0).unsqueeze(0).to(th.float32)
+                    if self._task_info_range is not None:
+                        # Normalize task info to [-1, 1]
+                        processed_obs["task"] = self._post_processing_fn(2 * (obs[key] - self._task_info_range[0]) /
+                            (self._task_info_range[1] - self._task_info_range[0]) - 1.0
+                        ).unsqueeze(0).unsqueeze(0).to(th.float32)
+                    else:
+                        # If no range is provided, just use the raw data
+                        processed_obs["task"] = obs[key].unsqueeze(0).unsqueeze(0).to(th.float32)
                     break
         return processed_obs

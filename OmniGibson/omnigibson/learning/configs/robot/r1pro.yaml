@@ -17,4 +17,4 @@ action_key_dims:
   left_gripper: 1
   right_arm: 7
   right_gripper: 1
-controllers:
+controllers:  # Can be overwritten by policy

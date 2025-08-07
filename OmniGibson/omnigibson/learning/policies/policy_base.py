@@ -12,7 +12,7 @@ class BasePolicy(ABC):
     """
 
     def __init__(self, robot_type: str, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self.robot_type = robot_type
 
     @classmethod

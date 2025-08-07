@@ -289,7 +289,12 @@ class BehaviorIterableDataset(IterableDataset):
                 else:
                     demo["actions"] = action_dict
             elif key == "task":
-                demo["obs"]["task"] = 2 * (data - self._task_info_range[0]) / (self._task_info_range[1] - self._task_info_range[0]) - 1.0
+                if self._task_info_range is not None:
+                    # Normalize task info to [-1, 1]
+                    demo["obs"]["task"] = 2 * (data - self._task_info_range[0]) / (self._task_info_range[1] - self._task_info_range[0]) - 1.0
+                else:
+                    # If no range is provided, just use the raw data
+                    demo["obs"]["task"] = data
             else:
                 # For other keys, just store the data as is
                 demo["obs"][key] = data
