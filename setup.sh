@@ -9,6 +9,7 @@ BDDL=false
 TELEOP=false
 DATASET=false
 PRIMITIVES=false
+EVAL=false
 DEV=false
 CUDA_VERSION="12.4"
 ACCEPT_CONDA_TOS=false
@@ -26,6 +27,7 @@ while [[ $# -gt 0 ]]; do
         --teleop) TELEOP=true; shift ;;
         --dataset) DATASET=true; shift ;;
         --primitives) PRIMITIVES=true; shift ;;
+        --eval) EVAL=true; shift ;;
         --dev) DEV=true; shift ;;
         --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
@@ -48,6 +50,7 @@ Options:
   --teleop                Install JoyLo (teleoperation interface)
   --dataset               Download BEHAVIOR datasets (requires --omnigibson)
   --primitives            Install OmniGibson with primitives support
+  --eval                  Install evaluation dependencies
   --dev                   Install development dependencies
   --cuda-version VERSION  Specify CUDA version (default: 12.4)
   --accept-conda-tos      Automatically accept Conda Terms of Service
@@ -64,6 +67,7 @@ fi
 [ "$OMNIGIBSON" = true ] && [ "$BDDL" = false ] && { echo "ERROR: --omnigibson requires --bddl"; exit 1; }
 [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --dataset requires --omnigibson"; exit 1; }
 [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --primitives requires --omnigibson"; exit 1; }
+[ "$EVAL" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --eval requires --omnigibson"; exit 1; }
 
 WORKDIR=$(pwd)
 
@@ -195,8 +199,6 @@ if [ "$NEW_ENV" = true ]; then
     CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.6 to 126
     
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
-    pip install torch-cluster -f https://data.pyg.org/whl/torch-2.6.0+cu${CUDA_VER_SHORT}.html
-
     echo "✓ PyTorch installation completed"
 fi
 # Install BDDL
@@ -371,12 +373,22 @@ if [ "$TELEOP" = true ]; then
     pip install -e "$WORKDIR/joylo"
 fi
 
+if [ "$EVAL" = true ]; then
+    # get torch version via pip and install corresponding torch-cluster
+    TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
+    pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
+    # install av and ffmpeg
+    conda install av -c conda-forge -y
+fi
+
 echo ""
 echo "=== Installation Complete! ==="
 [ "$NEW_ENV" = true ] && echo "✓ Created conda environment 'behavior'"
 [ "$OMNIGIBSON" = true ] && echo "✓ Installed OmniGibson + Isaac Sim"
 [ "$BDDL" = true ] && echo "✓ Installed BDDL"
 [ "$TELEOP" = true ] && echo "✓ Installed JoyLo"
+[ "$PRIMITIVES" = true ] && echo "✓ Installed primitives support"
+[ "$EVAL" = true ] && echo "✓ Installed evaluation support"
 [ "$DATASET" = true ] && echo "✓ Downloaded datasets"
 echo ""
 [ "$NEW_ENV" = true ] && echo "To activate: conda activate behavior"
