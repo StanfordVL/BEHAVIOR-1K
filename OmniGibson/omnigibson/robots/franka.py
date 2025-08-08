@@ -282,12 +282,8 @@ class FrankaPanda(ManipulationRobot):
     @property
     def urdf_path(self):
         # Only supported for normal franka now
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda has urdf currently. Got: {self._model_name}"
-        return (
-            os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
-        )
+        assert self._model_name == "franka_panda", f"Only franka_panda has urdf currently. Got: {self._model_name}"
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
 
     @property
     def curobo_path(self):
