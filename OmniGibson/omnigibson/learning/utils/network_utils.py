@@ -1,6 +1,7 @@
 """
 Adapted from https://github.com/Physical-Intelligence/openpi
 """
+
 import asyncio
 import functools
 import http
@@ -12,6 +13,7 @@ import torch as th
 import traceback
 import websockets.sync.client
 import websockets
+
 try:
     import websockets.asyncio.server as _server
 except ImportError:
@@ -154,8 +156,8 @@ class WebsocketPolicyServer:
 
 
 def _health_check(connection, request) -> Optional[Any]:
-    if hasattr(request, 'path') and request.path == "/healthz":
-        if hasattr(connection, 'respond'):
+    if hasattr(request, "path") and request.path == "/healthz":
+        if hasattr(connection, "respond"):
             return connection.respond(http.HTTPStatus.OK, "OK\n")
         else:
             # For older websockets versions, return a simple response
@@ -178,6 +180,7 @@ msgpack is good for (de)serializing data over a network for multiple reasons:
 The code below is adapted from https://github.com/lebedov/msgpack-numpy. The reason not to use that library directly is
 that it falls back to pickle for object arrays.
 """
+
 
 def pack_array(obj):
     if (isinstance(obj, (np.ndarray, np.generic))) and obj.dtype.kind in ("V", "O", "c"):

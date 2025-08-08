@@ -30,20 +30,17 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
     LerobotDatasetMetadata with the following customizations:
         1. Custom task names mapping to indices.
     """
-    def __init__(
-        self,
-        *args,
-        modalities: Iterable[str] = None,
-        cameras: Iterable[str] = None,
-        **kwargs
-    ):
+
+    def __init__(self, *args, modalities: Iterable[str] = None, cameras: Iterable[str] = None, **kwargs):
         super().__init__(*args, **kwargs)
         self.modalities = set(modalities)
         self.camera_names = set(cameras)
-        assert self.modalities.issubset({"rgb", "depth", "seg_instance_id"}), \
-            f"Modalities must be a subset of ['rgb', 'depth', 'seg_instance_id'], but got {self.modalities}"
-        assert self.camera_names.issubset(ROBOT_CAMERA_NAMES["R1Pro"]), \
-            f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
+        assert self.modalities.issubset(
+            {"rgb", "depth", "seg_instance_id"}
+        ), f"Modalities must be a subset of ['rgb', 'depth', 'seg_instance_id'], but got {self.modalities}"
+        assert self.camera_names.issubset(
+            ROBOT_CAMERA_NAMES["R1Pro"]
+        ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
 
     @property
     def features(self) -> dict[str, dict]:
@@ -51,8 +48,11 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         features = dict()
         # pop not required features
         for name in self.info["features"].keys():
-            if name.startswith("observation.images.") \
-                and name.split(".")[-1] in self.camera_names and name.split(".")[-2] in self.modalities:
+            if (
+                name.startswith("observation.images.")
+                and name.split(".")[-1] in self.camera_names
+                and name.split(".")[-2] in self.modalities
+            ):
                 features[name] = self.info["features"][name]
         return features
 
@@ -60,8 +60,9 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
 class BehaviorLeRobotDataset(LeRobotDataset):
     """
     LeRobotDataset with the following customizations:
-        1. Custom chunking logic based on 
+        1. Custom chunking logic based on
     """
+
     def __init__(
         self,
         repo_id: str,
@@ -74,7 +75,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         force_cache_sync: bool = False,
         download_videos: bool = True,
         video_backend: str | None = "pyav",
-
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
@@ -108,8 +108,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # ========== Customizations ==========
         # Load metadata
         self.meta = BehaviorLerobotDatasetMetadata(
-            repo_id=self.repo_id, root=self.root, revision=self.revision, force_cache_sync=force_cache_sync,
-            modalities=modalities, cameras=cameras
+            repo_id=self.repo_id,
+            root=self.root,
+            revision=self.revision,
+            force_cache_sync=force_cache_sync,
+            modalities=modalities,
+            cameras=cameras,
         )
         self.tasks_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
         # overwrite episode based on task
@@ -165,7 +169,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
 
 def generate_task_json(data_dir: str) -> int:
     num_tasks = len(TASK_NAMES_TO_INDICES)
-    
+
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
         for task_name, task_index in TASK_NAMES_TO_INDICES.items():
             json.dump({"task_index": task_index, "task": task_name}, f)
@@ -192,7 +196,7 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                         episode_json = {
                             "episode_index": episode_index,
                             "tasks": [task_name],
-                            "length": episode_info["num_samples"]
+                            "length": episode_info["num_samples"],
                         }
                         episode_stats_json = {
                             "episode_index": episode_index,
@@ -203,9 +207,9 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                                     "max": np.array([episode_info["num_samples"]]).tolist(),
                                     "mean": np.array([episode_info["num_samples"]]).tolist(),
                                     "std": np.array([episode_info["num_samples"]]).tolist(),
-                                    "count": np.array([episode_info["num_samples"]]).tolist()
+                                    "count": np.array([episode_info["num_samples"]]).tolist(),
                                 }
-                            }
+                            },
                         }
                         num_episodes += 1
                         num_frames += episode_info["num_samples"]
@@ -221,7 +225,7 @@ def generate_info_json(
     fps: int = 30,
     total_episodes: int = 50,
     total_tasks: int = 50,
-    total_frames: int = 50, 
+    total_frames: int = 50,
 ):
     info = {
         "codebase_version": "v2.1",
@@ -240,16 +244,8 @@ def generate_info_json(
         "features": {
             "observation.images.rgb.left_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "rgb"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -258,21 +254,13 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
                     "video.is_depth_map": False,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.rgb.right_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "rgb"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -281,21 +269,13 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
                     "video.is_depth_map": False,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.rgb.head": {
                 "dtype": "video",
-                "shape": [
-                    720,
-                    720,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "rgb"
-                ],
+                "shape": [720, 720, 3],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 720,
@@ -304,21 +284,13 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
                     "video.is_depth_map": False,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.depth.left_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "depth"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "depth"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -327,21 +299,13 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p16le",
                     "video.is_depth_map": True,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.depth.right_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "depth"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "depth"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -350,21 +314,13 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p16le",
                     "video.is_depth_map": True,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.depth.head": {
                 "dtype": "video",
-                "shape": [
-                    720,
-                    720,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "depth"
-                ],
+                "shape": [720, 720, 3],
+                "names": ["height", "width", "depth"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 720,
@@ -373,116 +329,58 @@ def generate_info_json(
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p16le",
                     "video.is_depth_map": True,
-                    "has_audio": False
-                }
+                    "has_audio": False,
+                },
             },
             "observation.images.seg_instance_id.left_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "seg_instance_id"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "seg_instance_id"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
                     "video.width": 480,
                     "video.channels": 3,
                     "video.codec": "libx265",
-                    "video.pix_fmt": "yuv420p", 
-                    "has_audio": False
-                }
+                    "video.pix_fmt": "yuv420p",
+                    "has_audio": False,
+                },
             },
             "observation.images.seg_instance_id.right_wrist": {
                 "dtype": "video",
-                "shape": [
-                    480,
-                    480,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "seg_instance_id"
-                ],
+                "shape": [480, 480, 3],
+                "names": ["height", "width", "seg_instance_id"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
                     "video.width": 480,
                     "video.channels": 3,
                     "video.codec": "libx265",
-                    "video.pix_fmt": "yuv420p", 
-                    "has_audio": False
-                }
+                    "video.pix_fmt": "yuv420p",
+                    "has_audio": False,
+                },
             },
             "observation.images.seg_instance_id.head": {
                 "dtype": "video",
-                "shape": [
-                    720,
-                    720,
-                    3
-                ],
-                "names": [
-                    "height",
-                    "width",
-                    "seg_instance_id"
-                ],
+                "shape": [720, 720, 3],
+                "names": ["height", "width", "seg_instance_id"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 720,
                     "video.width": 720,
                     "video.channels": 3,
                     "video.codec": "libx265",
-                    "video.pix_fmt": "yuv420p", 
-                    "has_audio": False
-                }
+                    "video.pix_fmt": "yuv420p",
+                    "has_audio": False,
+                },
             },
-            "action": {
-                "dtype": "float32",
-                "shape": [
-                    23
-                ],
-                "names": None
-            },
-            "timestamp": {
-                "dtype": "float64",
-                "shape": [
-                    1
-                ],
-                "names": None
-            },
-            "episode_index": {
-                "dtype": "int64",
-                "shape": [
-                    1
-                ],
-                "names": None
-            },
-            "index": {
-                "dtype": "int64",
-                "shape": [
-                    1
-                ],
-                "names": None
-            },
-            "observation.cam_rel_poses": {
-                "dtype": "float32",
-                "shape": [
-                    21
-                ],
-                "names": None
-            },
-            "observation.state": {
-                "dtype": "float32",
-                "shape": [None],
-                "names": None
-            },
-        }
+            "action": {"dtype": "float32", "shape": [23], "names": None},
+            "timestamp": {"dtype": "float64", "shape": [1], "names": None},
+            "episode_index": {"dtype": "int64", "shape": [1], "names": None},
+            "index": {"dtype": "int64", "shape": [1], "names": None},
+            "observation.cam_rel_poses": {"dtype": "float32", "shape": [21], "names": None},
+            "observation.state": {"dtype": "float32", "shape": [None], "names": None},
+        },
     }
 
     with open(f"{data_dir}/meta/info.json", "w") as f:
@@ -498,4 +396,6 @@ if __name__ == "__main__":
     num_episodes, num_frames = generate_episode_json(args.data_dir)
     print(num_tasks, num_episodes, num_frames)
 
-    generate_info_json(args.data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)
+    generate_info_json(
+        args.data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames
+    )

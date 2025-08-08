@@ -13,23 +13,21 @@ from typing import Dict, Optional, Tuple, Generator, List
 from omnigibson.utils.constants import semantic_class_name_to_id
 
 
-#==============================================
+# ==============================================
 # Depth
-#==============================================
+# ==============================================
 
 MIN_DEPTH = 0.0
 MAX_DEPTH = 10.0
 DEPTH_SHIFT = 3.5
 
+
 def quantize_depth(
-    depth: np.ndarray, 
-    min_depth: float = MIN_DEPTH, 
-    max_depth: float = MAX_DEPTH, 
-    shift: float=DEPTH_SHIFT
+    depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
 ) -> np.ndarray:
     """
     Quantizes depth values to a 14-bit range (0 to 16383) based on the specified min and max depth.
-    
+
     Args:
         depth (np.ndarray): Depth tensor.
         min_depth (float): Minimum depth value.
@@ -50,14 +48,11 @@ def quantize_depth(
 
 
 def dequantize_depth(
-    quantized_depth: np.ndarray, 
-    min_depth: float = MIN_DEPTH, 
-    max_depth: float = MAX_DEPTH, 
-    shift: float=DEPTH_SHIFT
+    quantized_depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
 ) -> np.ndarray:
     """
     Dequantizes a 14-bit depth tensor back to the original depth values.
-    
+
     Args:
         quantized_depth (np.ndarray): Quantized depth tensor.
         min_depth (float): Minimum depth value.
@@ -77,18 +72,19 @@ def dequantize_depth(
     return depth
 
 
-#==============================================
+# ==============================================
 # Video I/O
-#==============================================
+# ==============================================
+
 
 def create_video_writer(
-    fpath, 
-    resolution, 
-    codec_name="libx264", 
-    rate=30, 
+    fpath,
+    resolution,
+    codec_name="libx264",
+    rate=30,
     pix_fmt="yuv420p",
     stream_options=None,
-    context_options=None, 
+    context_options=None,
 ) -> Tuple[Container, Stream]:
     """
     Creates a video writer to write video frames to when playing back the dataset using PyAV
@@ -105,8 +101,10 @@ def create_video_writer(
         av.Container: PyAV container object that can be used to write video frames
         av.Stream: PyAV stream object that can be used to write video frames
     """
-    assert fpath.endswith(".mp4") or fpath.endswith(".mkv"), f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
-    container = av.open(fpath, mode='w')
+    assert fpath.endswith(".mp4") or fpath.endswith(
+        ".mkv"
+    ), f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
+    container = av.open(fpath, mode="w")
     stream = container.add_stream(codec_name, rate=rate)
     stream.height = resolution[0]
     stream.width = resolution[1]
@@ -116,6 +114,7 @@ def create_video_writer(
     if context_options is not None:
         stream.codec_context.options = context_options
     return container, stream
+
 
 def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> None:
     """
@@ -132,15 +131,15 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
     batch_size = batch_size or obs.shape[0]
     if mode == "rgb":
         for i in range(0, obs.shape[0], batch_size):
-            for frame in obs[i:i+batch_size]:
+            for frame in obs[i : i + batch_size]:
                 frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
                 for packet in stream.encode(frame):
                     container.mux(packet)
     elif mode == "depth":
         for i in range(0, obs.shape[0], batch_size):
-            quantized_depth = quantize_depth(obs[i:i+batch_size])
+            quantized_depth = quantize_depth(obs[i : i + batch_size])
             for frame in quantized_depth:
-                frame = av.VideoFrame.from_ndarray(frame, format='gray16le')
+                frame = av.VideoFrame.from_ndarray(frame, format="gray16le")
                 for packet in stream.encode(frame):
                     container.mux(packet)
     elif mode == "seg":
@@ -151,7 +150,7 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
         instance_id_to_idx = th.full((max_id,), -1, dtype=th.long)
         instance_id_to_idx[seg_ids] = th.arange(len(seg_ids))
         for i in range(0, obs.shape[0], batch_size):
-            seg_colored = palette[instance_id_to_idx[obs[i:i+batch_size]]].numpy()
+            seg_colored = palette[instance_id_to_idx[obs[i : i + batch_size]]].numpy()
             for frame in seg_colored:
                 frame = av.VideoFrame.from_ndarray(frame, format="rgb24")
                 for packet in stream.encode(frame):
@@ -159,13 +158,13 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
     elif mode == "bbox":
         bbox_2d_data = kwargs["bbox"]
         for i in range(0, obs.shape[0], batch_size):
-            for j, frame in enumerate(obs[i:i+batch_size].numpy()):
+            for j, frame in enumerate(obs[i : i + batch_size].numpy()):
                 # overlay bboxes with names
                 frame = overlay_bboxes_with_names(
-                    frame, 
-                    bbox_2d_data=bbox_2d_data[i+j], 
-                    instance_mapping=kwargs["instance_mapping"], 
-                    task_relevant_objects=kwargs["task_relevant_objects"]
+                    frame,
+                    bbox_2d_data=bbox_2d_data[i + j],
+                    instance_mapping=kwargs["instance_mapping"],
+                    task_relevant_objects=kwargs["task_relevant_objects"],
                 )
                 frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
                 for packet in stream.encode(frame):
@@ -176,17 +175,17 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
 
 class VideoLoader:
     def __init__(
-        self, 
+        self,
         path: str,
-        batch_size: Optional[int]=None, 
-        stride: int=1, 
-        output_size: Tuple[int, int]=(128, 128),
-        start_idx: int=0,
-        end_idx: Optional[int]=None,
-        fps: int=30,
-        downsample_factor: int=1,
-        *args, 
-        **kwargs
+        batch_size: Optional[int] = None,
+        stride: int = 1,
+        output_size: Tuple[int, int] = (128, 128),
+        start_idx: int = 0,
+        end_idx: Optional[int] = None,
+        fps: int = 30,
+        downsample_factor: int = 1,
+        *args,
+        **kwargs,
     ):
         """
         Sequentially load RGB video with robust frame extraction.
@@ -238,7 +237,7 @@ class VideoLoader:
                 # use downsample factor to skip frames
                 for _ in range(self._downsample_factor - 1):
                     next(self._frame_iter)
-                frame = next(self._frame_iter) 
+                frame = next(self._frame_iter)
                 processed_frame = self._process_single_frame(frame)
                 self._current_frame += 1
                 if self._current_frame == self._end_frame:
@@ -246,7 +245,7 @@ class VideoLoader:
                 self._frames.append(processed_frame)
                 if (self.batch_size and len(self._frames) == self.batch_size) or self._done:
                     batch = th.cat(self._frames, dim=0)
-                    self._frames = self._frames[self.stride:]
+                    self._frames = self._frames[self.stride :]
                     return batch
         except StopIteration:
             self._done = True
@@ -276,8 +275,9 @@ class VideoLoader:
                 if cur_frame == self._start_frame - 1:
                     return
                 elif cur_frame > self._start_frame - 1:
-                    raise ValueError(f"Start frame {self._start_frame} is beyond the video length. Current frame: {cur_frame}")
-
+                    raise ValueError(
+                        f"Start frame {self._start_frame} is beyond the video length. Current frame: {cur_frame}"
+                    )
 
     @property
     def frames(self) -> th.Tensor:
@@ -292,81 +292,51 @@ class VideoLoader:
 
 
 class RGBVideoLoader(VideoLoader):
-    def __init__(
-        self, 
-        data_path: str, 
-        task_id: int,
-        camera_id: str,
-        demo_id: str,
-        *args, 
-        **kwargs
-    ):
+    def __init__(self, data_path: str, task_id: int, camera_id: str, demo_id: str, *args, **kwargs):
         super().__init__(
             path=f"{data_path}/videos/task-{task_id:04d}/observation.images.rgb.{camera_id}/episode_{demo_id}.mp4",
-            *args, 
-            **kwargs
+            *args,
+            **kwargs,
         )
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
         rgb = F.interpolate(
-            th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), 
-            size=self.output_size, 
-            mode='nearest-exact'
-        ) 
+            th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), size=self.output_size, mode="nearest-exact"
+        )
         return rgb  # (1, 3, H, W)
 
 
 class DepthVideoLoader(VideoLoader):
-    def __init__(
-        self, 
-        data_path: str, 
-        task_id: int,
-        camera_id: str,
-        demo_id: str,
-        *args, 
-        **kwargs
-    ):
+    def __init__(self, data_path: str, task_id: int, camera_id: str, demo_id: str, *args, **kwargs):
         self.min_depth = kwargs.get("min_depth", MIN_DEPTH)
         self.max_depth = kwargs.get("max_depth", MAX_DEPTH)
         self.shift = kwargs.get("shift", DEPTH_SHIFT)
         super().__init__(
             path=f"{data_path}/videos/task-{task_id:04d}/observation.images.depth.{camera_id}/episode_{demo_id}.mp4",
-            *args, 
-            **kwargs
+            *args,
+            **kwargs,
         )
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         # Decode Y (luma) channel only; YUV420 → grayscale image
-        frame_gray16 = frame.reformat(format='gray16le').to_ndarray()  # (H, W)
-        depth = dequantize_depth(
-            frame_gray16,
-            min_depth=self.min_depth,
-            max_depth=self.max_depth,
-            shift=self.shift
-        )
+        frame_gray16 = frame.reformat(format="gray16le").to_ndarray()  # (H, W)
+        depth = dequantize_depth(frame_gray16, min_depth=self.min_depth, max_depth=self.max_depth, shift=self.shift)
         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-        depth = F.interpolate(depth, size=self.output_size, mode='nearest-exact')
-        return depth.squeeze(0) # (1, H, W)
+        depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
+        return depth.squeeze(0)  # (1, H, W)
+
 
 class SegVideoLoader(VideoLoader):
-    def __init__(
-        self, 
-        data_path: str, 
-        task_id: int,
-        camera_id: str,
-        demo_id: str,
-        *args, 
-        **kwargs
-    ):
+    def __init__(self, data_path: str, task_id: int, camera_id: str, demo_id: str, *args, **kwargs):
         self.id_list = kwargs.get("id_list", None)
         assert self.id_list is not None, "id_list must be provided for SegVideoLoader"
         self.id_list = self.id_list.to(device="cuda")  # (N_ids,)
         self.palette = th.from_numpy(generate_yuv_palette(len(self.id_list))).float().to(device="cuda")  # (N_ids, 3)
         super().__init__(
             path=f"{data_path}/videos/task-{task_id:04d}/observation.images.seg_instance_id.{camera_id}/episode_{demo_id}.mp4",
-            *args, 
-            **kwargs
+            *args,
+            **kwargs,
         )
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
@@ -376,7 +346,7 @@ class SegVideoLoader(VideoLoader):
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
         ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0)  # (1, H, W)
-        ids = F.interpolate(ids.unsqueeze(0), size=self.output_size, mode='nearest-exact')
+        ids = F.interpolate(ids.unsqueeze(0), size=self.output_size, mode="nearest-exact")
         return ids.squeeze(0).cpu().to(th.long)  # (1, H, W)
 
 
@@ -386,14 +356,15 @@ OBS_LOADER_MAP = {
     "seg_instance_id": SegVideoLoader,
 }
 
-#==============================================
+# ==============================================
 # Point Cloud
-#==============================================
+# ==============================================
+
 
 def depth_to_pcd(
     depth: th.Tensor,  # (B, [T], H, W)
-    rel_pose: th.Tensor,   # (B, [T], 7) relative pose from camera to base [pos, quat]
-    K: th.Tensor,      # (3, 3)
+    rel_pose: th.Tensor,  # (B, [T], 7) relative pose from camera to base [pos, quat]
+    K: th.Tensor,  # (3, 3)
 ) -> th.Tensor:
     """
     Convert depth images to point clouds with batch processing support.
@@ -415,7 +386,7 @@ def depth_to_pcd(
     rel_pos = rel_pose[:, :3]  # (B, 3)
     rel_quat = rel_pose[:, 3:]  # (B, 4)
     rel_rot = T.quat2mat(rel_quat)  # (B, 3, 3)
-    
+
     # # Add camera coordinate system adjustment (180 degree rotation around X-axis)
     rot_add = T.euler2mat(th.tensor([np.pi, 0, 0], device=device))  # (3, 3)
     rel_rot_matrix = th.matmul(rel_rot, rot_add)  # (B, 3, 3)
@@ -451,7 +422,7 @@ def depth_to_pcd(
 def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.Tensor]:
     """
     Downsample point clouds with batch FPS processing or random sampling.
-    
+
     Args:
         color_pcd: (B, [T], N, 6) point cloud tensor [rgb, xyz] for each batch
         num_points: target number of points
@@ -463,7 +434,7 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
     color_pcd = color_pcd.view(-1, original_shape[-2], original_shape[-1])  # (B, N, 6)
     B, N, C = color_pcd.shape
     device = color_pcd.device
-    
+
     if N > num_points:
         if use_fps:
             # Initialize output tensors
@@ -478,18 +449,18 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
             idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
             # Vectorized post-processing
             batch_idx = idx_flat // N  # Which batch each index belongs to
-            local_idx = idx_flat % N   # Local index within each batch
+            local_idx = idx_flat % N  # Local index within each batch
             for b in range(B):
                 batch_mask = batch_idx == b
                 if batch_mask.sum() > 0:
                     batch_local_indices = local_idx[batch_mask][:num_points]
-                    output_pcd[b, :len(batch_local_indices)] = color_pcd[b][batch_local_indices]
-                    output_idx[b, :len(batch_local_indices)] = batch_local_indices
+                    output_pcd[b, : len(batch_local_indices)] = color_pcd[b][batch_local_indices]
+                    output_idx[b, : len(batch_local_indices)] = batch_local_indices
         else:
             # Randomly sample num_points indices without replacement for each batch
-            output_idx = th.stack([
-                th.randperm(N, device=device)[:num_points] for _ in range(B)
-            ], dim=0)  # (B, num_points)
+            output_idx = th.stack(
+                [th.randperm(N, device=device)[:num_points] for _ in range(B)], dim=0
+            )  # (B, num_points)
             # Use proper batch indexing
             batch_indices = th.arange(B, device=device).unsqueeze(1).expand(B, num_points)
             output_pcd = color_pcd[batch_indices, output_idx]  # (B, num_points, C)
@@ -501,7 +472,7 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
         batch_indices = th.arange(B, device=device).unsqueeze(1).expand(B, num_points)  # (B, num_points)
         output_pcd = color_pcd[batch_indices, full_idx]  # (B, num_points, C)
         output_idx = full_idx
-    
+
     output_pcd = output_pcd.view(*original_shape[:-2], num_points, C)  # (B, [T], num_points, 6)
     return output_pcd, output_idx
 
@@ -509,35 +480,36 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
 def process_fused_point_cloud(
     obs: dict,
     camera_intrinsics: Dict[str, th.Tensor],
-    pcd_range: Tuple[float, float, float, float, float, float], # x_min, x_max, y_min, y_max, z_min, z_max
+    pcd_range: Tuple[float, float, float, float, float, float],  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: Optional[int] = None,
-    use_fps: bool=True,
-    process_seg: bool=False,
-    verbose: bool=False
+    use_fps: bool = True,
+    process_seg: bool = False,
+    verbose: bool = False,
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
     if verbose:
         print("Processing fused point cloud from observations...")
     rgb_pcd, seg_pcd = [], []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         pcd = depth_to_pcd(
-            obs[f"{camera_name}::depth_linear"], 
-            obs["cam_rel_poses"][..., 7*idx:7*idx+7], 
-            intrinsics
+            obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
         )
         rgb_pcd.append(
             th.cat([obs[f"{camera_name}::rgb"] / 255.0, pcd], dim=-1).flatten(-3, -2)
         )  # shape (B, [T], H*W, 6)
         if process_seg:
-            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1)) # shape (B, [T], H*W)
+            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1))  # shape (B, [T], H*W)
     # Fuse all point clouds together
     fused_pcd_all = th.cat(rgb_pcd, dim=-2).to(device="cuda")
     # Now, clip the point cloud to the specified range
     x_min, x_max, y_min, y_max, z_min, z_max = pcd_range
     mask = (
-        (fused_pcd_all[..., 3] >= x_min) & (fused_pcd_all[..., 3] <= x_max) &
-        (fused_pcd_all[..., 4] >= y_min) & (fused_pcd_all[..., 4] <= y_max) &
-        (fused_pcd_all[..., 5] >= z_min) & (fused_pcd_all[..., 5] <= z_max)
-    )   
+        (fused_pcd_all[..., 3] >= x_min)
+        & (fused_pcd_all[..., 3] <= x_max)
+        & (fused_pcd_all[..., 4] >= y_min)
+        & (fused_pcd_all[..., 4] <= y_max)
+        & (fused_pcd_all[..., 5] >= z_min)
+        & (fused_pcd_all[..., 5] <= z_max)
+    )
     fused_pcd_all[~mask] = 0.0
     if process_seg:
         seg_pcd = th.cat(seg_pcd, dim=-1)
@@ -545,7 +517,9 @@ def process_fused_point_cloud(
     # Now, downsample the point cloud if needed
     if pcd_num_points is not None:
         if verbose:
-            print(f"Downsampling point cloud to {pcd_num_points} points using {'FPS' if use_fps else 'random sampling'}")
+            print(
+                f"Downsampling point cloud to {pcd_num_points} points using {'FPS' if use_fps else 'random sampling'}"
+            )
         fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
         fused_pcd = fused_pcd.float()
         if process_seg:
@@ -561,8 +535,8 @@ def color_pcd_vis(color_pcd: np.ndarray):
     axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3, origin=[0, 0, 0])
 
     # Rotation matrices
-    Rz_90 = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, np.pi / 2])      # 90 deg about z
-    Rx_m90 = o3d.geometry.get_rotation_matrix_from_axis_angle([-np.pi / 2, 0, 0])    # -90 deg about x
+    Rz_90 = o3d.geometry.get_rotation_matrix_from_axis_angle([0, 0, np.pi / 2])  # 90 deg about z
+    Rx_m90 = o3d.geometry.get_rotation_matrix_from_axis_angle([-np.pi / 2, 0, 0])  # -90 deg about x
 
     # visualize with open3D
     if color_pcd.ndim == 2:
@@ -595,14 +569,15 @@ def color_pcd_vis(color_pcd: np.ndarray):
 # Segmentation
 # ==============================================
 
+
 def generate_yuv_palette(num_ids: int) -> np.ndarray:
     """
     Generate `num_ids` equidistant YUV colors in the valid YUV space.
     """
     # Y in [16, 235], U, V in [16, 240] for 8-bit YUV standards (BT.601)
-    Y_vals = np.linspace(16, 235, int(np.ceil(num_ids ** (1/3))))
-    U_vals = np.linspace(16, 240, int(np.ceil(num_ids ** (1/3))))
-    V_vals = np.linspace(16, 240, int(np.ceil(num_ids ** (1/3))))
+    Y_vals = np.linspace(16, 235, int(np.ceil(num_ids ** (1 / 3))))
+    U_vals = np.linspace(16, 240, int(np.ceil(num_ids ** (1 / 3))))
+    V_vals = np.linspace(16, 240, int(np.ceil(num_ids ** (1 / 3))))
 
     palette = []
     for y in Y_vals:
@@ -614,7 +589,9 @@ def generate_yuv_palette(num_ids: int) -> np.ndarray:
     return np.array(palette[:num_ids], dtype=np.uint8)
 
 
-def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str], unique_ins_ids: List[int]) -> Tuple[th.Tensor, Dict[int, str]]:
+def instance_id_to_instance(
+    obs: th.Tensor, instance_id_mapping: Dict[int, str], unique_ins_ids: List[int]
+) -> Tuple[th.Tensor, Dict[int, str]]:
     """
     Instance_id segmentation map each unique visual meshes of objects (e.g. /World/scene_name/object_name/visual_mesh_0)
     This function merges all visual meshes of the same object instance to a single instance id.
@@ -630,12 +607,12 @@ def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str],
     # extract the actual instance name, which is located at /World/scene_name/object_name
     # Note that 0, 1 are special cases for background and unlabelled, respectivelly
     instance_id_to_instance = {k: v.split("/")[3] for k, v in instance_id_mapping.items() if k not in [0, 1]}
-    # get all unique instance names 
+    # get all unique instance names
     instance_names = set(instance_id_to_instance.values())
     # construct a new instance mapping from instance names to instance ids
     instance_mapping = {0: "background", 1: "unlabelled"}
-    instance_mapping.update({k+2: v for k, v in enumerate(instance_names)}) # {i: object_name}
-    reversed_instance_mapping = {v: k for k, v in instance_mapping.items()} # {object_name: i}
+    instance_mapping.update({k + 2: v for k, v in enumerate(instance_names)})  # {i: object_name}
+    reversed_instance_mapping = {v: k for k, v in instance_mapping.items()}  # {object_name: i}
     # put back the background and unlabelled
     instance_id_to_instance.update({0: "background", 1: "unlabelled"})
     # Now, construct the instance segmentation
@@ -649,7 +626,9 @@ def instance_id_to_instance(obs: th.Tensor, instance_id_mapping: Dict[int, str],
     return instance_seg, instance_mapping
 
 
-def instance_to_semantic(obs, instance_mapping: Dict[int, str], unique_ins_ids: List[int], is_instance_id: bool=True) -> th.Tensor:
+def instance_to_semantic(
+    obs, instance_mapping: Dict[int, str], unique_ins_ids: List[int], is_instance_id: bool = True
+) -> th.Tensor:
     """
     Convert instance / instance id segmentation to semantic segmentation.
     Args:
@@ -675,7 +654,7 @@ def instance_to_semantic(obs, instance_mapping: Dict[int, str], unique_ins_ids: 
         if "robot" in v:
             instance_to_semantic[k] = "agent"
         else:
-            instance_to_semantic[k] = v.split("_")[0] 
+            instance_to_semantic[k] = v.split("_")[0]
     instance_to_semantic.update({0: "background", 1: "unlabelled"})
     # Now, construct the semantic segmentation
     semantic_seg = th.zeros_like(obs)
@@ -688,10 +667,12 @@ def instance_to_semantic(obs, instance_mapping: Dict[int, str], unique_ins_ids: 
     return semantic_seg
 
 
-def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str], unique_ins_ids: List[int]) -> List[List[Tuple[int, int, int, int, int]]]:
+def instance_to_bbox(
+    obs: th.Tensor, instance_mapping: Dict[int, str], unique_ins_ids: List[int]
+) -> List[List[Tuple[int, int, int, int, int]]]:
     """
     Convert instance segmentation to bounding boxes.
-    
+
     Args:
         obs (th.Tensor): (N, H, W) tensor of instance IDs
         instance_mapping (Dict[int, str]): Dict mapping instance IDs to instance names
@@ -707,7 +688,7 @@ def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str], unique_in
     valid_ids = [id for id in instance_mapping if id in unique_ins_ids]
     for instance_id in valid_ids:
         # Create mask for this instance
-        mask = (obs == instance_id)  # (N, H, W)
+        mask = obs == instance_id  # (N, H, W)
         # Find bounding boxes for each frame
         for n in range(N):
             frame_mask = mask[n]  # (H, W)
@@ -723,13 +704,14 @@ def instance_to_bbox(obs: th.Tensor, instance_mapping: Dict[int, str], unique_in
             y_min = y_coords.min().item()
             y_max = y_coords.max().item()
             bboxes[n].append((x_min, y_min, x_max, y_max, instance_id))
-    
+
     return bboxes
 
 
 # ==============================================
 # Bounding box
 # ==============================================
+
 
 def find_non_overlapping_text_position(x1, y1, x2, y2, text_size, occupied_regions, img_height, img_width):
     """Find a text position that doesn't overlap with existing text."""
@@ -779,8 +761,9 @@ def find_non_overlapping_text_position(x1, y1, x2, y2, text_size, occupied_regio
     text_rect = (text_x - padding, text_y - text_h - padding, text_x + text_w + padding, text_y + padding)
     return text_x, text_y, text_rect
 
+
 def overlay_bboxes_with_names(
-    img: np.ndarray, 
+    img: np.ndarray,
     bbox_2d_data: List[Tuple[int, int, int, int, int]],
     instance_mapping: Dict[int, str],
     task_relevant_objects: List[str],
@@ -851,6 +834,7 @@ def overlay_bboxes_with_names(
 
 def get_consistent_color(instance_id):
     import colorsys
+
     colors = [
         (52, 73, 94),  # Dark blue-gray
         (142, 68, 173),  # Purple

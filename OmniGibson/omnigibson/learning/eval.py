@@ -14,9 +14,9 @@ from av.stream import Stream
 from gello.robots.sim_robot.og_teleop_cfg import SUPPORTED_ROBOTS
 from gello.robots.sim_robot.og_teleop_utils import (
     augment_rooms,
-    load_available_tasks, 
+    load_available_tasks,
     get_task_relevant_room_types,
-    generate_robot_config
+    generate_robot_config,
 )
 from hydra.utils import call
 from inspect import getsourcefile
@@ -152,7 +152,7 @@ class Evaluator:
             # Update robot sensors:
             for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
                 sensor_name = camera_name.split("::")[1]
-                if camera_id == "head": 
+                if camera_id == "head":
                     robot.sensors[sensor_name].horizontal_aperture = 40.0
                     robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
                     robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
@@ -178,7 +178,7 @@ class Evaluator:
         Single step of the task
         """
         self.robot_action = self.policy.forward(obs=self.obs)
-        
+
         self.obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=3)
         # process obs
         if terminated or truncated:
@@ -234,7 +234,7 @@ class Evaluator:
             batch_size=1,
             mode="rgb",
         )
-        
+
     def reset(self) -> None:
         self.obs = self.env.reset()[0]
         self.obs = self._preprocess_obs(self.obs)
@@ -284,7 +284,7 @@ if __name__ == "__main__":
 
     with Evaluator(config) as evaluator:
         logger.info("Starting evaluation...")
- 
+
         for idx in instances_to_run:
             load_task_instance_for_env(evaluator.env, idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
@@ -294,7 +294,7 @@ if __name__ == "__main__":
                 evaluator.reset()
                 done = False
                 if config.write_video:
-                    video_name = str(video_path) + f'/video_{idx}_{epi}.mp4'
+                    video_name = str(video_path) + f"/video_{idx}_{epi}.mp4"
                     evaluator.video_writer = create_video_writer(
                         fpath=video_name,
                         resolution=(720, 1080),
@@ -304,19 +304,16 @@ if __name__ == "__main__":
                     if terminated or truncated:
                         done = True
                     if config.write_video:
-                       evaluator._write_video()
+                        evaluator._write_video()
                     if evaluator.env._current_step % 1000 == 0:
                         logger.info(f"Current step: {evaluator.env._current_step}")
                 logger.info(f"Evaluation finished at step {evaluator.env._current_step}.")
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
                 logger.info(f"Total trials: {evaluator.n_trials}")
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
-                
+
                 if config.write_video:
                     evaluator.video_writer = None
                     logger.info(f"Saved video to {video_name}")
                 else:
                     logger.warning("No observations were recorded.")
-                    
-               
-                

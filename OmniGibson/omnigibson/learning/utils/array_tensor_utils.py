@@ -129,7 +129,6 @@ def any_slice(x, slice):
         return x[slice]
     else:
         return x
-    
 
 
 def sequential_sum_balanced_partitioning(nums, M, i):

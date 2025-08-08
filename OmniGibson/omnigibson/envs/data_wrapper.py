@@ -32,7 +32,9 @@ class DataWrapper(EnvironmentWrapper):
     An OmniGibson environment wrapper for writing data to an HDF5 file.
     """
 
-    def __init__(self, env, output_path, compression=dict(), overwrite=True, only_successes=True, flush_every_n_traj=10):
+    def __init__(
+        self, env, output_path, compression=dict(), overwrite=True, only_successes=True, flush_every_n_traj=10
+    ):
         """
         Args:
             env (Environment): The environment to wrap
@@ -962,7 +964,9 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If record, record initial observations
         if record_data:
-            self.current_obs, _, _, _, init_info = self.env.step(action=action[0], n_render_iterations=self.n_render_iterations + 10)
+            self.current_obs, _, _, _, init_info = self.env.step(
+                action=action[0], n_render_iterations=self.n_render_iterations + 10
+            )
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
@@ -1004,7 +1008,9 @@ class DataPlaybackWrapper(DataWrapper):
                 )
                 if self.flush_every_n_steps > 0:
                     if i == 0:
-                        self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(step_data, f"demo_{episode_id}", num_samples=len(action))
+                        self.current_traj_grp, self.traj_dsets = self.allocate_traj_to_hdf5(
+                            step_data, f"demo_{episode_id}", num_samples=len(action)
+                        )
                     if i % self.flush_every_n_steps == 0:
                         self.flush_partial_traj()
                 # append to current trajectory history
@@ -1060,10 +1066,10 @@ class DataPlaybackWrapper(DataWrapper):
             if k in nested_keys:
                 obs_grp = traj_grp.create_group(k)
                 for mod, step_mod_data in dat.items():
-                   traj_dsets[k][mod] = obs_grp.create_dataset(
-                        mod, 
-                        shape=(num_samples, *step_mod_data.shape), 
-                        dtype=step_mod_data.numpy().dtype, 
+                    traj_dsets[k][mod] = obs_grp.create_dataset(
+                        mod,
+                        shape=(num_samples, *step_mod_data.shape),
+                        dtype=step_mod_data.numpy().dtype,
                         **self.compression,
                         chunks=(1, *step_mod_data.shape),
                         shuffle=True,
@@ -1093,24 +1099,32 @@ class DataPlaybackWrapper(DataWrapper):
             for key, dat in self.traj_dsets.items():
                 if isinstance(dat, dict):
                     for mod, dset in dat.items():
-                        obs_data_length = data_length_to_flush if self.current_episode_step_count < dset.shape[0] else data_length_to_flush - 1
+                        obs_data_length = (
+                            data_length_to_flush
+                            if self.current_episode_step_count < dset.shape[0]
+                            else data_length_to_flush - 1
+                        )
                         if obs_data_length > 0:
-                            dset[self.current_episode_step_count-data_length_to_flush+1:self.current_episode_step_count+1] = th.stack([
-                                self.current_traj_history[i][key][mod] for i in range(obs_data_length)
-                            ], dim=0)
+                            dset[
+                                self.current_episode_step_count
+                                - data_length_to_flush
+                                + 1 : self.current_episode_step_count + 1
+                            ] = th.stack(
+                                [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
+                            )
                         if self.current_episode_step_count == 0:
                             dset[0] = self.current_traj_history[0][key][mod]
                 else:
-                    dat[self.current_episode_step_count-data_length_to_flush:self.current_episode_step_count] = th.stack([
-                        self.current_traj_history[i][key] for i in range(data_length_to_flush)
-                    ], dim=0)
+                    dat[self.current_episode_step_count - data_length_to_flush : self.current_episode_step_count] = (
+                        th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0)
+                    )
         # Reset the current trajectory history
         self.current_traj_history = []
 
     def flush_current_traj(self):
         """
         Flush current trajectory data
-        For playback, we assume that all data needs to be stored. 
+        For playback, we assume that all data needs to be stored.
         """
         if self.flush_every_n_steps == 0:
             super().flush_current_traj()

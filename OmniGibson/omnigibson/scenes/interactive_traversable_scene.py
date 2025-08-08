@@ -163,7 +163,7 @@ class InteractiveTraversableScene(TraversableScene):
 
     def _should_load_object(self, obj_info, task_metadata):
         agent_ok = super()._should_load_object(obj_info, task_metadata)
-        
+
         name = obj_info["args"]["name"]
         category = obj_info["args"].get("category", "object")
         in_rooms = obj_info["args"].get("in_rooms", [])

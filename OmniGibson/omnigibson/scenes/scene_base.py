@@ -414,7 +414,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         objects based on, e.g., their category, size, etc.
 
         By default, this checks whether robot should be loaded.
-        Subclasses should call super and implement additional logic. 
+        Subclasses should call super and implement additional logic.
 
         Args:
             obj_info (dict): Dictionary of object kwargs that will be used to load the object

@@ -13,10 +13,7 @@ MAX_JOBS = 100  # Maximum number of jobs allowed
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 SERVICE_ACCOUNT_FILE = "/afs/cs.stanford.edu/u/{}/google_credentials.json".format(user)
 
-credentials = Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE,
-    scopes=SCOPES
-)
+credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 gc = gspread.authorize(credentials)
 
 
@@ -54,7 +51,7 @@ for ws in worksheets:
                 print(f"Scheduling job for file ID: {file_id} in task: {ws.title}")
                 cmd = (
                     "cd /vision/u/{}/BEHAVIOR-1K && "
-                    "sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh \"/vision/u/{}/data/behavior/raw/{}/{}\""
+                    'sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh "/vision/u/{}/data/behavior/raw/{}/{}"'
                 ).format(user, user, ws.title, file_id)
                 # Run the command non-blocking
                 subprocess.Popen(cmd, shell=True, text=True)

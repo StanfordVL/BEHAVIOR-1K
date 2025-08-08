@@ -12,7 +12,7 @@ ROBOT_CAMERA_NAMES = {
         "left_wrist": "robot_r1::robot_r1:left_realsense_link:Camera:0",
         "right_wrist": "robot_r1::robot_r1:right_realsense_link:Camera:0",
         "head": "robot_r1::robot_r1:zed_link:Camera:0",
-    }
+    },
 }
 
 # Camera resolutions and corresponding intrinstics
@@ -21,13 +21,19 @@ WRIST_RESOLUTION = (480, 480)
 # TODO: Fix A1
 CAMERA_INTRINSICS = {
     "A1": {
-        "external": np.array([[306., 0., 360.], [0., 306., 360.], [0., 0., 1.]], dtype=np.float32), # 240x240
-        "wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 240x240
+        "external": np.array([[306.0, 0.0, 360.0], [0.0, 306.0, 360.0], [0.0, 0.0, 1.0]], dtype=np.float32),  # 240x240
+        "wrist": np.array(
+            [[388.6639, 0.0, 240.0], [0.0, 388.6639, 240.0], [0.0, 0.0, 1.0]], dtype=np.float32
+        ),  # 240x240
     },
     "R1Pro": {
-        "head": np.array([[306., 0., 360.], [0., 306., 360.], [0., 0., 1.]], dtype=np.float32), # 720x720
-        "left_wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 480x480
-        "right_wrist": np.array([[388.6639, 0., 240.], [0., 388.6639, 240.], [0., 0., 1.]], dtype=np.float32), # 480x480
+        "head": np.array([[306.0, 0.0, 360.0], [0.0, 306.0, 360.0], [0.0, 0.0, 1.0]], dtype=np.float32),  # 720x720
+        "left_wrist": np.array(
+            [[388.6639, 0.0, 240.0], [0.0, 388.6639, 240.0], [0.0, 0.0, 1.0]], dtype=np.float32
+        ),  # 480x480
+        "right_wrist": np.array(
+            [[388.6639, 0.0, 240.0], [0.0, 388.6639, 240.0], [0.0, 0.0, 1.0]], dtype=np.float32
+        ),  # 480x480
     },
 }
 
@@ -49,7 +55,7 @@ ACTION_QPOS_INDICES = {
             "right_arm": np.s_[15:22],
             "right_gripper": np.s_[22:23],
         }
-    )
+    ),
 }
 
 
@@ -109,7 +115,7 @@ PROPRIOCEPTION_INDICES = {
             "base_qpos_cos": np.s_[252:255],
             "base_qvel": np.s_[255:258],
         }
-    )
+    ),
 }
 
 # Proprioception indices
@@ -128,7 +134,7 @@ PROPRIO_QPOS_INDICES = {
             "left_gripper": np.s_[24:26],
             "right_gripper": np.s_[26:28],
         }
-    )
+    ),
 }
 
 
@@ -137,59 +143,38 @@ JOINT_RANGE = {
     "A1": {
         "arm": (
             th.tensor([-2.8798, 0.0, -3.3161, -2.8798, -1.6581, -2.8798], dtype=th.float32),
-            th.tensor([2.8798, 3.1415, 0.0, 2.8798, 1.6581, 2.8798], dtype=th.float32)
+            th.tensor([2.8798, 3.1415, 0.0, 2.8798, 1.6581, 2.8798], dtype=th.float32),
         ),
-        "gripper": (
-            th.tensor([0.00], dtype=th.float32),
-            th.tensor([0.03], dtype=th.float32)
-        ),
+        "gripper": (th.tensor([0.00], dtype=th.float32), th.tensor([0.03], dtype=th.float32)),
     },
     "R1Pro": {
-        "base": (
-            th.tensor([-0.75, -0.75, -1.0], dtype=th.float32),
-            th.tensor([0.75, 0.75, 1.0], dtype=th.float32)
-        ),
+        "base": (th.tensor([-0.75, -0.75, -1.0], dtype=th.float32), th.tensor([0.75, 0.75, 1.0], dtype=th.float32)),
         "torso": (
             th.tensor([-1.1345, -2.7925, -1.8326, -3.0543], dtype=th.float32),
-            th.tensor([1.8326, 2.5307, 1.5708, 3.0543], dtype=th.float32)
+            th.tensor([1.8326, 2.5307, 1.5708, 3.0543], dtype=th.float32),
         ),
         "left_arm": (
             th.tensor([-4.4506, -0.1745, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=th.float32),
-            th.tensor([1.3090, 3.1416, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32)
+            th.tensor([1.3090, 3.1416, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32),
         ),
-        "left_gripper": (
-            th.tensor([-1], dtype=th.float32),
-            th.tensor([1], dtype=th.float32)
-        ),
+        "left_gripper": (th.tensor([-1], dtype=th.float32), th.tensor([1], dtype=th.float32)),
         "right_arm": (
             th.tensor([-4.4506, -3.1416, -2.3562, -2.0944, -2.3562, -1.0472, -1.5708], dtype=th.float32),
-            th.tensor([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32)
+            th.tensor([1.3090, 0.1745, 2.3562, 0.3491, 2.3562, 1.0472, 1.5708], dtype=th.float32),
         ),
-        "right_gripper": (
-            th.tensor([0.00], dtype=th.float32),
-            th.tensor([0.05], dtype=th.float32)
-        ),
-    }
+        "right_gripper": (th.tensor([0.00], dtype=th.float32), th.tensor([0.05], dtype=th.float32)),
+    },
 }
 
 
 EEF_POSITION_RANGE = {
     "A1": {
-        "0": (
-            th.tensor([0.0, -0.7, 0.0], dtype=th.float32),
-            th.tensor([0.7, 0.7, 0.7], dtype=th.float32)
-        ),
+        "0": (th.tensor([0.0, -0.7, 0.0], dtype=th.float32), th.tensor([0.7, 0.7, 0.7], dtype=th.float32)),
     },
     "R1Pro": {
-        "left": (
-            th.tensor([0.0, -0.65, 0.0], dtype=th.float32),
-            th.tensor([0.65, 0.65, 2.5], dtype=th.float32)
-        ),
-        "right": (
-            th.tensor([0.0, -0.65, 0.0], dtype=th.float32),
-            th.tensor([0.65, 0.65, 2.5], dtype=th.float32)
-        ),
-    }
+        "left": (th.tensor([0.0, -0.65, 0.0], dtype=th.float32), th.tensor([0.65, 0.65, 2.5], dtype=th.float32)),
+        "right": (th.tensor([0.0, -0.65, 0.0], dtype=th.float32), th.tensor([0.65, 0.65, 2.5], dtype=th.float32)),
+    },
 }
 
 
@@ -206,8 +191,8 @@ def generate_basic_environment_config(task_name, task_cfg):
     Generate a basic environment configuration
 
     Args:
-        task_name (str): Name of the task 
-        task_cfg: Dictionary of task config 
+        task_name (str): Name of the task
+        task_cfg: Dictionary of task config
 
     Returns:
         dict: Environment configuration
@@ -241,7 +226,7 @@ def generate_basic_environment_config(task_name, task_cfg):
                 "r_potential": 1.0,
             },
             "include_obs": False,
-        }
+        },
     }
     return cfg
 

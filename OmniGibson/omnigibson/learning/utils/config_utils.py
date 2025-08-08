@@ -108,4 +108,3 @@ def register_omegaconf_resolvers():
         return cfg
 
     OmegaConf.register_new_resolver("no_instantiate", _no_instantiate)
-

@@ -15,6 +15,7 @@ from omnigibson.sensors import ALL_SENSOR_MODALITIES
 from omnigibson.simulator import _launch_simulator as launch
 from omnigibson.tasks import REGISTERED_TASKS
 
+
 # Create logger
 class RelativeSeconds(logging.Formatter):
     def format(self, record):
@@ -25,6 +26,7 @@ class RelativeSeconds(logging.Formatter):
         # Format as HH:MM:SS.sss, with leading zeros
         record.relativeCreated_hms = f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
         return super().format(record)
+
 
 formatter = RelativeSeconds("[%(relativeCreated_hms)s] [%(levelname)s] [%(name)s] %(message)s")
 logging.basicConfig()
