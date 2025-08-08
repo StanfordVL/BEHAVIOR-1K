@@ -32,3 +32,11 @@ class FrankaMounted(FrankaPanda):
         return os.path.join(
             gm.ASSET_PATH, "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml"
         )
+
+    @property
+    def _assisted_grasp_start_points(self):
+        return None  # automatically inferred with this gripper
+
+    @property
+    def _assisted_grasp_end_points(self):
+        return None  # automatically inferred with this gripper
