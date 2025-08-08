@@ -1,8 +1,8 @@
 gha-creds-*.json
+/site
+.vscode
+.DS_Store
 
 # training
 outputs/
-.vscode/
 test.ipynb
-/site
-.vscode

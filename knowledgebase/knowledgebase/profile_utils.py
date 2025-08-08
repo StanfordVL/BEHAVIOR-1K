@@ -102,3 +102,23 @@ def make_realtime_badge(series_name):
     else:
         color = "red"
     return badge(left_text=f'{series_name} realtime performance', right_text=f"{realtime_coeff:.2f}x", right_color=color)
+
+
+def get_profile_badge_svg():
+    """Generate profile badge SVG for static site generation."""
+    try:
+        badge_text = make_realtime_badge("Rs_int")
+        return badge_text.encode('utf-8')
+    except Exception:
+        return None
+
+
+def get_profile_plot_png():
+    """Generate profile plot PNG for static site generation."""
+    try:
+        plot_img = plot_profile("Realtime Performance", 10, ignore_series=["Empty scene"])
+        stream = io.BytesIO()
+        plot_img.save(stream, format="PNG")
+        return stream.getvalue()
+    except Exception:
+        return None
