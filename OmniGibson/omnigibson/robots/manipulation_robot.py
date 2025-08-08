@@ -1232,7 +1232,7 @@ class ManipulationRobot(BaseRobot):
         )
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
         raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
-        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
+        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0) + 1e-8
         ray_data = set()
         # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
