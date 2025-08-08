@@ -252,6 +252,10 @@ class ManipulationRobot(BaseRobot):
     def _initialize(self):
         super()._initialize()
 
+        # make eef link not visible
+        for arm in self.arm_names:
+            self._links[self.eef_link_names[arm]].visible = False
+
         # Infer relevant link properties, e.g.: fingertip location, AG grasping points
         # We use a try / except to maintain backwards-compatibility with robots that do not follow our
         # OG-specified convention
