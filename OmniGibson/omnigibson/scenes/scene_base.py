@@ -94,6 +94,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._available_systems = None
         self._pose_info = None
         self._updated_state_objects = None
+        self._presampled_robot_poses = None
 
         # Call super init
         super().__init__()
@@ -135,6 +136,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # Create object class instance
                 obj = create_object_from_init_info(obj_info)
                 self._init_objs[obj_name] = obj
+
+            # Store presampled robot poses from metadata
+            self._presampled_robot_poses = task_metadata.get("robot_poses", None)
 
     @property
     def registry(self):
@@ -248,6 +252,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     @property
     def transition_rule_api(self):
         return self._transition_rule_api
+
+    @property
+    def presampled_robot_poses(self):
+        return self._presampled_robot_poses
 
     def clear_updated_objects(self):
         self._updated_state_objects = set()
@@ -403,6 +411,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
+            if key == "task":
+                # Robot poses data type can't get stored in the scene prim; we will store this with the task
+                data.pop("robot_poses")
             self.write_metadata(key=key, data=data)
 
     def _should_load_object(self, obj_info, task_metadata):

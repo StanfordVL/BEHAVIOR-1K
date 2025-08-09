@@ -81,6 +81,7 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
+        use_presampled_robot_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
         highlight_task_relevant_objects=False,
@@ -123,6 +124,7 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
+        self.use_presampled_robot_pose = use_presampled_robot_pose
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
@@ -242,9 +244,19 @@ class BehaviorTask(BaseTask):
     def reset(self, env):
         super().reset(env)
 
+        # Use presampled robot pose if specified (only available for officially supported mobile manipulators)
+        if self.use_presampled_robot_pose:
+            robot = self.get_agent(env)
+            presampled_poses = env.scene.presampled_robot_poses
+            assert (
+                robot.model_name in presampled_poses
+            ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
+            robot_pose = presampled_poses[robot.model_name][0]  # Use first presampled pose (could be randomized)
+            robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
+
         # Force wake objects
         for obj in self.object_scope.values():
-            if isinstance(obj, DatasetObject):
+            if obj.exists and isinstance(obj, DatasetObject):
                 obj.wake()
 
     def _load_non_low_dim_observation_space(self):
