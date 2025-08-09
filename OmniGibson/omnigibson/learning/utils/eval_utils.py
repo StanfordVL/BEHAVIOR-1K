@@ -211,7 +211,7 @@ TASK_NAMES_TO_INDICES = {
     "assembling_gift_baskets": 26,
     "sorting_household_items": 27,
     "getting_organized_for_work": 28,
-    "clean_up_your_desk": 29
+    "clean_up_your_desk": 29,
 }
 TASK_INDICES_TO_NAMES = {v: k for k, v in TASK_NAMES_TO_INDICES.items()}
 
