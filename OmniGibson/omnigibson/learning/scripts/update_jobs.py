@@ -21,11 +21,10 @@ def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict,
         "UserName": lightwheel_api_credentials["username"],
         "Authorization": lw_token,
     }
-    body = {
-        "versionUuids": uuids,
-        "projectUuid": lightwheel_api_credentials["projectUuid"]
-    }
-    response = requests.post("https://assetserver.lightwheel.net/api/asset/v1/teleoperation/download", headers=header, json=body)
+    body = {"versionUuids": uuids, "projectUuid": lightwheel_api_credentials["projectUuid"]}
+    response = requests.post(
+        "https://assetserver.lightwheel.net/api/asset/v1/teleoperation/download", headers=header, json=body
+    )
     response.raise_for_status()
     urls = [res["files"][0]["url"] for res in response.json()["downloadInfos"]]
     return urls
@@ -69,33 +68,29 @@ def main(args):
                     print(f"Scheduling job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}")
                     ws.update(
                         range_name=f"D{row_idx}:F{row_idx}",
-                        values=[["processing", user, time.strftime("%Y-%m-%d %H:%M:%S")]]
+                        values=[["processing", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                     )
                     if args.slurm:
                         cmd = (
                             "cd /vision/u/{}/BEHAVIOR-1K && "
                             'sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
-                        ).format(user, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx)
+                        ).format(
+                            user, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx
+                        )
                         # Run the command
                         subprocess.run(cmd, shell=True)
                     else:
                         cmd = (
                             "cd ~/Research/BEHAVIOR-1K && "
                             "python OmniGibson/omnigibson/learning/scripts/replay_obs.py "
-                            "--data_url \"{}\" "
+                            '--data_url "{}" '
                             "--data_folder {} "
                             "--task_name {} "
                             "--demo_id {} "
                             "--update_sheet "
                             "--low_dim --rgbd --seg --bbox --pcd_gt --pcd_vid "
                             "--row {}"
-                        ).format(
-                            url,
-                            data_dir,
-                            task_name,
-                            int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"),
-                            row_idx
-                        )
+                        ).format(url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx)
                         subprocess.run(cmd, shell=True, check=True)
                     job_quota -= 1
                     if job_quota <= 0:

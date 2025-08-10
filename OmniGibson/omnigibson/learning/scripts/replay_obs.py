@@ -199,9 +199,7 @@ def replay_hdf5_file(
     for camera_id, camera_name in camera_names.items():
         resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
         if generate_rgbd:
-            rgb_dir = os.path.join(
-                data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}"
-            )
+            rgb_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}")
             depth_dir = os.path.join(
                 data_folder, "videos", f"task-{task_id:04d}", f"observation.images.depth.{camera_id}"
             )
@@ -303,9 +301,7 @@ def replay_hdf5_file(
                     bbox = instance_to_bbox(instance_seg, instance_mapping, set(instance_mapping.keys()))
                     write_video(
                         th.from_numpy(
-                            env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][
-                                i : i + flush_every_n_steps
-                            ]
+                            env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][i : i + flush_every_n_steps]
                         ),
                         video_writer=video_writers[-1],
                         batch_size=flush_every_n_steps,
@@ -366,9 +362,7 @@ def generate_low_dim_data(
                 "observation.task_info": list(task_info),
             }
             df = pd.DataFrame(data)
-            df.to_parquet(
-                f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False
-            )
+            df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False)
 
             task_metadata = {}
             for attr_name in replayed_f["data"].attrs:
@@ -385,9 +379,7 @@ def generate_low_dim_data(
                     task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name].tolist()
                 else:
                     task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name]
-            with open(
-                f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w"
-            ) as f:
+            with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w") as f:
                 json.dump(task_metadata, f, indent=4)
     log.info(f"Successfully processed {data_folder}/replayed/episode_{demo_id:08d}.hdf5")
 
@@ -561,9 +553,7 @@ def rgbd_vid_to_pcd(
                 kwargs = {}
                 # ["robot_r1::robot_r1:zed_link:Camera:0::unique_ins_ids"]
                 if key == "seg_semantic_id":
-                    with open(
-                        f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json"
-                    ) as f:
+                    with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json") as f:
                         kwargs["id_list"] = th.tensor(json.load(f)[f"{robot_camera_name}::unique_ins_ids"])
                 obs_loaders[f"{robot_camera_name}::{key}"] = iter(
                     OBS_LOADER_MAP[key](
@@ -642,6 +632,7 @@ def main():
     if not os.path.exists(f"{args.data_folder}/raw/{args.task_name}/episode_{args.demo_id:08d}.hdf5"):
         if args.data_url:
             from omnigibson.learning.scripts.common import download_and_extract_data
+
             instance_id = int((args.demo_id % 1e4) // 10)
             traj_id = int(args.demo_id % 10)
             download_and_extract_data(args.data_url, args.data_folder, args.task_name, instance_id, traj_id)
@@ -701,6 +692,7 @@ def main():
     # Optionally update google sheet
     if args.update_sheet:
         from omnigibson.learning.scripts.common import update_google_sheet
+
         credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
         update_google_sheet(credentials_path, args.task_name, args.row)
     og.shutdown()
