@@ -182,7 +182,7 @@ TASK_NAMES_TO_INDICES = {
     # B10
     "turning_on_radio": 0,
     "picking_up_trash": 1,
-    "putting_away_halloween_decorations": 2,
+    "putting_away_Halloween_decorations": 2,
     "cleaning_up_plates_and_food": 3,
     "can_meat": 4,
     "setting_mousetraps": 5,

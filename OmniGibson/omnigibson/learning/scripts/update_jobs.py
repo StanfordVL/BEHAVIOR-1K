@@ -34,7 +34,7 @@ def main(args):
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path=credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
 
-    if args.slurm:
+    if not args.local:
         data_dir = f"/vision/u/{user}/data/behavior"
         # Get number of running or pending jobs for the current user
         cmd = (
@@ -70,7 +70,7 @@ def main(args):
                         range_name=f"D{row_idx}:F{row_idx}",
                         values=[["processing", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                     )
-                    if args.slurm:
+                    if not args.local:
                         cmd = (
                             "cd /vision/u/{}/BEHAVIOR-1K && "
                             'sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
@@ -100,7 +100,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--slurm", action="store_true", help="Whether run with slurm or not")
+    parser.add_argument("--local", action="store_true", help="Whether to run locally or with slurm")
     args = parser.parse_args()
 
     main(args)
