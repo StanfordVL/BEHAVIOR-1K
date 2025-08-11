@@ -91,7 +91,8 @@ def main():
                 counter[lw_id[0]] += 1
                 # rate limit
                 time.sleep(1)
-
+        # rate limit
+        time.sleep(1)
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] All tasks updated successfully.")
 
 
