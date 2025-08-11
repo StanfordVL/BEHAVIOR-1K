@@ -4,7 +4,6 @@ import os
 import requests
 from omnigibson.learning.scripts.common import get_credentials
 from collections import Counter
-from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from typing import Tuple
 

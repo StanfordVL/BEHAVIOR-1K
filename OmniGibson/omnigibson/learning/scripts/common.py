@@ -1,3 +1,4 @@
+import getpass
 import gspread
 import json
 import requests
@@ -43,11 +44,11 @@ def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
     # get row data
     row_data = task_worksheet.row_values(row_idx)
     assert row_data[3] == "processing"
-    assert row_data[4] == os.environ.get("USER")
+    assert row_data[4] == getpass.getuser()
     # update status and timestamp
     task_worksheet.update(
         range_name=f"D{row_idx}:F{row_idx}",
-        values=[["processed", os.getenv("USER"), time.strftime("%Y-%m-%d %H:%M:%S")]],
+        values=[["processed", getpass.getuser(), time.strftime("%Y-%m-%d %H:%M:%S")]],
     )
 
 

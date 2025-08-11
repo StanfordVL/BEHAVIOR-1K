@@ -186,10 +186,10 @@ TASK_NAMES_TO_INDICES = {
     "cleaning_up_plates_and_food": 3,
     "can_meat": 4,
     "setting_mousetraps": 5,
-    "hiding_easter_eggs": 6,
+    "hiding_Easter_eggs": 6,
     "picking_up_toys": 7,
     "rearranging_kitchen_furniture": 8,
-    "putting_up_christmas_decorations": 9,
+    "putting_up_Christmas_decorations_inside": 9,
     # B20
     "set_up_a_coffee_station_in_your_kitchen": 10,
     "putting_dishes_away_after_cleaning": 11,
