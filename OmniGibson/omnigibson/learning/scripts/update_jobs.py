@@ -1,16 +1,14 @@
 import argparse
-import gspread
+import getpass
 import os
 import requests
 import subprocess
-import time
-from google.oauth2.service_account import Credentials
 from omnigibson.learning.scripts.common import get_credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from typing import List
 
 
-user = os.environ.get("USER")
+user = getpass.getuser()
 home = os.environ.get("HOME")
 MAX_JOBS = 4  # Maximum number of jobs allowed
 credentials_path = f"{home}/Documents/credentials"
@@ -58,7 +56,7 @@ def main(args):
     for ws in worksheets:
         task_name = ws.title.split(" - ")[-1]
         if task_name in task_list:
-            task_id = TASK_NAMES_TO_INDICES[task_name]
+            task_id = TASK_NAMES_TO_INDICES[task_name]process
             # Iterate through all the rows, find the unprocessed ones
             all_rows = ws.get_all_values()
             for row_idx, row in enumerate(all_rows[1:], start=2):  # Skip header, row numbers start at 2
@@ -73,7 +71,7 @@ def main(args):
                     if not args.local:
                         cmd = (
                             "cd /vision/u/{}/BEHAVIOR-1K && "
-                            'sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
+                            '/usr/local/bin/sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
                         ).format(
                             user, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx
                         )

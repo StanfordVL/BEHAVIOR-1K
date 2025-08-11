@@ -1,3 +1,4 @@
 #!/bin/bash
 # This script is called by cron
-sbatch /vision/u/$USER/BEHAVIOR-1K/OmniGibson/omnigibson/learning/scripts/update_jobs.sbatch.sh
+mkdir -p /vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc
+cd /vision/u/$(whoami)/BEHAVIOR-1K && /usr/local/bin/sbatch OmniGibson/omnigibson/learning/scripts/update_jobs.sbatch.sh

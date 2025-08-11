@@ -18,7 +18,7 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
-source /vision/u/${USER}/miniconda3/bin/activate behavior
+source /vision/u/$(whoami)/miniconda3/bin/activate behavior
 
 echo "Running with args: $@"
 

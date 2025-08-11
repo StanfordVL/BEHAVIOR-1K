@@ -10,7 +10,6 @@ from typing import Tuple
 
 
 MAX_ENTRIES_PER_TASK = 1
-user = os.environ.get("USER")
 home = os.environ.get("HOME")
 credentials_path = f"{home}/Documents/credentials"
 
