@@ -37,12 +37,12 @@ def main(args):
         data_dir = f"/vision/u/{user}/data/behavior"
         # Get number of running or pending jobs for the current user
         cmd = (
-            "sacct --format=JobID,State --user={} --state=RUNNING,PENDING --noheader "
+            "/usr/local/bin/sacct --format=JobID,State --user={} --state=RUNNING,PENDING --noheader "
             "| awk '$2 ~ /RUNNING|PENDING/ {{ split($1, a, \".\"); print a[1] }}' "
             "| sort -u "
             "| wc -l"
         ).format(user)
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
         running_jobs = int(result.stdout.strip())
         if running_jobs >= MAX_JOBS:
             print(f"SLURM job limit reached: {running_jobs}. Exiting...")
