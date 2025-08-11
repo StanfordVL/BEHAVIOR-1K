@@ -130,3 +130,4 @@ data/migrations
 output
 /media
 /static
+/build
