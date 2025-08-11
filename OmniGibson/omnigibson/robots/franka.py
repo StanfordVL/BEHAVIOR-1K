@@ -122,7 +122,7 @@ class FrankaPanda(ManipulationRobot):
             ]
         elif end_effector == "allegro":
             self._model_name = "franka_allegro"
-            self._eef_link_names = "base_link"
+            self._eef_link_names = "palm_center"
             # thumb.proximal, ..., thumb.tip, ..., ring.tip
             self._finger_link_names = [f"link_{i}_0" for i in range(16)]
             self._finger_joint_names = [f"joint_{i}_0" for i in [12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3]]
@@ -276,16 +276,14 @@ class FrankaPanda(ManipulationRobot):
         return (
             os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/usd/franka_panda.usda")
             if self.model_name == "franka_panda"
-            else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.usd")
+            else os.path.join(gm.ASSET_PATH, f"models/franka/franka_dexhand/{self.model_name}.usd")
         )
 
     @property
     def urdf_path(self):
-        return (
-            os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
-            if self.model_name == "franka_panda"
-            else os.path.join(gm.ASSET_PATH, f"models/franka/{self.model_name}.urdf")
-        )
+        # Only supported for normal franka now
+        assert self._model_name == "franka_panda", f"Only franka_panda has urdf currently. Got: {self._model_name}"
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
 
     @property
     def curobo_path(self):
@@ -314,16 +312,16 @@ class FrankaPanda(ManipulationRobot):
 
     @property
     def _assisted_grasp_end_points(self):
-        return {self.default_arm: self._ag_start_points}
+        return {self.default_arm: self._ag_end_points}
 
     @property
     def disabled_collision_pairs(self):
         # panda_link5 has a very bad collision mesh (overapproximation) and should be fixed in the future.
         collision_pairs = [
             ["panda_link5", "panda_link7"],
-            ["panda_link5", "panda_hand"],
         ]
-
+        if self.end_effector == "gripper":
+            collision_pairs.append(["panda_link5", "panda_hand"])
         if self.end_effector == "allegro":
             collision_pairs.append(["link_12_0", "part_studio_link"])
         elif self.end_effector == "inspire":

@@ -68,21 +68,12 @@ jobs:
         run: pip install -r requirements.txt
 
       # - if: ${{ steps.cache-knowledgebase.outputs.cache-hit != 'true' }}
-      - name: Start, wait, scrape, and stop local server
+      - name: Generate static knowledgebase site
         working-directory: knowledgebase
-        run: |
-          (
-            flask --app knowledgebase.app run & 
-            FLASK_PID=$!
-            curl --head -X GET --retry 20 --retry-connrefused --retry-delay 5 http://localhost:5000/knowledgebase/
-            wget -mpEk http://localhost:5000/knowledgebase/
-            wget -P localhost:5000/knowledgebase/ http://localhost:5000/knowledgebase/searchable_items.json
-            kill $FLASK_PID
-          )
-
+        run: python build_static_site.py
 
       - name: Move knowledgebase to combined site
-        run: cp -R knowledgebase/localhost:5000/knowledgebase site
+        run: cp -R knowledgebase/build/knowledgebase site
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3
