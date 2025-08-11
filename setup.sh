@@ -229,10 +229,18 @@ if [ "$OMNIGIBSON" = true ]; then
     
     # Build extras
     EXTRAS=""
-    [ "$DEV" = true ] && [ "$PRIMITIVES" = true ] && EXTRAS="[dev,primitives]"
-    [ "$DEV" = true ] && [ "$PRIMITIVES" = false ] && EXTRAS="[dev]"
-    [ "$DEV" = false ] && [ "$PRIMITIVES" = true ] && EXTRAS="[primitives]"
-    
+    if [ "$DEV" = true ]; then
+    EXTRAS="${EXTRAS}dev,"
+    fi
+    if [ "$PRIMITIVES" = true ]; then
+    EXTRAS="${EXTRAS}primitives,"
+    fi
+    if [ "$EVAL" = true ]; then
+      EXTRAS="${EXTRAS}eval,"
+    fi
+    # Remove trailing comma, if any
+    EXTRAS="[${EXTRAS%,}]"
+
     pip install -e "$WORKDIR/OmniGibson$EXTRAS"
 
     # Install pre-commit for dev setup

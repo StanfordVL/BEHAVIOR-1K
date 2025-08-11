@@ -359,10 +359,17 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
     }
     
     # Build extras string
+$extrasList = @()
+
+if ($Dev) { $extrasList += "dev" }
+if ($Primitives) { $extrasList += "primitives" }
+if ($Eval) { $extrasList += "eval" }
+
+if ($extrasList.Count -gt 0) {
+    $extras = "[" + ($extrasList -join ",") + "]"
+} else {
     $extras = ""
-    if ($Dev -and $Primitives) { $extras = "[dev,primitives]" }
-    elseif ($Dev) { $extras = "[dev]" }
-    elseif ($Primitives) { $extras = "[primitives]" }
+}
     
     pip install -e "$WorkDir\OmniGibson$extras"
     
