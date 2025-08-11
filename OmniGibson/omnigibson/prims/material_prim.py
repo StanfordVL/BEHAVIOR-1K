@@ -48,7 +48,7 @@ class MaterialPrim(BasePrim):
             scene (Scene): Scene to which this material belongs.
             name (str): Name for the object.
             prim_path (str): prim path of the MaterialPrim.
-            **kwargs: Additional keyword arguments to pass to the MaterialPrim or subclass constructor.
+            **kwargs (dict): Additional keyword arguments to pass to the MaterialPrim or subclass constructor.
 
         Returns:
             MaterialPrim: Material prim at the specified path

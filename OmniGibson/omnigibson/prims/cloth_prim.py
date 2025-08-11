@@ -652,7 +652,7 @@ class ClothPrim(GeomPrim):
         Grabs particle indexes defining each of the faces for this cloth prim
 
         Returns:
-             th.tensor: (N, 3) numpy array, where each of the N faces are defined by the 3 particle indices
+            th.tensor: (N, 3) numpy array, where each of the N faces are defined by the 3 particle indices
                 corresponding to that face's vertices
         """
         return th.tensor(self.get_attribute("faceVertexIndices")).reshape(-1, 3)
@@ -664,7 +664,7 @@ class ClothPrim(GeomPrim):
         Total number of keyfaces is m.N_CLOTH_KEYFACES
 
         Returns:
-             th.tensor: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
+            th.tensor: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
                 corresponding to that face's vertices
         """
         return self.faces[self._keyface_idx]

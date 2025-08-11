@@ -232,8 +232,10 @@ def visualize_scene_graph(scene, G, show_window=True, cartesian_positioning=Fals
     Note: Currently, this function only works when we merge parallel edges, i.e. the graph is a DiGraph.
 
     Args:
+        scene (Scene): The scene object containing the scene graph.
+        G (Graph): The graph object to visualize.
         show_window (bool): Whether a cv2 GUI window containing the visualization should be shown.
-        realistic_positioning (bool): Whether nodes should be positioned based on their position in the scene (if True)
+        cartesian_positioning (bool): Whether nodes should be positioned based on their position in the scene (if True)
             or placed using a graphviz layout (neato) that makes it easier to read edges & find clusters.
     """
 

@@ -557,8 +557,9 @@ class ManipulationRobot(BaseRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
+                parent frame: set position relative to the object parent.
+                scene frame: set position relative to the scene.
         """
 
         # Store the original EEF poses.

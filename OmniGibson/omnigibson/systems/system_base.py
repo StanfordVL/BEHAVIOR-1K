@@ -791,7 +791,7 @@ class PhysicalParticleSystem(BaseSystem):
     def particle_particle_rest_distance(self):
         """
         Returns:
-            The minimum distance between individual particles at rest
+            float: The minimum distance between individual particles at rest
         """
         return self.particle_radius * 2.0
 

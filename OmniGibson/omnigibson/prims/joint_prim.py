@@ -54,11 +54,6 @@ class JointPrim(BasePrim):
             body1 (None or str): If specified, should be the absolute prim path to the child body that this joint
                 is connected to. None can also be valid, which corresponds to cases where only a single body may be
                 specified (e.g.: fixed joints)
-
-        articulation (None or int): if specified, should be handle to pre-existing articulation. This will enable
-            additional features for this joint prim, e.g.: polling / setting this joint's state. Note that in this
-            case, the joint must already exist prior to this class instance. Default is None,
-            which corresponds to a non-articulated joint.
     """
 
     def __init__(
