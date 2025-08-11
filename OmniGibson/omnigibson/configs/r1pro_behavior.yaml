@@ -100,7 +100,7 @@ objects: []
 
 task:
   type: BehaviorTask
-  activity_name: putting_away_Halloween_decorations
+  activity_name: picking_up_trash
   activity_definition_id: 0
   activity_instance_id: 0
   predefined_problem: null

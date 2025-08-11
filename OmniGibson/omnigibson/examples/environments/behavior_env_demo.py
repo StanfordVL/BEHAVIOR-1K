@@ -33,6 +33,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = os.path.join(og.example_config_path, "r1pro_behavior.yaml")
     cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     cfg["task"]["online_object_sampling"] = should_sample
+    cfg["task"]["use_presampled_robot_pose"] = not should_sample
 
     # Load the environment
     env = og.Environment(configs=cfg)
