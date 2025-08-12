@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name="replay_data"
-#SBATCH --account=vision
+#SBATCH --account=cvgl
 #SBATCH --partition=svl,napoli-gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:titanrtx:1
