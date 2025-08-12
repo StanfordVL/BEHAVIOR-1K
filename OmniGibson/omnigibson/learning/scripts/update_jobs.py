@@ -34,14 +34,15 @@ def main(args):
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
 
     if not args.local:
+        partition = "viscam" if args.viscam else "svl,napoli-gpu"
         data_dir = f"/vision/u/{user}/data/behavior"
         # Get number of running or pending jobs for the current user
         cmd = (
-            "/usr/local/bin/sacct --format=JobID,State --user={} --state=RUNNING,PENDING --noheader "
+            "/usr/local/bin/sacct --format=JobID,State --user={} --state=RUNNING,PENDING --partition {} --noheader "
             "| awk '$2 ~ /RUNNING|PENDING/ {{ split($1, a, \".\"); print a[1] }}' "
             "| sort -u "
             "| wc -l"
-        ).format(user)
+        ).format(user, partition)
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
         running_jobs = int(result.stdout.strip())
         if running_jobs >= MAX_JOBS:
@@ -70,11 +71,12 @@ def main(args):
                         values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                     )
                     if not args.local:
+                        node = "viscam" if args.viscam else "vision"
                         cmd = (
                             "cd /vision/u/{}/BEHAVIOR-1K && "
-                            '/usr/local/bin/sbatch OmniGibson/omnigibson/learning/scripts/replay_data.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
+                            '/usr/local/bin/sbatch OmniGibson/omnigibson/learning/scripts/replay_data_{}.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
                         ).format(
-                            user, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx
+                            user, node, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx
                         )
                         # Run the command
                         subprocess.run(cmd, shell=True)
@@ -100,6 +102,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--local", action="store_true", help="Whether to run locally or with slurm")
+    parser.add_argument("--viscam", action="store_true", help="Whether to run with viscam")
     args = parser.parse_args()
 
     main(args)
