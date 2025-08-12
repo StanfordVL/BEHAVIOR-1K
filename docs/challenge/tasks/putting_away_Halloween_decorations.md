@@ -5,7 +5,8 @@ icon: material/video-outline
 # Task 2: Putting Away Halloween Decorations
 
 **Rooms:** Living Room 
-**Duration:** 120s avg
+**Duration:** 120s avg  
+**Task Definition:** [View on BEHAVIOR Knowledge Base](https://behavior.stanford.edu/knowledgebase/tasks/putting_away_Halloween_decorations-0.html)
 
 === "RGB"
     

@@ -5,7 +5,8 @@ icon: material/video-outline
 # Task 1: Picking Up Trash
 
 **Rooms:** Kitchen, Living Room  
-**Duration:** 90s avg
+**Duration:** 90s avg  
+**Task Definition:** [View on BEHAVIOR Knowledge Base](https://behavior.stanford.edu/knowledgebase/tasks/picking_up_trash-0.html)
 
 === "RGB"
     
