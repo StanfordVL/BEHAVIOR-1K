@@ -8,7 +8,7 @@ from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from typing import Tuple
 
 
-MAX_ENTRIES_PER_TASK = 150
+MAX_ENTRIES_PER_TASK = 300
 home = os.environ.get("HOME")
 credentials_path = f"{home}/Documents/credentials"
 
