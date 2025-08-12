@@ -76,7 +76,13 @@ def main(args):
                             "cd /vision/u/{}/BEHAVIOR-1K && "
                             '/usr/local/bin/sbatch OmniGibson/omnigibson/learning/scripts/replay_data_{}.sbatch.sh --data_url "{}" --data_folder {} --task_name {} --demo_id {} --update_sheet --row {}'
                         ).format(
-                            user, node, url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx
+                            user,
+                            node,
+                            url,
+                            data_dir,
+                            task_name,
+                            int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"),
+                            row_idx,
                         )
                         # Run the command
                         subprocess.run(cmd, shell=True)
