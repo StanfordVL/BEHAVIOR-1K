@@ -253,10 +253,9 @@ def replay_hdf5_file(
                     stream_options={"x265-params": "log-level=none"},
                 )
             )
-            ins_id_seg_original = env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"]
             ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}"].attrs[f"{camera_name}::unique_ins_ids"]
             write_video(
-                ins_id_seg_original,
+                env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"],
                 video_writer=video_writers[-1],
                 batch_size=flush_every_n_steps,
                 mode="seg",

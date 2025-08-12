@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name="replay_data"
 #SBATCH --account=vision
-#SBATCH --partition=svl
+#SBATCH --partition=svl,napoli-gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=70G
@@ -21,6 +21,29 @@ echo "working directory = "$SLURM_SUBMIT_DIR
 source /vision/u/$(whoami)/miniconda3/bin/activate behavior
 
 echo "Running with args: $@"
+
+
+ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/${SLURM_JOB_ID}.err"
+
+# Start watchdog in background
+(
+  prev_lines=0
+  while true; do
+    if [[ -f "$ERR_FILE" ]]; then
+      current_lines=$(wc -l < "$ERR_FILE")
+      if [[ "$current_lines" -le "$prev_lines" ]]; then
+        echo "No new output detected in $ERR_FILE. Killing job $SLURM_JOB_ID."
+        scancel $SLURM_JOB_ID
+        exit 0
+      else
+        prev_lines=$current_lines
+      fi
+    else
+      echo "$ERR_FILE does not exist yet."
+    fi
+    sleep 3600  # wait 1h
+  done
+) &
 
 # run slurm ready script
 /vision/u/$(whoami)/BEHAVIOR-1K/OmniGibson/scripts/slurm_ready.sh

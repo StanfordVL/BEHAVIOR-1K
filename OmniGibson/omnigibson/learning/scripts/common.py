@@ -43,12 +43,12 @@ def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
     task_worksheet = spreadsheet.worksheet(worksheet_name)
     # get row data
     row_data = task_worksheet.row_values(row_idx)
-    assert row_data[3] == "processing"
+    assert row_data[3] == "pending"
     assert row_data[4] == getpass.getuser()
     # update status and timestamp
     task_worksheet.update(
         range_name=f"D{row_idx}:F{row_idx}",
-        values=[["processed", getpass.getuser(), time.strftime("%Y-%m-%d %H:%M:%S")]],
+        values=[["done", getpass.getuser(), time.strftime("%Y-%m-%d %H:%M:%S")]],
     )
 
 

@@ -67,7 +67,7 @@ def main(args):
                     print(f"Scheduling job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}")
                     ws.update(
                         range_name=f"D{row_idx}:F{row_idx}",
-                        values=[["processing", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
+                        values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                     )
                     if not args.local:
                         cmd = (
