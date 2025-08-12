@@ -77,6 +77,7 @@ setup(
             "websockets>=15.0.1",
             "msgpack>=1.1.0",
             "lerobot @ git+https://github.com/huggingface/lerobot@main",
+            "gspread>=6.2.1",
         ]
     },
     tests_require=[],

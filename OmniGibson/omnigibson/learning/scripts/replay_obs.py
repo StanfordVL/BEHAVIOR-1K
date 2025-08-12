@@ -1,4 +1,5 @@
 import argparse
+import gspread
 import h5py
 import json
 import numpy as np
@@ -73,9 +74,6 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         traj_grp.attrs["robot_type"] = "R1Pro"
         # Add the list of task obs keys as attrs (this is list of strs)
         traj_grp.attrs["task_obs_keys"] = self.env.task.low_dim_obs_keys
-        traj_grp.attrs["task_relevant_objs"] = [
-            obj.unwrapped.name for obj in self.env.task.object_scope.values() if obj.unwrapped.name != "robot_r1"
-        ]
         # add instance mapping keys as attrs
         traj_grp.attrs["ins_id_mapping"] = json.dumps(VisionSensor.INSTANCE_ID_REGISTRY)
 
@@ -278,7 +276,17 @@ def replay_hdf5_file(
                         stream_options={"x265-params": "log-level=none"},
                     )
                 )
-                task_relevant_objs = env.hdf5_file[f"data/demo_{episode_id}"].attrs["task_relevant_objs"]
+                # read task relevant objects from google sheet
+                credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
+                gc = gspread.service_account(filename=credentials_path)
+                sh = gc.open("Object Instance ID to be annotated for B50 tasks")
+                worksheet = sh.worksheet("Sheet1").get_all_values()
+                task_relevant_objs = None
+                for row in worksheet[1:]:
+                    if row and row[0] == task_name:
+                        task_relevant_objs = row[1] + row[2]
+                        break
+                assert task_relevant_objs is not None, "Task relevant objects not found!"
                 instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                 instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
                 unique_ins_ids = env.hdf5_file[f"data/demo_{episode_id}"].attrs[f"{camera_name}::unique_ins_ids"]

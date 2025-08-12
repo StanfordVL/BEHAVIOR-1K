@@ -11,7 +11,11 @@ from typing import List
 
 user = getpass.getuser()
 home = os.environ.get("HOME")
-MAX_JOBS = {"vision": 64, "viscam": 32}  # Maximum number of jobs allowed
+MAX_JOBS = {
+    "vision": 64,
+    "viscam": 32
+}  # Maximum number of jobs allowed
+MAX_TRAJ_PER_TASK = 200 
 credentials_path = f"{home}/Documents/credentials"
 
 
@@ -35,6 +39,7 @@ def main(args):
 
     if not args.local:
         partition = "viscam" if args.viscam else "svl,napoli-gpu"
+        node = "viscam" if args.viscam else "vision"
         data_dir = f"/vision/u/{user}/data/behavior"
         # Get number of running or pending jobs for the current user
         cmd = (
@@ -45,10 +50,10 @@ def main(args):
         ).format(user, partition)
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
         running_jobs = int(result.stdout.strip())
-        if running_jobs >= MAX_JOBS:
+        if running_jobs >= MAX_JOBS[node]:
             print(f"SLURM job limit reached: {running_jobs}. Exiting...")
             exit(0)
-        job_quota = MAX_JOBS - running_jobs
+        job_quota = MAX_JOBS[node] - running_jobs
     else:
         data_dir = os.path.expanduser("~/Documents/Files/behavior")
         job_quota = 1
@@ -61,8 +66,13 @@ def main(args):
             task_id = TASK_NAMES_TO_INDICES[task_name]
             # Iterate through all the rows, find the unprocessed ones
             all_rows = ws.get_all_values()
+            num_process_traj = 0
             for row_idx, row in enumerate(all_rows[1:], start=2):  # Skip header, row numbers start at 2
-                if row and row[3].strip().lower() == "unprocessed":
+                if num_process_traj >= MAX_TRAJ_PER_TASK:
+                    break
+                elif row and row[3].strip().lower() in ["pending", "done"]:
+                    num_process_traj += 1
+                elif row and row[3].strip().lower() == "unprocessed" and int(row[1]) == 0:    # currently only generate unique task instance
                     instance_id, traj_id, resource_uuid = int(row[0]), int(row[1]), row[2]
                     url = get_urls_from_lightwheel([resource_uuid], lightwheel_api_credentials, lw_token=lw_token)[0]
                     print(f"Scheduling job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}")
@@ -100,6 +110,7 @@ def main(args):
                         ).format(url, data_dir, task_name, int(f"{task_id:04d}{instance_id:03d}{traj_id:01d}"), row_idx)
                         subprocess.run(cmd, shell=True, check=True)
                     job_quota -= 1
+                    num_process_traj += 1
                     if job_quota <= 0:
                         print(f"Reached job limit, exiting...")
                         exit(0)
