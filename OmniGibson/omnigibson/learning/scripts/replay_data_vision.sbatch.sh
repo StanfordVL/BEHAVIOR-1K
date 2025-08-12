@@ -4,7 +4,7 @@
 #SBATCH --partition=svl,napoli-gpu
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:titanrtx:1
-#SBATCH --mem=70G
+#SBATCH --mem=60G
 #SBATCH --cpus-per-task=8
 #SBATCH --time=1-00:00:00
 #SBATCH --output=outputs/sc/replay_data_%j.out
