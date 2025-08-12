@@ -182,13 +182,6 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    @property
-    def task_metadata(self):
-        # Store mapping from entity name to its corresponding BDDL instance name
-        return dict(
-            inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
-        )
-
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
@@ -247,7 +240,7 @@ class BehaviorTask(BaseTask):
         # Use presampled robot pose if specified (only available for officially supported mobile manipulators)
         if self.use_presampled_robot_pose:
             robot = self.get_agent(env)
-            presampled_poses = env.scene.presampled_robot_poses
+            presampled_poses = env.scene.get_task_metadata(key="robot_poses")
             assert (
                 robot.model_name in presampled_poses
             ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
@@ -411,7 +404,7 @@ class BehaviorTask(BaseTask):
             env (Environment): Current active environment instance
         """
         # Load task metadata
-        inst_to_name = self.load_task_metadata(env=env)["inst_to_name"]
+        inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
 
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
@@ -436,6 +429,11 @@ class BehaviorTask(BaseTask):
                 bddl_inst=obj_inst,
                 entity=entity,
             )
+
+        # Write back to task metadata
+        env.scene.write_task_metadata(
+            key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
+        )
 
     def _get_obs(self, env):
         low_dim_obs = dict()
@@ -619,8 +617,11 @@ class BehaviorTask(BaseTask):
             with open(path, "w+") as f:
                 json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
         else:
-            # Write metadata and then save
-            self.write_task_metadata(env)
+            # Update task metadata and save
+            env.scene.write_task_metadata(
+                key="inst_to_name",
+                data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
+            )
             env.scene.save(json_path=path)
 
     @property
