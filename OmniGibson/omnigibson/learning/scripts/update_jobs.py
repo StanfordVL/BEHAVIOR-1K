@@ -11,11 +11,8 @@ from typing import List
 
 user = getpass.getuser()
 home = os.environ.get("HOME")
-MAX_JOBS = {
-    "vision": 64,
-    "viscam": 32
-}  # Maximum number of jobs allowed
-MAX_TRAJ_PER_TASK = 200 
+MAX_JOBS = {"vision": 64, "viscam": 32}  # Maximum number of jobs allowed
+MAX_TRAJ_PER_TASK = 200
 credentials_path = f"{home}/Documents/credentials"
 
 
@@ -72,7 +69,9 @@ def main(args):
                     break
                 elif row and row[3].strip().lower() in ["pending", "done"]:
                     num_process_traj += 1
-                elif row and row[3].strip().lower() == "unprocessed" and int(row[1]) == 0:    # currently only generate unique task instance
+                elif (
+                    row and row[3].strip().lower() == "unprocessed" and int(row[1]) == 0
+                ):  # currently only generate unique task instance
                     instance_id, traj_id, resource_uuid = int(row[0]), int(row[1]), row[2]
                     url = get_urls_from_lightwheel([resource_uuid], lightwheel_api_credentials, lw_token=lw_token)[0]
                     print(f"Scheduling job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}")
