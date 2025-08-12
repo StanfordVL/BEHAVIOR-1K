@@ -23,7 +23,7 @@ source /vision/u/$(whoami)/miniconda3/bin/activate behavior
 echo "Running with args: $@"
 
 
-ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/${SLURM_JOB_ID}.err"
+ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data_${SLURM_JOB_ID}.err"
 
 # Start watchdog in background
 (
