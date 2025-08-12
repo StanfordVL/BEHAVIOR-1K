@@ -30,50 +30,9 @@ Browse through all 50 household tasks in our 2025 challenge. Click on any task t
   </div>
 </div>
 
-<div class="grid cards compact" id="task-grid" markdown>
-
-- ![Turning On Radio](https://i.vimeocdn.com/video/2046655249-86934e83f1a8908d7650d7d7794ce5b7a6303dabbb8182e286623b17614c13bf-d_295x166){ .task-thumbnail }
-
-    **Turning On Radio**
-    {: .task-title data-rooms="living-room" data-duration="45" }
-
-    ---
-
-    :material-home: Living Room  
-    :material-clock-outline: 45s avg
-
-    [:octicons-arrow-right-24: View Task](./tasks/turning_on_radio.md)
-
-- ![Picking Up Trash](https://i.vimeocdn.com/video/2046660576-1b8dc9c40d1e4a390fd7ddc851da0c62895371e0d27a52c4133e9d8391ce28ca-d_295x166){ .task-thumbnail }
-
-    **Picking Up Trash**
-    {: .task-title data-rooms="kitchen living-room" data-duration="90" }
-
-    ---
-
-    :material-home: Kitchen, Living Room  
-    :material-clock-outline: 90s avg
-
-    [:octicons-arrow-right-24: View Task](./tasks/picking_up_trash.md)
-
-- ![Putting Away Halloween Decorations](https://i.vimeocdn.com/video/2046668931-9db3428391e4025c251343a4a026a6ead0afb888965b6a3987fdecd6785ece76-d_295x166){ .task-thumbnail }
-
-    **Putting Away Halloween Decorations**
-    {: .task-title data-rooms="living-room" data-duration="120" }
-
-    ---
-
-    :material-home: Living Room
-    :material-clock-outline: 120s avg
-
-    [:octicons-arrow-right-24: View Task](./tasks/putting_away_Halloween_decorations.md)
-
-<!-- TODO: Add remaining 47 task cards in the same format -->
-
-</div>
+<div class="grid cards compact" id="task-grid"></div>
 
 <style>
-/* Controls styling */
 .controls {
   display: flex;
   gap: 2rem;
@@ -105,50 +64,66 @@ Browse through all 50 household tasks in our 2025 challenge. Click on any task t
   cursor: pointer;
 }
 
-/* Make grid cards more compact to fit more per row */
 .grid.cards.compact {
+  display: grid !important;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)) !important;
+  gap: 1rem;
+  margin-top: 1.5rem;
 }
 
-.grid.cards.compact > li {
-  margin: 0.5rem !important;
-  list-style: none !important;  /* Remove the dots */
+.task-card {
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  padding: 1rem;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
-.grid.cards.compact > li::before {
-  display: none !important;  /* Remove any pseudo-element markers */
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
-.grid.cards.compact .task-thumbnail {
+.task-card.hidden {
+  display: none;
+}
+
+.task-thumbnail {
   width: 100%;
   border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.task-title {
+  font-size: 1.1rem;
+  font-weight: 600;
   margin-bottom: 0.5rem;
+  color: var(--md-default-fg-color);
 }
 
-/* Reduce padding in cards for compact view */
-.grid.cards.compact > li > div {
-  padding: 1rem !important;
-}
-
-.grid.cards.compact > li > div > p {
-  margin: 0.5rem 0 !important;
+.task-meta {
+  color: var(--md-default-fg-color--light);
   font-size: 0.9rem;
+  margin: 0.25rem 0;
 }
 
-/* Ensure grid stays consistent when sorting */
-.grid.cards {
-  display: grid !important;
+.task-link {
+  display: inline-block;
+  margin-top: 0.75rem;
+  color: var(--md-primary-fg-color);
+  text-decoration: none;
+  font-weight: 500;
 }
 
-/* Responsive adjustments */
+.task-link:hover {
+  text-decoration: underline;
+}
+
 @media (max-width: 768px) {
   .controls {
     flex-direction: column;
     align-items: stretch;
-  }
-  
-  #search-input {
-    max-width: 100%;
+    gap: 1rem;
   }
   
   .grid.cards.compact {
@@ -158,87 +133,125 @@ Browse through all 50 household tasks in our 2025 challenge. Click on any task t
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const taskGrid = document.getElementById('task-grid');
-  const roomFilter = document.getElementById('room-filter');
-  const sortSelect = document.getElementById('sort-select');
+(function() {
+  // Centralized task data
+  const tasks = [
+    {
+      id: 'turning_on_radio',
+      name: 'Turning On Radio',
+      rooms: ['living-room'],
+      duration: 45,
+      thumbnail: 'https://i.vimeocdn.com/video/2046655249-86934e83f1a8908d7650d7d7794ce5b7a6303dabbb8182e286623b17614c13bf-d_295x166',
+      path: './tasks/turning_on_radio.md'
+    },
+    {
+      id: 'picking_up_trash',
+      name: 'Picking Up Trash',
+      rooms: ['kitchen', 'living-room'],
+      duration: 90,
+      thumbnail: 'https://i.vimeocdn.com/video/2046660576-1b8dc9c40d1e4a390fd7ddc851da0c62895371e0d27a52c4133e9d8391ce28ca-d_295x166',
+      path: './tasks/picking_up_trash.md'
+    },
+    {
+      id: 'putting_away_halloween_decorations',
+      name: 'Putting Away Halloween Decorations',
+      rooms: ['living-room'],
+      duration: 120,
+      thumbnail: 'https://i.vimeocdn.com/video/2046668931-9db3428391e4025c251343a4a026a6ead0afb888965b6a3987fdecd6785ece76-d_295x166',
+      path: './tasks/putting_away_Halloween_decorations.md'
+    }
+    // TODO: Add remaining 47 tasks here
+  ];
 
-  function initializeCards() {
-    const taskCards = Array.from(taskGrid.querySelectorAll('li'));
+  // Room display names
+  const roomNames = {
+    'kitchen': 'Kitchen',
+    'living-room': 'Living Room',
+    'bedroom': 'Bedroom',
+    'bathroom': 'Bathroom',
+    'dining-room': 'Dining Room',
+    'garage': 'Garage'
+  };
+
+  // Initialize gallery - runs immediately
+  function initGallery() {
+    const taskGrid = document.getElementById('task-grid');
+    const roomFilter = document.getElementById('room-filter');
+    const sortSelect = document.getElementById('sort-select');
     
-    // Extract data from each card
-    taskCards.forEach(card => {
-      // Get task name from the bold text
-      const strongElement = card.querySelector('strong');
-      if (strongElement) {
-        card.dataset.name = strongElement.textContent.trim().toLowerCase();
-      }
-      
-      // Extract duration from text content
-      const durationMatch = card.textContent.match(/(\d+)s avg/);
-      if (durationMatch) {
-        card.dataset.duration = durationMatch[1];
-      }
-      
-      // Extract rooms from the content - look for the room names in the text
-      const textContent = card.textContent.toLowerCase();
-      const rooms = [];
-      
-      if (textContent.includes('kitchen')) rooms.push('kitchen');
-      if (textContent.includes('living room')) rooms.push('living-room');
-      if (textContent.includes('bedroom')) rooms.push('bedroom');
-      if (textContent.includes('bathroom')) rooms.push('bathroom');
-      if (textContent.includes('dining room')) rooms.push('dining-room');
-      if (textContent.includes('garage')) rooms.push('garage');
-      
-      card.dataset.rooms = rooms.join(' ');
-    });
-
-    return taskCards;
-  }
-
-  // Initialize cards
-  const taskCards = initializeCards();
-
-  // Filter functionality
-  function applyFilter() {
-    const selectedRoom = roomFilter.value;
+    if (!taskGrid || !roomFilter || !sortSelect) {
+      // Elements not ready, try again
+      setTimeout(initGallery, 10);
+      return;
+    }
     
-    taskCards.forEach(card => {
+    let currentTasks = [...tasks];
+    
+    // Render tasks
+    function renderTasks(taskList) {
+      taskGrid.innerHTML = '';
+      
+      taskList.forEach(task => {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+        card.dataset.id = task.id;
+        
+        const roomsDisplay = task.rooms.map(r => roomNames[r]).join(', ');
+        
+        card.innerHTML = `
+          <img src="${task.thumbnail}" alt="${task.name}" class="task-thumbnail">
+          <div class="task-title">${task.name}</div>
+          <div class="task-meta">📍 ${roomsDisplay}</div>
+          <div class="task-meta">⏱️ ${task.duration}s avg</div>
+          <a href="${task.path}" class="task-link">View Task →</a>
+        `;
+        
+        taskGrid.appendChild(card);
+      });
+    }
+    
+    // Filter tasks
+    function filterTasks() {
+      const selectedRoom = roomFilter.value;
+      
       if (selectedRoom === 'all') {
-        card.style.display = '';
+        currentTasks = [...tasks];
       } else {
-        const cardRooms = card.dataset.rooms || '';
-        const hasRoom = cardRooms.includes(selectedRoom);
-        card.style.display = hasRoom ? '' : 'none';
+        currentTasks = tasks.filter(task => task.rooms.includes(selectedRoom));
       }
-    });
-  }
-
-  // Sort functionality  
-  function applySort() {
-    const sortBy = sortSelect.value;
+      
+      sortTasks();
+    }
     
-    const sortedCards = [...taskCards].sort((a, b) => {
-      switch(sortBy) {
-        case 'name':
-          return (a.dataset.name || '').localeCompare(b.dataset.name || '');
-        case 'duration-asc':
-          return parseInt(a.dataset.duration || '0') - parseInt(b.dataset.duration || '0');
-        case 'duration-desc':
-          return parseInt(b.dataset.duration || '0') - parseInt(a.dataset.duration || '0');
-        default:
-          return 0;
-      }
-    });
-
-    // Clear and re-add sorted cards
-    taskCards.forEach(card => card.remove());
-    sortedCards.forEach(card => taskGrid.appendChild(card));
+    // Sort tasks
+    function sortTasks() {
+      const sortBy = sortSelect.value;
+      
+      currentTasks.sort((a, b) => {
+        switch(sortBy) {
+          case 'name':
+            return a.name.localeCompare(b.name);
+          case 'duration-asc':
+            return a.duration - b.duration;
+          case 'duration-desc':
+            return b.duration - a.duration;
+          default:
+            return 0;
+        }
+      });
+      
+      renderTasks(currentTasks);
+    }
+    
+    // Event listeners
+    roomFilter.addEventListener('change', filterTasks);
+    sortSelect.addEventListener('change', sortTasks);
+    
+    // Initial render
+    renderTasks(currentTasks);
   }
-
-  // Event listeners
-  roomFilter.addEventListener('change', applyFilter);
-  sortSelect.addEventListener('change', applySort);
-});
+  
+  // Start initialization immediately
+  initGallery();
+})();
 </script>
