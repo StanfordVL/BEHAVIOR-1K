@@ -444,6 +444,15 @@ class BehaviorTask(BaseTask):
             )
 
         # Write back to task metadata
+        self.update_bddl_scope_metadata(env)
+
+    def update_bddl_scope_metadata(self, env):
+        """
+        Updates the task metadata with the current instance-to-name mapping for all existing entities.
+
+        Args:
+            env: The environment containing the scene to update
+        """
         env.scene.write_task_metadata(
             key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
         )
@@ -631,10 +640,7 @@ class BehaviorTask(BaseTask):
                 json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
         else:
             # Update task metadata and save
-            env.scene.write_task_metadata(
-                key="inst_to_name",
-                data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
-            )
+            self.update_bddl_scope_metadata(env)
             env.scene.save(json_path=path)
 
     @property
