@@ -11,7 +11,7 @@ from typing import List
 
 user = getpass.getuser()
 home = os.environ.get("HOME")
-MAX_JOBS = {"vision": 32, "viscam": 8}  # Maximum number of jobs allowed
+MAX_JOBS = {"vision": 64, "viscam": 12}  # Maximum number of jobs allowed
 MAX_TRAJ_PER_TASK = 200
 credentials_path = f"{home}/Documents/credentials"
 
@@ -37,7 +37,7 @@ def main(args):
     if not args.local:
         partition = "viscam" if args.viscam else "svl,napoli-gpu"
         node = "viscam" if args.viscam else "vision"
-        data_dir = f"/vision/u/{user}/data/behavior"
+        data_dir = "/vision/group/behavior"
         # Get number of running or pending jobs for the current user
         cmd = (
             "/usr/local/bin/sacct --format=JobID,State --user={} --state=RUNNING,PENDING --partition {} --noheader "

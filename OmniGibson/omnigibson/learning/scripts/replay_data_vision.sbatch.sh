@@ -5,10 +5,10 @@
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:titanrtx:1
 #SBATCH --mem=60G
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=7
 #SBATCH --time=1-00:00:00
-#SBATCH --output=outputs/sc/replay_data_%j.out
-#SBATCH --error=outputs/sc/replay_data_%j.err
+#SBATCH --output=outputs/sc/replay_data/%j.out
+#SBATCH --error=outputs/sc/replay_data/%j.err
 
 # list out some useful information
 echo "SLURM_JOBID="$SLURM_JOBID
@@ -23,7 +23,7 @@ source /vision/u/$(whoami)/miniconda3/bin/activate behavior
 echo "Running with args: $@"
 
 
-ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data_${SLURM_JOB_ID}.err"
+ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data/${SLURM_JOB_ID}.err"
 
 # Start watchdog in background
 (
@@ -47,7 +47,7 @@ ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data_${SLURM_JOB_ID}
 
 # run slurm ready script
 /vision/u/$(whoami)/BEHAVIOR-1K/OmniGibson/scripts/slurm_ready.sh
-OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py $@ --low_dim --rgbd --seg --bbox
+OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py $@ --low_dim --rgbd --seg
 
 echo "Job finished."
 exit 0

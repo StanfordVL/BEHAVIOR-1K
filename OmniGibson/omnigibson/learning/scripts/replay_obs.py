@@ -53,8 +53,11 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
-            # move seg maps to cpu
-            obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
+            # remove seg semantic map
+            obs.pop(f"{camera_name}::seg_semantic")
+            # use the following line if we want to store seg semantic map instead
+            # obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
+            # move seg instance maps to cpu
             obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose
             cam_pose = robot.sensors[camera_name.split("::")[1]].get_position_orientation()
@@ -106,6 +109,7 @@ def replay_hdf5_file(
     generate_seg: bool = False,
     generate_bbox: bool = False,
     flush_every_n_steps: int = 500,
+    offline_rgbd: bool = False
 ) -> None:
     """
     Replays a single HDF5 file and saves videos to a new folder
@@ -119,6 +123,7 @@ def replay_hdf5_file(
         generate_seg: If True, generates segmentation data from the replayed data
         generate_bbox: If True, generates bounding box data from the replayed data
         flush_every_n_steps: Number of steps to flush the data after
+        offline_rgbd: If True, generates RGBD videos from h5 after replaying
     """
     if generate_bbox:
         assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
@@ -172,6 +177,8 @@ def replay_hdf5_file(
         flush_every_n_steps=flush_every_n_steps,
         additional_wrapper_configs=additional_wrapper_configs,
         full_scene_file=full_scene_file,
+        include_robot_control=False,
+        include_contacts=False,
     )
 
     # Modify head camera
@@ -187,52 +194,53 @@ def replay_hdf5_file(
     num_samples = [env.input_hdf5["data"][key].attrs["num_samples"] for key in env.input_hdf5["data"].keys()]
     episode_id = num_samples.index(max(num_samples))
     log.info(f" >>> Replaying episode {episode_id}")
-    env.playback_episode(
-        episode_id=episode_id,
-        record_data=True,
-    )
-
-    # now store obs as videos
-    video_writers = []
-    for camera_id, camera_name in camera_names.items():
-        resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
-        if generate_rgbd:
+    # initialize video writers if required
+    video_writers = dict()
+    if generate_rgbd: 
+        for camera_id, camera_name in camera_names.items():
             rgb_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}")
             depth_dir = os.path.join(
                 data_folder, "videos", f"task-{task_id:04d}", f"observation.images.depth.{camera_id}"
             )
             os.makedirs(rgb_dir, exist_ok=True)
             os.makedirs(depth_dir, exist_ok=True)
+            resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
             # RGB video writer
-            video_writers.append(
-                create_video_writer(
-                    fpath=f"{rgb_dir}/episode_{demo_id:08d}.mp4",
-                    resolution=resolution,
-                    codec_name="libx265",
-                    pix_fmt="yuv420p",
-                    stream_options={"x265-params": "log-level=none"},
-                )
+            video_writers[f"{camera_name}::rgb"] = create_video_writer(
+                fpath=f"{rgb_dir}/episode_{demo_id:08d}.mp4",
+                resolution=resolution,
+                codec_name="libx265",
+                pix_fmt="yuv420p",
+                stream_options={"x265-params": "log-level=none"},
             )
+            # Depth video writer
+            video_writers[f"{camera_name}::depth_linear"] = create_video_writer(
+                fpath=f"{depth_dir}/episode_{demo_id:08d}.mp4",
+                resolution=resolution,
+                codec_name="libx265",
+                pix_fmt="yuv420p10le",
+                stream_options={"x265-params": "lossless=1:log-level=none"},
+            )
+    env.playback_episode(
+        episode_id=episode_id,
+        record_data=True,
+        video_writers=video_writers if not offline_rgbd else None,
+    )
+
+    # now store obs as videos
+    for camera_id, camera_name in camera_names.items():
+        resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
+        if generate_rgbd and offline_rgbd:
             write_video(
                 env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"],
-                video_writer=video_writers[-1],
+                video_writer=video_writers[f"{camera_name}::rgb"],
                 batch_size=flush_every_n_steps,
                 mode="rgb",
             )
             log.info(f"Saved rgb video for {camera_name}")
-            # Depth video writer
-            video_writers.append(
-                create_video_writer(
-                    fpath=f"{depth_dir}/episode_{demo_id:08d}.mp4",
-                    resolution=resolution,
-                    codec_name="libx265",
-                    pix_fmt="yuv420p10le",
-                    stream_options={"x265-params": "lossless=1:log-level=none"},
-                )
-            )
             write_video(
                 env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::depth_linear"],
-                video_writer=video_writers[-1],
+                video_writer=video_writers[f"{camera_name}::depth_linear"],
                 batch_size=flush_every_n_steps,
                 mode="depth",
             )
@@ -242,19 +250,17 @@ def replay_hdf5_file(
                 data_folder, "videos", f"task-{task_id:04d}", f"observation.images.seg_instance_id.{camera_id}"
             )
             os.makedirs(seg_dir, exist_ok=True)
-            video_writers.append(
-                create_video_writer(
-                    fpath=f"{seg_dir}/episode_{demo_id:08d}.mp4",
-                    resolution=resolution,
-                    codec_name="libx265",
-                    pix_fmt="yuv420p",
-                    stream_options={"x265-params": "log-level=none"},
-                )
+            video_writers[f"{camera_name}::seg_instance_id"] = create_video_writer(
+                fpath=f"{seg_dir}/episode_{demo_id:08d}.mp4",
+                resolution=resolution,
+                codec_name="libx265",
+                pix_fmt="yuv420p",
+                stream_options={"x265-params": "log-level=none"},
             )
             ins_id_ids = env.hdf5_file[f"data/demo_{episode_id}"].attrs[f"{camera_name}::unique_ins_ids"]
             write_video(
                 env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::seg_instance_id"],
-                video_writer=video_writers[-1],
+                video_writer=video_writers[f"{camera_name}::seg_instance_id"],
                 batch_size=flush_every_n_steps,
                 mode="seg",
                 seg_ids=ins_id_ids,
@@ -267,14 +273,12 @@ def replay_hdf5_file(
                     data_folder, "videos", f"task-{task_id:04d}", f"observation.images.bbox.{camera_id}"
                 )
                 os.makedirs(bbox_dir, exist_ok=True)
-                video_writers.append(
-                    create_video_writer(
-                        fpath=f"{bbox_dir}/episode_{demo_id:08d}.mp4",
-                        resolution=resolution,
-                        codec_name="libx265",
-                        pix_fmt="yuv420p",
-                        stream_options={"x265-params": "log-level=none"},
-                    )
+                video_writers[f"{camera_name}::bbox"] = create_video_writer(
+                    fpath=f"{bbox_dir}/episode_{demo_id:08d}.mp4",
+                    resolution=resolution,
+                    codec_name="libx265",
+                    pix_fmt="yuv420p",
+                    stream_options={"x265-params": "log-level=none"},
                 )
                 # read task relevant objects from google sheet
                 credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
@@ -310,7 +314,7 @@ def replay_hdf5_file(
                         th.from_numpy(
                             env.hdf5_file[f"data/demo_{episode_id}/obs/{camera_name}::rgb"][i : i + flush_every_n_steps]
                         ),
-                        video_writer=video_writers[-1],
+                        video_writer=video_writers[f"{camera_name}::bbox"],
                         batch_size=flush_every_n_steps,
                         mode="bbox",
                         bbox=bbox,
@@ -319,7 +323,7 @@ def replay_hdf5_file(
                     )
                 log.info(f"Saved bbox video for {camera_name}")
     # Close all video writers
-    for container, stream in video_writers:
+    for container, stream in video_writers.values():
         # Flush any remaining packets
         for packet in stream.encode():
             container.mux(packet)
@@ -620,6 +624,8 @@ def main():
     parser.add_argument("--demo_id", type=int, required=True, help="Demo ID to process")
     parser.add_argument("--low_dim", action="store_true", help="Include this flag to generate low dimensional data")
     parser.add_argument("--rgbd", action="store_true", help="Include this flag to generate rgbd videos")
+    parser.add_argument("--offline_rgbd", action="store_true", help="Whether rgbd videos should be generated offline")
+
     parser.add_argument(
         "--pcd_gt", action="store_true", help="Include this flag to generate point cloud data from ground truth RGBD"
     )
@@ -636,7 +642,7 @@ def main():
     task_id = TASK_NAMES_TO_INDICES[args.task_name]
 
     # Process each file
-    if not os.path.exists(f"{args.data_folder}/raw/{args.task_name}/episode_{args.demo_id:08d}.hdf5"):
+    if not os.path.exists(f"{args.data_folder}/raw/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"):
         if args.data_url:
             from omnigibson.learning.scripts.common import download_and_extract_data
 
@@ -644,8 +650,7 @@ def main():
             traj_id = int(args.demo_id % 10)
             download_and_extract_data(args.data_url, args.data_folder, args.task_name, instance_id, traj_id)
         else:
-            log.error(f"Error: Folder {args.data_folder} does not exist")
-            return
+            raise FileNotFoundError(f"Error: Folder {args.data_folder} does not exist")
     if args.rgbd or args.seg or args.bbox:
         replay_hdf5_file(
             data_folder=args.data_folder,
@@ -655,6 +660,7 @@ def main():
             generate_seg=args.seg,
             generate_bbox=args.bbox,
             flush_every_n_steps=FLUSH_EVERY_N_STEPS,
+            offline_rgbd=args.offline_rgbd,
         )
 
     if args.low_dim:
@@ -695,7 +701,7 @@ def main():
 
     log.info("All done!")
     # remove replayed hdf5 to free up storage
-    os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
+    # os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
     # Optionally update google sheet
     if args.update_sheet:
         from omnigibson.learning.scripts.common import update_google_sheet

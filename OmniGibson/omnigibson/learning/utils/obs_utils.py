@@ -121,7 +121,7 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
     Writes videos to the specified video writers using the current trajectory history
 
     Args:
-        obs (torch.Tensor): Observation tensor
+        obs (np.ndarray): Observation data
         video_writer (container, stream): PyAV container and stream objects to write video frames to
         mode (str): Mode to write video frames to. Only "rgb", "depth" and "seg" are supported.
         batch_size (int): Batch size to write video frames to. If None, write video frames to the entire video.
@@ -135,7 +135,7 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
                 frame = av.VideoFrame.from_ndarray(frame[..., :3], format="rgb24")
                 for packet in stream.encode(frame):
                     container.mux(packet)
-    elif mode == "depth":
+    elif mode == "depth" or mode == "depth_linear":
         for i in range(0, obs.shape[0], batch_size):
             quantized_depth = quantize_depth(obs[i : i + batch_size])
             for frame in quantized_depth:

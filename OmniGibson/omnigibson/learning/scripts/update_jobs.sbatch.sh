@@ -3,12 +3,11 @@
 #SBATCH --account=vision
 #SBATCH --partition=svl
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
-#SBATCH --mem=48G
-#SBATCH --cpus-per-task=8
+#SBATCH --mem=40G
+#SBATCH --cpus-per-task=12
 #SBATCH --time=1-00:00:00
-#SBATCH --output=outputs/sc/update_jobs_%j.out
-#SBATCH --error=outputs/sc/update_jobs_%j.err
+#SBATCH --output=outputs/sc/update_jobs/%j.out
+#SBATCH --error=outputs/sc/update_jobs/%j.err
 
 # list out some useful information
 echo "SLURM_JOBID="$SLURM_JOBID

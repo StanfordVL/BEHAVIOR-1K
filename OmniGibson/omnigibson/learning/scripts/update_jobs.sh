@@ -1,9 +1,9 @@
 #!/bin/bash
 USER_DIR="/vision/u/$(whoami)/BEHAVIOR-1K"
-OUT_DIR="$USER_DIR/outputs/sc"
 SCRIPT="$USER_DIR/OmniGibson/omnigibson/learning/scripts/update_jobs.sbatch.sh"
 
-mkdir -p "$OUT_DIR"
+mkdir -p /vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data
+mkdir -p /vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/update_jobs
 
 jobid=$(cd "$USER_DIR" && /usr/local/bin/sbatch "$SCRIPT" "$@" | awk '{print $4}')
 
