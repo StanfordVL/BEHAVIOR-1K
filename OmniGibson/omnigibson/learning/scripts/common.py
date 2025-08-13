@@ -60,7 +60,7 @@ def download_and_extract_data(
     instance_id: int,
     traj_id: int,
 ):
-    makedirs_with_mode(f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}", mode=0o775)
+    makedirs_with_mode(f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}")
     # Download zip file
     response = requests.get(url)
     response.raise_for_status()
