@@ -105,6 +105,7 @@ def main(args):
                                 f"Failed to schedule job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}",
                                 result.stderr,
                             )
+                            exit(0)
                     else:
                         cmd = (
                             "cd ~/Research/BEHAVIOR-1K && "
