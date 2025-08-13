@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import Path
+import random
 
 import torch as th
 from bddl.activity import (
@@ -54,6 +55,9 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
+        use_presampled_robot_pose (bool): Whether to use presampled robot poses from scene metadata
+        randomize_presampled_pose (bool): If True, randomly selects from available presampled poses. If False, always
+            uses the first pose. Only applies when use_presampled_robot_pose is True. Default is False.
         sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
             mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
             that category. During sampling, if a given synset is found in this whitelist, only the specified
@@ -82,6 +86,7 @@ class BehaviorTask(BaseTask):
         predefined_problem=None,
         online_object_sampling=False,
         use_presampled_robot_pose=False,
+        randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
         highlight_task_relevant_objects=False,
@@ -125,6 +130,7 @@ class BehaviorTask(BaseTask):
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
         self.use_presampled_robot_pose = use_presampled_robot_pose
+        self.randomize_presampled_pose = randomize_presampled_pose
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
@@ -244,7 +250,14 @@ class BehaviorTask(BaseTask):
             assert (
                 robot.model_name in presampled_poses
             ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
-            robot_pose = presampled_poses[robot.model_name][0]  # Use first presampled pose (could be randomized)
+
+            # Select pose based on randomize_presampled_pose flag
+            available_poses = presampled_poses[robot.model_name]
+            if self.randomize_presampled_pose:
+                robot_pose = random.choice(available_poses)
+            else:
+                robot_pose = available_poses[0]  # Use first presampled pose
+
             robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
 
         # Force wake objects

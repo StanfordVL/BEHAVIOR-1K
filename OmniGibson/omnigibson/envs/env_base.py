@@ -617,7 +617,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - dict: info, i.e. dictionary with any useful information
         """
         # Pre-processing before stepping simulation
-        if isinstance(action, (dict, OrderedDict)):
+        if isinstance(action, dict):
             # Convert iterable values in dict to tensors
             action = {
                 k: th.as_tensor(v, dtype=th.float).flatten()
