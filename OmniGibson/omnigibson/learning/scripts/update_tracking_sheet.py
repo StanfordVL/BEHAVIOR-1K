@@ -2,6 +2,7 @@ import gspread
 import time
 import os
 import requests
+from datetime import datetime
 from omnigibson.learning.scripts.common import get_credentials
 from collections import Counter
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
@@ -49,6 +50,12 @@ def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict
     return [(item["level2"], item["resourceUuid"]) for item in response.json().get("data", [])]
 
 
+def is_more_than_12_hours_ago(dt_str, fmt="%Y-%m-%d %H:%M:%S"):
+    dt = datetime.strptime(dt_str, fmt)
+    diff_hours = (datetime.now() - dt).total_seconds() / 3600
+    return diff_hours > 12
+
+
 def main():
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
@@ -70,8 +77,9 @@ def main():
         lw_ids = get_all_instance_id_for_task(lw_token, lightwheel_api_credentials, task_name)
 
         # Get all resource uuids
-        resource_uuids = set(task_worksheet.col_values(3)[1:])
-        counter = Counter(task_worksheet.col_values(1)[1:])
+        rows = task_worksheet.get_all_values()
+        resource_uuids = set(row[2] for row in rows[1:] if len(row) > 2)
+        counter = Counter(row[0] for row in rows[1:] if len(row) > 0)
         for lw_id in lw_ids:
             num_entries = task_worksheet.row_count - 1
             if MAX_ENTRIES_PER_TASK is not None and num_entries >= MAX_ENTRIES_PER_TASK:
@@ -91,6 +99,16 @@ def main():
                 counter[lw_id[0]] += 1
                 # rate limit
                 time.sleep(1)
+        # now iterate through entires and find failure ones
+        for row_idx, row in enumerate(rows[1:], start=2):
+            if row and row[3].strip().lower() == "pending" and is_more_than_12_hours_ago(row[5]):
+                print(f"Row {row_idx} in {worksheet_name} is pending for more than 12 hours, marking as failed.")
+                # change row[3] to failed and append '+' to row[6]
+                task_worksheet.update(
+                    range_name=f"D{row_idx}:G{row_idx}",
+                    values=[["failed", row[4].strip(), time.strftime("%Y-%m-%d %H:%M:%S"), row[6].strip() + "a"]],
+                )
+                time.sleep(1)  # rate limit
         # rate limit
         time.sleep(1)
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] All tasks updated successfully.")

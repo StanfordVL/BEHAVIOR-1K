@@ -28,7 +28,7 @@ ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data/${SLURM_JOB_ID}
 
 # Start watchdog in background
 (
-  prev_lines=0
+  prev_lines=-1
   while true; do
     if [[ -f "$ERR_FILE" ]]; then
       current_lines=$(wc -l < "$ERR_FILE")
