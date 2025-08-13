@@ -8,6 +8,7 @@ import time
 from typing import Tuple
 from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
+from omnigibson.learning.scripts.replay_obs import makedirs_with_mode
 
 
 def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:
@@ -59,8 +60,7 @@ def download_and_extract_data(
     instance_id: int,
     traj_id: int,
 ):
-    os.makedirs(f"{data_dir}/raw", exist_ok=True, mode=0o775)
-    os.makedirs(f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}", exist_ok=True, mode=0o775)
+    makedirs_with_mode(f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}", mode=0o775)
     # Download zip file
     response = requests.get(url)
     response.raise_for_status()

@@ -723,7 +723,7 @@ def main():
 
     log.info("All done!")
     # remove replayed hdf5 to free up storage
-    # os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
+    os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
     # Optionally update google sheet
     if args.update_sheet:
         from omnigibson.learning.scripts.common import update_google_sheet
