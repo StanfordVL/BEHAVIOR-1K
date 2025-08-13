@@ -54,9 +54,9 @@ def makedirs_with_mode(path, mode=0o775):
     # Normalize path
     path = os.path.abspath(path)
     parts = path.split(os.sep)
-    if parts[0] == '':
+    if parts[0] == "":
         parts[0] = os.sep  # for absolute paths on Unix
-    
+
     current_path = parts[0]
     for part in parts[1:]:
         current_path = os.path.join(current_path, part)
@@ -66,6 +66,7 @@ def makedirs_with_mode(path, mode=0o775):
             os.chmod(current_path, mode)
         else:
             pass
+
 
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
