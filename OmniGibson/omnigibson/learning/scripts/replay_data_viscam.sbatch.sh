@@ -34,7 +34,7 @@ ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data/${SLURM_JOB_ID}
       current_lines=$(wc -l < "$ERR_FILE")
       if [[ "$current_lines" -le "$prev_lines" ]]; then
         echo "No new output detected in $ERR_FILE. Killing job $SLURM_JOB_ID."
-        scancel $SLURM_JOB_ID
+        /usr/local/bin/scancel $SLURM_JOB_ID
         exit 0
       else
         prev_lines=$current_lines

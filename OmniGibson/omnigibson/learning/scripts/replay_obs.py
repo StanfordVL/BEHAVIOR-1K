@@ -7,6 +7,7 @@ import omnigibson as og
 import os
 import omnigibson.utils.transform_utils as T
 import pandas as pd
+import time
 import torch as th
 import torch.nn.functional as F
 import yaml
@@ -732,8 +733,19 @@ def main():
         from omnigibson.learning.scripts.common import update_google_sheet
 
         credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
-        update_google_sheet(credentials_path, args.task_name, args.row)
-    og.shutdown()
+        sheet_update_success = False
+        for _ in range(5):
+            try:
+                update_google_sheet(credentials_path, args.task_name, args.row)
+                sheet_update_success = True
+                break
+            except gspread.exceptions.APIError as e:
+                log.error(f"Failed to update Google Sheet: {e}")
+                time.sleep(60)
+        if not sheet_update_success:
+            # update one last time
+            update_google_sheet(credentials_path, args.task_name, args.row)
+    log.shutdown()
 
 
 if __name__ == "__main__":

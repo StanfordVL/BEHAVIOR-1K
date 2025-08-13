@@ -11,7 +11,7 @@ from typing import List
 
 user = getpass.getuser()
 home = os.environ.get("HOME")
-MAX_JOBS = {"vision": 64, "viscam": 12}  # Maximum number of jobs allowed
+MAX_JOBS = {"vision": 64, "viscam": 16}  # Maximum number of jobs allowed
 MAX_TRAJ_PER_TASK = 10
 credentials_path = f"{home}/Documents/credentials"
 
@@ -47,6 +47,7 @@ def main(args):
         ).format(user, partition)
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True, check=True)
         running_jobs = int(result.stdout.strip())
+        print(f"Running jobs: {running_jobs}")
         if running_jobs >= MAX_JOBS[node]:
             print(f"SLURM job limit reached: {running_jobs}. Exiting...")
             exit(0)
@@ -69,16 +70,12 @@ def main(args):
                     break
                 elif row and row[3].strip().lower() in ["pending", "done"]:
                     num_process_traj += 1
-                elif (
-                    row and row[3].strip().lower() == "unprocessed" and int(row[1]) == 0
+                elif row and (
+                    (row[3].strip().lower() == "unprocessed" and int(row[1]) == 0)
+                    or (row[3].strip().lower() == "failed" and row[4].strip() == user)
                 ):  # currently only generate unique task instance
                     instance_id, traj_id, resource_uuid = int(row[0]), int(row[1]), row[2]
                     url = get_urls_from_lightwheel([resource_uuid], lightwheel_api_credentials, lw_token=lw_token)[0]
-                    print(f"Scheduling job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}")
-                    ws.update(
-                        range_name=f"D{row_idx}:F{row_idx}",
-                        values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
-                    )
                     if not args.local:
                         node = "viscam" if args.viscam else "vision"
                         cmd = (
@@ -94,7 +91,20 @@ def main(args):
                             row_idx,
                         )
                         # Run the command
-                        subprocess.run(cmd, shell=True)
+                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            print(
+                                f"Scheduled job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}", result.stdout
+                            )
+                            ws.update(
+                                range_name=f"D{row_idx}:F{row_idx}",
+                                values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
+                            )
+                        else:
+                            print(
+                                f"Failed to schedule job for episode {task_id:04d}{instance_id:03d}{traj_id:01d}",
+                                result.stderr,
+                            )
                     else:
                         cmd = (
                             "cd ~/Research/BEHAVIOR-1K && "
@@ -111,7 +121,7 @@ def main(args):
                     job_quota -= 1
                     num_process_traj += 1
                     if job_quota <= 0:
-                        print(f"Reached job limit, exiting...")
+                        print("Reached job limit, exiting...")
                         exit(0)
 
 

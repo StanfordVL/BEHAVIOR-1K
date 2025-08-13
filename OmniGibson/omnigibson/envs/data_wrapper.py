@@ -1126,10 +1126,10 @@ class DataPlaybackWrapper(DataWrapper):
                             if self.current_episode_step_count < num_samples
                             else data_length_to_flush - 1
                         )
-                        data_to_write = th.stack(
-                            [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
-                        )
                         if obs_data_length > 0:
+                            data_to_write = th.stack(
+                                [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
+                            )
                             if video_writers is not None and mod in video_writers.keys():
                                 # write to video
                                 write_video(
