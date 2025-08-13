@@ -109,7 +109,7 @@ def replay_hdf5_file(
     generate_seg: bool = False,
     generate_bbox: bool = False,
     flush_every_n_steps: int = 500,
-    offline_rgbd: bool = False
+    offline_rgbd: bool = False,
 ) -> None:
     """
     Replays a single HDF5 file and saves videos to a new folder
@@ -196,7 +196,7 @@ def replay_hdf5_file(
     log.info(f" >>> Replaying episode {episode_id}")
     # initialize video writers if required
     video_writers = dict()
-    if generate_rgbd: 
+    if generate_rgbd:
         for camera_id, camera_name in camera_names.items():
             rgb_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}")
             depth_dir = os.path.join(

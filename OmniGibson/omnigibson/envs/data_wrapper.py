@@ -1038,7 +1038,9 @@ class DataPlaybackWrapper(DataWrapper):
                 record_data=record_data,
             )
 
-    def allocate_traj_to_hdf5(self, step_data, traj_grp_name, num_samples: int, nested_keys=("obs",), data_grp=None, video_writers=None):
+    def allocate_traj_to_hdf5(
+        self, step_data, traj_grp_name, num_samples: int, nested_keys=("obs",), data_grp=None, video_writers=None
+    ):
         """
         Allocate trajectory data space from @step_data given the number of samples @num_samples.
 
@@ -1069,7 +1071,7 @@ class DataPlaybackWrapper(DataWrapper):
             if k in nested_keys:
                 obs_grp = traj_grp.create_group(k)
                 for mod, step_mod_data in dat.items():
-                    if mod.split("::")[-1] != "seg_semantic":   # Don't store seg semantic for now
+                    if mod.split("::")[-1] != "seg_semantic":  # Don't store seg semantic for now
                         if video_writers is None or mod not in video_writers.keys():
                             traj_dsets[k][mod] = obs_grp.create_dataset(
                                 mod,
@@ -1143,9 +1145,9 @@ class DataPlaybackWrapper(DataWrapper):
                                     + 1 : self.current_episode_step_count + 1
                                 ] = data_to_write
                 else:
-                    self.traj_dsets[key][self.current_episode_step_count - data_length_to_flush : self.current_episode_step_count] = (
-                        th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0)
-                    )
+                    self.traj_dsets[key][
+                        self.current_episode_step_count - data_length_to_flush : self.current_episode_step_count
+                    ] = th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0)
         # Reset the current trajectory history
         self.current_traj_history = []
 
