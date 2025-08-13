@@ -61,9 +61,12 @@ def makedirs_with_mode(path, mode=0o2775):
     for part in parts[1:]:
         current_path = os.path.join(current_path, part)
         if not os.path.exists(current_path):
-            os.mkdir(current_path)
-            # Apply mode explicitly because os.mkdir may be affected by umask
-            os.chmod(current_path, mode)
+            try:
+                os.makedirs(current_path, exist_ok=True)
+                # Apply mode explicitly because os.mkdir may be affected by umask
+                os.chmod(current_path, mode)
+            except Exception as e:
+                log.error(f"Failed to create directory {current_path}: {e}")
         else:
             pass
 
