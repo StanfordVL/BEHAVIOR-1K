@@ -46,6 +46,27 @@ gm.DEFAULT_VIEWER_HEIGHT = 128
 FLUSH_EVERY_N_STEPS = 500
 
 
+def makedirs_with_mode(path, mode=0o775):
+    """
+    Recursively create directories with specified mode applied to all newly created dirs.
+    Existing directories keep their current permissions.
+    """
+    # Normalize path
+    path = os.path.abspath(path)
+    parts = path.split(os.sep)
+    if parts[0] == '':
+        parts[0] = os.sep  # for absolute paths on Unix
+    
+    current_path = parts[0]
+    for part in parts[1:]:
+        current_path = os.path.join(current_path, part)
+        if not os.path.exists(current_path):
+            os.mkdir(current_path)
+            # Apply mode explicitly because os.mkdir may be affected by umask
+            os.chmod(current_path, mode)
+        else:
+            pass
+
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
         robot = self.env.robots[0]
@@ -130,7 +151,7 @@ def replay_hdf5_file(
     # get processed folder path
     task_name = TASK_INDICES_TO_NAMES[task_id]
     replay_dir = os.path.join(data_folder, "replayed")
-    os.makedirs(replay_dir, exist_ok=True)
+    makedirs_with_mode(replay_dir, mode=0o775)
 
     # This flag is needed to run data playback wrapper
     gm.ENABLE_TRANSITION_RULES = False
@@ -202,8 +223,8 @@ def replay_hdf5_file(
             depth_dir = os.path.join(
                 data_folder, "videos", f"task-{task_id:04d}", f"observation.images.depth.{camera_id}"
             )
-            os.makedirs(rgb_dir, exist_ok=True)
-            os.makedirs(depth_dir, exist_ok=True)
+            makedirs_with_mode(rgb_dir, mode=0o775)
+            makedirs_with_mode(depth_dir, mode=0o775)
             resolution = HEAD_RESOLUTION if "zed" in camera_name else WRIST_RESOLUTION
             # RGB video writer
             video_writers[f"{camera_name}::rgb"] = create_video_writer(
@@ -249,7 +270,7 @@ def replay_hdf5_file(
             seg_dir = os.path.join(
                 data_folder, "videos", f"task-{task_id:04d}", f"observation.images.seg_instance_id.{camera_id}"
             )
-            os.makedirs(seg_dir, exist_ok=True)
+            makedirs_with_mode(seg_dir, mode=0o775)
             video_writers[f"{camera_name}::seg_instance_id"] = create_video_writer(
                 fpath=f"{seg_dir}/episode_{demo_id:08d}.mp4",
                 resolution=resolution,
@@ -272,7 +293,7 @@ def replay_hdf5_file(
                 bbox_dir = os.path.join(
                     data_folder, "videos", f"task-{task_id:04d}", f"observation.images.bbox.{camera_id}"
                 )
-                os.makedirs(bbox_dir, exist_ok=True)
+                makedirs_with_mode(bbox_dir, mode=0o775)
                 video_writers[f"{camera_name}::bbox"] = create_video_writer(
                     fpath=f"{bbox_dir}/episode_{demo_id:08d}.mp4",
                     resolution=resolution,
@@ -344,8 +365,8 @@ def generate_low_dim_data(
     """
     Post-process the replayed low-dimensional data (proprio, action, task-info, etc) to parquet.
     """
-    os.makedirs(f"{data_folder}/data/task-{task_id:04d}", exist_ok=True)
-    os.makedirs(f"{data_folder}/meta/episodes/task-{task_id:04d}", exist_ok=True)
+    makedirs_with_mode(f"{data_folder}/data/task-{task_id:04d}", mode=0o775)
+    makedirs_with_mode(f"{data_folder}/meta/episodes/task-{task_id:04d}", mode=0o775)
     with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
         for episode_id in range(replayed_f["data"].attrs["n_episodes"]):
             actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
@@ -430,7 +451,7 @@ def rgbd_gt_to_pcd(
     """
     log.info(f"Generating point cloud data from RGBD for {demo_id:08d} in {data_folder}")
     output_dir = os.path.join(data_folder, "pcd_gt", f"task-{task_id:04d}")
-    os.makedirs(output_dir, exist_ok=True)
+    makedirs_with_mode(output_dir, mode=0o775)
 
     with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as in_f:
         # create a new hdf5 file to store the point cloud data
@@ -535,7 +556,7 @@ def rgbd_vid_to_pcd(
     """
     log.info(f"Generating point cloud data from RGBD for {demo_id} in {data_folder}")
     output_dir = os.path.join(data_folder, "pcd_vid", f"task-{task_id:04d}")
-    os.makedirs(output_dir, exist_ok=True)
+    makedirs_with_mode(output_dir, mode=0o775)
 
     # create a new hdf5 file to store the point cloud data
     with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
