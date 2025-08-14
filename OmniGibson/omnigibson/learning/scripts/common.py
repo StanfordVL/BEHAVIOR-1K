@@ -8,9 +8,33 @@ import time
 from typing import Tuple
 from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
-from omnigibson.learning.scripts.replay_obs import makedirs_with_mode
 
 VALID_USER_NAME = ["wsai", "yinhang", "svl"]
+
+
+def makedirs_with_mode(path, mode=0o2775):
+    """
+    Recursively create directories with specified mode applied to all newly created dirs.
+    Existing directories keep their current permissions.
+    """
+    # Normalize path
+    path = os.path.abspath(path)
+    parts = path.split(os.sep)
+    if parts[0] == "":
+        parts[0] = os.sep  # for absolute paths on Unix
+
+    current_path = parts[0]
+    for part in parts[1:]:
+        current_path = os.path.join(current_path, part)
+        if not os.path.exists(current_path):
+            try:
+                os.makedirs(current_path, exist_ok=True)
+                # Apply mode explicitly because os.mkdir may be affected by umask
+                os.chmod(current_path, mode)
+            except Exception as e:
+                print(f"Failed to create directory {current_path}: {e}")
+        else:
+            pass
 
 
 def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:

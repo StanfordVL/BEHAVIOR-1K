@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import yaml
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
+from omnigibson.learning.scripts.common import update_google_sheet, makedirs_with_mode
 from omnigibson.learning.utils.eval_utils import (
     PROPRIOCEPTION_INDICES,
     TASK_NAMES_TO_INDICES,
@@ -45,31 +46,6 @@ gm.DEFAULT_VIEWER_WIDTH = 128
 gm.DEFAULT_VIEWER_HEIGHT = 128
 
 FLUSH_EVERY_N_STEPS = 500
-
-
-def makedirs_with_mode(path, mode=0o2775):
-    """
-    Recursively create directories with specified mode applied to all newly created dirs.
-    Existing directories keep their current permissions.
-    """
-    # Normalize path
-    path = os.path.abspath(path)
-    parts = path.split(os.sep)
-    if parts[0] == "":
-        parts[0] = os.sep  # for absolute paths on Unix
-
-    current_path = parts[0]
-    for part in parts[1:]:
-        current_path = os.path.join(current_path, part)
-        if not os.path.exists(current_path):
-            try:
-                os.makedirs(current_path, exist_ok=True)
-                # Apply mode explicitly because os.mkdir may be affected by umask
-                os.chmod(current_path, mode)
-            except Exception as e:
-                log.error(f"Failed to create directory {current_path}: {e}")
-        else:
-            pass
 
 
 class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
@@ -751,8 +727,6 @@ def main():
     os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
     # Optionally update google sheet
     if args.update_sheet:
-        from omnigibson.learning.scripts.common import update_google_sheet
-
         credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
         sheet_update_success = False
         for _ in range(5):
