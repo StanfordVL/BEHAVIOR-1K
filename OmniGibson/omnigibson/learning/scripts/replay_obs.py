@@ -189,7 +189,22 @@ def replay_hdf5_file(
         if file.endswith(".json") and "partial_rooms" not in file:
             full_scene_file = os.path.join(task_scene_file_folder, file)
     assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
-
+    # optimizations for data replay
+    credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
+    gc = gspread.service_account(filename=credentials_path)
+    load_room_instances = None
+    for _ in range(3):
+        try:
+            sh = gc.open("B50 Task Misc")
+            worksheet = sh.worksheet("HSF-tasks-rooms").get_all_values()
+            for row in worksheet[1:]:
+                if row and task_name in row[0]:
+                    load_room_instances = row[1].strip().split("\n")
+                    break
+            break
+        except Exception as e:
+            log.error(f"Error occurred while reading Google Sheet: {e}")
+    assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=f"{data_folder}/raw/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
         output_path=os.path.join(replay_dir, f"episode_{demo_id:08d}.hdf5"),
@@ -205,6 +220,7 @@ def replay_hdf5_file(
         full_scene_file=full_scene_file,
         include_robot_control=False,
         include_contacts=False,
+        load_room_instances=load_room_instances,
     )
 
     # Modify head camera
@@ -247,6 +263,7 @@ def replay_hdf5_file(
                 pix_fmt="yuv420p10le",
                 stream_options={"x265-params": "lossless=1:log-level=none"},
             )
+
     env.playback_episode(
         episode_id=episode_id,
         record_data=True,
@@ -309,13 +326,18 @@ def replay_hdf5_file(
                 # read task relevant objects from google sheet
                 credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
                 gc = gspread.service_account(filename=credentials_path)
-                sh = gc.open("Object Instance ID to be annotated for B50 tasks")
-                worksheet = sh.worksheet("Sheet1").get_all_values()
-                task_relevant_objs = None
-                for row in worksheet[1:]:
-                    if row and row[0] == task_name:
-                        task_relevant_objs = row[1] + row[2]
+                for _ in range(3):
+                    try:
+                        sh = gc.open("Object Instance ID to be annotated for B50 tasks")
+                        worksheet = sh.worksheet("Sheet1").get_all_values()
+                        task_relevant_objs = None
+                        for row in worksheet[1:]:
+                            if row and row[0] == task_name:
+                                task_relevant_objs = row[1] + row[2]
+                                break
                         break
+                    except Exception as e:
+                        log.error(f"Error occurred while reading Google Sheet: {e}")
                 assert task_relevant_objs is not None, "Task relevant objects not found!"
                 instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                 instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}

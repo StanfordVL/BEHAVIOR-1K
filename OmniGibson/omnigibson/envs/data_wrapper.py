@@ -685,6 +685,7 @@ class DataPlaybackWrapper(DataWrapper):
         include_task_obs=True,
         include_robot_control=True,
         include_contacts=True,
+        load_room_instances=None,
     ):
         """
         Create a DataPlaybackWrapper environment instance form the recorded demonstration info
@@ -735,6 +736,8 @@ class DataPlaybackWrapper(DataWrapper):
                 robot.control_enabled=False
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
                 objects to be visual_only
+            load_room_instances (None or list of str): If specified, list of room instance names to load during
+                playback
 
         Returns:
             DataPlaybackWrapper: Generated playback environment
@@ -763,6 +766,7 @@ class DataPlaybackWrapper(DataWrapper):
             )
             # Overwrite rooms type to avoid loading room types from the hdf5 file
             config["scene"]["load_room_types"] = None
+            config["scene"]["load_room_instances"] = load_room_instances
         else:
             config["scene"]["scene_file"] = json.loads(f["data"].attrs["scene_file"])
 
@@ -825,6 +829,7 @@ class DataPlaybackWrapper(DataWrapper):
             flush_every_n_traj=flush_every_n_traj,
             flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
+            partial_full_scene_load=load_room_instances is not None and full_scene_file is not None,
         )
 
     def __init__(
@@ -839,6 +844,7 @@ class DataPlaybackWrapper(DataWrapper):
         flush_every_n_traj=10,
         flush_every_n_steps=0,
         full_scene_file=None,
+        partial_full_scene_load=False,
     ):
         """
         Args:
@@ -857,6 +863,8 @@ class DataPlaybackWrapper(DataWrapper):
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
+            partial_full_scene_load (bool): Whether to use a partial load the full scene
+                This will include objects not in the original hdf5 but not everything in the full scene either
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -874,6 +882,8 @@ class DataPlaybackWrapper(DataWrapper):
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
             self.scene_file = merge_scene_files(scene_a=full_scene_json, scene_b=self.scene_file, keep_robot_from="b")
+            if partial_full_scene_load:
+                self.scene_file = env.scene.save(as_dict=True)
 
         # Store additional variables
         self.n_render_iterations = n_render_iterations

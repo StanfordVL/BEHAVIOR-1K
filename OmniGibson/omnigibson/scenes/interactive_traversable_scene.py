@@ -4,7 +4,7 @@ import omnigibson as og
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_og_scene_path
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -193,7 +193,7 @@ class InteractiveTraversableScene(TraversableScene):
         valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
         # HACK: always load building structure
-        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
+        is_building_structure = category in (STRUCTURE_CATEGORIES) or category in ["door", "sliding_door"]
 
         # We only load this model if all the above conditions are met
         return is_building_structure or (not_blacklisted and whitelisted and valid_room and agent_ok)
