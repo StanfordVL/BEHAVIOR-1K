@@ -129,7 +129,7 @@ def main(args):
                                 "--task_name {} "
                                 "--demo_id {} "
                                 "--update_sheet "
-                                "--low_dim --rgbd --seg --bbox --pcd_gt --pcd_vid "
+                                "--low_dim --rgbd --seg "
                                 "--row {}"
                             ).format(
                                 gpu_id,
