@@ -14,6 +14,7 @@ CUDA_VERSION="12.4"
 ACCEPT_CONDA_TOS=false
 ACCEPT_NVIDIA_EULA=false
 ACCEPT_DATASET_TOS=false
+SKIP_CONDA_PREFIX=false
 
 [ "$#" -eq 0 ] && HELP=true
 
@@ -31,6 +32,7 @@ while [[ $# -gt 0 ]]; do
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
+        --skip-conda-prefix) SKIP_CONDA_PREFIX=true; shift ;;
         *) echo "Unknown option: \$1"; exit 1 ;;
     esac
 done
@@ -53,6 +55,7 @@ Options:
   --accept-conda-tos      Automatically accept Conda Terms of Service
   --accept-nvidia-eula    Automatically accept NVIDIA Isaac Sim EULA
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
+  --skip-conda-prefix     Skip checking if conda environment is active, useful for installing into system python environment
 
 Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
 Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
@@ -211,7 +214,7 @@ if [ "$OMNIGIBSON" = true ]; then
     [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
     
     # Pre-installation checks
-    [ -z "$CONDA_PREFIX" ] && { echo "ERROR: Must run in conda environment"; exit 1; }
+    [ "$SKIP_CONDA_PREFIX" = false ] && [ -z "$CONDA_PREFIX" ] && { echo "ERROR: Must run in conda environment"; exit 1; }
     
     # Check Python version
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
