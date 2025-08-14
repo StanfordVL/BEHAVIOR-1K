@@ -463,7 +463,7 @@ def rgbd_gt_to_pcd(
         with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
             for demo_name in in_f["data"]:
                 data = in_f["data"][demo_name]["obs"]
-                data_size = data[f"robot_r1::cam_rel_poses"].shape[0]
+                data_size = data["robot_r1::cam_rel_poses"].shape[0]
                 fused_pcd_dset = out_f.create_dataset(
                     f"data/{demo_name}/robot_r1::fused_pcd",
                     shape=(data_size, pcd_num_points, 6),
@@ -523,7 +523,7 @@ def rgbd_gt_to_pcd(
                     if process_seg:
                         pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
-    log.info(f"Point cloud data saved!")
+    log.info("Point cloud data saved!")
 
 
 def rgbd_vid_to_pcd(
@@ -569,13 +569,13 @@ def rgbd_vid_to_pcd(
         cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
         data_size = cam_rel_poses.shape[0]
         fused_pcd_dset = out_f.create_dataset(
-            f"data/demo_0/robot_r1::fused_pcd",
+            "data/demo_0/robot_r1::fused_pcd",
             shape=(data_size, pcd_num_points, 6),
             compression="lzf",
         )
         if process_seg:
             pcd_semantic_dset = out_f.create_dataset(
-                f"data/demo_0/robot_r1::pcd_semantic",
+                "data/demo_0/robot_r1::pcd_semantic",
                 shape=(data_size, pcd_num_points),
                 compression="lzf",
             )
@@ -639,7 +639,7 @@ def rgbd_vid_to_pcd(
             if process_seg:
                 pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
-    log.info(f"Point cloud data saved!")
+    log.info("Point cloud data saved!")
 
 
 def main():
@@ -725,7 +725,6 @@ def main():
                 process_seg=False,
             )
 
-    log.info("All done!")
     # remove replayed hdf5 to free up storage
     os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
     # Optionally update google sheet
@@ -745,7 +744,9 @@ def main():
         if not sheet_update_success:
             # update one last time
             update_google_sheet(credentials_path, args.task_name, args.row)
-    log.shutdown()
+
+    log.info("All done!")
+    og.shutdown()
 
 
 if __name__ == "__main__":
