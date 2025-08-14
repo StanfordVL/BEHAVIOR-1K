@@ -10,6 +10,8 @@ from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from omnigibson.learning.scripts.replay_obs import makedirs_with_mode
 
+VALID_USER_NAME = ["wsai", "yinhang", "svl"]
+
 
 def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:
     # authorize with Google Sheets API
@@ -34,6 +36,7 @@ def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:
 
 
 def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
+    assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     SERVICE_ACCOUNT_FILE = f"{credentials_path}/google_credentials.json"

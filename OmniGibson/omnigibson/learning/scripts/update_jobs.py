@@ -4,7 +4,7 @@ import os
 import requests
 import subprocess
 import time
-from omnigibson.learning.scripts.common import get_credentials
+from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from typing import List
 
@@ -31,6 +31,7 @@ def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict,
 
 
 def main(args):
+    assert user in VALID_USER_NAME, f"Invalid user {user}!"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path=credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
 
@@ -107,6 +108,10 @@ def main(args):
                             )
                             exit(0)
                     else:
+                        ws.update(
+                            range_name=f"D{row_idx}:F{row_idx}",
+                            values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
+                        )
                         cmd = (
                             "cd ~/Research/BEHAVIOR-1K && "
                             "python OmniGibson/omnigibson/learning/scripts/replay_obs.py "

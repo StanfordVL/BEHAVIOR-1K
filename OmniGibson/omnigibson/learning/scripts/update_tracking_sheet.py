@@ -1,9 +1,10 @@
+import getpass
 import gspread
 import time
 import os
 import requests
 from datetime import datetime
-from omnigibson.learning.scripts.common import get_credentials
+from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME
 from collections import Counter
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from typing import Tuple
@@ -57,6 +58,7 @@ def is_more_than_12_hours_ago(dt_str, fmt="%Y-%m-%d %H:%M:%S"):
 
 
 def main():
+    assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
     # Update main sheet
