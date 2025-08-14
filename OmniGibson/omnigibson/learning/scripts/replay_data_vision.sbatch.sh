@@ -20,6 +20,7 @@ echo "working directory = "$SLURM_SUBMIT_DIR
 
 source /vision/u/$(whoami)/miniconda3/bin/activate behavior
 
+echo "Current time: $(date)"
 echo "Running with args: $@"
 
 
