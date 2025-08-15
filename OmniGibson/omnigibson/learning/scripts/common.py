@@ -9,7 +9,7 @@ from typing import Tuple
 from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 
-VALID_USER_NAME = ["wsai", "yinhang", "svl", "wpai", "qinengw"]
+VALID_USER_NAME = ["wsai", "yinhang", "svl", "wpai", "qinengw", "wsaqi-yfj"]
 
 
 def makedirs_with_mode(path, mode=0o2775):
