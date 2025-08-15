@@ -67,6 +67,25 @@ This demo instantiates one of our navigation tasks in a fully-populated scene an
     --8<-- "examples/environments/navigation_env_demo.py"
     ```
 
+### **Vector Environment Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to instantiate multiple parallel environments using VectorEnvironment
+    * Benchmarking environment performance with parallel execution
+    * Learning how to configure batch simulation settings
+
+```{.python .annotate}
+python -m omnigibson.examples.environments.vector_env_demo
+```
+
+This demo instantiates multiple parallel environments using `VectorEnvironment` with 5 environments running simultaneously. Each environment loads a `FrankaPanda` robot and executes random actions independently. The demo measures and reports frames per second (FPS) and effective (aggregated) FPS across all environments.
+
+??? code "vector_env_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "examples/environments/vector_env_demo.py"
+    ```
+
 ## :material-school: **Learning**
 These examples showcase how **`OmniGibson`** can be used to train embodied AI agents.
 
