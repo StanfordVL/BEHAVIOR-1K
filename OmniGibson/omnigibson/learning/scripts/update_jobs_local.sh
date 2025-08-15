@@ -25,8 +25,9 @@ while true; do
 
     if [ -z "$JOB_PID" ]; then
         # No job running, launch a new one
-        TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
-        LOG_FILE="$LOG_DIR/update_jobs_$TIMESTAMP.log"
+    TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
+    PATTERN_LAST_CHAR="${PATTERN: -1}"
+    LOG_FILE="$LOG_DIR/update_jobs_${TIMESTAMP}_${PATTERN_LAST_CHAR}.log"
         cd "$SCRIPT_DIR" || exit 1
 
         python "$PYTHON_SCRIPT" "$@" --local > "$LOG_FILE" 2>&1 &
@@ -46,7 +47,8 @@ while true; do
                 kill "$JOB_PID"
                 # Launch a new job immediately after killing
                 TIMESTAMP=$(date +%Y-%m-%d_%H-%M)
-                LOG_FILE="$LOG_DIR/update_jobs_$TIMESTAMP.log"
+                PATTERN_LAST_CHAR="${PATTERN: -1}"
+                LOG_FILE="$LOG_DIR/update_jobs_${TIMESTAMP}_${PATTERN_LAST_CHAR}.log"
                 cd "$SCRIPT_DIR" || exit 1
                 python "$PYTHON_SCRIPT" "$@" --local > "$LOG_FILE" 2>&1 &
                 JOB_PID=$!
