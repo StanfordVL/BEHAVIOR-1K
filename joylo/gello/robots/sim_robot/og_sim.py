@@ -875,12 +875,13 @@ class OGRobotServer:
                 tro_state = recursively_convert_to_torch(json.load(f))
             self.env.scene.reset()
             for bddl_name, obj_state in tro_state.items():
-                if "agent" in bddl_name:
+                if bddl_name == "robot_poses":
+                    presampled_robot_poses = obj_state
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = obj_state["joint_pos"][:3] + obj_state["root_link"]["pos"]
-                    robot_quat = T.euler2quat(th.tensor([0, 0, obj_state["joint_pos"][5]]))
-                    self.env.task.object_scope[bddl_name].set_position_orientation(robot_pos, robot_quat)
+                    robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
+                    robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
+                    self.robot.set_position_orientation(robot_pos, robot_quat)
                 else:
                     self.env.task.object_scope[bddl_name].load_state(obj_state, serialized=False)
                     

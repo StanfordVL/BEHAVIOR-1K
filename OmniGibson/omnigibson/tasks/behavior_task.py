@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import Path
+import random
 
 import torch as th
 from bddl.activity import (
@@ -54,6 +55,9 @@ class BehaviorTask(BaseTask):
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
         online_object_sampling (bool): whether to sample object locations online at runtime or not
+        use_presampled_robot_pose (bool): Whether to use presampled robot poses from scene metadata
+        randomize_presampled_pose (bool): If True, randomly selects from available presampled poses. If False, always
+            uses the first pose. Only applies when use_presampled_robot_pose is True. Default is False.
         sampling_whitelist (None or dict): If specified, should map synset name (e.g.: "table.n.01" to a dictionary
             mapping category name (e.g.: "breakfast_table") to a list of valid models to be sampled from
             that category. During sampling, if a given synset is found in this whitelist, only the specified
@@ -81,6 +85,8 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
+        use_presampled_robot_pose=False,
+        randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
         highlight_task_relevant_objects=False,
@@ -123,6 +129,8 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.online_object_sampling = online_object_sampling  # bool
+        self.use_presampled_robot_pose = use_presampled_robot_pose
+        self.randomize_presampled_pose = randomize_presampled_pose
         self.sampling_whitelist = sampling_whitelist  # Maps str to str to list
         self.sampling_blacklist = sampling_blacklist  # Maps str to str to list
         self.highlight_task_relevant_objs = highlight_task_relevant_objects  # bool
@@ -180,13 +188,6 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
-    @property
-    def task_metadata(self):
-        # Store mapping from entity name to its corresponding BDDL instance name
-        return dict(
-            inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
-        )
-
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
@@ -242,9 +243,26 @@ class BehaviorTask(BaseTask):
     def reset(self, env):
         super().reset(env)
 
+        # Use presampled robot pose if specified (only available for officially supported mobile manipulators)
+        if self.use_presampled_robot_pose:
+            robot = self.get_agent(env)
+            presampled_poses = env.scene.get_task_metadata(key="robot_poses")
+            assert (
+                robot.model_name in presampled_poses
+            ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
+
+            # Select pose based on randomize_presampled_pose flag
+            available_poses = presampled_poses[robot.model_name]
+            if self.randomize_presampled_pose:
+                robot_pose = random.choice(available_poses)
+            else:
+                robot_pose = available_poses[0]  # Use first presampled pose
+
+            robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
+
         # Force wake objects
         for obj in self.object_scope.values():
-            if isinstance(obj, DatasetObject):
+            if obj.exists and isinstance(obj, DatasetObject):
                 obj.wake()
 
     def _load_non_low_dim_observation_space(self):
@@ -399,7 +417,7 @@ class BehaviorTask(BaseTask):
             env (Environment): Current active environment instance
         """
         # Load task metadata
-        inst_to_name = self.load_task_metadata(env=env)["inst_to_name"]
+        inst_to_name = env.scene.get_task_metadata(key="inst_to_name")
 
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
@@ -424,6 +442,20 @@ class BehaviorTask(BaseTask):
                 bddl_inst=obj_inst,
                 entity=entity,
             )
+
+        # Write back to task metadata
+        self.update_bddl_scope_metadata(env)
+
+    def update_bddl_scope_metadata(self, env):
+        """
+        Updates the task metadata with the current instance-to-name mapping for all existing entities.
+
+        Args:
+            env: The environment containing the scene to update
+        """
+        env.scene.write_task_metadata(
+            key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
+        )
 
     def _get_obs(self, env):
         low_dim_obs = dict()
@@ -607,8 +639,8 @@ class BehaviorTask(BaseTask):
             with open(path, "w+") as f:
                 json.dump(task_relevant_state_dict, f, cls=TorchEncoder, indent=4)
         else:
-            # Write metadata and then save
-            self.write_task_metadata(env)
+            # Update task metadata and save
+            self.update_bddl_scope_metadata(env)
             env.scene.save(json_path=path)
 
     @property

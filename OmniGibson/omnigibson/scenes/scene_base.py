@@ -94,6 +94,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._available_systems = None
         self._pose_info = None
         self._updated_state_objects = None
+        self._task_metadata = {}
 
         # Call super init
         super().__init__()
@@ -135,6 +136,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # Create object class instance
                 obj = create_object_from_init_info(obj_info)
                 self._init_objs[obj_name] = obj
+
+            # Store presampled robot poses from metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
     @property
     def registry(self):
@@ -403,7 +408,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
-            self.write_metadata(key=key, data=data)
+            self.write_task_metadata(key=key, data=data)
 
     def _should_load_object(self, obj_info, task_metadata):
         """
@@ -763,7 +768,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     "git_hash": omnigibson.utils.asset_utils.get_asset_git_hash(),
                 },
             },
-            "metadata": self._scene_prim.prim.GetCustomData(),
+            "metadata": self._task_metadata,
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -806,6 +811,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # The saved state are lists, convert them to torch tensors
         state = recursively_convert_to_torch(scene_info["state"])
 
+        # Recover metadata
+        for key, data in scene_info.get("metadata", dict()).items():
+            self.write_task_metadata(key=key, data=data)
+
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:
             log.error(
@@ -846,24 +855,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if update_initial_file:
             self.update_initial_file(scene_file=scene_file)
 
-    def write_metadata(self, key, data):
-        """
-        Writes metadata @data to the current global metadata dict using key @key
+    def get_task_metadata(self, key):
+        return self._task_metadata.get(key, None)
 
-        Args:
-            key (str): Keyword entry in the global metadata dictionary to use
-            data (dict): Data to write to @key in the global metadata dictionary
-        """
-        self._scene_prim.prim.SetCustomDataByKey(key, data)
-
-    def get_metadata(self, key):
-        """
-        Grabs metadata from the current global metadata dict using key @key
-
-        Args:
-            key (str): Keyword entry in the global metadata dictionary to use
-        """
-        return self._scene_prim.prim.GetCustomDataByKey(key)
+    def write_task_metadata(self, key, data):
+        self._task_metadata[key] = data
 
     def get_position_orientation(self):
         """
