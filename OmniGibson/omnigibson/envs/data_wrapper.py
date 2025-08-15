@@ -1075,6 +1075,7 @@ class DataPlaybackWrapper(DataWrapper):
             traj_dsets[k] = dict()
         data_grp = self.hdf5_file.require_group("data") if data_grp is None else data_grp
         traj_grp = data_grp.create_group(traj_grp_name)
+        log.info(f"Number of samples: {num_samples}")
         traj_grp.attrs["num_samples"] = num_samples
 
         for k, dat in step_data.items():
