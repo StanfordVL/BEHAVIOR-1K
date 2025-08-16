@@ -380,7 +380,7 @@ def _quat2mat(quaternion):
     Convert quaternions into rotation matrices.
 
     Args:
-        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (x, y, z, w).
 
     Returns:
         torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.

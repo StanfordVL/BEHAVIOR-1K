@@ -29,7 +29,7 @@ Many of our examples set various `macros` settings at the beginning of the scrip
 ***
 
 ## :material-earth: **Environments**
-These examples showcase the full **`OmniGibson`** stack in use, and the types of environments immediately supported.
+These examples showcase the full **`BEHAVIOR`** stack in use, and the types of environments immediately supported.
 
 ### **BEHAVIOR Task Demo**
 !!! abstract "This demo is useful for..."
@@ -41,7 +41,7 @@ These examples showcase the full **`OmniGibson`** stack in use, and the types of
 python -m omnigibson.examples.environments.behavior_env_demo
 ```
 
-This demo instantiates one of our BEHAVIOR tasks (and optionally sampling object locations online) in a fully-populated scene and loads a `Fetch` robot. The robot executes random actions and the environment is reset periodically.
+This demo instantiates one of our BEHAVIOR tasks (and optionally sampling object locations online) in a fully-populated scene and loads a `R1Pro` robot. The robot executes random actions and the environment is reset periodically.
 
 ??? code "behavior_env_demo.py"
 
@@ -95,11 +95,17 @@ These examples showcase how **`OmniGibson`** can be used to train embodied AI ag
     * Understanding how to hook up **`OmniGibson`** to an external algorithm
     * Understanding how to train and evaluate a policy
 
+!!! note "Required Dependencies"
+    This demo requires stable-baselines for reinforcement learning. If not already installed, run:
+    ```bash
+    pip install stable-baselines3[extra]
+    ```
+
 ```{.python .annotate}
 python -m omnigibson.examples.learning.navigation_policy_demo
 ```
 
-This demo loads a BEHAVIOR task with a `Fetch` robot, and trains / evaluates the agent using [Stable Baseline3](https://stable-baselines3.readthedocs.io/en/master/)'s PPO algorithm.
+This demo loads a BEHAVIOR task with a `TurtleBot` robot, and trains / evaluates the agent using [Stable Baseline3](https://stable-baselines3.readthedocs.io/en/master/)'s PPO algorithm.
 
 ??? code "navigation_policy_demo.py"
 
@@ -120,7 +126,7 @@ These examples showcase how to leverage **`OmniGibson`**'s large-scale, diverse 
 python -m omnigibson.examples.scenes.scene_selector
 ```
 
-This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with a `Turtlebot` robot, and cycles the resulting environment periodically.
+This demo lets you choose a scene from the BEHAVIOR dataset and load it.
 
 ??? code "scene_selector.py"
 
