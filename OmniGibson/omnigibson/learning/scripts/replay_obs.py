@@ -180,6 +180,7 @@ def replay_hdf5_file(
             break
         except Exception as e:
             log.error(f"Error occurred while reading Google Sheet: {e}")
+            time.sleep(60)
     assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=f"{data_folder}/raw/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
@@ -314,6 +315,7 @@ def replay_hdf5_file(
                         break
                     except Exception as e:
                         log.error(f"Error occurred while reading Google Sheet: {e}")
+                        time.sleep(60)
                 assert task_relevant_objs is not None, "Task relevant objects not found!"
                 instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                 instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}

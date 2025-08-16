@@ -1,4 +1,5 @@
 import os
+import time
 from omnigibson.learning.scripts.common import get_credentials, download_and_extract_data
 from omnigibson.learning.scripts.update_jobs import get_urls_from_lightwheel
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
@@ -41,6 +42,8 @@ for ws in worksheets:
                     traj_downloaded += 1
             if traj_downloaded >= MAX_TRAJ_PER_TASK:
                 break
+        time.sleep(1)
+
     print(f"Finished processing task: {ws.title}, {file_downloaded} files downloaded.")
 
 print("All tasks processed.")
