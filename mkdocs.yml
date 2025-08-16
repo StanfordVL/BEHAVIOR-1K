@@ -4,7 +4,7 @@
 
 site_name: BEHAVIOR
 repo_name: StanfordVL/BEHAVIOR-1K
-site_url: https://behavior.stanford.edu/omnigibson # TODO: move this to root
+site_url: https://behavior.stanford.edu
 repo_url: https://github.com/StanfordVL/BEHAVIOR-1K
 theme: 
   name: material
