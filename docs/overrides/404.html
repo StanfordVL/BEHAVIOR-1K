@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+<!-- Fix for 404 pages: inject base tag before any other assets load -->
+{% block analytics %}
+  <!-- Force absolute URLs for all assets on 404 pages -->
+  <base href="{{ config.site_url }}">
+  {{ super() }}
+{% endblock %}
+
+{% block content %}
+  <div class="md-content" data-md-component="content">
+    <article class="md-content__inner md-typeset">
+      <h1>404 - Page Not Found</h1>
+      <p>Sorry, the page you requested could not be found.</p>
+    </article>
+  </div>
+{% endblock %}
