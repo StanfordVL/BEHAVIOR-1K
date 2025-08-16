@@ -172,10 +172,10 @@ def replay_hdf5_file(
     for _ in range(3):
         try:
             sh = gc.open("B50 Task Misc")
-            worksheet = sh.worksheet("HSF-tasks-rooms").get_all_values()
+            worksheet = sh.worksheet("Task Misc").get_all_values()
             for row in worksheet[1:]:
-                if row and task_name in row[0]:
-                    load_room_instances = row[1].strip().split("\n")
+                if row and task_name in row[1]:
+                    load_room_instances = row[2].strip().split("\n")
                     break
             break
         except Exception as e:
