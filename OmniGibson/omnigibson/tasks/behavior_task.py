@@ -85,7 +85,7 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        use_presampled_robot_pose=False,
+        use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
