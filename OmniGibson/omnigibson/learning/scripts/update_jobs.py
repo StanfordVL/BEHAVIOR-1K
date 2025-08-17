@@ -145,6 +145,9 @@ def main(args):
                         if job_quota <= 0:
                             print("Reached job limit, exiting...")
                             exit(0)
+                    # Remove this if we don't want failed trajectories to count
+                    elif row and row[3].strip().lower() == "failed":
+                        num_process_traj += 1
 
 
 if __name__ == "__main__":
