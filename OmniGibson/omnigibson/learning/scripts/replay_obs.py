@@ -126,6 +126,8 @@ def replay_hdf5_file(
         generate_bbox: If True, generates bounding box data from the replayed data
         flush_every_n_steps: Number of steps to flush the data after
         offline_rgbd: If True, generates RGBD videos from h5 after replaying
+    Returns:
+        episode_id: ID of the episode
     """
     if generate_bbox:
         assert generate_rgbd and generate_seg, "Bounding box data requires rgb and segmentation data"
@@ -360,12 +362,14 @@ def replay_hdf5_file(
     env.save_data()
 
     log.info(f"Successfully processed episode_{demo_id:08d}")
+    return episode_id
 
 
 def generate_low_dim_data(
     data_folder: str,
     task_id: int,
     demo_id: int,
+    episode_id: int,
 ):
     """
     Post-process the replayed low-dimensional data (proprio, action, task-info, etc) to parquet.
@@ -373,51 +377,48 @@ def generate_low_dim_data(
     makedirs_with_mode(f"{data_folder}/data/task-{task_id:04d}")
     makedirs_with_mode(f"{data_folder}/meta/episodes/task-{task_id:04d}")
     with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
-        for episode_id in range(replayed_f["data"].attrs["n_episodes"]):
-            actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
-            proprio = np.array(
-                replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32
-            )
-            task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
-            cam_rel_poses = np.array(
-                replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::cam_rel_poses"][:], dtype=np.float32
-            )
-            # check if the data is valid
-            assert (
-                actions.shape[0] == proprio.shape[0] == task_info.shape[0]
-            ), "Action, proprio, and task-info must have the same length"
-            T = len(actions)
+        actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
+        proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
+        task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
+        cam_rel_poses = np.array(
+            replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::cam_rel_poses"][:], dtype=np.float32
+        )
+        # check if the data is valid
+        assert (
+            actions.shape[0] == proprio.shape[0] == task_info.shape[0]
+        ), "Action, proprio, and task-info must have the same length"
+        T = len(actions)
 
-            data = {
-                "index": np.arange(T, dtype=np.int64),
-                "episode_index": np.zeros(T, dtype=np.int64) + episode_id,
-                "task_index": np.zeros(T, dtype=np.int64),
-                "timestamp": np.arange(T, dtype=np.float64) / 30.0,  # 30 fps
-                "observation.state": list(proprio),
-                "observation.cam_rel_poses": list(cam_rel_poses),
-                "action": list(actions),
-                "observation.task_info": list(task_info),
-            }
-            df = pd.DataFrame(data)
-            df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False)
+        data = {
+            "index": np.arange(T, dtype=np.int64),
+            "episode_index": np.zeros(T, dtype=np.int64) + episode_id,
+            "task_index": np.zeros(T, dtype=np.int64),
+            "timestamp": np.arange(T, dtype=np.float64) / 30.0,  # 30 fps
+            "observation.state": list(proprio),
+            "observation.cam_rel_poses": list(cam_rel_poses),
+            "action": list(actions),
+            "observation.task_info": list(task_info),
+        }
+        df = pd.DataFrame(data)
+        df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False)
 
-            task_metadata = {}
-            for attr_name in replayed_f["data"].attrs:
-                if isinstance(replayed_f["data"].attrs[attr_name], np.int64):
-                    task_metadata[attr_name] = int(replayed_f["data"].attrs[attr_name])
-                elif isinstance(replayed_f["data"].attrs[attr_name], np.ndarray):
-                    task_metadata[attr_name] = replayed_f["data"].attrs[attr_name].tolist()
-                else:
-                    task_metadata[attr_name] = replayed_f["data"].attrs[attr_name]
-            for attr_name in replayed_f["data"][f"demo_{episode_id}"].attrs:
-                if isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.int64):
-                    task_metadata[attr_name] = int(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name])
-                elif isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.ndarray):
-                    task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name].tolist()
-                else:
-                    task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name]
-            with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w") as f:
-                json.dump(task_metadata, f, indent=4)
+        task_metadata = {}
+        for attr_name in replayed_f["data"].attrs:
+            if isinstance(replayed_f["data"].attrs[attr_name], np.int64):
+                task_metadata[attr_name] = int(replayed_f["data"].attrs[attr_name])
+            elif isinstance(replayed_f["data"].attrs[attr_name], np.ndarray):
+                task_metadata[attr_name] = replayed_f["data"].attrs[attr_name].tolist()
+            else:
+                task_metadata[attr_name] = replayed_f["data"].attrs[attr_name]
+        for attr_name in replayed_f["data"][f"demo_{episode_id}"].attrs:
+            if isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.int64):
+                task_metadata[attr_name] = int(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name])
+            elif isinstance(replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name], np.ndarray):
+                task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name].tolist()
+            else:
+                task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name]
+        with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w") as f:
+            json.dump(task_metadata, f, indent=4)
     log.info(f"Successfully processed {data_folder}/replayed/episode_{demo_id:08d}.hdf5")
 
 
@@ -530,6 +531,7 @@ def rgbd_vid_to_pcd(
     data_folder: str,
     task_id: int,
     demo_id: int,
+    episode_id: int,
     robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
     downsample_ratio: int = 4,
     pcd_range: Tuple[float, float, float, float, float, float] = (
@@ -569,13 +571,13 @@ def rgbd_vid_to_pcd(
         cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
         data_size = cam_rel_poses.shape[0]
         fused_pcd_dset = out_f.create_dataset(
-            "data/demo_0/robot_r1::fused_pcd",
+            f"data/demo_{episode_id}/robot_r1::fused_pcd",
             shape=(data_size, pcd_num_points, 6),
             compression="lzf",
         )
         if process_seg:
             pcd_semantic_dset = out_f.create_dataset(
-                "data/demo_0/robot_r1::pcd_semantic",
+                f"data/demo_{episode_id}/robot_r1::pcd_semantic",
                 shape=(data_size, pcd_num_points),
                 compression="lzf",
             )
@@ -678,7 +680,7 @@ def main():
         else:
             raise FileNotFoundError(f"Error: Folder {args.data_folder} does not exist")
     if args.rgbd or args.seg or args.bbox:
-        replay_hdf5_file(
+        episode_id = replay_hdf5_file(
             data_folder=args.data_folder,
             task_id=task_id,
             demo_id=args.demo_id,
@@ -688,12 +690,13 @@ def main():
             flush_every_n_steps=FLUSH_EVERY_N_STEPS,
             offline_rgbd=args.offline_rgbd,
         )
+    else:
+        # TODO: change this
+        episode_id = 0
 
     if args.low_dim:
         generate_low_dim_data(
-            data_folder=args.data_folder,
-            task_id=task_id,
-            demo_id=args.demo_id,
+            data_folder=args.data_folder, task_id=task_id, demo_id=args.demo_id, episode_id=episode_id
         )
     if args.pcd_gt or args.pcd_vid:
         with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/{args.task_name}.yaml") as f:
@@ -703,6 +706,7 @@ def main():
                 data_folder=args.data_folder,
                 task_id=task_id,
                 demo_id=args.demo_id,
+                episode_id=episode_id,
                 robot_camera_names=ROBOT_CAMERA_NAMES["R1Pro"],
                 pcd_range=pcd_range,
                 downsample_ratio=4,
