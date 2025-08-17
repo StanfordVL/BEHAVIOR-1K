@@ -14,7 +14,7 @@ CUDA_VERSION="12.4"
 ACCEPT_CONDA_TOS=false
 ACCEPT_NVIDIA_EULA=false
 ACCEPT_DATASET_TOS=false
-SKIP_CONDA_PREFIX=false
+CONFIRM_NO_CONDA=false
 
 [ "$#" -eq 0 ] && HELP=true
 
@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
-        --skip-conda-prefix) SKIP_CONDA_PREFIX=true; shift ;;
+        --confirm-no-conda) CONFIRM_NO_CONDA=true; shift ;;
         *) echo "Unknown option: \$1"; exit 1 ;;
     esac
 done
@@ -55,7 +55,7 @@ Options:
   --accept-conda-tos      Automatically accept Conda Terms of Service
   --accept-nvidia-eula    Automatically accept NVIDIA Isaac Sim EULA
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
-  --skip-conda-prefix     Skip checking if conda environment is active, useful for installing into system python environment
+  --confirm-no-conda      Skip confirmation prompt when not in a conda environment
 
 Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
 Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
@@ -67,8 +67,28 @@ fi
 [ "$OMNIGIBSON" = true ] && [ "$BDDL" = false ] && { echo "ERROR: --omnigibson requires --bddl"; exit 1; }
 [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --dataset requires --omnigibson"; exit 1; }
 [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --primitives requires --omnigibson"; exit 1; }
+[ "$NEW_ENV" = true ] && [ "$CONFIRM_NO_CONDA" = true ] && { echo "ERROR: --new-env and --confirm-no-conda are mutually exclusive"; exit 1; }
 
 WORKDIR=$(pwd)
+
+# Check conda environment condition early (unless creating new environment)
+if [ "$NEW_ENV" = false ]; then
+    if [ -z "$CONDA_PREFIX" ]; then
+        if [ "$CONFIRM_NO_CONDA" = false ]; then
+            echo ""
+            echo "WARNING: You are not in a conda environment."
+            echo "Currently using Python from: $(which python)"
+            echo ""
+            echo "Continue? [y/n] (or rerun with --confirm-no-conda to skip this prompt)"
+            read -r response
+            if [[ ! "$response" =~ ^[Yy]$ ]]; then
+                echo "Installation cancelled."
+                exit 1
+            fi
+        fi
+        echo "Proceeding without conda environment..."
+    fi
+fi
 
 # Function to prompt for terms acceptance
 prompt_for_terms() {
@@ -185,11 +205,15 @@ if [ "$NEW_ENV" = true ]; then
         exit 1
     fi
     
-    # Create environment with only the necessary packages
-    conda create -n behavior python=3.10 "numpy<2" "setuptools<=79" -c conda-forge -y
+    # Create environment with only Python 3.10
+    conda create -n behavior python=3.10 -c conda-forge -y
     conda activate behavior
     
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
+    
+    # Install numpy and setuptools via pip
+    echo "Installing numpy and setuptools..."
+    pip install "numpy<2" "setuptools<=79"
     
     # Install PyTorch via pip with CUDA support
     echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
@@ -212,9 +236,6 @@ fi
 if [ "$OMNIGIBSON" = true ]; then
     echo "Installing OmniGibson..."
     [ ! -d "OmniGibson" ] && { echo "ERROR: OmniGibson directory not found"; exit 1; }
-    
-    # Pre-installation checks
-    [ "$SKIP_CONDA_PREFIX" = false ] && [ -z "$CONDA_PREFIX" ] && { echo "ERROR: Must run in conda environment"; exit 1; }
     
     # Check Python version
     PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
