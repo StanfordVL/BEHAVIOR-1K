@@ -64,7 +64,7 @@ class DataWrapper(EnvironmentWrapper):
         else:
             data_grp = self.hdf5_file["data"]
         if overwrite or "config" not in set(data_grp.attrs.keys()):
-            env.task.write_task_metadata(env)
+            env.task.update_bddl_scope_metadata(env)
             scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)

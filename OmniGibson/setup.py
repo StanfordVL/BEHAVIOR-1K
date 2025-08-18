@@ -65,6 +65,7 @@ setup(
             "mkdocstrings[python]",
             "mkdocs-section-index",
             "mkdocs-literate-nav",
+            "mkdocs-redirects",
             "telemoma~=0.2.0",
             "gspread",
         ],

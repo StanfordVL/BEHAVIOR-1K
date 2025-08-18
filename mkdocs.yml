@@ -4,7 +4,7 @@
 
 site_name: BEHAVIOR
 repo_name: StanfordVL/BEHAVIOR-1K
-site_url: https://behavior.stanford.edu/omnigibson # TODO: move this to root
+site_url: https://behavior.stanford.edu
 repo_url: https://github.com/StanfordVL/BEHAVIOR-1K
 theme: 
   name: material
@@ -69,6 +69,12 @@ markdown_extensions:
 plugins:
   - search
   - autorefs
+  - redirects:
+      redirect_maps:
+        'omnigibson/modules/overview.md': 'omnigibson/overview.md'
+        'omnigibson/getting_started/installation.md': 'getting_started/installation.md'
+        'omnigibson/getting_started/examples.md': 'getting_started/examples.md'
+        'omnigibson/behavior_components/behavior_knowledgebase.md': 'https://behavior.stanford.edu/knowledgebase/'
   - mkdocstrings:
       handlers:
         python:
