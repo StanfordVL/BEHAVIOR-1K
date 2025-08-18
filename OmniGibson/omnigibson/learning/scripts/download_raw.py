@@ -37,7 +37,9 @@ for ws in worksheets:
                         file_downloaded += 1
                         traj_downloaded += 1
                     except AssertionError as e:
-                        print(f"Error downloading or extracting data for {task_name} instance {instance_id}: {e}")
+                        print(
+                            f"Error downloading or extracting data for {task_name} resource uuid {resource_uuid}: {e}"
+                        )
                 else:
                     traj_downloaded += 1
             if traj_downloaded >= MAX_TRAJ_PER_TASK:

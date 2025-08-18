@@ -109,7 +109,7 @@ def download_and_extract_data(
         assert running_args["task_name"] == task_name, f"Task name mismatch: {running_args['task_name']} != {task_name}"
         assert (
             running_args["instance_id"] == instance_id
-        ), f"Instance ID mismatch: {running_args['instance_id']} != {instance_id}"
+        ), f"Instance ID mismatch: {running_args['instance_id']} in running_args.json != {instance_id} from LW API"
     os.rename(
         f"{data_dir}/raw/{base_name}/{task_name}.hdf5",
         f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}/episode_{TASK_NAMES_TO_INDICES[task_name]:04d}{instance_id:03d}{traj_id:01d}.hdf5",
