@@ -271,12 +271,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             if cond_type in cond_types and state_type not in obj.states:
                 return False, f"{cls.__name__} requires {state_type.__name__} state!"
 
-        if len(conditions) > 0:
-            system_name = list(conditions.keys())[0]
-            system = obj.scene.get_system(system_name, force_init=False)
-            if isinstance(system, MicroParticleSystem) and not gm.USE_GPU_DYNAMICS:
-                return False, f"{cls.__name__} requires gm.USE_GPU_DYNAMICS=True!"
-
         return True, None
 
     @classmethod
@@ -745,6 +739,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             tuple of str: System names that should be actively checked for particle modification at the current timestep
         """
         # Default is all supported active systems
+        # Exclude MicroParticleSystems when GPU dynamics is disabled
+        if not gm.USE_GPU_DYNAMICS:
+            return tuple(
+                name
+                for name, system in self.obj.scene.active_systems.items()
+                if not isinstance(system, MicroParticleSystem)
+            )
         return tuple(self.obj.scene.active_systems.keys())
 
     @property
@@ -1073,7 +1074,7 @@ class ParticleApplier(ParticleModifier):
         system_name = list(self.conditions.keys())[0]
 
         # This will initialize the system if it's not initialized already.
-        system = self.obj.scene.get_system(system_name)
+        system = self.obj.scene.get_system(system_name, force_init=gm.USE_GPU_DYNAMICS)
 
         # TODO: particle visualization module has been deprecated since Isaac 4.2.0
         # We need to find a new way for this visualization; keeping this code for now for future reference
@@ -1536,8 +1537,9 @@ class ParticleApplier(ParticleModifier):
 
     @property
     def systems_to_check(self):
-        # Only should check the systems in the owned conditions
-        return tuple(self.conditions.keys())
+        # Only should check active systems in the owned conditions
+        active_systems = super().systems_to_check
+        return tuple(name for name in self.conditions.keys() if name in active_systems)
 
     @property
     def projection_is_active(self):
