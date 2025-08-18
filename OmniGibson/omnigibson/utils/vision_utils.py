@@ -66,14 +66,15 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")  # Initialize the key_array as empty
+        self.device = "cuda" if th.cuda.is_available() else "cpu"
+        self.key_array = th.empty(0, dtype=th.int32, device=self.device)  # Initialize the key_array as empty
         self.known_ids = set()
         self.unlabelled_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")
+        self.key_array = th.empty(0, dtype=th.int32, device=self.device)
         self.known_ids = set()
         self.unlabelled_ids = set()
 
@@ -104,7 +105,7 @@ class Remapper:
         if image_max_key > key_array_max_key:
             prev_key_array = self.key_array.clone()
             # We build a new key array and use max int32 as the default value.
-            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device="cuda")
+            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device=self.device)
             # Copy the previous key array into the new key array
             self.key_array[: len(prev_key_array)] = prev_key_array
 
