@@ -426,6 +426,7 @@ def rgbd_gt_to_pcd(
     data_folder: str,
     task_id: int,
     demo_id: int,
+    episode_id: int,
     robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
     downsample_ratio: int = 4,
     pcd_range: Tuple[float, float, float, float, float, float] = (
@@ -447,6 +448,7 @@ def rgbd_gt_to_pcd(
         data_folder (str): Path to the data folder containing RGBD data.
         task_id (int): Task ID for the task being processed.
         demo_id (int): Demo ID for the episode being processed.
+        episode_id (int): Episode ID for the episode being processed.
         robot_camera_names (dict): Dict of camera names to process.
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
@@ -462,67 +464,66 @@ def rgbd_gt_to_pcd(
     with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as in_f:
         # create a new hdf5 file to store the point cloud data
         with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
-            for demo_name in in_f["data"]:
-                data = in_f["data"][demo_name]["obs"]
-                data_size = data["robot_r1::cam_rel_poses"].shape[0]
-                fused_pcd_dset = out_f.create_dataset(
-                    f"data/{demo_name}/robot_r1::fused_pcd",
-                    shape=(data_size, pcd_num_points, 6),
+            data = in_f["data"][f"demo_{episode_id}"]["obs"]
+            data_size = data["robot_r1::cam_rel_poses"].shape[0]
+            fused_pcd_dset = out_f.create_dataset(
+                f"data/demo_{episode_id}/robot_r1::fused_pcd",
+                shape=(data_size, pcd_num_points, 6),
+                compression="lzf",
+            )
+            if process_seg:
+                pcd_semantic_dset = out_f.create_dataset(
+                    f"data/demo_{episode_id}/robot_r1::pcd_semantic",
+                    shape=(data_size, pcd_num_points),
                     compression="lzf",
                 )
-                if process_seg:
-                    pcd_semantic_dset = out_f.create_dataset(
-                        f"data/{demo_name}/robot_r1::pcd_semantic",
-                        shape=(data_size, pcd_num_points),
-                        compression="lzf",
+            # We batch process every batch_size frames
+            for i in range(0, data_size, batch_size):
+                log.info(f"Processing batch {i} of {data_size}...")
+                obs = dict()  # to store rgbd and pass into process_fused_point_cloud
+                obs["cam_rel_poses"] = th.from_numpy(data["robot_r1::cam_rel_poses"][i : i + batch_size])
+                # get all camera intrinsics
+                camera_intrinsics = {}
+                for camera_id, robot_camera_name in robot_camera_names.items():
+                    resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
+                    # Calculate the downsampled camera intrinsics
+                    camera_intrinsics[robot_camera_name] = (
+                        th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id]) / downsample_ratio
                     )
-                # We batch process every batch_size frames
-                for i in range(0, data_size, batch_size):
-                    log.info(f"Processing batch {i} of {data_size}...")
-                    obs = dict()  # to store rgbd and pass into process_fused_point_cloud
-                    obs["cam_rel_poses"] = th.from_numpy(data["robot_r1::cam_rel_poses"][i : i + batch_size])
-                    # get all camera intrinsics
-                    camera_intrinsics = {}
-                    for camera_id, robot_camera_name in robot_camera_names.items():
-                        resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
-                        # Calculate the downsampled camera intrinsics
-                        camera_intrinsics[robot_camera_name] = (
-                            th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id]) / downsample_ratio
-                        )
-                        camera_intrinsics[robot_camera_name][-1, -1] = 1.0
-                        obs[f"{robot_camera_name}::rgb"] = F.interpolate(
-                            th.from_numpy(data[f"{robot_camera_name}::rgb"][i : i + batch_size, :, :, :3]).movedim(
-                                -1, -3
-                            ),
-                            size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
-                            mode="nearest-exact",
-                        ).movedim(-3, -1)
-                        obs[f"{robot_camera_name}::depth_linear"] = F.interpolate(
-                            th.from_numpy(data[f"{robot_camera_name}::depth_linear"][i : i + batch_size]).unsqueeze(0),
+                    camera_intrinsics[robot_camera_name][-1, -1] = 1.0
+                    obs[f"{robot_camera_name}::rgb"] = F.interpolate(
+                        th.from_numpy(data[f"{robot_camera_name}::rgb"][i : i + batch_size, :, :, :3]).movedim(
+                            -1, -3
+                        ),
+                        size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                        mode="nearest-exact",
+                    ).movedim(-3, -1)
+                    obs[f"{robot_camera_name}::depth_linear"] = F.interpolate(
+                        th.from_numpy(data[f"{robot_camera_name}::depth_linear"][i : i + batch_size]).unsqueeze(0),
+                        size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                        mode="nearest-exact",
+                    ).squeeze(0)
+
+                    if process_seg:
+                        obs[f"{robot_camera_name}::seg_semantic"] = F.interpolate(
+                            th.from_numpy(data[f"{robot_camera_name}::seg_semantic"][i : i + batch_size]).unsqueeze,
                             size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
                             mode="nearest-exact",
                         ).squeeze(0)
-
-                        if process_seg:
-                            obs[f"{robot_camera_name}::seg_semantic"] = F.interpolate(
-                                th.from_numpy(data[f"{robot_camera_name}::seg_semantic"][i : i + batch_size]).unsqueeze,
-                                size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
-                                mode="nearest-exact",
-                            ).squeeze(0)
-                    # process the fused point cloud
-                    pcd, seg = process_fused_point_cloud(
-                        obs=obs,
-                        camera_intrinsics=camera_intrinsics,
-                        pcd_range=pcd_range,
-                        pcd_num_points=pcd_num_points,
-                        use_fps=use_fps,
-                        process_seg=process_seg,
-                        verbose=True,
-                    )
-                    log.info("Saving point cloud data...")
-                    fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-                    if process_seg:
-                        pcd_semantic_dset[i : i + batch_size] = seg.cpu()
+                # process the fused point cloud
+                pcd, seg = process_fused_point_cloud(
+                    obs=obs,
+                    camera_intrinsics=camera_intrinsics,
+                    pcd_range=pcd_range,
+                    pcd_num_points=pcd_num_points,
+                    use_fps=use_fps,
+                    process_seg=process_seg,
+                    verbose=True,
+                )
+                log.info("Saving point cloud data...")
+                fused_pcd_dset[i : i + batch_size] = pcd.cpu()
+                if process_seg:
+                    pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     log.info("Point cloud data saved!")
 
@@ -553,6 +554,7 @@ def rgbd_vid_to_pcd(
         data_folder (str): Path to the data folder containing RGBD data.
         task_id (int): Task ID for the task being processed.
         demo_id (int): Demo ID for the episode being processed.
+        episode_id (int): Episode ID for the episode being processed.
         robot_camera_names (dict): Dict of camera names to process.
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
@@ -720,6 +722,7 @@ def main():
                 data_folder=args.data_folder,
                 task_id=task_id,
                 demo_id=args.demo_id,
+                episode_id=episode_id,
                 robot_camera_names=ROBOT_CAMERA_NAMES["R1Pro"],
                 pcd_range=pcd_range,
                 downsample_ratio=4,
