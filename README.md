@@ -19,7 +19,7 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 
 ## Quick Start
 
-For most users, we recommend the full installation with a new conda environment:
+For most users, we recommend the full installation. You can either create a new conda environment or use your existing Python environment:
 
 ### Linux
 ```bash
@@ -51,11 +51,30 @@ cd BEHAVIOR-1K
 
 | Option | Flag | Description |
 |--------|------|-------------|
-| **New Environment** | `--new-env` | Create a new conda environment named `behavior` |
+| **New Environment** | `--new-env` | Create a new conda environment named `behavior` (requires conda) |
 | **Datasets** | `--dataset` | Download BEHAVIOR datasets (requires `--omnigibson`) |
 | **Primitives** | `--primitives` | Install OmniGibson with action primitives support |
 | **Development** | `--dev` | Install development dependencies |
 | **CUDA Version** | `--cuda-version X.X` | Specify CUDA version (default: 12.4) |
+| **No Conda Confirmation** | `--confirm-no-conda` | Skip confirmation prompt when not in a conda environment |
+
+### Installation without Conda
+
+If you prefer to use your existing Python environment (system Python, venv, etc.) instead of conda, simply omit the `--new-env` flag:
+
+```bash
+# Linux
+./setup.sh --omnigibson --bddl --teleop --dataset
+
+# Windows
+.\setup.ps1 -OmniGibson -BDDL -Teleop -Dataset
+```
+
+If you're not in a conda environment, the script will prompt for confirmation. To skip this prompt (useful for CI/CD):
+
+```bash
+./setup.sh --omnigibson --bddl --teleop --dataset --confirm-no-conda
+```
 
 ### Terms of Service & License Acceptance
 
