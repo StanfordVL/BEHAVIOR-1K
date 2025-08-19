@@ -487,8 +487,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 indicator_mesh.load(self.obj.scene)
                 indicator_mesh.initialize()
                 indicator_mesh.visible = True
-                # Scale is 4% of the full scale
-                indicator_mesh_rel_scale = 0.04
+                # Scale is 5% of the full scale
+                indicator_mesh_rel_scale = 0.05
                 indicator_mesh.scale = self._projection_mesh_params["extents"] * indicator_mesh_rel_scale
                 indicator_z_offset = (
                     0.0
