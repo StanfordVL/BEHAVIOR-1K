@@ -11,8 +11,8 @@ from typing import List
 
 user = getpass.getuser()
 home = os.environ.get("HOME")
-MAX_JOBS = {"vision": 64, "viscam": 16}  # Maximum number of jobs allowed
-MAX_TRAJ_PER_TASK = 100
+MAX_JOBS = {"vision": 64, "viscam": 32}  # Maximum number of jobs allowed
+MAX_TRAJ_PER_TASK = 150
 credentials_path = f"{home}/Documents/credentials"
 
 
