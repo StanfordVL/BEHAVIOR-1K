@@ -1,14 +1,19 @@
 import argparse
+import av
 import json
+import logging
 import os
 import packaging.version
 import numpy as np
 import torch as th
+import torchvision
 from collections.abc import Callable
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
+from omnigibson.learning.utils.obs_utils import dequantize_depth, MIN_DEPTH, MAX_DEPTH, DEPTH_SHIFT
 from pathlib import Path
 from torch.utils.data import Dataset
-from typing import Iterable, Tuple
+from torchvision.io import VideoReader
+from typing import Any, Dict, Iterable, Tuple
 
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.compute_stats import aggregate_stats
@@ -22,7 +27,7 @@ from lerobot.datasets.utils import (
     get_safe_version,
     load_jsonlines,
 )
-from lerobot.datasets.video_utils import get_safe_default_codec
+from lerobot.datasets.video_utils import get_safe_default_codec, decode_video_frames as _decode_video_frames
 
 
 class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
@@ -97,6 +102,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.tolerance_s = tolerance_s
         self.revision = revision if revision else CODEBASE_VERSION
         self.video_backend = video_backend if video_backend else get_safe_default_codec()
+        if "depth" in self.modalities:
+            assert self.video_backend == "pyav", (
+                "Depth videos can only be decoded with the 'pyav' backend. "
+                "Please set video_backend='pyav' when initializing the dataset."
+            )
         self.delta_indices = None
 
         # Unused attributes
@@ -165,6 +175,162 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             fpaths += video_files
 
         return fpaths
+
+    def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
+        """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
+        in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
+        Segmentation Fault. This probably happens because a memory reference to the video loader is created in
+        the main process and a subprocess fails to access it.
+        """
+        item = {}
+        for vid_key, query_ts in query_timestamps.items():
+            video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
+            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
+            # post-process seg instance id:
+            if "seg_instance_id" in vid_key:
+                N, H, W, C = frames.shape
+                rgb_flat = frames.reshape(N, -1, C)  # (H*W, 3)
+                # For each rgb pixel, find the index of the nearest color in the equidistant bins
+                distances = th.cdist(rgb_flat, self.palette.unsqueeze(0).expand(N, -1, -1), p=2)
+                ids = th.argmin(distances, dim=-1)  # (N, H*W)
+                frames = self.id_list[ids].reshape(N, H, W)  # (N, H, W)
+            item[vid_key] = frames.squeeze(0)
+
+        return item
+
+
+def decode_video_frames(
+    video_path: Path | str,
+    timestamps: list[float],
+    tolerance_s: float,
+    backend: str | None = None,
+) -> th.Tensor:
+    if "depth" in video_path.name:
+        return decode_video_frames_depth(video_path, timestamps, tolerance_s)
+    else:
+        return _decode_video_frames(
+            video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
+        )
+
+
+def decode_video_frames_depth(
+    video_path: Path | str,
+    timestamps: list[float],
+    tolerance_s: float,
+    log_loaded_timestamps: bool = False,
+) -> th.Tensor:
+    """
+    Adapted from decode_video_frames_vision to handle depth decoding
+    """
+    video_path = str(video_path)
+
+    # set backend
+    torchvision.set_video_backend("pyav")
+    keyframes_only = True  # pyav doesn't support accurate seek
+
+    # set a video stream reader
+    # TODO(rcadene): also load audio stream at the same time
+    reader = DepthVideoReader(video_path, "video")
+
+    # set the first and last requested timestamps
+    # Note: previous timestamps are usually loaded, since we need to access the previous key frame
+    first_ts = min(timestamps)
+    last_ts = max(timestamps)
+
+    # access closest key frame of the first requested frame
+    # Note: closest key frame timestamp is usually smaller than `first_ts` (e.g. key frame can be the first frame of the video)
+    # for details on what `seek` is doing see: https://pyav.basswood-io.com/docs/stable/api/container.html?highlight=inputcontainer#av.container.InputContainer.seek
+    reader.seek(first_ts, keyframes_only=keyframes_only)
+
+    # load all frames until last requested frame
+    loaded_frames = []
+    loaded_ts = []
+    for frame in reader:
+        current_ts = frame["pts"]
+        if log_loaded_timestamps:
+            logging.info(f"frame loaded at timestamp={current_ts:.4f}")
+        loaded_frames.append(frame["data"])
+        loaded_ts.append(current_ts)
+        if current_ts >= last_ts:
+            break
+
+    reader.container.close()
+
+    reader = None
+
+    query_ts = th.tensor(timestamps)
+    loaded_ts = th.tensor(loaded_ts)
+
+    # compute distances between each query timestamp and timestamps of all loaded frames
+    dist = th.cdist(query_ts[:, None], loaded_ts[:, None], p=1)
+    min_, argmin_ = dist.min(1)
+
+    is_within_tol = min_ < tolerance_s
+    assert is_within_tol.all(), (
+        f"One or several query timestamps unexpectedly violate the tolerance ({min_[~is_within_tol]} > {tolerance_s=})."
+        "It means that the closest frame that can be loaded from the video is too far away in time."
+        "This might be due to synchronization issues with timestamps during data collection."
+        "To be safe, we advise to ignore this item during training."
+        f"\nqueried timestamps: {query_ts}"
+        f"\nloaded timestamps: {loaded_ts}"
+        f"\nvideo: {video_path}"
+        f"\nbackend: pyav"
+    )
+
+    # get closest frames to the query timestamps
+    closest_frames = th.stack([loaded_frames[idx] for idx in argmin_])
+    closest_ts = loaded_ts[argmin_]
+
+    if log_loaded_timestamps:
+        logging.info(f"{closest_ts=}")
+
+    # convert to the pytorch format which is float32 in [0,1] range (and channel first)
+    closest_frames = closest_frames.type(th.float32) / 255
+
+    assert len(timestamps) == len(closest_frames)
+    return closest_frames
+
+
+class DepthVideoReader(VideoReader):
+    """
+    Adapted from torchvision.io.VideoReader to support gray16le decoding for depth
+    """
+
+    def __next__(self) -> Dict[str, Any]:
+        """Decodes and returns the next frame of the current stream.
+        Frames are encoded as a dict with mandatory
+        data and pts fields, where data is a tensor, and pts is a
+        presentation timestamp of the frame expressed in seconds
+        as a float.
+
+        Returns:
+            (dict): a dictionary and containing decoded frame (``data``)
+            and corresponding timestamp (``pts``) in seconds
+
+        """
+        try:
+            frame = next(self._c)
+            pts = float(frame.pts * frame.time_base)
+            if "video" in self.pyav_stream:
+                frame = th.as_tensor(
+                    dequantize_depth(
+                        frame.reformat(format="gray16le").to_ndarray(),
+                        min_depth=MIN_DEPTH,
+                        max_depth=MAX_DEPTH,
+                        shift=DEPTH_SHIFT,
+                    )
+                )
+            elif "audio" in self.pyav_stream:
+                frame = th.as_tensor(frame.to_ndarray()).permute(1, 0)
+            else:
+                frame = None
+        except av.error.EOFError:
+            raise StopIteration
+
+        if frame.numel() == 0:
+            raise StopIteration
+
+        return {"data": frame, "pts": pts}
 
 
 def generate_task_json(data_dir: str) -> int:

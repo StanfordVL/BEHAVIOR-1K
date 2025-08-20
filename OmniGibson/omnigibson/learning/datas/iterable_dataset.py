@@ -35,7 +35,7 @@ class BehaviorIterableDataset(IterableDataset):
     @classmethod
     def get_all_demo_keys(cls, data_path: str, task_name: str) -> List[Any]:
         task_dir_name = f"task-{TASK_NAMES_TO_INDICES[task_name]:04d}"
-        assert os.path.exists(f"{data_path}/data/{task_dir_name}"), f"Data path does not exist!"
+        assert os.path.exists(f"{data_path}/data/{task_dir_name}"), "Data path does not exist!"
         demo_keys = sorted(
             [
                 file_name.split(".")[0].split("_")[-1]
@@ -63,8 +63,6 @@ class BehaviorIterableDataset(IterableDataset):
         task_info_range: Optional[ListConfig] = None,
         seed: int = 42,
         shuffle: bool = True,
-        # dataset parameters
-        use_gt_pcd: bool = False,
         **kwargs,
     ) -> None:
         """
@@ -90,7 +88,6 @@ class BehaviorIterableDataset(IterableDataset):
             task_info_range (Optional[ListConfig]): Range of the task information (for normalization).
             seed (int): Random seed.
             shuffle (bool): Whether to shuffle the dataset.
-            use_gt_pcd (bool): Whether to use ground truth point clouds (as opposed to video-generated ones).
         """
         super().__init__(*args, **kwargs)
         self._data_path = data_path
@@ -120,7 +117,6 @@ class BehaviorIterableDataset(IterableDataset):
         self._visual_obs_types = set(visual_obs_types)
 
         self._multi_view_cameras = multi_view_cameras
-        self._use_gt_pcd = use_gt_pcd
 
         self._demo_indices = list(range(len(self._demo_keys)))
         # Preload low dim into memory
@@ -163,10 +159,9 @@ class BehaviorIterableDataset(IterableDataset):
         obs_loaders = dict()
         for obs_type in self._visual_obs_types:
             if obs_type == "pcd":
-                data_folder = "pcd_gt" if self._use_gt_pcd else "pcd_vid"
                 # pcd_generator
                 f_pcd = h5py.File(
-                    f"{self._data_path}/{data_folder}/task-{self._task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
+                    f"{self._data_path}/pcd/task-{self._task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
                     "r",
                     swmr=True,
                     libver="latest",
@@ -289,7 +284,7 @@ class BehaviorIterableDataset(IterableDataset):
                 for key, indices in ACTION_QPOS_INDICES[self._robot_type].items():
                     action_dict[key] = data[:, indices]
                     # action normalization
-                    if not "gripper" in key:  # Gripper actions are already normalized to [-1, 1]
+                    if "gripper" not in key:  # Gripper actions are already normalized to [-1, 1]
                         action_dict[key] = (
                             2
                             * (action_dict[key] - JOINT_RANGE[self._robot_type][key][0])
