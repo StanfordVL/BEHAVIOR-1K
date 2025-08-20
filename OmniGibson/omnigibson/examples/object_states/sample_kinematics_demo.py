@@ -1,8 +1,11 @@
+import math
+
 import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
+import omnigibson.utils.transform_utils as T
 
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
@@ -12,7 +15,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo to use the raycasting-based sampler to load objects onTop and/or inside another
     Loads a cabinet, a microwave open on top of it, and two plates with apples on top, one inside and one on top of the cabinet
-    Then loads a shelf and cracker boxes inside of it
+    Then loads a bookcase and cracker boxes inside of it
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
@@ -29,15 +32,13 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="microwave",
         category="microwave",
         model="hjjxmi",
-        bounding_box=[0.768, 0.512, 0.392],
     )
 
     cabinet_cfg = dict(
         type="DatasetObject",
         name="cabinet",
         category="bottom_cabinet",
-        model="bamfsz",
-        bounding_box=[1.075, 1.131, 1.355],
+        model="songes",
     )
 
     plate_cfgs = [
@@ -46,7 +47,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"plate{i}",
             category="plate",
             model="iawoof",
-            bounding_box=th.tensor([0.20, 0.20, 0.05]),
+            scale=0.6,
+            # bounding_box=th.tensor([0.20, 0.20, 0.02]),
         )
         for i in range(2)
     ]
@@ -57,17 +59,15 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"apple{i}",
             category="apple",
             model="agveuv",
-            bounding_box=[0.065, 0.065, 0.077],
         )
-        for i in range(4)
+        for i in range(2)
     ]
 
-    shelf_cfg = dict(
+    bookcase_cfg = dict(
         type="DatasetObject",
-        name="shelf",
-        category="shelf",
-        model="pkgbcp",
-        bounding_box=th.tensor([1.0, 0.4, 2.0]),
+        name="bookcase",
+        category="bookcase",
+        model="gsksby",
     )
 
     box_cfgs = [
@@ -76,7 +76,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=f"box{i}",
             category="box_of_crackers",
             model="cmdigf",
-            bounding_box=th.tensor([0.2, 0.05, 0.3]),
         )
         for i in range(5)
     ]
@@ -87,7 +86,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         cabinet_cfg,
         *plate_cfgs,
         *apple_cfgs,
-        shelf_cfg,
+        bookcase_cfg,
         *box_cfgs,
     ]
 
@@ -102,7 +101,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.step([])
 
     # Sample microwave and boxes
-    sample_boxes_on_shelf(env)
+    sample_boxes_on_bookcase(env)
     sample_microwave_plates_apples(env)
 
     max_steps = 100 if short_exec else -1
@@ -112,7 +111,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         step += 1
 
     # Always close environment at the end
-    og.clear()
+    og.shutdown()
 
 
 def sample_microwave_plates_apples(env):
@@ -123,10 +122,12 @@ def sample_microwave_plates_apples(env):
 
     # Place the cabinet at a pre-determined location on the floor
     og.log.info("Placing cabinet on the floor...")
-    cabinet.set_orientation([0, 0, 0, 1.0])
     env.step(th.empty(0))
     offset = cabinet.get_position_orientation()[0][2] - cabinet.aabb_center[2]
-    cabinet.set_position_orientation(position=th.tensor([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
+    cabinet.set_position_orientation(
+        position=th.tensor([0.5, 0, cabinet.aabb_extent[2] / 2]) + offset,
+        orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
+    )
     env.step(th.empty(0))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
@@ -162,24 +163,26 @@ def sample_microwave_plates_apples(env):
                 env.step(th.empty(0))
 
 
-def sample_boxes_on_shelf(env):
-    shelf = env.scene.object_registry("name", "shelf")
+def sample_boxes_on_bookcase(env):
+    bookcase = env.scene.object_registry("name", "bookcase")
     boxes = list(env.scene.object_registry("category", "box_of_crackers"))
-    # Place the shelf at a pre-determined location on the floor
-    og.log.info("Placing shelf on the floor...")
-    shelf.set_orientation([0, 0, 0, 1.0])
+    # Place the bookcase at a pre-determined location on the floor
+    og.log.info("Placing bookcase on the floor...")
     env.step(th.empty(0))
-    offset = shelf.get_position_orientation()[0][2] - shelf.aabb_center[2]
-    shelf.set_position_orientation(position=th.tensor([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
+    offset = bookcase.get_position_orientation()[0][2] - bookcase.aabb_center[2]
+    bookcase.set_position_orientation(
+        position=th.tensor([-0.5, 0, bookcase.aabb_extent[2] / 2]) + offset,
+        orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
+    )
     env.step(th.empty(0))  # One step is needed for the object to be fully initialized
 
-    og.log.info("Shelf placed.")
+    og.log.info("bookcase placed.")
     for _ in range(50):
         env.step(th.empty(0))
 
     og.log.info("Placing boxes...")
     for i, box in enumerate(boxes):
-        box.states[object_states.Inside].set_value(shelf, True)
+        box.states[object_states.Inside].set_value(bookcase, True)
         og.log.info(f"Box {i} placed.")
 
         for _ in range(50):

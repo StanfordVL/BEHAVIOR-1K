@@ -43,9 +43,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     sink_cfg = dict(
         type="DatasetObject",
         name="sink",
-        category="sink",
-        model="egwapq",
-        bounding_box=[2.427, 0.625, 1.2],
+        category="furniture_sink",
+        model="czyfhq",
         abilities={
             "toggleable": {},
             "particleSource": {
@@ -62,7 +61,8 @@ def main(random_selection=False, headless=False, short_exec=False):
                 },
             },
         },
-        position=[0.0, 0, 0.42],
+        fixed_base=True,
+        position=[0.0, 0, 0.4],
     )
 
     cfg["objects"] = [sink_cfg]
@@ -72,8 +72,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([0.37860532, -0.65396566, 1.4067066]),
-        orientation=th.tensor([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
+        position=th.tensor([0.4732, -0.5300, 1.1335]),
+        orientation=th.tensor([0.4920, 0.1984, 0.3171, 0.7861]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink
@@ -108,7 +108,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     finally:
         # Always shut down environment at the end
-        og.clear()
+        og.shutdown()
 
 
 if __name__ == "__main__":
