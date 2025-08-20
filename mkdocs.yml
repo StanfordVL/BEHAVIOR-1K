@@ -96,6 +96,9 @@ nav:
   - Home: index.md
   - 🏆 2025 BEHAVIOR Challenge: 
     - challenge/overview.md
+    - Tutorials:
+      - Using Data: challenge/tutorials/using_data.md
+      - Policy Evaluation: challenge/tutorials/policy_eval.md
     - Demo Gallery: 
       - challenge/demo_gallery.md
       - Turning On Radio: challenge/tasks/turning_on_radio.md
