@@ -70,7 +70,7 @@ export material OmniGibsonVRayMtl(
         anno::in_group("Emission"),
         anno::display_name("Emission Intensity")
     ]],
-	float albedo_add = float(0.0)
+	uniform float albedo_add = float(0.0)
 	[[
 		anno::display_name("Albedo Add"),
 		anno::soft_range(float(-1.0f), float(1.0f)),
@@ -88,7 +88,7 @@ export material OmniGibsonVRayMtl(
     anno::display_name("OmniGibsonVRayMtl")
 ]]
 = vray_materials::VRayMtl(
-    Diffuse : color tinted_diffuse_color = multiply_colors(
+    Diffuse : multiply_colors(
 		vray_maps::VRayBitmap(
         	filename : diffuse_texture,
 			rgb_offset : albedo_add
