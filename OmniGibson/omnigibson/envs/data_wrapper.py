@@ -727,10 +727,16 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Hot swap in additional info for playing back data
 
-        # Minimize physics leakage during playback (we need to take an env step when loading state)
-        config["env"]["action_frequency"] = 30.0
-        config["env"]["rendering_frequency"] = 30.0
-        config["env"]["physics_frequency"] = 120.0
+        if include_contacts:
+            # Minimize physics leakage during playback (we need to take an env step when loading state)
+            config["env"]["action_frequency"] = 1000.0
+            config["env"]["rendering_frequency"] = 1000.0
+            config["env"]["physics_frequency"] = 1000.0
+        else:
+            # Since we are setting all objects to be visual-only, physics will not be propogating
+            config["env"]["action_frequency"] = 30.0
+            config["env"]["rendering_frequency"] = 30.0
+            config["env"]["physics_frequency"] = 120.0
 
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
