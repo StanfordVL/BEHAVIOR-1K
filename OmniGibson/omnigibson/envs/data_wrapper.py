@@ -803,6 +803,7 @@ class DataPlaybackWrapper(DataWrapper):
             flush_every_n_traj=flush_every_n_traj,
             full_scene_file=full_scene_file,
             include_robot_control=include_robot_control,
+            include_contacts=include_contacts,
         )
 
     def __init__(
@@ -816,6 +817,7 @@ class DataPlaybackWrapper(DataWrapper):
         flush_every_n_traj=10,
         full_scene_file=None,
         include_robot_control=True,
+        include_contacts=True,
     ):
         """
         Args:
@@ -832,6 +834,7 @@ class DataPlaybackWrapper(DataWrapper):
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
+            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -853,6 +856,7 @@ class DataPlaybackWrapper(DataWrapper):
         # Store additional variables
         self.n_render_iterations = n_render_iterations
         self.include_robot_control = include_robot_control
+        self.include_contacts = include_contacts
 
         # Run super
         super().__init__(
@@ -984,8 +988,10 @@ class DataPlaybackWrapper(DataWrapper):
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
-            for obj in self.scene.objects:
-                obj.keep_still()
+            if not self.include_contacts:
+                # When all objects are visual-only, keep them still on every step
+                for obj in self.scene.objects:
+                    obj.keep_still()
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
