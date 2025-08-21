@@ -396,10 +396,10 @@ fi
 
 echo ""
 echo "=== Installation Complete! ==="
-[ "$NEW_ENV" = true ] && echo "✓ Created conda environment 'behavior'"
-[ "$OMNIGIBSON" = true ] && echo "✓ Installed OmniGibson + Isaac Sim"
-[ "$BDDL" = true ] && echo "✓ Installed BDDL"
-[ "$TELEOP" = true ] && echo "✓ Installed JoyLo"
-[ "$DATASET" = true ] && echo "✓ Downloaded datasets"
+if [ "$NEW_ENV" = true ]; then echo "✓ Created conda environment 'behavior'"; fi
+if [ "$OMNIGIBSON" = true ]; then echo "✓ Installed OmniGibson + Isaac Sim"; fi
+if [ "$BDDL" = true ]; then echo "✓ Installed BDDL"; fi
+if [ "$TELEOP" = true ]; then echo "✓ Installed JoyLo"; fi
+if [ "$DATASET" = true ]; then echo "✓ Downloaded datasets"; fi
 echo ""
-[ "$NEW_ENV" = true ] && echo "To activate: conda activate behavior"
+if [ "$NEW_ENV" = true ]; then echo "To activate: conda activate behavior"; fi
