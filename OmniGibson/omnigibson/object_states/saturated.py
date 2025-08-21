@@ -189,7 +189,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
     def get_texture_change_params(self):
         colors = []
 
-        for system_name in self._limits.keys():
+        for system_name in self.obj.states[ModifiedParticles].particle_counts.keys():
             system = self.obj.scene.get_system(system_name, force_init=False)
             if self.get_value(system):
                 colors.append(system.color)
