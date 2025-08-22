@@ -222,6 +222,9 @@ gm.FORCE_ROUGHNESS = 0.7
 # mass from the category-level density and the volume of the object.
 gm.FORCE_CATEGORY_MASS = True
 
+# Gavity on z direction
+gm.GRAVITY = 9.81
+
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):

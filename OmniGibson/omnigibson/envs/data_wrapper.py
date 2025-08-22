@@ -14,6 +14,7 @@ from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
 from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
@@ -737,6 +738,8 @@ class DataPlaybackWrapper(DataWrapper):
             config["env"]["action_frequency"] = 30.0
             config["env"]["rendering_frequency"] = 30.0
             config["env"]["physics_frequency"] = 120.0
+            # Disable gravity
+            gm.GRAVITY = 0.0
 
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
@@ -982,6 +985,8 @@ class DataPlaybackWrapper(DataWrapper):
                     obj = create_object_from_init_info(add_obj_info)
                     scene.add_object(obj)
                     obj.set_position(th.ones(3) * 100.0 + th.ones(3) * 5 * j)
+                    if not self.include_contacts:
+                        obj.visual_only = True
                 # Step physics to initialize any new objects
                 og.sim.step()
 
@@ -992,6 +997,11 @@ class DataPlaybackWrapper(DataWrapper):
                 # When all objects are visual-only, keep them still on every step
                 for obj in self.scene.objects:
                     obj.keep_still()
+                for system in self.scene.systems:
+                    if isinstance(system, MacroPhysicalParticleSystem):
+                        system.set_particles_velocities(
+                            lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
+                        )
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
