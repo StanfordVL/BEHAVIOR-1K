@@ -554,24 +554,6 @@ This demo lets you choose a grasping mode and then loads a `Fetch` robot and a c
     --8<-- "examples/robots/grasping_mode_example.py"
     ```
 
-### **Advanced: IK Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how to construct your own IK functionality using omniverse's native lula library without explicitly utilizing all of OmniGibson's class abstractions
-    * Understanding how to manipulate the simulator at a lower-level than the main Environment entry point
-
-```{.python .annotate}
-python -m omnigibson.examples.robots.advanced.ik_example
-```
-
-This demo loads in `Fetch` robot and a IK solver to control the robot, and then lets you teleoperate the robot using your keyboard.
-
-??? code "ik_example.py"
-
-    ``` py linenums="1"
-    --8<-- "examples/robots/advanced/ik_example.py"
-    ```
-
 ## :material-wrench: **Simulator**
 These examples showcase useful functionality from **`OmniGibson`**'s monolithic `Simulator` object.
 
@@ -606,24 +588,4 @@ This demo loads a stripped-down scene with the `Turtlebot` robot, and lets you i
 
     ``` py linenums="1"
     --8<-- "examples/simulator/sim_save_load_example.py"
-    ```
-
-## :material-image: **Rendering**
-These examples showcase how to change renderer settings in **`OmniGibson`**.
-
-### **Renderer Settings Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how to use RendererSettings class
-
-```{.python .annotate}
-python -m omnigibson.examples.renderer_settings.renderer_settings_example
-```
-
-This demo iterates over different renderer settings of and shows how they can be programmatically set with **`OmniGibson`** interface.
-
-??? code "renderer_settings_example.py"
-
-    ``` py linenums="1"
-    --8<-- "examples/renderer_settings/renderer_settings_example.py"
     ```
