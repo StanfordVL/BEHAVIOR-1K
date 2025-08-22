@@ -5,11 +5,30 @@ mdl 1.6;
 
 // Import
 import ::anno::*;
-import ::base::texture_return;
+import ::base::*;
 import vray_maps::VRayBitmap;
 import vray_maps::VRayBitmap_bump;
 import vray_maps::vray_mono_output;
 import vray_materials::VRayMtl;
+
+base::texture_return multiply_colors(
+    color color_1 = color(1.0, 1.0, 1.0),
+    color color_2 = color(.5, .5, .5),
+	float weight  = 1.0
+) [[ 
+    anno::hidden() 
+]]
+{
+    return base::blend_color_layers(
+                layers: base::color_layer[](
+                    base::color_layer(
+                        layer_color:    color_2,
+                        weight:         weight,
+                        mode:           base::color_layer_multiply
+                        )),
+                base: color_1
+    );
+}
 
 export material OmniGibsonVRayMtl(
 	uniform texture_2d diffuse_texture = texture_2d() [[
@@ -50,15 +69,32 @@ export material OmniGibsonVRayMtl(
     [[
         anno::in_group("Emission"),
         anno::display_name("Emission Intensity")
-    ]]
+    ]],
+	uniform float albedo_add = float(0.0)
+	[[
+		anno::display_name("Albedo Add"),
+		anno::soft_range(float(-1.0f), float(1.0f)),
+		anno::description("Adds a constant value to the diffuse color "),
+		anno::in_group("Tints")
+	]],
+	color diffuse_tint = color(1.0f)
+	[[
+		anno::display_name("Color Tint"),
+		anno::description("When enabled, this color value is multiplied over the final albedo color"),
+		anno::in_group("Tints")
+	]]
 ) 
 [[
     anno::display_name("OmniGibsonVRayMtl")
 ]]
 = vray_materials::VRayMtl(
-    Diffuse : vray_maps::VRayBitmap(
-        filename : diffuse_texture
-    ).tint,
+    Diffuse : multiply_colors(
+		vray_maps::VRayBitmap(
+        	filename : diffuse_texture,
+			rgb_offset : albedo_add
+    	).tint,
+		diffuse_tint, 1.0
+	).tint,
     Reflection : vray_maps::VRayBitmap(
         filename : reflection_texture
     ).tint,
