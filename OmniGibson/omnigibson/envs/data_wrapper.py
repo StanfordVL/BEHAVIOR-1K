@@ -15,6 +15,7 @@ from omnigibson.learning.utils.obs_utils import write_video
 from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
@@ -758,6 +759,8 @@ class DataPlaybackWrapper(DataWrapper):
             config["env"]["action_frequency"] = 30.0
             config["env"]["rendering_frequency"] = 30.0
             config["env"]["physics_frequency"] = 120.0
+            # Simulator-level visual-only set to True
+            gm.VISUAL_ONLY = True
 
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
@@ -805,11 +808,6 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Load env
         env = og.Environment(configs=config)
-
-        if not include_contacts:
-            with og.sim.stopped():
-                for obj in env.scene.objects:
-                    obj.visual_only = True
 
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
@@ -1029,9 +1027,14 @@ class DataPlaybackWrapper(DataWrapper):
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
             if not self.include_contacts:
-                # When all objects are visual-only, keep them still on every step
+                # When all objects/systems are visual-only, keep them still on every step
                 for obj in self.scene.objects:
                     obj.keep_still()
+                for system in self.scene.systems:
+                    if isinstance(system, MacroPhysicalParticleSystem):
+                        system.set_particles_velocities(
+                            lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
+                        )
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data
