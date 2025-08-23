@@ -148,6 +148,8 @@ def main(args):
                     # Remove this if we don't want failed trajectories to count
                     elif row and row[3].strip().lower() == "failed":
                         num_process_traj += 1
+                # rate limit
+                time.sleep(1)
 
 
 if __name__ == "__main__":
