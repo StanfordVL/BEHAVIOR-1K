@@ -14,6 +14,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 from torchvision.io import VideoReader
 from typing import Any, Dict, Iterable, Tuple
+from tqdm import tqdm
 
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.compute_stats import aggregate_stats
@@ -79,10 +80,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         revision: str | None = None,
         force_cache_sync: bool = False,
         download_videos: bool = True,
-        video_backend: str | None = "pyav",
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
+        video_backend: str | None = "pyav",
+        local_only: bool = False,
     ):
         """
         Custom args:
@@ -92,6 +94,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.
                 must be a subset of ["left_wrist", "right_wrist", "head"]
             video_backend: video backend to use for decoding videos.
+            local_only: whether to only use local data (not download from HuggingFace).
         """
         Dataset.__init__(self)
         self.repo_id = repo_id
@@ -102,7 +105,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.tolerance_s = tolerance_s
         self.revision = revision if revision else CODEBASE_VERSION
         self.video_backend = video_backend if video_backend else get_safe_default_codec()
-        if "depth" in self.modalities:
+        if "depth" in modalities:
             assert self.video_backend == "pyav", (
                 "Depth videos can only be decoded with the 'pyav' backend. "
                 "Please set video_backend='pyav' when initializing the dataset."
@@ -143,6 +146,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
             self.hf_dataset = self.load_hf_dataset()
         except (AssertionError, FileNotFoundError, NotADirectoryError):
+            if local_only:
+                raise FileNotFoundError
             self.revision = get_safe_version(self.repo_id, self.revision)
             self.download_episodes(download_videos)
             self.hf_dataset = self.load_hf_dataset()
@@ -337,7 +342,7 @@ def generate_task_json(data_dir: str) -> int:
     num_tasks = len(TASK_NAMES_TO_INDICES)
 
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
-        for task_name, task_index in TASK_NAMES_TO_INDICES.items():
+        for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
             json.dump({"task_index": task_index, "task": task_name}, f)
             f.write("\n")
     return num_tasks
@@ -352,9 +357,11 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
     num_episodes = 0
     with open(f"{data_dir}/meta/episodes.jsonl", "w") as out_f:
         with open(f"{data_dir}/meta/episodes_stats.jsonl", "w") as out_stats_f:
-            for task_info in task_json:
+            for task_info in tqdm(task_json):
                 task_index = task_info["task_index"]
                 task_name = task_info["task"]
+                if not os.path.exists(f"{data_dir}/meta/episodes/task-{task_index:04d}"):
+                    continue
                 for episode_name in sorted(os.listdir(f"{data_dir}/meta/episodes/task-{task_index:04d}")):
                     with open(f"{data_dir}/meta/episodes/task-{task_index:04d}/{episode_name}", "r") as f:
                         episode_info = json.load(f)
@@ -400,13 +407,13 @@ def generate_info_json(
         "total_frames": total_frames,
         "total_tasks": total_tasks,
         "total_videos": total_episodes * 6,
-        "chunks_size": 1000,
+        "chunks_size": 10000,
         "fps": fps,
         "splits": {
             "train": "0:" + str(total_episodes),
         },
-        "data_path": "data/task-{episode_chunk:04d}/episode_{episode_index:07d}.parquet",
-        "video_path": "videos/task-{episode_chunk:04d}/{video_key}/episode_{episode_index:07d}.mp4",
+        "data_path": "data/task-{episode_chunk:04d}/episode_{episode_index:08d}.parquet",
+        "video_path": "videos/task-{episode_chunk:04d}/{video_key}/episode_{episode_index:08d}.mp4",
         "features": {
             "observation.images.rgb.left_wrist": {
                 "dtype": "video",
@@ -545,7 +552,8 @@ def generate_info_json(
             "episode_index": {"dtype": "int64", "shape": [1], "names": None},
             "index": {"dtype": "int64", "shape": [1], "names": None},
             "observation.cam_rel_poses": {"dtype": "float32", "shape": [21], "names": None},
-            "observation.state": {"dtype": "float32", "shape": [None], "names": None},
+            "observation.state": {"dtype": "float32", "shape": [259], "names": None},
+            "observation.task_info": {"dtype": "float32", "shape": [None], "names": None},
         },
     }
 
@@ -555,7 +563,7 @@ def generate_info_json(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", type=str, default="/home/svl/Documents/Files/behavior")
+    parser.add_argument("-d", "--data_dir", type=str, default="/home/svl/behavior")
     args = parser.parse_args()
 
     num_tasks = generate_task_json(args.data_dir)

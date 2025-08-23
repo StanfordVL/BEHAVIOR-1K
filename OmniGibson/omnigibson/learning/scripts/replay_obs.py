@@ -391,8 +391,8 @@ def generate_low_dim_data(
 
         data = {
             "index": np.arange(T, dtype=np.int64),
-            "episode_index": np.zeros(T, dtype=np.int64) + episode_id,
-            "task_index": np.zeros(T, dtype=np.int64),
+            "episode_index": np.zeros(T, dtype=np.int64) + demo_id,
+            "task_index": np.zeros(T, dtype=np.int64) + task_id,
             "timestamp": np.arange(T, dtype=np.float64) / 30.0,  # 30 fps
             "observation.state": list(proprio),
             "observation.cam_rel_poses": list(cam_rel_poses),
@@ -492,9 +492,7 @@ def rgbd_gt_to_pcd(
                     )
                     camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                     obs[f"{robot_camera_name}::rgb"] = F.interpolate(
-                        th.from_numpy(data[f"{robot_camera_name}::rgb"][i : i + batch_size, :, :, :3]).movedim(
-                            -1, -3
-                        ),
+                        th.from_numpy(data[f"{robot_camera_name}::rgb"][i : i + batch_size, :, :, :3]).movedim(-1, -3),
                         size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
                         mode="nearest-exact",
                     ).movedim(-3, -1)

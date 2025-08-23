@@ -33,13 +33,14 @@ logger = create_module_logger("BehaviorIterableDataset")
 
 class BehaviorIterableDataset(IterableDataset):
     @classmethod
-    def get_all_demo_keys(cls, data_path: str, task_name: str) -> List[Any]:
-        task_dir_name = f"task-{TASK_NAMES_TO_INDICES[task_name]:04d}"
-        assert os.path.exists(f"{data_path}/data/{task_dir_name}"), "Data path does not exist!"
+    def get_all_demo_keys(cls, data_path: str, task_names: List[str]) -> List[Any]:
+        assert os.path.exists(data_path), "Data path does not exist!"
+        task_dir_names = [f"task-{TASK_NAMES_TO_INDICES[name]:04d}" for name in task_names]
         demo_keys = sorted(
             [
                 file_name.split(".")[0].split("_")[-1]
-                for file_name in sorted(os.listdir(f"{data_path}/data/{task_dir_name}"))
+                for task_dir_name in task_dir_names
+                for file_name in os.listdir(f"{data_path}/data/{task_dir_name}")
                 if file_name.endswith(".parquet")
             ]
         )
@@ -49,7 +50,6 @@ class BehaviorIterableDataset(IterableDataset):
         self,
         *args,
         data_path: str,
-        task_name: str,
         demo_keys: List[Any],
         robot_type: str = "R1Pro",
         obs_window_size: int,
@@ -69,7 +69,6 @@ class BehaviorIterableDataset(IterableDataset):
         Initialize the BehaviorIterableDataset.
         Args:
             data_path (str): Path to the data directory.
-            task_name (str): Task name.
             demo_keys (List[Any]): List of demo keys.
             robot_type (str): Type of the robot. Default is "R1Pro".
             obs_window_size (int): Size of the observation window.
@@ -91,7 +90,6 @@ class BehaviorIterableDataset(IterableDataset):
         """
         super().__init__(*args, **kwargs)
         self._data_path = data_path
-        self._task_id = self._get_task_id_by_name(task_name)
         self._demo_keys = demo_keys
         self._robot_type = robot_type
         self._obs_window_size = obs_window_size
@@ -154,6 +152,7 @@ class BehaviorIterableDataset(IterableDataset):
             yield from self.get_streamed_data(demo_ptr, start_idx, end_idx)
 
     def get_streamed_data(self, demo_ptr: int, start_idx: int, end_idx: int) -> Generator[Dict[str, Any], None, None]:
+        task_id = int(self._demo_keys[demo_ptr]) // 10000
         chunk_generator = self._chunk_demo(demo_ptr, start_idx, end_idx)
         # Initialize obs loaders
         obs_loaders = dict()
@@ -161,7 +160,7 @@ class BehaviorIterableDataset(IterableDataset):
             if obs_type == "pcd":
                 # pcd_generator
                 f_pcd = h5py.File(
-                    f"{self._data_path}/pcd/task-{self._task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
+                    f"{self._data_path}/pcd/task-{task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
                     "r",
                     swmr=True,
                     libver="latest",
@@ -178,7 +177,7 @@ class BehaviorIterableDataset(IterableDataset):
                     obs_loaders[f"{camera_name}::{obs_type}"] = iter(
                         OBS_LOADER_MAP[obs_type](
                             data_path=self._data_path,
-                            task_id=self._task_id,
+                            task_id=task_id,
                             camera_id=camera_id,
                             demo_id=self._demo_keys[demo_ptr],
                             batch_size=self._obs_window_size,
@@ -339,8 +338,9 @@ class BehaviorIterableDataset(IterableDataset):
         return demo
 
     def _extract_low_dim_data(self, demo_key: Any) -> Dict[str, th.Tensor]:
+        task_id = int(demo_key) // 10000
         df = pd.read_parquet(
-            os.path.join(self._data_path, "data", f"task-{self._task_id:04d}", f"episode_{demo_key}.parquet")
+            os.path.join(self._data_path, "data", f"task-{task_id:04d}", f"episode_{demo_key}.parquet")
         )
         ret = {
             "proprio": th.from_numpy(
@@ -417,13 +417,3 @@ class BehaviorIterableDataset(IterableDataset):
                     * self._downsample_factor : self._downsample_factor
                 ]
             )
-
-    def _get_task_id_by_name(self, task_name: str) -> int:
-        """
-        Get the task id by name.
-        Args:
-            task_name (str): Name of the task.
-        Returns:
-            int: Task id.
-        """
-        return TASK_NAMES_TO_INDICES[task_name]

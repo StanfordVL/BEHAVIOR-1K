@@ -52,6 +52,14 @@ def any_to_torch(tensor_struct, device: str = "cuda"):
 
 
 @make_recursive_func
+def torch_to_numpy(tensor_struct):
+    """
+    Converts all tensors in a nested structure to numpy arrays.
+    """
+    return tree.map_structure(lambda x: x.detach().cpu().numpy(), tensor_struct)
+
+
+@make_recursive_func
 def any_ones_like(x: Union[Dict, np.ndarray, th.Tensor, int, float, np.number]):
     """Returns a one-filled object of the same (d)type and shape as the input.
     The difference between this and `np.ones_like()` is that this works well
