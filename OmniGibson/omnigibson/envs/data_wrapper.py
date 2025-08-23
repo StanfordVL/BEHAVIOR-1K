@@ -829,6 +829,7 @@ class DataPlaybackWrapper(DataWrapper):
             flush_every_n_traj=flush_every_n_traj,
             flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
+            partial_full_scene_load=load_room_instances is not None and full_scene_file is not None,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
         )
