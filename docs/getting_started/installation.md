@@ -99,9 +99,21 @@ Choose your installation method:
 
         !!! info "What does the setup script do?"
             
-            - Creates a new conda environment named `behavior`
+            - Creates a new conda environment named `behavior` (when using `--new-env`)
             - Installs all selected components in editable mode
             - Downloads Isaac Sim and BEHAVIOR datasets (if requested)
+
+        !!! tip "Using an existing Python environment"
+            
+            You can omit `--new-env` to use your current Python environment instead of creating a new conda environment:
+            ```shell
+            # Linux: Install in current environment
+            ./setup.sh --omnigibson --bddl --teleop --dataset
+            
+            # Skip confirmation prompt with --confirm-no-conda
+            ./setup.sh --omnigibson --bddl --confirm-no-conda
+            ```
+            The script will prompt for confirmation if not in a conda environment.
 
         !!! note "Windows Note"
             

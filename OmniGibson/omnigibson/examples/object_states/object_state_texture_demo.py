@@ -12,7 +12,7 @@ gm.ENABLE_HQ_RENDERING = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
-    # Create the scene config to load -- empty scene plus a cabinet
+    # Create the scene config to load -- empty scene plus a steak
     cfg = {
         "env": {
             "rendering_frequency": 60,  # for HQ rendering
@@ -24,10 +24,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         "objects": [
             {
                 "type": "DatasetObject",
-                "name": "cabinet",
-                "category": "bottom_cabinet",
-                "model": "zuwvdo",
-                "bounding_box": [1.595, 0.537, 1.14],
+                "name": "steak",
+                "category": "steak",
+                "model": "ppykkp",
                 "abilities": {
                     "freezable": {},
                     "cookable": {},
@@ -40,7 +39,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                             # particle applier / remover to apply / remover particles associated with that system
                             # The list should contain functions with signature condition() --> bool,
                             # where True means the condition is satisfied
-                            # In this case, we only allow our cabinet to absorb water, with no conditions needed.
+                            # In this case, we only allow our steak to absorb water, with no conditions needed.
                             # This is needed for the Saturated ("saturable") state so that we can modify the texture
                             # according to the water.
                             # NOTE: This will only change color if gm.ENABLE_HQ_RENDERING and gm.USE_GPU_DYNAMICS is
@@ -50,6 +49,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     },
                 },
                 "position": [0, 0, 0.59],
+                "fixed_base": True,
             },
         ],
     }
@@ -59,12 +59,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([1.7789, -1.68822, 1.13551]),
-        orientation=th.tensor([0.57065614, 0.20331904, 0.267029, 0.74947212]),
+        position=th.tensor([0.2425, 0.0894, 0.7872]),
+        orientation=th.tensor([0.2494, 0.3583, 0.7384, 0.5140]),
     )
 
     # Grab reference to object of interest
-    obj = env.scene.object_registry("name", "cabinet")
+    obj = env.scene.object_registry("name", "steak")
 
     # Make sure all the appropriate states are in the object
     assert object_states.Frozen in obj.states
@@ -128,7 +128,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Close environment at the end
     if not short_exec:
         input("Demo completed. Press ENTER to shutdown environment.")
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":
