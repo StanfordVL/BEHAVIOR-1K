@@ -12,7 +12,8 @@ param(
     [string]$CudaVersion = "12.4",
     [switch]$AcceptCondaTos,
     [switch]$AcceptNvidiaEula,
-    [switch]$AcceptDatasetTos
+    [switch]$AcceptDatasetTos,
+    [switch]$ConfirmNoConda
 )
 
 # Set error action preference to stop on errors
@@ -38,6 +39,7 @@ Options:
   -AcceptCondaTos         Automatically accept Conda Terms of Service
   -AcceptNvidiaEula       Automatically accept NVIDIA Isaac Sim EULA
   -AcceptDatasetTos       Automatically accept BEHAVIOR Dataset Terms
+  -ConfirmNoConda         Skip confirmation prompt when not in a conda environment
 
 Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
 Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptCondaTos -AcceptNvidiaEula -AcceptDatasetTos
@@ -61,7 +63,31 @@ if ($Primitives -and -not $OmniGibson) {
     exit 1
 }
 
+if ($NewEnv -and $ConfirmNoConda) {
+    Write-Error "ERROR: -NewEnv and -ConfirmNoConda are mutually exclusive"
+    exit 1
+}
+
 $WorkDir = Get-Location
+
+# Check conda environment condition early (unless creating new environment)
+if (-not $NewEnv) {
+    if (-not $env:CONDA_PREFIX) {
+        if (-not $ConfirmNoConda) {
+            Write-Host ""
+            Write-Host "WARNING: You are not in a conda environment."
+            Write-Host "Currently using Python from: $(Get-Command python | Select-Object -ExpandProperty Source)"
+            Write-Host ""
+            Write-Host "Continue? [y/n] (or rerun with -ConfirmNoConda to skip this prompt)"
+            $response = Read-Host
+            if ($response -notmatch '^[Yy]$') {
+                Write-Host "Installation cancelled."
+                exit 1
+            }
+        }
+        Write-Host "Proceeding without conda environment..."
+    }
+}
 
 # Function to prompt for terms acceptance
 function Prompt-ForTerms {
@@ -216,8 +242,8 @@ if ($NewEnv) {
         exit 1
     }
     
-    # Create environment with only the necessary packages
-    conda create -n behavior python=3.10 "numpy<2" "setuptools<=79" -c conda-forge -y
+    # Create environment with only Python 3.10
+    conda create -n behavior python=3.10 -c conda-forge -y
     
     # Activate environment
     Invoke-CondaActivate "behavior"
@@ -227,6 +253,10 @@ if ($NewEnv) {
     
     # Determine the CUDA version string for pip URL (e.g., cu126, cu118, etc.)
     $CudaVerShort = $CudaVersion -replace '\.', ''  # Convert 12.4 to 124
+    
+    # Install numpy and setuptools via pip
+    Write-Host "Installing numpy and setuptools..."
+    pip install "numpy<2" "setuptools<=79"
     
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
     
@@ -328,12 +358,6 @@ if ($OmniGibson) {
     
     if (-not (Test-Path "OmniGibson")) {
         Write-Error "ERROR: OmniGibson directory not found"
-        exit 1
-    }
-    
-    # Pre-installation checks
-    if (-not $env:CONDA_PREFIX) {
-        Write-Error "ERROR: Must run in conda environment"
         exit 1
     }
     

@@ -19,6 +19,7 @@ from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch, assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
+from omnigibson.controllers.controller_base import ControlType
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -715,8 +716,7 @@ class DataPlaybackWrapper(DataWrapper):
                 full scene file.
             include_task (bool): Whether to include the original task or not. If False, will use a DummyTask instead
             include_task_obs (bool): Whether to include task observations or not. If False, will not include task obs
-            include_robot_control (bool): Whether or not to include robot control. If False, will set all
-                robot.control_enabled=False
+            include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all
                 objects to be visual_only
 
@@ -729,10 +729,16 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Hot swap in additional info for playing back data
 
-        # Minimize physics leakage during playback (we need to take an env step when loading state)
-        config["env"]["action_frequency"] = 1000.0
-        config["env"]["rendering_frequency"] = 1000.0
-        config["env"]["physics_frequency"] = 1000.0
+        if include_contacts:
+            # Minimize physics leakage during playback (we need to take an env step when loading state)
+            config["env"]["action_frequency"] = 1000.0
+            config["env"]["rendering_frequency"] = 1000.0
+            config["env"]["physics_frequency"] = 1000.0
+        else:
+            # Since we are setting all objects to be visual-only, physics will not be propogating
+            config["env"]["action_frequency"] = 30.0
+            config["env"]["rendering_frequency"] = 30.0
+            config["env"]["physics_frequency"] = 120.0
 
         # Make sure obs space is flattened for recording
         config["env"]["flatten_obs_space"] = True
@@ -780,10 +786,6 @@ class DataPlaybackWrapper(DataWrapper):
                 for obj in env.scene.objects:
                     obj.visual_only = True
 
-        # If not controlling robots, disable for all robots
-        for robot in env.robots:
-            robot.control_enabled = include_robot_control
-
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
@@ -802,6 +804,8 @@ class DataPlaybackWrapper(DataWrapper):
             only_successes=only_successes,
             flush_every_n_traj=flush_every_n_traj,
             full_scene_file=full_scene_file,
+            include_robot_control=include_robot_control,
+            include_contacts=include_contacts,
         )
 
     def __init__(
@@ -814,6 +818,8 @@ class DataPlaybackWrapper(DataWrapper):
         only_successes=False,
         flush_every_n_traj=10,
         full_scene_file=None,
+        include_robot_control=True,
+        include_contacts=True,
     ):
         """
         Args:
@@ -829,6 +835,8 @@ class DataPlaybackWrapper(DataWrapper):
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
+            include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
+            include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
         """
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
@@ -849,6 +857,8 @@ class DataPlaybackWrapper(DataWrapper):
 
         # Store additional variables
         self.n_render_iterations = n_render_iterations
+        self.include_robot_control = include_robot_control
+        self.include_contacts = include_contacts
 
         # Run super
         super().__init__(
@@ -933,6 +943,20 @@ class DataPlaybackWrapper(DataWrapper):
                     setattr(obj, attr, val.item() if val.ndim == 0 else val)
         self.reset()
 
+        # If not controlling robots, disable for all robots
+        if not self.include_robot_control:
+            for robot in self.robots:
+                robot.control_enabled = False
+                # Set all controllers to effort mode with zero gain, this keeps the robot still
+                for controller in robot.controllers.values():
+                    for i, dof in enumerate(controller.dof_idx):
+                        dof_joint = robot.joints[robot.dof_names_ordered[dof]]
+                        dof_joint.set_control_type(
+                            control_type=ControlType.EFFORT,
+                            kp=None,
+                            kd=None,
+                        )
+
         # Restore to initial state
         og.sim.load_state(state[0, : int(state_size[0])], serialized=True)
 
@@ -966,6 +990,10 @@ class DataPlaybackWrapper(DataWrapper):
             # Restore the sim state, and take a very small step with the action to make sure physics are
             # properly propagated after the sim state update
             og.sim.load_state(s[: int(ss)], serialized=True)
+            if not self.include_contacts:
+                # When all objects are visual-only, keep them still on every step
+                for obj in self.scene.objects:
+                    obj.keep_still()
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
             # If recording, record data

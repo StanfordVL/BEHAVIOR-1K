@@ -556,6 +556,39 @@ class VRayMaterialPrim(MaterialPrim):
         return self.get_input(inp="diffuse_texture").resolvedPath
 
     @property
+    def albedo_add(self):
+        """
+        Returns:
+            float: this material's applied albedo_add
+        """
+        return self.get_input(inp="albedo_add")
+
+    @albedo_add.setter
+    def albedo_add(self, add):
+        """
+        Args:
+             add (float): this material's applied albedo_add
+        """
+        self.set_input(inp="albedo_add", val=add)
+
+    @property
+    def diffuse_tint(self):
+        """
+        Returns:
+            3-array: this material's applied (R,G,B) diffuse_tint
+        """
+        diffuse_tint = self.get_input(inp="diffuse_tint")
+        return th.tensor(diffuse_tint, dtype=th.float32) if diffuse_tint is not None else None
+
+    @diffuse_tint.setter
+    def diffuse_tint(self, color):
+        """
+        Args:
+             color (3-array): this material's applied (R,G,B) diffuse_tint
+        """
+        self.set_input(inp="diffuse_tint", val=lazy.pxr.Gf.Vec3f(*color.tolist()))
+
+    @property
     def average_diffuse_color(self):
         """
         Returns:

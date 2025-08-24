@@ -66,14 +66,14 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")  # Initialize the key_array as empty
+        self.key_array = None  # Will be initialized with the correct device on first use
         self.known_ids = set()
         self.unlabelled_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")
+        self.key_array = None  # Will be reinitialized with the correct device on next use
         self.known_ids = set()
         self.unlabelled_ids = set()
 
@@ -100,13 +100,20 @@ class Remapper:
             th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = max(th.max(image).item(), max(old_mapping.keys()))
-        key_array_max_key = len(self.key_array) - 1
-        if image_max_key > key_array_max_key:
-            prev_key_array = self.key_array.clone()
-            # We build a new key array and use max int32 as the default value.
-            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device="cuda")
-            # Copy the previous key array into the new key array
-            self.key_array[: len(prev_key_array)] = prev_key_array
+
+        if self.key_array is None:
+            # First time initialization
+            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device=image.device)
+        else:
+            key_array_max_key = len(self.key_array) - 1
+            if image_max_key > key_array_max_key:
+                prev_key_array = self.key_array.clone()
+                # We build a new key array and use max int32 as the default value.
+                self.key_array = th.full(
+                    (image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device=image.device
+                )
+                # Copy the previous key array into the new key array
+                self.key_array[: len(prev_key_array)] = prev_key_array
 
         # Retrospectively inspect our cached ids against the old mapping and update the key array
         updated_ids = set()
