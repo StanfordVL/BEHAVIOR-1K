@@ -51,10 +51,10 @@ def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict
     return [(item["level2"], item["resourceUuid"]) for item in response.json().get("data", [])]
 
 
-def is_more_than_12_hours_ago(dt_str, fmt="%Y-%m-%d %H:%M:%S"):
+def is_more_than_x_hours_ago(dt_str, x, fmt="%Y-%m-%d %H:%M:%S"):
     dt = datetime.strptime(dt_str, fmt)
     diff_hours = (datetime.now() - dt).total_seconds() / 3600
-    return diff_hours > 12
+    return diff_hours > x
 
 
 def main():
@@ -103,9 +103,12 @@ def main():
                 time.sleep(1)
         # now iterate through entires and find failure ones
         for row_idx, row in enumerate(rows[1:], start=2):
-            if row and row[3].strip().lower() == "pending" and is_more_than_12_hours_ago(row[5]):
-                print(f"Row {row_idx} in {worksheet_name} is pending for more than 12 hours, marking as failed.")
-                # change row[3] to failed and append '+' to row[6]
+            hours_to_check = 24
+            if row and row[3].strip().lower() == "pending" and is_more_than_x_hours_ago(row[5], hours_to_check):
+                print(
+                    f"Row {row_idx} in {worksheet_name} is pending for more than {hours_to_check} hours, marking as failed."
+                )
+                # change row[3] to failed and append 'a' to row[6]
                 task_worksheet.update(
                     range_name=f"D{row_idx}:G{row_idx}",
                     values=[["failed", row[4].strip(), time.strftime("%Y-%m-%d %H:%M:%S"), row[6].strip() + "a"]],
