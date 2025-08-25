@@ -3,7 +3,7 @@
 #SBATCH --account=viscam
 #SBATCH --partition=viscam
 #SBATCH --nodes=1
-#SBATCH --exclude=viscam1,viscam7,viscam9,viscam10,viscam11,viscam12,viscam13,viscam-hgx-1 
+#SBATCH --exclude=viscam1,viscam5,viscam7,viscam9,viscam10,viscam11,viscam12,viscam13,viscam-hgx-1 
 #SBATCH --gres=gpu:1
 #SBATCH --mem=60G
 #SBATCH --cpus-per-task=8

@@ -103,7 +103,7 @@ def main():
                 time.sleep(1)
         # now iterate through entires and find failure ones
         for row_idx, row in enumerate(rows[1:], start=2):
-            hours_to_check = 24
+            hours_to_check = 12
             if row and row[3].strip().lower() == "pending" and is_more_than_x_hours_ago(row[5], hours_to_check):
                 print(
                     f"Row {row_idx} in {worksheet_name} is pending for more than {hours_to_check} hours, marking as failed."
