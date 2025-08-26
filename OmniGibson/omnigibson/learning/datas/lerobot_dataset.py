@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import packaging.version
-import numpy as np
+import pandas as pd
 import torch as th
 import torchvision
 from collections.abc import Callable
@@ -31,42 +31,15 @@ from lerobot.datasets.utils import (
 from lerobot.datasets.video_utils import get_safe_default_codec, decode_video_frames as _decode_video_frames
 
 
-class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
-    """
-    LerobotDatasetMetadata with the following customizations:
-        1. Custom task names mapping to indices.
-    """
-
-    def __init__(self, *args, modalities: Iterable[str] = None, cameras: Iterable[str] = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.modalities = set(modalities)
-        self.camera_names = set(cameras)
-        assert self.modalities.issubset(
-            {"rgb", "depth", "seg_instance_id"}
-        ), f"Modalities must be a subset of ['rgb', 'depth', 'seg_instance_id'], but got {self.modalities}"
-        assert self.camera_names.issubset(
-            ROBOT_CAMERA_NAMES["R1Pro"]
-        ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
-
-    @property
-    def features(self) -> dict[str, dict]:
-        """All features contained in the dataset."""
-        features = dict()
-        # pop not required features
-        for name in self.info["features"].keys():
-            if (
-                name.startswith("observation.images.")
-                and name.split(".")[-1] in self.camera_names
-                and name.split(".")[-2] in self.modalities
-            ):
-                features[name] = self.info["features"][name]
-        return features
-
-
 class BehaviorLeRobotDataset(LeRobotDataset):
     """
-    LeRobotDataset with the following customizations:
-        1. Custom chunking logic based on
+    BehaviorLeRobotDataset is a customized dataset class for loading and managing LeRobot datasets,
+    with additional filtering and loading options tailored for the BEHAVIOR-1K benchmark.
+    This class extends LeRobotDataset and introduces the following customizations:
+        - Task-based filtering: Load only episodes corresponding to specific tasks.
+        - Modality and camera selection: Load only specified modalities (e.g., "rgb", "depth", "seg_instance_id")
+          and cameras (e.g., "left_wrist", "right_wrist", "head").
+        - Local-only mode: Optionally restrict dataset usage to local files, disabling downloads.
     """
 
     def __init__(
@@ -93,7 +66,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                 must be a subset of ["rgb", "depth", "seg_instance_id"]
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.
                 must be a subset of ["left_wrist", "right_wrist", "head"]
-            video_backend: video backend to use for decoding videos.
             local_only: whether to only use local data (not download from HuggingFace).
         """
         Dataset.__init__(self)
@@ -202,6 +174,40 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             item[vid_key] = frames.squeeze(0)
 
         return item
+
+
+class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
+    """
+    BehaviorLerobotDatasetMetadata extends LeRobotDatasetMetadata with the following customizations:
+        1. Restricts the set of allowed modalities to {"rgb", "depth", "seg_instance_id"}.
+        2. Restricts the set of allowed camera names to those defined in ROBOT_CAMERA_NAMES["R1Pro"].
+        3. Provides a filtered view of dataset features, including only those corresponding to the selected modalities and camera names.
+    """
+
+    def __init__(self, *args, modalities: Iterable[str] = None, cameras: Iterable[str] = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.modalities = set(modalities)
+        self.camera_names = set(cameras)
+        assert self.modalities.issubset(
+            {"rgb", "depth", "seg_instance_id"}
+        ), f"Modalities must be a subset of ['rgb', 'depth', 'seg_instance_id'], but got {self.modalities}"
+        assert self.camera_names.issubset(
+            ROBOT_CAMERA_NAMES["R1Pro"]
+        ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
+
+    @property
+    def features(self) -> dict[str, dict]:
+        """All features contained in the dataset."""
+        features = dict()
+        # pop not required features
+        for name in self.info["features"].keys():
+            if (
+                name.startswith("observation.images.")
+                and name.split(".")[-1] in self.camera_names
+                and name.split(".")[-2] in self.modalities
+            ):
+                features[name] = self.info["features"][name]
+        return features
 
 
 def decode_video_frames(
@@ -371,18 +377,22 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                             "tasks": [task_name],
                             "length": episode_info["num_samples"],
                         }
+                        # load the corresponding parquet file
+                        episode_df = pd.read_parquet(
+                            f"{data_dir}/data/task-{task_index:04d}/episode_{episode_index:08d}.parquet"
+                        )
+                        episode_stats = {}
+                        for key in episode_df.columns:
+                            if key not in episode_stats:
+                                episode_stats[key] = {}
+                            episode_stats[key]["min"] = episode_df[key].min()
+                            episode_stats[key]["max"] = episode_df[key].max()
+                            episode_stats[key]["mean"] = episode_df[key].mean()
+                            episode_stats[key]["std"] = episode_df[key].std()
+                            episode_stats[key]["count"] = episode_df[key].count()
                         episode_stats_json = {
                             "episode_index": episode_index,
-                            "tasks": [task_name],
-                            "stats": {
-                                "obs": {
-                                    "min": np.array([episode_info["num_samples"]]).tolist(),
-                                    "max": np.array([episode_info["num_samples"]]).tolist(),
-                                    "mean": np.array([episode_info["num_samples"]]).tolist(),
-                                    "std": np.array([episode_info["num_samples"]]).tolist(),
-                                    "count": np.array([episode_info["num_samples"]]).tolist(),
-                                }
-                            },
+                            "stats": episode_stats,
                         }
                         num_episodes += 1
                         num_frames += episode_info["num_samples"]
@@ -516,6 +526,7 @@ def generate_info_json(
                     "video.channels": 3,
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
+                    "video.is_depth_map": False,
                     "has_audio": False,
                 },
             },
@@ -530,6 +541,7 @@ def generate_info_json(
                     "video.channels": 3,
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
+                    "video.is_depth_map": False,
                     "has_audio": False,
                 },
             },
@@ -544,6 +556,7 @@ def generate_info_json(
                     "video.channels": 3,
                     "video.codec": "libx265",
                     "video.pix_fmt": "yuv420p",
+                    "video.is_depth_map": False,
                     "has_audio": False,
                 },
             },
@@ -563,13 +576,13 @@ def generate_info_json(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", type=str, default="/home/svl/behavior")
+    parser.add_argument("-d", "--data_dir", type=str, default="~/behavior")
     args = parser.parse_args()
 
-    num_tasks = generate_task_json(args.data_dir)
-    num_episodes, num_frames = generate_episode_json(args.data_dir)
+    # expand root
+    data_dir = os.path.expanduser(args.data_dir)
+    num_tasks = generate_task_json(data_dir)
+    num_episodes, num_frames = generate_episode_json(data_dir)
     print(num_tasks, num_episodes, num_frames)
 
-    generate_info_json(
-        args.data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames
-    )
+    generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)

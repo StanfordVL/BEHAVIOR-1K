@@ -32,6 +32,22 @@ logger = create_module_logger("BehaviorIterableDataset")
 
 
 class BehaviorIterableDataset(IterableDataset):
+    """
+    BehaviorIterableDataset is an IterableDataset designed for loading and streaming demonstration data for behavior tasks.
+    It supports multi-modal observations (including low-dimensional proprioception, visual data, and point clouds), action chunking,
+    temporal context windows, and distributed data loading for scalable training.
+    Key Features:
+        - Loads demonstration data from disk, supporting multiple tasks and robots.
+        - Preloads low-dimensional data (actions, proprioception, task info) into memory for efficient access.
+        - Supports visual observation types: RGB, depth, segmentation, and point clouds, with multi-view camera support.
+        - Handles action chunking for sequence prediction tasks, with optional prediction horizon and masking.
+        - Supports temporal downsampling of data for variable frame rates.
+        - Provides deterministic shuffling and partitioning for distributed and multi-worker training.
+        - Normalizes observations and actions to standardized ranges for learning.
+        - Optionally loads and normalizes privileged task information.
+        - Implements efficient chunked streaming of data for training with context windows.
+    """
+
     @classmethod
     def get_all_demo_keys(cls, data_path: str, task_names: List[str]) -> List[Any]:
         assert os.path.exists(data_path), "Data path does not exist!"
@@ -210,7 +226,7 @@ class BehaviorIterableDataset(IterableDataset):
 
     def _preload_demo(self, demo_key: Any) -> Dict[str, Any]:
         """
-        Preload a single demo into memory. Currently it loads action, proprio, and task info.
+        Preload a single demo into memory. Currently it loads action, proprio, and optionally task info.
         Args:
             demo_key (Any): Key of the demo to preload.
         Returns:

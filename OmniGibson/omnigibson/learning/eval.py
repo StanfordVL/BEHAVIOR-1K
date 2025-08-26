@@ -68,12 +68,14 @@ def load_task_instance_for_env(env, instance_id: int) -> None:
         tro_state = recursively_convert_to_torch(json.load(f))
     env.scene.reset()
     for bddl_name, obj_state in tro_state.items():
-        if "agent" in bddl_name:
+        if bddl_name == "robot_poses":
+            robot = env.robots[0]
+            presampled_robot_poses = obj_state
             # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
             # for orientation
-            robot_pos = obj_state["joint_pos"][:3] + obj_state["root_link"]["pos"]
-            robot_quat = T.euler2quat(th.tensor([0, 0, obj_state["joint_pos"][5]]))
-            env.task.object_scope[bddl_name].set_position_orientation(robot_pos, robot_quat)
+            robot_pos = presampled_robot_poses[robot.model_name][0]["position"]
+            robot_quat = presampled_robot_poses[robot.model_name][0]["orientation"]
+            robot.set_position_orientation(robot_pos, robot_quat)
         else:
             env.task.object_scope[bddl_name].load_state(obj_state, serialized=False)
 
@@ -136,7 +138,7 @@ class Evaluator:
             if self.cfg.robot.controllers is not None:
                 cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
             cfg["task"]["termination_config"]["max_steps"] = self.cfg.task.max_steps
-            cfg["task"]["include_obs"] = self.cfg.use_task_info
+            cfg["task"]["include_obs"] = self.cfg.model.use_task_info
             relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
             relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
             cfg["scene"]["load_room_types"] = relevant_rooms

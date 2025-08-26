@@ -176,15 +176,15 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
 class VideoLoader:
     def __init__(
         self,
+        *args,
         path: str,
         batch_size: Optional[int] = None,
         stride: int = 1,
-        output_size: Tuple[int, int] = (128, 128),
+        output_size: Tuple[int, int],
         start_idx: int = 0,
         end_idx: Optional[int] = None,
         fps: int = 30,
         downsample_factor: int = 1,
-        *args,
         **kwargs,
     ):
         """

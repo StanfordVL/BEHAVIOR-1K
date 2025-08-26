@@ -8,3 +8,4 @@ model:
   _target_: omnigibson.learning.policies.WebsocketPolicy
   host: 0.0.0.0
   port: 8000
+  use_task_info: false
