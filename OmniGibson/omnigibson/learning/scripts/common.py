@@ -5,9 +5,11 @@ import requests
 import os
 import tarfile
 import time
-from typing import Tuple
+from typing import Tuple, List
+from tqdm import tqdm
 from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
+from urllib.parse import urlparse
 
 VALID_USER_NAME = ["wsai", "yinhang", "svl", "wpai", "qinengw", "wsai-yfj", "jdw"]
 
@@ -71,13 +73,81 @@ def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
     task_worksheet = spreadsheet.worksheet(worksheet_name)
     # get row data
     row_data = task_worksheet.row_values(row_idx)
-    assert row_data[3] == "pending"
-    assert row_data[4] == getpass.getuser()
+    assert row_data[4] == "pending"
+    assert row_data[5] == getpass.getuser()
     # update status and timestamp
     task_worksheet.update(
-        range_name=f"D{row_idx}:F{row_idx}",
+        range_name=f"E{row_idx}:G{row_idx}",
         values=[["done", getpass.getuser(), time.strftime("%Y-%m-%d %H:%M:%S")]],
     )
+
+
+def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict, task_name: str) -> Tuple[int, str]:
+    """
+    Given task name, fetch all instance IDs for that task.
+    Args:
+        lw_token (str): Lightwheel API token.
+        lightwheel_api_credentials (dict): Lightwheel API credentials.
+        task_name (str): Name of the task.
+    Returns:
+        Tuple[int, str]: instance_id and resourceUuid
+    """
+    header = {
+        "UserName": lightwheel_api_credentials["username"],
+        "Authorization": lw_token,
+    }
+    body = {
+        "searchRequest": {
+            "whereEqFields": {
+                "projectUuid": lightwheel_api_credentials["projectUuid"],
+                "level1": task_name,
+                "taskType": 2,
+                "isEnd": True,
+                "passed": True,
+                "resourceType": 3,
+            },
+            "selectedFields": [],
+            "sortFields": {"createdAt": 2, "difficulty": 2},
+            "isDeleted": False,
+        },
+        "page": 1,
+        "pageSize": 300,
+    }
+    response = requests.post("https://assetserver.lightwheel.net/api/asset/v1/task/get", headers=header, json=body)
+    response.raise_for_status()
+    return [(item["level2"], item["resourceUuid"]) for item in response.json().get("data", [])]
+
+
+def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict, lw_token: str) -> List[str]:
+    header = {
+        "UserName": lightwheel_api_credentials["username"],
+        "Authorization": lw_token,
+    }
+    body = {"versionUuids": uuids, "projectUuid": lightwheel_api_credentials["projectUuid"]}
+    response = requests.post(
+        "https://assetserver.lightwheel.net/api/asset/v1/teleoperation/download", headers=header, json=body
+    )
+    response.raise_for_status()
+    urls = [res["files"][0]["url"] for res in response.json()["downloadInfos"]]
+    return urls
+
+
+def get_timestamp_from_lightwheel(urls: List[str]) -> List[str]:
+    timestamps = []
+    for url in tqdm(urls):
+        resp = requests.head(url, allow_redirects=True)
+        cd = resp.headers.get("content-disposition")
+        if cd and "filename=" in cd:
+            # e.g. 'attachment; filename="episode_00001234.parquet"'
+            fname = cd.split("filename=")[-1].strip('"; ')
+        else:
+            # fallback: use last part of the URL path
+            fname = urlparse(resp.url).path.split("/")[-1]
+        # extract timestamp from filename, which is of the format "`taskname`_`timestamp``.tar"
+        timestamp = fname.rsplit("_", 1)[1].split(".")[0]
+        assert len(timestamp) == 16, f"Invalid timestamp format: {timestamp}"
+        timestamps.append(timestamp)
+    return timestamps
 
 
 def download_and_extract_data(

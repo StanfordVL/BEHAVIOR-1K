@@ -1,12 +1,10 @@
 import argparse
 import getpass
 import os
-import requests
 import subprocess
 import time
-from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME
+from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME, get_urls_from_lightwheel
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
-from typing import List
 
 
 user = getpass.getuser()
@@ -14,20 +12,6 @@ home = os.environ.get("HOME")
 MAX_JOBS = {"vision": 64, "viscam": 32}  # Maximum number of jobs allowed
 MAX_TRAJ_PER_TASK = 200
 credentials_path = f"{home}/Documents/credentials"
-
-
-def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict, lw_token: str):
-    header = {
-        "UserName": lightwheel_api_credentials["username"],
-        "Authorization": lw_token,
-    }
-    body = {"versionUuids": uuids, "projectUuid": lightwheel_api_credentials["projectUuid"]}
-    response = requests.post(
-        "https://assetserver.lightwheel.net/api/asset/v1/teleoperation/download", headers=header, json=body
-    )
-    response.raise_for_status()
-    urls = [res["files"][0]["url"] for res in response.json()["downloadInfos"]]
-    return urls
 
 
 def main(args):
@@ -74,11 +58,11 @@ def main(args):
                 for row_idx, row in enumerate(all_rows[1:], start=2):  # Skip header, row numbers start at 2
                     if num_process_traj >= MAX_TRAJ_PER_TASK:
                         break
-                    elif row and row[3].strip().lower() in ["pending", "done"]:
+                    elif row and row[4].strip().lower() in ["pending", "done"]:
                         num_process_traj += 1
                     elif row and (
-                        (row[3].strip().lower() == "unprocessed" and int(row[1]) == 0)
-                        or (row[3].strip().lower() == "failed" and row[4].strip() == user and len(row[6].strip()) < 2)
+                        (row[4].strip().lower() == "unprocessed" and int(row[1]) == 0)
+                        or (row[4].strip().lower() == "failed" and row[5].strip() == user and len(row[7].strip()) < 2)
                     ):  # currently only generate unique task instance
                         instance_id, traj_id, resource_uuid = int(row[0]), int(row[1]), row[2]
                         url = get_urls_from_lightwheel([resource_uuid], lightwheel_api_credentials, lw_token=lw_token)[
@@ -106,7 +90,7 @@ def main(args):
                                     result.stdout,
                                 )
                                 ws.update(
-                                    range_name=f"D{row_idx}:F{row_idx}",
+                                    range_name=f"E{row_idx}:G{row_idx}",
                                     values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                                 )
                             else:
@@ -118,7 +102,7 @@ def main(args):
                         else:
                             gpu_id = args.gpu if args.gpu is not None else 0
                             ws.update(
-                                range_name=f"D{row_idx}:F{row_idx}",
+                                range_name=f"E{row_idx}:G{row_idx}",
                                 values=[["pending", user, time.strftime("%Y-%m-%d %H:%M:%S")]],
                             )
                             cmd = (
@@ -146,7 +130,7 @@ def main(args):
                             print("Reached job limit, exiting...")
                             exit(0)
                     # Remove this if we don't want failed trajectories to count
-                    elif row and row[3].strip().lower() == "failed":
+                    elif row and row[4].strip().lower() == "failed":
                         num_process_traj += 1
                 # rate limit
                 time.sleep(1)

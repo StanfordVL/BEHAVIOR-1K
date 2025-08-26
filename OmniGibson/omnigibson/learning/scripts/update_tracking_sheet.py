@@ -2,53 +2,21 @@ import getpass
 import gspread
 import time
 import os
-import requests
 from datetime import datetime
-from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME
+from omnigibson.learning.scripts.common import (
+    get_credentials,
+    VALID_USER_NAME,
+    get_all_instance_id_for_task,
+    get_urls_from_lightwheel,
+    get_timestamp_from_lightwheel,
+)
 from collections import Counter
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
-from typing import Tuple
 
 
 MAX_ENTRIES_PER_TASK = 300
 home = os.environ.get("HOME")
 credentials_path = f"{home}/Documents/credentials"
-
-
-def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict, task_name: str) -> Tuple[int, str]:
-    """
-    Given task name, fetch all instance IDs for that task.
-    Args:
-        lw_token (str): Lightwheel API token.
-        lightwheel_api_credentials (dict): Lightwheel API credentials.
-        task_name (str): Name of the task.
-    Returns:
-        Tuple[int, str]: instance_id and resourceUuid
-    """
-    header = {
-        "UserName": lightwheel_api_credentials["username"],
-        "Authorization": lw_token,
-    }
-    body = {
-        "searchRequest": {
-            "whereEqFields": {
-                "projectUuid": lightwheel_api_credentials["projectUuid"],
-                "level1": task_name,
-                "taskType": 2,
-                "isEnd": True,
-                "passed": True,
-                "resourceType": 3,
-            },
-            "selectedFields": [],
-            "sortFields": {"createdAt": 2, "difficulty": 2},
-            "isDeleted": False,
-        },
-        "page": 1,
-        "pageSize": 300,
-    }
-    response = requests.post("https://assetserver.lightwheel.net/api/asset/v1/task/get", headers=header, json=body)
-    response.raise_for_status()
-    return [(item["level2"], item["resourceUuid"]) for item in response.json().get("data", [])]
 
 
 def is_more_than_x_hours_ago(dt_str, x, fmt="%Y-%m-%d %H:%M:%S"):
@@ -71,18 +39,30 @@ def main():
         try:
             task_worksheet = spreadsheet.worksheet(worksheet_name)
         except gspread.exceptions.WorksheetNotFound:
-            task_worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="1", cols="7")
-            header = ["Instance ID", "Traj ID", "Resource UUID", "Status", "Worker ID", "Last Updated", "Misc"]
-            task_worksheet.update(range_name="A1:G1", values=[header])
+            task_worksheet = spreadsheet.add_worksheet(title=worksheet_name, rows="1", cols="8")
+            header = [
+                "Instance ID",
+                "Traj ID",
+                "Resource UUID",
+                "Timestamp",
+                "Status",
+                "Worker ID",
+                "Last Updated",
+                "Misc",
+            ]
+            task_worksheet.update(range_name="A1:H1", values=[header])
 
         # Get all ids from lightwheel
         lw_ids = get_all_instance_id_for_task(lw_token, lightwheel_api_credentials, task_name)
 
         # Get all resource uuids
         rows = task_worksheet.get_all_values()
+        assert len(rows) == len(lw_ids) + 1, f"Row count mismatch: {len(rows)} != {len(lw_ids) + 1}"
         resource_uuids = set(row[2] for row in rows[1:] if len(row) > 2)
         counter = Counter(row[0] for row in rows[1:] if len(row) > 0)
         for lw_id in lw_ids:
+            url = get_urls_from_lightwheel([lw_id[1]], lightwheel_api_credentials, lw_token)
+            timestamp = get_timestamp_from_lightwheel(url)[0]
             num_entries = task_worksheet.row_count - 1
             if MAX_ENTRIES_PER_TASK is not None and num_entries >= MAX_ENTRIES_PER_TASK:
                 break
@@ -92,6 +72,7 @@ def main():
                     lw_id[0],
                     counter[lw_id[0]],
                     lw_id[1],
+                    timestamp,
                     "unprocessed",
                     "",
                     time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -103,15 +84,15 @@ def main():
                 time.sleep(1)
         # now iterate through entires and find failure ones
         for row_idx, row in enumerate(rows[1:], start=2):
-            hours_to_check = 12
-            if row and row[3].strip().lower() == "pending" and is_more_than_x_hours_ago(row[5], hours_to_check):
+            hours_to_check = 24
+            if row and row[4].strip().lower() == "pending" and is_more_than_x_hours_ago(row[6], hours_to_check):
                 print(
                     f"Row {row_idx} in {worksheet_name} is pending for more than {hours_to_check} hours, marking as failed."
                 )
-                # change row[3] to failed and append 'a' to row[6]
+                # change row[4] to failed and append 'a' to row[7]
                 task_worksheet.update(
-                    range_name=f"D{row_idx}:G{row_idx}",
-                    values=[["failed", row[4].strip(), time.strftime("%Y-%m-%d %H:%M:%S"), row[6].strip() + "a"]],
+                    range_name=f"E{row_idx}:H{row_idx}",
+                    values=[["failed", row[5].strip(), time.strftime("%Y-%m-%d %H:%M:%S"), row[7].strip() + "a"]],
                 )
                 time.sleep(1)  # rate limit
         # rate limit
