@@ -3,9 +3,9 @@
 policy_name: websocket
 log_path: ~/Documents/logs/policy
 headless: false
+use_task_info: false
 
 model:
   _target_: omnigibson.learning.policies.WebsocketPolicy
   host: 0.0.0.0
   port: 8000
-  use_task_info: false

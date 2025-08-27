@@ -1,7 +1,10 @@
 import os
 import time
-from omnigibson.learning.scripts.common import get_credentials, download_and_extract_data
-from omnigibson.learning.scripts.update_jobs import get_urls_from_lightwheel
+from omnigibson.learning.scripts.common import (
+    get_credentials,
+    download_and_extract_data,
+    get_urls_from_lightwheel,
+)
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 # We download a maximum of 200 trajectories for each task

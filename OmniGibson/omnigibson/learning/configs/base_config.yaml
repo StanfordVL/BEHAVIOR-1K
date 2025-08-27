@@ -6,6 +6,7 @@ defaults:
 
 policy_name: ???  # filled by policy
 headless: true
+use_task_info: false
 
 write_video: true 
 log_path: ???

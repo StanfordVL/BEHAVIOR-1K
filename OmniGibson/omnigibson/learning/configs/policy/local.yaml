@@ -3,8 +3,8 @@
 policy_name: local
 log_path: ~/Documents/logs/policy
 headless: false
+use_task_info: false
 
 model:
   _target_: omnigibson.learning.policies.LocalPolicy
-  use_task_info: false
   action_dim: 23

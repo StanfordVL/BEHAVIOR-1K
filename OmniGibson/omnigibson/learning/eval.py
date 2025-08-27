@@ -138,7 +138,7 @@ class Evaluator:
             if self.cfg.robot.controllers is not None:
                 cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
             cfg["task"]["termination_config"]["max_steps"] = self.cfg.task.max_steps
-            cfg["task"]["include_obs"] = self.cfg.model.use_task_info
+            cfg["task"]["include_obs"] = self.cfg.use_task_info
             relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
             relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
             cfg["scene"]["load_room_types"] = relevant_rooms

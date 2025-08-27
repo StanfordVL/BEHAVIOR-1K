@@ -1,0 +1,32 @@
+import numpy as np
+from omnigibson.metrics.metric_base import MetricBase
+
+
+class TaskMetric(MetricBase):
+    def __init__(self):
+        self.timesteps = 0
+
+    def start_callback(self, env):
+        self.render_timestep = env.simulator.render_timestep
+
+    def step_callback(self, env):
+        self.timesteps += 1
+
+    def end_callback(self, env):
+        assert self.total_predicates > 0, "Total predicates should be greater than 0 at the end of the episode."
+        candidate_q_score = []
+        for option in env.task.ground_goal_state_options:
+            predicate_truth_values = []
+            for predicate in option:
+                predicate_truth_values.append(predicate.evaluate())
+            candidate_q_score.append(np.mean(predicate_truth_values))
+        self.final_q_score = np.max(candidate_q_score)
+
+    def gather_results(self):
+        return {
+            "q_score": {"final": self.final_q_score},
+            "time": {
+                "simulator_steps": self.timesteps,
+                "simulator_time": self.timesteps * self.render_timestep,
+            },
+        }
