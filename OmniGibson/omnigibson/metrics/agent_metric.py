@@ -1,5 +1,5 @@
 import copy
-import numpy as np
+import torch as th
 from omnigibson.metrics.metric_base import MetricBase
 
 
@@ -7,10 +7,13 @@ class RobotMetric(MetricBase):
     def __init__(self):
         self.initialized = False
 
+    def start_callback(self, env):
+        self.initialized = False
+
     def step_callback(self, env):
         robot = env.robots[0]
         self.next_state_cache = {
-            "base": {"position": robot.get_position()},
+            "base": {"position": robot.get_position_orientation()[0]},
             **{arm: {"position": robot.get_eef_position(arm)} for arm in robot.arm_names},
         }
 
@@ -24,14 +27,12 @@ class RobotMetric(MetricBase):
             self.initialized = True
 
         self.agent_pos["base"].append(list(self.state_cache["base"]["position"]))
-        distance = np.linalg.norm(
-            np.array(self.next_state_cache["base"]["position"]) - self.state_cache["base"]["position"]
-        )
+        distance = th.linalg.norm(self.next_state_cache["base"]["position"] - self.state_cache["base"]["position"])
         self.delta_agent_distance["base"].append(distance)
 
         for arm in robot.arm_names:
             self.agent_pos[arm].append(list(self.state_cache[arm]["position"]))
-            gripper_distance = np.linalg.norm(
+            gripper_distance = th.linalg.norm(
                 self.next_state_cache[arm]["position"] - self.state_cache[arm]["position"]
             )
             self.delta_agent_distance[arm].append(gripper_distance)
