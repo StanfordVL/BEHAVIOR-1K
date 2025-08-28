@@ -873,14 +873,12 @@ class VisionSensor(BaseSensor):
         """
         focal_length = self.camera_parameters["cameraFocalLength"]
         width, height = self.camera_parameters["renderProductResolution"]
-        horizontal_aperture = self.camera_parameters["cameraAperture"][0]
-        horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
-        vertical_fov = horizontal_fov * height / width
+        horizontal_aperture, vertical_aperture = self.camera_parameters["cameraAperture"]
 
-        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
-        cx = width / 2
-        cy = height / 2
+        fx = focal_length * (width / horizontal_aperture)
+        fy = focal_length * (height / vertical_aperture)
+        cx = width / 2.0
+        cy = height / 2.0
 
         intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
         return intrinsic_matrix
