@@ -72,7 +72,8 @@ class WebsocketClientPolicy:
         return action
 
     def reset(self) -> None:
-        pass
+        data = self._packer.pack({"reset": True})
+        self._ws.send(data)
 
 
 class WebsocketPolicyServer:
@@ -118,8 +119,12 @@ class WebsocketPolicyServer:
         while True:
             try:
                 start_time = time.monotonic()
-                obs = unpackb(await websocket.recv())
-                obs = any_to_torch(deepcopy(obs), device=self._policy.device)
+                result = unpackb(await websocket.recv())
+                if "reset" in result:
+                    self._policy.reset()
+                    continue
+
+                obs = any_to_torch(deepcopy(result), device="cpu")
 
                 infer_time = time.monotonic()
                 action = self._policy.act(obs)
