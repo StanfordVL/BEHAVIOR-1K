@@ -5,6 +5,12 @@ from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
 from typing import Optional
 
 
+__all__ = [
+    "LocalPolicy",
+    "WebsocketPolicy",
+]
+
+
 class LocalPolicy:
     """
     Local policy that directly queries action from policy,

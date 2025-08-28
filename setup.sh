@@ -254,16 +254,18 @@ if [ "$OMNIGIBSON" = true ]; then
     # Build extras
     EXTRAS=""
     if [ "$DEV" = true ]; then
-    EXTRAS="${EXTRAS}dev,"
+        EXTRAS="${EXTRAS}dev,"
     fi
     if [ "$PRIMITIVES" = true ]; then
-    EXTRAS="${EXTRAS}primitives,"
+        EXTRAS="${EXTRAS}primitives,"
     fi
     if [ "$EVAL" = true ]; then
-      EXTRAS="${EXTRAS}eval,"
+        EXTRAS="${EXTRAS}eval,"
     fi
-    # Remove trailing comma, if any
-    EXTRAS="[${EXTRAS%,}]"
+    # Remove trailing comma, if any, and add brackets only if EXTRAS is not empty
+    if [ -n "$EXTRAS" ]; then
+        EXTRAS="[${EXTRAS%,}]"
+    fi
 
     pip install -e "$WORKDIR/OmniGibson$EXTRAS"
 
@@ -410,7 +412,7 @@ if [ "$EVAL" = true ]; then
     TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
     pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
     # install av and ffmpeg
-    conda install av -c conda-forge -y
+    conda install av "numpy<2" -c conda-forge -y
 fi
 
 echo ""
