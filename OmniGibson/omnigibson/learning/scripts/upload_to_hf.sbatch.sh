@@ -2,6 +2,7 @@
 #SBATCH --job-name="replay_data"
 #SBATCH --account=cvgl
 #SBATCH --partition=svl,napoli-gpu
+#SBATCH --exclude=svl4
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:1
 #SBATCH --mem=480G
@@ -18,7 +19,9 @@ echo "SLURM_NNODES"=$SLURM_NNODES
 echo "SLURMTMPDIR="$SLURMTMPDIR
 echo "working directory = "$SLURM_SUBMIT_DIR
 
-python Omnigibson/omnigibson/learning/scripts/upload_to_hf.py
+source /vision/u/$(whoami)/miniconda3/bin/activate behavior
+
+python OmniGibson/omnigibson/learning/scripts/upload_to_hf.py $@
 
 echo "Job finished."
 exit 0
