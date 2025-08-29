@@ -871,17 +871,18 @@ class VisionSensor(BaseSensor):
             n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
-        focal_length = self.camera_parameters["cameraFocalLength"]
+        P = self.camera_parameters["cameraProjection"].reshape(4, 4)
         width, height = self.camera_parameters["renderProductResolution"]
-        horizontal_aperture, vertical_aperture = self.camera_parameters["cameraAperture"]
-
-        fx = focal_length * (width / horizontal_aperture)
-        fy = focal_length * (height / vertical_aperture)
-        cx = width / 2.0
-        cy = height / 2.0
-
-        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
-        return intrinsic_matrix
+        fx = P[0, 0] * width / 2.0
+        fy = P[1, 1] * height / 2.0
+        cx = (1.0 - P[0, 2]) * width / 2.0
+        cy = (1.0 - P[1, 2]) * height / 2.0
+        K = np.array([
+            [fx, 0,  cx],
+            [0,  fy, cy],
+            [0,  0,  1]
+        ])
+        return K
 
     @property
     def _obs_space_mapping(self):
