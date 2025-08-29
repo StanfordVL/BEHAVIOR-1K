@@ -10,7 +10,13 @@ import torch as th
 import torchvision
 from collections.abc import Callable
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
-from omnigibson.learning.utils.obs_utils import dequantize_depth, MIN_DEPTH, MAX_DEPTH, DEPTH_SHIFT
+from omnigibson.learning.utils.obs_utils import (
+    dequantize_depth,
+    MIN_DEPTH,
+    MAX_DEPTH,
+    DEPTH_SHIFT,
+    # generate_yuv_palette,
+)
 from pathlib import Path
 from torch.utils.data import Dataset
 from torchvision.io import VideoReader
@@ -24,10 +30,17 @@ from lerobot.datasets.utils import (
     EPISODES_PATH,
     check_delta_timestamps,
     check_timestamps_sync,
+    check_version_compatibility,
     get_delta_indices,
     get_episode_data_index,
     get_safe_version,
+    backward_compatible_episodes_stats,
+    load_episodes,
+    load_episodes_stats,
     load_jsonlines,
+    load_info,
+    load_stats,
+    load_tasks,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec, decode_video_frames as _decode_video_frames
 
@@ -63,6 +76,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         """
         Custom args:
             tasks (List[str]): list of task names to load. If None, all tasks will be loaded.
+                Note: only one of episodes or tasks can be specified. If both are None, will load everything.
             modalities (List[str]): list of modality names to load. If None, all modalities will be loaded.
                 must be a subset of ["rgb", "depth", "seg_instance_id"]
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.
@@ -92,6 +106,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        assert (
+            self.episodes is None or self.tasks_names is None
+        ), "Only one of episodes or tasks can be specified. Set both to be None if you want to load everything."
+        if self.episodes is None:
+            self.tasks_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
+            self.task_indices = [TASK_NAMES_TO_INDICES[task] for task in self.tasks_names]
         # Load metadata
         self.meta = BehaviorLerobotDatasetMetadata(
             repo_id=self.repo_id,
@@ -101,9 +121,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             modalities=modalities,
             cameras=cameras,
         )
-        self.tasks_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
         # overwrite episode based on task
-        if episodes is None:
+        if self.episodes is None:
             episodes = load_jsonlines(self.root / EPISODES_PATH)
             self.episodes = sorted([item["episode_index"] for item in episodes if item["tasks"][0] in self.tasks_names])
         # ====================================
@@ -165,13 +184,14 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
             # post-process seg instance id:
-            if "seg_instance_id" in vid_key:
-                N, H, W, C = frames.shape
-                rgb_flat = frames.reshape(N, -1, C)  # (H*W, 3)
-                # For each rgb pixel, find the index of the nearest color in the equidistant bins
-                distances = th.cdist(rgb_flat, self.palette.unsqueeze(0).expand(N, -1, -1), p=2)
-                ids = th.argmin(distances, dim=-1)  # (N, H*W)
-                frames = self.id_list[ids].reshape(N, H, W)  # (N, H, W)
+            # if "seg_instance_id" in vid_key:
+            #     palette = th.from_numpy(generate_yuv_palette(len(self.id_list))).float()
+            #     N, H, W, C = frames.shape
+            #     rgb_flat = frames.reshape(N, -1, C)  # (H*W, 3)
+            #     # For each rgb pixel, find the index of the nearest color in the equidistant bins
+            #     distances = th.cdist(rgb_flat, palette.unsqueeze(0).expand(N, -1, -1), p=2)
+            #     ids = th.argmin(distances, dim=-1)  # (N, H*W)
+            #     frames = self.id_list[ids].reshape(N, H, W)  # (N, H, W)
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -195,6 +215,18 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         assert self.camera_names.issubset(
             ROBOT_CAMERA_NAMES["R1Pro"]
         ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
+
+    def load_metadata(self):
+        self.info = load_info(self.root)
+        check_version_compatibility(self.repo_id, self._version, CODEBASE_VERSION)
+        self.tasks, self.task_to_task_index = load_tasks(self.root)
+        self.episodes = load_episodes(self.root)
+        if self._version < packaging.version.parse("v2.1"):
+            self.stats = load_stats(self.root)
+            self.episodes_stats = backward_compatible_episodes_stats(self.stats, self.episodes)
+        else:
+            self.episodes_stats = load_episodes_stats(self.root)
+            # self.stats = aggregate_stats(list(self.episodes_stats.values()))
 
     @property
     def features(self) -> dict[str, dict]:
@@ -571,7 +603,7 @@ def generate_info_json(
             "episode_index": {"dtype": "int64", "shape": [1], "names": None},
             "index": {"dtype": "int64", "shape": [1], "names": None},
             "observation.cam_rel_poses": {"dtype": "float32", "shape": [21], "names": None},
-            "observation.state": {"dtype": "float32", "shape": [259], "names": None},
+            "observation.state": {"dtype": "float32", "shape": [258], "names": None},
             "observation.task_info": {"dtype": "float32", "shape": [None], "names": None},
         },
     }
