@@ -2,6 +2,7 @@ import argparse
 import av
 import json
 import logging
+import numpy as np
 import os
 import packaging.version
 import pandas as pd
@@ -368,7 +369,7 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                 task_name = task_info["task"]
                 if not os.path.exists(f"{data_dir}/meta/episodes/task-{task_index:04d}"):
                     continue
-                for episode_name in sorted(os.listdir(f"{data_dir}/meta/episodes/task-{task_index:04d}")):
+                for episode_name in tqdm(sorted(os.listdir(f"{data_dir}/meta/episodes/task-{task_index:04d}"))):
                     with open(f"{data_dir}/meta/episodes/task-{task_index:04d}/{episode_name}", "r") as f:
                         episode_info = json.load(f)
                         episode_index = int(episode_name.split(".")[0].split("_")[-1])
@@ -385,11 +386,14 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                         for key in episode_df.columns:
                             if key not in episode_stats:
                                 episode_stats[key] = {}
-                            episode_stats[key]["min"] = episode_df[key].min()
-                            episode_stats[key]["max"] = episode_df[key].max()
-                            episode_stats[key]["mean"] = episode_df[key].mean()
-                            episode_stats[key]["std"] = episode_df[key].std()
-                            episode_stats[key]["count"] = episode_df[key].count()
+                            values = np.stack(episode_df[key].values)
+                            if len(values.shape) == 1:
+                                values = values[:, np.newaxis]
+                            episode_stats[key]["min"] = values.min(axis=0).tolist()
+                            episode_stats[key]["max"] = values.max(axis=0).tolist()
+                            episode_stats[key]["mean"] = values.mean(axis=0).tolist()
+                            episode_stats[key]["std"] = values.std(axis=0).tolist()
+                            episode_stats[key]["count"] = [values.shape[0]]
                         episode_stats_json = {
                             "episode_index": episode_index,
                             "stats": episode_stats,
