@@ -352,6 +352,7 @@ def generate_task_json(data_dir: str) -> int:
         for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
             json.dump({"task_index": task_index, "task": task_name}, f)
             f.write("\n")
+    print(f"Generated task JSON for {num_tasks} tasks.")
     return num_tasks
 
 
@@ -404,6 +405,7 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                     out_f.write("\n")
                     json.dump(episode_stats_json, out_stats_f)
                     out_stats_f.write("\n")
+    print(f"Generated episode JSON for {num_episodes} episodes and {num_frames} frames.")
     return num_episodes, num_frames
 
 
@@ -577,6 +579,8 @@ def generate_info_json(
     with open(f"{data_dir}/meta/info.json", "w") as f:
         json.dump(info, f, indent=4)
 
+    print(f"Generated info JSON for {len(info)} entries.")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -585,8 +589,10 @@ if __name__ == "__main__":
 
     # expand root
     data_dir = os.path.expanduser(args.data_dir)
+    print("Generating task JSON...")
     num_tasks = generate_task_json(data_dir)
+    print("Generating episode JSON...")
     num_episodes, num_frames = generate_episode_json(data_dir)
     print(num_tasks, num_episodes, num_frames)
-
+    print("Generating info JSON...")
     generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)
