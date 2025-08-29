@@ -2,6 +2,7 @@ import getpass
 import gspread
 import time
 import os
+from tqdm import tqdm
 from datetime import datetime
 from omnigibson.learning.scripts.common import (
     get_credentials,
@@ -33,7 +34,7 @@ def main():
     main_worksheet = spreadsheet.worksheet("Main")
     main_worksheet.update(range_name="A5:A5", values=[[f"Last updated: {time.strftime('%Y-%m-%d %H:%M:%S')}"]])
 
-    for task_name, task_index in TASK_NAMES_TO_INDICES.items():
+    for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
         worksheet_name = f"{task_index} - {task_name}"
         # Get or create the worksheet
         try:
@@ -57,16 +58,17 @@ def main():
 
         # Get all resource uuids
         rows = task_worksheet.get_all_values()
-        assert len(rows) == len(lw_ids) + 1, f"Row count mismatch: {len(rows)} != {len(lw_ids) + 1}"
+        if len(rows) != len(lw_ids) + 1:
+            print(f"Row count mismatch for task {task_name}: {len(rows)} != {len(lw_ids) + 1}")
         resource_uuids = set(row[2] for row in rows[1:] if len(row) > 2)
         counter = Counter(row[0] for row in rows[1:] if len(row) > 0)
         for lw_id in lw_ids:
-            url = get_urls_from_lightwheel([lw_id[1]], lightwheel_api_credentials, lw_token)
-            timestamp = get_timestamp_from_lightwheel(url)[0]
             num_entries = task_worksheet.row_count - 1
             if MAX_ENTRIES_PER_TASK is not None and num_entries >= MAX_ENTRIES_PER_TASK:
                 break
             if lw_id[1] not in resource_uuids:
+                url = get_urls_from_lightwheel([lw_id[1]], lightwheel_api_credentials, lw_token)
+                timestamp = str(get_timestamp_from_lightwheel(url)[0])
                 # append new row with unprocessed status
                 new_row = [
                     lw_id[0],
