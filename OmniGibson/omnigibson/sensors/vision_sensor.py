@@ -877,11 +877,7 @@ class VisionSensor(BaseSensor):
         fy = P[1, 1] * height / 2.0
         cx = (1.0 - P[0, 2]) * width / 2.0
         cy = (1.0 - P[1, 2]) * height / 2.0
-        K = np.array([
-            [fx, 0,  cx],
-            [0,  fy, cy],
-            [0,  0,  1]
-        ])
+        K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
         return K
 
     @property
