@@ -46,6 +46,7 @@ def makedirs_with_mode(path, mode=0o2775):
 
 
 def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:
+    credentials_path = os.path.expanduser(credentials_path)
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     SERVICE_ACCOUNT_FILE = f"{credentials_path}/google_credentials.json"

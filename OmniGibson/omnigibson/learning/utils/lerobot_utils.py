@@ -8,6 +8,7 @@ import pandas as pd
 import torch as th
 import torchvision
 from lerobot.datasets.compute_stats import _assert_type_and_shape
+from omnigibson.learning.utils.dataset_utils import get_credentials
 from omnigibson.learning.utils.eval_utils import (
     TASK_NAMES_TO_INDICES,
     PROPRIOCEPTION_INDICES,
@@ -212,8 +213,8 @@ def aggregate_feature_stats(stats_ft_list: list[dict[str, dict]]) -> dict[str, d
     total_variance = weighted_variances.sum(axis=0) / total_count
 
     # Compute weighted quantiles
-    weighted_q01 = np.percentile(q01, 1, axis=0, weights=counts)
-    weighted_q99 = np.percentile(q99, 99, axis=0, weights=counts)
+    weighted_q01 = np.percentile(q01, 1, axis=0)
+    weighted_q99 = np.percentile(q99, 99, axis=0)
 
     return {
         "min": np.min(np.stack([s["min"] for s in stats_ft_list]), axis=0),
@@ -226,12 +227,31 @@ def aggregate_feature_stats(stats_ft_list: list[dict[str, dict]]) -> dict[str, d
     }
 
 
-def generate_task_json(data_dir: str) -> int:
+def generate_task_json(data_dir: str, credentials_path: str) -> int:
     num_tasks = len(TASK_NAMES_TO_INDICES)
-
+    gc = get_credentials(credentials_path=credentials_path)[0]
+    spreadsheet = gc.open("B50 Task Misc")
+    ws = spreadsheet.worksheet("Task natural language instruction")
+    rows = ws.get_all_values()
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
         for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
-            json.dump({"task_index": task_index, "task": task_name}, f)
+            # find the corresponding row in the google sheet
+            natural_language_instruction = None
+            for row in rows:
+                if row[0] == task_name:
+                    natural_language_instruction = row[1]
+                    break
+            assert (
+                natural_language_instruction is not None
+            ), f"Natural language instruction not found for task: {task_name}"
+            json.dump(
+                {
+                    "task_index": task_index,
+                    "task": task_name,
+                    "natural_language_instruction": natural_language_instruction,
+                },
+                f,
+            )
             f.write("\n")
     print(f"Generated task JSON for {num_tasks} tasks.")
     return num_tasks
@@ -281,19 +301,19 @@ def generate_episode_json(data_dir: str, robot_type: str = "R1Pro") -> Tuple[int
                             if key == "observation.state":
                                 robot_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["robot_pos"]]
                                 episode_json["distance_traveled"] = round(
-                                    np.sum(np.linalg.norm(robot_pos[1:, :] - robot_pos[:-1, :], axis=-1)).item(), 3
+                                    np.sum(np.linalg.norm(robot_pos[1:, :] - robot_pos[:-1, :], axis=-1)).item(), 4
                                 )
                                 left_eef_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["eef_left_pos"]]
                                 right_eef_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["eef_right_pos"]]
                                 episode_json["left_eef_displacement"] = round(
                                     np.sum(np.linalg.norm(left_eef_pos[1:, :] - left_eef_pos[:-1, :], axis=-1)).item(),
-                                    3,
+                                    4,
                                 )
                                 episode_json["right_eef_displacement"] = round(
                                     np.sum(
                                         np.linalg.norm(right_eef_pos[1:, :] - right_eef_pos[:-1, :], axis=-1)
                                     ).item(),
-                                    3,
+                                    4,
                                 )
                         episode_stats_json = {
                             "episode_index": episode_index,
@@ -490,7 +510,7 @@ if __name__ == "__main__":
     # expand root
     data_dir = os.path.expanduser(args.data_dir)
     print("Generating task JSON...")
-    num_tasks = generate_task_json(data_dir)
+    num_tasks = generate_task_json(data_dir, credentials_path="~/Documents/credentials")
     print("Generating episode JSON...")
     num_episodes, num_frames = generate_episode_json(data_dir)
     print(num_tasks, num_episodes, num_frames)
