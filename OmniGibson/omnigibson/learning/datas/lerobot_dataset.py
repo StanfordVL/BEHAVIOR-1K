@@ -42,7 +42,7 @@ from lerobot.datasets.utils import (
     load_stats,
     load_tasks,
 )
-from lerobot.datasets.video_utils import get_safe_default_codec, decode_video_frames as _decode_video_frames
+from lerobot.datasets.video_utils import get_safe_default_codec
 
 
 class BehaviorLeRobotDataset(LeRobotDataset):
@@ -106,6 +106,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        if cameras is None:
+            cameras = ["head", "left_wrist", "right_wrist"]
         assert (
             self.episodes is None or self.tasks_names is None
         ), "Only one of episodes or tasks can be specified. Set both to be None if you want to load everything."
@@ -249,19 +251,17 @@ def decode_video_frames(
     tolerance_s: float,
     backend: str | None = None,
 ) -> th.Tensor:
-    if "depth" in video_path.name:
-        return decode_video_frames_depth(video_path, timestamps, tolerance_s)
-    else:
-        return _decode_video_frames(
-            video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
-        )
+    return decode_video_frames_torchvision(
+        video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
+    )
 
 
-def decode_video_frames_depth(
+def decode_video_frames_torchvision(
     video_path: Path | str,
     timestamps: list[float],
     tolerance_s: float,
     log_loaded_timestamps: bool = False,
+    backend: str | None = None,
 ) -> th.Tensor:
     """
     Adapted from decode_video_frames_vision to handle depth decoding
@@ -269,16 +269,23 @@ def decode_video_frames_depth(
     video_path = str(video_path)
 
     # set backend
-    torchvision.set_video_backend("pyav")
-    keyframes_only = True  # pyav doesn't support accurate seek
+    keyframes_only = False
+    if "depth" in video_path:
+        backend = "pyav"
+    torchvision.set_video_backend(backend)
+    if backend == "pyav":
+        keyframes_only = True  # pyav doesn't support accurate seek
 
     # set a video stream reader
     # TODO(rcadene): also load audio stream at the same time
-    reader = DepthVideoReader(video_path, "video")
+    if "depth" in video_path:
+        reader = DepthVideoReader(video_path, "video")
+    else:
+        reader = VideoReader(video_path, "video")
 
     # set the first and last requested timestamps
     # Note: previous timestamps are usually loaded, since we need to access the previous key frame
-    first_ts = min(timestamps)
+    first_ts = min(timestamps) - 5  # a little backward to account for timestamp mismatch
     last_ts = max(timestamps)
 
     # access closest key frame of the first requested frame
@@ -329,7 +336,9 @@ def decode_video_frames_depth(
         logging.info(f"{closest_ts=}")
 
     # convert to the pytorch format which is float32 in [0,1] range (and channel first)
-    closest_frames = closest_frames.type(th.float32) / 255
+    closest_frames = closest_frames.type(th.float32)
+    if "depth" not in video_path:
+        closest_frames = closest_frames / 255
 
     assert len(timestamps) == len(closest_frames)
     return closest_frames
