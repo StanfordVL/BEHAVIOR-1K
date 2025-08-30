@@ -237,7 +237,7 @@ def generate_task_json(data_dir: str) -> int:
     return num_tasks
 
 
-def generate_episode_json(data_dir: str) -> Tuple[int, int]:
+def generate_episode_json(data_dir: str, robot_type: str = "R1Pro") -> Tuple[int, int]:
     assert os.path.exists(f"{data_dir}/meta/tasks.jsonl"), "Task JSON does not exist!"
     assert os.path.exists(f"{data_dir}/meta/episodes"), "Episode metadata directory does not exist!"
     with open(f"{data_dir}/meta/tasks.jsonl", "r") as f:
@@ -264,35 +264,37 @@ def generate_episode_json(data_dir: str) -> Tuple[int, int]:
                         episode_df = pd.read_parquet(
                             f"{data_dir}/data/task-{task_index:04d}/episode_{episode_index:08d}.parquet"
                         )
-                        state = episode_info["observation.state"]
-                        # compute distance traveled by agent
-                        robot_pos = state[:, PROPRIOCEPTION_INDICES["robot_pos"]]
-                        episode_json["distance_traveled"] = np.sum(
-                            np.linalg.norm(robot_pos[:, 1:, :] - robot_pos[:, :-1, :], axis=-1)
-                        )
-                        left_eef_pos = state[:, PROPRIOCEPTION_INDICES["eef_left_pos"]]
-                        right_eef_pos = state[:, PROPRIOCEPTION_INDICES["eef_right_pos"]]
-                        episode_json["left_eef_displacement"] = np.sum(
-                            np.linalg.norm(left_eef_pos[:, 1:, :] - left_eef_pos[:, :-1, :], axis=-1)
-                        )
-                        episode_json["right_eef_displacement"] = np.sum(
-                            np.linalg.norm(right_eef_pos[:, 1:, :] - right_eef_pos[:, :-1, :], axis=-1)
-                        )
                         episode_stats = {}
-                        for key in episode_df.columns:
-                            if key != "observation.task_info":
-                                if key not in episode_stats:
-                                    episode_stats[key] = {}
-                                values = np.stack(episode_df[key].values)
-                                if len(values.shape) == 1:
-                                    values = values[:, np.newaxis]
-                                episode_stats[key]["min"] = values.min(axis=0).tolist()
-                                episode_stats[key]["max"] = values.max(axis=0).tolist()
-                                episode_stats[key]["mean"] = values.mean(axis=0).tolist()
-                                episode_stats[key]["std"] = values.std(axis=0).tolist()
-                                episode_stats[key]["q01"] = values.quantile(0.01, axis=0).tolist()
-                                episode_stats[key]["q99"] = values.quantile(0.99, axis=0).tolist()
-                                episode_stats[key]["count"] = [values.shape[0]]
+                        for key in ["action", "observation.state", "observation.cam_rel_poses"]:
+                            if key not in episode_stats:
+                                episode_stats[key] = {}
+                            values = np.stack(episode_df[key].values)
+                            if len(values.shape) == 1:
+                                values = values[:, np.newaxis]
+                            episode_stats[key]["min"] = values.min(axis=0).tolist()
+                            episode_stats[key]["max"] = values.max(axis=0).tolist()
+                            episode_stats[key]["mean"] = values.mean(axis=0).tolist()
+                            episode_stats[key]["std"] = values.std(axis=0).tolist()
+                            episode_stats[key]["q01"] = np.quantile(values, 0.01, axis=0).tolist()
+                            episode_stats[key]["q99"] = np.quantile(values, 0.99, axis=0).tolist()
+                            episode_stats[key]["count"] = [values.shape[0]]
+                            if key == "observation.state":
+                                robot_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["robot_pos"]]
+                                episode_json["distance_traveled"] = round(
+                                    np.sum(np.linalg.norm(robot_pos[1:, :] - robot_pos[:-1, :], axis=-1)).item(), 3
+                                )
+                                left_eef_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["eef_left_pos"]]
+                                right_eef_pos = values[:, PROPRIOCEPTION_INDICES[robot_type]["eef_right_pos"]]
+                                episode_json["left_eef_displacement"] = round(
+                                    np.sum(np.linalg.norm(left_eef_pos[1:, :] - left_eef_pos[:-1, :], axis=-1)).item(),
+                                    3,
+                                )
+                                episode_json["right_eef_displacement"] = round(
+                                    np.sum(
+                                        np.linalg.norm(right_eef_pos[1:, :] - right_eef_pos[:-1, :], axis=-1)
+                                    ).item(),
+                                    3,
+                                )
                         episode_stats_json = {
                             "episode_index": episode_index,
                             "stats": episode_stats,

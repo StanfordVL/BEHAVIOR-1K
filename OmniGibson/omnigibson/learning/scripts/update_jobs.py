@@ -3,7 +3,7 @@ import getpass
 import os
 import subprocess
 import time
-from omnigibson.learning.scripts.common import get_credentials, VALID_USER_NAME, get_urls_from_lightwheel
+from omnigibson.learning.utils.dataset_utils import get_credentials, VALID_USER_NAME, get_urls_from_lightwheel
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 

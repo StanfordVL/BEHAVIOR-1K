@@ -313,7 +313,7 @@ def remove_failed_episodes(worksheet, data_dir: str):
     return total_removed
 
 
-def check_leaf_folders_have_n(data_dir: str, n: int):
+def check_leaf_folders_have_n(data_dir: str, n: int = 200):
     """
     Recursively find all leaf folders under data_dir.
     A leaf folder is one that contains only files (no subdirectories).
@@ -325,7 +325,7 @@ def check_leaf_folders_have_n(data_dir: str, n: int):
     for root, dirs, files in os.walk(data_dir):
         # leaf folder: contains files but no subdirs
         if not dirs:
-            if "Trash-1000" not in root:  # ignore trash folder
+            if "Trash-1000" not in root and ".cache" not in root:  # ignore folders
                 count = len([f for f in files if os.path.isfile(os.path.join(root, f))])
                 results[root] = count
                 total_count += count

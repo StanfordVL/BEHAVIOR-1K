@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import yaml
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
-from omnigibson.learning.scripts.common import update_google_sheet, makedirs_with_mode
+from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
 from omnigibson.learning.utils.eval_utils import (
     PROPRIOCEPTION_INDICES,
     TASK_NAMES_TO_INDICES,
@@ -672,7 +672,7 @@ def main():
     # Process each file
     if not os.path.exists(f"{args.data_folder}/raw/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"):
         if args.data_url:
-            from omnigibson.learning.scripts.common import download_and_extract_data
+            from omnigibson.learning.utils.dataset_utils import download_and_extract_data
 
             instance_id = int((args.demo_id % 1e4) // 10)
             traj_id = int(args.demo_id % 10)
