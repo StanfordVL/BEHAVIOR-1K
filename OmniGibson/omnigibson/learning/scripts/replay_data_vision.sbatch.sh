@@ -46,8 +46,6 @@ ERR_FILE="/vision/u/$(whoami)/BEHAVIOR-1K/outputs/sc/replay_data/${SLURM_JOB_ID}
   done
 ) &
 
-# run slurm ready script
-/vision/u/$(whoami)/BEHAVIOR-1K/OmniGibson/scripts/slurm_ready.sh
 OMNIGIBSON_HEADLESS=1 python OmniGibson/omnigibson/learning/scripts/replay_obs.py $@ --low_dim --rgbd --seg
 
 echo "Job finished."
