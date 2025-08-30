@@ -110,6 +110,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         if self.episodes is None:
             episodes = load_jsonlines(self.root / EPISODES_PATH)
             self.episodes = sorted([item["episode_index"] for item in episodes if item["tasks"][0] in self.tasks_names])
+        # record the positional index of each episode index within self.episodes
+        self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
         # ====================================
 
         if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
@@ -157,6 +159,22 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             fpaths += video_files
 
         return fpaths
+
+    def _get_query_indices(self, idx: int, ep_idx: int) -> tuple[dict[str, list[int | bool]]]:
+        ep_idx = self.episode_data_index_pos[ep_idx]
+        ep_start = self.episode_data_index["from"][ep_idx]
+        ep_end = self.episode_data_index["to"][ep_idx]
+        query_indices = {
+            key: [max(ep_start.item(), min(ep_end.item() - 1, idx + delta)) for delta in delta_idx]
+            for key, delta_idx in self.delta_indices.items()
+        }
+        padding = {  # Pad values outside of current episode range
+            f"{key}_is_pad": th.BoolTensor(
+                [(idx + delta < ep_start.item()) | (idx + delta >= ep_end.item()) for delta in delta_idx]
+            )
+            for key, delta_idx in self.delta_indices.items()
+        }
+        return query_indices, padding
 
     def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
         """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
