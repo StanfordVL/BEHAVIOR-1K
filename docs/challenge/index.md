@@ -14,40 +14,8 @@
 
 This year's challenge features:
 
-- **50 full-length household tasks** from our 1,000 activity collection
+- **50 full-length household tasks** from our 1,000 activity collection, covering diverse activities like rearrangement, cooking, cleaning, and installation
 - **10,000 teleoperated demonstrations** (1200+ hours) for training
-
-=== ":material-format-list-checks: Tasks"
-
-    The challenge tasks span diverse everyday activities:
-
-    - **Rearrangement** - Organizing and tidying spaces
-    - **Cooking** - Food preparation and cooking processes
-    - **Cleaning** - Wiping surfaces, mopping floors, and using washers
-    - **Installation** - Hanging pictures, installing fixtures
-
-    [Learn more about tasks →](../behavior_components/behavior_tasks.md)
-
-=== ":material-robot: Simulator"
-
-    Powered by NVIDIA Omniverse, supporting:
-
-    - Rigid body and soft body physics
-    - Semantic object states and interactions
-    - High-fidelity rendering and sensors
-    - Fluid and particle systems  
-
-    [Simulator details →](../omnigibson/overview.md)
-
-=== ":material-home: Scenes"
-
-    - House-scale layouts with multiple rooms
-    - Fully interactive objects with realistic physics
-    - Rich semantic and physical properties
-    - Dynamic state changes (temperature, cleanliness, etc.)
-
-    [Explore scenes →](../omnigibson/scenes.md)
-
 
 ## :material-database: **Dataset & Baselines**
 
@@ -93,11 +61,10 @@ Top 3 teams from each track will be invited to present at the workshop!
 **Secondary metrics (efficiency):**
 
 - **Simulated time** - Total simulation steps × time per step
-- **Kinematic disarrangement** - Cumulative object displacement 
 - **Distance navigated** - Total base movement distance
 - **Hand displacement** - Cumulative hand movement
 
-[Evaluation details →](./tutorials/policy_eval.md)
+[Evaluation details →](./evaluation.md)
 
 
 ## :octicons-person-add-16: **Participating**
