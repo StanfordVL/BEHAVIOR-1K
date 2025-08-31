@@ -1,3 +1,4 @@
+import numpy as np
 import packaging.version
 import torch as th
 from collections.abc import Callable
@@ -11,6 +12,9 @@ from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION
 from lerobot.datasets.utils import (
     EPISODES_PATH,
+    EPISODES_STATS_PATH,
+    STATS_PATH,
+    cast_stats_to_numpy,
     check_delta_timestamps,
     check_timestamps_sync,
     check_version_compatibility,
@@ -18,11 +22,9 @@ from lerobot.datasets.utils import (
     get_episode_data_index,
     get_safe_version,
     backward_compatible_episodes_stats,
-    load_episodes,
-    load_episodes_stats,
+    load_json,
     load_jsonlines,
     load_info,
-    load_stats,
     load_tasks,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
@@ -103,6 +105,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             root=self.root,
             revision=self.revision,
             force_cache_sync=force_cache_sync,
+            tasks=self.task_names,
             modalities=modalities,
             cameras=cameras,
         )
@@ -208,8 +211,15 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         3. Provides a filtered view of dataset features, including only those corresponding to the selected modalities and camera names.
     """
 
-    def __init__(self, *args, modalities: Iterable[str] = None, cameras: Iterable[str] = None, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        *args,
+        tasks: Iterable[str] = None,
+        modalities: Iterable[str] = None,
+        cameras: Iterable[str] = None,
+        **kwargs,
+    ):
+        self.task_names = set(tasks)
         self.modalities = set(modalities)
         self.camera_names = set(cameras)
         assert self.modalities.issubset(
@@ -218,18 +228,45 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         assert self.camera_names.issubset(
             ROBOT_CAMERA_NAMES["R1Pro"]
         ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
+        super().__init__(*args, **kwargs)
 
     def load_metadata(self):
         self.info = load_info(self.root)
         check_version_compatibility(self.repo_id, self._version, CODEBASE_VERSION)
         self.tasks, self.task_to_task_index = load_tasks(self.root)
-        self.episodes = load_episodes(self.root)
+        # filter based on self.task_name
+        if self.tasks:
+            self.tasks = {k: v for k, v in self.tasks.items() if v in self.task_names}
+            self.task_to_task_index = {k: v for k, v in self.task_to_task_index.items() if k in self.task_names}
+        self.episodes = self.load_episodes(self.root)
         if self._version < packaging.version.parse("v2.1"):
-            self.stats = load_stats(self.root)
+            self.stats = self.load_stats(self.root)
             self.episodes_stats = backward_compatible_episodes_stats(self.stats, self.episodes)
         else:
-            self.episodes_stats = load_episodes_stats(self.root)
+            self.episodes_stats = self.load_episodes_stats(self.root)
             self.stats = aggregate_stats(list(self.episodes_stats.values()))
+
+    def load_episodes(self, local_dir: Path) -> dict:
+        episodes = load_jsonlines(local_dir / EPISODES_PATH)
+        return {
+            item["episode_index"]: item
+            for item in sorted(episodes, key=lambda x: x["episode_index"])
+            if item["tasks"][0] in self.task_names
+        }
+
+    def load_stats(self, local_dir: Path) -> dict[str, dict[str, np.ndarray]]:
+        if not (local_dir / STATS_PATH).exists():
+            return None
+        stats = load_json(local_dir / STATS_PATH)
+        return cast_stats_to_numpy(stats)
+
+    def load_episodes_stats(self, local_dir: Path) -> dict:
+        episodes_stats = load_jsonlines(local_dir / EPISODES_STATS_PATH)
+        return {
+            item["episode_index"]: cast_stats_to_numpy(item["stats"])
+            for item in sorted(episodes_stats, key=lambda x: x["episode_index"])
+            if item["episode_index"] in self.episodes
+        }
 
     @property
     def features(self) -> dict[str, dict]:
