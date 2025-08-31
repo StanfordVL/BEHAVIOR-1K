@@ -85,7 +85,7 @@ class Evaluator:
         # Load config file
         if self.env_type == "sim":
             available_tasks = load_available_tasks()
-            task_name = self.cfg.task
+            task_name = self.cfg.task.name
             assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
             # Load the seed instance by default
             task_cfg = available_tasks[task_name][0]
@@ -300,9 +300,9 @@ if __name__ == "__main__":
     with open(task_instance_csv_path, "r") as f:
         lines = list(csv.reader(f))[1:]
     assert (
-        lines[TASK_NAMES_TO_INDICES[config.task]][1] == config.task
-    ), f"Task name from config {config.task} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task]][1]}"
-    test_instances = lines[TASK_NAMES_TO_INDICES[config.task]][2].strip().split(",")
+        lines[TASK_NAMES_TO_INDICES[config.task.name]][1] == config.task.name
+    ), f"Task name from config {config.task.name} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task.name]][1]}"
+    test_instances = lines[TASK_NAMES_TO_INDICES[config.task.name]][2].strip().split(",")
     instances_to_run = [int(test_instances[i]) for i in instances_to_run]
     # establish metrics
     metrics = {}

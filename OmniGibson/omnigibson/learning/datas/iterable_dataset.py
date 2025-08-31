@@ -176,7 +176,7 @@ class BehaviorIterableDataset(IterableDataset):
             if obs_type == "pcd":
                 # pcd_generator
                 f_pcd = h5py.File(
-                    f"{self._data_path}/pcd/task-{task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
+                    f"{self._data_path}/pcd_vid/task-{task_id:04d}/episode_{self._demo_keys[demo_ptr]}.hdf5",
                     "r",
                     swmr=True,
                     libver="latest",

@@ -1,10 +1,10 @@
 defaults:
   - _self_  # all below configs will override this conf.yaml
   - robot: r1pro
+  - task: behavior
   - policy: ???
 
 env_type: sim
-task: ???  # filled by CLI
 policy_name: ???  # filled by policy
 headless: true
 use_task_info: false
