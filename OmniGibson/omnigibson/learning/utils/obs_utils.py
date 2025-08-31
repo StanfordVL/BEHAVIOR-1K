@@ -7,10 +7,16 @@ import torch.nn.functional as F
 from av.container import Container
 from av.stream import Stream
 from tqdm import trange
-from torch_cluster import fps
 from typing import Dict, Optional, Tuple, Generator, List
 from omnigibson.utils.constants import semantic_class_name_to_id
+from omnigibson.utils.ui_utils import create_module_logger
 
+logger = create_module_logger("obs_utils")
+
+try:
+    from torch_cluster import fps
+except ImportError:
+    logger.warning("torch_cluster is not installed, skipping fps import")
 
 # ==============================================
 # Depth

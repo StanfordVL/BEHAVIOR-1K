@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import packaging.version
 import torch as th
@@ -79,6 +80,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         """
         Dataset.__init__(self)
         self.repo_id = repo_id
+        self.root = os.path.expanduser(root)  # expand user
         self.root = Path(root) if root else HF_LEROBOT_HOME / repo_id
         self.image_transforms = image_transforms
         self.delta_timestamps = delta_timestamps
@@ -141,11 +143,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         try:
             if force_cache_sync:
                 raise FileNotFoundError
-            assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
+            for fpath in self.get_episodes_file_paths():
+                assert (self.root / fpath).is_file(), f"Missing file: {self.root / fpath}"
             self.hf_dataset = self.load_hf_dataset()
-        except (AssertionError, FileNotFoundError, NotADirectoryError):
+        except (AssertionError, FileNotFoundError, NotADirectoryError) as e:
             if local_only:
-                raise FileNotFoundError
+                raise e
             self.revision = get_safe_version(self.repo_id, self.revision)
             self.download_episodes(download_videos)
             self.hf_dataset = self.load_hf_dataset()
@@ -236,7 +239,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
-        meta_only: bool = False,
+        meta_only: bool = True,
     ):
         # ========== Customizations ==========
         self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
