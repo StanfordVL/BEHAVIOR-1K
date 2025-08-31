@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.7.0-alpha",
+    version="3.7.0",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -34,7 +34,7 @@ setup(
         "trimesh>=4.0.8",
         "h5py>=3.10.0",
         "cryptography>=41.0.7",
-        "bddl~=3.7.0-alpha",
+        "bddl~=3.7.0",
         "opencv-python>=4.8.1",
         "nest_asyncio>=1.5.6",
         "imageio>=2.33.1",
