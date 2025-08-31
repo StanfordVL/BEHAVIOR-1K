@@ -4,7 +4,7 @@ import torch as th
 import yaml
 
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, macros
 import omnigibson.utils.transform_utils as T
 
 # Make sure object states are enabled
@@ -18,21 +18,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = yaml.load(open(f"{og.example_config_path}/default_cfg.yaml", "r"), Loader=yaml.FullLoader)
     # Add objects that we want to create
     obj_cfgs = []
-    obj_cfgs.append(
-        dict(
-            type="LightObject",
-            name="light",
-            light_type="Sphere",
-            radius=0.01,
-            intensity=5000,
-            position=[0, 0, 1.0],
-        )
-    )
 
     base_z = 0.2
-    delta_z = 0.01
 
-    idx = 0
     obj_cfgs.append(
         dict(
             type="DatasetObject",
@@ -43,33 +31,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             abilities={"attachable": {}},
         )
     )
-    idx += 1
-
-    obj_cfgs.append(
-        dict(
-            type="DatasetObject",
-            name="bookcase_side_left",
-            category="bookcase_side",
-            model="bxfkjj",
-            position=[-0.39, 0, base_z + delta_z * idx],
-            orientation=T.euler2quat(th.tensor([0.0, math.pi / 2.0, 0.0])),
-            abilities={"attachable": {}},
-        )
-    )
-    idx += 1
-
-    obj_cfgs.append(
-        dict(
-            type="DatasetObject",
-            name="bookcase_side_right",
-            category="bookcase_side",
-            model="yujrmw",
-            position=[0.39, 0, base_z + delta_z * idx],
-            orientation=T.euler2quat(th.tensor([0.0, math.pi / 2.0, 0.0])),
-            abilities={"attachable": {}},
-        )
-    )
-    idx += 1
 
     ys = [-0.93, -0.61, -0.29, 0.03, 0.35, 0.68]
     for i in range(6):
@@ -79,12 +40,11 @@ def main(random_selection=False, headless=False, short_exec=False):
                 name=f"bookcase_shelf_{i}",
                 category="bookcase_shelf",
                 model="ymtnqa",
-                position=[0, ys[i], base_z + delta_z * idx],
+                position=[0, ys[i], base_z],
                 orientation=T.euler2quat(th.tensor([0.0, -math.pi / 2.0, math.pi / 2.0])),
                 abilities={"attachable": {}},
             )
         )
-        idx += 1
 
     obj_cfgs.append(
         dict(
@@ -92,28 +52,20 @@ def main(random_selection=False, headless=False, short_exec=False):
             name="bookcase_top",
             category="bookcase_top",
             model="pfiole",
-            position=[0, 1.0, base_z + delta_z * idx],
+            position=[0, 1.0, base_z],
             orientation=T.euler2quat(th.tensor([-math.pi / 2.0, math.pi / 2.0, -math.pi])),
             abilities={"attachable": {}},
         )
     )
-    idx += 1
-
-    obj_cfgs.append(
-        dict(
-            type="DatasetObject",
-            name="shelf_baseboard",
-            category="shelf_baseboard",
-            model="hlhneo",
-            position=[0, -10.97884506, base_z + delta_z * idx],
-            abilities={"attachable": {}},
-        )
-    )
-    idx += 1
 
     cfg["objects"] = obj_cfgs
 
     env = og.Environment(configs=cfg)
+
+    # Lower the break force to make it easier to break apart the bookcase
+    with macros.unlocked():
+        macros.object_states.attached_to.DEFAULT_BREAK_FORCE = 500.0
+        macros.object_states.attached_to.DEFAULT_BREAK_TORQUE = 500.0
 
     # Set viewer camera pose
     og.sim.viewer_camera.set_position_orientation(
@@ -124,20 +76,17 @@ def main(random_selection=False, headless=False, short_exec=False):
     for _ in range(10):
         env.step([])
 
-    bookcase_baseboard = env.scene.object_registry("name", "bookcase_baseboard")
-    bookcase_baseboard.set_position_orientation(position=[0, -0.979, 0.21], orientation=[0, 0, 0, 1])
-    bookcase_baseboard.keep_still()
-    # Lower the mass of the baseboard - otherwise, the gravity will create enough torque to break the joint
-    bookcase_baseboard.root_link.mass = 0.1
-
     input(
         "\n\nbookcase parts fall to their correct poses and get automatically attached to the back panel.\n"
         "You can try to drag (Shift + Left-CLICK + Drag) parts of the bookcase to break it apart (you may need to zoom out and drag with a larger force).\n"
         "Press [ENTER] to continue.\n"
     )
 
-    for _ in range(5000):
-        og.sim.step()
+    steps = 0
+    max_steps = -1 if not short_exec else 1000
+
+    while steps != max_steps:
+        env.step([])
 
     og.shutdown()
 

@@ -751,6 +751,8 @@ class DataPlaybackWrapper(DataWrapper):
             config["scene"]["scene_file"] = merge_scene_files(
                 scene_a=full_scene_json, scene_b=config["scene"]["scene_file"], keep_robot_from="b"
             )
+            config["scene"]["load_room_types"] = None
+            config["scene"]["load_room_instances"] = None
 
         # Use dummy task if not loading task
         if not include_task:
