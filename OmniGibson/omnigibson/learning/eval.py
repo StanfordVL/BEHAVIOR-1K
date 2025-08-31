@@ -290,7 +290,7 @@ if __name__ == "__main__":
     gm.HEADLESS = config.headless
     # set video path
     if config.write_video:
-        video_path = Path(config.log_path).expanduser()
+        video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
     # get run instances
     instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(10))
@@ -304,7 +304,10 @@ if __name__ == "__main__":
     ), f"Task name from config {config.task} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task]][1]}"
     test_instances = lines[TASK_NAMES_TO_INDICES[config.task]][2].strip().split(",")
     instances_to_run = [int(test_instances[i]) for i in instances_to_run]
+    # establish metrics
     metrics = {}
+    metrics_path = Path(config.log_path).expanduser() / "metrics"
+    metrics_path.mkdir(parents=True, exist_ok=True)
 
     with Evaluator(config) as evaluator:
         logger.info("Starting evaluation...")
@@ -341,9 +344,12 @@ if __name__ == "__main__":
                 logger.info(f"Evaluation exit state: {terminated}, {truncated}")
                 logger.info(f"Total trials: {evaluator.n_trials}")
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
-                # gather metric results
+                # gather metric results and write to file
                 for metric in evaluator.metrics:
                     metrics[metric.name] = metric.gather_results()
+                with open(metrics_path / f"{config.task}::{idx}::{epi}.json", "w") as f:
+                    json.dump(metrics, f)
+                # reset video writer
                 if config.write_video:
                     evaluator.video_writer = None
                     logger.info(f"Saved video to {video_name}")

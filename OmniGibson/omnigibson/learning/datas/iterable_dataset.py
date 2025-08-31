@@ -56,7 +56,7 @@ class BehaviorIterableDataset(IterableDataset):
             [
                 file_name.split(".")[0].split("_")[-1]
                 for task_dir_name in task_dir_names
-                for file_name in os.listdir(f"{data_path}/2025-challenge-demo/data/{task_dir_name}")
+                for file_name in os.listdir(f"{data_path}/2025-challenge-demos/data/{task_dir_name}")
                 if file_name.endswith(".parquet")
             ]
         )
@@ -192,7 +192,7 @@ class BehaviorIterableDataset(IterableDataset):
                     # TODO: ADD KWARGS
                     obs_loaders[f"{camera_name}::{obs_type}"] = iter(
                         OBS_LOADER_MAP[obs_type](
-                            data_path=f"{self._data_path}/2025-challenge-demo",
+                            data_path=f"{self._data_path}/2025-challenge-demos",
                             task_id=task_id,
                             camera_id=camera_id,
                             demo_id=self._demo_keys[demo_ptr],
@@ -357,7 +357,7 @@ class BehaviorIterableDataset(IterableDataset):
         task_id = int(demo_key) // 10000
         df = pd.read_parquet(
             os.path.join(
-                self._data_path, "2025-challenge-demo", "data", f"task-{task_id:04d}", f"episode_{demo_key}.parquet"
+                self._data_path, "2025-challenge-demos", "data", f"task-{task_id:04d}", f"episode_{demo_key}.parquet"
             )
         )
         ret = {

@@ -10,6 +10,7 @@ import pandas as pd
 import time
 import torch as th
 import torch.nn.functional as F
+import yaml
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
 from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
@@ -728,7 +729,8 @@ def main():
             data_folder=args.data_folder, task_id=task_id, demo_id=args.demo_id, episode_id=episode_id
         )
     if args.pcd_gt or args.pcd_vid:
-        pcd_range = (0.0, 2.0, -1.5, 1.5, 0.25, 1.25)
+        with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/behavior.yaml") as f:
+            pcd_range = tuple(yaml.safe_load(f)["pcd_range"])
         if args.pcd_gt:
             rgbd_gt_to_pcd(
                 data_folder=args.data_folder,
