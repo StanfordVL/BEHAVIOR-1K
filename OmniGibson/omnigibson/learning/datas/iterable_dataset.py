@@ -56,7 +56,7 @@ class BehaviorIterableDataset(IterableDataset):
             [
                 file_name.split(".")[0].split("_")[-1]
                 for task_dir_name in task_dir_names
-                for file_name in os.listdir(f"{data_path}/data/{task_dir_name}")
+                for file_name in os.listdir(f"{data_path}/2025-challenge-demo/data/{task_dir_name}")
                 if file_name.endswith(".parquet")
             ]
         )
@@ -192,7 +192,7 @@ class BehaviorIterableDataset(IterableDataset):
                     # TODO: ADD KWARGS
                     obs_loaders[f"{camera_name}::{obs_type}"] = iter(
                         OBS_LOADER_MAP[obs_type](
-                            data_path=self._data_path,
+                            data_path=f"{self._data_path}/2025-challenge-demo",
                             task_id=task_id,
                             camera_id=camera_id,
                             demo_id=self._demo_keys[demo_ptr],
@@ -356,7 +356,9 @@ class BehaviorIterableDataset(IterableDataset):
     def _extract_low_dim_data(self, demo_key: Any) -> Dict[str, th.Tensor]:
         task_id = int(demo_key) // 10000
         df = pd.read_parquet(
-            os.path.join(self._data_path, "data", f"task-{task_id:04d}", f"episode_{demo_key}.parquet")
+            os.path.join(
+                self._data_path, "2025-challenge-demo", "data", f"task-{task_id:04d}", f"episode_{demo_key}.parquet"
+            )
         )
         ret = {
             "proprio": th.from_numpy(
