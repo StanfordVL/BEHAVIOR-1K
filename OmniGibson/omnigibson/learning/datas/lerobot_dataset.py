@@ -94,11 +94,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         if cameras is None:
             cameras = ["head", "left_wrist", "right_wrist"]
         assert (
-            self.episodes is None or self.tasks_names is None
+            self.episodes is None or self.task_names is None
         ), "Only one of episodes or tasks can be specified. Set both to be None if you want to load everything."
         if self.episodes is None:
-            self.tasks_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
-            self.task_indices = [TASK_NAMES_TO_INDICES[task] for task in self.tasks_names]
+            self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
+            self.task_indices = [TASK_NAMES_TO_INDICES[task] for task in self.task_names]
         # Load metadata
         self.meta = BehaviorLerobotDatasetMetadata(
             repo_id=self.repo_id,
@@ -112,7 +112,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # overwrite episode based on task
         if self.episodes is None:
             episodes = load_jsonlines(self.root / EPISODES_PATH)
-            self.episodes = sorted([item["episode_index"] for item in episodes if item["tasks"][0] in self.tasks_names])
+            self.episodes = sorted([item["episode_index"] for item in episodes if item["tasks"][0] in self.task_names])
         # record the positional index of each episode index within self.episodes
         self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
         # ====================================
@@ -219,7 +219,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         cameras: Iterable[str] = None,
         **kwargs,
     ):
-        self.task_names = set(tasks)
+        self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
         self.modalities = set(modalities)
         self.camera_names = set(cameras)
         assert self.modalities.issubset(
