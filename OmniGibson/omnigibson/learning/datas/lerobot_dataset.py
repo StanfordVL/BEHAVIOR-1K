@@ -1,9 +1,11 @@
 import numpy as np
 import packaging.version
 import torch as th
+from collections import defaultdict
 from collections.abc import Callable
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
 from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
+from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
 from torch.utils.data import Dataset
 from typing import Iterable
@@ -28,6 +30,9 @@ from lerobot.datasets.utils import (
     load_tasks,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
+
+
+logger = create_module_logger("BehaviorLeRobotDataset")
 
 
 class BehaviorLeRobotDataset(LeRobotDataset):
@@ -60,6 +65,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
     ):
         """
         Custom args:
+            episodes (List[int]): list of episodes to use PER TASK.
+                NOTE: This is different from the actual episode indices in the dataset.
+                Rather, this is meant to be used for train/val split, or loading a specific amount of partial data.
             tasks (List[str]): list of task names to load. If None, all tasks will be loaded.
                 Note: only one of episodes or tasks can be specified. If both are None, will load everything.
             modalities (List[str]): list of modality names to load. If None, all modalities will be loaded.
@@ -73,7 +81,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root = Path(root) if root else HF_LEROBOT_HOME / repo_id
         self.image_transforms = image_transforms
         self.delta_timestamps = delta_timestamps
-        self.episodes = episodes
         self.tolerance_s = tolerance_s
         self.revision = revision if revision else CODEBASE_VERSION
         self.video_backend = video_backend if video_backend else get_safe_default_codec()
@@ -93,12 +100,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # ========== Customizations ==========
         if cameras is None:
             cameras = ["head", "left_wrist", "right_wrist"]
-        assert (
-            self.episodes is None or self.task_names is None
-        ), "Only one of episodes or tasks can be specified. Set both to be None if you want to load everything."
-        if self.episodes is None:
-            self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
-            self.task_indices = [TASK_NAMES_TO_INDICES[task] for task in self.task_names]
+        self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
+        self.task_indices = [TASK_NAMES_TO_INDICES[task] for task in self.task_names]
         # Load metadata
         self.meta = BehaviorLerobotDatasetMetadata(
             repo_id=self.repo_id,
@@ -110,11 +113,22 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             cameras=cameras,
         )
         # overwrite episode based on task
-        if self.episodes is None:
-            episodes = load_jsonlines(self.root / EPISODES_PATH)
-            self.episodes = sorted([item["episode_index"] for item in episodes if item["tasks"][0] in self.task_names])
+        all_episodes = load_jsonlines(self.root / EPISODES_PATH)
+        # get the episodes grouped by task
+        epi_by_task = defaultdict(list)
+        for item in all_episodes:
+            if item["tasks"][0] in self.task_names:
+                epi_by_task[item["tasks"][0]].append(item["episode_index"])
+        # sort and cherrypick episodes within each task
+        for task, ep_indices in epi_by_task.items():
+            epi_by_task[task] = sorted(ep_indices)
+            if episodes is not None:
+                epi_by_task[task] = [epi_by_task[task][i] for i in episodes if i < len(epi_by_task[task])]
+        # now put episodes back together
+        self.episodes = sorted([ep for eps in epi_by_task.values() for ep in eps])
         # record the positional index of each episode index within self.episodes
         self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
+        logger.info(f"Total episodes: {len(self.episodes)}")
         # ====================================
 
         if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
