@@ -739,7 +739,7 @@ def main():
                 pcd_range=pcd_range,
                 downsample_ratio=4,
                 pcd_num_points=4096,
-                batch_size=500,
+                batch_size=1000,
                 use_fps=True,
                 process_seg=False,
             )
@@ -753,7 +753,7 @@ def main():
                 pcd_range=pcd_range,
                 downsample_ratio=4,
                 pcd_num_points=4096,
-                batch_size=500,
+                batch_size=1000,
                 use_fps=True,
                 process_seg=False,
             )
