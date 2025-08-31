@@ -181,7 +181,7 @@ These are manipulation-only robots (an instance of [`ManipulationRobot`](../refe
     </tr>
     <tr>
         <td valign="top" width="60%">
-            [**`Franka Mounted`**](../reference/robots/frankamounted.md)<br><br>  
+            [**`Franka Mounted`**](../reference/robots/franka_mounted.md)<br><br>  
             Franka mounted on an aluminum extrusion frame cart.<br><br>
             <ul>
                 <li>_Controllers_: Arm, Gripper</li>
