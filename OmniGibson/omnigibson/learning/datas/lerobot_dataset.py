@@ -28,6 +28,7 @@ from lerobot.datasets.utils import (
     load_jsonlines,
     load_info,
     load_tasks,
+    is_valid_version,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
 
@@ -111,6 +112,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             tasks=self.task_names,
             modalities=modalities,
             cameras=cameras,
+            meta_only=local_only,  # don't update detailed metadata if local only
         )
         # overwrite episode based on task
         all_episodes = load_jsonlines(self.root / EPISODES_PATH)
@@ -227,12 +229,16 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
 
     def __init__(
         self,
-        *args,
+        repo_id: str,
+        root: str | Path | None = None,
+        revision: str | None = None,
+        force_cache_sync: bool = False,
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
-        **kwargs,
+        meta_only: bool = False,
     ):
+        # ========== Customizations ==========
         self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
         self.modalities = set(modalities)
         self.camera_names = set(cameras)
@@ -242,7 +248,24 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         assert self.camera_names.issubset(
             ROBOT_CAMERA_NAMES["R1Pro"]
         ), f"Camera names must be a subset of {ROBOT_CAMERA_NAMES['R1Pro']}, but got {self.camera_names}"
-        super().__init__(*args, **kwargs)
+        # ===================================
+
+        self.repo_id = repo_id
+        self.revision = revision if revision else CODEBASE_VERSION
+        self.root = Path(root) if root is not None else HF_LEROBOT_HOME / repo_id
+
+        try:
+            if force_cache_sync:
+                raise FileNotFoundError
+            self.load_metadata()
+        except (FileNotFoundError, NotADirectoryError):
+            if is_valid_version(self.revision):
+                self.revision = get_safe_version(self.repo_id, self.revision)
+
+            (self.root / "meta").mkdir(exist_ok=True, parents=True)
+            ignore_patterns = "**/episodes/**" if meta_only else None
+            self.pull_from_repo(allow_patterns="meta/**", ignore_patterns=ignore_patterns)
+            self.load_metadata()
 
     def load_metadata(self):
         self.info = load_info(self.root)

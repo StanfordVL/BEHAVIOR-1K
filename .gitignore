@@ -5,4 +5,4 @@ gha-creds-*.json
 
 # training
 outputs/
-test.ipynb
+/*.ipynb

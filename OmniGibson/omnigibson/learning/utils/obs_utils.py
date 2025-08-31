@@ -2,7 +2,6 @@ import av
 import cv2
 import numpy as np
 import omnigibson.utils.transform_utils as T
-import open3d as o3d
 import torch as th
 import torch.nn.functional as F
 from av.container import Container
@@ -531,6 +530,8 @@ def process_fused_point_cloud(
 
 
 def color_pcd_vis(color_pcd: np.ndarray):
+    import open3d as o3d
+
     pcd = o3d.geometry.PointCloud()
     axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.3, origin=[0, 0, 0])
 
