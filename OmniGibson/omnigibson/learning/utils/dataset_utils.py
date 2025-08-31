@@ -164,37 +164,37 @@ def download_and_extract_data(
     instance_id: int,
     traj_id: int,
 ):
-    makedirs_with_mode(f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}")
+    makedirs_with_mode(f"{data_dir}/2025-challenge-rawdata/task-{TASK_NAMES_TO_INDICES[task_name]:04d}")
     # Download zip file
     response = requests.get(url)
     response.raise_for_status()
     base_name = os.path.basename(url).split("?")[0]  # remove ?Expires... suffix
-    file_name = os.path.join(data_dir, "raw", base_name)
+    file_name = os.path.join(data_dir, "2025-challenge-rawdata", base_name)
     base_name = base_name.split(".")[0]  # remove .tar suffix
     with open(file_name, "wb") as f:
         f.write(response.content)
     # unzip file
     with tarfile.open(file_name, "r:*") as tar_ref:
-        tar_ref.extractall(f"{data_dir}/raw")
+        tar_ref.extractall(f"{data_dir}/2025-challenge-rawdata")
     # rename and move to "raw" folder
     assert os.path.exists(
-        f"{data_dir}/raw/{base_name}/{task_name}.hdf5"
-    ), f"File not found: {data_dir}/raw/{base_name}/{task_name}.hdf5"
+        f"{data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"
+    ), f"File not found: {data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"
     # check running_args.json
-    with open(f"{data_dir}/raw/{base_name}/running_args.json", "r") as f:
+    with open(f"{data_dir}/2025-challenge-rawdata/{base_name}/running_args.json", "r") as f:
         running_args = json.load(f)
         assert running_args["task_name"] == task_name, f"Task name mismatch: {running_args['task_name']} != {task_name}"
         assert (
             running_args["instance_id"] == instance_id
         ), f"Instance ID mismatch: {running_args['instance_id']} in running_args.json != {instance_id} from LW API"
     os.rename(
-        f"{data_dir}/raw/{base_name}/{task_name}.hdf5",
-        f"{data_dir}/raw/task-{TASK_NAMES_TO_INDICES[task_name]:04d}/episode_{TASK_NAMES_TO_INDICES[task_name]:04d}{instance_id:03d}{traj_id:01d}.hdf5",
+        f"{data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5",
+        f"{data_dir}/2025-challenge-rawdata/task-{TASK_NAMES_TO_INDICES[task_name]:04d}/episode_{TASK_NAMES_TO_INDICES[task_name]:04d}{instance_id:03d}{traj_id:01d}.hdf5",
     )
     # remove tar file and
     os.remove(file_name)
-    os.remove(f"{data_dir}/raw/{base_name}/running_args.json")
-    os.rmdir(f"{data_dir}/raw/{base_name}")
+    os.remove(f"{data_dir}/2025-challenge-rawdata/{base_name}/running_args.json")
+    os.rmdir(f"{data_dir}/2025-challenge-rawdata/{base_name}")
 
 
 def reorder_sheet(worksheet):
@@ -477,7 +477,7 @@ def fix_permissions(root_dir: str):
 
 def download_raw(credentials_path: str, max_traj_per_task: int = 200):
     task_list = list(TASK_NAMES_TO_INDICES.keys())
-    data_dir = "/vision/group/behavior"
+    data_dir = "/vision/group/behavior/2025-challenge-rawdata"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path=credentials_path)
 
     tracking_spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")

@@ -80,8 +80,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         """
         Dataset.__init__(self)
         self.repo_id = repo_id
-        self.root = os.path.expanduser(root)  # expand user
-        self.root = Path(root) if root else HF_LEROBOT_HOME / repo_id
+        self.root = Path(os.path.expanduser(str(root))) if root else HF_LEROBOT_HOME / repo_id
         self.image_transforms = image_transforms
         self.delta_timestamps = delta_timestamps
         self.tolerance_s = tolerance_s

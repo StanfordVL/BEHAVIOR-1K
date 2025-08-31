@@ -24,7 +24,7 @@ def main(args):
     if not args.local:
         partition = "viscam" if args.viscam else "svl,napoli-gpu"
         node = "viscam" if args.viscam else "vision"
-        data_dir = "/vision/group/behavior"
+        data_dir = "/vision/group/behavior/2025-challenge-demos"
         # Get number of running or pending jobs for the current user
         cmd = (
             "/usr/local/bin/sacct --format=JobID,State --user={} --state=RUNNING,PENDING --partition {} --noheader "

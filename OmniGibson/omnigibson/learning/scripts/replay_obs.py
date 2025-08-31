@@ -10,7 +10,6 @@ import pandas as pd
 import time
 import torch as th
 import torch.nn.functional as F
-import yaml
 from omnigibson.envs import DataPlaybackWrapper
 from omnigibson.sensors import VisionSensor
 from omnigibson.learning.utils.dataset_utils import update_google_sheet, makedirs_with_mode
@@ -185,7 +184,7 @@ def replay_hdf5_file(
             time.sleep(60)
     assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
-        input_path=f"{data_folder}/raw/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
+        input_path=f"{data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
         output_path=os.path.join(replay_dir, f"episode_{demo_id:08d}.hdf5"),
         compression={"compression": "lzf"},
         robot_obs_modalities=["proprio"],
@@ -219,9 +218,19 @@ def replay_hdf5_file(
     video_writers = dict()
     if generate_rgbd:
         for camera_id, camera_name in camera_names.items():
-            rgb_dir = os.path.join(data_folder, "videos", f"task-{task_id:04d}", f"observation.images.rgb.{camera_id}")
+            rgb_dir = os.path.join(
+                data_folder,
+                "2025-challenge-demos",
+                "videos",
+                f"task-{task_id:04d}",
+                f"observation.images.rgb.{camera_id}",
+            )
             depth_dir = os.path.join(
-                data_folder, "videos", f"task-{task_id:04d}", f"observation.images.depth.{camera_id}"
+                data_folder,
+                "2025-challenge-demos",
+                "videos",
+                f"task-{task_id:04d}",
+                f"observation.images.depth.{camera_id}",
             )
             makedirs_with_mode(rgb_dir)
             makedirs_with_mode(depth_dir)
@@ -269,7 +278,11 @@ def replay_hdf5_file(
             log.info(f"Saved depth video for {camera_name}")
         if generate_seg:
             seg_dir = os.path.join(
-                data_folder, "videos", f"task-{task_id:04d}", f"observation.images.seg_instance_id.{camera_id}"
+                data_folder,
+                "2025-challenge-demos",
+                "videos",
+                f"task-{task_id:04d}",
+                f"observation.images.seg_instance_id.{camera_id}",
             )
             makedirs_with_mode(seg_dir)
             video_writers[f"{camera_name}::seg_instance_id"] = create_video_writer(
@@ -292,7 +305,11 @@ def replay_hdf5_file(
             # We only generate bbox for head camera
             if "zed" in camera_name:
                 bbox_dir = os.path.join(
-                    data_folder, "videos", f"task-{task_id:04d}", f"observation.images.bbox.{camera_id}"
+                    data_folder,
+                    "2025-challenge-demos",
+                    "videos",
+                    f"task-{task_id:04d}",
+                    f"observation.images.bbox.{camera_id}",
                 )
                 makedirs_with_mode(bbox_dir)
                 video_writers[f"{camera_name}::bbox"] = create_video_writer(
@@ -374,9 +391,9 @@ def generate_low_dim_data(
     """
     Post-process the replayed low-dimensional data (proprio, action, task-info, etc) to parquet.
     """
-    makedirs_with_mode(f"{data_folder}/data/task-{task_id:04d}")
-    makedirs_with_mode(f"{data_folder}/meta/episodes/task-{task_id:04d}")
-    with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
+    makedirs_with_mode(f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}")
+    makedirs_with_mode(f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}")
+    with h5py.File(f"{data_folder}/2025-challenge-demos/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
         actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
         proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
         task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
@@ -400,7 +417,9 @@ def generate_low_dim_data(
             "observation.task_info": list(task_info),
         }
         df = pd.DataFrame(data)
-        df.to_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False)
+        df.to_parquet(
+            f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet", index=False
+        )
 
         task_metadata = {}
         for attr_name in replayed_f["data"].attrs:
@@ -417,7 +436,9 @@ def generate_low_dim_data(
                 task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name].tolist()
             else:
                 task_metadata[attr_name] = replayed_f["data"][f"demo_{episode_id}"].attrs[attr_name]
-        with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w") as f:
+        with open(
+            f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json", "w"
+        ) as f:
             json.dump(task_metadata, f, indent=4)
     log.info(f"Successfully processed {data_folder}/replayed/episode_{demo_id:08d}.hdf5")
 
@@ -567,7 +588,9 @@ def rgbd_vid_to_pcd(
 
     # create a new hdf5 file to store the point cloud data
     with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
-        in_f = pd.read_parquet(f"{data_folder}/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet")
+        in_f = pd.read_parquet(
+            f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet"
+        )
         cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
         data_size = cam_rel_poses.shape[0]
         fused_pcd_dset = out_f.create_dataset(
@@ -592,11 +615,13 @@ def rgbd_vid_to_pcd(
                 kwargs = {}
                 # ["robot_r1::robot_r1:zed_link:Camera:0::unique_ins_ids"]
                 if key == "seg_semantic_id":
-                    with open(f"{data_folder}/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json") as f:
+                    with open(
+                        f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json"
+                    ) as f:
                         kwargs["id_list"] = th.tensor(json.load(f)[f"{robot_camera_name}::unique_ins_ids"])
                 obs_loaders[f"{robot_camera_name}::{key}"] = iter(
                     OBS_LOADER_MAP[key](
-                        data_path=data_folder,
+                        data_path=f"{data_folder}/2025-challenge-demos",
                         task_id=task_id,
                         demo_id=f"{demo_id:08d}",
                         camera_id=camera_id,
@@ -670,7 +695,9 @@ def main():
     task_id = TASK_NAMES_TO_INDICES[args.task_name]
 
     # Process each file
-    if not os.path.exists(f"{args.data_folder}/raw/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"):
+    if not os.path.exists(
+        f"{args.data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{args.demo_id:08d}.hdf5"
+    ):
         if args.data_url:
             from omnigibson.learning.utils.dataset_utils import download_and_extract_data
 
@@ -678,7 +705,9 @@ def main():
             traj_id = int(args.demo_id % 10)
             download_and_extract_data(args.data_url, args.data_folder, args.task_name, instance_id, traj_id)
         else:
-            raise FileNotFoundError(f"Error: Folder {args.data_folder} does not exist")
+            raise FileNotFoundError(
+                f"Error: File episode_{args.demo_id:08d}.hdf5 does not exists under {args.data_folder}"
+            )
     if args.rgbd or args.seg or args.bbox:
         episode_id = replay_hdf5_file(
             data_folder=args.data_folder,
@@ -699,8 +728,7 @@ def main():
             data_folder=args.data_folder, task_id=task_id, demo_id=args.demo_id, episode_id=episode_id
         )
     if args.pcd_gt or args.pcd_vid:
-        with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/{args.task_name}.yaml") as f:
-            pcd_range = tuple(yaml.safe_load(f)["task"]["pcd_range"])
+        pcd_range = (0.0, 2.0, -1.5, 1.5, 0.25, 1.25)
         if args.pcd_gt:
             rgbd_gt_to_pcd(
                 data_folder=args.data_folder,
@@ -731,7 +759,10 @@ def main():
             )
 
     # remove replayed hdf5 to free up storage
-    os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
+    try:
+        os.remove(f"{args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5")
+    except FileNotFoundError:
+        log.warning(f"File {args.data_folder}/replayed/episode_{args.demo_id:08d}.hdf5 not found")
     # Optionally update google sheet
     if args.update_sheet:
         credentials_path = f"{os.environ.get('HOME')}/Documents/credentials"
