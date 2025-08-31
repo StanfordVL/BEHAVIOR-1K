@@ -68,7 +68,8 @@ class WebsocketClientPolicy:
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
         action_dict = unpackb(response)
-        action = th.from_numpy(action_dict["action"]).to(th.float32)
+        action_np = deepcopy(action_dict["action"])
+        action = th.from_numpy(action_np).to(th.float32)
         return action
 
     def reset(self) -> None:

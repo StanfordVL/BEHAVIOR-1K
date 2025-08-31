@@ -37,7 +37,7 @@ from omnigibson.learning.utils.obs_utils import (
     write_video,
 )
 from omnigibson.macros import gm
-from omnigibson.metrics import MetricBase, RobotMetric, TaskMetric
+from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
@@ -142,7 +142,7 @@ class Evaluator:
         return policy
 
     def load_metrics(self) -> List[MetricBase]:
-        return [RobotMetric(), TaskMetric()]
+        return [AgentMetric(), TaskMetric()]
 
     def step(self) -> Tuple[bool, bool]:
         """
@@ -272,11 +272,11 @@ class Evaluator:
             traceback.print_exception(exc_type, exc_value, exc_tb)
         self.video_writer = None
         self.env.close()
+        og.shutdown()
 
     def _sigint_handler(self, signal_received, frame):
         logger.warning("SIGINT or CTRL-C detected.\n")
         self.__exit__(None, None, None)
-        og.shutdown()
         sys.exit(0)
 
 
@@ -346,8 +346,8 @@ if __name__ == "__main__":
                 logger.info(f"Total success trials: {evaluator.n_success_trials}")
                 # gather metric results and write to file
                 for metric in evaluator.metrics:
-                    metrics[metric.name] = metric.gather_results()
-                with open(metrics_path / f"{config.task}::{idx}::{epi}.json", "w") as f:
+                    metrics.update(metric.gather_results())
+                with open(metrics_path / f"{config.task.name}::{idx}::{epi}.json", "w") as f:
                     json.dump(metrics, f)
                 # reset video writer
                 if config.write_video:

@@ -3,7 +3,7 @@ import torch as th
 from omnigibson.metrics.metric_base import MetricBase
 
 
-class RobotMetric(MetricBase):
+class AgentMetric(MetricBase):
     def __init__(self):
         self.initialized = False
 
@@ -18,37 +18,22 @@ class RobotMetric(MetricBase):
         }
 
         if not self.initialized:
-            self.agent_pos = {part: [] for part in ["base"] + robot.arm_names}
-            self.agent_local_pos = {part: [] for part in robot.arm_names}
-
             self.delta_agent_distance = {part: [] for part in ["base"] + robot.arm_names}
-
             self.state_cache = copy.deepcopy(self.next_state_cache)
             self.initialized = True
 
-        self.agent_pos["base"].append(list(self.state_cache["base"]["position"]))
-        distance = th.linalg.norm(self.next_state_cache["base"]["position"] - self.state_cache["base"]["position"])
+        distance = th.linalg.norm(
+            self.next_state_cache["base"]["position"] - self.state_cache["base"]["position"]
+        ).item()
         self.delta_agent_distance["base"].append(distance)
 
         for arm in robot.arm_names:
-            self.agent_pos[arm].append(list(self.state_cache[arm]["position"]))
-            gripper_distance = th.linalg.norm(
+            eef_distance = th.linalg.norm(
                 self.next_state_cache[arm]["position"] - self.state_cache[arm]["position"]
-            )
-            self.delta_agent_distance[arm].append(gripper_distance)
-            self.agent_local_pos[arm].append(robot.get_eef_position(arm).tolist())
+            ).item()
+            self.delta_agent_distance[arm].append(eef_distance)
 
         self.state_cache = copy.deepcopy(self.next_state_cache)
 
     def gather_results(self):
-        return {
-            "agent_distance": {
-                "timestep": self.delta_agent_distance,
-            },
-            "pos": {
-                "timestep": self.agent_pos,
-            },
-            "local_pos": {
-                "timestep": self.agent_local_pos,
-            },
-        }
+        return {"agent_distance": {k: sum(v) for k, v in self.delta_agent_distance.items()}}
