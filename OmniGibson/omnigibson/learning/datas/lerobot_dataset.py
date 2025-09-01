@@ -45,6 +45,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         - Task-based filtering: Load only episodes corresponding to specific tasks.
         - Modality and camera selection: Load only specified modalities (e.g., "rgb", "depth", "seg_instance_id")
           and cameras (e.g., "left_wrist", "right_wrist", "head").
+        - Ability to download and use additional annotation and metainfo files.
         - Local-only mode: Optionally restrict dataset usage to local files, disabling downloads.
     """
 
@@ -213,15 +214,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         for vid_key, query_ts in query_timestamps.items():
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend)
-            # post-process seg instance id:
-            # if "seg_instance_id" in vid_key:
-            #     palette = th.from_numpy(generate_yuv_palette(len(self.id_list))).float()
-            #     N, H, W, C = frames.shape
-            #     rgb_flat = frames.reshape(N, -1, C)  # (H*W, 3)
-            #     # For each rgb pixel, find the index of the nearest color in the equidistant bins
-            #     distances = th.cdist(rgb_flat, palette.unsqueeze(0).expand(N, -1, -1), p=2)
-            #     ids = th.argmin(distances, dim=-1)  # (N, H*W)
-            #     frames = self.id_list[ids].reshape(N, H, W)  # (N, H, W)
             item[vid_key] = frames.squeeze(0)
 
         return item
