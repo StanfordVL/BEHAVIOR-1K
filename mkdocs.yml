@@ -83,6 +83,7 @@ plugins:
           options:
             docstring_options:
               returns_named_value: false
+  - include-markdown
   # - social
   - gen-files:
       scripts:
@@ -98,6 +99,7 @@ nav:
   - Home: index.md
   - 🏆 2025 BEHAVIOR Challenge: 
     - challenge/index.md
+    - Call for Participation: challenge/call_for_participation.md
     - Rules: challenge/rules.md
     - Leaderboard: challenge/leaderboard.md
     - Dataset: challenge/dataset.md

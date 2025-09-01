@@ -66,6 +66,7 @@ setup(
             "mkdocs-section-index",
             "mkdocs-literate-nav",
             "mkdocs-redirects",
+            "mkdocs-include-markdown-plugin",
             "telemoma~=0.2.0",
             "gspread",
         ],
