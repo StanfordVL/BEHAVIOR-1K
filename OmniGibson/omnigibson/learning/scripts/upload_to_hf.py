@@ -12,7 +12,7 @@ login(token=credentials["token"])
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--folder_path", type=str, default="/vision/group/behavior/2025-challenge-demos")
+parser.add_argument("--folder_path", type=str, default="/scr/behavior/2025-challenge-demos")
 parser.add_argument("--task_id", type=int, required=True)
 args = parser.parse_args()
 
@@ -29,7 +29,7 @@ hub_api.create_branch(
 print(f"Branch task-{args.task_id:04d} created.")
 
 hub_api.upload_large_folder(
-    repo_id="behavior-1k/B50",
+    repo_id="behavior-1k/2025-challenge-demos",
     folder_path=args.folder_path,
     repo_type="dataset",
     revision=f"task-{args.task_id:04d}",
