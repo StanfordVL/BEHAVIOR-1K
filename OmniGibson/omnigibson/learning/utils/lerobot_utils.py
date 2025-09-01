@@ -245,8 +245,8 @@ def generate_task_json(data_dir: str, credentials_path: str) -> int:
             json.dump(
                 {
                     "task_index": task_index,
-                    "task": task_name,
-                    "prompt": prompt,
+                    "task_name": task_name,
+                    "task": prompt,
                 },
                 f,
             )

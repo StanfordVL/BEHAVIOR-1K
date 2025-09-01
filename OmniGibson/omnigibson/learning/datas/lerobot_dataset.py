@@ -241,7 +241,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         meta_only: bool = True,
     ):
         # ========== Customizations ==========
-        self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
+        self.task_name_candidates = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
         self.modalities = set(modalities)
         self.camera_names = set(cameras)
         assert self.modalities.issubset(
@@ -272,11 +272,13 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
     def load_metadata(self):
         self.info = load_info(self.root)
         check_version_compatibility(self.repo_id, self._version, CODEBASE_VERSION)
-        self.tasks, self.task_to_task_index, self.task_prompts = self.load_tasks(self.root)
-        # filter based on self.task_name
-        if self.tasks:
-            self.tasks = {k: v for k, v in self.tasks.items() if v in self.task_names}
-            self.task_to_task_index = {k: v for k, v in self.task_to_task_index.items() if k in self.task_names}
+        self.tasks, self.task_to_task_index, self.task_names = self.load_tasks(self.root)
+        # filter based on self.task_name_candidates
+        valid_task_indices = [idx for idx, name in self.task_names.items() if name in self.task_name_candidates]
+        self.task_names = set([self.task_names[idx] for idx in valid_task_indices])
+        self.tasks = {idx: self.tasks[idx] for idx in valid_task_indices}
+        self.task_to_task_index = {k: v for k, v in self.tasks.items()}
+
         self.episodes = self.load_episodes(self.root)
         if self._version < packaging.version.parse("v2.1"):
             self.stats = self.load_stats(self.root)
@@ -287,10 +289,10 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
 
     def load_tasks(self, local_dir: Path) -> tuple[dict, dict]:
         tasks = load_jsonlines(local_dir / TASKS_PATH)
+        task_names = {item["task_index"]: item["task_name"] for item in sorted(tasks, key=lambda x: x["task_index"])}
         tasks = {item["task_index"]: item["task"] for item in sorted(tasks, key=lambda x: x["task_index"])}
-        task_prompts = {item["task_index"]: item["prompt"] for item in sorted(tasks, key=lambda x: x["task_index"])}
         task_to_task_index = {task: task_index for task_index, task in tasks.items()}
-        return tasks, task_to_task_index, task_prompts
+        return tasks, task_to_task_index, task_names
 
     def load_episodes(self, local_dir: Path) -> dict:
         episodes = load_jsonlines(local_dir / EPISODES_PATH)
