@@ -22,6 +22,16 @@ Coming soon!
 
 ## Dataset Statistics
 
+| Metric | Value |
+| ------ | ----- |
+| Total Trajectories | 10,000 |
+| Total Tasks | 50 |
+| Total Hours of Data | 1102.56 hours |
+| Total Skills | 270,600 |
+| Unique Skills | 31 |
+| Avg. Skills per Trajectory | 27.06 |
+| Avg. Trajectory Duration | 397.04 seconds / 6.6 minutes |
+
 ### Overall Demo Duration
 
 ![Overall Demo Duration](../assets/challenge_2025/overall_demo_duration.png)

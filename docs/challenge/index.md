@@ -4,10 +4,6 @@
 
 ---
 
-## :material-video: **Challenge Walkthrough**
-
-[Challenge Video Placeholder - Main walkthrough video for participants]
-
 ## :material-graph-outline: **Overview**
 
 **BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that tests a robot's capability in high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale scenes.
