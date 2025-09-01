@@ -236,19 +236,17 @@ def generate_task_json(data_dir: str, credentials_path: str) -> int:
     with open(f"{data_dir}/meta/tasks.jsonl", "w") as f:
         for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
             # find the corresponding row in the google sheet
-            natural_language_instruction = None
+            prompt = None
             for row in rows:
                 if row[0] == task_name:
-                    natural_language_instruction = row[1]
+                    prompt = row[1].replace("\u2019", "'")
                     break
-            assert (
-                natural_language_instruction is not None
-            ), f"Natural language instruction not found for task: {task_name}"
+            assert prompt is not None, f"Natural language instruction not found for task: {task_name}"
             json.dump(
                 {
                     "task_index": task_index,
                     "task": task_name,
-                    "natural_language_instruction": natural_language_instruction,
+                    "prompt": prompt,
                 },
                 f,
             )
@@ -504,15 +502,15 @@ def generate_info_json(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", type=str, default="~/behavior")
+    parser.add_argument("-d", "--data_dir", type=str, default="~/behavior/2025-challenge-demos")
     args = parser.parse_args()
 
     # expand root
     data_dir = os.path.expanduser(args.data_dir)
     print("Generating task JSON...")
     num_tasks = generate_task_json(data_dir, credentials_path="~/Documents/credentials")
-    print("Generating episode JSON...")
-    num_episodes, num_frames = generate_episode_json(data_dir)
-    print(num_tasks, num_episodes, num_frames)
-    print("Generating info JSON...")
-    generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)
+    # print("Generating episode JSON...")
+    # num_episodes, num_frames = generate_episode_json(data_dir)
+    # print(num_tasks, num_episodes, num_frames)
+    # print("Generating info JSON...")
+    # generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)

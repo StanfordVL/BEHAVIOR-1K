@@ -17,6 +17,7 @@ from lerobot.datasets.utils import (
     EPISODES_PATH,
     EPISODES_STATS_PATH,
     STATS_PATH,
+    TASKS_PATH,
     cast_stats_to_numpy,
     check_delta_timestamps,
     check_timestamps_sync,
@@ -28,7 +29,6 @@ from lerobot.datasets.utils import (
     load_json,
     load_jsonlines,
     load_info,
-    load_tasks,
     is_valid_version,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
@@ -272,7 +272,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
     def load_metadata(self):
         self.info = load_info(self.root)
         check_version_compatibility(self.repo_id, self._version, CODEBASE_VERSION)
-        self.tasks, self.task_to_task_index = load_tasks(self.root)
+        self.tasks, self.task_to_task_index, self.task_prompts = self.load_tasks(self.root)
         # filter based on self.task_name
         if self.tasks:
             self.tasks = {k: v for k, v in self.tasks.items() if v in self.task_names}
@@ -284,6 +284,13 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         else:
             self.episodes_stats = self.load_episodes_stats(self.root)
             self.stats = aggregate_stats(list(self.episodes_stats.values()))
+
+    def load_tasks(self, local_dir: Path) -> tuple[dict, dict]:
+        tasks = load_jsonlines(local_dir / TASKS_PATH)
+        tasks = {item["task_index"]: item["task"] for item in sorted(tasks, key=lambda x: x["task_index"])}
+        task_prompts = {item["task_index"]: item["prompt"] for item in sorted(tasks, key=lambda x: x["task_index"])}
+        task_to_task_index = {task: task_index for task_index, task in tasks.items()}
+        return tasks, task_to_task_index, task_prompts
 
     def load_episodes(self, local_dir: Path) -> dict:
         episodes = load_jsonlines(local_dir / EPISODES_PATH)
