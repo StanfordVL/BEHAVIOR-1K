@@ -5,7 +5,7 @@ from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.robots.robot_base import REGISTERED_ROBOTS
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_og_scene_path
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -196,8 +196,11 @@ class InteractiveTraversableScene(TraversableScene):
         # Check whether this is an agent and we allow agents
         agent_ok = self.include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
+        # TODO: always load building structures for now because walls are missing room assignments
+        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
+
         # We only load this model if all the above conditions are met
-        return not_blacklisted and whitelisted and valid_room and agent_ok
+        return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure
 
     @property
     def seg_map(self):
