@@ -175,6 +175,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         """
         episodes = self.episodes if self.episodes is not None else list(self.meta.episodes.keys())
         fpaths = [str(self.meta.get_data_file_path(ep_idx)) for ep_idx in episodes]
+        # append language and metainfo annotations
+        fpaths += [str(self.meta.get_annotation_path(ep_idx)) for ep_idx in episodes]
+        fpaths += [str(self.meta.get_metainfo_path(ep_idx)) for ep_idx in episodes]
         if len(self.meta.video_keys) > 0:
             video_files = [
                 str(self.meta.get_video_file_path(ep_idx, vid_key))
@@ -182,9 +185,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                 for ep_idx in episodes
             ]
             fpaths += video_files
-        # append language and metainfo annotations
-        fpaths += [str(self.meta.get_annotation_path(ep_idx)) for ep_idx in episodes]
-        fpaths += [str(self.meta.get_metainfo_path(ep_idx)) for ep_idx in episodes]
 
         return fpaths
 
