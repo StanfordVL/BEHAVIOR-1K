@@ -21,7 +21,6 @@ except ImportError:
     import websockets.server as _server
 from copy import deepcopy
 from typing import Any, Dict, Optional, Tuple
-from omnigibson.learning.utils.array_tensor_utils import any_to_torch
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +61,14 @@ class WebsocketClientPolicy:
 
     def act(self, obs: Dict) -> th.Tensor:
         data = self._packer.pack(obs)
-        self._ws.send(data)
-        response = self._ws.recv()
+        try:
+            self._ws.send(data)
+            response = self._ws.recv()
+        except websockets.exceptions.ConnectionClosedError:
+            logging.warning("Connection to server lost, attempting to reconnect...")
+            self._ws, self._server_metadata = self._wait_for_server()
+            self._ws.send(data)
+            response = self._ws.recv()
         if isinstance(response, str):
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
@@ -125,7 +130,7 @@ class WebsocketPolicyServer:
                     self._policy.reset()
                     continue
 
-                obs = any_to_torch(deepcopy(result), device="cpu")
+                obs = deepcopy(result)
 
                 infer_time = time.monotonic()
                 action = self._policy.act(obs)

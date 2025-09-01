@@ -44,14 +44,6 @@ def any_concat(xs: List, *, dim: int = 0):
 
 
 @make_recursive_func
-def any_to_torch(tensor_struct, device: str = "cuda"):
-    """
-    Converts all arrays/tensors in a nested structure to PyTorch tensors.
-    """
-    return tree.map_structure(lambda x: th.tensor(x, dtype=th.float32).to(device), tensor_struct)
-
-
-@make_recursive_func
 def torch_to_numpy(tensor_struct):
     """
     Converts all tensors in a nested structure to numpy arrays.
