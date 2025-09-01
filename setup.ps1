@@ -4,7 +4,7 @@ param(
     [switch]$NewEnv,
     [switch]$OmniGibson,
     [switch]$BDDL,
-    [switch]$Teleop,
+    [switch]$JoyLo,
     [switch]$Dataset,
     [switch]$Primitives,
     [switch]$Eval,
@@ -30,7 +30,7 @@ Options:
   -NewEnv                 Create a new conda environment 'behavior'
   -OmniGibson             Install OmniGibson (core physics simulator)
   -BDDL                   Install BDDL (Behavior Domain Definition Language)
-  -Teleop                 Install JoyLo (teleoperation interface)
+  -JoyLo                  Install JoyLo (teleoperation interface)
   -Dataset                Download BEHAVIOR datasets (requires -OmniGibson)
   -Primitives             Install OmniGibson with primitives support
   -Eval                   Install evaluation dependencies
@@ -41,7 +41,7 @@ Options:
   -AcceptDatasetTos       Automatically accept BEHAVIOR Dataset Terms
   -ConfirmNoConda         Skip confirmation prompt when not in a conda environment
 
-Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset
 Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptCondaTos -AcceptNvidiaEula -AcceptDatasetTos
 "@
     exit 0
@@ -533,7 +533,7 @@ except Exception as e:
 }
 
 # Install JoyLo
-if ($Teleop) {
+if ($Joylo) {
     Write-Host "Installing JoyLo..."
     
     if (-not (Test-Path "joylo")) {
@@ -559,7 +559,7 @@ Write-Host "=== Installation Complete! ==="
 if ($NewEnv) { Write-Host "✓ Created conda environment 'behavior'" }
 if ($OmniGibson) { Write-Host "✓ Installed OmniGibson + Isaac Sim" }
 if ($BDDL) { Write-Host "✓ Installed BDDL" }
-if ($Teleop) { Write-Host "✓ Installed JoyLo" }
+if ($JoyLo) { Write-Host "✓ Installed JoyLo" }
 if ($Primitives) { Write-Host "✓ Installed primitives support" }
 if ($Eval) { Write-Host "✓ Installed evaluation support" }
 if ($Dataset) { Write-Host "✓ Downloaded datasets" }

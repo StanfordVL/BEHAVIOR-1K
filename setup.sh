@@ -6,7 +6,7 @@ HELP=false
 NEW_ENV=false
 OMNIGIBSON=false
 BDDL=false
-TELEOP=false
+JOYLO=false
 DATASET=false
 PRIMITIVES=false
 EVAL=false
@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
         --new-env) NEW_ENV=true; shift ;;
         --omnigibson) OMNIGIBSON=true; shift ;;
         --bddl) BDDL=true; shift ;;
-        --teleop) TELEOP=true; shift ;;
+        --joylo) JOYLO=true; shift ;;
         --dataset) DATASET=true; shift ;;
         --primitives) PRIMITIVES=true; shift ;;
         --eval) EVAL=true; shift ;;
@@ -49,7 +49,7 @@ Options:
   --new-env               Create a new conda environment 'behavior'
   --omnigibson            Install OmniGibson (core physics simulator)
   --bddl                  Install BDDL (Behavior Domain Definition Language)
-  --teleop                Install JoyLo (teleoperation interface)
+  --joylo                 Install JoyLo (teleoperation interface)
   --dataset               Download BEHAVIOR datasets (requires --omnigibson)
   --primitives            Install OmniGibson with primitives support
   --eval                  Install evaluation dependencies
@@ -60,7 +60,7 @@ Options:
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
   --confirm-no-conda      Skip confirmation prompt when not in a conda environment
 
-Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+Example: ./setup.sh --new-env --omnigibson --bddl --joylo --dataset
 Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 EOF
     exit 0
@@ -401,7 +401,7 @@ except Exception as e:
 fi
 
 # Install JoyLo
-if [ "$TELEOP" = true ]; then
+if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
     pip install -e "$WORKDIR/joylo"
@@ -420,7 +420,7 @@ echo "=== Installation Complete! ==="
 if [ "$NEW_ENV" = true ]; then echo "✓ Created conda environment 'behavior'"; fi
 if [ "$OMNIGIBSON" = true ]; then echo "✓ Installed OmniGibson + Isaac Sim"; fi
 if [ "$BDDL" = true ]; then echo "✓ Installed BDDL"; fi
-if [ "$TELEOP" = true ]; then echo "✓ Installed JoyLo"; fi
+if [ "$JOYLO" = true ]; then echo "✓ Installed JoyLo"; fi
 if [ "$PRIMITIVES" = true ]; then echo "✓ Installed OmniGibson with primitives support"; fi
 if [ "$EVAL" = true ]; then echo "✓ Installed evaluation support"; fi
 if [ "$DATASET" = true ]; then echo "✓ Downloaded datasets"; fi
