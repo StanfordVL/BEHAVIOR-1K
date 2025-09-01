@@ -12,7 +12,6 @@ import torch as th
 import traceback
 from av.container import Container
 from av.stream import Stream
-from gello.robots.sim_robot.og_teleop_cfg import SUPPORTED_ROBOTS
 from gello.robots.sim_robot.og_teleop_utils import (
     augment_rooms,
     load_available_tasks,
@@ -22,6 +21,7 @@ from gello.robots.sim_robot.og_teleop_utils import (
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
+from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
     HEAD_RESOLUTION,
@@ -56,6 +56,14 @@ logger.setLevel(20)  # info
 
 
 class Evaluator:
+    """
+    Evaluator class for running and evaluating policies for behavior task.
+    This class manages the setup, execution, and evaluation of policy rollouts in OmniGibson environment,
+    tracking metrics such as the number of trials, successes, and total time. It supports loading environments,
+    robots, policies, and metrics, and provides methods for stepping through the environment, resetting state,
+    and handling video outputs and loggings.
+    """
+
     def __init__(self, cfg: DictConfig) -> None:
         self.cfg = cfg
 
@@ -64,10 +72,8 @@ class Evaluator:
         self.n_success_trials = 0
         self.total_time = 0
         self.robot_action = dict()
-        # fetch env type, currently only supports "omnigibson"
-        self.env_type = cfg.env_type
 
-        self.env = self.load_env()
+        self.env = self.load_env(env_wrapper=self.cfg.env_wrapper)
         self.policy = self.load_policy()
         self.robot = self.load_robot()
         self.metrics = self.load_metrics()
@@ -77,62 +83,67 @@ class Evaluator:
         self.env._current_episode = 0
         self._video_writer = None
 
-    def load_env(self) -> og.Environment:
+    def load_env(self, env_wrapper: DictConfig) -> EnvironmentWrapper:
         """
         Read the environment config file and create the environment.
         The config file is located in the configs/envs directory.
         """
         # Load config file
-        if self.env_type == "sim":
-            available_tasks = load_available_tasks()
-            task_name = self.cfg.task.name
-            assert task_name in available_tasks, f"Got invalid OmniGibson task name: {task_name}"
-            # Load the seed instance by default
-            task_cfg = available_tasks[task_name][0]
-            robot_type = self.cfg.robot.type
-            assert robot_type in SUPPORTED_ROBOTS, f"Got invalid OmniGibson robot type: {robot_type}"
-            cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
-            cfg["robots"] = [
-                generate_robot_config(
-                    task_name=task_name,
-                    task_cfg=task_cfg,
-                )
-            ]
-            # Update observation modalities
-            cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb", "depth_linear"]
-            cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
-            if self.cfg.robot.controllers is not None:
-                cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
-            cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
-            cfg["task"]["include_obs"] = self.cfg.use_task_info
-            relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
-            relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
-            cfg["scene"]["load_room_types"] = relevant_rooms
-            env = og.Environment(configs=cfg)
-        else:
-            raise ValueError(f"Invalid environment type {self.env_type}")
+        available_tasks = load_available_tasks()
+        task_name = self.cfg.task.name
+        assert task_name in available_tasks, f"Got invalid task name: {task_name}"
+        # Load the seed instance by default
+        task_cfg = available_tasks[task_name][0]
+        robot_type = self.cfg.robot.type
+        assert robot_type == "R1Pro", f"Got invalid robot type: {robot_type}, only R1Pro is supported."
+        cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
+        cfg["robots"] = [
+            generate_robot_config(
+                task_name=task_name,
+                task_cfg=task_cfg,
+            )
+        ]
+        # Update observation modalities
+        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb", "depth_linear", "seg_instance_id"]
+        cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
+        if self.cfg.robot.controllers is not None:
+            cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
+        cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
+        cfg["task"]["include_obs"] = self.cfg.use_task_info
+        relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
+        relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
+        cfg["scene"]["load_room_types"] = relevant_rooms
+        env = og.Environment(configs=cfg)
+        # instantiate env wrapper
+        env = instantiate(env_wrapper, env=env)
         return env
 
     def load_robot(self) -> BaseRobot:
-        if self.env_type == "sim":
-            robot = self.env.scene.object_registry("name", "robot_r1")
-            og.sim.step()
-            # Update robot sensors:
-            for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
-                sensor_name = camera_name.split("::")[1]
-                if camera_id == "head":
-                    robot.sensors[sensor_name].horizontal_aperture = 40.0
-                    robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
-                    robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
-                else:
-                    robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
-                    robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
-            self.env.load_observation_space()
-        else:
-            raise ValueError(f"Invalid environment type {self.env_type}")
+        """
+        Loads and returns the robot instance from the environment.
+        Change robot cameras' parameters
+        Returns:
+            BaseRobot: The robot instance loaded from the environment.
+        """
+        robot = self.env.scene.object_registry("name", "robot_r1")
+        og.sim.step()
+        # Update robot sensors:
+        for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
+            sensor_name = camera_name.split("::")[1]
+            if camera_id == "head":
+                robot.sensors[sensor_name].horizontal_aperture = 40.0
+                robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
+                robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
+            else:
+                robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
+                robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
+        self.env.load_observation_space()
         return robot
 
     def load_policy(self) -> Any:
+        """
+        Loads and returns the policy instance.
+        """
         policy = instantiate(self.cfg.model)
         logger.info("")
         logger.info("=" * 50)
@@ -142,11 +153,30 @@ class Evaluator:
         return policy
 
     def load_metrics(self) -> List[MetricBase]:
+        """
+        Load agent and task metrics.
+        """
         return [AgentMetric(), TaskMetric()]
 
     def step(self) -> Tuple[bool, bool]:
         """
-        Single step of the task
+        Performs a single step of the task by executing the policy, interacting with the environment,
+        processing observations, updating metrics, and tracking trial success.
+
+        Returns:
+            Tuple[bool, bool]:
+                - terminated (bool): Whether the episode has terminated (i.e., reached a terminal state).
+                - truncated (bool): Whether the episode was truncated (i.e., stopped due to a time limit or other constraint).
+
+        Workflow:
+            1. Computes the next action using the policy based on the current observation.
+            2. Steps the environment with the computed action and retrieves the next observation,
+               termination and truncation flags, and additional info.
+            3. If the episode has ended (terminated or truncated), increments the trial counter and
+               updates the count of successful trials if the task was completed successfully.
+            4. Preprocesses the new observation.
+            5. Invokes step callbacks for all registered metrics to update their state.
+            6. Returns the termination and truncation status.
         """
         self.robot_action = self.policy.forward(obs=self.obs)
 
@@ -164,6 +194,9 @@ class Evaluator:
 
     @property
     def video_writer(self) -> Tuple[Container, Stream]:
+        """
+        Returns the video writer for the current evaluation step.
+        """
         return self._video_writer
 
     @video_writer.setter
@@ -178,7 +211,12 @@ class Evaluator:
         self._video_writer = video_writer
 
     def load_task_instance(self, instance_id: int) -> None:
-        assert self.env_type == "sim", "load_task_instance is only supported in sim environments"
+        """
+        Loads the configuration for a specific task instance.
+
+        Args:
+            instance_id (int): The ID of the task instance to load.
+        """
         scene_model = self.env.task.scene_name
         tro_filename = self.env.task.get_cached_activity_scene_filename(
             scene_model=scene_model,
@@ -217,6 +255,11 @@ class Evaluator:
     def _preprocess_obs(self, obs: dict) -> dict:
         """
         Preprocess the observation dictionary before passing it to the policy.
+        Args:
+            obs (dict): The observation dictionary to preprocess.
+
+        Returns:
+            dict: The preprocessed observation dictionary.
         """
         obs = flatten_obs_dict(obs)
         base_pose = self.robot.get_position_orientation()
@@ -228,6 +271,9 @@ class Evaluator:
         return obs
 
     def _write_video(self) -> None:
+        """
+        Write the current robot observations to video.
+        """
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
@@ -246,6 +292,9 @@ class Evaluator:
         )
 
     def reset(self) -> None:
+        """
+        Reset the environment, policy, and compute metrics.
+        """
         self.obs = self.env.reset()[0]
         self.obs = self._preprocess_obs(self.obs)
         # run metric start callbacks

@@ -4,7 +4,8 @@ defaults:
   - task: behavior
   - policy: ???
 
-env_type: sim
+env_wrapper: 
+  _target_: omnigibson.envs.EnvironmentWrapper
 policy_name: ???  # filled by policy
 headless: true
 use_task_info: false
