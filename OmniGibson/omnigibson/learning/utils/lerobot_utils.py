@@ -348,6 +348,8 @@ def generate_info_json(
         },
         "data_path": "data/task-{episode_chunk:04d}/episode_{episode_index:08d}.parquet",
         "video_path": "videos/task-{episode_chunk:04d}/{video_key}/episode_{episode_index:08d}.mp4",
+        "annotation_path": "annotations/task-{episode_chunk:04d}/episode_{episode_index:08d}.json",
+        "metainfo_path": "meta/episodes/task-{episode_chunk:04d}/episode_{episode_index:08d}.json",
         "features": {
             "observation.images.rgb.left_wrist": {
                 "dtype": "video",
@@ -502,15 +504,15 @@ def generate_info_json(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", type=str, default="~/behavior/2025-challenge-demos")
+    parser.add_argument("-d", "--data_dir", type=str, default="/scr/behavior/2025-challenge-demos")
     args = parser.parse_args()
 
     # expand root
     data_dir = os.path.expanduser(args.data_dir)
     print("Generating task JSON...")
     num_tasks = generate_task_json(data_dir, credentials_path="~/Documents/credentials")
-    # print("Generating episode JSON...")
-    # num_episodes, num_frames = generate_episode_json(data_dir)
-    # print(num_tasks, num_episodes, num_frames)
-    # print("Generating info JSON...")
-    # generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)
+    print("Generating episode JSON...")
+    num_episodes, num_frames = generate_episode_json(data_dir)
+    print(num_tasks, num_episodes, num_frames)
+    print("Generating info JSON...")
+    generate_info_json(data_dir, fps=30, total_episodes=num_episodes, total_tasks=num_tasks, total_frames=num_frames)

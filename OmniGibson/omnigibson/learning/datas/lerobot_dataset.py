@@ -59,10 +59,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         revision: str | None = None,
         force_cache_sync: bool = False,
         download_videos: bool = True,
+        video_backend: str | None = "pyav",
+        batch_encoding_size: int = 1,
+        # === Customized arguments for BehaviorLeRobotDataset ===
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
-        video_backend: str | None = "pyav",
         local_only: bool = False,
     ):
         """
@@ -76,7 +78,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                 must be a subset of ["rgb", "depth", "seg_instance_id"]
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.
                 must be a subset of ["left_wrist", "right_wrist", "head"]
-            local_only: whether to only use local data (not download from HuggingFace).
+            local_only (bool): whether to only use local data (not download from HuggingFace).
         """
         Dataset.__init__(self)
         self.repo_id = repo_id
@@ -86,12 +88,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.tolerance_s = tolerance_s
         self.revision = revision if revision else CODEBASE_VERSION
         self.video_backend = video_backend if video_backend else get_safe_default_codec()
-        if "depth" in modalities:
-            assert self.video_backend == "pyav", (
-                "Depth videos can only be decoded with the 'pyav' backend. "
-                "Please set video_backend='pyav' when initializing the dataset."
-            )
         self.delta_indices = None
+        self.batch_encoding_size = batch_encoding_size
+        self.episodes_since_last_encoding = 0
 
         # Unused attributes
         self.image_writer = None
@@ -100,6 +99,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        if "depth" in modalities:
+            assert self.video_backend == "pyav", (
+                "Depth videos can only be decoded with the 'pyav' backend. "
+                "Please set video_backend='pyav' when initializing the dataset."
+            )
         if cameras is None:
             cameras = ["head", "left_wrist", "right_wrist"]
         self.task_names = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
@@ -113,7 +117,6 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             tasks=self.task_names,
             modalities=modalities,
             cameras=cameras,
-            meta_only=local_only,  # don't update detailed metadata if local only
         )
         # overwrite episode based on task
         all_episodes = load_jsonlines(self.root / EPISODES_PATH)
@@ -178,6 +181,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                 for ep_idx in episodes
             ]
             fpaths += video_files
+        # append language and metainfo annotations
+        fpaths += [str(self.meta.get_annotation_path(ep_idx)) for ep_idx in episodes]
+        fpaths += [str(self.meta.get_metainfo_path(ep_idx)) for ep_idx in episodes]
 
         return fpaths
 
@@ -235,10 +241,10 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         root: str | Path | None = None,
         revision: str | None = None,
         force_cache_sync: bool = False,
+        # === Customized arguments for BehaviorLeRobotDataset ===
         tasks: Iterable[str] = None,
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
-        meta_only: bool = True,
     ):
         # ========== Customizations ==========
         self.task_name_candidates = set(tasks) if tasks is not None else set(TASK_NAMES_TO_INDICES.keys())
@@ -265,8 +271,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
                 self.revision = get_safe_version(self.repo_id, self.revision)
 
             (self.root / "meta").mkdir(exist_ok=True, parents=True)
-            ignore_patterns = "**/episodes/**" if meta_only else None
-            self.pull_from_repo(allow_patterns="meta/**", ignore_patterns=ignore_patterns)
+            self.pull_from_repo(allow_patterns="meta/**", ignore_patterns="episodes/**")
             self.load_metadata()
 
     def load_metadata(self):
@@ -315,6 +320,26 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
             for item in sorted(episodes_stats, key=lambda x: x["episode_index"])
             if item["episode_index"] in self.episodes
         }
+
+    def get_annotation_path(self, ep_index: int) -> Path:
+        ep_chunk = self.get_episode_chunk(ep_index)
+        fpath = self.annotation_path.format(episode_chunk=ep_chunk, episode_index=ep_index)
+        return Path(fpath)
+
+    def get_metainfo_path(self, ep_index: int) -> Path:
+        ep_chunk = self.get_episode_chunk(ep_index)
+        fpath = self.metainfo_path.format(episode_chunk=ep_chunk, episode_index=ep_index)
+        return Path(fpath)
+
+    @property
+    def annotation_path(self) -> str | None:
+        """Formattable string for the annotation files."""
+        return self.info["annotation_path"]
+
+    @property
+    def metainfo_path(self) -> str | None:
+        """Formattable string for the metainfo files."""
+        return self.info["metainfo_path"]
 
     @property
     def features(self) -> dict[str, dict]:
