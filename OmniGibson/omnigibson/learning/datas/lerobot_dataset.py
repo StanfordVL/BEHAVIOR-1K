@@ -4,13 +4,7 @@ import packaging.version
 import torch as th
 from collections import defaultdict
 from collections.abc import Callable
-from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
-from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
-from omnigibson.utils.ui_utils import create_module_logger
-from pathlib import Path
-from torch.utils.data import Dataset
-from typing import Iterable
-
+from huggingface_hub import snapshot_download
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION
 from lerobot.datasets.utils import (
@@ -32,6 +26,12 @@ from lerobot.datasets.utils import (
     is_valid_version,
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
+from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
+from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
+from omnigibson.utils.ui_utils import create_module_logger
+from pathlib import Path
+from torch.utils.data import Dataset
+from typing import Iterable
 
 
 logger = create_module_logger("BehaviorLeRobotDataset")
@@ -175,9 +175,10 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         """
         episodes = self.episodes if self.episodes is not None else list(self.meta.episodes.keys())
         fpaths = [str(self.meta.get_data_file_path(ep_idx)) for ep_idx in episodes]
-        # append language and metainfo annotations
-        fpaths += [str(self.meta.get_annotation_path(ep_idx)) for ep_idx in episodes]
+        # append metainfo and language annotations
         fpaths += [str(self.meta.get_metainfo_path(ep_idx)) for ep_idx in episodes]
+        # TODO: add this back once we have all the language annotations
+        # fpaths += [str(self.meta.get_annotation_path(ep_idx)) for ep_idx in episodes]
         if len(self.meta.video_keys) > 0:
             video_files = [
                 str(self.meta.get_video_file_path(ep_idx, vid_key))
@@ -187,6 +188,41 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             fpaths += video_files
 
         return fpaths
+
+    def download_episodes(self, download_videos: bool = True) -> None:
+        """
+        Overwrite base method to allow more flexible pattern matching.
+        Here, we do coarse filtering based on tasks, cameras, and modalities.
+        We do this instead of filename patterns to speed up pattern checking and download speed.
+        """
+        allow_patterns = []
+        for task in self.task_indices:
+            allow_patterns.append(f"**/task-{task:04d}/**")
+        for camera in self.meta.camera_names:
+            for modality in self.meta.modalities:
+                allow_patterns.append(f"**/observation.images.{modality}.{camera}/**")
+        ignore_patterns = None if download_videos else "videos/"
+
+        self.pull_from_repo(allow_patterns=allow_patterns, ignore_patterns=ignore_patterns)
+
+    def pull_from_repo(
+        self,
+        allow_patterns: list[str] | str | None = None,
+        ignore_patterns: list[str] | str | None = None,
+    ) -> None:
+        """
+        Overwrite base class to increase max workers to num of CPUs - 2
+        """
+        logger.info(f"Pulling dataset {self.repo_id} from HuggingFace hub...")
+        snapshot_download(
+            self.repo_id,
+            repo_type="dataset",
+            revision=self.revision,
+            local_dir=self.root,
+            allow_patterns=allow_patterns,
+            ignore_patterns=ignore_patterns,
+            max_workers=os.cpu_count() - 2,
+        )
 
     def _get_query_indices(self, idx: int, ep_idx: int) -> tuple[dict[str, list[int | bool]]]:
         ep_idx = self.episode_data_index_pos[ep_idx]
@@ -263,7 +299,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
                 self.revision = get_safe_version(self.repo_id, self.revision)
 
             (self.root / "meta").mkdir(exist_ok=True, parents=True)
-            self.pull_from_repo(allow_patterns="meta/**", ignore_patterns="episodes/**")
+            self.pull_from_repo(allow_patterns="meta/**", ignore_patterns="meta/episodes/**")
             self.load_metadata()
 
     def load_metadata(self):
@@ -283,6 +319,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         else:
             self.episodes_stats = self.load_episodes_stats(self.root)
             self.stats = aggregate_stats(list(self.episodes_stats.values()))
+        logger.info(f"Loaded metadata for {len(self.episodes)} episodes.")
 
     def load_tasks(self, local_dir: Path) -> tuple[dict, dict]:
         tasks = load_jsonlines(local_dir / TASKS_PATH)

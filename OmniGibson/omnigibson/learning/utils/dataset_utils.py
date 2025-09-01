@@ -7,8 +7,10 @@ import pandas as pd
 import random
 import re
 import requests
+import shutil
 import tarfile
 import time
+import zipfile
 from collections import Counter
 from datetime import datetime
 from typing import Tuple, List, Optional
@@ -45,7 +47,7 @@ def makedirs_with_mode(path, mode=0o2775):
             pass
 
 
-def get_credentials(credentials_path: str) -> Tuple[gspread.Client, str]:
+def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[gspread.Client, str]:
     credentials_path = os.path.expanduser(credentials_path)
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -314,6 +316,56 @@ def remove_failed_episodes(worksheet, data_dir: str):
     return total_removed
 
 
+def extract_annotations(data_dir: str, annotation_data_dir: str, credentials_path: str = "~/Documents/credentials"):
+    data_dir = os.path.expanduser(data_dir)
+    makedirs_with_mode(f"{data_dir}/annotations")
+    annotation_data_dir = os.path.expanduser(annotation_data_dir)
+    # get tracking worksheet
+    gc = get_credentials(credentials_path)[0]
+    spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
+
+    task_processed = 0
+    # iterate through all files under annotation_data_dir,
+    for file in os.listdir(annotation_data_dir):
+        if file.endswith(".zip"):
+            # extract filename
+            filename = file[:-4]
+            if filename not in TASK_NAMES_TO_INDICES:
+                print(f"Invalid task name: {filename}")
+                continue
+            # unzip the file
+            with zipfile.ZipFile(os.path.join(annotation_data_dir, file), "r") as zip_ref:
+                zip_ref.extractall(f"{data_dir}/annotations")
+            # rename folder based on task indices
+            task_index = TASK_NAMES_TO_INDICES[filename]
+            os.rename(f"{data_dir}/annotations/{filename}", f"{data_dir}/annotations/task-{task_index:04d}")
+            # now, assert there are 200 files in the task folder
+            assert (
+                len(os.listdir(f"{data_dir}/annotations/task-{task_index:04d}")) == 200
+            ), f"Task {task_index} does not have 200 files."
+            # now, fetch all timestamp - task indices correspondance from worksheet
+            worksheet = spreadsheet.worksheet(f"{task_index} - {filename}")
+            rows = worksheet.get_all_values()[1:]  # skip header
+            for row in rows:
+                if row and row[4] == "done":
+                    instance_id, traj_id, timestamp = int(row[0]), int(row[1]), row[3]
+                    assert os.path.isfile(
+                        f"{data_dir}/annotations/task-{task_index:04d}/{filename}_{timestamp}.json"
+                    ), f"Missing annotation for {instance_id}"
+                    # rename episode
+                    os.rename(
+                        f"{data_dir}/annotations/task-{task_index:04d}/{filename}_{timestamp}.json",
+                        f"{data_dir}/annotations/task-{task_index:04d}/episode_{task_index:04d}{instance_id:03d}{traj_id:01d}.json",
+                    )
+            print(f"Finished processing task {task_index} - {filename}")
+            task_processed += 1
+            time.sleep(1)  # to avoid rate limiting
+
+    # remove __MACOSX folder
+    shutil.rmtree(f"{data_dir}/annotations/__MACOSX")
+    print(f"Finished processing {task_processed} tasks.")
+
+
 def check_leaf_folders_have_n(data_dir: str, n: int = 200):
     """
     Recursively find all leaf folders under data_dir.
@@ -475,7 +527,7 @@ def fix_permissions(root_dir: str):
                 continue
 
 
-def download_raw(credentials_path: str, max_traj_per_task: int = 200):
+def download_raw(credentials_path: str = "~/Documents/credentials", max_traj_per_task: int = 200):
     task_list = list(TASK_NAMES_TO_INDICES.keys())
     data_dir = "/vision/group/behavior/2025-challenge-rawdata"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path=credentials_path)
@@ -527,7 +579,9 @@ def is_more_than_x_hours_ago(dt_str, x, fmt="%Y-%m-%d %H:%M:%S"):
     return diff_hours > x
 
 
-def update_tracking_sheet(credentials_path: str, max_entries_per_task: Optional[int] = None):
+def update_tracking_sheet(
+    credentials_path: str = "~/Documents/credentials", max_entries_per_task: Optional[int] = None
+):
     assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")

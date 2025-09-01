@@ -348,8 +348,8 @@ def generate_info_json(
         },
         "data_path": "data/task-{episode_chunk:04d}/episode_{episode_index:08d}.parquet",
         "video_path": "videos/task-{episode_chunk:04d}/{video_key}/episode_{episode_index:08d}.mp4",
-        "annotation_path": "annotations/task-{episode_chunk:04d}/episode_{episode_index:08d}.json",
         "metainfo_path": "meta/episodes/task-{episode_chunk:04d}/episode_{episode_index:08d}.json",
+        "annotation_path": "annotations/task-{episode_chunk:04d}/episode_{episode_index:08d}.json",
         "features": {
             "observation.images.rgb.left_wrist": {
                 "dtype": "video",
