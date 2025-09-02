@@ -65,6 +65,7 @@ cd BEHAVIOR-1K
 | **New Environment** | `--new-env` | Create a new conda environment named `behavior` (requires conda) |
 | **Datasets** | `--dataset` | Download BEHAVIOR datasets (requires `--omnigibson`) |
 | **Primitives** | `--primitives` | Install OmniGibson with action primitives support |
+| **Eval** | `--eval` | Install evaluation support for OmniGibson |
 | **Development** | `--dev` | Install development dependencies |
 | **CUDA Version** | `--cuda-version X.X` | Specify CUDA version (default: 12.4) |
 | **No Conda Confirmation** | `--confirm-no-conda` | Skip confirmation prompt when not in a conda environment |
