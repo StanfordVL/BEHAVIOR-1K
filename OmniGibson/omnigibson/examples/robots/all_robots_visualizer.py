@@ -23,6 +23,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Iterate over all robots and demo their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+        if robot_name in ["BehaviorRobot"]:
+            continue
+
         # Create and import robot
         robot = robot_cls(
             name=robot_name,
@@ -56,24 +59,17 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.sim.step()
 
         # Then apply random actions for a bit
-        if robot_name not in ["BehaviorRobot"]:
+        for _ in range(10):
+            action = robot.action_space.sample() * 0.05
             for _ in range(30):
-                action_lo, action_hi = -0.1, 0.1
-                action = th.rand(robot.action_dim) * (action_hi - action_lo) + action_lo
-                if robot_name == "Tiago":
-                    tiago_lo, tiago_hi = -0.1, 0.1
-                    action[robot.base_action_idx] = (
-                        th.rand(len(robot.base_action_idx)) * (tiago_hi - tiago_lo) + tiago_lo
-                    )
-                for _ in range(10):
-                    env.step(action)
+                env.step(action)
 
         # Stop the simulator and remove the robot
         og.sim.stop()
         env.scene.remove_object(obj=robot)
 
     # Always shut down the environment cleanly at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

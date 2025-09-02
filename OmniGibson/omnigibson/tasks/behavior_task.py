@@ -85,7 +85,7 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        use_presampled_robot_pose=False,
+        use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
@@ -106,6 +106,11 @@ class BehaviorTask(BaseTask):
         else:
             # Infer activity name
             activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
+
+        # Make sure to not use presampled robot pose if we're using online object sampling
+        assert not (
+            online_object_sampling and use_presampled_robot_pose
+        ), "Cannot use presampled robot pose if online_object_sampling is True!"
 
         # Initialize relevant variables
 
@@ -451,7 +456,7 @@ class BehaviorTask(BaseTask):
         Updates the task metadata with the current instance-to-name mapping for all existing entities.
 
         Args:
-            env: The environment containing the scene to update
+            env (Environment): The environment containing the scene to update
         """
         env.scene.write_task_metadata(
             key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}

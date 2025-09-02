@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="joylo",
-    version="3.7.0-alpha",
+    version="3.7.0",
     author="Stanford University",
     description="JoyLo for OmniGibson",
     long_description=long_description,

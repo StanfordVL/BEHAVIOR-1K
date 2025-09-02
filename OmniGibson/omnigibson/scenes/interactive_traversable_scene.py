@@ -196,11 +196,11 @@ class InteractiveTraversableScene(TraversableScene):
         # Check whether this is an agent and we allow agents
         agent_ok = self.include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
-        # HACK: always load building structure
+        # TODO: always load building structures for now because walls are missing room assignments
         is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
 
         # We only load this model if all the above conditions are met
-        return is_building_structure or (not_blacklisted and whitelisted and valid_room and agent_ok)
+        return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure
 
     @property
     def seg_map(self):

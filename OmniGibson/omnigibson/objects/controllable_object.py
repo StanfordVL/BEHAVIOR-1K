@@ -545,16 +545,9 @@ class ControllableObject(BaseObject):
             action implementations.
 
         Args:
-            control (k- or n-array): control signals to deploy. This should be n-DOF length if all joints are being set,
-                or k-length (k < n) if specific indices are being set. In this case, the length of @control must
-                be the same length as @indices!
-            control_type (k- or n-array): control types for each DOF. Each entry should be one of ControlType.
-                 This should be n-DOF length if all joints are being set, or k-length (k < n) if specific
-                 indices are being set. In this case, the length of @control must be the same length as @indices!
-            indices (None or k-array): If specified, should be k (k < n) length array of specific DOF controls to deploy.
-                Default is None, which assumes that all joints are being set.
-            normalized (bool): Whether the inputted joint controls should be interpreted as normalized
-                values. Expects a single bool for the entire @control. Default is False.
+            control (n-array): control signals to deploy. This should be n-DOF length for all joints being set.
+            control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
+                 This should be n-DOF length for all joints being set.
         """
         # Run sanity check
         assert len(control) == len(control_type) == self.n_dof, (

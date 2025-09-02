@@ -80,7 +80,7 @@ class LinkBasedStateMixin(BaseObjectState):
     def requires_meta_link(cls, **kwargs):
         """
         Returns:
-            Whether an object state instantiated with constructor arguments **kwargs will require a meta link
+            bool: Whether an object state instantiated with constructor arguments **kwargs will require a meta link
                 or not
         """
         # True by default

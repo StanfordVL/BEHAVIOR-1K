@@ -76,7 +76,7 @@ Don’t forget to merge/collapse this modifier as part of the next step.
 * If a warning dialog pops up, click Yes.
 * Confirm in the **Scene Explorer** (left-hand panel) that instances of your object are still instances (check for italicized names). The collapse operation should preserve instancing if done correctly.
 
-![](image1.png) ![](image2.png) 
+![](../assets/asset_pipeline/image1.png) ![](../assets/asset_pipeline/image2.png) 
 
 ## 5\. Replace object copies with instances
 
@@ -84,7 +84,7 @@ When multiple copies of the same model exist, they should be **instances**, not 
 
 Enable **Display > Display Dependents** in the Scene Explorer (object list).
 
-![](image3.png) 
+![](../assets/asset_pipeline/image3.png) 
 
 Click on each object used multiple times. If its copies are true instances, they will also be highlighted (and likely have italicized names). If not, they are separate copies and must be replaced.
 
@@ -109,7 +109,7 @@ For each moving part:
     1.  **Prismatic:** Translate the instance copy to its fully **open** ("upper") position. Ensure movement is purely along the joint's axis.
     2.  **Revolute:** Rotate the instance copy to its fully **open** ("upper") position.
         1.  Set a temporary pivot point for the rotation using **Hierarchy > Affect Pivot Only**. Choose the pivot carefully (e.g., the hinge center) so the part rotates naturally without intersecting the fixed part.
-            ![](image4.png) 
+            ![](../assets/asset_pipeline/image4.png) 
         2.  Use the **Rotate** tool. You can often enter exact angles (e.g., 90 degrees).
         3.  **CRITICAL:** Do not apply rotations greater than 180 degrees. The pipeline interprets the shorter arc. If >180 degrees is needed, adjust the "lower" position definition or consult leads.
 
@@ -185,7 +185,7 @@ Common container types: `bag`, `box`, `bottle`, `jar`, `can`. Ask leads for othe
 Validate properties and name lights correctly.
 
 * **Type:** Must be **VrayLight**. Convert others or ask for help.
-* **Properties:** (See ![](image5.png) )
+* **Properties:** (See ![](../assets/asset_pipeline/image5.png) )
     * **Type:** Sphere, Plane, or Disc.
     * **Targeted:** MUST be **DISABLED**. Delete any associated `VrayTarget` objects.
     * **Units:** Must be **Luminous Power (lm)**. Change if needed; multiplier should auto-convert.
@@ -283,11 +283,11 @@ Requirements:
 
 * High quality (check renders).
 * **Native Format:** Must be **3ds Max** (V-Ray, Scanline, Arnold renderers okay; **NO Corona**). Verify the "NATIVE" format on the product page, not just the file format filter.
-    ![](image10.png) ![](image11.png) 
+    ![](../assets/asset_pipeline/image10.png) ![](../assets/asset_pipeline/image11.png) 
 * Affordable (Prioritize Free, soft cap $20). Ask leads if >$20.
-    ![](image12.png) 
+    ![](../assets/asset_pipeline/image12.png) 
 * **No Editorial or Branded** if possible. If unavoidable, mark `1` in Column I; you'll need to remove branding later.
-    ![](image13.png) 
+    ![](../assets/asset_pipeline/image13.png) 
 
 ## 1\. Import files Into `asset_pippeline/cad/objects`
 
