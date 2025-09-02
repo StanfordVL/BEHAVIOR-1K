@@ -126,8 +126,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # get the episodes grouped by task
         epi_by_task = defaultdict(list)
         for item in all_episodes:
-            if item["task_name"][0] in self.task_names:
-                epi_by_task[item["task_name"][0]].append(item["episode_index"])
+            if item["tasks"][0] in self.tasks:
+                epi_by_task[item["tasks"][0]].append(item["episode_index"])
         # sort and cherrypick episodes within each task
         for task, ep_indices in epi_by_task.items():
             epi_by_task[task] = sorted(ep_indices)
