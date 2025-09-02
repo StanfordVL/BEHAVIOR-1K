@@ -29,7 +29,7 @@ from omnigibson.learning.utils.obs_utils import (
     write_video,
     instance_id_to_instance,
     instance_to_bbox,
-    OBS_LOADER_MAP,
+    rgbd_vid_to_pcd,
 )
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
@@ -542,128 +542,6 @@ def rgbd_gt_to_pcd(
                 fused_pcd_dset[i : i + batch_size] = pcd.cpu()
                 if process_seg:
                     pcd_semantic_dset[i : i + batch_size] = seg.cpu()
-
-    log.info("Point cloud data saved!")
-
-
-def rgbd_vid_to_pcd(
-    data_folder: str,
-    task_id: int,
-    demo_id: int,
-    episode_id: int,
-    robot_camera_names: Dict[str, str] = ROBOT_CAMERA_NAMES["R1Pro"],
-    downsample_ratio: int = 4,
-    pcd_range: Tuple[float, float, float, float, float, float] = (
-        -0.2,
-        1.0,
-        -1.0,
-        1.0,
-        -0.2,
-        1.5,
-    ),  # x_min, x_max, y_min, y_max, z_min, z_max
-    pcd_num_points: int = 4096,
-    process_seg: bool = False,
-    batch_size: int = 500,
-    use_fps: bool = False,
-):
-    """
-    Generate point cloud data from compressed RGBD data (mp4) in the specified task folder.
-    Args:
-        data_folder (str): Path to the data folder containing RGBD data.
-        task_id (int): Task ID for the task being processed.
-        demo_id (int): Demo ID for the episode being processed.
-        episode_id (int): Episode ID for the episode being processed.
-        robot_camera_names (dict): Dict of camera names to process.
-        downsample_ratio (int): Downsample ratio for the camera resolution.
-        pcd_range (tuple): Range of the point cloud.
-        pcd_num_points (int): Number of points to sample from the point cloud.
-        process_seg (bool): Whether to process the segmentation map.
-        batch_size (int): Number of frames to process in each batch.
-        use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
-    """
-    log.info(f"Generating point cloud data from RGBD for {demo_id} in {data_folder}")
-    output_dir = os.path.join(data_folder, "pcd_vid", f"task-{task_id:04d}")
-    makedirs_with_mode(output_dir)
-
-    # create a new hdf5 file to store the point cloud data
-    with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
-        in_f = pd.read_parquet(
-            f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet"
-        )
-        cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
-        data_size = cam_rel_poses.shape[0]
-        fused_pcd_dset = out_f.create_dataset(
-            f"data/demo_{episode_id}/robot_r1::fused_pcd",
-            shape=(data_size, pcd_num_points, 6),
-            compression="lzf",
-        )
-        if process_seg:
-            pcd_semantic_dset = out_f.create_dataset(
-                f"data/demo_{episode_id}/robot_r1::pcd_semantic",
-                shape=(data_size, pcd_num_points),
-                compression="lzf",
-            )
-        # get observation loaders
-        obs_loaders = {}
-        for camera_id, robot_camera_name in robot_camera_names.items():
-            resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
-            keys = ["rgb", "depth_linear"]
-            if process_seg:
-                keys.append("seg_semantic_id")
-            for key in keys:
-                kwargs = {}
-                # ["robot_r1::robot_r1:zed_link:Camera:0::unique_ins_ids"]
-                if key == "seg_semantic_id":
-                    with open(
-                        f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}/episode_{demo_id:08d}.json"
-                    ) as f:
-                        kwargs["id_list"] = th.tensor(json.load(f)[f"{robot_camera_name}::unique_ins_ids"])
-                obs_loaders[f"{robot_camera_name}::{key}"] = iter(
-                    OBS_LOADER_MAP[key](
-                        data_path=f"{data_folder}/2025-challenge-demos",
-                        task_id=task_id,
-                        demo_id=f"{demo_id:08d}",
-                        camera_id=camera_id,
-                        output_size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
-                        batch_size=batch_size,
-                        stride=batch_size,
-                        **kwargs,
-                    )
-                )
-
-        # We batch process every batch_size frames
-        for i in range(0, data_size, batch_size):
-            log.info(f"Processing batch {i} of {data_size}...")
-            obs = dict()  # to store rgbd and pass into process_fused_point_cloud
-            obs["cam_rel_poses"] = cam_rel_poses[i : i + batch_size]
-            # get all camera intrinsics
-            camera_intrinsics = {}
-            for camera_id, robot_camera_name in robot_camera_names.items():
-                # Calculate the downsampled camera intrinsics
-                camera_intrinsics[robot_camera_name] = (
-                    th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id]) / downsample_ratio
-                )
-                camera_intrinsics[robot_camera_name][-1, -1] = 1.0
-                obs[f"{robot_camera_name}::rgb"] = next(obs_loaders[f"{robot_camera_name}::rgb"]).movedim(-3, -1)
-                obs[f"{robot_camera_name}::depth_linear"] = next(obs_loaders[f"{robot_camera_name}::depth_linear"])
-                if process_seg:
-                    obs[f"{robot_camera_name}::seg_semantic"] = next(
-                        obs_loaders[f"{robot_camera_name}::seg_semantic_id"]
-                    )
-            # process the fused point cloud
-            pcd, seg = process_fused_point_cloud(
-                obs=obs,
-                camera_intrinsics=camera_intrinsics,
-                pcd_range=pcd_range,
-                pcd_num_points=pcd_num_points,
-                use_fps=use_fps,
-                process_seg=process_seg,
-                verbose=True,
-            )
-            log.info("Saving point cloud data...")
-            fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-            if process_seg:
-                pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     log.info("Point cloud data saved!")
 
