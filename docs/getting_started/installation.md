@@ -70,7 +70,7 @@ Choose your installation method:
 
                 ```powershell
                 # Full installation with all components
-                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Joylo -Dataset -Eval -Primitives
+                .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset -Eval -Primitives
 
                 # Core components only (without teleoperation)
                 .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset
