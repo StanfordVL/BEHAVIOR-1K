@@ -629,7 +629,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--download_omnigibson_robot_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_behavior_1k_assets", action="store_true", help="download BEHAVIOR-1K Dataset")
-    parser.add_argument("--download_2025_challenge_task_instances", action="store_true", help="download 2025 BEHAVIOR Challenge Tasks dataset")
+    parser.add_argument(
+        "--download_2025_challenge_task_instances",
+        action="store_true",
+        help="download 2025 BEHAVIOR Challenge Tasks dataset",
+    )
     parser.add_argument("--accept_license", action="store_true", help="pre-accept the BEHAVIOR-1K dataset license")
     args = parser.parse_args()
 
