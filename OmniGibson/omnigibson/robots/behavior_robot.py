@@ -549,7 +549,9 @@ class BRPart(ABC):
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
                 relative_prim_path=f"/{gh_name}",
-                usd_path=os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/behavior_robot/usd/{gh_name}.usd"),
+                usd_path=os.path.join(
+                    get_dataset_path("omnigibson-robot-assets"), f"models/behavior_robot/usd/{gh_name}.usd"
+                ),
                 name=gh_name,
                 scale=0.001,
                 visible=False,

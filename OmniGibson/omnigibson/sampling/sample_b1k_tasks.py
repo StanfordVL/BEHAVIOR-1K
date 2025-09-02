@@ -226,7 +226,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         worksheet.update_acell(f"X{scene_row}", args.thread_id)
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json")
+    default_scene_fpath = os.path.join(
+        get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json"
+    )
     if not os.path.exists(default_scene_fpath):
         create_stable_scene_json(scene_model=args.scene_model)
 

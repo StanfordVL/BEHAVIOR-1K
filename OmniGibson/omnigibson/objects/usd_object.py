@@ -114,7 +114,7 @@ class USDObject(StatefulObject):
             # TODO: Undo this when we switch to Isaac Sim 5.0
             # On Isaac 4.5, if you add a USDZ reference, the textures don't load correctly.
             # So for now we unpack the USDZ and load the USD instead.
-            with zipfile.ZipFile(usdz_path, 'r') as zip_ref:
+            with zipfile.ZipFile(usdz_path, "r") as zip_ref:
                 zip_ref.extractall(tempdir_path)
             os.unlink(usdz_path)
 
@@ -155,7 +155,7 @@ class USDObject(StatefulObject):
             # TODO: Undo this when we switch to Isaac Sim 5.0
             # On Isaac 4.5, if you add a USDZ reference, the textures don't load correctly.
             # So for now we unpack the USDZ and load the USD instead.
-            with zipfile.ZipFile(usdz_path, 'r') as zip_ref:
+            with zipfile.ZipFile(usdz_path, "r") as zip_ref:
                 zip_ref.extractall(tempdir_path)
             os.unlink(usdz_path)
 

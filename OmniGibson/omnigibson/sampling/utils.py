@@ -406,7 +406,9 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     env.scene.update_initial_file()
 
     # Save this as a stable file
-    path = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json")
+    path = os.path.join(
+        get_dataset_path("behavior-1k-assets"), "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json"
+    )
     og.sim.save(json_paths=[path])
 
     # record this feedback if requested

@@ -650,7 +650,9 @@ def _launch_simulator(*args, **kwargs):
             )
             self._skybox.load(None)
             self._skybox.color = (1.07, 0.85, 0.61)
-            self._skybox.texture_file_path = os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/background/sky.jpg")
+            self._skybox.texture_file_path = os.path.join(
+                get_dataset_path("omnigibson-robot-assets"), "models/background/sky.jpg"
+            )
 
         def get_sim_step_dt(self):
             """

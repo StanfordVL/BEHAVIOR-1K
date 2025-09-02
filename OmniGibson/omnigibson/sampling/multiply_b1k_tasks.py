@@ -92,11 +92,17 @@ def main():
 
     # Define where to save instances
     save_dir = os.path.join(
-        get_dataset_path("behavior-1k-assets"), "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{args.activity}_instances"
+        get_dataset_path("behavior-1k-assets"),
+        "scenes",
+        env.task.scene_name,
+        "json",
+        f"{env.task.scene_name}_task_{args.activity}_instances",
     )
 
     # If we want to create a stable scene config, do that now
-    default_scene_fpath = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json")
+    default_scene_fpath = os.path.join(
+        get_dataset_path("behavior-1k-assets"), "scenes", args.scene_model, "json", f"{args.scene_model}_stable.json"
+    )
     # Get the default scene instance
     assert os.path.exists(default_scene_fpath), "Did not find default stable scene json!"
     with open(default_scene_fpath, "r") as f:

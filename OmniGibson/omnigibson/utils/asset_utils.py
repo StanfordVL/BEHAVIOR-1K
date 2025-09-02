@@ -58,8 +58,10 @@ def is_dot_file(p):
 def get_dataset_path(dataset_name):
     return os.path.join(gm.DATA_PATH, dataset_name)
 
+
 def get_key_path():
     return os.path.join(gm.DATA_PATH, "omnigibson.key")
+
 
 def get_avg_category_specs():
     """
@@ -105,7 +107,9 @@ def get_available_behavior_1k_scenes():
     """
     behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
     behavior_1k_scenes_path = os.path.join(behavior_1k_assets_path, "scenes")
-    available_behavior_1k_scenes = sorted([f for f in os.listdir(behavior_1k_scenes_path) if (not is_dot_file(f) and f != "background")])
+    available_behavior_1k_scenes = sorted(
+        [f for f in os.listdir(behavior_1k_scenes_path) if (not is_dot_file(f) and f != "background")]
+    )
     return available_behavior_1k_scenes
 
 
@@ -326,7 +330,9 @@ def get_omnigibson_robot_asset_git_hash():
     """
     try:
         git_hash = subprocess.check_output(
-            ["git", "-C", get_dataset_path("omnigibson-robot-assets"), "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
+            ["git", "-C", get_dataset_path("omnigibson-robot-assets"), "rev-parse", "HEAD"],
+            shell=False,
+            stderr=subprocess.DEVNULL,
         )
         return git_hash.decode("utf-8").strip()
     except subprocess.CalledProcessError:
@@ -449,7 +455,12 @@ def download_omnigibson_robot_assets():
     if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
         print("Assets already downloaded.")
     else:
-        snapshot_download(repo_id="behavior-1k/omnigibson-robot-assets", repo_type="dataset", local_dir=get_dataset_path("omnigibson-robot-assets"))
+        snapshot_download(
+            repo_id="behavior-1k/omnigibson-robot-assets",
+            repo_type="dataset",
+            local_dir=get_dataset_path("omnigibson-robot-assets"),
+        )
+
 
 def print_user_agreement():
     print(
@@ -557,7 +568,11 @@ def download_behavior_1k_assets(accept_license=False):
     if os.path.exists(get_dataset_path("behavior-1k-assets")):
         print("BEHAVIOR-1K dataset already installed.")
     else:
-        snapshot_download(repo_id="behavior-1k/behavior-1k-assets", repo_type="dataset", local_dir=get_dataset_path("behavior-1k-assets"))
+        snapshot_download(
+            repo_id="behavior-1k/behavior-1k-assets",
+            repo_type="dataset",
+            local_dir=get_dataset_path("behavior-1k-assets"),
+        )
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):

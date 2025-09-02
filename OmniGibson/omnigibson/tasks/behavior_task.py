@@ -617,7 +617,11 @@ class BehaviorTask(BaseTask):
                 via env.scene.save()
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
-        save_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", self.scene_name, "json") if save_dir is None else save_dir
+        save_dir = (
+            os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", self.scene_name, "json")
+            if save_dir is None
+            else save_dir
+        )
         assert self.scene_name is not None, "Scene name must be set in order to save task"
         fname = self.get_cached_activity_scene_filename(
             scene_model=self.scene_name,

@@ -1273,7 +1273,8 @@ class ManipulationRobot(BaseRobot):
         model = self.model_name.lower()
         return {
             emb_sel: os.path.join(
-                get_dataset_path("omnigibson-robot-assets"), f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml"
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml",
             )
             for emb_sel in CuRoboEmbodimentSelection
         }
