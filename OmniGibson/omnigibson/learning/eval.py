@@ -239,7 +239,7 @@ class Evaluator:
             activity_instance_id=instance_id,
         )
         tro_file_path = os.path.join(
-            get_task_instance_path(),
+            get_task_instance_path(scene_model),
             f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
         )
         assert os.path.exists(

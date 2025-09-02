@@ -866,7 +866,7 @@ class OGRobotServer:
                 activity_definition_id=self.env.task.activity_definition_id,
                 activity_instance_id=self.instance_id,
             )
-            tro_file_path = os.path.join(get_task_instance_path(), f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json")
+            tro_file_path = os.path.join(get_task_instance_path(scene_model), f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json")
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):
                 print(f"Task {self.env.task.activity_name} instance id: {self.instance_id} does not exist")
