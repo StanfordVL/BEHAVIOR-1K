@@ -198,16 +198,25 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         We do this instead of filename patterns to speed up pattern checking and download speed.
         """
         allow_patterns = []
-        for task in self.task_indices:
-            allow_patterns.append(f"**/task-{task:04d}/**")
-        for camera in self.meta.camera_names:
+        if set(self.task_indices) != set(TASK_NAMES_TO_INDICES.values()):
+            for task in self.task_indices:
+                allow_patterns.append(f"**/task-{task:04d}/**")
+        if len(self.meta.modalities) != 3:
             for modality in self.meta.modalities:
-                allow_patterns.append(f"**/observation.images.{modality}.{camera}/**")
+                if len(self.meta.camera_names) != 3:
+                    for camera in self.meta.camera_names:
+                        allow_patterns.append(f"**/observation.images.{modality}.{camera}/**")
+                else:
+                    allow_patterns.append(f"**/observation.images.{modality}.*/**")
+        elif len(self.meta.camera_names) != 3:
+            for camera in self.meta.camera_names:
+                allow_patterns.append(f"**/observation.images.*.{camera}/**")
         ignore_patterns = []
         if not download_videos:
             ignore_patterns.append("videos/")
-        for task in set(TASK_NAMES_TO_INDICES.values()).difference(self.task_indices):
-            ignore_patterns.append(f"**/task-{task:04d}/**")
+        if set(self.task_indices) != set(TASK_NAMES_TO_INDICES.values()):
+            for task in set(TASK_NAMES_TO_INDICES.values()).difference(self.task_indices):
+                ignore_patterns.append(f"**/task-{task:04d}/**")
 
         allow_patterns = None if allow_patterns == [] else allow_patterns
         ignore_patterns = None if ignore_patterns == [] else ignore_patterns
