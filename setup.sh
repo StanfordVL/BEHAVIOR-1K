@@ -407,6 +407,7 @@ if [ "$EVAL" = true ]; then
     pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
     # install av and ffmpeg
     conda install av "numpy<2" -c conda-forge -y
+fi
     
 # Install asset pipeline
 if [ "$ASSET_PIPELINE" = true ]; then
