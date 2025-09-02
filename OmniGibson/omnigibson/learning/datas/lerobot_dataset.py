@@ -100,6 +100,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        if modalities is None:
+            modalities = ["rgb", "depth", "seg_instance_id"]
         if "depth" in modalities:
             assert self.video_backend == "pyav", (
                 "Depth videos can only be decoded with the 'pyav' backend. "
