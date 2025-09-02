@@ -19,13 +19,15 @@ from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 from urllib.parse import urlparse
 
-VALID_USER_NAME = ["wsai", "yinhang", "svl", "wpai", "qinengw", "wsai-yfj", "jdw"]
+VALID_USER_NAME = ["wsai", "yinhang", "svl", "wsai-yfj", "wpai", "qinengw", "jdw"]
 
 
-def makedirs_with_mode(path, mode=0o2775):
+def makedirs_with_mode(path, mode=0o2775) -> None:
     """
     Recursively create directories with specified mode applied to all newly created dirs.
-    Existing directories keep their current permissions.
+    Args:
+        path (str): The directory path to create.
+        mode (int): The mode to apply to newly created directories.
     """
     # Normalize path
     path = os.path.abspath(path)
@@ -47,7 +49,14 @@ def makedirs_with_mode(path, mode=0o2775):
             pass
 
 
-def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[gspread.Client, str]:
+def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[gspread.Client, dict, str]:
+    """
+    [Internal use only] Get Google Sheets and Lightwheel API credentials.
+    Args:
+        credentials_path (str): Path to the credentials directory.
+    Returns:
+        Tuple[gspread.Client, dict, str]: Google Sheets client and Lightwheel API credentials and token.
+    """
     credentials_path = os.path.expanduser(credentials_path)
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -70,7 +79,14 @@ def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[
     return gc, lightwheel_api_credentials, lw_token
 
 
-def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
+def update_google_sheet(credentials_path: str, task_name: str, row_idx: int) -> None:
+    """
+    [Internal use only] update internal data replay tracking sheet.
+    Args:
+        credentials_path (str): Path to the credentials directory.
+        task_name (str): Name of the task to update.
+        row_idx (int): Row index to update.
+    """
     assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -93,7 +109,7 @@ def update_google_sheet(credentials_path: str, task_name: str, row_idx: int):
 
 def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict, task_name: str) -> Tuple[int, str]:
     """
-    Given task name, fetch all instance IDs for that task.
+    [Internal use only] Given task name, fetch all instance IDs for that task.
     Args:
         lw_token (str): Lightwheel API token.
         lightwheel_api_credentials (dict): Lightwheel API credentials.
@@ -128,6 +144,15 @@ def get_all_instance_id_for_task(lw_token: str, lightwheel_api_credentials: dict
 
 
 def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict, lw_token: str) -> List[str]:
+    """
+    [Internal use only] Given a list of UUIDs, fetch their download URLs from Lightwheel API.
+    Args:
+        uuids (List[str]): List of version UUIDs.
+        lightwheel_api_credentials (dict): Lightwheel API credentials.
+        lw_token (str): Lightwheel API token.
+    Returns:
+        List[str]: List of download URLs.
+    """
     header = {
         "UserName": lightwheel_api_credentials["username"],
         "Authorization": lw_token,
@@ -142,6 +167,13 @@ def get_urls_from_lightwheel(uuids: List[str], lightwheel_api_credentials: dict,
 
 
 def get_timestamp_from_lightwheel(urls: List[str]) -> List[str]:
+    """
+    [Internal use only] Given a list of URLs, fetch their timestamps (on the filename) from Lightwheel API.
+    Args:
+        urls (List[str]): List of download URLs.
+    Returns:
+        List[str]: List of timestamps.
+    """
     timestamps = []
     for url in tqdm(urls):
         resp = requests.head(url, allow_redirects=True)
@@ -165,7 +197,16 @@ def download_and_extract_data(
     task_name: str,
     instance_id: int,
     traj_id: int,
-):
+) -> None:
+    """
+    [Internal use only] Download and extract data from a Lightwheel API URL.
+    Args:
+        url (str): The download URL.
+        data_dir (str): The directory to save the data.
+        task_name (str): The name of the task.
+        instance_id (int): The instance ID.
+        traj_id (int): The trajectory ID.
+    """
     makedirs_with_mode(f"{data_dir}/2025-challenge-rawdata/task-{TASK_NAMES_TO_INDICES[task_name]:04d}")
     # Download zip file
     response = requests.get(url)
@@ -199,7 +240,7 @@ def download_and_extract_data(
     os.rmdir(f"{data_dir}/2025-challenge-rawdata/{base_name}")
 
 
-def reorder_sheet(worksheet):
+def reorder_sheet(worksheet) -> None:
     """
     Reorder rows in the worksheet based on column B and column A.
 
@@ -244,7 +285,7 @@ def reorder_sheet(worksheet):
     time.sleep(1)  # to avoid rate limiting
 
 
-def remove_failed_episodes(worksheet, data_dir: str):
+def remove_failed_episodes(worksheet, data_dir: str) -> None:
     """
     For the given worksheet and data_dir:
     0. Ignore the first row (header)
@@ -316,7 +357,12 @@ def remove_failed_episodes(worksheet, data_dir: str):
     return total_removed
 
 
-def extract_annotations(data_dir: str, annotation_data_dir: str, credentials_path: str = "~/Documents/credentials"):
+def extract_annotations(
+    data_dir: str, annotation_data_dir: str, credentials_path: str = "~/Documents/credentials"
+) -> None:
+    """
+    Extract annotations from the annotation data directory and store in the data directory.
+    """
     data_dir = os.path.expanduser(data_dir)
     makedirs_with_mode(f"{data_dir}/annotations")
     annotation_data_dir = os.path.expanduser(annotation_data_dir)
@@ -366,33 +412,41 @@ def extract_annotations(data_dir: str, annotation_data_dir: str, credentials_pat
     print(f"Finished processing {task_processed} tasks.")
 
 
-def check_leaf_folders_have_n(data_dir: str, n: int = 200):
+def check_leaf_folders_have_n(data_dir: str, n: int = 200) -> Tuple[dict, int]:
     """
     Recursively find all leaf folders under data_dir.
     A leaf folder is one that contains only files (no subdirectories).
     For each leaf folder, check it has exactly n files.
-    Prints results and returns a dict {folder_path: count}.
+    Args:
+        data_dir (str): The root directory to start searching.
+        n (int): The exact number of files each leaf folder should have.
+    Returns:
+        Tuple[dict, int]: A tuple containing:
+            - A dictionary mapping leaf folder paths to their file counts.
+            - The total file count across all leaf folders.
     """
+    data_dir = os.path.expanduser(data_dir)
     results = {}
     total_count = 0
     for root, dirs, files in os.walk(data_dir):
+        # ignore hidden folders
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
         # leaf folder: contains files but no subdirs
         if not dirs:
-            if "Trash-1000" not in root and ".cache" not in root:  # ignore folders
-                count = len([f for f in files if os.path.isfile(os.path.join(root, f))])
-                results[root] = count
-                total_count += count
-                if count == n:
-                    print(f"✅ {root} has exactly {n} files.")
-                else:
-                    raise Exception(f"❌ {root} has {count} files (expected {n}).")
+            count = len([f for f in files if os.path.isfile(os.path.join(root, f))])
+            results[root] = count
+            total_count += count
+            if count == n:
+                print(f"✅ {root} has exactly {n} files.")
+            else:
+                raise Exception(f"❌ {root} has {count} files (expected {n}).")
     print(f"Total files across all leaf folders: {total_count}")
     return results, total_count
 
 
-def update_sheet_counts(worksheet):
+def update_sheet_counts(worksheet) -> None:
     """
-    Updates the worksheet:
+    [Internal use only] Updates the worksheet:
     1. For rows with B != 0:
        - E = "ignored"
        - F = ""
@@ -432,7 +486,7 @@ def update_sheet_counts(worksheet):
     time.sleep(1)  # to avoid rate limiting
 
 
-def assign_test_instances(task_ws, ws_misc, misc_values):
+def assign_test_instances(task_ws, ws_misc, misc_values) -> None:
     """
     For a given task worksheet and the misc spreadsheet:
     1. Get task_id and task_name from worksheet title "{id} - {name}".
@@ -581,7 +635,13 @@ def is_more_than_x_hours_ago(dt_str, x, fmt="%Y-%m-%d %H:%M:%S"):
 
 def update_tracking_sheet(
     credentials_path: str = "~/Documents/credentials", max_entries_per_task: Optional[int] = None
-):
+) -> None:
+    """
+    [Internal use only] Updates the tracking sheet with the latest information from lightwheel.
+    Args:
+        credentials_path (str): The path to the credentials file.
+        max_entries_per_task (Optional[int]): The maximum number of entries to process per task.
+    """
     assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")

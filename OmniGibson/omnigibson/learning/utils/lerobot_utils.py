@@ -340,8 +340,8 @@ def generate_info_json(
         "total_episodes": total_episodes,
         "total_frames": total_frames,
         "total_tasks": total_tasks,
-        "total_videos": total_episodes * 6,
-        "chunks_size": 10000,
+        "total_videos": total_episodes * 9,
+        "chunks_size": 200,
         "fps": fps,
         "splits": {
             "train": "0:" + str(total_episodes),
@@ -444,7 +444,7 @@ def generate_info_json(
             "observation.images.seg_instance_id.left_wrist": {
                 "dtype": "video",
                 "shape": [480, 480, 3],
-                "names": ["height", "width", "seg_instance_id"],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -459,7 +459,7 @@ def generate_info_json(
             "observation.images.seg_instance_id.right_wrist": {
                 "dtype": "video",
                 "shape": [480, 480, 3],
-                "names": ["height", "width", "seg_instance_id"],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 480,
@@ -474,7 +474,7 @@ def generate_info_json(
             "observation.images.seg_instance_id.head": {
                 "dtype": "video",
                 "shape": [720, 720, 3],
-                "names": ["height", "width", "seg_instance_id"],
+                "names": ["height", "width", "rgb"],
                 "info": {
                     "video.fps": 30.0,
                     "video.height": 720,
