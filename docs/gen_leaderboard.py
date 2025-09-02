@@ -73,7 +73,7 @@ def generate_combined_leaderboard():
         # Submission instructions
         fd.write("## How to Submit\n\n")
         fd.write("To submit your results to the leaderboard:\n\n")
-        fd.write("1. **Submit self-reported scores** through this [google form](#)\n")
+        fd.write("1. **Submit self-reported scores** through this [google form](https://forms.gle/54tVqi5zs3ANGutn7)\n")
         fd.write("2. **Wait for review** - once approved, your results will appear on the leaderboard!\n\n")
 
 # Generate the leaderboard when this module is imported during mkdocs build
