@@ -4,6 +4,7 @@ import os
 import tempfile
 import zipfile
 
+from OmniGibson.omnigibson import lazy
 import omnigibson as og
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.asset_utils import decrypt_file
@@ -122,6 +123,17 @@ class USDObject(StatefulObject):
             usd_files = list(glob.glob(os.path.join(tempdir_path, "*.usd")))
             assert len(usd_files) == 1, f"Expected exactly one USD file in {tempdir_path}, found {usd_files}"
             usd_path = usd_files[0]
+
+            # Patch the weird MDL 0 prefix issue.
+            stage = lazy.pxr.Usd.Stage.Open(usd_path)
+            def _update_path(asset_path):
+                if asset_path.endswith(".mdl"):
+                    return os.path.basename(asset_path)
+                return asset_path
+
+            lazy.pxr.UsdUtils.ModifyAssetPaths(stage.GetRootLayer(), _update_path)
+            stage.Save()
+            del stage
         else:
             self.check_hash(usd_path)
 
@@ -163,6 +175,17 @@ class USDObject(StatefulObject):
             usd_files = list(glob.glob(os.path.join(tempdir_path, "*.usd")))
             assert len(usd_files) == 1, f"Expected exactly one USD file in {tempdir_path}, found {usd_files}"
             usd_path = usd_files[0]
+
+            # Patch the weird MDL 0 prefix issue.
+            stage = lazy.pxr.Usd.Stage.Open(usd_path)
+            def _update_path(asset_path):
+                if asset_path.endswith(".mdl"):
+                    return os.path.basename(asset_path)
+                return asset_path
+
+            lazy.pxr.UsdUtils.ModifyAssetPaths(stage.GetRootLayer(), _update_path)
+            stage.Save()
+            del stage
         else:
             self.check_hash(usd_path)
 
