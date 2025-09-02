@@ -13,9 +13,7 @@ import traceback
 from av.container import Container
 from av.stream import Stream
 from gello.robots.sim_robot.og_teleop_utils import (
-    augment_rooms,
     load_available_tasks,
-    get_task_relevant_room_types,
     generate_robot_config,
 )
 from hydra.utils import instantiate
@@ -110,9 +108,6 @@ class Evaluator:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
         cfg["task"]["termination_config"]["max_steps"] = self.cfg.max_steps
         cfg["task"]["include_obs"] = self.cfg.use_task_info
-        relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
-        relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
-        cfg["scene"]["load_room_types"] = relevant_rooms
         env = og.Environment(configs=cfg)
         # instantiate env wrapper
         env = instantiate(env_wrapper, env=env)

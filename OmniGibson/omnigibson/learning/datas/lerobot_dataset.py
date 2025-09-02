@@ -126,13 +126,13 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # get the episodes grouped by task
         epi_by_task = defaultdict(list)
         for item in all_episodes:
-            if item["tasks"][0] in self.meta.tasks:
-                epi_by_task[item["tasks"][0]].append(item["episode_index"])
+            if item["episode_index"] // 1e4 in self.meta.tasks:
+                epi_by_task[item["episode_index"] // 1e4].append(item["episode_index"])
         # sort and cherrypick episodes within each task
-        for task, ep_indices in epi_by_task.items():
-            epi_by_task[task] = sorted(ep_indices)
+        for task_id, ep_indices in epi_by_task.items():
+            epi_by_task[task_id] = sorted(ep_indices)
             if episodes is not None:
-                epi_by_task[task] = [epi_by_task[task][i] for i in episodes if i < len(epi_by_task[task])]
+                epi_by_task[task_id] = [epi_by_task[task_id][i] for i in episodes if i < len(epi_by_task[task_id])]
         # now put episodes back together
         self.episodes = sorted([ep for eps in epi_by_task.values() for ep in eps])
         # record the positional index of each episode index within self.episodes
@@ -350,7 +350,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         return {
             item["episode_index"]: item
             for item in sorted(episodes, key=lambda x: x["episode_index"])
-            if item["tasks"][0] in self.tasks
+            if item["episode_index"] // 1e4 in self.tasks
         }
 
     def load_stats(self, local_dir: Path) -> dict[str, dict[str, np.ndarray]]:
