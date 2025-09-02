@@ -6,9 +6,10 @@ HELP=false
 NEW_ENV=false
 OMNIGIBSON=false
 BDDL=false
-TELEOP=false
+JOYLO=false
 DATASET=false
 PRIMITIVES=false
+EVAL=false
 ASSET_PIPELINE=false
 DEV=false
 CUDA_VERSION="12.4"
@@ -25,9 +26,10 @@ while [[ $# -gt 0 ]]; do
         --new-env) NEW_ENV=true; shift ;;
         --omnigibson) OMNIGIBSON=true; shift ;;
         --bddl) BDDL=true; shift ;;
-        --teleop) TELEOP=true; shift ;;
+        --joylo) JOYLO=true; shift ;;
         --dataset) DATASET=true; shift ;;
         --primitives) PRIMITIVES=true; shift ;;
+        --eval) EVAL=true; shift ;;
         --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
         --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
@@ -49,9 +51,10 @@ Options:
   --new-env               Create a new conda environment 'behavior'
   --omnigibson            Install OmniGibson (core physics simulator)
   --bddl                  Install BDDL (Behavior Domain Definition Language)
-  --teleop                Install JoyLo (teleoperation interface)
+  --joylo                 Install JoyLo (teleoperation interface)
   --dataset               Download BEHAVIOR datasets (requires --omnigibson)
   --primitives            Install OmniGibson with primitives support
+  --eval                  Install evaluation dependencies
   --asset-pipeline        Install the 3D scene and object asset pipeline
   --dev                   Install development dependencies
   --cuda-version VERSION  Specify CUDA version (default: 12.4)
@@ -60,7 +63,7 @@ Options:
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
   --confirm-no-conda      Skip confirmation prompt when not in a conda environment
 
-Example: ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+Example: ./setup.sh --new-env --omnigibson --bddl --joylo --dataset
 Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 EOF
     exit 0
@@ -70,6 +73,7 @@ fi
 [ "$OMNIGIBSON" = true ] && [ "$BDDL" = false ] && { echo "ERROR: --omnigibson requires --bddl"; exit 1; }
 [ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --dataset requires --omnigibson"; exit 1; }
 [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --primitives requires --omnigibson"; exit 1; }
+[ "$EVAL" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --eval requires --omnigibson"; exit 1; }
 [ "$NEW_ENV" = true ] && [ "$CONFIRM_NO_CONDA" = true ] && { echo "ERROR: --new-env and --confirm-no-conda are mutually exclusive"; exit 1; }
 
 WORKDIR=$(pwd)
@@ -225,7 +229,6 @@ if [ "$NEW_ENV" = true ]; then
     CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.6 to 126
     
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
-    
     echo "✓ PyTorch installation completed"
 fi
 # Install BDDL
@@ -253,10 +256,20 @@ if [ "$OMNIGIBSON" = true ]; then
     
     # Build extras
     EXTRAS=""
-    [ "$DEV" = true ] && [ "$PRIMITIVES" = true ] && EXTRAS="[dev,primitives]"
-    [ "$DEV" = true ] && [ "$PRIMITIVES" = false ] && EXTRAS="[dev]"
-    [ "$DEV" = false ] && [ "$PRIMITIVES" = true ] && EXTRAS="[primitives]"
-    
+    if [ "$DEV" = true ]; then
+        EXTRAS="${EXTRAS}dev,"
+    fi
+    if [ "$PRIMITIVES" = true ]; then
+        EXTRAS="${EXTRAS}primitives,"
+    fi
+    if [ "$EVAL" = true ]; then
+        EXTRAS="${EXTRAS}eval,"
+    fi
+    # Remove trailing comma, if any, and add brackets only if EXTRAS is not empty
+    if [ -n "$EXTRAS" ]; then
+        EXTRAS="[${EXTRAS%,}]"
+    fi
+
     pip install -e "$WORKDIR/OmniGibson$EXTRAS"
 
     # Install pre-commit for dev setup
@@ -382,12 +395,20 @@ if [ "$OMNIGIBSON" = true ]; then
 fi
 
 # Install JoyLo
-if [ "$TELEOP" = true ]; then
+if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
     pip install -e "$WORKDIR/joylo"
 fi
 
+if [ "$EVAL" = true ]; then
+    # get torch version via pip and install corresponding torch-cluster
+    TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
+    pip install torch-cluster -f https://data.pyg.org/whl/torch-${TORCH_VERSION}.html
+    # install av and ffmpeg
+    conda install av "numpy<2" -c conda-forge -y
+fi
+    
 # Install asset pipeline
 if [ "$ASSET_PIPELINE" = true ]; then
     echo "Installing asset pipeline..."
@@ -400,7 +421,9 @@ echo "=== Installation Complete! ==="
 if [ "$NEW_ENV" = true ]; then echo "✓ Created conda environment 'behavior'"; fi
 if [ "$OMNIGIBSON" = true ]; then echo "✓ Installed OmniGibson + Isaac Sim"; fi
 if [ "$BDDL" = true ]; then echo "✓ Installed BDDL"; fi
-if [ "$TELEOP" = true ]; then echo "✓ Installed JoyLo"; fi
+if [ "$JOYLO" = true ]; then echo "✓ Installed JoyLo"; fi
+if [ "$PRIMITIVES" = true ]; then echo "✓ Installed OmniGibson with primitives support"; fi
+if [ "$EVAL" = true ]; then echo "✓ Installed evaluation support"; fi
 if [ "$DATASET" = true ]; then echo "✓ Downloaded datasets"; fi
 echo ""
 if [ "$NEW_ENV" = true ]; then echo "To activate: conda activate behavior"; fi

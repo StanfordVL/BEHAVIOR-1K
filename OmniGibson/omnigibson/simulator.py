@@ -282,7 +282,7 @@ def _launch_simulator(*args, **kwargs):
 
         def __init__(
             self,
-            gravity=9.81,
+            gravity=9.81 if not gm.VISUAL_ONLY else 0.0,
             physics_dt=None,
             rendering_dt=None,
             sim_step_dt=None,

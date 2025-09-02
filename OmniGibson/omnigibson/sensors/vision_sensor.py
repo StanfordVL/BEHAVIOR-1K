@@ -50,11 +50,11 @@ class VisionSensor(BaseSensor):
     Args:
         relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
-        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb".
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb". "all" will enable all
             Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
                 {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
-                bbox_2d_loose, bbox_3d, camera}
+                bbox_2d_loose, bbox_3d, camera_params}
         enabled (bool): Whether this sensor should be enabled by default
         noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -171,7 +171,10 @@ class VisionSensor(BaseSensor):
             self.all_modalities
         ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
-        modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
+        if modalities == "all":
+            modalities = self.all_modalities
+        else:
+            modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
 
         # 1) seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
         # 2) bounding box observations require seg_semantic to be enabled (for remapping bounding box semantic IDs)

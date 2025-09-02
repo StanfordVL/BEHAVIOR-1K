@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch as th
 
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors import (
@@ -346,7 +346,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
         ori = T.quat2euler(quat)
 
-        ori_2d = T.z_angle_from_quat(quat)
+        ori_2d = T.z_angle_from_quat(quat).unsqueeze(0)  # Convert to 1D tensor
 
         # Pack everything together
         return dict(

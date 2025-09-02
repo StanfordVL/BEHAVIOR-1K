@@ -220,6 +220,9 @@ gm.FORCE_ROUGHNESS = 0.7
 # mass from the category-level density and the volume of the object.
 gm.FORCE_CATEGORY_MASS = True
 
+# Disable collision and gravity for the simulator, should default to False
+gm.VISUAL_ONLY = False
+
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):

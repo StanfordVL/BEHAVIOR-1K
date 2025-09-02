@@ -53,10 +53,10 @@ Choose your installation method:
 
                 ```shell
                 # Full installation with all components
-                ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+                ./setup.sh --new-env --omnigibson --bddl --joylo --dataset --eval --primitives
 
                 # Core components only (without teleoperation)
-                ./setup.sh --new-env --omnigibson --bddl
+                ./setup.sh --new-env --omnigibson --bddl --dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)
                 ./setup.sh --new-env --omnigibson --bddl --dataset \
@@ -70,10 +70,10 @@ Choose your installation method:
 
                 ```powershell
                 # Full installation with all components
-                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+                .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset -Eval -Primitives
 
                 # Core components only (without teleoperation)
-                .\setup.ps1 -NewEnv -OmniGibson -BDDL
+                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)
                 .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset `
@@ -108,7 +108,7 @@ Choose your installation method:
             You can omit `--new-env` to use your current Python environment instead of creating a new conda environment:
             ```shell
             # Linux: Install in current environment
-            ./setup.sh --omnigibson --bddl --teleop --dataset
+            ./setup.sh --omnigibson --bddl --joylo --dataset
             
             # Skip confirmation prompt with --confirm-no-conda
             ./setup.sh --omnigibson --bddl --confirm-no-conda
