@@ -793,7 +793,7 @@ def instance_to_semantic(
         if "robot" in v:
             instance_to_semantic[k] = "agent"
         else:
-            instance_to_semantic[k] = v.split("_")[0]
+            instance_to_semantic[k] = v.rsplit("_", 2)[0]
     instance_to_semantic.update({0: "background", 1: "unlabelled"})
     # Now, construct the semantic segmentation
     semantic_seg = th.zeros_like(obs)
