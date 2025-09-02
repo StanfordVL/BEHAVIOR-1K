@@ -100,7 +100,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Close environment at the end
         input("Demo completed. Press ENTER to shutdown environment.")
 
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

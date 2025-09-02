@@ -637,8 +637,9 @@ class StatefulObject(BaseObject):
         Args:
             position (None or 3-array): The position to set the object to. If None, the position is not changed.
             orientation (None or 4-array): The orientation to set the object to. If None, the orientation is not changed.
-            frame (Literal): The frame in which to set the position and orientation. Defaults to world. parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): The frame in which to set the position and orientation. Defaults to world.
+                parent frame: set position relative to the object parent.
+                scene frame: set position relative to the scene.
         """
         super().set_position_orientation(position=position, orientation=orientation, frame=frame)
         self.clear_states_cache()

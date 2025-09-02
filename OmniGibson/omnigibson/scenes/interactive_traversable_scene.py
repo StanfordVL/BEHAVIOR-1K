@@ -4,7 +4,7 @@ import omnigibson as og
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.utils.asset_utils import get_og_scene_path
-from omnigibson.utils.constants import STRUCTURE_CATEGORIES
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -192,11 +192,14 @@ class InteractiveTraversableScene(TraversableScene):
         # This object is not located in one of the selected rooms, skip
         valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
-        # HACK: always load building structure
+        # TODO (Wensi): always load building structures for now because walls are missing room assignments
         is_building_structure = category in (STRUCTURE_CATEGORIES) or category in ["door", "sliding_door"]
+        # TODO (Wensi): below is the original implementation, which is changed to above to allow partial scene demo replay.
+        # We need to think of a better way to handle this.
+        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
 
         # We only load this model if all the above conditions are met
-        return is_building_structure or (not_blacklisted and whitelisted and valid_room and agent_ok)
+        return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure
 
     @property
     def seg_map(self):

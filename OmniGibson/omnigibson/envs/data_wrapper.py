@@ -20,6 +20,7 @@ from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.utils.python_utils import create_object_from_init_info, h5py_group_to_torch
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.controllers.controller_base import ControlType
 
 # Create module logger
@@ -73,7 +74,8 @@ class DataWrapper(EnvironmentWrapper):
         else:
             data_grp = self.hdf5_file["data"]
         if overwrite or "config" not in set(data_grp.attrs.keys()):
-            env.task.update_bddl_scope_metadata(env)
+            if isinstance(env.task, BehaviorTask):
+                env.task.update_bddl_scope_metadata(env)
             scene_file = env.scene.save()
             config = deepcopy(env.config)
             self.add_metadata(group=data_grp, name="config", data=config)

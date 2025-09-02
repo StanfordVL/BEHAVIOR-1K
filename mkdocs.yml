@@ -49,7 +49,7 @@ extra_javascript:
 markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - admonition
   - pymdownx.details
   - pymdownx.superfences
@@ -75,6 +75,7 @@ plugins:
         'omnigibson/getting_started/installation.md': 'getting_started/installation.md'
         'omnigibson/getting_started/examples.md': 'getting_started/examples.md'
         'omnigibson/behavior_components/behavior_knowledgebase.md': 'https://behavior.stanford.edu/knowledgebase/'
+        'behavior-100.md': 'behavior_100/overview.md'
   - mkdocstrings:
       handlers:
         python:
@@ -82,10 +83,13 @@ plugins:
           options:
             docstring_options:
               returns_named_value: false
+  - include-markdown
   # - social
   - gen-files:
       scripts:
       - docs/gen_ref_pages.py
+      - docs/gen_task_pages.py
+      - docs/gen_leaderboard.py
   - literate-nav:
       nav_file: SUMMARY.md
   - section-index
@@ -93,7 +97,15 @@ plugins:
 
 nav:
   - Home: index.md
-  # - 🏆 2025 BEHAVIOR Challenge: challenge/overview.md
+  - 🏆 2025 BEHAVIOR Challenge: 
+    - challenge/index.md
+    - Call for Participation: challenge/call_for_participation.md
+    - Rules: challenge/rules.md
+    - Leaderboard: challenge/leaderboard.md
+    - Dataset: challenge/dataset.md
+    - Baselines: challenge/baselines.md
+    - Evaluation: challenge/evaluation.md
+    - Demo Gallery: challenge/tasks/
   - Documentation:
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md

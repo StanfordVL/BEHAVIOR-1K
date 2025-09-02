@@ -3,8 +3,9 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_og_scenes
 from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -21,34 +22,26 @@ def main(random_selection=False, headless=False, short_exec=False):
         print("This demo should only be run not headless! Exiting early.")
         og.shutdown()
 
-    # Choose the scene type to load
-    scene_options = {
-        "InteractiveTraversableScene": "Procedurally generated scene with fully interactive objects",
-        # "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
-    }
-    scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
-
     # Choose the scene model to load
-    scenes = get_available_og_scenes() if scene_type == "InteractiveTraversableScene" else get_available_g_scenes()
+    scenes = get_available_og_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
     print(f"scene model: {scene_model}")
 
     cfg = {
         "scene": {
-            "type": scene_type,
+            "type": "InteractiveTraversableScene",
             "scene_model": scene_model,
         },
     }
 
-    # If the scene type is interactive, also check if we want to quick load or full load the scene
-    if scene_type == "InteractiveTraversableScene":
-        load_options = {
-            "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
-            "Full": "Load all interactive objects in the scene",
-        }
-        load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
-        if load_mode == "Quick":
-            cfg["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
+    # Check if we want to quick load or full load the scene
+    load_options = {
+        "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
+        "Full": "Load all interactive objects in the scene",
+    }
+    load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
+    if load_mode == "Quick":
+        cfg["scene"]["load_object_categories"] = list(STRUCTURE_CATEGORIES)
 
     # Load the environment
     env = og.Environment(configs=cfg)
@@ -91,7 +84,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.ESCAPE,
-        callback_fn=lambda: og.clear(),
+        callback_fn=lambda: og.shutdown(),
     )
 
     # Print out additional keyboard commands
@@ -106,6 +99,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     while steps != max_steps:
         env.step([])
         steps += 1
+
+    og.shutdown()
 
 
 if __name__ == "__main__":

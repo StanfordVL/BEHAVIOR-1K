@@ -842,7 +842,7 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
         ValueError: If the bounding box size is not found in the metadata.
 
     Returns:
-        None
+        bool: Success status of the conversion
     """
     # Check if filepath exists
     model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
@@ -1802,7 +1802,7 @@ def generate_collision_meshes(
         hull_count (int): If @method="coacd", this sets the max number of hulls to generate
         discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
             that are not proper volumes
-        error_handling: If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead
+        error_handling (bool): If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead
 
     Returns:
         List[trimesh.Trimesh]: The collision meshes.
@@ -2147,19 +2147,19 @@ def generate_urdf_for_mesh(
     Each submesh in articulated files (glb, gltf) will be extracted as a separate link.
 
     Args:
-        asset_path: Path to the input mesh file (.obj, .glb, .gltf)
-        obj_dir: Output directory
-        category: Category name for the object
-        mdl: Model name
-        collision_method: Method for generating collision meshes ("convex", "coacd", or None)
-        hull_count: Maximum number of convex hulls for COACD method
-        up_axis: Up axis for the model ("y" or "z")
-        scale: User choice scale, will be overwritten if check_scale and rescale
-        check_scale: Whether to check mesh size based on heuristic
-        rescale: Whether to rescale mesh if check_scale
-        dataset_root: Root directory for the dataset
-        overwrite: Whether to overwrite existing files
-        n_submesh: If submesh number is more than n_submesh, will not convert and skip
+        asset_path (str): Path to the input mesh file (.obj, .glb, .gltf)
+        obj_dir (str): Output directory
+        category (str): Category name for the object
+        mdl (str): Model name
+        collision_method (str or None): Method for generating collision meshes ("convex", "coacd", or None)
+        hull_count (int): Maximum number of convex hulls for COACD method
+        up_axis (str): Up axis for the model ("y" or "z")
+        scale (float): User choice scale, will be overwritten if check_scale and rescale
+        check_scale (bool): Whether to check mesh size based on heuristic
+        rescale (bool): Whether to rescale mesh if check_scale
+        dataset_root (str or None): Root directory for the dataset
+        overwrite (bool): Whether to overwrite existing files
+        n_submesh (int): If submesh number is more than n_submesh, will not convert and skip
     """
 
     # Validate file format

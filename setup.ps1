@@ -8,6 +8,7 @@ param(
     [switch]$Dataset,
     [switch]$Primitives,
     [switch]$Eval,
+    [switch]$AssetPipeline,
     [switch]$Dev,
     [string]$CudaVersion = "12.4",
     [switch]$AcceptCondaTos,
@@ -34,6 +35,7 @@ Options:
   -Dataset                Download BEHAVIOR datasets (requires -OmniGibson)
   -Primitives             Install OmniGibson with primitives support
   -Eval                   Install evaluation dependencies
+  -AssetPipeline          Install the 3D scene and object asset pipeline
   -Dev                    Install development dependencies
   -CudaVersion VERSION    Specify CUDA version (default: 12.4)
   -AcceptCondaTos         Automatically accept Conda Terms of Service
@@ -497,36 +499,27 @@ if (-not $isaacInstalled) {
             $DatasetAcceptFlag = "True"
         }
         
-        $pythonScript = @"
-import os
-os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
-try:
-    from omnigibson.macros import gm
-    from omnigibson.utils.asset_utils import download_assets, download_og_dataset
-    
-    dataset_exists = os.path.exists(gm.DATASET_PATH)
-    assets_exist = os.path.exists(gm.ASSET_PATH)
-    
-    if not (dataset_exists and assets_exist):
-        print(f'Installing data to:')
-        print(f'  Dataset (~25GB): {gm.DATASET_PATH}')
-        print(f'  Assets (~2.5GB): {gm.ASSET_PATH}')
+        $env:OMNI_KIT_ACCEPT_EULA = "YES"
         
-        if not dataset_exists:
-            print('Downloading dataset...')
-            download_og_dataset(accept_license=$DatasetAcceptFlag)
+        Write-Host "Installing data to:"
+        $DatasetPath = python -c "from omnigibson.macros import gm; print(gm.DATASET_PATH)"
+        $AssetPath = python -c "from omnigibson.macros import gm; print(gm.ASSET_PATH)"
+        Write-Host "  Dataset (~25GB): $DatasetPath"
+        Write-Host "  Assets (~2.5GB): $AssetPath"
         
-        if not assets_exist:
-            print('Downloading assets...')
-            download_assets()
-    else:
-        print('Datasets already exist, skipping download.')
-except Exception as e:
-    print(f'ERROR: Dataset installation failed: {e}')
-    exit(1)
-"@
+        Write-Host "Downloading dataset..."
+        python -c "from omnigibson.utils.asset_utils import download_og_dataset; download_og_dataset(accept_license=$DatasetAcceptFlag)"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: Dataset installation failed"
+            exit 1
+        }
         
-        python -c $pythonScript
+        Write-Host "Downloading assets..."
+        python -c "from omnigibson.utils.asset_utils import download_assets; download_assets()"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: Assets installation failed"
+            exit 1
+        }
     }
     
     Write-Host "OmniGibson installation completed successfully!"
@@ -544,6 +537,7 @@ if ($Joylo) {
     pip install -e "$WorkDir\joylo"
 }
 
+# Install Eval
 if ($Eval) {
     Write-Host "Installing evaluation dependencies..."
 
@@ -551,6 +545,18 @@ if ($Eval) {
     $TorchVersion = (pip show torch | Select-String "Version" | ForEach-Object { $_.ToString().Split(" ")[-1] })
     pip install torch-cluster -f "https://data.pyg.org/whl/torch-$TorchVersion.html"
     conda install av -c conda-forge -y
+
+
+# Install asset pipeline
+if ($AssetPipeline) {
+    Write-Host "Installing asset pipeline..."
+    
+    if (-not (Test-Path "asset_pipeline")) {
+        Write-Error "ERROR: asset_pipeline directory not found"
+        exit 1
+    }
+    
+    pip install -r "$WorkDir\asset_pipeline\requirements.txt"
 }
 
 # Installation summary
@@ -562,6 +568,7 @@ if ($BDDL) { Write-Host "✓ Installed BDDL" }
 if ($JoyLo) { Write-Host "✓ Installed JoyLo" }
 if ($Primitives) { Write-Host "✓ Installed primitives support" }
 if ($Eval) { Write-Host "✓ Installed evaluation support" }
+if ($AssetPipeline) { Write-Host "✓ Installed asset pipeline" }
 if ($Dataset) { Write-Host "✓ Downloaded datasets" }
 Write-Host ""
 if ($NewEnv) { Write-Host "To activate: conda activate behavior" }

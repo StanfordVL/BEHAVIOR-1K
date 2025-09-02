@@ -1085,7 +1085,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the height of the given floor. Default is 0.0, since we only have a single floor
 
         Args:
-            floor: an integer identifying the floor
+            floor (int): an integer identifying the floor
 
         Returns:
             int: height of the given floor

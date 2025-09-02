@@ -73,7 +73,7 @@ class GymObservable(metaclass=ABCMeta):
     (get_obs()), and should define an observation space that is created when load_observation_space() is called
 
     Args:
-        kwargs: dict, does nothing, used to sink any extraneous arguments during initialization
+        **kwargs (dict): does nothing, used to sink any extraneous arguments during initialization
     """
 
     def __init__(self, *args, **kwargs):
