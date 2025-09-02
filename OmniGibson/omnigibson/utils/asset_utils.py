@@ -430,7 +430,12 @@ def get_texture_file(mesh_file):
 def download_and_unpack_zipped_dataset(dataset_name):
     tempdir = tempfile.mkdtemp()
     real_target = get_dataset_path(dataset_name)
-    local_path = hf_hub_download(repo_id="behavior-1k/zipped-datasets", filename=f"{dataset_name}.zip", repo_type="dataset", local_path=real_target)
+    local_path = hf_hub_download(
+        repo_id="behavior-1k/zipped-datasets",
+        filename=f"{dataset_name}.zip",
+        repo_type="dataset",
+        local_path=real_target,
+    )
     with zipfile.ZipFile(local_path, "r") as zip_ref:
         zip_ref.extractall(real_target)
     shutil.rmtree(tempdir)
