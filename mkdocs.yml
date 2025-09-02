@@ -87,7 +87,7 @@ plugins:
   # - social
   - gen-files:
       scripts:
-      - docs/gen_ref_pages.py
+      # - docs/gen_ref_pages.py
       - docs/gen_task_pages.py
       - docs/gen_leaderboard.py
   - literate-nav:
