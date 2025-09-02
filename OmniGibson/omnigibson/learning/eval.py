@@ -37,6 +37,7 @@ from omnigibson.learning.utils.obs_utils import (
 from omnigibson.macros import gm
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
+from omnigibson.utils.asset_utils import get_task_instance_path
 from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
@@ -98,7 +99,7 @@ class Evaluator:
             "left_eef_displacement": [],
             "right_eef_displacement": [],
         }
-        with open(f"{gm.DATASET_PATH}/metadata/episodes.jsonl", "r") as f:
+        with open(os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
             episodes = [json.loads(line) for line in f]
         for episode in episodes:
             if episode["episode_index"] // 1e4 == task_idx:
@@ -237,7 +238,10 @@ class Evaluator:
             activity_definition_id=self.env.task.activity_definition_id,
             activity_instance_id=instance_id,
         )
-        tro_file_path = f"{gm.DATASET_PATH}/scenes/{scene_model}/json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json"
+        tro_file_path = os.path.join(
+            get_task_instance_path(),
+            f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
+        )
         assert os.path.exists(
             tro_file_path
         ), f"Could not find TRO file at {tro_file_path}, did you run ./populate_behavior_tasks.sh?"
@@ -356,7 +360,9 @@ if __name__ == "__main__":
     instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(20))
     assert set(instances_to_run).issubset(set(range(20))), "eval instance ids must be in range(20)"
     # load csv file
-    task_instance_csv_path = f"{gm.DATASET_PATH}/metadata/test_instances.csv"
+    task_instance_csv_path = os.path.join(
+        gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
+    )
     with open(task_instance_csv_path, "r") as f:
         lines = list(csv.reader(f))[1:]
     assert (
