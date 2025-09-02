@@ -7,15 +7,12 @@ import mkdocs_gen_files
 def load_submissions(track_dir):
     """Load all submissions from a track directory."""
     submissions = []
-    track_path = Path("challenge_submissions") / track_dir
+    track_path = Path("docs/challenge_submissions") / track_dir
     
     if not track_path.exists():
         return []
     
     for yaml_file in track_path.glob("*.yaml"):
-        if yaml_file.name == "TEMPLATE.yaml":
-            continue
-            
         try:
             with open(yaml_file) as f:
                 data = yaml.safe_load(f)
@@ -76,7 +73,7 @@ def generate_combined_leaderboard():
         # Submission instructions
         fd.write("## How to Submit\n\n")
         fd.write("To submit your results to the leaderboard:\n\n")
-        fd.write("1. **Submit self-reported scores** through this [google form](#)\n")
+        fd.write("1. **Submit self-reported scores** through this [google form](https://forms.gle/54tVqi5zs3ANGutn7)\n")
         fd.write("2. **Wait for review** - once approved, your results will appear on the leaderboard!\n\n")
 
 # Generate the leaderboard when this module is imported during mkdocs build

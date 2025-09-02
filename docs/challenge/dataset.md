@@ -26,7 +26,6 @@ Coming soon!
 | ------ | ----- |
 | Total Trajectories | 10,000 |
 | Total Tasks | 50 |
-| Total Hours of Data | 1102.56 hours |
 | Total Skills | 270,600 |
 | Unique Skills | 31 |
 | Avg. Skills per Trajectory | 27.06 |
@@ -39,3 +38,5 @@ Coming soon!
 ### Per Task Demo Duration
 
 ![Per Task Demo Duration](../assets/challenge_2025/per_task_demo_duration.png)
+
+Note: Language annotations will be released gradually and will be available soon. Currently, 15 tasks are fully annotated across all demonstrations, with the remaining annotations in the final stages of QA before release. 
