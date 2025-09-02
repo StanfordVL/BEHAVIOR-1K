@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the dataset path
-DATASET_PATH=$(python3 -c "from omnigibson.asset_utils import get_dataset_path; print(get_dataset_path('behavior-1k-assets'))")
+DATASET_PATH=$(python3 -c "from omnigibson.utils.asset_utils import get_dataset_path; print(get_dataset_path('behavior-1k-assets'))")
 echo "Using dataset path: $DATASET_PATH"
 
 SRC_DIR="./sampled_task"

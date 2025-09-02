@@ -435,7 +435,7 @@ class XFormPrim(BasePrim):
             scale = th.tensor(scale, dtype=th.float32)
         else:
             scale = th.ones(3, dtype=th.float32) * scale
-        # assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
+        assert th.all(scale > 0), f"Scale {scale} must consist of positive numbers."
         # Invalidate the cached scale
         self._cached_scale = None
         scale = lazy.pxr.Gf.Vec3d(*scale.tolist())

@@ -498,7 +498,7 @@ if (-not $isaacInstalled) {
         Write-Host "Downloading OmniGibson robot assets..."
         python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: Assets installation failed"
+            Write-Host "ERROR: OmniGibson robot assets installation failed"
             exit 1
         }
     }
