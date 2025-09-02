@@ -22,8 +22,9 @@ class RichObservationWrapper(EnvironmentWrapper):
             if isinstance(sensor, VisionSensor):
                 sensor.add_modality("normal")
                 sensor.add_modality("flow")
-                sensor.add_modality("bbox_3d")
-        # Here, we include privileged task observations (i.e. object poses for task-relevant objects)
+        # reload observation space
+        env.load_observation_space()
+        # we also set task to include obs
         env.task._include_obs = True
 
     def step(self, action, n_render_iterations=1):
@@ -43,5 +44,12 @@ class RichObservationWrapper(EnvironmentWrapper):
                 - (dict) misc information
         """
         obs, reward, terminated, truncated, info = self.env.step(action, n_render_iterations=n_render_iterations)
-        # Now, query the environment for some additional info
+        # Now, query for some additional privileged task info
+        obs["task"] = self.env.task.get_obs(self.env)
         return obs, reward, terminated, truncated, info
+
+    def reset(self):
+        # Note that we need to also add additional observations in reset() because the returned observation will be passed into policy
+        ret = self.env.reset()
+        ret[0]["task"] = self.env.task.get_obs(self.env)
+        return ret
