@@ -434,7 +434,7 @@ def download_and_unpack_zipped_dataset(dataset_name):
         repo_id="behavior-1k/zipped-datasets",
         filename=f"{dataset_name}.zip",
         repo_type="dataset",
-        local_path=real_target,
+        local_dir=real_target,
     )
     with zipfile.ZipFile(local_path, "r") as zip_ref:
         zip_ref.extractall(real_target)
