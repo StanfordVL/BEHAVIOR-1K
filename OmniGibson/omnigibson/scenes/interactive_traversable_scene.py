@@ -192,11 +192,13 @@ class InteractiveTraversableScene(TraversableScene):
         # This object is not located in one of the selected rooms, skip
         valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
-        # TODO (Wensi): always load building structures for now because walls are missing room assignments
-        is_building_structure = category in (STRUCTURE_CATEGORIES) or category in ["door", "sliding_door"]
-        # TODO (Wensi): below is the original implementation, which is changed to above to allow partial scene demo replay.
+        # Always load building structures for now because walls are missing room assignments
+        # TODO (Wensi): below is changed to include doors to allow partial scene demo replay.
         # We need to think of a better way to handle this.
-        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES)
+        is_building_structure = category in (STRUCTURE_CATEGORIES - GROUND_CATEGORIES) or category in [
+            "door",
+            "sliding_door",
+        ]
 
         # We only load this model if all the above conditions are met
         return (not_blacklisted and whitelisted and valid_room and agent_ok) or is_building_structure

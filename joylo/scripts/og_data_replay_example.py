@@ -187,7 +187,7 @@ def replay_hdf5_file(hdf_input_path):
     for robot_camera_name in robot_camera_names:
         video_writers.append(env.create_video_writer(
             fpath=f"{video_dir}/{robot_camera_name}.mp4",
-            resulution=(RESOLUTION_WRIST, RESOLUTION_WRIST),    
+            resolution=(RESOLUTION_WRIST, RESOLUTION_WRIST),    
         ))
         video_rgb_keys.append(robot_camera_name)
     # Create video writers for external cameras

@@ -37,6 +37,8 @@ setup(
         "bddl~=3.7.0",
         "opencv-python>=4.8.1",
         "nest_asyncio>=1.5.6",
+        "imageio>=2.33.1",
+        "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
         "pymeshlab~=2022.2",
