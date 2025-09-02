@@ -4,15 +4,17 @@ from importlib.metadata import version
 import inspect
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
 from urllib.request import urlretrieve
+import zipfile
 
 import bddl
-from huggingface_hub import snapshot_download
+from huggingface_hub import hf_hub_download
 import progressbar
 from cryptography.fernet import Fernet
 
@@ -425,6 +427,15 @@ def get_texture_file(mesh_file):
     return texture_file
 
 
+def download_and_unpack_zipped_dataset(dataset_name):
+    tempdir = tempfile.mkdtemp()
+    real_target = get_dataset_path(dataset_name)
+    local_path = hf_hub_download(repo_id="behavior-1k/zipped-datasets", filename=f"{dataset_name}.zip", repo_type="dataset", local_path=real_target)
+    with zipfile.ZipFile(local_path, "r") as zip_ref:
+        zip_ref.extractall(real_target)
+    shutil.rmtree(tempdir)
+
+
 def download_omnigibson_robot_assets():
     """
     Download OmniGibson assets
@@ -432,15 +443,7 @@ def download_omnigibson_robot_assets():
     if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
         print("Assets already downloaded.")
     else:
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "https://huggingface.co/datasets/behavior-1k/omnigibson-robot-assets",
-                get_dataset_path("omnigibson-robot-assets"),
-            ],
-            check=True,
-        )
+        download_and_unpack_zipped_dataset("omnigibson-robot-assets")
 
 
 def print_user_agreement():
@@ -549,30 +552,14 @@ def download_behavior_1k_assets(accept_license=False):
     if os.path.exists(get_dataset_path("behavior-1k-assets")):
         print("BEHAVIOR-1K dataset already installed.")
     else:
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "https://huggingface.co/datasets/behavior-1k/behavior-1k-assets",
-                get_dataset_path("behavior-1k-assets"),
-            ],
-            check=True,
-        )
+        download_and_unpack_zipped_dataset("behavior-1k-assets")
 
 
 def download_2025_challenge_task_instances():
     if os.path.exists(get_dataset_path("2025-challenge-task-instances")):
         print("2025 BEHAVIOR Challenge Tasks dataset already installed.")
     else:
-        subprocess.run(
-            [
-                "git",
-                "clone",
-                "https://huggingface.co/datasets/behavior-1k/2025-challenge-task-instances",
-                get_dataset_path("2025-challenge-task-instances"),
-            ],
-            check=True,
-        )
+        download_and_unpack_zipped_dataset("2025-challenge-task-instances")
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
