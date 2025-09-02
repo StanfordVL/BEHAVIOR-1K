@@ -341,7 +341,7 @@ def generate_info_json(
         "total_frames": total_frames,
         "total_tasks": total_tasks,
         "total_videos": total_episodes * 9,
-        "chunks_size": 200,
+        "chunks_size": 10000,
         "fps": fps,
         "splits": {
             "train": "0:" + str(total_episodes),
