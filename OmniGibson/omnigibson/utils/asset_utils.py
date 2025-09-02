@@ -575,6 +575,17 @@ def download_behavior_1k_assets(accept_license=False):
         )
 
 
+def download_2025_challenge_task_instances():
+    if os.path.exists(get_dataset_path("2025-challenge-task-instances")):
+        print("2025 BEHAVIOR Challenge Tasks dataset already installed.")
+    else:
+        snapshot_download(
+            repo_id="behavior-1k/2025-challenge-task-instances",
+            repo_type="dataset",
+            local_dir=get_dataset_path("2025-challenge-task-instances"),
+        )
+
+
 def decrypt_file(encrypted_filename, decrypted_filename):
     with open(get_key_path(), "rb") as filekey:
         key = filekey.read()
@@ -618,6 +629,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--download_omnigibson_robot_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_behavior_1k_assets", action="store_true", help="download BEHAVIOR-1K Dataset")
+    parser.add_argument("--download_2025_challenge_task_instances", action="store_true", help="download 2025 BEHAVIOR Challenge Tasks dataset")
     parser.add_argument("--accept_license", action="store_true", help="pre-accept the BEHAVIOR-1K dataset license")
     args = parser.parse_args()
 
@@ -625,5 +637,7 @@ if __name__ == "__main__":
         download_omnigibson_robot_assets()
     if args.download_behavior_1k_assets:
         download_behavior_1k_assets(accept_license=args.accept_license)
+    if args.download_2025_challenge_task_instances:
+        download_2025_challenge_task_instances()
 
     og.shutdown()

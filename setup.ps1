@@ -487,18 +487,25 @@ if (-not $isaacInstalled) {
         }
         
         $env:OMNI_KIT_ACCEPT_EULA = "YES"
-        
+
+        Write-Host "Downloading OmniGibson robot assets..."
+        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: OmniGibson robot assets installation failed"
+            exit 1
+        }
+
         Write-Host "Downloading BEHAVIOR-1K assets..."
         python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=$DatasetAcceptFlag)"
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: Dataset installation failed"
             exit 1
         }
-        
-        Write-Host "Downloading OmniGibson robot assets..."
-        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
+    
+        Write-Host "Downloading 2025 BEHAVIOR Challenge Task Instances..."
+        python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "ERROR: OmniGibson robot assets installation failed"
+            Write-Host "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
             exit 1
         }
     }
