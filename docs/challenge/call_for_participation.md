@@ -122,15 +122,3 @@ To cite BEHAVIOR-1K, please use:
   journal={arXiv preprint arXiv:2403.09227},
   year={2024}
 }
-```
-To cite the challenge dataset, please use:
-```bibtex
-@misc{behavior-1k_2025,
-	author       = { BEHAVIOR-1K },
-	title        = { 2025-challenge-demos },
-	year         = 2025,
-	url          = { https://huggingface.co/datasets/behavior-1k/2025-challenge-demos },
-	doi          = { 10.57967/hf/6394 },
-	publisher    = { Hugging Face }
-}
-```
