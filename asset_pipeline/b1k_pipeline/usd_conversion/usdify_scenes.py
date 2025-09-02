@@ -2,34 +2,46 @@ import json
 import os
 import signal
 import subprocess
-import sys
+import pathlib
+import traceback
 from dask.distributed import Client, as_completed
 import fs.copy
 from fs.multifs import MultiFS
-import fs.path
 from fs.tempfs import TempFS
 import tqdm
 
 from b1k_pipeline.utils import ParallelZipFS, PipelineFS, TMP_DIR, launch_cluster
 
-WORKER_COUNT = 1
+WORKER_COUNT = 2
 MAX_TIME_PER_PROCESS = 60 * 60  # 1 hour
 
 def run_on_scene(dataset_path, scene):
-    python_cmd = ["python", "-m", "b1k_pipeline.usd_conversion.usdify_scenes_process", dataset_path, scene]
-    cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
-    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err", "w") as ferr:
-        try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
-            p.wait(timeout=MAX_TIME_PER_PROCESS)
-        except subprocess.TimeoutExpired:
-            ferr.write(f'\nTimeout for {scene} ({MAX_TIME_PER_PROCESS}s) expired. Killing\n')
-            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-            p.wait()
+    try:
+        basename = pathlib.Path(scene).stem
+        print("Running on scene:", basename)
+        python_cmd = ["python", "-m", "b1k_pipeline.usd_conversion.usdify_scenes_process", dataset_path, scene]
+        cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
+        with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{basename}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{basename}.err", "w") as ferr:
+            try:
+                p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
+                pid = p.pid
+                p.wait(timeout=MAX_TIME_PER_PROCESS)
+            except subprocess.TimeoutExpired as e:
+                ferr.write(f'\nTimeout for {basename} ({MAX_TIME_PER_PROCESS}s) expired. Killing\n')
+                try:
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                except ProcessLookupError:
+                    ferr.write(f'Process {pid} already exited.\n')
+                p.wait()
 
-    # Check if the success file exists.
-    if not os.path.exists(f"{dataset_path}/scenes/{scene}/usdify_scenes.success"):
-        raise ValueError(f"Scene {scene} processing failed: no success file found. Check the logs.")
+        # Check if the success file exists.
+        success_file = (pathlib.Path(dataset_path) / scene).with_suffix(".success")
+        if not success_file.exists():
+            raise ValueError(f"Scene {scene} processing failed: no success file found. Check the logs.")
+        
+        return None
+    except:
+        return traceback.format_exc()
 
 def main():
     with PipelineFS() as pipeline_fs, \
@@ -53,12 +65,13 @@ def main():
             print("Launching cluster...")
             dask_client = launch_cluster(WORKER_COUNT)
 
-            # Start the batched run
-            scenes = [x for x in dataset_fs.listdir("scenes")]
+            # Start the batched run. We remove the leading / so that pathlib can append it to dataset path correctly.
+            scenes = [x.path[1:] for x in dataset_fs.glob("scenes/*/urdf/*.urdf")]
             print("Queueing scenes.")
             print("Total count: ", len(scenes))
             futures = {}
             for scene in scenes:
+
                 worker_future = dask_client.submit(
                     run_on_scene,
                     dataset_fs.getsyspath("/"),
@@ -71,11 +84,9 @@ def main():
             print("Queued all scenes. Waiting for them to finish...")
             errors = {}
             for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
-                try:
-                    future.result()
-                except Exception as e:
-                    raise
-                    errors[futures[future]] = str(e)
+                exc = future.result()
+                if exc:
+                    errors[futures[future]] = str(exc)
 
             # Move the USDs to the output FS
             print("Copying scene JSONs to output FS...")

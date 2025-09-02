@@ -138,6 +138,17 @@ class FSResolver(trimesh.resolvers.Resolver):
             data = f.read()
         return data
 
+    def keys(self):
+        """
+        List all files available to be loaded.
+
+        Yields
+        -----------
+        name : str
+          Name of a file which can be accessed.
+        """
+        yield from self._fs.walk.files()
+
     def write(self, name, data):
         """
         Write an asset to a file path.
@@ -170,9 +181,10 @@ def load_mesh(fs, name, **kwargs):
     with fs.open(name, "rb") as f:
         return trimesh.load(f, resolver=FSResolver(fs), file_type="obj", **kwargs)
     
-def save_mesh(mesh, fs, name, **kwargs):
-    with fs.open(name, "wb") as f:
-        return mesh.export(f, resolver=FSResolver(fs), file_type="obj", **kwargs)
+def save_mesh(mesh, out_fs, name, **kwargs):
+    with out_fs.open(name, "wb") as f:
+        filetype = fs.path.splitext(name)[1][1:]  # Get file extension without dot
+        return mesh.export(f, resolver=FSResolver(out_fs), file_type=filetype, **kwargs)
 
 def create_docker_container(cl, hostname:str, i: int):
     name = f"ig_pipeline_{i}"

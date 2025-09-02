@@ -21,6 +21,7 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
+        "huggingface-hub[cli]>=0.34.4",
         "gymnasium>=0.28.1",
         "numpy<2.0.0,>=1.23.5",
         "scipy>=1.10.1",

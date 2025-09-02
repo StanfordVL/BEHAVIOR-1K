@@ -10,7 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
+from omnigibson.utils.asset_utils import get_all_object_category_models, get_avg_category_specs, get_dataset_path
 from omnigibson.utils.constants import (
     DEFAULT_PRISMATIC_JOINT_FRICTION,
     DEFAULT_REVOLUTE_JOINT_FRICTION,
@@ -29,11 +29,6 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 
-class DatasetType(IntEnum):
-    BEHAVIOR = 0
-    CUSTOM = 1
-
-
 class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
@@ -47,7 +42,7 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
-        dataset_type=DatasetType.BEHAVIOR,
+        dataset_name="behavior-1k-assets",
         scale=None,
         visible=True,
         fixed_base=False,
@@ -72,12 +67,12 @@ class DatasetObject(USDObject):
             model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
 
-                    {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+                    {gm.DATA_PATH}/{dataset_name}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-            dataset_type (DatasetType): Dataset to search for this object. Default is BEHAVIOR, corresponding to the
-                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Possible values are {BEHAVIOR, CUSTOM}.
-                If CUSTOM, assumes asset is found at gm.CUSTOM_DATASET_PATH and additionally not encrypted.
+            dataset_name (str): Dataset to search for this object. Default is behavior-1k-assets, corresponding to the
+                proprietary (encrypted) BEHAVIOR-1K dataset. Any other dataset names are searched for
+                under the gm.DATA_PATH directory.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
@@ -120,7 +115,7 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
-        load_config["dataset_type"] = dataset_type
+        load_config["dataset_name"] = dataset_name
         # All DatasetObjects should have xform properties pre-loaded
         # TODO: enable this after next dataset release
         load_config["xform_props_pre_loaded"] = False
@@ -132,13 +127,13 @@ class DatasetObject(USDObject):
             model = random.choice(available_models)
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
+        usd_path = self.get_usd_path(category=category, model=model, dataset_name=dataset_name)
 
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=dataset_type == DatasetType.BEHAVIOR,
+            encrypted=dataset_name == "behavior-1k-assets",
             name=name,
             category=category,
             scale=scale,
@@ -157,7 +152,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model, dataset_type=DatasetType.BEHAVIOR):
+    def get_usd_path(cls, category, model, dataset_name="behavior-1k-assets"):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -166,13 +161,13 @@ class DatasetObject(USDObject):
         Args:
             category (str): Category for the object
             model (str): Specific model ID of the object
-            dataset_type (DatasetType): Dataset type, used to infer dataset directory to search for @category and @model
+            dataset_name (str): Dataset type, used to infer dataset directory to search for @category and @model
 
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        dataset_path = gm.DATASET_PATH if dataset_type == DatasetType.BEHAVIOR else gm.CUSTOM_DATASET_PATH
-        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
+        dataset_path = get_dataset_path(dataset_name)
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usdz")
 
     def sample_orientation(self):
         """
@@ -244,7 +239,7 @@ class DatasetObject(USDObject):
             scale = th.ones(3)
 
         # Assert that the scale does not have too small dimensions
-        assert th.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
+        assert th.all(th.abs(scale) > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
@@ -253,10 +248,16 @@ class DatasetObject(USDObject):
         super()._post_load()
 
         # Get the average mass/density for this object category
-        avg_specs = get_og_avg_category_specs()
-        assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
-        category_mass = avg_specs[self.category]["mass"]
-        category_density = avg_specs[self.category]["density"]
+        avg_specs = get_avg_category_specs()
+        if self.category in avg_specs:
+            category_mass = avg_specs[self.category]["mass"]
+            category_density = avg_specs[self.category]["density"]
+        else:
+            log.warning(
+                f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
+            )
+            category_mass = 1.0
+            category_density = 1.0
 
         if self._prim_type == PrimType.RIGID:
             total_volume = sum(link.volume for link in self._links.values())

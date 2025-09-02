@@ -15,6 +15,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import classproperty
 
 m = create_module_macros(module_path=__file__)
@@ -153,7 +154,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/behavior_robot/usd/BehaviorRobot.usd")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/behavior_robot/usd/BehaviorRobot.usd")
 
     @classproperty
     def n_arms(cls):
@@ -548,7 +549,9 @@ class BRPart(ABC):
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
                 relative_prim_path=f"/{gh_name}",
-                usd_path=os.path.join(gm.ASSET_PATH, f"models/behavior_robot/usd/{gh_name}.usd"),
+                usd_path=os.path.join(
+                    get_dataset_path("omnigibson-robot-assets"), f"models/behavior_robot/usd/{gh_name}.usd"
+                ),
                 name=gh_name,
                 scale=0.001,
                 visible=False,

@@ -107,27 +107,25 @@ macros = MacroDict()
 gm = macros.globals
 
 
-def determine_gm_path(default_path, env_var_name):
-    # Start with the default path
-    path = default_path
+def determine_data_path():
+    # Start with the default path. Check that it exists.
+    path = pathlib.Path(__file__).parents[2] / "datasets"
     # Override with the environment variable, if set
-    if env_var_name in os.environ:
-        path = os.environ[env_var_name]
+    if "OMNIGIBSON_DATA_PATH" in os.environ:
+        path = os.environ["OMNIGIBSON_DATA_PATH"]
     # Expand the user directory (~)
     path = os.path.expanduser(path)
     # Make the path absolute if it's not already
     if not os.path.isabs(path):
         path = os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
+    assert os.path.exists(path), f"Data path {path} does not exist!"
     return path
 
 
 # Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset includes objects + scene
 # can override assets_path and dataset_path from environment variable
-gm.ASSET_PATH = determine_gm_path(os.path.join("data", "assets"), "OMNIGIBSON_ASSET_PATH")
-gm.DATASET_PATH = determine_gm_path(os.path.join("data", "og_dataset"), "OMNIGIBSON_DATASET_PATH")
-gm.CUSTOM_DATASET_PATH = determine_gm_path(os.path.join("data", "custom_dataset"), "OMNIGIBSON_CUSTOM_DATASET_PATH")
-gm.KEY_PATH = determine_gm_path(os.path.join("data", "omnigibson.key"), "OMNIGIBSON_KEY_PATH")
+gm.DATA_PATH = determine_data_path()
 
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
 # integer or string-form integer

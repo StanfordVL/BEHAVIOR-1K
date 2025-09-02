@@ -1,13 +1,12 @@
 """
-Helper script to download OmniGibson dataset and assets.
+Helper script to download BEHAVIOR-1K dataset and assets.
 Improved version that can import obj file and articulated file (glb, gltf).
 """
 
+import pathlib
 from typing import Literal
 import click
-import sys
 import shutil
-import select
 import tempfile
 import omnigibson as og
 
@@ -29,7 +28,7 @@ from omnigibson.utils.asset_conversion_utils import (
     "--model",
     required=True,
     type=click.STRING,
-    help="Model name to assign to the imported asset. This MUST be a 6-character long string that exclusively contains letters, and must be unique within the given @category",
+    help="Model name to assign to the imported asset. This must be unique within the dataset.",
 )
 @click.option(
     "--collision-method",
@@ -49,7 +48,6 @@ from omnigibson.utils.asset_conversion_utils import (
 @click.option("--check_scale", is_flag=True, help="Check meshes scale based on heuristic")
 @click.option("--rescale", is_flag=True, help="Rescale meshes based on heuristic if check_scale ")
 @click.option("--overwrite", is_flag=True, help="Overwrite any pre-existing files")
-@click.option("--n_submesh", type=int, help="Maximum of submesh numnber")
 def import_custom_object(
     asset_path: str,
     category: str,
@@ -62,87 +60,68 @@ def import_custom_object(
     check_scale: bool,
     rescale: bool,
     overwrite: bool,
-    n_submesh: int,
 ):
     """
     Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
-    files to the custom dataset directory (gm.CUSTOM_DATASET_PATH)
+    files to the selected dataset directory.
     """
 
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."
     collision_method = None if collision_method == "none" else collision_method
 
-    # Sanity check mesh type
-    mesh_format = asset_path.split(".")[-1]
+    # Resolve the asset path here
+    asset_path = pathlib.Path(asset_path).absolute()
 
     # If we're not a URDF, import the mesh directly first
-    urdf_dep_paths = None
-    temp_dirs = []
-    if mesh_format != "urdf":
-        temp_urdf_dir = tempfile.mkdtemp()
-        temp_dirs.append(temp_urdf_dir)
-
-        # Try to generate URDF, may raise ValueError if too many submeshes
-        urdf_path = generate_urdf_for_mesh(
-            asset_path,
-            temp_urdf_dir,
-            category,
-            model,
-            collision_method,
-            hull_count,
-            up_axis,
-            scale=scale,
-            check_scale=check_scale,
-            rescale=rescale,
-            overwrite=overwrite,
-            n_submesh=n_submesh,
-        )
-        if urdf_path is not None:
-            click.echo("URDF generation complete!")
-            urdf_dep_paths = ["material"]
-            collision_method = None
-        else:
-            # Clean up temp directories before exiting
-            for tmp_dir in temp_dirs:
-                shutil.rmtree(tmp_dir)
-            click.echo("Error during URDF generation")
-            raise click.Abort()
-    else:
-        urdf_path = asset_path
-        collision_method = collision_method
+    temp_dir = tempfile.mkdtemp()
 
     try:
+        if asset_path.suffix != ".urdf":
+            # Try to generate URDF, may raise ValueError if too many submeshes
+            urdf_path = generate_urdf_for_mesh(
+                asset_path,
+                temp_dir,
+                category,
+                model,
+                collision_method,
+                hull_count,
+                up_axis,
+                scale=scale,
+                check_scale=check_scale,
+                rescale=rescale,
+                overwrite=True,
+            )
+            if urdf_path is not None:
+                click.echo("URDF generation complete!")
+                collision_method = None
+            else:
+                # Clean up temp directories before exiting
+                click.echo("Error during URDF generation")
+                raise click.Abort()
+        else:
+            urdf_path = asset_path
+            collision_method = collision_method
+
         # Convert to USD
         import_og_asset_from_urdf(
             category=category,
             model=model,
-            urdf_path=urdf_path,
-            urdf_dep_paths=urdf_dep_paths,
+            urdf_path=str(urdf_path),
             collision_method=collision_method,
             hull_count=hull_count,
             overwrite=overwrite,
             use_usda=False,
         )
 
-    except Exception as e:
-        click.echo(f"Error during USD conversion: {str(e)}")
+    finally:
         # Clean up temp directories before exiting
-        for tmp_dir in temp_dirs:
-            shutil.rmtree(tmp_dir)
-        raise click.Abort()
-
-    # Clean up temp directories
-    for tmp_dir in temp_dirs:
-        shutil.rmtree(tmp_dir)
+        shutil.rmtree(temp_dir)
 
     # Visualize if not headless
     if not headless:
         click.echo("The asset has been successfully imported. You can view it and make changes and save if you'd like.")
         while True:
             og.sim.render()
-            if select.select([sys.stdin], [], [], 0)[0]:
-                sys.stdin.readline()  # Clear the input buffer
-                break
 
 
 if __name__ == "__main__":

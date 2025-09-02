@@ -1,7 +1,7 @@
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_behavior_1k_scenes
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose the scene model to load
-    scenes = get_available_og_scenes()
+    scenes = get_available_behavior_1k_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
 
     cfg = {

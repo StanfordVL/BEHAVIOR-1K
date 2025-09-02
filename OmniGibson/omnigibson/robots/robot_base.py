@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch as th
 
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors import (
@@ -14,6 +14,7 @@ from omnigibson.sensors import (
     VisionSensor,
     create_sensor,
 )
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
@@ -615,7 +616,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def usd_path(self):
         # By default, sets the standardized path
         model = self.model_name.lower()
-        return os.path.join(gm.ASSET_PATH, f"models/{model}/usd/{model}.usda")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/usd/{model}.usda")
 
     @property
     def urdf_path(self):
@@ -625,7 +626,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         # By default, sets the standardized path
         model = self.model_name.lower()
-        return os.path.join(gm.ASSET_PATH, f"models/{model}/urdf/{model}.urdf")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/urdf/{model}.urdf")
 
     @classproperty
     def _do_not_register_classes(cls):
