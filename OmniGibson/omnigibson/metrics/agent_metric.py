@@ -1,11 +1,21 @@
 import copy
 import torch as th
 from omnigibson.metrics.metric_base import MetricBase
+from typing import Optional
 
 
 class AgentMetric(MetricBase):
-    def __init__(self):
+    def __init__(self, human_stats: Optional[dict] = None):
         self.initialized = False
+        self.human_stats = human_stats
+        if human_stats is None:
+            print("No human stats provided.")
+        else:
+            self.human_stats = {
+                "base": self.human_stats["distance_traveled"],
+                "left": self.human_stats["left_eef_displacement"],
+                "right": self.human_stats["right_eef_displacement"],
+            }
 
     def start_callback(self, env):
         self.initialized = False
@@ -36,4 +46,7 @@ class AgentMetric(MetricBase):
         self.state_cache = copy.deepcopy(self.next_state_cache)
 
     def gather_results(self):
-        return {"agent_distance": {k: sum(v) for k, v in self.delta_agent_distance.items()}}
+        results = {
+            "agent_distance": {k: sum(v) for k, v in self.delta_agent_distance.items()},
+        }
+        results.update({"normalized_agent_distance": {k: v / self.human_stats[k] for k, v in results.items()}})

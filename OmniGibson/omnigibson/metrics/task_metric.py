@@ -1,11 +1,19 @@
 import numpy as np
 import omnigibson as og
 from omnigibson.metrics.metric_base import MetricBase
+from typing import Optional
 
 
 class TaskMetric(MetricBase):
-    def __init__(self):
+    def __init__(self, human_stats: Optional[dict] = None):
         self.timesteps = 0
+        self.human_stats = human_stats
+        if human_stats is None:
+            print("No human stats provided.")
+        else:
+            self.human_stats = {
+                "steps": self.human_stats["length"],
+            }
 
     def start_callback(self, env):
         self.timesteps = 0
@@ -29,5 +37,6 @@ class TaskMetric(MetricBase):
             "time": {
                 "simulator_steps": self.timesteps,
                 "simulator_time": self.timesteps * self.render_timestep,
+                "normalized_time": self.timesteps / self.human_stats["steps"],
             },
         }
