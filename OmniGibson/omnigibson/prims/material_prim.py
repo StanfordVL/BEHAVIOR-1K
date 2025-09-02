@@ -394,7 +394,7 @@ class OmniPBRMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "OmniPBR.mdl" and asset_sub_identifier == "OmniPBR"
+        return asset_path.endswith("OmniPBR.mdl") and asset_sub_identifier == "OmniPBR"
 
     @property
     def mdl_name(self):
@@ -509,7 +509,7 @@ class VRayMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "omnigibson_vray_mtl.mdl" and asset_sub_identifier == "OmniGibsonVRayMtl"
+        return asset_path.endswith("omnigibson_vray_mtl.mdl") and asset_sub_identifier == "OmniGibsonVRayMtl"
 
     @property
     def mdl_name(self):
@@ -592,7 +592,7 @@ class OmniGlassMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "OmniGlass.mdl" and asset_sub_identifier == "OmniGlass"
+        return asset_path.endswith("OmniGlass.mdl") and asset_sub_identifier == "OmniGlass"
 
     @property
     def mdl_name(self):
@@ -648,8 +648,8 @@ class OmniSurfaceMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return (asset_path == "OmniSurface.mdl" and asset_sub_identifier == "OmniSurface") or (
-            asset_path == "OmniSurfacePresets.mdl" and asset_sub_identifier.startswith("OmniSurface_")
+        return (asset_path.endswith("OmniSurface.mdl") and asset_sub_identifier == "OmniSurface") or (
+            asset_path.endswith("OmniSurfacePresets.mdl") and asset_sub_identifier.startswith("OmniSurface_")
         )
 
     @property

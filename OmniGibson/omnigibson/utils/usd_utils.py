@@ -676,11 +676,10 @@ class PoseAPI:
         cls._refresh()
 
         # Avoid premature imports
-        from omnigibson.utils.deprecated_utils import _get_world_pose_transform_w_scale
+        from omnigibson.utils.deprecated_utils import get_world_pose
 
-        result_transform = _get_world_pose_transform_w_scale(cls.PRIMS[prim_path])
-        scale, shear, quat, translate = T.decompose_mat(th.as_tensor(result_transform).unsqueeze(0))
-        return translate.squeeze(0), quat.squeeze(0)
+        position, orientation = get_world_pose(cls.PRIMS[prim_path])
+        return th.tensor(position, dtype=th.float32), th.tensor(orientation, dtype=th.float32)
 
     @classmethod
     def get_world_pose_with_scale(cls, prim_path):

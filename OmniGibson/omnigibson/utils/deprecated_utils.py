@@ -1101,3 +1101,12 @@ def _get_world_pose_transform_w_scale(fabric_prim):
         if parent_prim:
             parent_world_transform = _get_world_pose_transform_w_scale(parent_prim)
         return local_transform * parent_world_transform
+
+
+# This is a faster version than the native implementation, as it avoids pre-processing initially and also avoids
+# re-ordering the quaternion
+def get_world_pose(fabric_prim):
+    result_transform = _get_world_pose_transform_w_scale(fabric_prim)
+    result_transform.Orthonormalize()
+    result_transform = np.transpose(result_transform)
+    return result_transform[:3, 3], R.from_matrix(result_transform[:3, :3]).as_quat()
