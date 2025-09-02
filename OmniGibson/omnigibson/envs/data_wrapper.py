@@ -952,7 +952,7 @@ class DataPlaybackWrapper(DataWrapper):
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
-            video_writers: Optional video writers to record the playback
+            video_writers (Any): Optional video writers to record the playback
         """
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
