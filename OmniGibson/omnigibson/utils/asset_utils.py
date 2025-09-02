@@ -455,11 +455,7 @@ def download_omnigibson_robot_assets():
     if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
         print("Assets already downloaded.")
     else:
-        snapshot_download(
-            repo_id="behavior-1k/omnigibson-robot-assets",
-            repo_type="dataset",
-            local_dir=get_dataset_path("omnigibson-robot-assets"),
-        )
+        subprocess.run(["git", "clone", "https://huggingface.co/datasets/behavior-1k/omnigibson-robot-assets", get_dataset_path("omnigibson-robot-assets")], check=True)
 
 
 def print_user_agreement():
@@ -568,22 +564,14 @@ def download_behavior_1k_assets(accept_license=False):
     if os.path.exists(get_dataset_path("behavior-1k-assets")):
         print("BEHAVIOR-1K dataset already installed.")
     else:
-        snapshot_download(
-            repo_id="behavior-1k/behavior-1k-assets",
-            repo_type="dataset",
-            local_dir=get_dataset_path("behavior-1k-assets"),
-        )
+        subprocess.run(["git", "clone", "https://huggingface.co/datasets/behavior-1k/behavior-1k-assets", get_dataset_path("behavior-1k-assets")], check=True)
 
 
 def download_2025_challenge_task_instances():
     if os.path.exists(get_dataset_path("2025-challenge-task-instances")):
         print("2025 BEHAVIOR Challenge Tasks dataset already installed.")
     else:
-        snapshot_download(
-            repo_id="behavior-1k/2025-challenge-task-instances",
-            repo_type="dataset",
-            local_dir=get_dataset_path("2025-challenge-task-instances"),
-        )
+        subprocess.run(["git", "clone", "https://huggingface.co/datasets/behavior-1k/2025-challenge-task-instances", get_dataset_path("2025-challenge-task-instances")], check=True)
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
