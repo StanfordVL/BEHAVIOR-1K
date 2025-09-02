@@ -397,29 +397,6 @@ def get_behavior_1k_assets_version():
         return None
 
 
-def get_available_g_scenes():
-    """
-    Returns:
-        list: available Gibson scenes
-    """
-    data_path = og.g_dataset_path
-    available_g_scenes = sorted([f for f in os.listdir(data_path) if not is_dot_file(f)])
-    return available_g_scenes
-
-
-def get_scene_path(scene_id):
-    """
-    Args:
-        scene_id (str): scene id, e.g., "Rs_int"
-
-    Returns:
-        str: scene path for this scene_id
-    """
-    data_path = og.g_dataset_path
-    assert scene_id in os.listdir(data_path), "Scene {} does not exist".format(scene_id)
-    return os.path.join(data_path, scene_id)
-
-
 def get_texture_file(mesh_file):
     """
     Get texture file
