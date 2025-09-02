@@ -4,6 +4,7 @@ from importlib.metadata import version
 import inspect
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import tempfile
@@ -600,8 +601,9 @@ def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None
 
 @contextlib.contextmanager
 def decrypted(encrypted_filename):
-    fpath = Path(encrypted_filename)
-    decrypted_filename = os.path.join(og.tempdir, f"{fpath.stem}.tmp{fpath.suffix}")
+    decrypted_filename_template = pathlib.Path(encrypted_filename.replace(".encrypted", ""))
+    decrypted_fd, decrypted_filename = tempfile.mkstemp(suffix=decrypted_filename_template.suffix, prefix=decrypted_filename_template.stem, dir=og.tempdir)
+    os.close(decrypted_fd)
     decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
     yield decrypted_filename
 
