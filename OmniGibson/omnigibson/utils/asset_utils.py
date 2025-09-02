@@ -308,11 +308,12 @@ def get_all_object_category_models_with_abilities(category, abilities):
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
         usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-        with extracted(decrypted(usd_path), usd_only=True) as fpath:
-            stage = lazy.pxr.Usd.Stage.Open(fpath)
-            prim = stage.GetDefaultPrim()
-            if supports_abilities(abilities_info, prim):
-                valid_models.append(model)
+        with decrypted(usd_path) as dpath:
+            with extracted(dpath, usd_only=True) as fpath:
+                stage = lazy.pxr.Usd.Stage.Open(fpath)
+                prim = stage.GetDefaultPrim()
+                if supports_abilities(abilities_info, prim):
+                    valid_models.append(model)
 
     return valid_models
 
@@ -334,15 +335,16 @@ def get_attachment_meta_links(category, model):
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
     usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-    with extracted(decrypted(usd_path), usd_only=True) as fpath:
-        stage = lazy.pxr.Usd.Stage.Open(fpath)
-        prim = stage.GetDefaultPrim()
-        attachment_meta_links = []
-        for child in prim.GetChildren():
-            if child.GetTypeName() == "Xform":
-                if any(meta_link_type in child.GetName() for meta_link_type in AttachedTo.meta_link_types):
-                    attachment_meta_links.append(child.GetName())
-        return attachment_meta_links
+    with decrypted(usd_path) as dpath:
+        with extracted(dpath, usd_only=True) as fpath:
+            stage = lazy.pxr.Usd.Stage.Open(fpath)
+            prim = stage.GetDefaultPrim()
+            attachment_meta_links = []
+            for child in prim.GetChildren():
+                if child.GetTypeName() == "Xform":
+                    if any(meta_link_type in child.GetName() for meta_link_type in AttachedTo.meta_link_types):
+                        attachment_meta_links.append(child.GetName())
+            return attachment_meta_links
 
 
 def get_omnigibson_robot_asset_git_hash():
