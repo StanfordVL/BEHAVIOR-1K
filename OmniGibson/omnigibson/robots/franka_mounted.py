@@ -1,6 +1,7 @@
 import os
 from omnigibson.macros import gm
 from omnigibson.robots.franka import FrankaPanda
+from omnigibson.utils.asset_utils import get_dataset_path
 
 
 class FrankaMounted(FrankaPanda):
@@ -21,16 +22,16 @@ class FrankaMounted(FrankaPanda):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted/usd/franka_mounted.usda")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_mounted/usd/franka_mounted.usda")
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_mounted/urdf/franka_mounted.urdf")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_mounted/urdf/franka_mounted.urdf")
 
     @property
     def curobo_path(self):
         return os.path.join(
-            gm.ASSET_PATH, "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml"
+            get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml"
         )
 
     @property

@@ -27,6 +27,7 @@ from omnigibson.systems.system_base import (
     get_all_system_names,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
@@ -314,7 +315,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         pass
 
     def _load_systems(self):
-        system_dir = os.path.join(gm.DATASET_PATH, "systems")
+        system_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "systems")
 
         available_systems = (
             {
@@ -760,12 +761,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     "version": omnigibson.utils.asset_utils.get_bddl_version(),
                     "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
                 },
-                "og_dataset": {
-                    "version": omnigibson.utils.asset_utils.get_og_dataset_version(),
+                "behavior-1k-assets": {
+                    "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
                 },
-                "assets": {
-                    "version": omnigibson.utils.asset_utils.get_asset_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_asset_git_hash(),
+                "omnigibson-robot-assets": {
+                    "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
+                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
             "metadata": self._task_metadata,

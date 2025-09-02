@@ -1,6 +1,7 @@
 import omnigibson as og
 from omnigibson.objects import DatasetObject
 from omnigibson.systems import MicroPhysicalParticleSystem
+from omnigibson.utils.asset_utils import get_dataset_path
 import omnigibson.lazy as lazy
 from bddl.activity import evaluate_state
 
@@ -405,7 +406,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
     env.scene.update_initial_file()
 
     # Save this as a stable file
-    path = os.path.join(gm.DATASET_PATH, "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json")
+    path = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", env.scene.scene_model, "json", f"{scene_model}_stable.json")
     og.sim.save(json_paths=[path])
 
     # record this feedback if requested

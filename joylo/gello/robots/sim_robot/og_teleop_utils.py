@@ -9,6 +9,7 @@ import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.prims import VisualGeomPrim
 from omnigibson.prims.material_prim import OmniPBRMaterialPrim
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.usd_utils import create_primitive_mesh, absolute_prim_path_to_scene_relative
 from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
@@ -946,7 +947,7 @@ def setup_ghost_robot(scene, task_cfg=None):
     # NOTE: Add ghost robot, but don't register it
     ghost = USDObject(
         name="ghost", 
-        usd_path=os.path.join(gm.ASSET_PATH, f"models/{ROBOT_TYPE.lower()}/usd/{ROBOT_TYPE.lower()}.usda"), 
+        usd_path=os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{ROBOT_TYPE.lower()}/usd/{ROBOT_TYPE.lower()}.usda"), 
         visual_only=True, 
         position=(task_cfg is not None and task_cfg["robot_start_position"]) or [0.0, 0.0, 0.0],
         orientation=(task_cfg is not None and task_cfg["robot_start_orientation"]) or [0.0, 0.0, 0.0, 1.0],

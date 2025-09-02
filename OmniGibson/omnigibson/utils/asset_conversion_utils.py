@@ -25,6 +25,7 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
 from omnigibson.utils.usd_utils import create_primitive_mesh
@@ -59,8 +60,6 @@ _MTL_MAP_TYPE_MAPPINGS = {
     "map_Ns": "reflection_ior",
 }
 
-_SPLIT_COLLISION_MESHES = False
-
 _META_LINK_RENAME_MAPPING = {
     "fillable": "container",
     "fluidsink": "particlesink",
@@ -86,6 +85,8 @@ _OPACITY_CATEGORIES = {"tree", "low_resolution_tree", "bush"}
 _VISUAL_ONLY_CATEGORIES = {
     "carpet",
 }
+
+_ALLOW_INSTANCING = False
 
 
 class _TorchEncoder(json.JSONEncoder):
@@ -134,109 +135,6 @@ def _tensor_to_space_script(array):
         str: String equivalent of @array
     """
     return " ".join(["{}".format(x) for x in array.tolist()])
-
-
-def _split_obj_file_into_connected_components(obj_fpath):
-    """
-    Splits an OBJ file into individual OBJ files, each containing a single connected mesh.
-
-    Args:
-        obj_fpath (str): The file path to the input OBJ file.
-
-    Returns:
-        int: The number of individual connected mesh files created.
-
-    The function performs the following steps:
-    1. Loads the OBJ file using trimesh.
-    2. Splits the loaded mesh into individual connected components.
-    3. Saves each connected component as a separate OBJ file in the same directory as the input file.
-    """
-    # Open file in trimesh
-    obj = trimesh.load(obj_fpath, file_type="obj", force="mesh")
-
-    # Split to grab all individual bodies
-    obj_bodies = obj.split(only_watertight=False)
-
-    # Procedurally create new files in the same folder as obj_fpath
-    out_fpath = os.path.dirname(obj_fpath)
-    out_fname_root = os.path.splitext(os.path.basename(obj_fpath))[0]
-
-    for i, obj_body in enumerate(obj_bodies):
-        # Write to a new file
-        obj_body.export(f"{out_fpath}/{out_fname_root}_{i}.obj", "obj")
-
-    # We return the number of splits we had
-    return len(obj_bodies)
-
-
-def _split_all_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
-    """
-    Splits the OBJ references in the given URDF file into separate files for each connected component.
-
-    This function parses a URDF file, finds all collision mesh references, splits the referenced OBJ files into
-    connected components, and updates the URDF file to reference these new OBJ files. The updated URDF file is
-    saved with a new name.
-
-    Args:
-        urdf_fpath (str): The file path to the URDF file to be processed.
-        name_suffix (str, optional): Suffix to append to the output URDF file name. Defaults to "split".
-        mesh_fpath_offset (str, optional): Offset path to the directory containing the mesh files. Defaults to ".".
-
-    Returns:
-        str: The file path to the newly created URDF file with split OBJ references.
-    """
-    tree = ET.parse(urdf_fpath)
-    root = tree.getroot()
-    urdf_dir = os.path.dirname(urdf_fpath)
-    out_fname_root = os.path.splitext(os.path.basename(urdf_fpath))[0]
-
-    def recursively_find_collision_meshes(ele):
-        # Finds all collision meshes starting at @ele
-        cols = []
-        for child in ele:
-            if child.tag == "collision":
-                # If the nested geom type is a mesh, add this to our running list along with its parent node
-                if child.find("./geometry/mesh") is not None:
-                    cols.append((child, ele))
-            elif child.tag == "visual":
-                # There will be no collision mesh internally here so we simply pass
-                continue
-            else:
-                # Recurisvely look through all children of the child
-                cols += recursively_find_collision_meshes(ele=child)
-
-        return cols
-
-    # Iterate over the tree and find all collision entries
-    col_elements = recursively_find_collision_meshes(ele=root)
-
-    # For each collision element and its parent, we remove the original one and create a set of new ones with their
-    # filename references changed
-    for col, parent in col_elements:
-        # Don't change the original
-        col_copy = deepcopy(col)
-        # Delete the original
-        parent.remove(col)
-        # Create new objs first so we know how many we need to create in the URDF
-        obj_fpath = col_copy.find("./geometry/mesh").attrib["filename"]
-        n_new_objs = _split_obj_file_into_connected_components(obj_fpath=f"{urdf_dir}/{mesh_fpath_offset}/{obj_fpath}")
-        # Create the new objs in the URDF
-        for i in range(n_new_objs):
-            # Copy collision again
-            col_copy_copy = deepcopy(col_copy)
-            # Modify the filename
-            fname = col_copy_copy.find("./geometry/mesh").attrib["filename"]
-            fname = fname.split(".obj")[0] + f"_{i}.obj"
-            col_copy_copy.find("./geometry/mesh").attrib["filename"] = fname
-            # Add to parent
-            parent.append(col_copy_copy)
-
-    # Finally, write this to a new file
-    urdf_out_path = f"{urdf_dir}/{out_fname_root}_{name_suffix}.urdf"
-    tree.write(urdf_out_path)
-
-    # Return the urdf it wrote to
-    return urdf_out_path
 
 
 def _set_omnipbr_mtl_diffuse(mtl_prim, texture):
@@ -333,9 +231,10 @@ def _get_visual_objs_from_urdf(urdf_path):
     return visual_objs
 
 
-def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path, dataset_root):
+def _force_asset_pipeline_materials(obj_prim, obj_category, obj_model, usd_path, dataset_root):
     """
-    Imports and binds rendering channels for a given object in an Omniverse USD stage.
+    Updates the object to use V-Ray and PBR materials rendered through the asset pipeline instead of
+    its currently assigned materials.
 
     This function performs the following steps:
     1. Removes existing material prims from the object.
@@ -349,7 +248,6 @@ def _import_rendering_channels(obj_prim, obj_category, obj_model, model_root_pat
         obj_prim (Usd.Prim): The USD prim representing the object.
         obj_category (str): The category of the object (e.g., "ceilings", "walls").
         obj_model (str): The model name of the object.
-        model_root_path (str): The root path of the model files.
         usd_path (str): The path to the USD file.
         dataset_root (str): The root path of the dataset containing the object files.
 
@@ -825,18 +723,18 @@ def _process_glass_link(prim):
         )
 
 
-def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_render_channels=False):
+def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_asset_pipeline_materials=False):
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
-    iGibson and OmniGibson datasets.
+    iGibson and BEHAVIOR-1K datasets.
 
     Args:
         usd_path (str): Path to USD file
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
         dataset_root (str): The root directory of the dataset.
-        import_render_channels (bool, optional): Flag to import rendering channels. Defaults to False.
+        force_asset_pipeline_materials (bool, optional): Flag to force the use of asset pipeline materials. Defaults to False.
 
     Raises:
         ValueError: If the bounding box size is not found in the metadata.
@@ -844,19 +742,19 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     Returns:
         bool: Success status of the conversion
     """
-    # Check if filepath exists
-    model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-    log.debug("Loading", usd_path, "for metadata import.")
+    usd_path = pathlib.Path(usd_path)
+    usd_dir = usd_path.parent
+    model_root_path = usd_dir.parent
 
     # Load model
-    lazy.isaacsim.core.utils.stage.open_stage(usd_path)
+    lazy.isaacsim.core.utils.stage.open_stage(str(usd_path))
     stage = lazy.isaacsim.core.utils.stage.get_current_stage()
     prim = stage.GetDefaultPrim()
 
     data = dict()
     for data_group in {"metadata", "mvbb_meta", "material_groups", "heights_per_link"}:
-        data_path = f"{model_root_path}/misc/{data_group}.json"
-        if exists(data_path):
+        data_path = model_root_path / f"misc/{data_group}.json"
+        if data_path.exists():
             # Load data
             with open(data_path, "r") as f:
                 data[data_group] = json.load(f)
@@ -953,20 +851,12 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     prim.SetCustomData(data)
 
     # Add material channels
-    # log.debug(f"prim children: {prim.GetChildren()}")
-    # looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
-    # looks_prim = prim.GetChildren()[0] #lazy.isaacsim.core.utils.prims.get_prim_at_path(looks_prim_path)
-    # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
-    # mat_prim = looks_prim.GetChildren()[0] #lazy.isaacsim.core.utils.prims.get_prim_at_path(mat_prim_path)
-    # log.debug(f"looks children: {looks_prim.GetChildren()}")
-    # log.debug(f"mat prim: {mat_prim}")
-    if import_render_channels:
-        _import_rendering_channels(
+    if force_asset_pipeline_materials:
+        _force_asset_pipeline_materials(
             obj_prim=prim,
             obj_category=obj_category,
             obj_model=obj_model,
-            model_root_path=model_root_path,
-            usd_path=usd_path,
+            usd_path=str(usd_path),
             dataset_root=dataset_root,
         )
     for link, link_tags in data["metadata"]["link_tags"].items():
@@ -990,7 +880,6 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, import_
     for i, mat_prim in enumerate(mat_prims):
         mat = MaterialPrim(mat_prim.GetPrimPath().pathString, f"mat{i}")
         mat.load(DummyScene)
-        mat.shader_update_asset_paths_with_root_path(root_path=os.path.dirname(usd_path), relative=True)
 
     # Save stage
     stage.Save()
@@ -1109,11 +998,11 @@ def _create_urdf_import_config(
     return import_config
 
 
-def import_obj_urdf(
+def convert_urdf_to_usd(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_root=gm.CUSTOM_DATASET_PATH,
+    dataset_name="custom_dataset",
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -1125,7 +1014,7 @@ def import_obj_urdf(
         urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
-        dataset_root (str): The root directory of the dataset.
+        dataset_name (str): The name of the dataset.
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
@@ -1137,6 +1026,7 @@ def import_obj_urdf(
             - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for meta links
+    dataset_root = get_dataset_path(dataset_name)
     urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
@@ -1145,22 +1035,214 @@ def import_obj_urdf(
         use_convex_decomposition=use_omni_convex_decomp,
         merge_fixed_joints=merge_fixed_joints,
     )
-    # Check if filepath exists
-    usd_path = f"{dataset_root}/objects/{obj_category}/{obj_model}/usd/{obj_model}.{'usda' if use_usda else 'usd'}"
-    if _SPLIT_COLLISION_MESHES:
-        log.debug(f"Converting collision meshes from {obj_category}, {obj_model}...")
-        urdf_path = _split_all_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
+
+    # Pre-clear the scene.
+    og.sim.clear()
+
+    model_root_path = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model
+    usd_dir = model_root_path / "usd"
+    usd_filename = obj_model + (".usda" if use_usda else ".usd")
+    usd_path = usd_dir / usd_filename
     log.debug(f"Importing {obj_category}, {obj_model} into path {usd_path}...")
     # Only import if it doesn't exist
     lazy.omni.kit.commands.execute(
         "URDFParseAndImportFile",
         urdf_path=urdf_path,
         import_config=cfg,
-        dest_path=usd_path,
+        dest_path=str(usd_path),
     )
-    log.debug(f"Imported {obj_category}, {obj_model}")
 
-    return urdf_path, usd_path
+    # Also clear again to release the file.
+    og.sim.clear()
+
+    # Find all the relevant files
+    configuration_dir = usd_dir / "configuration"
+    physics_usd_path = configuration_dir / f"{obj_model}_physics.usd"
+    sensor_usd_path = configuration_dir / f"{obj_model}_sensor.usd"
+    base_usd_path = configuration_dir / f"{obj_model}_base.usd"
+
+    # Remove the mixed and sensor files
+    usd_path.unlink()
+    sensor_usd_path.unlink()
+
+    # Move the materials directory contents
+    current_materials = configuration_dir / "materials" / "textures"
+    new_materials = model_root_path / "material"
+    if current_materials.exists():
+        new_materials.mkdir()
+        for texture in current_materials.iterdir():
+            texture.rename(new_materials / texture.name)
+
+    # Load the physics stage and prepare to flatten it and save it.
+    physics_stage = lazy.pxr.Usd.Stage.Open(str(physics_usd_path))
+
+    # Prior to flattening things, we want to remove all instanceable flags and refs. We do this because
+    # if you flatten with instancing the flatten function ends up duplicating the whole mesh tree.
+    # We keep track to reenable them post-flattening
+    instanceable_prims_and_refs = {}
+    for prim in physics_stage.Traverse():
+        arcs = lazy.pxr.Usd.PrimCompositionQuery.GetDirectReferences(prim).GetCompositionArcs()
+        if not arcs:
+            continue
+        assert len(arcs) == 1, f"Expected only one reference arc for {prim.GetPath()}"
+        instanceable_prims_and_refs[str(prim.GetPath())] = (
+            str(arcs[0].GetTargetPrimPath()),
+            prim.IsInstanceable(),
+        )
+    for instanceable_prim_path, _ in instanceable_prims_and_refs.items():
+        instanceable_prim = physics_stage.GetPrimAtPath(instanceable_prim_path)
+        instanceable_prim.SetInstanceable(False)
+        instanceable_prim.GetReferences().ClearReferences()
+
+    # Flatten everything and save at the target location.
+    physics_stage.Flatten()
+    physics_stage.Export(str(usd_path))
+    del physics_stage
+
+    # Now reload at the correct path.
+    side_stage = lazy.pxr.Usd.Stage.Open(str(usd_path))
+
+    # Return everything back to its original reference state.
+    for instanceable_prim_path, (ref, is_instanceable) in instanceable_prims_and_refs.items():
+        instanceable_prim = side_stage.GetPrimAtPath(instanceable_prim_path)
+        instanceable_prim.SetInstanceable(is_instanceable and _ALLOW_INSTANCING)
+        instanceable_prim.GetReferences().AddReference("", ref)
+
+    # Also update the asset paths
+    def _update_path(asset_path):
+        # Get the absolute path - the asset path is relative to where the USD is.
+        absolute_asset_path = (usd_dir / asset_path).resolve()
+        absolute_original_materials_path = current_materials.resolve()
+
+        # If the file is not in our current materials directory, we don't update.
+        if not absolute_asset_path.is_relative_to(absolute_original_materials_path):
+            return asset_path
+
+        # Otherwise, first get the new absolute path of the asset in the new folder
+        relative_to_material_dir = absolute_asset_path.relative_to(absolute_original_materials_path)
+        absolute_moved_path = new_materials / relative_to_material_dir
+
+        # Finally, find where that file is relative to the path where the USD goes.
+        final_path = os.path.relpath(absolute_moved_path, usd_dir.resolve())
+        print("Updating", asset_path, "to", final_path)
+        return final_path
+
+    lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+
+    # Go through all of the prims in the visuals and colliders trees, and promote the mesh prims
+    # one level up, so instead of visuals -> linkname -> mesh we just have visuals -> linkname where
+    # the linkname prim has the mesh and xforms combined.
+    visuals_prim = side_stage.GetPrimAtPath("/visuals")
+    colliders_prim = side_stage.GetPrimAtPath("/colliders")
+    links = list(visuals_prim.GetChildren()) + list(colliders_prim.GetChildren())
+    wrappers = [wrapper for link in links for wrapper in link.GetChildren()]
+    for parent_prim in wrappers:
+        parent_path = parent_prim.GetPath()
+        grandparent_path = parent_path.GetParentPath()
+
+        # Find the child prim - it's actually away at a reference. There should be exactly one.
+        references = parent_prim.GetPrimStack()[0].referenceList.prependedItems
+        assert len(references) == 1, f"{parent_path} is not a reference!"
+        referenced_wrapper_path_str = str(references[0].primPath)
+        referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
+        assert referenced_wrapper_prim.IsValid()
+
+        child_prim = referenced_wrapper_prim.GetChild("mesh")
+        assert child_prim.IsValid()
+        child_path = child_prim.GetPath()
+
+        # Duplicate the properties on the parent prim onto the child.
+        for attr in parent_prim.GetAttributes():
+            if attr.IsAuthored():
+                # Get attribute info
+                attr_name = attr.GetName()
+                attr_type = attr.GetTypeName()
+
+                # Create or get the attribute on destination
+                dest_attr = child_prim.CreateAttribute(attr_name, attr_type)
+
+                # Copy the value
+                if attr.HasValue():
+                    dest_attr.Set(attr.Get())
+
+        # Delete the parent prim
+        del side_stage.GetRootLayer().GetPrimAtPath(grandparent_path).nameChildren[parent_path.name]
+
+        # Move the child prim to the parent's path.
+        assert lazy.pxr.Sdf.CopySpec(side_stage.GetRootLayer(), child_path, side_stage.GetRootLayer(), parent_path)
+
+        # Delete the child's original path
+        del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
+
+    # Remove the meshes hierarchy altogether
+    del side_stage.GetRootLayer().rootPrims["meshes"]
+
+    # Delete any collision groups
+    for child_prim in list(side_stage.Traverse()):
+        if child_prim.GetTypeName() == "PhysicsCollisionGroup":
+            del (
+                side_stage.GetRootLayer()
+                .GetPrimAtPath(child_prim.GetPath().GetParentPath())
+                .nameChildren[child_prim.GetPath().name]
+            )
+
+    # Find references to correct. The idea here is that we do not want our `visuals` or `collisions`
+    # prims to be references, because we want to be able to put properties on the meshes underneath.
+    # Instead, we'll just make the mesh prims instanceable.
+    found_reference_prims = {}
+    for possible_referrer in list(side_stage.Traverse()):
+        if not possible_referrer.IsValid():
+            continue
+        # Check if the prim has a reference on it
+        references = possible_referrer.GetPrimStack()[0].referenceList.prependedItems
+        if references:
+            assert possible_referrer.GetName() in ["visuals", "collisions"]
+            assert (
+                len(references) == 1
+            ), f"Expected exactly one reference for {possible_referrer.GetPath()}, got {len(references)}"
+            referrer_path = possible_referrer.GetPath()
+            referee_path = references[0].primPath
+            found_reference_prims[referrer_path] = referee_path
+            del side_stage.GetRootLayer().GetPrimAtPath(referrer_path.GetParentPath()).nameChildren[referrer_path.name]
+
+    # Create references for all of the individual meshes
+    for referrer_prim_path, referee_path in found_reference_prims.items():
+        referee_prim = side_stage.GetPrimAtPath(referee_path)
+
+        # Create an XFormPrim for the collisions/visuals tree
+        referrer_prim = lazy.pxr.UsdGeom.Xform.Define(side_stage, referrer_prim_path)
+
+        # For each of the mesh originals, add a reference to the collisions/visuals prim
+        for mesh_original in referee_prim.GetChildren():
+            # Get its type
+            assert mesh_original.IsValid(), f"Can't find mesh {mesh_original.GetPath()}"
+            prim_type = mesh_original.GetTypeName()
+
+            # Create the prim
+            name = mesh_original.GetName()
+            mesh_prim = side_stage.DefinePrim(referrer_prim.GetPath().AppendChild(name), prim_type)
+
+            # Add the collision APIs
+            if referrer_prim_path.name == "collisions":
+                collision_api = lazy.pxr.UsdPhysics.CollisionAPI.Apply(mesh_prim)
+                mesh_collision_api = lazy.pxr.UsdPhysics.MeshCollisionAPI.Apply(mesh_prim)
+                mesh_collision_api.GetApproximationAttr().Set("convexHull")
+                convex_hull_api = lazy.pxr.PhysxSchema.PhysxConvexHullCollisionAPI.Apply(mesh_prim)
+
+            # Add the reference to the actual collisions
+            mesh_prim.GetReferences().AddReference("", mesh_original.GetPath())
+
+            # Make it instanceable
+            mesh_prim.SetInstanceable(_ALLOW_INSTANCING)
+
+    # Flatten everything and save at the target location.
+    side_stage.Save()
+    del side_stage
+
+    # Remove the old stage files.
+    shutil.rmtree(configuration_dir)
+
+    return urdf_path, str(usd_path)
 
 
 def _pretty_print_xml(current, parent=None, index=-1, depth=0, use_tabs=False):
@@ -1393,15 +1475,12 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     Returns:
         str: The path to the updated URDF file.
     """
-    # Check if filepath exists
-    model_root_path = f"{dataset_root}/objects/{obj_category}/{obj_model}"
-
     # Load urdf
     tree = ET.parse(urdf_path)
     root = tree.getroot()
 
     # Load metadata
-    metadata_fpath = f"{model_root_path}/misc/metadata.json"
+    metadata_fpath = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model / "misc/metadata.json"
     with open(metadata_fpath, "r") as f:
         metadata = json.load(f)
 
@@ -1479,7 +1558,7 @@ def _add_meta_links_to_urdf(urdf_path, obj_category, obj_model, dataset_root):
     return _save_xmltree_as_urdf(
         root_element=root,
         name=f"{obj_model}_with_meta_links",
-        dirpath=f"{model_root_path}/urdf",
+        dirpath=os.path.dirname(urdf_path),
         unique_urdf=False,
     )
 
@@ -1542,9 +1621,11 @@ def _load_scene_from_urdf(urdf):
 
     for obj_name, obj_info in objs_info.items():
         try:
+            if obj_info["cfg"]["category"] in ["ceilings", "roof"]:
+                continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
-                    ".usd", ".encrypted.usd"
+                    ".usdz", ".usdz.encrypted"
                 )
             ):
                 log.warning("Missing object", obj_name)
@@ -1559,7 +1640,8 @@ def _load_scene_from_urdf(urdf):
             raise ValueError(f"Failed to load object {obj_name}") from e
 
     # Take a sim step
-    og.sim.step()
+    with og.sim.slowed():
+        og.sim.step()
 
 
 def _get_objects_config_from_scene_urdf(urdf):
@@ -1626,7 +1708,7 @@ def _get_objects_config_from_element(element, model_pose_info):
                 log.debug(name)
                 assert name in model_pose_info, f"Did not find {name} in current model pose info!"
                 model_pose_info[name]["cfg"]["category"] = ele.get("category")
-                model_pose_info[name]["cfg"]["visual_only"] = ele.get("category") in _VISUAL_ONLY_CATEGORIES
+                model_pose_info[name]["cfg"]["visual_only"] = True  # ele.get("category") in _VISUAL_ONLY_CATEGORIES
                 model_pose_info[name]["cfg"]["model"] = ele.get("model")
                 model_pose_info[name]["cfg"]["bounding_box"] = (
                     _space_string_to_tensor(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
@@ -2063,73 +2145,9 @@ def get_collision_approximation_for_urdf(
     )
 
 
-def copy_urdf_to_dataset(
-    urdf_path,
-    category,
-    mdl,
-    urdf_dep_paths=None,
-    dataset_root=gm.CUSTOM_DATASET_PATH,
-    suffix="original",
-    overwrite=False,
-):
-    """
-    Copies a URDF file and its dependencies to a structured dataset directory.
-
-    Parameters:
-        urdf_path (str): Path to the source URDF file.
-        category (str): Category name for organizing the model in the dataset.
-        mdl (str): Model identifier/name.
-        urdf_dep_paths (list, optional): List of relative paths to URDF dependencies.
-            If None, dependencies will be automatically detected. Defaults to None.
-        dataset_root (str, optional): Root directory of the dataset.
-            Defaults to gm.CUSTOM_DATASET_PATH.
-        suffix (str, optional): Suffix to append to the model name in the new URDF.
-            Defaults to "original".
-        overwrite (bool, optional): Whether to overwrite existing directories.
-            If False, raises an assertion error if target directory exists.
-            Defaults to False.
-
-    Returns:
-        str: Path to the newly created URDF file in the dataset.
-
-    Raises:
-        AssertionError: If the target directory already exists and overwrite is False.
-    """
-    # Create a directory for the object
-    obj_dir = pathlib.Path(dataset_root) / "objects" / category / mdl / "urdf"
-    if not overwrite:
-        assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
-    obj_dir.mkdir(parents=True, exist_ok=True)
-
-    # Copy over all relevant meshes to new obj directory
-    old_urdf_dir = pathlib.Path(os.path.dirname(urdf_path))
-
-    # Load urdf
-    tree = ET.parse(urdf_path)
-    root = tree.getroot()
-
-    # Find all mesh paths, and replace them with new obj directory
-    # urdf_dep_paths should be relative paths wrt the original URDF path
-    new_dirs = set() if urdf_dep_paths is None else set(urdf_dep_paths)
-    for mesh_type in ["visual", "collision"]:
-        for mesh_element in root.findall(f"link/{mesh_type}/geometry/mesh"):
-            mesh_root_dir = mesh_element.attrib["filename"].split("/")[0]
-            new_dirs.add(mesh_root_dir)
-    for new_dir in new_dirs:
-        shutil.copytree(old_urdf_dir / new_dir, obj_dir / new_dir, dirs_exist_ok=overwrite)
-
-    # Export this URDF
-    return _save_xmltree_as_urdf(
-        root_element=root,
-        name=f"{mdl}_{suffix}",
-        dirpath=obj_dir,
-        unique_urdf=False,
-    )
-
-
 def generate_urdf_for_mesh(
     asset_path,
-    obj_dir,
+    out_dir,
     category,
     mdl,
     collision_method=None,
@@ -2138,9 +2156,7 @@ def generate_urdf_for_mesh(
     scale=1.0,
     check_scale=False,
     rescale=False,
-    dataset_root=None,
     overwrite=False,
-    n_submesh=10,
 ):
     """
     Generate URDF file for either single mesh or articulated files.
@@ -2148,7 +2164,7 @@ def generate_urdf_for_mesh(
 
     Args:
         asset_path (str): Path to the input mesh file (.obj, .glb, .gltf)
-        obj_dir (str): Output directory
+        out_dir (str): Output directory
         category (str): Category name for the object
         mdl (str): Model name
         collision_method (str or None): Method for generating collision meshes ("convex", "coacd", or None)
@@ -2157,354 +2173,115 @@ def generate_urdf_for_mesh(
         scale (float): User choice scale, will be overwritten if check_scale and rescale
         check_scale (bool): Whether to check mesh size based on heuristic
         rescale (bool): Whether to rescale mesh if check_scale
-        dataset_root (str or None): Root directory for the dataset
         overwrite (bool): Whether to overwrite existing files
-        n_submesh (int): If submesh number is more than n_submesh, will not convert and skip
     """
 
-    # Validate file format
-    valid_formats = trimesh.available_formats()
-    mesh_format = pathlib.Path(asset_path).suffix[1:]  # Remove the dot
-    assert mesh_format in valid_formats, f"Invalid mesh format: {mesh_format}. Valid formats: {valid_formats}"
-    assert mesh_format in [
-        "obj",
-        "glb",
-        "gltf",
-    ], "Not obj, glb, gltf file, can only deal with these file types"
+    # Convert out_dir to Path object
+    if isinstance(out_dir, str):
+        out_dir = pathlib.Path(out_dir)
+    if isinstance(asset_path, str):
+        asset_path = pathlib.Path(asset_path)
 
-    # Convert obj_dir to Path object
-    if isinstance(obj_dir, str):
-        obj_dir = pathlib.Path(obj_dir)
+    # Validate that the filename starts with a letter. Isaac 4.5 has issues if you don't do this.
+    assert asset_path.stem[
+        0
+    ].isalpha(), f"Invalid asset path: {asset_path}. Isaac Sim expects the filename to start with a letter."
 
     # Create directory structure
     if not overwrite:
-        assert not obj_dir.exists(), f"Object directory {obj_dir} already exists!"
-    obj_dir.mkdir(parents=True, exist_ok=True)
+        assert not out_dir.exists(), f"Object directory {out_dir} already exists!"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     obj_name = "_".join([category, mdl])
 
-    # Dictionary to store links with their visual and collision meshes
-    links = {}
+    visual_mesh = trimesh.load(str(asset_path), force="mesh", process=False, skip_materials=True)
+    if isinstance(visual_mesh, list):
+        visual_mesh = visual_mesh[0]  # Take first mesh if multiple
 
-    # Load and process based on file type
-    if mesh_format == "obj":
-        # Handle single mesh files with original loading method
-        visual_mesh = trimesh.load(asset_path, force="mesh", process=False)
-        if isinstance(visual_mesh, list):
-            visual_mesh = visual_mesh[0]  # Take first mesh if multiple
+    # Generate collision meshes if requested
+    collision_meshes = []
+    if collision_method is not None:
+        collision_meshes = generate_collision_meshes(
+            visual_mesh, method=collision_method, hull_count=hull_count, error_handling=True
+        )
 
-        # Generate collision meshes if requested
-        collision_meshes = []
-        if collision_method is not None:
-            collision_meshes = generate_collision_meshes(
-                visual_mesh, method=collision_method, hull_count=hull_count, error_handling=True
-            )
-
-        # Add to links dictionary as a single link named "base_link"
-        links["base_link"] = {"visual_mesh": visual_mesh, "collision_meshes": collision_meshes, "transform": th.eye(4)}
-
-    elif mesh_format in ["glb", "gltf"]:
-        # Handle articulated files
-        scene = trimesh.load(asset_path)
-        # Count geometries (submeshes)
-        submesh_count = len(scene.geometry)
-        if submesh_count > n_submesh:
-            print(f"❌ Submesh count: {submesh_count} > {n_submesh}, skipping")
-            return None
-
-        # Get transforms from graph and extract each geometry as a separate link
-        link_index = 0
-        for node_name in scene.graph.nodes_geometry:
-            geometry_name = scene.graph[node_name][1]
-            if not isinstance(geometry_name, str):
-                print(f"Warning: Skipping node {node_name} with non-string geometry name: {geometry_name}")
-                continue
-
-            # Get the geometry and transform
-            geometry = scene.geometry[geometry_name]
-
-            transform, _ = scene.graph.get(frame_to=node_name, frame_from=scene.graph.base_frame)
-            transform_tensor = th.from_numpy(transform.copy()).float()
-
-            # Process the geometry based on its type
-            if isinstance(geometry, trimesh.Trimesh):
-                # Create a link name based on the node name or index
-                link_name = f"link_{link_index}"
-                if node_name and isinstance(node_name, str):
-                    # Clean up node name to make it a valid link name
-                    link_name = "link_" + "".join(c if c.isalnum() or c == "_" else "_" for c in node_name)
-
-                # Create a copy of the geometry
-                visual_mesh = geometry.copy()
-
-                # Generate collision meshes if requested
-                collision_meshes = []
-                if collision_method is not None:
-                    # Create collision meshes based on the original geometry
-                    # (not transformed yet - we'll handle transforms at the URDF level)
-                    collision_meshes = generate_collision_meshes(
-                        geometry,
-                        method=collision_method,
-                        hull_count=hull_count,
-                        discard_not_volume=True,
-                        error_handling=True,
-                    )
-
-                # Add to links dictionary with original transform
-                links[link_name] = {
-                    "visual_mesh": visual_mesh,
-                    "collision_meshes": collision_meshes,
-                    "transform": transform_tensor,
-                    "node_name": node_name,
-                }
-                link_index += 1
-
-            elif isinstance(geometry, (list, tuple)):
-                # Handle cases where geometry is a list of meshes
-                for i, submesh in enumerate(geometry):
-                    if isinstance(submesh, trimesh.Trimesh):
-                        # Create a link name
-                        link_name = f"link_{link_index}"
-                        if node_name and isinstance(node_name, str):
-                            link_name = f"link_{node_name}_{i}"
-
-                        # Create a copy of the submesh
-                        visual_mesh = submesh.copy()
-
-                        # Generate collision meshes if requested
-                        collision_meshes = []
-
-                        if collision_method is not None:
-                            # Create collision meshes based on the original geometry
-                            collision_meshes = generate_collision_meshes(
-                                submesh,
-                                method=collision_method,
-                                hull_count=hull_count,
-                                discard_not_volume=True,
-                                error_handling=True,
-                            )
-
-                        # Add to links dictionary with original transform
-                        links[link_name] = {
-                            "visual_mesh": visual_mesh,
-                            "collision_meshes": collision_meshes,
-                            "transform": transform_tensor,
-                            "node_name": f"{node_name}_{i}",
-                        }
-                        link_index += 1
-
-        if not links:
-            print("Warning: No valid meshes found in the scene!")
-            print("Scene contents:")
-            print(f"Geometries: {scene.geometry}")
-            print(f"Graph: {scene.graph}")
-            raise ValueError("No valid meshes found in the input file")
-    else:
-        raise ValueError(f"Unsupported file format: {mesh_format}")
+    # Keep track of the base transform
+    rpy = [0, 0, 0]
 
     # Handle rotation for up_axis if needed
     if up_axis == "y":
-        rotation_matrix = trimesh.transformations.rotation_matrix(math.pi / 2, [1, 0, 0])
-        rotation_tensor = th.from_numpy(rotation_matrix).float()
-
-        for link_name, link_data in links.items():
-            # Update the transform - we'll apply the actual transforms later
-            link_data["transform"] = th.matmul(rotation_tensor, link_data["transform"])
+        rpy = [math.pi / 2, 0, 0]
 
     # Compute new scale if check_scale = True
     new_scale = 1.0
 
     if check_scale:
-        if links:
-            # Find the link with the biggest bounding box
-            max_bbox_size = [0, 0, 0]
-            max_bbox_link = None
+        # Find the link with the biggest bounding box
+        bbox_size = visual_mesh.bounding_box.extents
 
-            for link_name, link_data in links.items():
-                # Apply the transform to get the correct size
-                temp_mesh = link_data["visual_mesh"].copy()
-                temp_mesh.apply_transform(link_data["transform"].numpy())
-                bbox_size = temp_mesh.bounding_box.extents
+        click.echo(f"Visual mesh bounding box size: {bbox_size}")
 
-                # Check if this link has a bigger dimension than the current max
-                if any(s > max_s for s, max_s in zip(bbox_size, max_bbox_size)):
-                    max_bbox_size = bbox_size
-                    max_bbox_link = link_name
-
-            click.echo(f"Largest visual mesh bounding box size: {max_bbox_size} (link: {max_bbox_link})")
-
-            # Check if any dimension is too large (> 100)
-            if any(size > 5.0 for size in max_bbox_size):
-                if any(size > 50.0 for size in max_bbox_size):
-                    if any(size > 500.0 for size in max_bbox_size):
-                        new_scale = 0.001
-                    else:
-                        new_scale = 0.01
+        # Check if any dimension is too large (> 100)
+        if any(size > 5.0 for size in bbox_size):
+            if any(size > 50.0 for size in bbox_size):
+                if any(size > 500.0 for size in bbox_size):
+                    new_scale = 0.001
                 else:
-                    new_scale = 0.1
-
-                click.echo(
-                    "Warning: The bounding box sounds a bit large. "
-                    "We just wanted to confirm this is intentional. You can skip this check by passing check_scale = False."
-                )
-
-            # Check if any dimension is too small (< 0.01)
-            elif all(size < 0.005 for size in max_bbox_size):
-                new_scale = 1000.0
-                click.echo(
-                    "Warning: The bounding box sounds a bit small. "
-                    "We just wanted to confirm this is intentional. You can skip this check by passing check_scale = False."
-                )
-
+                    new_scale = 0.01
             else:
-                click.echo("Size is reasonable, no scaling")
+                new_scale = 0.1
+
+            click.echo(
+                "Warning: The bounding box sounds a bit large. "
+                "We just wanted to confirm this is intentional. You can skip this check by passing check_scale = False."
+            )
+
+        # Check if any dimension is too small (< 0.01)
+        elif all(size < 0.005 for size in bbox_size):
+            new_scale = 1000.0
+            click.echo(
+                "Warning: The bounding box sounds a bit small. "
+                "We just wanted to confirm this is intentional. You can skip this check by passing check_scale = False."
+            )
 
         else:
-            click.echo("Warning: No links found in the file!")
-            return None
+            click.echo("Size is reasonable, no scaling")
 
     # Rescale mesh if rescale= True, else scale based on function input scale
     if rescale:
         click.echo(f"Original scale {scale} be overwrtten to {new_scale}")
         scale = new_scale
 
-    if scale != 1.0:
-        click.echo(f"Adjusting scale to {scale}")
-        scale_transform = trimesh.transformations.scale_matrix(scale)
-        scale_tensor = th.from_numpy(scale_transform).float()
+    # Create directory structure for the output
+    obj_link_mesh_folder = out_dir / "shape"
+    obj_link_mesh_folder.mkdir(exist_ok=True)
+    obj_link_collision_mesh_folder = obj_link_mesh_folder / "collision"
+    obj_link_collision_mesh_folder.mkdir(exist_ok=True)
 
-        for link_name, link_data in links.items():
-            # Update the transform - we'll apply the actual transforms later
-            link_data["transform"] = th.matmul(scale_tensor, link_data["transform"])
+    # Process collision meshes
+    collision_info = []
+    for i, collision_mesh in enumerate(collision_meshes):
+        # Export collision mesh filename
+        collision_filename = f"{obj_name}_base_link_collision_{i}.obj"
 
-    # Create temporary directory for processing
-    with tempfile.TemporaryDirectory() as temp_dir:
-        temp_dir_path = pathlib.Path(temp_dir)
+        # Scale collision mesh to unit bbox if needed
+        bounding_box = collision_mesh.bounding_box.extents
+        assert all(x > 0 for x in bounding_box), f"Invalid bounding box: {bounding_box}"
 
-        # Create directory structure for the output
-        obj_link_mesh_folder = obj_dir / "shape"
-        obj_link_mesh_folder.mkdir(exist_ok=True)
-        obj_link_visual_mesh_folder = obj_link_mesh_folder / "visual"
-        obj_link_visual_mesh_folder.mkdir(exist_ok=True)
-        obj_link_collision_mesh_folder = obj_link_mesh_folder / "collision"
-        obj_link_collision_mesh_folder.mkdir(exist_ok=True)
-        obj_link_material_folder = obj_dir / "material"
-        obj_link_material_folder.mkdir(exist_ok=True)
+        collision_scale = 1.0 / bounding_box
+        collision_scale_matrix = th.eye(4)
+        collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
 
-        # Dictionary to store information for URDF generation
-        urdf_links = {}
+        # Create a copy to avoid modifying the original
+        scaled_collision_mesh = collision_mesh.copy()
+        scaled_collision_mesh.apply_transform(collision_scale_matrix.numpy())
 
-        # Process each link
-        for link_name, link_data in links.items():
-            visual_mesh = link_data["visual_mesh"].copy()  # Create a copy to avoid modifying original
-            collision_meshes = [mesh.copy() for mesh in link_data["collision_meshes"]]  # Copy all collision meshes
-            transform = link_data["transform"]
+        # Export collision mesh
+        collision_path = obj_link_collision_mesh_folder / collision_filename
+        scaled_collision_mesh.export(collision_path, file_type="obj")
 
-            # Apply transform to visual mesh before exporting
-            visual_mesh.apply_transform(transform.numpy())
-
-            # Export the transformed mesh
-            visual_filename = f"{obj_name}_{link_name}.obj"
-            visual_temp_path = temp_dir_path / visual_filename
-            visual_mesh.export(visual_temp_path, file_type="obj")
-
-            # Check for material files
-            material_files = [x for x in temp_dir_path.iterdir() if x.suffix == ".mtl"]
-            material_filename = None
-
-            if material_files:
-                # Process material file if exists
-                material_file = material_files[0]
-                material_filename = f"{obj_name}_{link_name}.mtl"
-
-                # Process MTL file (similar to original code)
-                with open(visual_temp_path, "r") as f:
-                    new_lines = []
-                    for line in f.readlines():
-                        if f"mtllib {material_file.name}" in line:
-                            line = f"mtllib {material_filename}\n"
-                        new_lines.append(line)
-
-                with open(visual_temp_path, "w") as f:
-                    for line in new_lines:
-                        f.write(line)
-
-                # Process texture references in MTL file
-                with open(material_file, "r") as f:
-                    new_lines = []
-                    for line in f.readlines():
-                        if "map_" in line:
-                            parts = line.split(" ", 1)
-                            if len(parts) > 1:
-                                map_kind, texture_filename = parts
-                                texture_filename = texture_filename.strip()
-                                map_kind = map_kind.strip().replace("map_", "")
-                                new_filename = f"../../material/{obj_name}_{link_name}_{map_kind}.png"
-
-                                # Copy texture file
-                                texture_from_path = temp_dir_path / texture_filename
-                                if texture_from_path.exists():
-                                    texture_to_path = (
-                                        obj_link_material_folder / f"{obj_name}_{link_name}_{map_kind}.png"
-                                    )
-                                    if not overwrite and texture_to_path.exists():
-                                        print(f"Warning: Texture file {texture_to_path} already exists!")
-                                    else:
-                                        shutil.copy2(texture_from_path, texture_to_path)
-
-                                # Update line
-                                line = f"{parts[0]} {new_filename}\n"
-                        new_lines.append(line)
-
-                # Write updated MTL file
-                with open(obj_link_visual_mesh_folder / material_filename, "w") as f:
-                    for line in new_lines:
-                        f.write(line)
-
-            # Copy visual mesh to final location
-            visual_final_path = obj_link_visual_mesh_folder / visual_filename
-            shutil.copy2(visual_temp_path, visual_final_path)
-
-            # Process collision meshes
-            collision_info = []
-            for i, collision_mesh in enumerate(collision_meshes):
-                # Apply transform to collision mesh before exporting
-                collision_mesh.apply_transform(transform.numpy())
-
-                # Export collision mesh filename
-                collision_filename = visual_filename.replace(".obj", f"_collision_{i}.obj")
-
-                # Scale collision mesh to unit bbox if needed
-                bounding_box = collision_mesh.bounding_box.extents
-                if all(x > 0 for x in bounding_box):
-                    collision_scale = 1.0 / bounding_box
-                    collision_scale_matrix = th.eye(4)
-                    collision_scale_matrix[:3, :3] = th.diag(th.as_tensor(collision_scale))
-
-                    # Create a copy to avoid modifying the original
-                    scaled_collision_mesh = collision_mesh.copy()
-                    scaled_collision_mesh.apply_transform(collision_scale_matrix.numpy())
-
-                    # Export collision mesh
-                    collision_path = obj_link_collision_mesh_folder / collision_filename
-                    scaled_collision_mesh.export(collision_path, file_type="obj")
-
-                    # Since we've already applied the transform, scale includes only the sizing adjustment
-                    collision_info.append({"filename": collision_filename, "scale": 1.0 / collision_scale})
-                else:
-                    print(f"Warning: Skipping collision mesh with invalid bounding box: {bounding_box}")
-
-            # Store information for URDF generation - now without transform since it's been applied
-            urdf_links[link_name] = {
-                "visual_filename": visual_filename,
-                "collision_info": collision_info,
-                "transform": th.eye(4),  # Identity transform since we've already applied it to the meshes
-            }
-
-    if mesh_format == "obj":
-        # Change the link name from "base_link" to "obj_link"
-        if "base_link" in urdf_links:
-            urdf_links["obj_link"] = urdf_links.pop("base_link")
+        # Since we've already applied the transform, scale includes only the sizing adjustment
+        collision_info.append({"filename": collision_path, "scale": 1.0 / collision_scale})
 
     # Generate URDF XML
     tree_root = ET.Element("robot")
@@ -2514,56 +2291,40 @@ def generate_urdf_for_mesh(
     base_link = ET.SubElement(tree_root, "link")
     base_link.attrib = {"name": "base_link"}
 
-    # Add all other links and joints to connect them to the base_link
-    for link_name, link_info in urdf_links.items():
-        # Create link element
-        link_xml = ET.SubElement(tree_root, "link")
-        link_xml.attrib = {"name": link_name}
+    rpy_str = " ".join(str(item) for item in rpy)
 
-        # Add visual geometry
-        visual_xml = ET.SubElement(link_xml, "visual")
-        visual_origin_xml = ET.SubElement(visual_xml, "origin")
-        visual_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}  # Zero transform since already applied
-        visual_geometry_xml = ET.SubElement(visual_xml, "geometry")
-        visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
-        visual_mesh_xml.attrib = {
-            "filename": os.path.join("shape", "visual", link_info["visual_filename"]).replace("\\", "/"),
-            "scale": "1 1 1",  # Using 1.0 scale since transform already applied
+    # Add visual geometry
+    visual_xml = ET.SubElement(base_link, "visual")
+    visual_origin_xml = ET.SubElement(visual_xml, "origin")
+    visual_origin_xml.attrib = {"xyz": "0 0 0", "rpy": rpy_str}
+    visual_geometry_xml = ET.SubElement(visual_xml, "geometry")
+    visual_mesh_xml = ET.SubElement(visual_geometry_xml, "mesh")
+    visual_mesh_xml.attrib = {
+        "filename": str(asset_path),
+        "scale": f"{scale} {scale} {scale}",
+    }
+
+    # Add collision geometries
+    for i, collision in enumerate(collision_info):
+        collision_xml = ET.SubElement(base_link, "collision")
+        collision_xml.attrib = {"name": f"base_link_collision_{i}"}
+        collision_origin_xml = ET.SubElement(collision_xml, "origin")
+        collision_origin_xml.attrib = {"xyz": "0 0 0", "rpy": rpy_str}  # Zero transform since already applied
+        collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
+        collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
+        collision_mesh_xml.attrib = {
+            "filename": str(collision["filename"]),
+            "scale": " ".join(str(item) for item in scale * collision["scale"]),
         }
-
-        # Add collision geometries
-        for i, collision in enumerate(link_info["collision_info"]):
-            collision_xml = ET.SubElement(link_xml, "collision")
-            collision_xml.attrib = {"name": f"{link_name}_collision_{i}"}
-            collision_origin_xml = ET.SubElement(collision_xml, "origin")
-            collision_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}  # Zero transform since already applied
-            collision_geometry_xml = ET.SubElement(collision_xml, "geometry")
-            collision_mesh_xml = ET.SubElement(collision_geometry_xml, "mesh")
-            collision_mesh_xml.attrib = {
-                "filename": os.path.join("shape", "collision", collision["filename"]).replace("\\", "/"),
-                "scale": " ".join(str(item) for item in collision["scale"]),
-            }
-
-        # Create a joint to connect this link to the base_link
-        joint_xml = ET.SubElement(tree_root, "joint")
-        joint_xml.attrib = {"name": f"{link_name}_joint", "type": "fixed"}
-
-        # Set parent and child links
-        parent_xml = ET.SubElement(joint_xml, "parent")
-        parent_xml.attrib = {"link": "base_link"}
-        child_xml = ET.SubElement(joint_xml, "child")
-        child_xml.attrib = {"link": link_name}
-
-        # Set origin for the joint with zeros since transform was applied to meshes
-        joint_origin_xml = ET.SubElement(joint_xml, "origin")
-        joint_origin_xml.attrib = {"xyz": "0 0 0", "rpy": "0 0 0"}
 
     # Save URDF file
     xmlstr = minidom.parseString(ET.tostring(tree_root)).toprettyxml(indent="   ")
     xmlio = io.StringIO(xmlstr)
     tree = ET.parse(xmlio)
 
-    urdf_path = obj_dir / f"{mdl}.urdf"
+    urdf_dir = out_dir / "urdf"
+    urdf_dir.mkdir(exist_ok=True)
+    urdf_path = urdf_dir / f"{mdl}.urdf"
     with open(urdf_path, "wb") as f:
         tree.write(f, xml_declaration=True)
 
@@ -2600,8 +2361,6 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
     for mesh, transform in vfk.items():
         scene.add_geometry(geometry=mesh, transform=transform)
 
-    # Calculate relevant metadata
-
     # Base link offset is pos offset from robot root link -> overall AABB center
     # Since robot is placed at origin, this is simply the AABB centroid
     base_link_offset = scene.bounding_box.centroid
@@ -2627,15 +2386,14 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
 def import_og_asset_from_urdf(
     category,
     model,
+    dataset_root,
     urdf_path=None,
-    urdf_dep_paths=None,
     collision_method="coacd",
     coacd_links=None,
     convex_links=None,
     no_decompose_links=None,
     visual_only_links=None,
     merge_fixed_joints=False,
-    dataset_root=gm.CUSTOM_DATASET_PATH,
     hull_count=32,
     overwrite=False,
     use_usda=False,
@@ -2649,8 +2407,6 @@ def import_og_asset_from_urdf(
         model (str): Model name to assign to imported asset
         urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
             converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
-        urdf_dep_paths (None or list of str): If specified, relative paths to the @urdf_path directory that should be copied
-            over to the custom dataset, e.g., relevant material directories
         collision_method (None or str): If specified, collision decomposition method to use to generate
             OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
         coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
@@ -2673,27 +2429,10 @@ def import_og_asset_from_urdf(
             - str: Absolute path to generated USD file
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
-    # If URDF already exists, write it to the dataset
-    if urdf_path is not None:
-        print(f"Copying URDF to dataset root {dataset_root}...")
-        urdf_path = copy_urdf_to_dataset(
-            urdf_path=urdf_path,
-            category=category,
-            mdl=model,
-            urdf_dep_paths=urdf_dep_paths,
-            dataset_root=dataset_root,
-            suffix="original",
-            overwrite=overwrite,
-        )
-    else:
-        # Verify that the object exists at the expected location
-        # This is <dataset_root>/objects/<category>/<model>/urdf/<model>_original.urdf
-        urdf_path = os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}_original.urdf")
-        assert os.path.exists(urdf_path), f"Expected urdf at dataset location {urdf_path}, but none was found!"
-
     # Make sure all scaling is positive
     model_dir = os.path.join(dataset_root, "objects", category, model)
-    urdf_path = make_asset_positive(urdf_fpath=urdf_path)
+    os.makedirs(model_dir, exist_ok=overwrite)
+    # urdf_path = make_asset_positive(urdf_fpath=urdf_path)
 
     # Update collisions if requested
     if collision_method is not None:
@@ -2721,7 +2460,7 @@ def import_og_asset_from_urdf(
     print("Converting obj URDF to USD...")
     og.launch()
     assert len(og.sim.scenes) == 0
-    urdf_path, usd_path = import_obj_urdf(
+    urdf_path, usd_path = convert_urdf_to_usd(
         urdf_path=urdf_path,
         obj_category=category,
         obj_model=model,
@@ -2731,16 +2470,7 @@ def import_og_asset_from_urdf(
         merge_fixed_joints=merge_fixed_joints,
     )
 
-    # Copy meta links URDF to original name of object model
-    shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
-
-    prim = import_obj_metadata(
-        usd_path=usd_path,
-        obj_category=category,
-        obj_model=model,
-        dataset_root=dataset_root,
-        import_render_channels=False,  # TODO: Make this True once we find a systematic / robust way to import materials of different source formats
-    )
+    prim = import_obj_metadata(usd_path=usd_path, obj_category=category, obj_model=model, dataset_root=dataset_root)
     print(
         f"\nConversion complete! Object has been successfully imported into OmniGibson-compatible USD, located at:\n\n{usd_path}\n"
     )

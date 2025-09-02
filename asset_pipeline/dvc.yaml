@@ -414,6 +414,14 @@ stages:
     - params.yaml
     outs:
     - artifacts/pipeline/combined_room_object_list.json
+  export_glbs:
+    cmd: python -m b1k_pipeline.export_glbs
+    deps:
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_objs.success
+    - b1k_pipeline/export_glbs.py
+    outs:
+    - artifacts/parallels/objects_glb.zip
   export_meshes:
     do:
       cmd: python b1k_pipeline/batch_3dsmax.py cad/${item}/processed.max b1k_pipeline/max/export_meshes.py

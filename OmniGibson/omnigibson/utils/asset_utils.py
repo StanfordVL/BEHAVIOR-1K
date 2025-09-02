@@ -12,6 +12,7 @@ from pathlib import Path
 from urllib.request import urlretrieve
 
 import bddl
+from huggingface_hub import snapshot_download
 import progressbar
 from cryptography.fernet import Fernet
 
@@ -54,7 +55,13 @@ def is_dot_file(p):
     return p.startswith(".")
 
 
-def get_og_avg_category_specs():
+def get_dataset_path(dataset_name):
+    return os.path.join(gm.DATA_PATH, dataset_name)
+
+def get_key_path():
+    return os.path.join(gm.DATA_PATH, "omnigibson.key")
+
+def get_avg_category_specs():
     """
     Load average object specs (dimension and mass) for objects
 
@@ -67,42 +74,42 @@ def get_og_avg_category_specs():
             return json.load(f)
     else:
         log.warning(
-            "Requested average specs of the object categories in the OmniGibson Dataset of objects, but the "
+            "Requested average specs of the object categories in the BEHAVIOR-1K Dataset of objects, but the "
             "file cannot be found. Did you download the dataset? Returning an empty dictionary"
         )
         return dict()
 
 
-def get_og_category_ids():
+def get_behavior_1k_category_ids():
     """
     Get OmniGibson object categories
 
     Returns:
         str: file path to the scene name
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_files = os.path.join(og_dataset_path, "metadata", "categories.txt")
+    behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
+    categories_files = os.path.join(behavior_1k_assets_path, "metadata", "categories.txt")
     name_to_id = {}
-    with open(og_categories_files, "r") as fp:
+    with open(categories_files, "r") as fp:
         for i, l in enumerate(fp.readlines()):
             name_to_id[l.rstrip()] = i
     return defaultdict(lambda: 255, name_to_id)
 
 
-def get_available_og_scenes():
+def get_available_behavior_1k_scenes():
     """
     OmniGibson interactive scenes
 
     Returns:
         list: Available OmniGibson interactive scenes
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_scenes_path = os.path.join(og_dataset_path, "scenes")
-    available_og_scenes = sorted([f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")])
-    return available_og_scenes
+    behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
+    behavior_1k_scenes_path = os.path.join(behavior_1k_assets_path, "scenes")
+    available_behavior_1k_scenes = sorted([f for f in os.listdir(behavior_1k_scenes_path) if (not is_dot_file(f) and f != "background")])
+    return available_behavior_1k_scenes
 
 
-def get_og_scene_path(scene_name):
+def get_scene_path(scene_name, dataset_name="behavior-1k-assets"):
     """
     Get OmniGibson scene path
 
@@ -112,14 +119,14 @@ def get_og_scene_path(scene_name):
     Returns:
         str: file path to the scene name
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_scenes_path = os.path.join(og_dataset_path, "scenes")
+    dataset_path = get_dataset_path(dataset_name)
+    scenes_path = os.path.join(dataset_path, "scenes")
     log.info("Scene name: {}".format(scene_name))
-    assert scene_name in os.listdir(og_scenes_path), "Scene {} does not exist".format(scene_name)
-    return os.path.join(og_scenes_path, scene_name)
+    assert scene_name in os.listdir(scenes_path), "Scene {} does not exist".format(scene_name)
+    return os.path.join(scenes_path, scene_name)
 
 
-def get_og_category_path(category_name):
+def get_category_path(category_name, dataset_name="behavior-1k-assets"):
     """
     Get OmniGibson object category path
 
@@ -129,13 +136,13 @@ def get_og_category_path(category_name):
     Returns:
         str: file path to the object category
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "objects")
-    assert category_name in os.listdir(og_categories_path), "Category {} does not exist".format(category_name)
-    return os.path.join(og_categories_path, category_name)
+    dataset_path = get_dataset_path(dataset_name)
+    categories_path = os.path.join(dataset_path, "objects")
+    assert category_name in os.listdir(categories_path), "Category {} does not exist".format(category_name)
+    return os.path.join(categories_path, category_name)
 
 
-def get_og_model_path(category_name, model_name):
+def get_model_path(category_name, model_name, dataset_name="behavior-1k-assets"):
     """
     Get OmniGibson object model path
 
@@ -146,11 +153,11 @@ def get_og_model_path(category_name, model_name):
     Returns:
         str: file path to the object model
     """
-    og_category_path = get_og_category_path(category_name)
-    assert model_name in os.listdir(og_category_path), "Model {} from category {} does not exist".format(
-        model_name, category_name
+    category_path = get_category_path(category_name, dataset_name=dataset_name)
+    assert model_name in os.listdir(category_path), "Model {} from category {} in dataset {} does not exist".format(
+        model_name, category_name, dataset_name
     )
-    return os.path.join(og_category_path, model_name)
+    return os.path.join(category_path, model_name)
 
 
 def get_all_system_categories(include_cloth=False):
@@ -163,10 +170,10 @@ def get_all_system_categories(include_cloth=False):
     Returns:
         list: all system categories
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "systems")
+    behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
+    categories_path = os.path.join(behavior_1k_assets_path, "systems")
 
-    categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    categories = [f for f in os.listdir(categories_path) if not is_dot_file(f)]
     if include_cloth:
         categories.append("cloth")
     return sorted(categories)
@@ -179,10 +186,7 @@ def get_all_object_categories():
     Returns:
         list: all object categories
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "objects")
-
-    categories = [f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    categories = {x.name for x in Path(gm.DATA_PATH).glob("*/objects/*") if x.is_dir() and not is_dot_file(x.name)}
     return sorted(categories)
 
 
@@ -193,19 +197,7 @@ def get_all_object_models():
     Returns:
         list: all object model paths
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "objects")
-
-    categories = os.listdir(og_categories_path)
-    categories = [item for item in categories if os.path.isdir(os.path.join(og_categories_path, item))]
-    models = []
-    for category in categories:
-        category_models = os.listdir(os.path.join(og_categories_path, category))
-        category_models = [
-            item for item in category_models if os.path.isdir(os.path.join(og_categories_path, category, item))
-        ]
-        models.extend([os.path.join(og_categories_path, category, item) for item in category_models])
-    return sorted(models)
+    return sorted({str(x) for x in Path(gm.DATA_PATH).glob("*/objects/*/*") if x.is_dir() and not is_dot_file(x.name)})
 
 
 def get_all_object_category_models(category):
@@ -218,9 +210,9 @@ def get_all_object_category_models(category):
     Returns:
         list of str: all object models belonging to @category
     """
-    og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "objects", category)
-    return sorted(os.listdir(og_categories_path)) if os.path.exists(og_categories_path) else []
+    behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
+    categories_path = os.path.join(behavior_1k_assets_path, "objects", category)
+    return sorted(os.listdir(categories_path)) if os.path.exists(categories_path) else []
 
 
 def get_all_object_category_models_with_abilities(category, abilities):
@@ -289,7 +281,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
 
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
-        usd_path = usd_path.replace(".usd", ".encrypted.usd")
+        usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
         with decrypted(usd_path) as fpath:
             stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
@@ -315,7 +307,7 @@ def get_attachment_meta_links(category, model):
     from omnigibson.objects.dataset_object import DatasetObject
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
-    usd_path = usd_path.replace(".usd", ".encrypted.usd")
+    usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
     with decrypted(usd_path) as fpath:
         stage = lazy.pxr.Usd.Stage.Open(fpath)
         prim = stage.GetDefaultPrim()
@@ -327,27 +319,27 @@ def get_attachment_meta_links(category, model):
         return attachment_meta_links
 
 
-def get_asset_git_hash():
+def get_omnigibson_robot_asset_git_hash():
     """
     Returns:
         str: OmniGibson asset commit hash
     """
     try:
         git_hash = subprocess.check_output(
-            ["git", "-C", gm.ASSET_PATH, "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
+            ["git", "-C", get_dataset_path("omnigibson-robot-assets"), "rev-parse", "HEAD"], shell=False, stderr=subprocess.DEVNULL
         )
         return git_hash.decode("utf-8").strip()
     except subprocess.CalledProcessError:
         return None
 
 
-def get_asset_version():
+def get_omnigibson_robot_asset_version():
     """
     Returns:
         str: OmniGibson assets version
     """
     try:
-        return (Path(gm.ASSET_PATH) / "VERSION").read_text().strip()
+        return (Path(get_dataset_path("omnigibson-robot-assets")) / "VERSION").read_text().strip()
     except FileNotFoundError:
         return None
 
@@ -388,13 +380,13 @@ def get_bddl_version():
     return version("bddl")
 
 
-def get_og_dataset_version():
+def get_behavior_1k_assets_version():
     """
     Returns:
-        str: OmniGibson dataset version
+        str: BEHAVIOR-1K dataset version
     """
     try:
-        return (Path(gm.DATASET_PATH) / "VERSION").read_text().strip()
+        return (Path(get_dataset_path("behavior-1k-assets")) / "VERSION").read_text().strip()
     except FileNotFoundError:
         return None
 
@@ -450,53 +442,14 @@ def get_texture_file(mesh_file):
     return texture_file
 
 
-def download_assets():
+def download_omnigibson_robot_assets():
     """
     Download OmniGibson assets
     """
-    if os.path.exists(gm.ASSET_PATH):
+    if os.path.exists(get_dataset_path("omnigibson-robot-assets")):
         print("Assets already downloaded.")
     else:
-        with tempfile.TemporaryDirectory() as td:
-            tmp_file = os.path.join(td, "og_assets.tar.gz")
-            os.makedirs(gm.ASSET_PATH, exist_ok=True)
-            path = "https://storage.googleapis.com/gibson_scenes/og_assets_3_7_0rc2.tar.gz"
-            log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-            assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
-            assert (
-                subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0
-            ), "Assets extraction failed."
-            # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
-
-
-def download_demo_data(accept_license=False):
-    """
-    Download OmniGibson demo dataset
-    """
-    # Print user agreement
-    if os.path.exists(gm.KEY_PATH):
-        print("OmniGibson dataset encryption key already installed.")
-    else:
-        if not accept_license:
-            print("\n")
-            print_user_agreement()
-            while input("Do you agree to the above terms for using OmniGibson dataset? [y/n]") != "y":
-                print("You need to agree to the terms for using OmniGibson dataset.")
-
-        download_key()
-
-    if os.path.exists(gm.DATASET_PATH):
-        print("OmniGibson dataset already installed.")
-    else:
-        tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
-        os.makedirs(gm.DATASET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_demo_1_0_0.tar.gz"
-        log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
-        assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
-        assert (
-            subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0
-        ), "Dataset extraction failed."
-
+        snapshot_download(repo_id="behavior-1k/omnigibson-robot-assets", repo_type="dataset", local_dir=get_dataset_path("omnigibson-robot-assets"))
 
 def print_user_agreement():
     print(
@@ -513,8 +466,7 @@ def print_user_agreement():
 
 
 def download_key():
-    os.makedirs(os.path.dirname(gm.KEY_PATH), exist_ok=True)
-    if not os.path.exists(gm.KEY_PATH):
+    if not os.path.exists(get_key_path()):
         _ = (() == ()) + (() == ())
         __ = ((_ << _) << _) * _
         ___ = (
@@ -583,41 +535,33 @@ def download_key():
             )
         )
         path = ___
-        assert urlretrieve(path, gm.KEY_PATH, show_progress), "Key download failed."
+        assert urlretrieve(path, get_key_path(), show_progress), "Key download failed."
 
 
-def download_og_dataset(accept_license=False):
+def download_behavior_1k_assets(accept_license=False):
     """
-    Download OmniGibson dataset
+    Download BEHAVIOR-1K dataset
     """
     # Print user agreement
-    if os.path.exists(gm.KEY_PATH):
-        print("OmniGibson dataset encryption key already installed.")
+    if os.path.exists(get_key_path()):
+        print("BEHAVIOR-1K dataset encryption key already installed.")
     else:
         if not accept_license:
             print("\n")
             print_user_agreement()
-            while input("Do you agree to the above terms for using OmniGibson dataset? [y/n]") != "y":
-                print("You need to agree to the terms for using OmniGibson dataset.")
+            while input("Do you agree to the above terms for using BEHAVIOR-1K dataset? [y/n]") != "y":
+                print("You need to agree to the terms for using BEHAVIOR-1K dataset.")
 
         download_key()
 
-    if os.path.exists(gm.DATASET_PATH):
-        print("OmniGibson dataset already installed.")
+    if os.path.exists(get_dataset_path("behavior-1k-assets")):
+        print("BEHAVIOR-1K dataset already installed.")
     else:
-        tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
-        os.makedirs(gm.DATASET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_3_7_0rc21.tar.gz"
-        log.info(f"Downloading and decompressing OmniGibson dataset from {path}")
-        assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
-        assert (
-            subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0
-        ), "Dataset extraction failed."
-        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+        snapshot_download(repo_id="behavior-1k/behavior-1k-assets", repo_type="dataset", local_dir=get_dataset_path("behavior-1k-assets"))
 
 
 def decrypt_file(encrypted_filename, decrypted_filename):
-    with open(gm.KEY_PATH, "rb") as filekey:
+    with open(get_key_path(), "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
 
@@ -631,7 +575,7 @@ def decrypt_file(encrypted_filename, decrypted_filename):
 
 
 def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None):
-    with open(gm.KEY_PATH, "rb") as filekey:
+    with open(get_key_path(), "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
 
@@ -657,17 +601,14 @@ def decrypted(encrypted_filename):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--download_assets", action="store_true", help="download assets file")
-    parser.add_argument("--download_demo_data", action="store_true", help="download demo data Rs")
-    parser.add_argument("--download_og_dataset", action="store_true", help="download OmniGibson Dataset")
-    parser.add_argument("--accept_license", action="store_true", help="pre-accept the OmniGibson dataset license")
+    parser.add_argument("--download_omnigibson_robot_assets", action="store_true", help="download assets file")
+    parser.add_argument("--download_behavior_1k_assets", action="store_true", help="download BEHAVIOR-1K Dataset")
+    parser.add_argument("--accept_license", action="store_true", help="pre-accept the BEHAVIOR-1K dataset license")
     args = parser.parse_args()
 
-    if args.download_assets:
-        download_assets()
-    if args.download_demo_data:
-        download_demo_data(accept_license=args.accept_license)
-    if args.download_og_dataset:
-        download_og_dataset(accept_license=args.accept_license)
+    if args.download_omnigibson_robot_assets:
+        download_omnigibson_robot_assets()
+    if args.download_behavior_1k_assets:
+        download_behavior_1k_assets(accept_license=args.accept_license)
 
     og.shutdown()

@@ -24,6 +24,7 @@ from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjec
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
+from omnigibson.utils.asset_utils import get_dataset_path
 
 from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
 
@@ -865,7 +866,7 @@ class OGRobotServer:
                 activity_definition_id=self.env.task.activity_definition_id,
                 activity_instance_id=self.instance_id,
             )
-            tro_file_path = f"{gm.DATASET_PATH}/scenes/{scene_model}/json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json"
+            tro_file_path = os.path.join(get_dataset_path("behavior-1k-assets"), f"scenes/{scene_model}/json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json")
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):
                 print(f"Task {self.env.task.activity_name} instance id: {self.instance_id} does not exist")

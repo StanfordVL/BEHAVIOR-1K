@@ -359,21 +359,15 @@ if [ "$OMNIGIBSON" = true ]; then
         
         export OMNI_KIT_ACCEPT_EULA=YES
         
-        echo "Installing data to:"
-        DATASET_PATH=$(python -c "from omnigibson.macros import gm; print(gm.DATASET_PATH)")
-        ASSET_PATH=$(python -c "from omnigibson.macros import gm; print(gm.ASSET_PATH)")
-        echo "  Dataset (~25GB): $DATASET_PATH"
-        echo "  Assets (~2.5GB): $ASSET_PATH"
-        
-        echo "Downloading dataset..."
-        python -c "from omnigibson.utils.asset_utils import download_og_dataset; download_og_dataset(accept_license=${DATASET_ACCEPT_FLAG})" || {
+        echo "Downloading BEHAVIOR-1K assets..."
+        python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=${DATASET_ACCEPT_FLAG})" || {
             echo "ERROR: Dataset installation failed"
             exit 1
         }
         
-        echo "Downloading assets..."
-        python -c "from omnigibson.utils.asset_utils import download_assets; download_assets()" || {
-            echo "ERROR: Assets installation failed"
+        echo "Downloading OmniGibson robot assets..."
+        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
+            echo "ERROR: OmniGibson robot assets installation failed"
             exit 1
         }
     fi

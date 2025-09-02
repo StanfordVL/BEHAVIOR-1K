@@ -5,6 +5,7 @@ import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.utils.asset_utils import get_dataset_path
 
 
 class FrankaPanda(ManipulationRobot):
@@ -274,16 +275,16 @@ class FrankaPanda(ManipulationRobot):
     @property
     def usd_path(self):
         return (
-            os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/usd/franka_panda.usda")
+            os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_panda/usd/franka_panda.usda")
             if self.model_name == "franka_panda"
-            else os.path.join(gm.ASSET_PATH, f"models/franka/franka_dexhand/{self.model_name}.usd")
+            else os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/franka/franka_dexhand/{self.model_name}.usd")
         )
 
     @property
     def urdf_path(self):
         # Only supported for normal franka now
         assert self._model_name == "franka_panda", f"Only franka_panda has urdf currently. Got: {self._model_name}"
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda/urdf/franka_panda.urdf")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_panda/urdf/franka_panda.urdf")
 
     @property
     def curobo_path(self):
@@ -292,7 +293,7 @@ class FrankaPanda(ManipulationRobot):
             self._model_name == "franka_panda"
         ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
         return os.path.join(
-            gm.ASSET_PATH, "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml"
+            get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml"
         )
 
     @cached_property

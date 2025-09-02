@@ -59,7 +59,7 @@ class DataWrapper(EnvironmentWrapper):
         self.current_traj_history = []
 
         Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
-        log.info(f"\nWriting OmniGibson dataset hdf5 to: {output_path}\n")
+        log.info(f"\nWriting dataset hdf5 to: {output_path}\n")
         self.hdf5_file = h5py.File(output_path, "w" if overwrite else "a")
         if "data" not in set(self.hdf5_file.keys()):
             data_grp = self.hdf5_file.create_group("data")

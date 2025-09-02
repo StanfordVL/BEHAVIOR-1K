@@ -4,7 +4,7 @@ import omnigibson as og
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.robots.robot_base import REGISTERED_ROBOTS
 from omnigibson.scenes.traversable_scene import TraversableScene
-from omnigibson.utils.asset_utils import get_og_scene_path
+from omnigibson.utils.asset_utils import get_scene_path
 from omnigibson.utils.constants import STRUCTURE_CATEGORIES, GROUND_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -24,6 +24,7 @@ class InteractiveTraversableScene(TraversableScene):
         scene_model,
         scene_instance=None,
         scene_file=None,
+        dataset_name="behavior-1k-assets",
         trav_map_resolution=0.1,
         default_erosion_radius=0.0,
         trav_map_with_objects=True,
@@ -41,9 +42,10 @@ class InteractiveTraversableScene(TraversableScene):
         Args:
             scene_model (str): Scene model name, e.g.: Rs_int
             scene_instance (None or str): name of json file to load (without .json); if None,
-                defaults to og_dataset/scenes/<scene_model>/json/<scene_instance>.urdf
+                defaults to <gm.DATA_PATH>/<dataset_name>/scenes/<scene_model>/json/<scene_instance>.urdf
             scene_file (None or str): If specified, full path of JSON file to load (with .json).
                 This will override scene_instance and scene_model!
+            dataset_name (str): Type of dataset to load the scene from, e.g.: "behavior-1k-assets"
             trav_map_resolution (float): traversability map resolution
             default_erosion_radius (float): default map erosion radius in meters
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
@@ -62,7 +64,7 @@ class InteractiveTraversableScene(TraversableScene):
         self.include_robots = include_robots
 
         # Infer scene directory
-        self.scene_dir = get_og_scene_path(scene_model)
+        self.scene_dir = get_scene_path(scene_model, dataset_name=dataset_name)
 
         # Other values that will be loaded at runtime
         self.load_object_categories = None
@@ -108,7 +110,7 @@ class InteractiveTraversableScene(TraversableScene):
         Args:
             scene_model (str): Name of the scene to load, e.g, Rs_int, etc.
             scene_instance (None or str): If specified, should be name of json file to load. (without .json), default to
-                og_dataset/scenes/<scene_model>/json/<scene_instance>.json
+                behavior-1k-assets/scenes/<scene_model>/json/<scene_instance>.json
 
         Returns:
             str: Absolute path to the desired scene file (.json) to load

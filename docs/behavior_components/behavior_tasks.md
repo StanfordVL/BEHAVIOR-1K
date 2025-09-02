@@ -206,7 +206,7 @@ env.task.save_task()
 
 Default save location:
 ```
-<gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/<scene_model>_task_{activity_name}_{activity_definition_id}_{activity_instance_id}_template.json
+<gm.DATA_PATH>/behavior-1k-assets/scenes/<SCENE_MODEL>/json/<scene_model>_task_{activity_name}_{activity_definition_id}_{activity_instance_id}_template.json
 ```
 
 ## Loading Pre-sampled Tasks
@@ -250,7 +250,7 @@ env = og.Environment(configs=cfg)
 Discover available pre-sampled task instances in your dataset:
 
 ```bash
-ls -l <gm.DATASET_PATH>/scenes/*/json/*task*
+ls -l <gm.DATA_PATH>/*/scenes/*/json/*task*
 ```
 
 **Recommendation:** Set `online_object_sampling=False` to load the stable, pre-sampled task instances for consistent evaluation and comparison.

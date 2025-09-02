@@ -30,7 +30,7 @@ The bridge between the WordNet(-like) synsets and OmniGibson's object and substa
 ### **Objects**
 One-to-one mapping to a specific 3D object model in our dataset.
 
-- Each object belongs to **exactly one category**, e.g. `coffee_maker-fwlabx` belongs to `coffee_maker`, correspounding to the object model residing at `<gm.DATASET_PATH>/objects/coffee_maker/fwlabx`.
+- Each object belongs to **exactly one category**, e.g. `coffee_maker-fwlabx` belongs to `coffee_maker`, correspounding to the object model residing at `<gm.DATA_PATH>/behavior-1k-assets/objects/coffee_maker/fwlabx`.
 - Each object can have multiple meta links that serve the relevant object states in OmniGibson. For example, for the `coffee_maker-fwlabx` object, it is annotated with `connectedpart` for the `AttachedTo` state, `heatsource` for the `HeatSourceOrSink` state, and `toggleButton` for the `ToggledOn` state.
 - Objects appear in specific scenes and rooms within the BEHAVIOR environment.
 
@@ -136,17 +136,17 @@ You can use Excel, Google Sheets or any other spreadsheet software to modify the
 
 - **Information**: map an object category to a synset.
 - **When modify**: add a new object category.
-- **Caveat**: you also need to add the canonical density of the object category to `<gm.DATASET_PATH>/metadata/avg_category_specs.json`.
+- **Caveat**: you also need to add the canonical density of the object category to `<gm.DATA_PATH>/behavior-1k-assets/metadata/avg_category_specs.json`.
 
 [substance_hyperparams.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/substance_hyperparams.csv)
 
 - **Information**: map a substance category to a synset, and also specify the substance's type (e.g. `fluid`, `macro_physical_particle`), physical attributes (e.g. `is_viscous`, `particle_density`) and visual appearance (e.g. `material_mtl_name`, `diffuse_reflection_color`).
 - **When modify**: add a new substance category.
-- **Caveat**: you also need to add the metadata (in a JSON file) and (optionally) particle prototypes to the `<gm.DATASET_PATH>/systems/<substance_category>`.
-    - `fluid`: only metadata is needed, e.g. `<gm.DATASET_PATH>/systems/water/metadata.json`.
-    - `granular`: both metadata and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/salt/metadata.json` and `<gm.DATASET_PATH>/systems/sugar/iheusv`.
-    - `macro_physical_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/cashew/metadata.json` and `<gm.DATASET_PATH>/systems/cashew/qyglnm`.
-    - `macro_visual_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATASET_PATH>/systems/stain/metadata.json` and `<gm.DATASET_PATH>/systems/stain/ahkjul`.
+- **Caveat**: you also need to add the metadata (in a JSON file) and (optionally) particle prototypes to the `<gm.DATA_PATH>/behavior-1k-assets/systems/<substance_category>`.
+    - `fluid`: only metadata is needed, e.g. `<gm.DATA_PATH>/behavior-1k-assets/systems/water/metadata.json`.
+    - `granular`: both metadata and particle prototypes are needed, e.g. `<gm.DATA_PATH>/behavior-1k-assets/systems/salt/metadata.json` and `<gm.DATA_PATH>/behavior-1k-assets/systems/sugar/iheusv`.
+    - `macro_physical_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATA_PATH>/behavior-1k-assets/systems/cashew/metadata.json` and `<gm.DATA_PATH>/behavior-1k-assets/systems/cashew/qyglnm`.
+    - `macro_visual_particle`: both hyperparams and particle prototypes are needed, e.g. `<gm.DATA_PATH>/behavior-1k-assets/systems/stain/metadata.json` and `<gm.DATA_PATH>/behavior-1k-assets/systems/stain/ahkjul`.
 
 [synsets.csv](https://github.com/StanfordVL/bddl/tree/master/bddl/generated_data/synsets.csv)
 

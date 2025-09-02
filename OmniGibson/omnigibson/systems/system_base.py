@@ -6,7 +6,7 @@ import torch as th
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
-from omnigibson.utils.asset_utils import get_all_system_categories
+from omnigibson.utils.asset_utils import get_all_system_categories, get_dataset_path
 from omnigibson.utils.python_utils import Serializable, get_uuid
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
@@ -957,12 +957,12 @@ class PhysicalParticleSystem(BaseSystem):
 @cache
 def get_all_system_names():
     """
-    Gets all available systems from the OmniGibson dataset
+    Gets all available systems from the BEHAVIOR-1K dataset
 
     Returns:
         set: Set of all available system names that can be created in OmniGibson
     """
-    system_dir = os.path.join(gm.DATASET_PATH, "systems")
+    system_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "systems")
 
     assert os.path.exists(system_dir), f"Path for OmniGibson systems not found! Attempted path: {system_dir}"
     return set(os.listdir(system_dir))
@@ -1008,7 +1008,7 @@ def create_system_from_metadata(system_name):
         #         lambda prim_path, name: og.objects.DatasetObject(
         #             prim_path=prim_path,
         #             name=name,
-        #             usd_path=os.path.join(gm.DATASET_PATH, "systems", system_name, f"{system_name}.usd"),
+        #             usd_path=os.path.join(get_dataset_path("behavior-1k-assets"), "systems", system_name, f"{system_name}.usd"),
         #             category=system_name,
         #             visible=False,
         #             fixed_base=False,
@@ -1038,7 +1038,7 @@ def create_system_from_metadata(system_name):
 
         # Then, compile the necessary kwargs and generate the requested system
         # Parse information
-        system_dir = os.path.join(gm.DATASET_PATH, "systems", system_name)
+        system_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "systems", system_name)
         with open(os.path.join(system_dir, "metadata.json"), "r") as f:
             metadata = json.load(f)
         system_type = metadata["type"]
@@ -1056,7 +1056,7 @@ def create_system_from_metadata(system_name):
         if not has_asset:
             if system_type == "macro_visual_particle":
                 # Fallback to stain asset
-                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "ahkjul.usd")
+                asset_path = os.path.join(get_dataset_path("behavior-1k-assets"), "systems", "stain", "ahkjul", "usd", "ahkjul.usd")
                 has_asset = True
         if has_asset:
 

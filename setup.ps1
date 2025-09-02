@@ -488,21 +488,15 @@ if (-not $isaacInstalled) {
         
         $env:OMNI_KIT_ACCEPT_EULA = "YES"
         
-        Write-Host "Installing data to:"
-        $DatasetPath = python -c "from omnigibson.macros import gm; print(gm.DATASET_PATH)"
-        $AssetPath = python -c "from omnigibson.macros import gm; print(gm.ASSET_PATH)"
-        Write-Host "  Dataset (~25GB): $DatasetPath"
-        Write-Host "  Assets (~2.5GB): $AssetPath"
-        
-        Write-Host "Downloading dataset..."
-        python -c "from omnigibson.utils.asset_utils import download_og_dataset; download_og_dataset(accept_license=$DatasetAcceptFlag)"
+        Write-Host "Downloading BEHAVIOR-1K assets..."
+        python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=$DatasetAcceptFlag)"
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: Dataset installation failed"
             exit 1
         }
         
-        Write-Host "Downloading assets..."
-        python -c "from omnigibson.utils.asset_utils import download_assets; download_assets()"
+        Write-Host "Downloading OmniGibson robot assets..."
+        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: Assets installation failed"
             exit 1
