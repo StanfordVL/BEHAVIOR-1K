@@ -7,15 +7,12 @@ import mkdocs_gen_files
 def load_submissions(track_dir):
     """Load all submissions from a track directory."""
     submissions = []
-    track_path = Path("challenge_submissions") / track_dir
+    track_path = Path("docs/challenge_submissions") / track_dir
     
     if not track_path.exists():
         return []
     
     for yaml_file in track_path.glob("*.yaml"):
-        if yaml_file.name == "TEMPLATE.yaml":
-            continue
-            
         try:
             with open(yaml_file) as f:
                 data = yaml.safe_load(f)
