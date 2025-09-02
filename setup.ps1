@@ -180,7 +180,7 @@ function Prompt-ForTerms {
     if ($script:NeedsDatasetTos) { $script:AcceptDatasetTos = $true }
     
     Write-Host ""
-    Write-Host "✓ All terms accepted. Proceeding with installation..."
+    Write-Host "All terms accepted. Proceeding with installation..."
     Write-Host ""
 }
 
@@ -235,7 +235,7 @@ if ($NewEnv) {
     # Set auto-accept environment variable if user agreed to TOS
     if ($AcceptCondaTos) {
         $env:CONDA_PLUGINS_AUTO_ACCEPT_TOS = "yes"
-        Write-Host "✓ Conda TOS auto-acceptance enabled"
+        Write-Host "Conda TOS auto-acceptance enabled"
     }
     
     # Check if environment already exists and exit with instructions
@@ -266,7 +266,7 @@ if ($NewEnv) {
     
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
     
-    Write-Host "✓ PyTorch installation completed"
+    Write-Host "PyTorch installation completed"
 }
 
 # Find Isaac Sim installation
