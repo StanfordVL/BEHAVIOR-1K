@@ -340,8 +340,8 @@ if __name__ == "__main__":
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
     # get run instances
-    instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(10))
-    assert set(instances_to_run).issubset(set(range(10))), "eval instance ids must be in range(10)"
+    instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(20))
+    assert set(instances_to_run).issubset(set(range(20))), "eval instance ids must be in range(20)"
     # load csv file
     task_instance_csv_path = f"{gm.DATASET_PATH}/metadata/test_instances.csv"
     with open(task_instance_csv_path, "r") as f:

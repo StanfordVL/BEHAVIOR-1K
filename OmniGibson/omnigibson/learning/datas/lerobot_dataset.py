@@ -350,7 +350,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         return {
             item["episode_index"]: item
             for item in sorted(episodes, key=lambda x: x["episode_index"])
-            if item["tasks"][0] in self.task_names
+            if item["tasks"][0] in self.tasks
         }
 
     def load_stats(self, local_dir: Path) -> dict[str, dict[str, np.ndarray]]:

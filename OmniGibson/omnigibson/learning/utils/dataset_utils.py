@@ -491,8 +491,8 @@ def assign_test_instances(task_ws, ws_misc, misc_values) -> None:
     For a given task worksheet and the misc spreadsheet:
     1. Get task_id and task_name from worksheet title "{id} - {name}".
     2. Collect unique integers in Column A and compute missing IDs from {1..300}.
-    3. Sample up to 20 missing IDs, shuffle, split into 2 groups of 10.
-    4. Write groups into columns C and D in the matching row of Test Instances tab.
+    3. Sample up to 20 missing IDs
+    4. Write groups into columns C in the matching row of Test Instances tab.
     """
     # --- Step 1: parse task id/name from worksheet title ---
     title = task_ws.title
@@ -520,7 +520,6 @@ def assign_test_instances(task_ws, ws_misc, misc_values) -> None:
     # --- Step 3: sample up to 20 ---
     sample_missing = random.sample(missing, 20)
     random.shuffle(sample_missing)
-    group1, group2 = sample_missing[:10], sample_missing[10:]
 
     # --- Step 4: open misc sheet and find correct row ---
 
@@ -531,9 +530,7 @@ def assign_test_instances(task_ws, ws_misc, misc_values) -> None:
     ), f"Row mismatch for task {task_id} - {task_name}: found {target_row[0]} - {target_row[1]}"
 
     # --- Step 5: update in one batch ---
-    ws_misc.update(
-        range_name=f"C{task_id + 2}:D{task_id + 2}", values=[[", ".join(map(str, group1)), ", ".join(map(str, group2))]]
-    )
+    ws_misc.update(range_name=f"C{task_id + 2}:C{task_id + 2}", values=[[", ".join(map(str, sample_missing))]])
     time.sleep(1)
 
     print(f"✅ Updated task {task_id} - {task_name} with test instances.")
@@ -719,4 +716,13 @@ def update_tracking_sheet(
 
 if __name__ == "__main__":
     check_leaf_folders_have_n("~/behavior", 200)
+    # gc = get_credentials("~/Documents/credentials")[0]
+    # tracking_spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
+    # misc_sheet = gc.open("B50 Task Misc")
+    # misc_ws = misc_sheet.worksheet("Test Instances")
+    # misc_values = misc_ws.get_all_values()
+    # for task_name, task_index in tqdm(TASK_NAMES_TO_INDICES.items()):
+    #     task_ws = tracking_spreadsheet.worksheet(f"{task_index} - {task_name}")
+    #     assign_test_instances(task_ws, misc_ws, misc_values)
+    #     time.sleep(1)
     og.shutdown()
