@@ -28,6 +28,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems.macro_particle_system import MacroPhysicalParticleSystem
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.python_utils import Serializable
 from omnigibson.utils.python_utils import clear as clear_python_utils
@@ -281,7 +282,7 @@ def _launch_simulator(*args, **kwargs):
 
         def __init__(
             self,
-            gravity=9.81,
+            gravity=9.81 if not gm.VISUAL_ONLY else 0.0,
             physics_dt=None,
             rendering_dt=None,
             sim_step_dt=None,
@@ -649,7 +650,9 @@ def _launch_simulator(*args, **kwargs):
             )
             self._skybox.load(None)
             self._skybox.color = (1.07, 0.85, 0.61)
-            self._skybox.texture_file_path = f"{gm.ASSET_PATH}/models/background/sky.jpg"
+            self._skybox.texture_file_path = os.path.join(
+                get_dataset_path("omnigibson-robot-assets"), "models/background/sky.jpg"
+            )
 
         def get_sim_step_dt(self):
             """

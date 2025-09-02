@@ -28,7 +28,7 @@ git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
 
 # Run the setup script
-./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+./setup.sh --new-env --omnigibson --bddl --joylo --dataset
 ```
 
 ### Windows
@@ -38,7 +38,7 @@ git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
 
 # Run the setup script
-.\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+.\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset
 ```
 
 > **Development Branch**: If you want the latest development features (potentially less stable), clone the main branch instead:
@@ -56,7 +56,7 @@ cd BEHAVIOR-1K
 |-----------|------|-------------|
 | **OmniGibson** | `--omnigibson` | Core physics simulator and robotics environment |
 | **BDDL** | `--bddl` | Behavior Domain Definition Language for task specification |
-| **Teleoperation** | `--teleop` | JoyLo interface for robot teleoperation |
+| **JoyLo** | `--joylo` | JoyLo interface for robot teleoperation |
 
 ### Additional Options
 
@@ -75,16 +75,16 @@ If you prefer to use your existing Python environment (system Python, venv, etc.
 
 ```bash
 # Linux
-./setup.sh --omnigibson --bddl --teleop --dataset
+./setup.sh --omnigibson --bddl --joylo --dataset
 
 # Windows
-.\setup.ps1 -OmniGibson -BDDL -Teleop -Dataset
+.\setup.ps1 -OmniGibson -BDDL -JoyLo -Dataset
 ```
 
 If you're not in a conda environment, the script will prompt for confirmation. To skip this prompt (useful for CI/CD):
 
 ```bash
-./setup.sh --omnigibson --bddl --teleop --dataset --confirm-no-conda
+./setup.sh --omnigibson --bddl --joylo --dataset --confirm-no-conda
 ```
 
 ### Terms of Service & License Acceptance
@@ -100,7 +100,7 @@ BEHAVIOR-1K installation may require acceptance of various terms of service and 
 For automated/CI environments, you can bypass all prompts:
 
 ```bash
-./setup.sh --new-env --omnigibson --bddl --teleop --dataset \
+./setup.sh --new-env --omnigibson --bddl --joylo --dataset \
            --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 ```
 

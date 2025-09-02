@@ -1,5 +1,5 @@
 black>=22.10.0
-dask[distributed]>=2023.1.1
+dask[distributed]==2023.5.0
 dvc~=3.42.0
 dvc-gs~=3.0.1
 fs>=2.4.16

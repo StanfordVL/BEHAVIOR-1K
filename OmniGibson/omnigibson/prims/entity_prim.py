@@ -136,7 +136,7 @@ class EntityPrim(XFormPrim):
             self._load_config["visual_only"]
             if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
             else False
-        )
+        ) or gm.VISUAL_ONLY
 
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."

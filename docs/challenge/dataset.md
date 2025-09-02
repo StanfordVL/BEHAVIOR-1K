@@ -12,13 +12,21 @@ Our demonstration data is provided in **LeRobot format**, a widely-adopted forma
 
 To learn more about the LeRobot format, visit the official [LeRobot repository](https://github.com/huggingface/lerobot).
 
-## Data Structure
+##  Loading the Dataset
 
-Coming soon!
+<iframe 
+  src="https://nbviewer.org/github/StanfordVL/b1k-baselines/blob/main/tutorials/dataset.ipynb"
+  width="100%" 
+  height="800">
+</iframe>
 
-## Loading the Dataset
+## Custom Data Generation
 
-Coming soon!
+<iframe 
+  src="https://nbviewer.org/github/StanfordVL/b1k-baselines/blob/main/tutorials/generate_custom_data.ipynb"
+  width="100%" 
+  height="800">
+</iframe>
 
 ## Dataset Statistics
 

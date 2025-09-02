@@ -1,0 +1,13 @@
+type: A1
+multi_view_cameras:
+  external: 
+    name: external::external_camera
+    resolution: [240, 240]
+  wrist: 
+    name: external::wrist_camera
+    resolution: [240, 240]
+action_keys: [arm, gripper]
+action_key_dims:
+  arm: 6
+  gripper: 1
+controllers:  # Can be overwritten by policy

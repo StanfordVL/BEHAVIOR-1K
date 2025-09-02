@@ -54,7 +54,7 @@ jobs:
         working-directory: ${{ github.workspace }}/bddl
 
       - name: Install OmniGibson
-        run: pip install -e .[dev,primitives] --no-build-isolation
+        run: pip install -e .[dev,primitives,eval] --no-build-isolation
 
       - name: Print env
         run: printenv

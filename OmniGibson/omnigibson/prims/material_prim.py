@@ -1,5 +1,3 @@
-import os
-
 import cv2
 from omnigibson.utils.ui_utils import create_module_logger
 import torch as th
@@ -259,32 +257,6 @@ class MaterialPrim(BasePrim):
         """
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
 
-    def shader_update_asset_paths_with_root_path(self, root_path, relative=False):
-        """
-        Similar to @shader_update_asset_paths, except in this case, root_path is explicitly provided by the caller.
-
-        Args:
-            root_path (str): root directory from which to update shader paths
-            relative (bool): If set, all paths will be updated as relative paths with respect to @root_path.
-                Otherwise, @root_path will be pre-appended to the original asset paths
-        """
-
-        for inp_name in self.get_shader_input_names_by_type("SdfAssetPath", include_default=True):
-            inp = self.get_input(inp_name)
-            # If the input doesn't have any path, skip
-            if inp is None:
-                continue
-
-            original_path = inp.path if inp.resolvedPath == "" else inp.resolvedPath
-            # If the input has an empty path, skip
-            if original_path == "":
-                continue
-
-            new_path = (
-                f"./{os.path.relpath(original_path, root_path)}" if relative else os.path.join(root_path, original_path)
-            )
-            self.set_input(inp_name, new_path)
-
     def get_input(self, inp):
         """
         Grabs the input with corresponding name @inp associated with this material and shader
@@ -422,7 +394,7 @@ class OmniPBRMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "OmniPBR.mdl" and asset_sub_identifier == "OmniPBR"
+        return asset_path.endswith("OmniPBR.mdl") and asset_sub_identifier == "OmniPBR"
 
     @property
     def mdl_name(self):
@@ -537,7 +509,7 @@ class VRayMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "omnigibson_vray_mtl.mdl" and asset_sub_identifier == "OmniGibsonVRayMtl"
+        return asset_path.endswith("omnigibson_vray_mtl.mdl") and asset_sub_identifier == "OmniGibsonVRayMtl"
 
     @property
     def mdl_name(self):
@@ -620,7 +592,7 @@ class OmniGlassMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return asset_path == "OmniGlass.mdl" and asset_sub_identifier == "OmniGlass"
+        return asset_path.endswith("OmniGlass.mdl") and asset_sub_identifier == "OmniGlass"
 
     @property
     def mdl_name(self):
@@ -676,8 +648,8 @@ class OmniSurfaceMaterialPrim(MaterialPrim):
 
     @classmethod
     def supports_material(cls, asset_path, asset_sub_identifier):
-        return (asset_path == "OmniSurface.mdl" and asset_sub_identifier == "OmniSurface") or (
-            asset_path == "OmniSurfacePresets.mdl" and asset_sub_identifier.startswith("OmniSurface_")
+        return (asset_path.endswith("OmniSurface.mdl") and asset_sub_identifier == "OmniSurface") or (
+            asset_path.endswith("OmniSurfacePresets.mdl") and asset_sub_identifier.startswith("OmniSurface_")
         )
 
     @property

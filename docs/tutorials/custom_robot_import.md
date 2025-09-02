@@ -15,13 +15,13 @@ There are two ways to convert our raw robot URDF into an OmniGibson-compatible U
 Our custom robot importer [`import_custom_robot.py`](https://github.com/StanfordVL/OmniGibson/tree/main/omnigibson/examples/robots/import_custom_robot.py) wraps the native URDF Importer from Isaac Sim to convert our robot URDF model into USD format. Please see the following steps for running this script:
 
 1. All that is required is a single source config yaml file that dictates how the URDF should be post-processed when being converted into a USD. You can run `import_custom_robot.py --help` to see a detailed example configuration used, which is also shown below (`r1_pro_source_config.yaml`) for your convenience.
-2. All output files are written to `<gm.CUSTOM_DATASET_PATH>/objects/robot/<name>`. Please move this directory to `<gm.ASSET_PATH>/objects/<name>` so it can be imported into **OmniGibson**.
+2. All output files are written to `<gm.DATA_PATH>/custom_dataset/objects/robot/<name>`. Please move this directory to `<gm.DATA_PATH>/omnigibson-robot-assets/objects/<name>` so it can be imported into **OmniGibson**.
 
 Some notes about the importing script:
 
 - The importing procedure can be summarized as follows:
 
-  1. Copy the raw URDF file + any dependencies into the `gm.CUSTOM_DATASET_PATH` directory
+  1. Copy the raw URDF file + any dependencies into the `gm.DATA_PATH/custom_dataset` directory
   2. Updates the URDF + meshes to ensure all scaling is positive
   3. Generates collision meshes for each robot link (as specified by the source config)
   4. Generates metadata necessary for **OmniGibson**
@@ -404,7 +404,7 @@ Now that we have the USD model, let's open it up in Isaac Sim and inspect it.
     ![Stretch Robot Import 5b](../assets/tutorials/stretch-import-5b.png)
     ![Stretch Robot Import 5c](../assets/tutorials/stretch-import-5c.png)
 
-6. Finally, save your USD (as a USDA file)! Note that you need to remove the fixed link created at step 4 before saving. Please save the file to `<gm.ASSET_PATH>/models/<name>/usd/<name>.usda`.
+6. Finally, save your USD (as a USDA file)! Note that you need to remove the fixed link created at step 4 before saving. Please save the file to `<gm.DATA_PATH>/omnigibson-robot-assets/models/<name>/usd/<name>.usda`.
 
 ## Create the Robot Class
 Now that we have the USD file for the robot, let's write our own robot class. For more information please refer to the [Robot module](../omnigibson/robots.md).
@@ -413,7 +413,7 @@ Now that we have the USD file for the robot, let's write our own robot class. Fo
 
 2. Determine which robot interfaces it should inherit. We currently support three modular interfaces that can be used together: [`LocomotionRobot`](../reference/robots/locomotion_robot.md) for robots whose bases can move (and a more specific [`TwoWheelRobot`](../reference/robots/two_wheel_robot.md) for locomotive robots that only have two wheels), [`ManipulationRobot`](../reference/robots/manipulation_robot.md) for robots equipped with one or more arms and grippers, and [`ActiveCameraRobot`](../reference/robots/active_camera_robot.md) for robots with a controllable head or camera mount. In our case, our robot is a mobile manipulator with a moveable camera mount, so our Python class inherits all three interfaces.
 
-3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify. Note that **OmniGibson** automatically looks for your robot file at `<gm.ASSET_PATH>/models/<name>/usd/<name>.usda`, so if it exists elsewhere please specify the path via the `usd_path` property in the robot class.
+3. You must implement all required abstract properties defined by each respective inherited robot interface. In the most simple case, this is usually simply defining relevant metadata from the original robot source files, such as relevant joint / link names and absolute paths to the corresponding robot URDF and USD files. Please see our annotated `stretch.py` module below which serves as a good starting point that you can modify. Note that **OmniGibson** automatically looks for your robot file at `<gm.DATA_PATH>/omnigibson-robot-assets/models/<name>/usd/<name>.usda`, so if it exists elsewhere please specify the path via the `usd_path` property in the robot class.
 
     ??? note "Optional properties"
      
