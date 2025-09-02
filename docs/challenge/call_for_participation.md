@@ -122,3 +122,4 @@ To cite BEHAVIOR-1K, please use:
   journal={arXiv preprint arXiv:2403.09227},
   year={2024}
 }
+```
