@@ -4,8 +4,8 @@ import os
 import tempfile
 import zipfile
 
-from OmniGibson.omnigibson import lazy
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
