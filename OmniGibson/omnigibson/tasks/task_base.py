@@ -58,6 +58,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._success = None
         self._info = None
         self._low_dim_obs_dim = None
+        self._low_dim_obs_keys = None
         self._include_obs = include_obs
 
         # Run super init
@@ -134,8 +135,23 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         env.scene.reset(hard=False)
 
         # Compute the low dimensional observation dimension
-        obs = self.get_obs(env=env, flatten_low_dim=True)
-        self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
+        obs = self.get_obs(env=env, flatten_low_dim=False)
+        if "low_dim" in obs:
+            self._low_dim_obs_keys = list(obs["low_dim"].keys())
+            self._low_dim_obs_dim = len(self._flatten_low_dim_obs(obs=obs["low_dim"]))
+        else:
+            self._low_dim_obs_keys = []
+            self._low_dim_obs_dim = 0
+
+    @property
+    def low_dim_obs_keys(self):
+        """
+        Returns:
+            list of str: List of low-dimensional observation keys for this task
+        """
+        # Make sure we're loaded
+        assert self._loaded, "Task must be loaded using load() before accessing low_dim_obs_keys!"
+        return self._low_dim_obs_keys
 
     @abstractmethod
     def _create_termination_conditions(self):

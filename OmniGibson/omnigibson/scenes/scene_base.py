@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.robots.robot_base import REGISTERED_ROBOTS, m as robot_macros
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -65,6 +65,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         floor_plane_visible=True,
         floor_plane_color=(1.0, 1.0, 1.0),
         use_skybox=True,
+        include_robots=True,
     ):
         """
         Args:
@@ -76,6 +77,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
                 to the generated floor plane
             use_skybox (bool): whether to load a skybox into the simulator
+            include_robots (bool): whether to also include the robot(s) defined in the scene
         """
         # Store internal variables
         self.scene_file = scene_file
@@ -94,6 +96,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._available_systems = None
         self._pose_info = None
         self._updated_state_objects = None
+        self._include_robots = include_robots
         self._task_metadata = {}
 
         # Call super init
@@ -415,7 +418,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
         objects based on, e.g., their category, size, etc.
 
-        Subclasses can implement additional logic. By default, this returns True
+        By default, this checks whether robot should be loaded.
+        Subclasses should call super and implement additional logic.
 
         Args:
             obj_info (dict): Dictionary of object kwargs that will be used to load the object
@@ -423,7 +427,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             bool: Whether this object should be loaded or not
         """
-        return True
+        # Check whether this is an agent and we allow agents
+        return self._include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
     def load(self, idx, **kwargs):
         """

@@ -345,7 +345,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
         ori = T.quat2euler(quat)
 
-        ori_2d = T.z_angle_from_quat(quat)
+        ori_2d = T.z_angle_from_quat(quat).unsqueeze(0)  # Convert to 1D tensor
 
         # Pack everything together
         return dict(

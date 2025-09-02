@@ -17,7 +17,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
         deps.update({AABB})
         return deps
 
-    def _set_value(self, other, new_value, reset_before_sampling=False):
+    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
         if not new_value:
             raise NotImplementedError("Inside does not support set_value(False)")
 
@@ -31,7 +31,7 @@ class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
             self.obj.reset()
 
         for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
-            if sample_kinematics("inside", self.obj, other) and self.get_value(other):
+            if sample_kinematics("inside", self.obj, other, use_trav_map=use_trav_map) and self.get_value(other):
                 return True
             else:
                 og.sim.load_state(state, serialized=False)
