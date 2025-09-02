@@ -1,29 +1,32 @@
-# Evaluation and Challenge Rules
-
-## Challenge Tracks
-
-We will have the following two tracks for the 1st challenge:
-
-### 1. Standard Track
-- Participants are restricted to using the state observations provided in the demonstration dataset for their policy models.
-- **Allowed observations:** RGB, depth, instance segmentation, proprioception information
-- **Not allowed:** Object state
-
-### 2. Privileged Information Track
-- Participants may query the simulator for any privileged information (e.g., target object poses, scene point cloud) and use it for their policy models.
-
-**Awards:**  
-Top three teams from each track will share the challenge prizes and be invited to present at the workshop!
-
-| Place | Prize |
-|-------|-------|
-| 🥇 1st | $1,000 |
-| 🥈 2nd | $500   |
-| 🥉 3rd | $300   |
+# Evaluation
 
 ---
 
-## Performance Metrics
+## Running Evaluations
+
+We provide a unified entry point for running evaluation:
+```
+python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
+```
+Here is a brief explanation of the arguments:
+
+- `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
+
+- `WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. For standard track, you MUST use the following command to start the evaluator:
+    ```
+    python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME
+    ```
+Here, it will use the default `omnigibson.envs.EnvironmentWrapper`, which is a barebone wrapper that does not provide anything beyond our standard. The evaluator will load the task and spawn a server listening on `0.0.0.0:80` Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` to serve your policy and communicate with the Evaluator. 
+
+For privileged information track, you are allowed to design your own environment wrapper, within which you can arbitrarily query the environment instance for privileged information. We provided an example wrapper at `omnigibson.learning.wrappers.RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relavant objects at every frame. The custom wrapper you wrote needs to submitted for inspection to make sure you have not abused the environment by any way (e.g. teleporting the robot, or changing object states directly). 
+
+
+As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the baselines section for more information.
+
+
+## Metrics and Results
+
+We will calculate the following metric during policy rollout:
 
 ### Primary Metric (Ranking)
 - **Task success score rate:** Averaged across 50 tasks.
@@ -34,44 +37,31 @@ Top three teams from each track will share the challenge prizes and be invited t
 - **Distance navigated:** Accumulated distance traveled by the agent’s base body.
 - **Displacement of end effectors/hands:** Accumulated displacement of the agent’s end effectors/hands.
 
-*Secondary metrics are normalized using human averages from 200 demonstrations per task.*
+*Secondary metrics will be normalized using human averages from 200 demonstrations per task.*
 
----
+When running the eval script, an json file will be outputed after ech rollout episode containing the results. Here is a sample output json file for one episode of evaluation:
 
-## Evaluation Protocol and Logistics
+```
+{
+    "agent_distance": {
+        "base": 9.703554042062024e-06, 
+        "left": 0.019627160858362913, 
+        "right": 0.015415858360938728
+    }, 
+    "normalized_agent_distance": {
+        "base": 4.93031697036899e-06, 
+        "left": 0.006022007241065448, 
+        "right": 0.0037894888066205374
+    }, 
+    "q_score": {
+        "final": 0.0
+    }, 
+    "time": {
+        "simulator_steps": 6, 
+        "simulator_time": 0.2, 
+        "normalized_time": 0.002791165032284476
+    }
+}
+```
 
-### Evaluation Protocol
-
-1. **Training:**  
-    - Training instances and 200 human demonstrations per task are released publicly.
-
-2. **Self-Evaluation & Report:**  
-    - 20 additional validation instances provided.
-    - Evaluate your policy 5 times (with time-outs, via our evaluation script) per instance.
-    - Submit scores using our Google Form (see below).
-    - Leaderboard updated after sanity-check.
-
-3. **Final Evaluation:**  
-    - 20 held-out instances for final evaluation.
-    - Leaderboard freezes on **November 15th, 2025**.
-    - Top-5 solutions evaluated on these instances.
-
-
-
----
-
-
-### Final Model Submission & Evaluation
-
-- **Hardware:** Model should run on a single 24GB VRAM GPU (RTX 3090, A5000, TitanRTX).
-- **Model Serving:** You may serve your models and provide IP addresses for evaluation. Recommended libraries: TorchServe, LitServe, vLLM, NVIDIA Triton, etc.
-- **Entry Policy:** Multiple checkpoints from the same team = single entry.
-
----
-
-## Challenge Office Hours
-
-- **Every Monday and Thursday**
-- **4:30pm–6:00pm PST**
-- **Over Zoom:** [TBD]
-
+** YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON IN ANY WAY **. Since each tasks will be evaluated on 20 instances and 5 rollout each, there should be 5k json files after the full evaluation. Zip them all and upload through google form. For privileged information track participants, zip your wrapper code and submit together with the result json files.

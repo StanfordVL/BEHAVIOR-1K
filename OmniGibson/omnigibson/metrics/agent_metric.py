@@ -49,4 +49,7 @@ class AgentMetric(MetricBase):
         results = {
             "agent_distance": {k: sum(v) for k, v in self.delta_agent_distance.items()},
         }
-        results.update({"normalized_agent_distance": {k: v / self.human_stats[k] for k, v in results.items()}})
+        results.update(
+            {"normalized_agent_distance": {k: v / self.human_stats[k] for k, v in results["agent_distance"].items()}}
+        )
+        return results
