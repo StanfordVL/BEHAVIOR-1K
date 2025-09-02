@@ -37,7 +37,7 @@ from typing import Dict, Tuple
 
 
 # Create module logger
-log = create_module_logger(module_name="omnigibson.learning.scripts.replay_obs")
+log = create_module_logger(module_name="replay_obs")
 # set level to be info
 log.setLevel(20)
 
@@ -55,10 +55,8 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
-            # remove seg semantic map
+            # remove seg semantic map (Alternatively, change this line to store seg semantic instead)
             obs.pop(f"{camera_name}::seg_semantic")
-            # use the following line if we want to store seg semantic map instead
-            # obs[f"{camera_name}::seg_semantic"] = obs[f"{camera_name}::seg_semantic"].cpu()
             # move seg instance maps to cpu
             obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose

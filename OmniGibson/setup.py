@@ -49,7 +49,6 @@ setup(
         "numba>=0.59.1",
         "cffi>=1.16.0",
         "pillow~=11.0.0",
-        "open3d>=0.19.0",
     ],
     extras_require={
         "dev": [
@@ -79,6 +78,7 @@ setup(
             "msgpack>=1.1.0",
             "lerobot @ git+https://github.com/huggingface/lerobot@577cd10974b84bea1f06b6472eb9e5e74e07f77a",
             "gspread>=6.2.1",
+            "open3d>=0.19.0",
         ]
     },
     tests_require=[],

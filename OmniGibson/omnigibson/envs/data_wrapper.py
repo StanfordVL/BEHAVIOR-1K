@@ -42,6 +42,7 @@ class DataWrapper(EnvironmentWrapper):
             env (Environment): The environment to wrap
             output_path (str): path to store hdf5 data file
             compression (dict): If specified, the compression arguments to use for the hdf5 file.
+                For more information, check out https://docs.h5py.org/en/stable/high/dataset.html#filter-pipeline
             overwrite (bool): If set, will overwrite any pre-existing data found at @output_path.
                 Otherwise, will load the data and append to it
             only_successes (bool): Whether to only save successful episodes
@@ -743,6 +744,9 @@ class DataPlaybackWrapper(DataWrapper):
         Returns:
             DataPlaybackWrapper: Generated playback environment
         """
+        # check flush parameters
+        if flush_every_n_steps > 0:
+            assert flush_every_n_traj == 1, "flush_every_n_traj must be 1 if flush_every_n_steps is greater than 0"
         # Read from the HDF5 file
         f = h5py.File(input_path, "r")
         config = json.loads(f["data"].attrs["config"])
@@ -829,7 +833,7 @@ class DataPlaybackWrapper(DataWrapper):
             flush_every_n_traj=flush_every_n_traj,
             flush_every_n_steps=flush_every_n_steps,
             full_scene_file=full_scene_file,
-            partial_full_scene_load=load_room_instances is not None and full_scene_file is not None,
+            load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
         )
@@ -846,7 +850,7 @@ class DataPlaybackWrapper(DataWrapper):
         flush_every_n_traj=10,
         flush_every_n_steps=0,
         full_scene_file=None,
-        partial_full_scene_load=False,
+        load_room_instances=None,
         include_robot_control=True,
         include_contacts=True,
     ):
@@ -867,8 +871,7 @@ class DataPlaybackWrapper(DataWrapper):
             full_scene_file (None or str): If specified, the full scene file to use for playback. During data collection,
                 the scene file stored may be partial, and this will be used to fill in the missing scene objects from the
                 full scene file.
-            partial_full_scene_load (bool): Whether to use a partial load the full scene
-                This will include objects not in the original hdf5 but not everything in the full scene either
+            load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
         """
@@ -884,11 +887,16 @@ class DataPlaybackWrapper(DataWrapper):
         # Store scene file so we can restore the data upon each episode reset
         self.input_hdf5 = h5py.File(input_path, "r")
         self.scene_file = json.loads(self.input_hdf5["data"].attrs["scene_file"])
+        assert not (
+            load_room_instances and not full_scene_file
+        ), "Full scene file must be specified in order to load room instances"
         if full_scene_file:
             with open(full_scene_file, "r") as json_file:
                 full_scene_json = json.load(json_file)
             self.scene_file = merge_scene_files(scene_a=full_scene_json, scene_b=self.scene_file, keep_robot_from="b")
-            if partial_full_scene_load:
+            if load_room_instances is not None and full_scene_file is not None:
+                # we loaded more room than the stored scene file, but still not the full scene
+                # we need to save the current scene file here to avoid errors
                 self.scene_file = env.scene.save(as_dict=True)
 
         # Store additional variables
@@ -941,7 +949,7 @@ class DataPlaybackWrapper(DataWrapper):
         Args:
             episode_id (int): Episode to playback. This should be a valid demo ID number from the inputted collected
                 data hdf5 file
-            record_data (bool): Whether to record data during playback or not,
+            record_data (bool): Whether to record data during playback or not
             video_writers: Optional video writers to record the playback
         """
         data_grp = self.input_hdf5["data"]
@@ -997,8 +1005,10 @@ class DataPlaybackWrapper(DataWrapper):
 
         # If record, record initial observations
         if record_data:
+            # We need to step the environment to get the initial observations propagated
+            first_time_load_n_iteration = 10
             self.current_obs, _, _, _, init_info = self.env.step(
-                action=action[0], n_render_iterations=self.n_render_iterations + 10
+                action=action[0], n_render_iterations=self.n_render_iterations + first_time_load_n_iteration
             )
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
@@ -1032,6 +1042,7 @@ class DataPlaybackWrapper(DataWrapper):
                 for obj in self.scene.objects:
                     obj.keep_still()
                 for system in self.scene.systems:
+                    # TODO: Implement keep_still for other systems
                     if isinstance(system, MacroPhysicalParticleSystem):
                         system.set_particles_velocities(
                             lin_vels=th.zeros((system.n_particles, 3)), ang_vels=th.zeros((system.n_particles, 3))
