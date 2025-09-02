@@ -15,7 +15,7 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
         deps.update({Touching, VerticalAdjacency})
         return deps
 
-    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=True):
+    def _set_value(self, other, new_value, reset_before_sampling=False, use_trav_map=False):
         if not new_value:
             raise NotImplementedError("OnTop does not support set_value(False)")
 
