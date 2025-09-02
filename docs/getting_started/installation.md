@@ -36,16 +36,33 @@ Choose your installation method:
             === "Linux"
 
                 ```shell
-                git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+                # Clone the latest stable release (recommended)
+                git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
                 cd BEHAVIOR-1K
                 ```
 
             === "Windows"
 
                 ```powershell
-                git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+                # Clone the latest stable release (recommended)
+                git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
                 cd BEHAVIOR-1K
                 ```
+            
+            !!! note "Development Branch"
+                If you want the latest development features and updates (potentially less stable), clone the main branch instead:
+                
+                === "Linux"
+                    ```shell
+                    git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+                    cd BEHAVIOR-1K
+                    ```
+                
+                === "Windows"
+                    ```powershell
+                    git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+                    cd BEHAVIOR-1K
+                    ```
 
         2. Run the unified setup script:
 

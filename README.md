@@ -19,21 +19,32 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 
 ## Quick Start
 
-For most users, we recommend the full installation. You can either create a new conda environment or use your existing Python environment:
+For most users, we recommend installing the latest stable release (v3.7.0) with all components:
 
 ### Linux
 ```bash
-git clone https://github.com/StanfordVL/BEHAVIOR-1K
+# Clone the latest stable release (recommended)
+git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
+
+# Run the setup script
 ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
 ```
 
 ### Windows
 ```powershell
-git clone https://github.com/StanfordVL/BEHAVIOR-1K
+# Clone the latest stable release (recommended)
+git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
+
+# Run the setup script
 .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
 ```
+
+> **Development Branch**: If you want the latest development features (potentially less stable), clone the main branch instead:
+> ```bash
+> git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+> ```
 
 > **Note**: Run PowerShell as Administrator and set execution policy if needed: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
