@@ -308,7 +308,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
         usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-        with decrypted(usd_path) as fpath:
+        with extracted(decrypted(usd_path), usd_only=True) as fpath:
             stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
             if supports_abilities(abilities_info, prim):
@@ -334,7 +334,7 @@ def get_attachment_meta_links(category, model):
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
     usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-    with decrypted(usd_path) as fpath:
+    with extracted(decrypted(usd_path), usd_only=True) as fpath:
         stage = lazy.pxr.Usd.Stage.Open(fpath)
         prim = stage.GetDefaultPrim()
         attachment_meta_links = []
@@ -625,6 +625,23 @@ def decrypted(encrypted_filename):
     os.close(decrypted_fd)
     decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
     yield decrypted_filename
+    os.remove(decrypted_filename)
+
+
+@contextlib.contextmanager
+def extracted(usdz_filename, usd_only=False):
+    out_dir = tempfile.mkdtemp(prefix=os.path.basename(usdz_filename), dir=og.tempdir)
+    with zipfile.ZipFile(usdz_filename, "r") as zip_ref:
+        if usd_only:
+            usds = [f for f in zip_ref.namelist() if f.endswith(".usd")]
+            zip_ref.extractall(out_dir, members=usds)
+        else:
+            zip_ref.extractall(out_dir)
+    usd_file = [f for f in os.listdir(out_dir) if f.endswith(".usd")]
+    assert len(usd_file) == 1, "Expected exactly one USD file in USDZ archive, found {}".format(usd_file)
+    usd_file = os.path.join(out_dir, usd_file[0])
+    yield usd_file
+    shutil.rmtree(out_dir)
 
 
 if __name__ == "__main__":
