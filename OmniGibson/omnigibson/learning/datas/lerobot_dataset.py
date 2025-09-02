@@ -203,8 +203,14 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         for camera in self.meta.camera_names:
             for modality in self.meta.modalities:
                 allow_patterns.append(f"**/observation.images.{modality}.{camera}/**")
-        ignore_patterns = None if download_videos else "videos/"
+        ignore_patterns = []
+        if not download_videos:
+            ignore_patterns.append("videos/")
+        for task in set(TASK_NAMES_TO_INDICES.values()).difference(self.task_indices):
+            ignore_patterns.append(f"**/task-{task:04d}/**")
 
+        allow_patterns = None if allow_patterns == [] else allow_patterns
+        ignore_patterns = None if ignore_patterns == [] else ignore_patterns
         self.pull_from_repo(allow_patterns=allow_patterns, ignore_patterns=ignore_patterns)
 
     def pull_from_repo(
