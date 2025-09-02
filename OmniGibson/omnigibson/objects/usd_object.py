@@ -126,6 +126,7 @@ class USDObject(StatefulObject):
 
             # Patch the weird MDL 0 prefix issue.
             stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
             def _update_path(asset_path):
                 if asset_path.endswith(".mdl"):
                     return os.path.basename(asset_path)
@@ -178,6 +179,7 @@ class USDObject(StatefulObject):
 
             # Patch the weird MDL 0 prefix issue.
             stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
             def _update_path(asset_path):
                 if asset_path.endswith(".mdl"):
                     return os.path.basename(asset_path)
