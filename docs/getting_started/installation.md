@@ -53,10 +53,10 @@ Choose your installation method:
 
                 ```shell
                 # Full installation with all components
-                ./setup.sh --new-env --omnigibson --bddl --joylo --dataset
+                ./setup.sh --new-env --omnigibson --bddl --joylo --dataset --eval --primitives
 
                 # Core components only (without teleoperation)
-                ./setup.sh --new-env --omnigibson --bddl
+                ./setup.sh --new-env --omnigibson --bddl --dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)
                 ./setup.sh --new-env --omnigibson --bddl --dataset \
@@ -70,10 +70,10 @@ Choose your installation method:
 
                 ```powershell
                 # Full installation with all components
-                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Joylo -Dataset -Eval -Primitives
 
                 # Core components only (without teleoperation)
-                .\setup.ps1 -NewEnv -OmniGibson -BDDL
+                .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)
                 .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset `
