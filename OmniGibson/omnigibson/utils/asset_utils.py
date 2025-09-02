@@ -133,6 +133,25 @@ def get_scene_path(scene_name, dataset_name="behavior-1k-assets"):
     return os.path.join(scenes_path, scene_name)
 
 
+def get_task_instance_path(scene_name):
+    """
+    Get task instance path
+
+    Args:
+        scene_name (str): scene name, e.g., "Rs_int"
+
+    Returns:
+        str: file path to the scene name
+    """
+    task_instances_path = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances")
+    scenes_path = os.path.join(task_instances_path, "scenes")
+    log.info("Scene name: {}".format(scene_name))
+    if scene_name in os.listdir(scenes_path):
+        return os.path.join(scenes_path, scene_name)
+    else:
+        return None
+
+
 def get_category_path(category_name, dataset_name="behavior-1k-assets"):
     """
     Get OmniGibson object category path
