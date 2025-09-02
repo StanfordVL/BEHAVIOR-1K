@@ -96,9 +96,9 @@ function Prompt-ForTerms {
     Write-Host ""
     
     # Check what terms need to be accepted
-    $NeedsCondaTos = $false
-    $NeedsNvidiaEula = $false
-    $NeedsDatasetTos = $false
+    $script:NeedsCondaTos = $false
+    $script:NeedsNvidiaEula = $false
+    $script:NeedsDatasetTos = $false
     
     if ($NewEnv -and -not $AcceptCondaTos) {
         $script:NeedsCondaTos = $true
@@ -251,7 +251,7 @@ if ($NewEnv) {
     # Install PyTorch via pip with CUDA support
     Write-Host "Installing PyTorch with CUDA $CudaVersion support..."
     
-    # Determine the CUDA version string for pip URL (e.g., cu126, cu118, etc.)
+    # Determine the CUDA version string for pip URL (e.g., cu124, cu118, etc.)
     $CudaVerShort = $CudaVersion -replace '\.', ''  # Convert 12.4 to 124
     
     # Install numpy and setuptools via pip
@@ -261,67 +261,6 @@ if ($NewEnv) {
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
     
     Write-Host "✓ PyTorch installation completed"
-}
-
-# Setup Isaac Sim conda environment helper functions
-function Set-IsaacSimCondaEnv {
-    param(
-        [string]$IsaacSimPath,
-        [string]$CondaPrefix
-    )
-    
-    # Create directories
-    $activateDir = Join-Path $CondaPrefix "etc\conda\activate.d"
-    $deactivateDir = Join-Path $CondaPrefix "etc\conda\deactivate.d"
-    
-    New-Item -ItemType Directory -Path $activateDir -Force | Out-Null
-    New-Item -ItemType Directory -Path $deactivateDir -Force | Out-Null
-    
-    # Create empty files
-    foreach ($dir in @($activateDir, $deactivateDir)) {
-        foreach ($file in @("env_vars.bat", "env_vars.ps1")) {
-            $filePath = Join-Path $dir $file
-            if (-not (Test-Path $filePath)) {
-                New-Item -ItemType File -Path $filePath -Force | Out-Null
-            }
-        }
-    }
-    
-    # Setup CMD activation script
-    $cmdActFile = Join-Path $activateDir "env_vars.bat"
-    @"
-@echo off
-set PYTHONPATH_OLD=%PYTHONPATH%
-set PYTHONPATH=%PYTHONPATH%;$IsaacSimPath\site
-set CARB_APP_PATH=$IsaacSimPath\kit
-set EXP_PATH=$IsaacSimPath\apps
-set ISAAC_PATH=$IsaacSimPath
-"@ | Out-File -FilePath $cmdActFile -Encoding ascii
-    
-    # Setup CMD deactivation script
-    $cmdDeactFile = Join-Path $deactivateDir "env_vars.bat"
-    @"
-@echo off
-set PYTHONPATH=%PYTHONPATH_OLD%
-set PYTHONPATH_OLD=""
-"@ | Out-File -FilePath $cmdDeactFile -Encoding ascii
-    
-    # Setup PowerShell activation script
-    $psActFile = Join-Path $activateDir "env_vars.ps1"
-    @"
-`$env:PYTHONPATH_OLD="`$env:PYTHONPATH"
-`$env:PYTHONPATH="`$env:PYTHONPATH;$IsaacSimPath\site"
-`$env:CARB_APP_PATH="$IsaacSimPath\kit"
-`$env:EXP_PATH="$IsaacSimPath\apps"
-`$env:ISAAC_PATH="$IsaacSimPath"
-"@ | Out-File -FilePath $psActFile -Encoding utf8
-    
-    # Setup PowerShell deactivation script
-    $psDeactFile = Join-Path $deactivateDir "env_vars.ps1"
-    @"
-`$env:PYTHONPATH="`$env:PYTHONPATH_OLD"
-`$env:PYTHONPATH_OLD=`$null
-"@ | Out-File -FilePath $psDeactFile -Encoding utf8
 }
 
 # Find Isaac Sim installation
@@ -379,11 +318,17 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
     
     # Build extras string
     $extras = ""
-    if ($Dev -and $Primitives) { $extras = "[dev,primitives]" }
-    elseif ($Dev) { $extras = "[dev]" }
-    elseif ($Primitives) { $extras = "[primitives]" }
+    if ($Dev -and $Primitives) { 
+        $extras = '[dev,primitives]' 
+    }
+    elseif ($Dev) { 
+        $extras = '[dev]' 
+    }
+    elseif ($Primitives) { 
+        $extras = '[primitives]' 
+    }
     
-    pip install -e "$WorkDir\OmniGibson$extras"
+    pip install -e "${WorkDir}\OmniGibson${extras}"
     
     # Install pre-commit for dev setup
     if ($Dev) {
@@ -414,7 +359,7 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
         Write-Host "Installing Isaac Sim via pip..."
     }
     
-if (-not $isaacInstalled) {
+    if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
             "omniverse_kit-106.5.0.162521", "isaacsim_kernel-4.5.0.0", "isaacsim_app-4.5.0.0",
@@ -434,7 +379,7 @@ if (-not $isaacInstalled) {
         try {
             foreach ($pkg in $packages) {
                 $pkgParts = $pkg -split "-"
-                $pkgName = ($pkgParts[0..$($pkgParts.Length-2)] -join "-").Replace("_", "-")
+                $pkgName = ($pkgParts[0..($pkgParts.Length-2)] -join "-").Replace("_", "-")
                 $filename = "$pkg-cp310-none-win_amd64.whl"
                 $url = "https://pypi.nvidia.com/$pkgName/$filename"
                 $filepath = Join-Path $tempDir $filename
@@ -489,21 +434,21 @@ if (-not $isaacInstalled) {
         $env:OMNI_KIT_ACCEPT_EULA = "YES"
 
         Write-Host "Downloading OmniGibson robot assets..."
-        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
+        python -c 'from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()'
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: OmniGibson robot assets installation failed"
             exit 1
         }
 
         Write-Host "Downloading BEHAVIOR-1K assets..."
-        python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=$DatasetAcceptFlag)"
+        python -c 'from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=$DatasetAcceptFlag)'
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: Dataset installation failed"
             exit 1
         }
     
         Write-Host "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-        python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
+        python -c 'from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()'
         if ($LASTEXITCODE -ne 0) {
             Write-Host "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
             exit 1
@@ -540,11 +485,11 @@ if ($AssetPipeline) {
 # Installation summary
 Write-Host ""
 Write-Host "=== Installation Complete! ==="
-if ($NewEnv) { Write-Host "✓ Created conda environment 'behavior'" }
-if ($OmniGibson) { Write-Host "✓ Installed OmniGibson + Isaac Sim" }
-if ($BDDL) { Write-Host "✓ Installed BDDL" }
-if ($Teleop) { Write-Host "✓ Installed JoyLo" }
-if ($AssetPipeline) { Write-Host "✓ Installed asset pipeline" }
-if ($Dataset) { Write-Host "✓ Downloaded datasets" }
+if ($NewEnv) { Write-Host "Created conda environment 'behavior'" }
+if ($OmniGibson) { Write-Host "Installed OmniGibson + Isaac Sim" }
+if ($BDDL) { Write-Host "Installed BDDL" }
+if ($Teleop) { Write-Host "Installed JoyLo" }
+if ($AssetPipeline) { Write-Host "Installed asset pipeline" }
+if ($Dataset) { Write-Host "Downloaded datasets" }
 Write-Host ""
 if ($NewEnv) { Write-Host "To activate: conda activate behavior" }
