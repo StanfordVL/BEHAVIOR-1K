@@ -53,7 +53,7 @@ Choose your installation method:
 
                 ```shell
                 # Full installation with all components
-                ./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+                ./setup.sh --new-env --omnigibson --bddl --joylo --dataset
 
                 # Core components only (without teleoperation)
                 ./setup.sh --new-env --omnigibson --bddl
@@ -108,7 +108,7 @@ Choose your installation method:
             You can omit `--new-env` to use your current Python environment instead of creating a new conda environment:
             ```shell
             # Linux: Install in current environment
-            ./setup.sh --omnigibson --bddl --teleop --dataset
+            ./setup.sh --omnigibson --bddl --joylo --dataset
             
             # Skip confirmation prompt with --confirm-no-conda
             ./setup.sh --omnigibson --bddl --confirm-no-conda
