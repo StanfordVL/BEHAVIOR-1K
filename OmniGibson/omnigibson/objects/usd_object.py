@@ -125,16 +125,16 @@ class USDObject(StatefulObject):
             usd_path = usd_files[0]
 
             # Patch the weird MDL 0 prefix issue.
-            stage = lazy.pxr.Usd.Stage.Open(usd_path)
+            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
 
             def _update_path(asset_path):
                 if asset_path.endswith(".mdl"):
                     return os.path.basename(asset_path)
                 return asset_path
 
-            lazy.pxr.UsdUtils.ModifyAssetPaths(stage.GetRootLayer(), _update_path)
-            stage.Save()
-            del stage
+            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+            side_stage.Save()
+            del side_stage
         else:
             self.check_hash(usd_path)
 
@@ -178,16 +178,16 @@ class USDObject(StatefulObject):
             usd_path = usd_files[0]
 
             # Patch the weird MDL 0 prefix issue.
-            stage = lazy.pxr.Usd.Stage.Open(usd_path)
+            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
 
             def _update_path(asset_path):
                 if asset_path.endswith(".mdl"):
                     return os.path.basename(asset_path)
                 return asset_path
 
-            lazy.pxr.UsdUtils.ModifyAssetPaths(stage.GetRootLayer(), _update_path)
-            stage.Save()
-            del stage
+            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+            side_stage.Save()
+            del side_stage
         else:
             self.check_hash(usd_path)
 
