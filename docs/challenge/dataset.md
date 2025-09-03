@@ -6,27 +6,14 @@ We host our dataset on Hugging Face:
 
 **Dataset URL**: [https://huggingface.co/datasets/behavior-1k/2025-challenge-demos](https://huggingface.co/datasets/behavior-1k/2025-challenge-demos)
 
+**Rawdata URL**: [https://huggingface.co/datasets/behavior-1k/2025-challenge-rawdata](https://huggingface.co/datasets/behavior-1k/2025-challenge-rawdata)
+
 ## Data Format
 
 Our demonstration data is provided in **LeRobot format**, a widely-adopted format for robot learning datasets. LeRobot provides a unified interface for robot demonstration data, making it easy to load, process, and use the data for training policies.
 
-To learn more about the LeRobot format, visit the official [LeRobot repository](https://github.com/huggingface/lerobot).
+To learn more about the LeRobot format, visit the official [LeRobot repository](https://github.com/huggingface/lerobot). We also provide tutorial notebooks about [loading the dataset](https://github.com/StanfordVL/b1k-baselines/blob/main/tutorials/dataset.ipynb) and [generating custom data](https://github.com/StanfordVL/b1k-baselines/blob/main/tutorials/generate_custom_data.ipynb)
 
-##  Loading the Dataset
-
-<iframe 
-  src="https://nbviewer.org/github/StanfordVL/b1k-baselines/blob/main/tutorials/dataset.ipynb"
-  width="100%" 
-  height="800">
-</iframe>
-
-## Custom Data Generation
-
-<iframe 
-  src="https://nbviewer.org/github/StanfordVL/b1k-baselines/blob/main/tutorials/generate_custom_data.ipynb"
-  width="100%" 
-  height="800">
-</iframe>
 
 ## Dataset Statistics
 

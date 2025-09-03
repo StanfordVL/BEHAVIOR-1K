@@ -1,6 +1,20 @@
-# Evaluation
+# Evaluation and Rules
 
 ---
+
+## Challenge Tracks
+
+For the 1st BEHAVIOR-1K Challenge, We will have the following two tracks for the 1st challenge:
+
+- **Standard track:** Participants are restricted to using the state observations we provided in the demonstration dataset for their policy models.
+    - RGB + depth + segmentation + proprioception information
+    - No object state
+
+- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, scene point cloud, etc, and use such information for the policy models.
+
+We will select the top three winning teams from each track, they will share the challenge prizes, and will be invited to present their approaches at the challenge workshop!
+ 🏆 Prizes for each track: 🥇 $1,000 🥈 $500 🥉 $300
+
 
 ## Running Evaluations
 
@@ -16,7 +30,7 @@ Here is a brief explanation of the arguments:
     ```
     python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME
     ```
-Here, it will use the default `omnigibson.envs.EnvironmentWrapper`, which is a barebone wrapper that does not provide anything beyond our standard. The evaluator will load the task and spawn a server listening on `0.0.0.0:80` Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` to serve your policy and communicate with the Evaluator. 
+Here, it will use the default `omnigibson.envs.EnvironmentWrapper`, which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. The evaluator will load the task and spawn a server listening on `0.0.0.0:80`. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` to serve your policy and communicate with the Evaluator. 
 
 For privileged information track, you are allowed to design your own environment wrapper, within which you can arbitrarily query the environment instance for privileged information. We provided an example wrapper at `omnigibson.learning.wrappers.RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relavant objects at every frame. The custom wrapper you wrote needs to submitted for inspection to make sure you have not abused the environment by any way (e.g. teleporting the robot, or changing object states directly). 
 
@@ -34,12 +48,38 @@ We will calculate the following metric during policy rollout:
 
 ### Secondary Metrics (Efficiency)
 - **Simulated time:** Total simulation time (hardware-independent).
-- **Distance navigated:** Accumulated distance traveled by the agent’s base body.
-- **Displacement of end effectors/hands:** Accumulated displacement of the agent’s end effectors/hands.
+- **Distance navigated:** Accumulated distance traveled by the agent’s base body. This metric evaluates the efficiency of the agent in navigating the environment.
+- **Displacement of end effectors/hands:** Accumulated displacement of the agent’s end effectors/hands. This metric evaluates the efficiency of the agent in its interaction with the environment.
 
 *Secondary metrics will be normalized using human averages from 200 demonstrations per task.*
 
-When running the eval script, an json file will be outputed after ech rollout episode containing the results. Here is a sample output json file for one episode of evaluation:
+
+## Evaluation Protocol and Logistics
+
+**Evaluation protocol:**
+
+- **Training:** The training instances and human demonstrations (200 per task) are released to the public.
+
+- **Self-evaluation and report:** We have prepared 20 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 5 times (with time-outs, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+
+- **Final evaluation:** We will hold out 20 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
+
+- Each instance differs in terms of:
+    - Initial object states
+    - Initial robot poses
+
+<iframe 
+  src="https://player.vimeo.com/video/1115082804?badge=0&autopause=0&autoplay=1&muted=1&loop=1&title=0&byline=0&portrait=0&controls=0" 
+  width="640" 
+  height="320" 
+  frameborder="0" 
+  allow="autoplay; fullscreen" 
+  allowfullscreen>
+</iframe>
+
+**Submission details**
+
+When running the eval script, an json file will be outputed after each rollout episode containing the results. Here is a sample output json file for one episode of evaluation:
 
 ```
 {
@@ -64,4 +104,21 @@ When running the eval script, an json file will be outputed after ech rollout ep
 }
 ```
 
+- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7).
+    - To self-report your performance, check our [evaluation guide](./evaluation.md). 
+    - You can view the leaderboard [here](./leaderboard.md).
+    - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
+
+- Final model submission and evaluation:
+    - Submitted models and our compute specs
+        - The model should run on a single 24GB VRAM GPU. We will use the following GPUs to perform the final evaluation: RTX 3090, A5000, TitanRTX
+    - IP address-based evaluation: You can serve your models and provide us with corresponding IP addresses that allow us to query your models for evaluation. We recommend common model serving libraries, such as [TorchServe](https://docs.pytorch.org/serve/), [LitServe](https://lightning.ai/docs/litserve/home), [vLLM](https://docs.vllm.ai/en/latest/index.html), [NVIDIA Triton](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html), etc.
+    - The same model with different checkpoints from the same team will be considered as a single entry.
+
+
 ** YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON IN ANY WAY **. Since each tasks will be evaluated on 20 instances and 5 rollout each, there should be 5k json files after the full evaluation. Zip them all and upload through google form. For privileged information track participants, zip your wrapper code and submit together with the result json files.
+
+
+**Challenge office hours**
+
+- Every Monday and Thursday, 4:30pm-6:00pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).

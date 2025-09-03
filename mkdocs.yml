@@ -87,7 +87,7 @@ plugins:
   # - social
   - gen-files:
       scripts:
-      # - docs/gen_ref_pages.py
+      - docs/gen_ref_pages.py
       - docs/gen_task_pages.py
       - docs/gen_leaderboard.py
   - literate-nav:
@@ -100,11 +100,10 @@ nav:
   - 🏆 2025 BEHAVIOR Challenge: 
     - challenge/index.md
     - Call for Participation: challenge/call_for_participation.md
-    - Rules: challenge/rules.md
     - Leaderboard: challenge/leaderboard.md
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
-    - Evaluation: challenge/evaluation.md
+    - Evaluation and Rules: challenge/evaluation.md
     - Demo Gallery: challenge/tasks/
   - Documentation:
     - Installation: getting_started/installation.md
