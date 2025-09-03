@@ -50,8 +50,6 @@ Pre-implemented training & evaluation pipelines for:
 
 Top 3 teams from each track will be invited to present at the workshop!
 
-[Full challenge rules →](./rules.md)
-
 ### Evaluation Metrics
 
 **Primary metric (for ranking):** Task success rate averaged across 50 tasks. Partial credit given as fraction of satisfied BDDL goal predicates.
@@ -62,7 +60,7 @@ Top 3 teams from each track will be invited to present at the workshop!
 - **Distance navigated** - Total base movement distance
 - **Hand displacement** - Cumulative hand movement
 
-[Evaluation details →](./evaluation.md)
+[Evaluation details & Full challenge rules →](./evaluation.md)
 
 
 ## :octicons-person-add-16: **Participating**
