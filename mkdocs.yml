@@ -76,6 +76,7 @@ plugins:
         'omnigibson/getting_started/examples.md': 'getting_started/examples.md'
         'omnigibson/behavior_components/behavior_knowledgebase.md': 'https://behavior.stanford.edu/knowledgebase/'
         'behavior-100.md': 'behavior_100/overview.md'
+        'challenge/rules.md': 'challenge/evaluation.md'
   - mkdocstrings:
       handlers:
         python:
