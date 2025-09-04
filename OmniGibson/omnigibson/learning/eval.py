@@ -22,8 +22,6 @@ from omegaconf import DictConfig, OmegaConf
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
-    HEAD_RESOLUTION,
-    WRIST_RESOLUTION,
     ROBOT_CAMERA_NAMES,
     PROPRIOCEPTION_INDICES,
     generate_basic_environment_config,
@@ -126,7 +124,7 @@ class Evaluator:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
         logger.info(f"Setting timeout to be 2x the average length of human demos: {self.human_stats['length'] * 2}")
         cfg["task"]["termination_config"]["max_steps"] = self.human_stats["length"] * 2
-        cfg["task"]["include_obs"] = self.cfg.use_task_info
+        cfg["task"]["include_obs"] = False
         env = og.Environment(configs=cfg)
         # instantiate env wrapper
         env = instantiate(env_wrapper, env=env)
@@ -135,23 +133,10 @@ class Evaluator:
     def load_robot(self) -> BaseRobot:
         """
         Loads and returns the robot instance from the environment.
-        Change robot cameras' parameters
         Returns:
             BaseRobot: The robot instance loaded from the environment.
         """
         robot = self.env.scene.object_registry("name", "robot_r1")
-        og.sim.step()
-        # Update robot sensors:
-        for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
-            sensor_name = camera_name.split("::")[1]
-            if camera_id == "head":
-                robot.sensors[sensor_name].horizontal_aperture = 40.0
-                robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
-                robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
-            else:
-                robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
-                robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
-        self.env.load_observation_space()
         return robot
 
     def load_policy(self) -> Any:
@@ -292,13 +277,16 @@ class Evaluator:
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
-            (360, 360),
+            (224, 224),
         )
         right_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["right_wrist"] + "::rgb"].numpy(),
-            (360, 360),
+            (224, 224),
         )
-        head_rgb = self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy()
+        head_rgb = cv2.resize(
+            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy(),
+            (448, 448),
+        )
         write_video(
             np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
             video_writer=self.video_writer,
@@ -390,7 +378,7 @@ if __name__ == "__main__":
                     video_name = str(video_path) + f"/video_{idx}_{epi}.mp4"
                     evaluator.video_writer = create_video_writer(
                         fpath=video_name,
-                        resolution=(720, 1080),
+                        resolution=(448, 672),
                     )
                 # run metric start callbacks
                 for metric in evaluator.metrics:

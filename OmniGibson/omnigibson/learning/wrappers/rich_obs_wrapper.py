@@ -1,10 +1,10 @@
 from omnigibson.envs import EnvironmentWrapper, Environment
-from omnigibson.sensors import VisionSensor
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.learning.utils.eval_utils import ROBOT_CAMERA_NAMES, HEAD_RESOLUTION, WRIST_RESOLUTION
 
 
 # Create module logger
-log = create_module_logger("RichObservationWrapper")
+logger = create_module_logger("RichObservationWrapper")
 
 
 class RichObservationWrapper(EnvironmentWrapper):
@@ -15,17 +15,27 @@ class RichObservationWrapper(EnvironmentWrapper):
 
     def __init__(self, env: Environment):
         super().__init__(env=env)
-        # Here, we modify the robot observation to include more modalities
-        # For a complete list of available modalities, see VisionSensor.ALL_MODALITIES
+        # Note that from eval.py we already set the robot to include rgb + depth + seg_instance_id modalities
         robot = env.robots[0]
-        for sensor in robot.sensors.values():
-            if isinstance(sensor, VisionSensor):
-                sensor.add_modality("normal")
-                sensor.add_modality("flow")
+        # Here, we change the camera resolution and head camera aperture to match the one we used in data collection
+        for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
+            sensor_name = camera_name.split("::")[1]
+            if camera_id == "head":
+                robot.sensors[sensor_name].horizontal_aperture = 40.0
+                robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
+                robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
+            else:
+                robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
+                robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
+            # Here, we modify the robot observation to include normal and flow modalities
+            # For a complete list of available modalities, see VisionSensor.ALL_MODALITIES
+            robot.sensors[sensor_name].add_modality("normal")
+            robot.sensors[sensor_name].add_modality("flow")
         # reload observation space
         env.load_observation_space()
         # we also set task to include obs
         env.task._include_obs = True
+        logger.info("Reloaded observation space!")
 
     def step(self, action, n_render_iterations=1):
         """

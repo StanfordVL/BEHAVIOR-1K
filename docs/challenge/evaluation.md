@@ -26,13 +26,18 @@ Here is a brief explanation of the arguments:
 
 - `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
 
-- `WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. For standard track, you MUST use the following command to start the evaluator:
+- `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use the default `omnigibson.learning.wrappers.DefaultWrapper`:
     ```
     python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME
     ```
-Here, it will use the default `omnigibson.envs.EnvironmentWrapper`, which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. The evaluator will load the task and spawn a server listening on `0.0.0.0:80`. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` to serve your policy and communicate with the Evaluator. 
+which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. There are two more example wrappers under `omnigibson.learning.wrappers`:
 
-For privileged information track, you are allowed to design your own environment wrapper, within which you can arbitrarily query the environment instance for privileged information. We provided an example wrapper at `omnigibson.learning.wrappers.RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relavant objects at every frame. The custom wrapper you wrote needs to submitted for inspection to make sure you have not abused the environment by any way (e.g. teleporting the robot, or changing object states directly). 
+    - `RGBLowResWrapper`: only use rgb as observation and reduce camera resolutions to 224 * 224. This could speed up the simulator and thus reduce evaluation time. This wrapper is ok to use in standard track. 
+    - `RichOvservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
+
+After launching, the evaluator will load the task and spawn a server listening on `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
+
+You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. For privileged information track, you can arbitrarily query the environment instance for privileged information within the wrapper, as shown in the example `RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relavant objects at every frame. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission is on the right track, and you have not abused the environment by any means (e.g. teleporting the robot, or changing object states directly). 
 
 
 As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the baselines section for more information.
@@ -43,7 +48,7 @@ As a starter, we provided a codebase of common imitation learning algorithms for
 We will calculate the following metric during policy rollout:
 
 ### Primary Metric (Ranking)
-- **Task success score rate:** Averaged across 50 tasks.
+- **Task success score:** Averaged across 50 tasks.
 - **Calculation:** Partial successes = (Number of goal BDDL predicates satisfied at episode end) / (Total number of goal predicates).
 
 ### Secondary Metrics (Efficiency)
@@ -105,7 +110,6 @@ When running the eval script, an json file will be outputed after each rollout e
 ```
 
 - Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7).
-    - To self-report your performance, check our [evaluation guide](./evaluation.md). 
     - You can view the leaderboard [here](./leaderboard.md).
     - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
 
