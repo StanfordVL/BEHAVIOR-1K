@@ -20,15 +20,17 @@ We will select the top three winning teams from each track, they will share the 
 
 We provide a unified entry point for running evaluation:
 ```
-python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
+python OmniGibson/omnigibson/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
 Here is a brief explanation of the arguments:
+
+- `$LOG_PATH` is the path to where the evaluator will store the logs (metrics json file and recorded rollout videos)
 
 - `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
 
 - `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use the default `omnigibson.learning.wrappers.DefaultWrapper`:
     ```
-    python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME
+    python OmniGibson/omnigibson/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
     ```
 which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. There are two more example wrappers under `omnigibson.learning.wrappers`:
 
