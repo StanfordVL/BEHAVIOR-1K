@@ -73,8 +73,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             episodes (List[int]): list of episodes to use PER TASK.
                 NOTE: This is different from the actual episode indices in the dataset.
                 Rather, this is meant to be used for train/val split, or loading a specific amount of partial data.
+                If set to None, all episodes will be loaded for a given task.
             tasks (List[str]): list of task names to load. If None, all tasks will be loaded.
-                Note: only one of episodes or tasks can be specified. If both are None, will load everything.
             modalities (List[str]): list of modality names to load. If None, all modalities will be loaded.
                 must be a subset of ["rgb", "depth", "seg_instance_id"]
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.

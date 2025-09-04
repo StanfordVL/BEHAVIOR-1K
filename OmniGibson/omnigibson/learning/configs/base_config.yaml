@@ -7,8 +7,8 @@ defaults:
 env_wrapper: 
   _target_: omnigibson.learning.wrappers.DefaultWrapper
 policy_name: ???  # filled by policy
-headless: true
+headless: true  # whether to run in headless mode (no GUI)
 episodes_per_instance: 5  # number of episodes to eval per instance
 eval_instance_ids: null  # specific list of instance ids to eval on, if null test on all instances
-write_video: true 
+write_video: true # whether we record videos during rollout
 log_path: ???
