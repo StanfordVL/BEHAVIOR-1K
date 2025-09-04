@@ -36,6 +36,8 @@ class LocalPolicy:
             obs=obs,
             camera_intrinsics=cam_intrinsics,
             pcd_range=(-2, 2, -2, 2, 0, 2),
+            pcd_num_points=100000,
+            use_fps=False,
         )[0].cpu()
         color_pcd_vis(pcd)
         # ============================================================
@@ -43,7 +45,10 @@ class LocalPolicy:
             return self.policy.act(obs).detach().cpu()
         else:
             assert self.action_dim is not None
-            return th.zeros(self.action_dim, dtype=th.float32)
+            # ===== JUST FOR TESTING, REVERT BEFORE MERGING PR =======
+            return th.randn(self.action_dim, dtype=th.float32) * 0.5
+            # return th.zeros(self.action_dim, dtype=th.float32)
+            # ============================================================
 
     def reset(self) -> None:
         if self.policy is not None:
