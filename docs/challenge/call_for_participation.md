@@ -66,7 +66,7 @@ If you’re new to embodied AI, don’t worry: the BEHAVIOR challenge provides t
 
 ## **Evaluation, Timeline, and Prizes**
 
-**Please see the detailed challenge rules [on this page](./rules.md). Here is a high-level overview.**
+**Please see the detailed challenge rules [on this page](./evaluation.md). Here is a high-level overview.**
 
 ### **How will entries be evaluated?** 
 
