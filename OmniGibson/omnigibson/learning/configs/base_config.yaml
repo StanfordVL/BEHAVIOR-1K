@@ -11,4 +11,4 @@ headless: true
 episodes_per_instance: 5  # number of episodes to eval per instance
 eval_instance_ids: null  # specific list of instance ids to eval on, if null test on all instances
 write_video: true 
-log_path: ~/Documents/logs/policy
+log_path: ???
