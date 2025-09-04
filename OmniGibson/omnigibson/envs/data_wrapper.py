@@ -795,6 +795,8 @@ class DataPlaybackWrapper(DataWrapper):
         # Set scene file and disable online object sampling if BehaviorTask is being used
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
+            # Don't use presampled robot pose
+            config["task"]["use_presampled_robot_pose"] = False
 
         # Because we're loading directly from the cached scene file, we need to disable any additional objects that are being added since
         # they will already be cached in the original scene file

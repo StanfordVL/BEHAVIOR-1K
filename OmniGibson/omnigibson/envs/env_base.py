@@ -695,8 +695,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._reset_variables()
 
         if get_obs:
-            # Run a single simulator step to make sure we can grab updated observations
+            # Run a single simulator step and 3 iterations of render to make sure we can grab updated observations
             og.sim.step()
+            for _ in range(3):
+                og.sim.render()
 
             # Grab and return observations
             obs, info = self.get_obs()
