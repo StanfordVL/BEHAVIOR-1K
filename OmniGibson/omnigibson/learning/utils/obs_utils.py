@@ -510,7 +510,7 @@ def process_fused_point_cloud(
             obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
         )
         rgb_pcd.append(
-            th.cat([obs[f"{camera_name}::rgb"] / 255.0, pcd], dim=-1).flatten(-3, -2)
+            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
         )  # shape (B, [T], H*W, 6)
         if process_seg:
             seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1))  # shape (B, [T], H*W)
