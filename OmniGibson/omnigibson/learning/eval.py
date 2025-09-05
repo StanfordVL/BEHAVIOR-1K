@@ -227,9 +227,6 @@ class Evaluator:
             get_task_instance_path(scene_model),
             f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
         )
-        assert os.path.exists(
-            tro_file_path
-        ), f"Could not find TRO file at {tro_file_path}, did you run ./populate_behavior_tasks.sh?"
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
         for tro_key, tro_state in tro_state.items():
@@ -373,8 +370,6 @@ if __name__ == "__main__":
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(config.episodes_per_instance):
-                for _ in range(10):
-                    og.sim.render()
                 evaluator.reset()
                 done = False
                 if config.write_video:

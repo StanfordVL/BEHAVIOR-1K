@@ -55,10 +55,12 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
-            # remove seg semantic map (Alternatively, change this line to store seg semantic instead)
-            obs.pop(f"{camera_name}::seg_semantic")
-            # move seg instance maps to cpu
-            obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
+            if f"{camera_name}::seg_semantic" in obs:
+                # remove seg semantic map (Alternatively, change this line to store seg semantic instead)
+                obs.pop(f"{camera_name}::seg_semantic")
+            if f"{camera_name}::seg_instance_id" in obs:
+                # move seg instance maps to cpu
+                obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose
             cam_pose = robot.sensors[camera_name.split("::")[1]].get_position_orientation()
             cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
@@ -392,7 +394,7 @@ def generate_low_dim_data(
     """
     makedirs_with_mode(f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}")
     makedirs_with_mode(f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}")
-    with h5py.File(f"{data_folder}/2025-challenge-demos/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
+    with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
         actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
         proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
         task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
@@ -564,7 +566,7 @@ def main():
     )
     parser.add_argument("--seg", action="store_true", help="Include this flag to generate segmentation maps")
     parser.add_argument("--bbox", action="store_true", help="Include this flag to generate bounding box data")
-    # the following arguments are for Google Sheets integration
+    # [Internal use only] the following arguments are for Google Sheets integration
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
@@ -605,7 +607,9 @@ def main():
             data_folder=args.data_folder, task_id=task_id, demo_id=args.demo_id, episode_id=episode_id
         )
     if args.pcd_gt or args.pcd_vid:
-        with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/behavior.yaml") as f:
+        with open(
+            f"{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/omnigibson/learning/configs/task/behavior.yaml"
+        ) as f:
             pcd_range = tuple(yaml.safe_load(f)["pcd_range"])
         if args.pcd_gt:
             rgbd_gt_to_pcd(

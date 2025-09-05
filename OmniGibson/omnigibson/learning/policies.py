@@ -4,6 +4,8 @@ from omnigibson.learning.utils.array_tensor_utils import torch_to_numpy
 from omnigibson.learning.utils.network_utils import WebsocketClientPolicy
 from typing import Optional
 
+from omnigibson.learning.utils.obs_utils import process_fused_point_cloud, color_pcd_vis
+from omnigibson.learning.utils.eval_utils import CAMERA_INTRINSICS, ROBOT_CAMERA_NAMES
 
 __all__ = [
     "LocalPolicy",
@@ -25,11 +27,28 @@ class LocalPolicy:
         """
         Directly return a zero action tensor of the specified action dimension.
         """
+        # ===== JUST FOR TESTING, REMOVE BEFORE MERGING PR =======
+        cam_intrinsics = {}
+        for camera_id, camera_names in ROBOT_CAMERA_NAMES["R1Pro"].items():
+            cam_intrinsics[camera_names] = th.from_numpy(CAMERA_INTRINSICS["R1Pro"][camera_id])
+        obs["cam_rel_poses"] = obs["robot_r1::cam_rel_poses"]
+        pcd = process_fused_point_cloud(
+            obs=obs,
+            camera_intrinsics=cam_intrinsics,
+            pcd_range=(-2, 2, -2, 2, 0, 2),
+            pcd_num_points=100000,
+            use_fps=False,
+        )[0].cpu()
+        color_pcd_vis(pcd)
+        # ============================================================
         if self.policy is not None:
             return self.policy.act(obs).detach().cpu()
         else:
             assert self.action_dim is not None
-            return th.zeros(self.action_dim, dtype=th.float32)
+            # ===== JUST FOR TESTING, REVERT BEFORE MERGING PR =======
+            return th.randn(self.action_dim, dtype=th.float32) * 0.5
+            # return th.zeros(self.action_dim, dtype=th.float32)
+            # ============================================================
 
     def reset(self) -> None:
         if self.policy is not None:
