@@ -1,3 +1,4 @@
+import json
 import os
 import numpy as np
 import packaging.version
@@ -28,6 +29,7 @@ from lerobot.datasets.utils import (
 from lerobot.datasets.video_utils import get_safe_default_codec
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
 from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
+from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
 from torch.utils.data import Dataset
@@ -47,6 +49,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
           and cameras (e.g., "left_wrist", "right_wrist", "head").
         - Ability to download and use additional annotation and metainfo files.
         - Local-only mode: Optionally restrict dataset usage to local files, disabling downloads.
+        - Random shuffling of episodes for training purposes, and optionally streaming for faster access.
+    These customizations allow for more efficient and targeted dataset usage in the context of B1K tasks
     """
 
     def __init__(
@@ -67,6 +71,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
         local_only: bool = False,
+        streaming: bool = True,
+        shuffle: bool = True,
+        seed: int = 42,
     ):
         """
         Custom args:
@@ -80,6 +87,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             cameras (List[str]): list of camera names to load. If None, all cameras will be loaded.
                 must be a subset of ["left_wrist", "right_wrist", "head"]
             local_only (bool): whether to only use local data (not download from HuggingFace).
+            streaming (bool): whether to use streaming mode for loading the dataset.
+                NOTE: As B1K challenge demos has GOP size of 250 frames for efficient storage, it is STRONGLY recommended to use streaming mode for faster access for the dataset if you don't need true random access.
+                When streaming is enabled, it is recommended to set shuffle to True for better randomness in episode selection.
+                We also enforce that segmentation instance ID videos can only be loaded in streaming mode for faster access.
+            shuffle (bool): whether to shuffle the episodes after loading. This ONLY applies in streaming mode.
+            seed (int): random seed for shuffling episodes.
         """
         Dataset.__init__(self)
         self.repo_id = repo_id
@@ -102,6 +115,8 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # ========== Customizations ==========
         if modalities is None:
             modalities = ["rgb", "depth", "seg_instance_id"]
+        if "seg_instance_id" in modalities:
+            assert streaming, "For the sake of data loading speed, please use streaming=True when loading segmentation instance ID videos."
         if "depth" in modalities:
             assert self.video_backend == "pyav", (
                 "Depth videos can only be decoded with the 'pyav' backend. "
@@ -135,6 +150,17 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                 epi_by_task[task_id] = [epi_by_task[task_id][i] for i in episodes if i < len(epi_by_task[task_id])]
         # now put episodes back together
         self.episodes = sorted([ep for eps in epi_by_task.values() for ep in eps])
+        # handle streaming mode and shuffling of episodes
+        self.streaming = streaming
+        if self.streaming:
+            logger.info(
+                "Streaming mode is enabled. It is recommended to set shuffle=True for better randomness in episode selection."
+            )
+            # Now, we randomly permute the episodes if shuffle is True
+            if shuffle:
+                rng = np.random.default_rng(seed)
+                rng.shuffle(self.episodes)
+            self.obs_loaders = dict()
         # record the positional index of each episode index within self.episodes
         self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
         logger.info(f"Total episodes: {len(self.episodes)}")
@@ -157,6 +183,18 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             self.revision = get_safe_version(self.repo_id, self.revision)
             self.download_episodes(download_videos)
             self.hf_dataset = self.load_hf_dataset()
+
+        # ========== Customizations ==========
+        # select a starting frame index for streaming
+        # this will ensure differnt worker has a different starting frame index
+        if streaming:
+            if shuffle:
+                self.current_streaming_frame_idx = np.random.default_rng().integers(0, self.num_frames).item()
+                self.current_streaming_episode_idx = -1
+            else:
+                self.current_streaming_frame_idx = 0
+                self.current_streaming_episode_idx = -1
+        # ========== Customizations ==========
 
         self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
 
@@ -240,6 +278,70 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             ignore_patterns=ignore_patterns,
             max_workers=os.cpu_count() - 2,
         )
+
+    def __getitem__(self, idx) -> dict:
+        if not self.streaming:
+            return super().__getitem__(idx)
+        # Streaming mode: we will load the episode at the current streaming index, and then increment the index for next call
+        if self.current_streaming_frame_idx >= self.num_frames:
+            self.current_streaming_frame_idx = 0
+
+        item = self.hf_dataset[self.current_streaming_frame_idx]
+        ep_idx = item["episode_index"].item()
+        if ep_idx != self.current_streaming_episode_idx:
+            for loader in self.obs_loaders.values():
+                loader.close()
+            self.obs_loaders = dict()
+            # reload video loaders for new episode
+            self.current_streaming_episode_idx = ep_idx
+            for vid_key in self.meta.video_keys:
+                kwargs = {}
+                task_id = item["task_index"].item()
+                if "seg_instance_id" in vid_key:
+                    # load id list
+                    with open(
+                        self.root / "meta/episodes" / f"task-{task_id:04d}" / f"episode_{ep_idx:08d}.json",
+                        "r",
+                    ) as f:
+                        kwargs["id_list"] = th.tensor(
+                            json.load(f)[f"{ROBOT_CAMERA_NAMES['R1Pro'][vid_key.split('.')[-1]]}::unique_ins_ids"]
+                        )
+                self.obs_loaders[vid_key] = iter(
+                    OBS_LOADER_MAP[vid_key.split(".")[2]](
+                        data_path=self.root,
+                        task_id=task_id,
+                        camera_id=vid_key.split(".")[-1],
+                        demo_id=f"{ep_idx:08d}",
+                        start_idx=item["index"].item(),
+                        batch_size=1,
+                        stride=1,
+                        **kwargs,
+                    )
+                )
+
+        query_indices = None
+        if self.delta_indices is not None:
+            query_indices, padding = self._get_query_indices(idx, ep_idx)
+            query_result = self._query_hf_dataset(query_indices)
+            item = {**item, **padding}
+            for key, val in query_result.items():
+                item[key] = val
+
+        # load visual observations
+        for key in self.meta.video_keys:
+            item[key] = next(self.obs_loaders[key])[0]
+
+        if self.image_transforms is not None:
+            image_keys = self.meta.camera_keys
+            for cam in image_keys:
+                item[cam] = self.image_transforms(item[cam])
+
+        # Add task as a string
+        task_idx = item["task_index"].item()
+        item["task"] = self.meta.tasks[task_idx]
+        self.current_streaming_frame_idx += 1
+
+        return item
 
     def _get_query_indices(self, idx: int, ep_idx: int) -> tuple[dict[str, list[int | bool]]]:
         ep_idx = self.episode_data_index_pos[ep_idx]

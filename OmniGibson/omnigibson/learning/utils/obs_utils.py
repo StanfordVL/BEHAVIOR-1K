@@ -196,7 +196,7 @@ class VideoLoader:
         path: str,
         batch_size: Optional[int] = None,
         stride: int = 1,
-        output_size: Tuple[int, int],
+        output_size: Tuple[int, int] = None,
         start_idx: int = 0,
         end_idx: Optional[int] = None,
         fps: int = 30,
@@ -317,6 +317,8 @@ class RGBVideoLoader(VideoLoader):
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
+        if self.output_size is None:
+            return th.from_numpy(rgb).movedim(-1, -3).unsqueeze(0)
         rgb = F.interpolate(
             th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), size=self.output_size, mode="nearest-exact"
         )
@@ -339,7 +341,8 @@ class DepthVideoLoader(VideoLoader):
         frame_gray16 = frame.reformat(format="gray16le").to_ndarray()  # (H, W)
         depth = dequantize_depth(frame_gray16, min_depth=self.min_depth, max_depth=self.max_depth, shift=self.shift)
         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-        depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
+        if self.output_size is not None:
+            depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
         return depth.squeeze(0)  # (1, H, W)
 
 
@@ -361,13 +364,15 @@ class SegVideoLoader(VideoLoader):
         # For each rgb pixel, find the index of the nearest color in the equidistant bins
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
-        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0)  # (1, H, W)
-        ids = F.interpolate(ids.unsqueeze(0), size=self.output_size, mode="nearest-exact")
+        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+        if self.output_size is not None:
+            ids = F.interpolate(ids.float(), size=self.output_size, mode="nearest-exact")
         return ids.squeeze(0).cpu().to(th.long)  # (1, H, W)
 
 
 OBS_LOADER_MAP = {
     "rgb": RGBVideoLoader,
+    "depth": DepthVideoLoader,  # alias for depth_linear for compatibility
     "depth_linear": DepthVideoLoader,
     "seg_instance_id": SegVideoLoader,
 }

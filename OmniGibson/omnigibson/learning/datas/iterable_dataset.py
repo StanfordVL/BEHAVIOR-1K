@@ -1,10 +1,12 @@
 import h5py
+import json
 import numpy as np
 import os
 import pandas as pd
 import torch as th
 import torch.distributed as dist
 from copy import deepcopy
+from omegaconf import OmegaConf, ListConfig
 from omnigibson.learning.utils.array_tensor_utils import (
     any_concat,
     any_ones_like,
@@ -13,8 +15,6 @@ from omnigibson.learning.utils.array_tensor_utils import (
     get_batch_size,
     sequential_sum_balanced_partitioning,
 )
-from torch.utils.data import IterableDataset, get_worker_info
-from omegaconf import OmegaConf, ListConfig
 from omnigibson.learning.utils.eval_utils import (
     ACTION_QPOS_INDICES,
     JOINT_RANGE,
@@ -22,9 +22,11 @@ from omnigibson.learning.utils.eval_utils import (
     PROPRIOCEPTION_INDICES,
     TASK_NAMES_TO_INDICES,
     EEF_POSITION_RANGE,
+    ROBOT_CAMERA_NAMES,
 )
 from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
+from torch.utils.data import IterableDataset, get_worker_info
 from typing import Any, Optional, List, Tuple, Dict, Generator
 
 
@@ -189,7 +191,15 @@ class BehaviorIterableDataset(IterableDataset):
                 for camera_id in self._multi_view_cameras.keys():
                     camera_name = self._multi_view_cameras[camera_id]["name"]
                     stride = 1
-                    # TODO: ADD KWARGS
+                    kwargs = {}
+                    if obs_type == "seg_instance_id":
+                        with open(
+                            f"{self._data_path}/2025-challenge-demos/meta/episodes/task-{task_id:04d}/episode_{self._demo_keys[demo_ptr]}.json",
+                            "r",
+                        ) as f:
+                            kwargs["id_list"] = th.tensor(
+                                json.load(f)[f"{ROBOT_CAMERA_NAMES['R1Pro'][camera_id]}::unique_ins_ids"]
+                            )
                     obs_loaders[f"{camera_name}::{obs_type}"] = iter(
                         OBS_LOADER_MAP[obs_type](
                             data_path=f"{self._data_path}/2025-challenge-demos",
@@ -201,6 +211,7 @@ class BehaviorIterableDataset(IterableDataset):
                             start_idx=start_idx * stride * self._downsample_factor,
                             end_idx=((end_idx - 1) * stride + self._obs_window_size) * self._downsample_factor,
                             output_size=tuple(self._multi_view_cameras[camera_id]["resolution"]),
+                            **kwargs,
                         )
                     )
         for _ in range(start_idx, end_idx):
