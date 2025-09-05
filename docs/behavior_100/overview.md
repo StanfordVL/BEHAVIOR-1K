@@ -2,6 +2,9 @@
 icon: material/graph-outline
 ---
 
+!!! warning "Deprecated"
+    This information is about BEHAVIOR-100, a legacy version of BEHAVIOR built on iGibson and kept for posterity reasons. We recommend all new users to use BEHAVIOR-1K, which features 1,000 human-grounded household activities (vs. 100), 50 diverse scenes, thousands of annotated objects, and runs on the more powerful OmniGibson simulator with richer physics and visual realism.
+
 <iframe 
   src="https://player.vimeo.com/video/1101627941?badge=0&autopause=0&autoplay=1&muted=1&loop=1&title=0&byline=0&portrait=0&controls=0" 
   width="640" 
