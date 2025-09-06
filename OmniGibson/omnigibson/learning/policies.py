@@ -35,10 +35,17 @@ class LocalPolicy:
         pcd = process_fused_point_cloud(
             obs=obs,
             camera_intrinsics=cam_intrinsics,
-            pcd_range=(-2, 2, -2, 2, 0, 2),
+            pcd_range=(
+                -10,
+                10,
+                -10,
+                10,
+                0,
+                2,
+            ),  # TODO: this range is now in world frame if we are using native point cloud
             pcd_num_points=100000,
             use_fps=False,
-        )[0].cpu()
+        ).cpu()
         color_pcd_vis(pcd)
         # ============================================================
         if self.policy is not None:

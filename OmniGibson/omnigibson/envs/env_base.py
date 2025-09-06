@@ -8,6 +8,7 @@ import gymnasium as gym
 import torch as th
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
@@ -695,11 +696,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._reset_variables()
 
         if get_obs:
-            # Run a single simulator step and 3 iterations of render to make sure we can grab updated observations
+            # Run a single simulator step and a replicator step to make sure we can grab updated observations
             og.sim.step()
-            for _ in range(3):
-                og.sim.render()
-
+            # This blocks until replicator is done updating
+            lazy.omni.replicator.core.orchestrator.step(pause_timeline=False, delta_time=0.0)
             # Grab and return observations
             obs, info = self.get_obs()
 

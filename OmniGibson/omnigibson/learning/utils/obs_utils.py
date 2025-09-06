@@ -499,21 +499,25 @@ def process_fused_point_cloud(
     pcd_range: Tuple[float, float, float, float, float, float],  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: Optional[int] = None,
     use_fps: bool = True,
-    process_seg: bool = False,
     verbose: bool = False,
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
     if verbose:
         print("Processing fused point cloud from observations...")
-    rgb_pcd, seg_pcd = [], []
+    rgb_pcd = []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
-        pcd = depth_to_pcd(
-            obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
-        )
-        rgb_pcd.append(
-            th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
-        )  # shape (B, [T], H*W, 6)
-        if process_seg:
-            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1))  # shape (B, [T], H*W)
+        if f"{camera_name}::pointcloud" in obs:
+            pcd = obs[f"{camera_name}::pointcloud"]
+            # first 3 channels are xyz, last 3 channels are rgb; rgb in [0, 255]
+            xyz = pcd[:, :3]
+            rgb = pcd[:, 3:] / 255.0
+            rgb_pcd.append(th.cat([rgb, xyz], dim=-1))
+        else:
+            pcd = depth_to_pcd(
+                obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
+            )
+            rgb_pcd.append(
+                th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
+            )  # shape (B, [T], H*W, 6)
     # Fuse all point clouds together
     fused_pcd_all = th.cat(rgb_pcd, dim=-2).to(device="cuda")
     # Now, clip the point cloud to the specified range
@@ -527,9 +531,6 @@ def process_fused_point_cloud(
         & (fused_pcd_all[..., 5] <= z_max)
     )
     fused_pcd_all[~mask] = 0.0
-    if process_seg:
-        seg_pcd = th.cat(seg_pcd, dim=-1)
-        seg_pcd = seg_pcd[mask]  # shape (N, [T])
     # Now, downsample the point cloud if needed
     if pcd_num_points is not None:
         if verbose:
@@ -538,12 +539,10 @@ def process_fused_point_cloud(
             )
         fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
         fused_pcd = fused_pcd.float()
-        if process_seg:
-            fused_seg = th.gather(seg_pcd, 1, sampled_idx.cpu())
     else:
         fused_pcd = fused_pcd_all.float()
 
-    return fused_pcd, fused_seg if process_seg else None
+    return fused_pcd
 
 
 def rgbd_vid_to_pcd(
