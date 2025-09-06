@@ -199,6 +199,7 @@ class VideoLoader:
         output_size: Tuple[int, int] = None,
         start_idx: int = 0,
         end_idx: Optional[int] = None,
+        start_idx_is_keyframe: bool = False,
         fps: int = 30,
         downsample_factor: int = 1,
         **kwargs,
@@ -215,6 +216,8 @@ class VideoLoader:
             start_idx (int): Frame to start loading the video from. Default is 0.
             end_idx (Optional[int]): Frame to stop loading the video at. If None, will load until video end.
                 NOTE: end idx is not inclusive, i.e. if end_idx=10, the last frame will be 9.
+            start_idx_is_keyframe (bool): Whether the start index is a keyframe.
+                Set this to True if you know the start index is a keyframe, which will allow for faster seeking to the start index.
             fps (int): Frames per second of the video. Default is 30.
             downsample_factor (int): Factor to downsample the video frames by. Default is 1 (no downsampling).
         Returns:
@@ -230,13 +233,15 @@ class VideoLoader:
         self.output_size = output_size
         self._start_frame = start_idx
         self._end_frame = end_idx if end_idx is not None else self.stream.frames
+        self._start_idx_is_keyframe = start_idx_is_keyframe
         self._current_frame = start_idx
         self._time_base = self.stream.time_base
         self._fps = fps
         self._downsample_factor = downsample_factor
-        # Note that we also set start_pts to be a few frames preceding the start_frame if it's not 0,
+        # Note that unless start idx is keyframe, we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
-        self._start_pts = int(max(0, self._start_frame - 5) / self._fps / self._time_base)
+        start_frame = self._start_frame if self._start_idx_is_keyframe else max(0, self._start_frame - 5)
+        self._start_pts = int(start_frame / self._fps / self._time_base)
         self.reset()
 
     def __iter__(self) -> Generator[th.Tensor, None, None]:
@@ -282,7 +287,7 @@ class VideoLoader:
         self._current_frame = self._start_frame
         self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
         self._frame_iter = self.container.decode(self.stream)
-        if self._start_frame > 0:
+        if self._start_frame > 0 and not self._start_idx_is_keyframe:
             # Decode forward until we find the start frame
             for frame in self._frame_iter:
                 if frame.pts is None:
