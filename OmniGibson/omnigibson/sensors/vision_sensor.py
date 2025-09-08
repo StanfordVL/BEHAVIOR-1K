@@ -312,7 +312,7 @@ class VisionSensor(BaseSensor):
             if modality == "pointcloud":
                 # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
                 # Note: rgb values are in the range of [0, 255]
-                concatenated = np.concatenate([raw_obs["data"], raw_obs["pointRgb"][:, :3]], axis=1)
+                concatenated = np.concatenate([raw_obs["pointRgb"][:, :3], raw_obs["data"]], axis=1)
                 # Pad to match gym space dimensions (self.image_height * self.image_width)
                 target_rows = self.image_height * self.image_width
                 if concatenated.shape[0] < target_rows:

@@ -517,10 +517,7 @@ def process_fused_point_cloud(
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         if f"{camera_name}::pointcloud" in obs:
             pcd = obs[f"{camera_name}::pointcloud"]
-            # first 3 channels are xyz, last 3 channels are rgb; rgb in [0, 255]
-            xyz = pcd[:, :3]
-            rgb = pcd[:, 3:] / 255.0
-            rgb_pcd.append(th.cat([rgb, xyz], dim=-1))
+            rgb_pcd.append(th.cat([pcd[:, :3] / 255.0, pcd[:, 3:]], dim=-1))
         else:
             pcd = depth_to_pcd(
                 obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
@@ -547,7 +544,7 @@ def process_fused_point_cloud(
             print(
                 f"Downsampling point cloud to {pcd_num_points} points using {'FPS' if use_fps else 'random sampling'}"
             )
-        fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
+        fused_pcd = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)[0]
         fused_pcd = fused_pcd.float()
     else:
         fused_pcd = fused_pcd_all.float()
@@ -571,7 +568,6 @@ def rgbd_vid_to_pcd(
         1.5,
     ),  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int = 4096,
-    process_seg: bool = False,
     batch_size: int = 500,
     use_fps: bool = False,
 ):
@@ -586,7 +582,6 @@ def rgbd_vid_to_pcd(
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
         pcd_num_points (int): Number of points to sample from the point cloud.
-        process_seg (bool): Whether to process the segmentation map.
         batch_size (int): Number of frames to process in each batch.
         use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
     """
@@ -606,19 +601,11 @@ def rgbd_vid_to_pcd(
             shape=(data_size, pcd_num_points, 6),
             compression="lzf",
         )
-        if process_seg:
-            pcd_semantic_dset = out_f.create_dataset(
-                f"data/demo_{episode_id}/robot_r1::pcd_semantic",
-                shape=(data_size, pcd_num_points),
-                compression="lzf",
-            )
         # get observation loaders
         obs_loaders = {}
         for camera_id, robot_camera_name in robot_camera_names.items():
             resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
             keys = ["rgb", "depth_linear"]
-            if process_seg:
-                keys.append("seg_semantic_id")
             for key in keys:
                 kwargs = {}
                 if key == "seg_semantic_id":
@@ -654,24 +641,17 @@ def rgbd_vid_to_pcd(
                 camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                 obs[f"{robot_camera_name}::rgb"] = next(obs_loaders[f"{robot_camera_name}::rgb"]).movedim(-3, -1)
                 obs[f"{robot_camera_name}::depth_linear"] = next(obs_loaders[f"{robot_camera_name}::depth_linear"])
-                if process_seg:
-                    obs[f"{robot_camera_name}::seg_semantic"] = next(
-                        obs_loaders[f"{robot_camera_name}::seg_semantic_id"]
-                    )
             # process the fused point cloud
-            pcd, seg = process_fused_point_cloud(
+            pcd = process_fused_point_cloud(
                 obs=obs,
                 camera_intrinsics=camera_intrinsics,
                 pcd_range=pcd_range,
                 pcd_num_points=pcd_num_points,
                 use_fps=use_fps,
-                process_seg=process_seg,
                 verbose=True,
             )
             logger.info("Saving point cloud data...")
             fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-            if process_seg:
-                pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     logger.info("Point cloud data saved!")
 

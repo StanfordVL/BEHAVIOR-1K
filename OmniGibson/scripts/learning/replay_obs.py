@@ -460,7 +460,6 @@ def rgbd_gt_to_pcd(
         1.5,
     ),  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int = 4096,
-    process_seg: bool = False,
     batch_size: int = 500,
     use_fps: bool = False,
 ):
@@ -475,7 +474,6 @@ def rgbd_gt_to_pcd(
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
         pcd_num_points (int): Number of points to sample from the point cloud.
-        process_seg (bool): Whether to process the segmentation map.
         batch_size (int): Number of frames to process in each batch.
         use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
     """
@@ -493,12 +491,6 @@ def rgbd_gt_to_pcd(
                 shape=(data_size, pcd_num_points, 6),
                 compression="lzf",
             )
-            if process_seg:
-                pcd_semantic_dset = out_f.create_dataset(
-                    f"data/demo_{episode_id}/robot_r1::pcd_semantic",
-                    shape=(data_size, pcd_num_points),
-                    compression="lzf",
-                )
             # We batch process every batch_size frames
             for i in range(0, data_size, batch_size):
                 log.info(f"Processing batch {i} of {data_size}...")
@@ -524,26 +516,17 @@ def rgbd_gt_to_pcd(
                         mode="nearest-exact",
                     ).squeeze(0)
 
-                    if process_seg:
-                        obs[f"{robot_camera_name}::seg_semantic"] = F.interpolate(
-                            th.from_numpy(data[f"{robot_camera_name}::seg_semantic"][i : i + batch_size]).unsqueeze,
-                            size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
-                            mode="nearest-exact",
-                        ).squeeze(0)
                 # process the fused point cloud
-                pcd, seg = process_fused_point_cloud(
+                pcd = process_fused_point_cloud(
                     obs=obs,
                     camera_intrinsics=camera_intrinsics,
                     pcd_range=pcd_range,
                     pcd_num_points=pcd_num_points,
                     use_fps=use_fps,
-                    process_seg=process_seg,
                     verbose=True,
                 )
                 log.info("Saving point cloud data...")
                 fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-                if process_seg:
-                    pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     log.info("Point cloud data saved!")
 
@@ -623,7 +606,6 @@ def main():
                 pcd_num_points=4096,
                 batch_size=1000,
                 use_fps=True,
-                process_seg=False,
             )
         if args.pcd_vid:
             rgbd_vid_to_pcd(
@@ -637,7 +619,6 @@ def main():
                 pcd_num_points=4096,
                 batch_size=1000,
                 use_fps=True,
-                process_seg=False,
             )
 
     # remove replayed hdf5 to free up storage
