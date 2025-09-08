@@ -37,6 +37,6 @@ class TaskMetric(MetricBase):
             "time": {
                 "simulator_steps": self.timesteps,
                 "simulator_time": self.timesteps * self.render_timestep,
-                "normalized_time": self.timesteps / self.human_stats["steps"],
+                "normalized_time": self.human_stats["steps"] / self.timesteps,
             },
         }
