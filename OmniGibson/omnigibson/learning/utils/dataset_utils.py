@@ -1,6 +1,7 @@
 import getpass
 import gspread
 import json
+import numpy as np
 import os
 import omnigibson as og
 import pandas as pd
@@ -558,6 +559,38 @@ def update_parquet_indices(root_dir: str):
                 df["episode_index"] = episode_num
                 assert "task_index" in df.columns
                 df["task_index"] = task_num
+
+                # overwrite parquet
+                df.to_parquet(fpath, index=False)
+
+            except Exception as e:
+                print(f"Skipping {fpath}, error: {e}")
+
+
+def remove_grasp_state(root_dir: str):
+    """
+    For every parquet file named episode_XXXXXXXX.parquet,
+    If observation.state has dim 258, remove dim 193 and 233 (grasp_left and grasp_right) and save the parquet back to disk.
+    """
+    pat = re.compile(r"episode_(\d{8})\.parquet$")
+
+    for dirpath, _, filenames in os.walk(root_dir):
+        print(dirpath)
+        for fname in filenames:
+            fpath = os.path.join(dirpath, fname)
+
+            m = pat.search(fname)
+            if not m:
+                continue  # not a matching parquet
+
+            try:
+                df = pd.read_parquet(fpath)
+
+                assert "observation.state" in df.columns
+                obs = np.array(df["observation.state"].tolist())
+                if obs.ndim == 2 and obs.shape[1] == 258:
+                    obs = np.delete(obs, [193, 233], axis=1)
+                    df["observation.state"] = obs.tolist()
 
                 # overwrite parquet
                 df.to_parquet(fpath, index=False)
