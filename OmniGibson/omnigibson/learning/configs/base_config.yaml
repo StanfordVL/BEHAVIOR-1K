@@ -5,7 +5,7 @@ defaults:
   - policy: ???
 
 env_wrapper: 
-  _target_: omnigibson.learning.wrappers.DefaultWrapper
+  _target_: omnigibson.learning.wrappers.RGBLowResWrapper
 policy_name: ???  # filled by policy
 headless: true  # whether to run in headless mode (no GUI)
 episodes_per_instance: 5  # number of episodes to eval per instance

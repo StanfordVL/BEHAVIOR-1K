@@ -28,13 +28,14 @@ Here is a brief explanation of the arguments:
 
 - `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
 
-- `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use the default `omnigibson.learning.wrappers.DefaultWrapper`:
+- `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use `omnigibson.learning.wrappers.RGBLowResWrapper`:
     ```
     python OmniGibson/omnigibson/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
     ```
-which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. There are two more example wrappers under `omnigibson.learning.wrappers`:
+which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
-    - `RGBLowResWrapper`: only use rgb as observation and reduce camera resolutions to 224 * 224. This could speed up the simulator and thus reduce evaluation time. This wrapper is ok to use in standard track. 
+    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in standard track. 
+    - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track. 
     - `RichObservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
 
 After launching, the evaluator will load the task and spawn a server listening on `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
