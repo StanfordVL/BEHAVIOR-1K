@@ -491,7 +491,7 @@ def generate_info_json(
             "episode_index": {"dtype": "int64", "shape": [1], "names": None},
             "index": {"dtype": "int64", "shape": [1], "names": None},
             "observation.cam_rel_poses": {"dtype": "float32", "shape": [21], "names": None},
-            "observation.state": {"dtype": "float32", "shape": [258], "names": None},
+            "observation.state": {"dtype": "float32", "shape": [256], "names": None},
             "observation.task_info": {"dtype": "float32", "shape": [None], "names": None},
         },
     }
