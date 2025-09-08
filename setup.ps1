@@ -69,6 +69,10 @@ if ($Eval -and -not $OmniGibson) {
     Write-Error "ERROR: -Eval requires -OmniGibson"
 }
 
+if ($Eval -and -not $JoyLo) {
+    Write-Error "ERROR: -Eval requires -JoyLo"
+}
+
 if ($NewEnv -and $ConfirmNoConda) {
     Write-Error "ERROR: -NewEnv and -ConfirmNoConda are mutually exclusive"
     exit 1
