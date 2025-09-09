@@ -592,8 +592,8 @@ def remove_grasp_state(root_dir: str):
                     obs = np.delete(obs, [193, 233], axis=1)
                     df["observation.state"] = obs.tolist()
 
-                # overwrite parquet
-                df.to_parquet(fpath, index=False)
+                    # overwrite parquet
+                    df.to_parquet(fpath, index=False)
 
             except Exception as e:
                 print(f"Skipping {fpath}, error: {e}")
