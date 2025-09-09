@@ -118,7 +118,7 @@ class Evaluator:
             )
         ]
         # Update observation modalities
-        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb", "depth_linear", "seg_instance_id", "pointcloud"]
+        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb"]
         cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
         if self.cfg.robot.controllers is not None:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)

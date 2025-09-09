@@ -27,6 +27,9 @@ class DefaultWrapper(EnvironmentWrapper):
             else:
                 robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
                 robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
+            # add depth and segmentation
+            robot.sensors[sensor_name].add_modality("depth_linear")
+            robot.sensors[sensor_name].add_modality("seg_instance_id")
         # reload observation space
         env.load_observation_space()
         logger.info("Reloaded observation space!")
