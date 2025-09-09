@@ -29,6 +29,7 @@ class DefaultWrapper(EnvironmentWrapper):
                 robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
             # add depth and segmentation
             robot.sensors[sensor_name].add_modality("depth_linear")
+            robot.sensors[sensor_name].add_modality("seg_semantic")
             robot.sensors[sensor_name].add_modality("seg_instance_id")
         # reload observation space
         env.load_observation_space()
