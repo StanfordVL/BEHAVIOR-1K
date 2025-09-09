@@ -1,4 +1,5 @@
 import argparse
+import csv
 import gspread
 import h5py
 import json
@@ -171,18 +172,14 @@ def replay_hdf5_file(
     credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
     gc = gspread.service_account(filename=credentials_path)
     load_room_instances = None
-    for _ in range(3):
-        try:
-            sh = gc.open("B50 Task Misc")
-            worksheet = sh.worksheet("Task Misc").get_all_values()
-            for row in worksheet[1:]:
-                if row and task_name in row[1]:
-                    load_room_instances = row[2].strip().split("\n")
-                    break
-            break
-        except Exception as e:
-            log.error(f"Error occurred while reading Google Sheet: {e}")
-            time.sleep(60)
+    with open(
+        f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
+    ) as f:
+        task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+        for row in task_misc_csv:
+            if task_name in row[1]:
+                load_room_instances = row[2].strip().split("\n")
+                break
     assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=f"{data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",

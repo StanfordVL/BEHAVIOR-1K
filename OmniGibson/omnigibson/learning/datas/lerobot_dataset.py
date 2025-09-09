@@ -156,9 +156,10 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         # handle streaming mode and shuffling of episodes
         self._chunk_streaming_using_keyframe = chunk_streaming_using_keyframe
         if self._chunk_streaming_using_keyframe:
-            logger.info(
-                "chunk_streaming_using_keyframe mode is enabled. It is recommended to set shuffle=True for better randomness in batch selection."
-            )
+            if not shuffle:
+                logger.warning(
+                    "chunk_streaming_using_keyframe mode is enabled but shuffle is set to False. This may lead to less randomness in chunk selection."
+                )
             self.chunks = self._get_keyframe_chunk_indices()
             # Now, we randomly permute the episodes if shuffle is True
             if shuffle:
