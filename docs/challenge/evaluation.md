@@ -129,3 +129,27 @@ When running the eval script, an json file will be outputed after each rollout e
 **Challenge office hours**
 
 - Every Monday and Thursday, 4:30pm-6:00pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+
+## Performance Benchmarks
+
+### System Spec
+
+The following benchmarks were measured on:
+
+- **GPU:** NVIDIA RTX 4090 (24GB VRAM)
+- **CPU:** AMD Ryzen 9 7950X 16-Core Processor (32 threads)
+- **RAM:** 128GB
+- **OS:** Ubuntu 22.04.5 LTS
+
+**Scene Load Time:** Approximately 150-300 seconds (one-time cost per trial, varies by scene complexity)
+
+### Evaluation Frame Rate with Random Actions
+
+The following table records the approximate frames per second (FPS) performance when running evaluation with random actions across different settings:
+
+| Sensor Modality | Resolution (Head, Wrist)| FPS |
+|---------|------------|-----|
+| RGB | 224x224, 224x224 | 24.55 |
+| RGB | 720x720, 480x480 | 20.62 |
+| RGB + depth + segmentation | 224x224, 224x224 | 16.55 |
+| RGB + depth + segmentation | 720x720, 480x480 | 13.52 |
