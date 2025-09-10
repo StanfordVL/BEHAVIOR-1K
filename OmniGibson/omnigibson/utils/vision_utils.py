@@ -2,6 +2,7 @@ import colorsys
 
 import torch as th
 from PIL import Image, ImageDraw
+import omnigibson.utils.transform_utils as T
 
 try:
     import accimage
@@ -328,3 +329,35 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
     return th.tensor(rgb)
+
+
+def change_pcd_frame(pcd: th.Tensor, rel_pose: th.Tensor) -> th.Tensor:
+    """
+    Transform point cloud from one frame to another frame.
+
+    Args:
+        pcd: (B, N, 6) point cloud tensor in world frame
+        rel_pose: (B, 7) relative pose tensor [pos, quat] in world frame
+    Returns:
+        th.Tensor: (B, N, 6) point cloud tensor in target frame
+    """
+    B, N, _ = pcd.shape
+    device = pcd.device
+
+    rel_pos = rel_pose[:, :3]  # (B, 3)
+    rel_quat = rel_pose[:, 3:]  # (B, 4)
+    rel_rot = T.quat2mat(rel_quat)  # (B, 3, 3)
+
+    # Create transformation matrix
+    tf = th.eye(4, device=device).unsqueeze(0).expand(B, 4, 4).clone()
+    tf[:, :3, :3] = rel_rot.transpose(-2, -1)
+    tf[:, :3, 3] = -th.matmul(rel_rot.transpose(-2, -1), rel_pos.unsqueeze(-1)).squeeze(-1)
+
+    # Add homogeneous coordinate to point cloud
+    xyz = pcd[..., 3:]  # (B, N, 3)
+    xyz_homo = th.cat([xyz, th.ones_like(xyz[..., :1])], dim=-1)  # (B, N, 4)
+
+    # Transform point cloud from camera frame to base frame
+    new_xyz = th.matmul(xyz_homo, tf.transpose(-2, -1))  # (B, N, 4)
+    pcd[..., 3:] = new_xyz[..., :3]
+    return pcd

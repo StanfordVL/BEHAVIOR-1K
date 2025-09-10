@@ -21,6 +21,7 @@ from omnigibson.learning.utils.eval_utils import (
 from omnigibson.learning.utils.dataset_utils import makedirs_with_mode
 from omnigibson.utils.constants import semantic_class_name_to_id
 from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.vision_utils import change_pcd_frame
 
 logger = create_module_logger("obs_utils")
 
@@ -413,7 +414,7 @@ def depth_to_pcd(
     rel_quat = rel_pose[:, 3:]  # (B, 4)
     rel_rot = T.quat2mat(rel_quat)  # (B, 3, 3)
 
-    # # Add camera coordinate system adjustment (180 degree rotation around X-axis)
+    # Add camera coordinate system adjustment (180 degree rotation around X-axis)
     rot_add = T.euler2mat(th.tensor([np.pi, 0, 0], device=device))  # (3, 3)
     rel_rot_matrix = th.matmul(rel_rot, rot_add)  # (B, 3, 3)
 
@@ -511,16 +512,28 @@ def process_fused_point_cloud(
     use_fps: bool = True,
     verbose: bool = False,
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
+    """
+    Given a dictionary of observations, process the fused point cloud from all cameras and return the final point cloud tensor in robot base frame.
+    Args:
+        obs (dict): Dictionary of observations containing point cloud data from different cameras.
+        camera_intrinsics (Dict[str, th.Tensor]): Dictionary of camera intrinsics for each camera.
+        pcd_range (Tuple[float, float, float, float, float, float]): Range of the point cloud to filter [x_min, x_max, y_min, y_max, z_min, z_max].
+        pcd_num_points (Optional[int]): Number of points to sample from the point cloud. If None, no downsampling is performed.
+        use_fps (bool): Whether to use farthest point sampling for point cloud downsampling. Default is True.
+        verbose (bool): Whether to print verbose output during processing. Default is False.
+    """
     if verbose:
         print("Processing fused point cloud from observations...")
     rgb_pcd = []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         if f"{camera_name}::pointcloud" in obs:
-            # NOTE: Point cloud returned by this will be in world frame.
             pcd = obs[f"{camera_name}::pointcloud"]
+            pcd = change_pcd_frame(
+                pcd,
+                obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7],
+            )
             rgb_pcd.append(th.cat([pcd[:, :3] / 255.0, pcd[:, 3:]], dim=-1))
         else:
-            # NOTE: Point cloud returned by this will be in robot base frame.
             pcd = depth_to_pcd(
                 obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
             )

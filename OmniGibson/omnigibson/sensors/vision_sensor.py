@@ -17,7 +17,7 @@ from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import create_module_logger, dock_window
-from omnigibson.utils.vision_utils import Remapper
+from omnigibson.utils.vision_utils import change_pcd_frame, Remapper
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -320,6 +320,11 @@ class VisionSensor(BaseSensor):
                     obs[modality] = np.pad(concatenated, pad_width, mode="constant", constant_values=0)
                 else:
                     obs[modality] = concatenated
+                # now, change the pcd from world frame to camera frame
+                obs[modality] = change_pcd_frame(
+                    pcd=th.from_numpy(obs[modality]),
+                    rel_pose=th.cat(self.get_position_orientation()),
+                )
             else:
                 # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
                 obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
