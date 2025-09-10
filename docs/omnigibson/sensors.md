@@ -219,7 +219,7 @@ Vision observations are captured by the [`VisionSensor`](../reference/sensors/vi
             Point cloud obtained from the camera.<br><br>
             Size: (height, width, 6), numpy.uint8<br>
             Last dimension is (r, g, b, x, y, z)<br>
-            NOTE: coordinate is of global frame<br>
+            NOTE: coordinates are in world (global) frame<br>
         </td>
         <td>
             <img src="../assets/sensor_asset/pcd.png" alt="Point Cloud">

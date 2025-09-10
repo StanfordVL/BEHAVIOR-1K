@@ -516,9 +516,11 @@ def process_fused_point_cloud(
     rgb_pcd = []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         if f"{camera_name}::pointcloud" in obs:
+            # NOTE: Point cloud returned by this will be in world frame.
             pcd = obs[f"{camera_name}::pointcloud"]
             rgb_pcd.append(th.cat([pcd[:, :3] / 255.0, pcd[:, 3:]], dim=-1))
         else:
+            # NOTE: Point cloud returned by this will be in robot base frame.
             pcd = depth_to_pcd(
                 obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
             )
