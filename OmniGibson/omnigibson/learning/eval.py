@@ -32,7 +32,7 @@ from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
     write_video,
 )
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
@@ -40,6 +40,10 @@ from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
 from typing import Any, Tuple, List
+
+m = create_module_macros(module_path=__file__)
+m.NUM_EVAL_EPISODES = 1
+m.NUM_EVAL_INSTANCES = 20
 
 
 # set global variables to boost performance
@@ -345,8 +349,12 @@ if __name__ == "__main__":
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
     # get run instances
-    instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(10))
-    assert set(instances_to_run).issubset(set(range(10))), "eval instance ids must be in range(10)"
+    instances_to_run = (
+        config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
+    )
+    assert set(instances_to_run).issubset(
+        set(range(m.NUM_EVAL_INSTANCES))
+    ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
     # load csv file
     task_instance_csv_path = os.path.join(
         gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
@@ -369,7 +377,7 @@ if __name__ == "__main__":
         for idx in instances_to_run:
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
-            for epi in range(config.episodes_per_instance):
+            for epi in range(m.NUM_EVAL_EPISODES):
                 evaluator.reset()
                 done = False
                 if config.write_video:

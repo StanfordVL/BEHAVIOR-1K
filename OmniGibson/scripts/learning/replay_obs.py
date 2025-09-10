@@ -172,14 +172,20 @@ def replay_hdf5_file(
     credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
     gc = gspread.service_account(filename=credentials_path)
     load_room_instances = None
-    with open(
-        f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
-    ) as f:
-        task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
-        for row in task_misc_csv:
-            if task_name in row[1]:
-                load_room_instances = row[2].strip().split("\n")
-                break
+    try:
+        with open(
+            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
+        ) as f:
+            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+            for row in task_misc_csv:
+                if task_name in row[1]:
+                    load_room_instances = row[2].strip().split("\n")
+                    break
+    except FileNotFoundError as e:
+        log.error(
+            "No B50_task_misc.csv file found in 2025-challenge-task-instances/metadata folder. Please ensure the dataset is up to date."
+        )
+        raise e
     assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=f"{data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
