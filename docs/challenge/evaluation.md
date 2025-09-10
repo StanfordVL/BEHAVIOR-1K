@@ -20,7 +20,7 @@ We will select the top three winning teams from each track, they will share the 
 
 We provide a unified entry point for running evaluation:
 ```
-python OmniGibson/omnigibson/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
+python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
 Here is a brief explanation of the arguments:
 
@@ -30,7 +30,7 @@ Here is a brief explanation of the arguments:
 
 - `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use `omnigibson.learning.wrappers.RGBLowResWrapper`:
     ```
-    python OmniGibson/omnigibson/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
+    python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
     ```
 which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
@@ -68,7 +68,7 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 20 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 times (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** We have prepared 20 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
 
 - **Final evaluation:** We will hold out 20 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 

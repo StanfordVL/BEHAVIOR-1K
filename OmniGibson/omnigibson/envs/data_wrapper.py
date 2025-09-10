@@ -11,7 +11,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.learning.utils.obs_utils import write_video
 from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
@@ -26,6 +25,12 @@ from omnigibson.controllers.controller_base import ControlType
 # Create module logger
 log = create_module_logger(module_name=__name__)
 log.setLevel(logging.INFO)
+
+
+try:
+    from omnigibson.learning.utils.obs_utils import write_video
+except ImportError:
+    write_video = None
 
 h5py.get_config().track_order = True
 
@@ -1165,6 +1170,9 @@ class DataPlaybackWrapper(DataWrapper):
             for key, dat in self.current_traj_history[0].items():
                 for mod in dat.keys():
                     if video_writers is not None and mod in video_writers.keys():
+                        assert (
+                            write_video is not None
+                        ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
                         # write to video
                         write_video(
                             self.current_traj_history[0][key][mod].unsqueeze(0).numpy(),
@@ -1188,6 +1196,9 @@ class DataPlaybackWrapper(DataWrapper):
                                 [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
                             )
                             if video_writers is not None and mod in video_writers.keys():
+                                assert (
+                                    write_video is not None
+                                ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
                                 # write to video
                                 write_video(
                                     data_to_write.numpy(),

@@ -28,7 +28,7 @@ logger = create_module_logger("obs_utils")
 try:
     from torch_cluster import fps
 except ImportError:
-    logger.warning("torch_cluster is not installed, skipping fps import")
+    fps = None
 
 # ==============================================
 # Depth
@@ -473,6 +473,9 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
             # Create batch indices for all points
             batch_indices = th.arange(B, device=device).repeat_interleave(N)  # (B*N,)
             # Single FPS call for all batches
+            assert (
+                fps is not None
+            ), "torch_cluster.fps is not available! Please make sure you have omnigibson setup with eval dependencies."
             idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
             # Vectorized post-processing
             batch_idx = idx_flat // N  # Which batch each index belongs to
