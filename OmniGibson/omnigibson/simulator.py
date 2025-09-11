@@ -125,18 +125,21 @@ def _launch_app():
         assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
         kit_file_name = m.KIT_FILES[isaac_version_tuple]
 
-    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
     assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
     exp_path = os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
     kit_file_target = Path(exp_path) / kit_file_name
+    icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
+    icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
     try:
         shutil.copy(kit_file, kit_file_target)
+        shutil.copy(icon_file, icon_file_target)
     except Exception as e:
-        raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
+        raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
     # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
     os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
