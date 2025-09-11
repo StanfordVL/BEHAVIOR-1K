@@ -68,7 +68,7 @@ setup(
             "mkdocs-literate-nav",
             "mkdocs-redirects",
             "mkdocs-include-markdown-plugin",
-            "telemoma~=0.2.0",
+            "telemoma~=0.3.0",
             "gspread",
         ],
         "primitives": [
