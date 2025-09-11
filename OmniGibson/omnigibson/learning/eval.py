@@ -273,14 +273,11 @@ class Evaluator:
             camera = self.robot.sensors[camera_name.split("::")[1]]
             direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
             if np.allclose(direct_cam_pose, np.zeros(16)):
-                breakpoint()
                 cam_rel_poses.append(
                     th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose))
                 )
             else:
                 cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
-                if "zed" in camera_name:
-                    print(f"Camera {camera_name} pose from cameraViewTransform: {cam_pose}")
                 cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         return obs

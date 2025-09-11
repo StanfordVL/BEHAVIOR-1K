@@ -1,5 +1,4 @@
 import getpass
-import gspread
 import json
 import numpy as np
 import os
@@ -14,7 +13,7 @@ import time
 import zipfile
 from collections import Counter
 from datetime import datetime
-from typing import Tuple, List, Optional
+from typing import Any, Tuple, List, Optional
 from tqdm import tqdm
 from google.oauth2.service_account import Credentials
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
@@ -50,7 +49,7 @@ def makedirs_with_mode(path, mode=0o2775) -> None:
             pass
 
 
-def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[gspread.Client, dict, str]:
+def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[Any, dict, str]:
     """
     [Internal use only] Get Google Sheets and Lightwheel API credentials.
     Args:
@@ -58,6 +57,8 @@ def get_credentials(credentials_path: str = "~/Documents/credentials") -> Tuple[
     Returns:
         Tuple[gspread.Client, dict, str]: Google Sheets client and Lightwheel API credentials and token.
     """
+    import gspread
+
     credentials_path = os.path.expanduser(credentials_path)
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -88,6 +89,8 @@ def update_google_sheet(credentials_path: str, task_name: str, row_idx: int) -> 
         task_name (str): Name of the task to update.
         row_idx (int): Row index to update.
     """
+    import gspread
+
     assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     # authorize with Google Sheets API
     SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -672,6 +675,8 @@ def update_tracking_sheet(
         credentials_path (str): The path to the credentials file.
         max_entries_per_task (Optional[int]): The maximum number of entries to process per task.
     """
+    import gspread
+
     assert getpass.getuser() in VALID_USER_NAME, f"Invalid user {getpass.getuser()}"
     gc, lightwheel_api_credentials, lw_token = get_credentials(credentials_path)
     spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
