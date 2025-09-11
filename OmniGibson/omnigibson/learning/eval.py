@@ -183,14 +183,15 @@ class Evaluator:
         """
         self.robot_action = self.policy.forward(obs=self.obs)
 
-        self.obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+        obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
         # process obs
+        self.obs = self._preprocess_obs(obs)
+
         if terminated or truncated:
             self.n_trials += 1
             if info["done"]["success"]:
                 self.n_success_trials += 1
 
-        self.obs = self._preprocess_obs(self.obs)
         for metric in self.metrics:
             metric.step_callback(self.env)
         return terminated, truncated
@@ -269,8 +270,18 @@ class Evaluator:
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
-            cam_pose = self.robot.sensors[camera_name.split("::")[1]].get_position_orientation()
-            cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
+            camera = self.robot.sensors[camera_name.split("::")[1]]
+            direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
+            if np.allclose(direct_cam_pose, np.zeros(16)):
+                breakpoint()
+                cam_rel_poses.append(
+                    th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose))
+                )
+            else:
+                cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
+                if "zed" in camera_name:
+                    print(f"Camera {camera_name} pose from cameraViewTransform: {cam_pose}")
+                cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         return obs
 
@@ -302,8 +313,7 @@ class Evaluator:
         """
         Reset the environment, policy, and compute metrics.
         """
-        self.obs = self.env.reset()[0]
-        self.obs = self._preprocess_obs(self.obs)
+        self.obs = self._preprocess_obs(self.env.reset()[0])
         # run metric start callbacks
         for metric in self.metrics:
             metric.start_callback(self.env)

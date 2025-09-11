@@ -17,7 +17,7 @@ from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
 from omnigibson.utils.ui_utils import create_module_logger, dock_window
-from omnigibson.utils.vision_utils import change_pcd_frame, Remapper
+from omnigibson.utils.vision_utils import Remapper
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -320,11 +320,6 @@ class VisionSensor(BaseSensor):
                     obs[modality] = np.pad(concatenated, pad_width, mode="constant", constant_values=0)
                 else:
                     obs[modality] = concatenated
-                # now, change the pcd from world frame to camera frame
-                obs[modality] = change_pcd_frame(
-                    pcd=th.from_numpy(obs[modality]),
-                    rel_pose=th.cat(self.get_position_orientation()),
-                )
             else:
                 # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
                 obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
@@ -673,8 +668,9 @@ class VisionSensor(BaseSensor):
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
             # Requires 3 render updates for camera params annotator to decome active
-            for _ in range(3):
-                render()
+            # for _ in range(3):
+            #     render()
+            lazy.omni.replicator.core.orchestrator.step(pause_timeline=False, delta_time=0.0)
 
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
