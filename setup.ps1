@@ -466,6 +466,13 @@ if ($AssetPipeline) {
 
 # Install datasets
 if ($Dataset) {
+
+    python -c "import omnigibson"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: OmniGibson import failed, please make sure you have omnigibson installed before downloading datasets"
+        exit 1
+    }
+
     Write-Host "Installing datasets..."
     
     # Determine if we should accept dataset license automatically

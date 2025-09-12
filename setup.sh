@@ -386,6 +386,11 @@ fi
 
 # Install datasets
 if [ "$DATASET" = true ]; then
+    python -c "import omnigibson" || {
+        echo "ERROR: OmniGibson import failed, please make sure you have omnigibson installed before downloading datasets"
+        exit 1
+    }
+    
     echo "Installing datasets..."
     
     # Determine if we should accept dataset license automatically
