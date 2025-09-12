@@ -1133,18 +1133,17 @@ class DataPlaybackWrapper(DataWrapper):
             if k in nested_keys:
                 obs_grp = traj_grp.create_group(k)
                 for mod, step_mod_data in dat.items():
-                    if mod.split("::")[-1] != "seg_semantic":  # Don't store seg semantic for now
-                        if video_writers is None or mod not in video_writers.keys():
-                            traj_dsets[k][mod] = obs_grp.create_dataset(
-                                mod,
-                                shape=(num_samples, *step_mod_data.shape),
-                                dtype=step_mod_data.numpy().dtype,
-                                **self.compression,
-                                chunks=(1, *step_mod_data.shape),
-                                shuffle=True,
-                            )
-                        else:
-                            log.info(f"Skipping storing {mod} in h5, writing to video instead.")
+                    if video_writers is None or mod not in video_writers.keys():
+                        traj_dsets[k][mod] = obs_grp.create_dataset(
+                            mod,
+                            shape=(num_samples, *step_mod_data.shape),
+                            dtype=step_mod_data.numpy().dtype,
+                            **self.compression,
+                            chunks=(1, *step_mod_data.shape),
+                            shuffle=True,
+                        )
+                    else:
+                        log.info(f"Skipping storing {mod} in h5, writing to video instead.")
             else:
                 traj_dsets[k] = traj_grp.create_dataset(
                     k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression, shuffle=True

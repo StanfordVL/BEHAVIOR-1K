@@ -269,6 +269,12 @@ class Evaluator:
         obs = flatten_obs_dict(obs)
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
+        # The first time we query for camera parameters, it will return all zeros
+        # For this case, we use camera.get_position_orientation() instead.
+        # The reason we are not using camera.get_position_orientation() by defualt is because it will always return the most recent camera poses
+        # However, since og render is somewhat "async", it takes >= 3 render calls per step to actually get the up-to-date camera renderings
+        # Since we are using n_render_iterations=1 for speed concern, we need the correct corresponding camera poses instead of the most update-to-date one.
+        # Thus, we use camera parameters which are guaranteed to be in sync with the visual observations.
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             camera = self.robot.sensors[camera_name.split("::")[1]]
             direct_cam_pose = camera.camera_parameters["cameraViewTransform"]

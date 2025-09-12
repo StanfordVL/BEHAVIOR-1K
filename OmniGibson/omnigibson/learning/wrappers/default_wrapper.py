@@ -31,7 +31,6 @@ class DefaultWrapper(EnvironmentWrapper):
             robot.sensors[sensor_name].add_modality("depth_linear")
             robot.sensors[sensor_name].add_modality("seg_semantic")
             robot.sensors[sensor_name].add_modality("seg_instance_id")
-            robot.sensors[sensor_name].add_modality("pointcloud")
         # reload observation space
         env.load_observation_space()
         logger.info("Reloaded observation space!")
