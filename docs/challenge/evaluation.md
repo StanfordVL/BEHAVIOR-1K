@@ -10,7 +10,7 @@ For the 1st BEHAVIOR-1K Challenge, We will have the following two tracks for the
     - RGB + depth + segmentation + proprioception information
     - No object state
 
-- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, scene point cloud, etc, and use such information for the policy models.
+- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, full-scene point cloud (Note: point cloud directly obtained from on-board vision sensor or estimated from rgbd is fine for stanford track), etc, and use such information for the policy models.
 
 We will select the top three winning teams from each track, they will share the challenge prizes, and will be invited to present their approaches at the challenge workshop!
  🏆 Prizes for each track: 🥇 $1,000 🥈 $500 🥉 $300
