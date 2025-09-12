@@ -21,7 +21,6 @@ from omnigibson.learning.utils.eval_utils import (
 from omnigibson.learning.utils.dataset_utils import makedirs_with_mode
 from omnigibson.utils.constants import semantic_class_name_to_id
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.vision_utils import change_pcd_frame
 
 logger = create_module_logger("obs_utils")
 
@@ -530,13 +529,11 @@ def process_fused_point_cloud(
     rgb_pcd = []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
         if f"{camera_name}::pointcloud" in obs:
+            # should already be in robot base frame, see BaseRobot._get_obs()
             pcd = obs[f"{camera_name}::pointcloud"]
-            pcd = change_pcd_frame(
-                pcd,
-                obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7],
-            )
             rgb_pcd.append(th.cat([pcd[:, :3] / 255.0, pcd[:, 3:]], dim=-1))
         else:
+            # need to convert from depth to point cloud in robot base frame
             pcd = depth_to_pcd(
                 obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
             )

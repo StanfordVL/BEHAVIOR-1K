@@ -348,13 +348,13 @@ def change_pcd_frame(pcd: th.Tensor, rel_pose: th.Tensor) -> th.Tensor:
     # Create transformation matrix
     tf = th.eye(4)
     tf[:3, :3] = rel_rot
-    tf[:3, 3] = th.matmul(rel_rot, rel_pos)
+    tf[:3, 3] = rel_pos
 
     # Add homogeneous coordinate to point cloud
     xyz = pcd[..., 3:]  # (N, 3)
     xyz_homo = th.cat([xyz, th.ones_like(xyz[..., :1])], dim=-1)  # (N, 4)
 
     # Transform point cloud from camera frame to base frame
-    new_xyz = th.matmul(xyz_homo, tf)  # (N, 4)
+    new_xyz = th.matmul(xyz_homo, th.inverse(tf).T)  # (N, 4)
     pcd[..., 3:] = new_xyz[..., :3]
     return pcd
