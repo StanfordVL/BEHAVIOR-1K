@@ -128,7 +128,7 @@ When running the eval script, an json file will be outputed after each rollout e
 
 **Challenge office hours**
 
-- Every Monday and Thursday, 4:30pm-6:00pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+- Every Monday and Thursday, 4:30pm-5:30pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
 
 ## Performance Benchmarks
 
