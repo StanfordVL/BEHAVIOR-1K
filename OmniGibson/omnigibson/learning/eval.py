@@ -126,8 +126,10 @@ class Evaluator:
         cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
         if self.cfg.robot.controllers is not None:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
-        logger.info(f"Setting timeout to be 2x the average length of human demos: {self.human_stats['length'] * 2}")
-        cfg["task"]["termination_config"]["max_steps"] = self.human_stats["length"] * 2
+        logger.info(
+            f"Setting timeout to be 2x the average length of human demos: {int(self.human_stats['length'] * 2)}"
+        )
+        cfg["task"]["termination_config"]["max_steps"] = int(self.human_stats["length"] * 2)
         cfg["task"]["include_obs"] = False
         env = og.Environment(configs=cfg)
         # instantiate env wrapper
