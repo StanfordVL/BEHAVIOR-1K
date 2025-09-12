@@ -6,6 +6,9 @@ import os
 import shutil
 import signal
 import socket
+import sys
+import tempfile
+import traceback
 from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
@@ -76,6 +79,72 @@ def print_save_usd_warning(_):
     log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
 
 
+class SuppressLogsUntilError:
+    """
+    Suppress stdout/stderr logs until an error occurs, at which point dump everything.
+    """
+
+    def __init__(self, _):
+        self._old_stdout = None
+        self._old_stderr = None
+        self._tmpfile = None
+        self._tmppath = None
+        self._running = False
+
+    def __enter__(self):
+        # Temp file to buffer logs
+        self._tmpfile = tempfile.NamedTemporaryFile(delete=False, mode="w+")
+        self._tmppath = self._tmpfile.name
+        self._tmpfile.close()
+
+        # Save original fds
+        sys.stdout.flush()
+        sys.stderr.flush()
+        self._old_stdout = os.dup(1)
+        self._old_stderr = os.dup(2)
+
+        # Redirect stdout/stderr → temp file
+        fd = os.open(self._tmppath, os.O_WRONLY | os.O_APPEND)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+        os.close(fd)
+
+        # Start background reader
+        self._running = True
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Stop background reader
+        self._running = False
+
+        # Restore stdout/stderr
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(self._old_stdout, 1)
+        os.dup2(self._old_stderr, 2)
+        os.close(self._old_stdout)
+        os.close(self._old_stderr)
+
+        # On error → dump everything + traceback
+        if exc_type is not None:
+            print("\n=== Isaac Sim logs (dump on error) ===\n")
+            with open(self._tmppath, "r") as f:
+                print(f.read())
+            print("=== End of Isaac Sim logs ===\n")
+
+            print("Python traceback:\n")
+            traceback.print_exception(exc_type, exc_val, exc_tb)
+
+        # Cleanup
+        try:
+            os.remove(self._tmppath)
+        except OSError:
+            pass
+
+        return False  # let exception propagate
+
+
 def _launch_app():
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
@@ -100,10 +169,11 @@ def _launch_app():
         except ImportError:
             pass
 
-        # TODO: Find a more elegant way to prune omni logging
-        # sys.argv.append("--/log/level=warning")
-        # sys.argv.append("--/log/fileLogLevel=warning")
-        # sys.argv.append("--/log/outputStreamLevel=error")
+        # Find a more elegant way to prune omni logging
+        if gm.NO_OMNI_LOGS:
+            sys.argv.append("--/log/level=error")
+            sys.argv.append("--/log/fileLogLevel=error")
+            sys.argv.append("--/log/outputStreamLevel=error")
 
     # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
     # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
@@ -144,7 +214,7 @@ def _launch_app():
     # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
     os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
-    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+    launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))

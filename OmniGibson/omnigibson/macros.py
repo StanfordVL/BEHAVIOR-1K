@@ -157,6 +157,9 @@ gm.RENDER_VIEWER_CAMERA = True
 # logging messages
 gm.DEBUG = os.getenv("OMNIGIBSON_DEBUG", "False").lower() in ("true", "1", "t")
 
+# Whether to suppress any omni logs upon startup, and prune the following omni logs to error level
+gm.NO_OMNI_LOGS = os.getenv("OMNIGIBSON_NO_OMNI_LOGS", "False").lower() in ("true", "1", "t")
+
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = False
 
