@@ -7,10 +7,10 @@
 For the 1st BEHAVIOR-1K Challenge, We will have the following two tracks for the 1st challenge:
 
 - **Standard track:** Participants are restricted to using the state observations we provided in the demonstration dataset for their policy models.
-    - RGB + depth + segmentation + proprioception information
+    - RGB + depth + segmentation (semantic, instance, instance id) + proprioception information (Note that robot global poses are NOT allowed)
     - No object state
 
-- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, full-scene point cloud (Note: point cloud directly obtained from on-board vision sensor or estimated from rgbd is fine for stanford track), robot base global poses, etc, and use such information for the policy models.
+- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, full-scene point cloud (Note: point cloud obtained from on-board vision sensor (e.g. estimated through rgbd) is fine for stanford track), robot global poses, etc, and use such information for the policy models.
 
 We will select the top three winning teams from each track, they will share the challenge prizes, and will be invited to present their approaches at the challenge workshop!
  🏆 Prizes for each track: 🥇 $1,000 🥈 $500 🥉 $300
@@ -35,7 +35,7 @@ Here is a brief explanation of the arguments:
 which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
     - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in standard track. 
-    - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track. 
+    - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track, but evaluation will be considerably slower compared to `RGBLowResWrapper`. 
     - `RichObservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
 
 After launching, the evaluator will load the task and spawn a server listening on `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
@@ -87,7 +87,7 @@ We will calculate the following metric during policy rollout:
 
 **Submission details**
 
-When running the eval script, an json file will be outputed after each rollout episode containing the results. Here is a sample output json file for one episode of evaluation:
+After running the eval script, there will be two output files: an json file containing the metric results, and a mp4 video recording of the rollout trajectory. Here is a sample output json file for one episode of evaluation:
 
 ```
 {
@@ -116,6 +116,8 @@ When running the eval script, an json file will be outputed after each rollout e
     - You can view the leaderboard [here](./leaderboard.md).
     - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
 
+- **Partial submission is allowed**: Since each tasks will be evaluated on 20 instances and 1 rollout each, there should be 1k json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
+
 - Final model submission and evaluation:
     - Submitted models and our compute specs
         - The model should run on a single 24GB VRAM GPU. We will use the following GPUs to perform the final evaluation: RTX 3090, A5000, TitanRTX
@@ -123,7 +125,13 @@ When running the eval script, an json file will be outputed after each rollout e
     - The same model with different checkpoints from the same team will be considered as a single entry.
 
 
-** YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON IN ANY WAY **. Since each tasks will be evaluated on 20 instances and 5 rollout each, there should be 5k json files after the full evaluation. Zip them all and upload through google form. For privileged information track participants, zip your wrapper code and submit together with the result json files.
+**YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
+
+1. All the json files, one for each rollout you performed (up to 1000);
+2. All the mp4 videos, one for each rollout you performed (up to 1000);
+3. Wrapper code you used during evaluation;
+4. [Optional] Model docker files;
+5. A readme file that specifies details to perform evaluation with your policy.
 
 
 **Challenge office hours**

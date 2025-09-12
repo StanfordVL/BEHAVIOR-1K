@@ -169,8 +169,6 @@ def replay_hdf5_file(
             full_scene_file = os.path.join(task_scene_file_folder, file)
     assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
     # optimizations for data replay
-    credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
-    gc = gspread.service_account(filename=credentials_path)
     load_room_instances = None
     try:
         with open(
@@ -324,21 +322,17 @@ def replay_hdf5_file(
                     stream_options={"x265-params": "log-level=none"},
                 )
                 # read task relevant objects from google sheet
-                credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
-                gc = gspread.service_account(filename=credentials_path)
-                for _ in range(3):
-                    try:
-                        sh = gc.open("Object Instance ID to be annotated for B50 tasks")
-                        worksheet = sh.worksheet("Sheet1").get_all_values()
-                        task_relevant_objs = None
-                        for row in worksheet[1:]:
-                            if row and row[0] == task_name:
-                                task_relevant_objs = row[1] + row[2]
-                                break
-                        break
-                    except Exception as e:
-                        log.error(f"Error occurred while reading Google Sheet: {e}")
-                        time.sleep(60)
+                task_relevant_objs = None
+                with open(
+                    f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_object_instance_ID.csv",
+                    newline="",
+                    encoding="utf-8",
+                ) as f:
+                    oi_csv = csv.reader(f, delimiter=",", quotechar='"')
+                    for row in oi_csv:
+                        if row[0] == task_name:
+                            task_relevant_objs = row[1] + row[2]
+                            break
                 assert task_relevant_objs is not None, "Task relevant objects not found!"
                 instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                 instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
