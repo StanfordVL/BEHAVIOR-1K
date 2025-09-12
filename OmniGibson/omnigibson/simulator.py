@@ -6,6 +6,9 @@ import os
 import shutil
 import signal
 import socket
+import sys
+import tempfile
+import traceback
 from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
@@ -76,10 +79,87 @@ def print_save_usd_warning(_):
     log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
 
 
+class SuppressLogsUntilError:
+    """
+    Suppress stdout/stderr logs until an error occurs, at which point dump everything.
+    """
+
+    def __init__(self, _):
+        self._old_stdout = None
+        self._old_stderr = None
+        self._tmpfile = None
+        self._tmppath = None
+        self._running = False
+
+    def __enter__(self):
+        # Temp file to buffer logs
+        self._tmpfile = tempfile.NamedTemporaryFile(delete=False, mode="w+")
+        self._tmppath = self._tmpfile.name
+        self._tmpfile.close()
+
+        # Save original fds
+        sys.stdout.flush()
+        sys.stderr.flush()
+        self._old_stdout = os.dup(1)
+        self._old_stderr = os.dup(2)
+
+        # Redirect stdout/stderr → temp file
+        fd = os.open(self._tmppath, os.O_WRONLY | os.O_APPEND)
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+        os.close(fd)
+
+        # Start background reader
+        self._running = True
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # Stop background reader
+        self._running = False
+
+        # Restore stdout/stderr
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os.dup2(self._old_stdout, 1)
+        os.dup2(self._old_stderr, 2)
+        os.close(self._old_stdout)
+        os.close(self._old_stderr)
+
+        # On error → dump everything + traceback
+        if exc_type is not None:
+            print("\n=== Isaac Sim logs (dump on error) ===\n")
+            with open(self._tmppath, "r") as f:
+                print(f.read())
+            print("=== End of Isaac Sim logs ===\n")
+
+            print("Python traceback:\n")
+            traceback.print_exception(exc_type, exc_val, exc_tb)
+
+        # Cleanup
+        try:
+            os.remove(self._tmppath)
+        except OSError:
+            pass
+
+        return False  # let exception propagate
+
+
 def _launch_app():
     log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
+
+    # TODO (Cem): Currently remove texture cache folder
+    try:
+        log.info("Texture cache folder found, removing...")
+        shutil.rmtree(os.path.join(os.path.expanduser("~"), ".cache", "ov", "texturecache"))
+    except FileNotFoundError:
+        log.info("Texture cache folder not found, no need to remove")
+    except PermissionError:
+        log.info("Permission error when removing texture cache. Ignoring")
+    except Exception as e:
+        log.info(f"Unexpected error when removing texture cache: {e}. Ignoring")
 
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
@@ -100,10 +180,11 @@ def _launch_app():
         except ImportError:
             pass
 
-        # TODO: Find a more elegant way to prune omni logging
-        # sys.argv.append("--/log/level=warning")
-        # sys.argv.append("--/log/fileLogLevel=warning")
-        # sys.argv.append("--/log/outputStreamLevel=error")
+        # Find a more elegant way to prune omni logging
+        if gm.NO_OMNI_LOGS:
+            sys.argv.append("--/log/level=error")
+            sys.argv.append("--/log/fileLogLevel=error")
+            sys.argv.append("--/log/outputStreamLevel=error")
 
     # Try to import the isaacsim module that only shows up in Isaac Sim 4.0.0. This ensures that
     # if we are using the pip installed version, all the ISAAC_PATH etc. env vars are set correctly.
@@ -125,23 +206,26 @@ def _launch_app():
         assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
         kit_file_name = m.KIT_FILES[isaac_version_tuple]
 
-    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
     # ensure that the kit file is always up to date.
     assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
     exp_path = os.environ["EXP_PATH"]
     kit_file = Path(__file__).parent / kit_file_name
     kit_file_target = Path(exp_path) / kit_file_name
+    icon_file = Path(__file__).parents[2] / "docs" / "assets" / "OmniGibson_logo.png"
+    icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
     try:
         shutil.copy(kit_file, kit_file_target)
+        shutil.copy(icon_file, icon_file_target)
     except Exception as e:
-        raise e from ValueError(f"Failed to copy {kit_file_name} to Isaac Sim apps directory.")
+        raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
     # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
     os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
-    launch_context = nullcontext if gm.DEBUG else suppress_omni_log
+    launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))

@@ -1,6 +1,5 @@
-import math
-
 import gymnasium as gym
+import numpy as np
 import torch as th
 
 import omnigibson as og
@@ -83,6 +82,7 @@ class VisionSensor(BaseSensor):
         "bbox_2d_loose",
         "bbox_3d",
         "camera_params",
+        "pointcloud",
     )
 
     # Documentation for the different types of segmentation for particle systems:
@@ -165,6 +165,7 @@ class VisionSensor(BaseSensor):
             bbox_2d_loose="bounding_box_2d_loose",
             bbox_3d="bounding_box_3d",
             camera_params="camera_params",
+            pointcloud="pointcloud",
         )
 
         assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(
@@ -308,8 +309,20 @@ class VisionSensor(BaseSensor):
         for modality in reordered_modalities:
             raw_obs = self._annotators[modality].get_data(device=og.sim.device)
 
-            # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
-            obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+            if modality == "pointcloud":
+                # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
+                # Note: rgb values are in the range of [0, 255], xyz is in world frame
+                concatenated = np.concatenate([raw_obs["pointRgb"][:, :3], raw_obs["data"]], axis=1)
+                # Pad to match gym space dimensions (self.image_height * self.image_width)
+                target_rows = self.image_height * self.image_width
+                if concatenated.shape[0] < target_rows:
+                    pad_width = ((0, target_rows - concatenated.shape[0]), (0, 0))
+                    obs[modality] = np.pad(concatenated, pad_width, mode="constant", constant_values=0)
+                else:
+                    obs[modality] = concatenated
+            else:
+                # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
+                obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
 
             if og.sim.device == "cpu":
                 obs[modality] = self._preprocess_cpu_obs(obs[modality], modality)
@@ -325,7 +338,7 @@ class VisionSensor(BaseSensor):
     def _preprocess_cpu_obs(self, obs, modality):
         # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
         if "seg_" in modality:
-            obs = obs.astype(NumpyTypes.INT32)
+            obs = obs.astype(NumpyTypes.INT64)  # Convert to int64 first to avoid overflow
         return th.from_numpy(obs) if "bbox_" not in modality else obs
 
     def _preprocess_gpu_obs(self, obs, modality):
@@ -654,10 +667,9 @@ class VisionSensor(BaseSensor):
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
-            # Requires 3 render updates for camera params annotator to decome active
+            # Requires 3 render updates for camera params annotator to become active
             for _ in range(3):
                 render()
-
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
 
@@ -930,6 +942,7 @@ class VisionSensor(BaseSensor):
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,
+            pointcloud=((self.image_height * self.image_width, 6), -float("inf"), float("inf"), NumpyTypes.FLOAT32),
         )
 
         return obs_space_mapping

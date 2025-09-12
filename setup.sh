@@ -71,9 +71,9 @@ fi
 
 # Validate dependencies
 [ "$OMNIGIBSON" = true ] && [ "$BDDL" = false ] && { echo "ERROR: --omnigibson requires --bddl"; exit 1; }
-[ "$DATASET" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --dataset requires --omnigibson"; exit 1; }
 [ "$PRIMITIVES" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --primitives requires --omnigibson"; exit 1; }
 [ "$EVAL" = true ] && [ "$OMNIGIBSON" = false ] && { echo "ERROR: --eval requires --omnigibson"; exit 1; }
+[ "$EVAL" = true ] && [ "$JOYLO" = false ] && { echo "ERROR: --eval requires --joylo"; exit 1; }
 [ "$NEW_ENV" = true ] && [ "$CONFIRM_NO_CONDA" = true ] && { echo "ERROR: --new-env and --confirm-no-conda are mutually exclusive"; exit 1; }
 
 WORKDIR=$(pwd)
@@ -152,7 +152,7 @@ EOF
         cat << EOF
 3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
     Last revision: December 8, 2022
-    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. 
+    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K. 
     The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
     It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
     Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
@@ -358,39 +358,6 @@ if [ "$OMNIGIBSON" = true ]; then
         fi
     fi
     
-    # Install datasets
-    if [ "$DATASET" = true ]; then
-        echo "Installing datasets..."
-        
-        # Determine if we should accept dataset license automatically
-        DATASET_ACCEPT_FLAG=""
-        if [ "$ACCEPT_DATASET_TOS" = true ]; then
-            DATASET_ACCEPT_FLAG="True"
-        else
-            DATASET_ACCEPT_FLAG="False"
-        fi
-        
-        export OMNI_KIT_ACCEPT_EULA=YES
-        
-        echo "Downloading OmniGibson robot assets..."
-        python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
-            echo "ERROR: OmniGibson robot assets installation failed"
-            exit 1
-        }
-
-        echo "Downloading BEHAVIOR-1K assets..."
-        python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=${DATASET_ACCEPT_FLAG})" || {
-            echo "ERROR: Dataset installation failed"
-            exit 1
-        }
-
-        echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
-        python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
-            echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
-            exit 1
-        }
-    fi
-    
     echo "OmniGibson installation completed successfully!"
 fi
 
@@ -401,6 +368,7 @@ if [ "$JOYLO" = true ]; then
     pip install -e "$WORKDIR/joylo"
 fi
 
+# Install Eval
 if [ "$EVAL" = true ]; then
     # get torch version via pip and install corresponding torch-cluster
     TORCH_VERSION=$(pip show torch | grep Version | cut -d " " -f 2)
@@ -414,6 +382,44 @@ if [ "$ASSET_PIPELINE" = true ]; then
     echo "Installing asset pipeline..."
     [ ! -d "asset_pipeline" ] && { echo "ERROR: asset_pipeline directory not found"; exit 1; }
     pip install -r "$WORKDIR/asset_pipeline/requirements.txt"
+fi
+
+# Install datasets
+if [ "$DATASET" = true ]; then
+    python -c "import omnigibson" || {
+        echo "ERROR: OmniGibson import failed, please make sure you have omnigibson installed before downloading datasets"
+        exit 1
+    }
+    
+    echo "Installing datasets..."
+    
+    # Determine if we should accept dataset license automatically
+    DATASET_ACCEPT_FLAG=""
+    if [ "$ACCEPT_DATASET_TOS" = true ]; then
+        DATASET_ACCEPT_FLAG="True"
+    else
+        DATASET_ACCEPT_FLAG="False"
+    fi
+    
+    export OMNI_KIT_ACCEPT_EULA=YES
+    
+    echo "Downloading OmniGibson robot assets..."
+    python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()" || {
+        echo "ERROR: OmniGibson robot assets installation failed"
+        exit 1
+    }
+
+    echo "Downloading BEHAVIOR-1K assets..."
+    python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=${DATASET_ACCEPT_FLAG})" || {
+        echo "ERROR: Dataset installation failed"
+        exit 1
+    }
+
+    echo "Downloading 2025 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()" || {
+        echo "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+        exit 1
+    }
 fi
 
 echo ""

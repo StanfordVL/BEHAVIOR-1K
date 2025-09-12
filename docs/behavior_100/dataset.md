@@ -2,6 +2,9 @@
 icon: fontawesome/solid/vr-cardboard
 ---
 
+!!! warning "Deprecated"
+    This information is about BEHAVIOR-100, a legacy version of BEHAVIOR built on iGibson and kept for posterity reasons. We recommend all new users to use BEHAVIOR-1K, which features 1,000 human-grounded household activities (vs. 100), 50 diverse scenes, thousands of annotated objects, and runs on the more powerful OmniGibson simulator with richer physics and visual realism.
+
 BEHAVIOR-100 includes a dataset of 500 VR demonstrations. Each BEHAVIOR-100 activity is demonstrated five times: three times in the same scene and instantiation, showing variation from execution; once in the same scene with a different instantiation; and once in a different scene. Demonstrators in VR have embodiment identical to one of BEHAVIOR-100's embodiments
 
 

@@ -86,7 +86,11 @@ class ControllableObject(BaseObject):
         # Store inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
-        self._reset_joint_pos = None if reset_joint_pos is None else th.tensor(reset_joint_pos, dtype=th.float)
+        self._reset_joint_pos = (
+            None
+            if reset_joint_pos is None or isinstance(reset_joint_pos, th.Tensor)
+            else th.tensor(reset_joint_pos, dtype=th.float)
+        )
 
         # Make sure action type is valid, and also save
         assert_valid_key(key=action_type, valid_keys={"discrete", "continuous"}, name="action type")

@@ -22,8 +22,6 @@ from omegaconf import DictConfig, OmegaConf
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 from omnigibson.learning.utils.config_utils import register_omegaconf_resolvers
 from omnigibson.learning.utils.eval_utils import (
-    HEAD_RESOLUTION,
-    WRIST_RESOLUTION,
     ROBOT_CAMERA_NAMES,
     PROPRIOCEPTION_INDICES,
     generate_basic_environment_config,
@@ -34,7 +32,7 @@ from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
     write_video,
 )
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
@@ -42,6 +40,10 @@ from omnigibson.utils.python_utils import recursively_convert_to_torch
 from pathlib import Path
 from signal import signal, SIGINT
 from typing import Any, Tuple, List
+
+m = create_module_macros(module_path=__file__)
+m.NUM_EVAL_EPISODES = 1
+m.NUM_EVAL_INSTANCES = 10
 
 
 # set global variables to boost performance
@@ -120,13 +122,15 @@ class Evaluator:
             )
         ]
         # Update observation modalities
-        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb", "depth_linear", "seg_instance_id"]
+        cfg["robots"][0]["obs_modalities"] = ["proprio", "rgb"]
         cfg["robots"][0]["proprio_obs"] = list(PROPRIOCEPTION_INDICES["R1Pro"].keys())
         if self.cfg.robot.controllers is not None:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
-        logger.info(f"Setting timeout to be 2x the average length of human demos: {self.human_stats['length'] * 2}")
-        cfg["task"]["termination_config"]["max_steps"] = self.human_stats["length"] * 2
-        cfg["task"]["include_obs"] = self.cfg.use_task_info
+        logger.info(
+            f"Setting timeout to be 2x the average length of human demos: {int(self.human_stats['length'] * 2)}"
+        )
+        cfg["task"]["termination_config"]["max_steps"] = int(self.human_stats["length"] * 2)
+        cfg["task"]["include_obs"] = False
         env = og.Environment(configs=cfg)
         # instantiate env wrapper
         env = instantiate(env_wrapper, env=env)
@@ -135,23 +139,10 @@ class Evaluator:
     def load_robot(self) -> BaseRobot:
         """
         Loads and returns the robot instance from the environment.
-        Change robot cameras' parameters
         Returns:
             BaseRobot: The robot instance loaded from the environment.
         """
         robot = self.env.scene.object_registry("name", "robot_r1")
-        og.sim.step()
-        # Update robot sensors:
-        for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():
-            sensor_name = camera_name.split("::")[1]
-            if camera_id == "head":
-                robot.sensors[sensor_name].horizontal_aperture = 40.0
-                robot.sensors[sensor_name].image_height = HEAD_RESOLUTION[0]
-                robot.sensors[sensor_name].image_width = HEAD_RESOLUTION[1]
-            else:
-                robot.sensors[sensor_name].image_height = WRIST_RESOLUTION[0]
-                robot.sensors[sensor_name].image_width = WRIST_RESOLUTION[1]
-        self.env.load_observation_space()
         return robot
 
     def load_policy(self) -> Any:
@@ -194,14 +185,15 @@ class Evaluator:
         """
         self.robot_action = self.policy.forward(obs=self.obs)
 
-        self.obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=3)
+        obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
         # process obs
+        self.obs = self._preprocess_obs(obs)
+
         if terminated or truncated:
             self.n_trials += 1
             if info["done"]["success"]:
                 self.n_success_trials += 1
 
-        self.obs = self._preprocess_obs(self.obs)
         for metric in self.metrics:
             metric.step_callback(self.env)
         return terminated, truncated
@@ -242,20 +234,18 @@ class Evaluator:
             get_task_instance_path(scene_model),
             f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
         )
-        assert os.path.exists(
-            tro_file_path
-        ), f"Could not find TRO file at {tro_file_path}, did you run ./populate_behavior_tasks.sh?"
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
-        self.env.scene.reset()
-        for tro_key, obj_state in tro_state.items():
+        for tro_key, tro_state in tro_state.items():
             if tro_key == "robot_poses":
-                presampled_robot_poses = obj_state
+                presampled_robot_poses = tro_state
                 robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
                 robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
                 self.robot.set_position_orientation(robot_pos, robot_quat)
+                # Write robot poses to scene metadata
+                self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
             else:
-                self.env.task.object_scope[tro_key].load_state(obj_state, serialized=False)
+                self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
 
         # Try to ensure that all task-relevant objects are stable
         # They should already be stable from the sampled instance, but there is some issue where loading the state
@@ -265,7 +255,9 @@ class Evaluator:
             for entity in self.env.task.object_scope.values():
                 if not entity.is_system and entity.exists:
                     entity.keep_still()
+
         self.env.scene.update_initial_file()
+        self.env.scene.reset()
 
     def _preprocess_obs(self, obs: dict) -> dict:
         """
@@ -279,9 +271,22 @@ class Evaluator:
         obs = flatten_obs_dict(obs)
         base_pose = self.robot.get_position_orientation()
         cam_rel_poses = []
+        # The first time we query for camera parameters, it will return all zeros
+        # For this case, we use camera.get_position_orientation() instead.
+        # The reason we are not using camera.get_position_orientation() by defualt is because it will always return the most recent camera poses
+        # However, since og render is somewhat "async", it takes >= 3 render calls per step to actually get the up-to-date camera renderings
+        # Since we are using n_render_iterations=1 for speed concern, we need the correct corresponding camera poses instead of the most update-to-date one.
+        # Thus, we use camera parameters which are guaranteed to be in sync with the visual observations.
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
-            cam_pose = self.robot.sensors[camera_name.split("::")[1]].get_position_orientation()
-            cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
+            camera = self.robot.sensors[camera_name.split("::")[1]]
+            direct_cam_pose = camera.camera_parameters["cameraViewTransform"]
+            if np.allclose(direct_cam_pose, np.zeros(16)):
+                cam_rel_poses.append(
+                    th.cat(T.relative_pose_transform(*(camera.get_position_orientation()), *base_pose))
+                )
+            else:
+                cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
+                cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
         return obs
 
@@ -292,13 +297,16 @@ class Evaluator:
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
-            (360, 360),
+            (224, 224),
         )
         right_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["right_wrist"] + "::rgb"].numpy(),
-            (360, 360),
+            (224, 224),
         )
-        head_rgb = self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy()
+        head_rgb = cv2.resize(
+            self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb"].numpy(),
+            (448, 448),
+        )
         write_video(
             np.expand_dims(np.hstack([np.vstack([left_wrist_rgb, right_wrist_rgb]), head_rgb]), 0),
             video_writer=self.video_writer,
@@ -310,8 +318,7 @@ class Evaluator:
         """
         Reset the environment, policy, and compute metrics.
         """
-        self.obs = self.env.reset()[0]
-        self.obs = self._preprocess_obs(self.obs)
+        self.obs = self._preprocess_obs(self.env.reset()[0])
         # run metric start callbacks
         for metric in self.metrics:
             metric.start_callback(self.env)
@@ -357,8 +364,12 @@ if __name__ == "__main__":
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
     # get run instances
-    instances_to_run = config.eval_instance_ids if config.eval_instance_ids is not None else set(range(20))
-    assert set(instances_to_run).issubset(set(range(20))), "eval instance ids must be in range(20)"
+    instances_to_run = (
+        config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
+    )
+    assert set(instances_to_run).issubset(
+        set(range(m.NUM_EVAL_INSTANCES))
+    ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
     # load csv file
     task_instance_csv_path = os.path.join(
         gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
@@ -381,16 +392,14 @@ if __name__ == "__main__":
         for idx in instances_to_run:
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
-            for epi in range(config.episodes_per_instance):
-                for _ in range(10):
-                    og.sim.render()
+            for epi in range(m.NUM_EVAL_EPISODES):
                 evaluator.reset()
                 done = False
                 if config.write_video:
                     video_name = str(video_path) + f"/video_{idx}_{epi}.mp4"
                     evaluator.video_writer = create_video_writer(
                         fpath=video_name,
-                        resolution=(720, 1080),
+                        resolution=(448, 672),
                     )
                 # run metric start callbacks
                 for metric in evaluator.metrics:

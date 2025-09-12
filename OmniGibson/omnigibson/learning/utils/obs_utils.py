@@ -27,7 +27,7 @@ logger = create_module_logger("obs_utils")
 try:
     from torch_cluster import fps
 except ImportError:
-    logger.warning("torch_cluster is not installed, skipping fps import")
+    fps = None
 
 # ==============================================
 # Depth
@@ -196,9 +196,10 @@ class VideoLoader:
         path: str,
         batch_size: Optional[int] = None,
         stride: int = 1,
-        output_size: Tuple[int, int],
+        output_size: Tuple[int, int] = None,
         start_idx: int = 0,
         end_idx: Optional[int] = None,
+        start_idx_is_keyframe: bool = False,
         fps: int = 30,
         downsample_factor: int = 1,
         **kwargs,
@@ -215,6 +216,8 @@ class VideoLoader:
             start_idx (int): Frame to start loading the video from. Default is 0.
             end_idx (Optional[int]): Frame to stop loading the video at. If None, will load until video end.
                 NOTE: end idx is not inclusive, i.e. if end_idx=10, the last frame will be 9.
+            start_idx_is_keyframe (bool): Whether the start index is a keyframe.
+                Set this to True if you know the start index is a keyframe, which will allow for faster seeking to the start index.
             fps (int): Frames per second of the video. Default is 30.
             downsample_factor (int): Factor to downsample the video frames by. Default is 1 (no downsampling).
         Returns:
@@ -230,13 +233,15 @@ class VideoLoader:
         self.output_size = output_size
         self._start_frame = start_idx
         self._end_frame = end_idx if end_idx is not None else self.stream.frames
+        self._start_idx_is_keyframe = start_idx_is_keyframe
         self._current_frame = start_idx
         self._time_base = self.stream.time_base
         self._fps = fps
         self._downsample_factor = downsample_factor
-        # Note that we also set start_pts to be a few frames preceding the start_frame if it's not 0,
+        # Note that unless start idx is keyframe, we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
-        self._start_pts = int(max(0, self._start_frame - 5) / self._fps / self._time_base)
+        start_frame = self._start_frame if self._start_idx_is_keyframe else max(0, self._start_frame - 5)
+        self._start_pts = int(start_frame / self._fps / self._time_base)
         self.reset()
 
     def __iter__(self) -> Generator[th.Tensor, None, None]:
@@ -282,7 +287,7 @@ class VideoLoader:
         self._current_frame = self._start_frame
         self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
         self._frame_iter = self.container.decode(self.stream)
-        if self._start_frame > 0:
+        if self._start_frame > 0 and not self._start_idx_is_keyframe:
             # Decode forward until we find the start frame
             for frame in self._frame_iter:
                 if frame.pts is None:
@@ -317,6 +322,8 @@ class RGBVideoLoader(VideoLoader):
 
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
+        if self.output_size is None:
+            return th.from_numpy(rgb).movedim(-1, -3).unsqueeze(0)
         rgb = F.interpolate(
             th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), size=self.output_size, mode="nearest-exact"
         )
@@ -339,7 +346,8 @@ class DepthVideoLoader(VideoLoader):
         frame_gray16 = frame.reformat(format="gray16le").to_ndarray()  # (H, W)
         depth = dequantize_depth(frame_gray16, min_depth=self.min_depth, max_depth=self.max_depth, shift=self.shift)
         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-        depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
+        if self.output_size is not None:
+            depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
         return depth.squeeze(0)  # (1, H, W)
 
 
@@ -361,13 +369,15 @@ class SegVideoLoader(VideoLoader):
         # For each rgb pixel, find the index of the nearest color in the equidistant bins
         distances = th.cdist(rgb_flat[None, :, :], self.palette[None, :, :], p=2)[0]  # (H*W, N_ids)
         ids = th.argmin(distances, dim=-1)  # (H*W,)
-        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0)  # (1, H, W)
-        ids = F.interpolate(ids.unsqueeze(0), size=self.output_size, mode="nearest-exact")
+        ids = self.id_list[ids].reshape((rgb.shape[0], rgb.shape[1])).unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
+        if self.output_size is not None:
+            ids = F.interpolate(ids.float(), size=self.output_size, mode="nearest-exact")
         return ids.squeeze(0).cpu().to(th.long)  # (1, H, W)
 
 
 OBS_LOADER_MAP = {
     "rgb": RGBVideoLoader,
+    "depth": DepthVideoLoader,  # alias for depth_linear for compatibility
     "depth_linear": DepthVideoLoader,
     "seg_instance_id": SegVideoLoader,
 }
@@ -403,7 +413,7 @@ def depth_to_pcd(
     rel_quat = rel_pose[:, 3:]  # (B, 4)
     rel_rot = T.quat2mat(rel_quat)  # (B, 3, 3)
 
-    # # Add camera coordinate system adjustment (180 degree rotation around X-axis)
+    # Add camera coordinate system adjustment (180 degree rotation around X-axis)
     rot_add = T.euler2mat(th.tensor([np.pi, 0, 0], device=device))  # (3, 3)
     rel_rot_matrix = th.matmul(rel_rot, rot_add)  # (B, 3, 3)
 
@@ -462,6 +472,9 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
             # Create batch indices for all points
             batch_indices = th.arange(B, device=device).repeat_interleave(N)  # (B*N,)
             # Single FPS call for all batches
+            assert (
+                fps is not None
+            ), "torch_cluster.fps is not available! Please make sure you have omnigibson setup with eval dependencies."
             idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
             # Vectorized post-processing
             batch_idx = idx_flat // N  # Which batch each index belongs to
@@ -499,21 +512,34 @@ def process_fused_point_cloud(
     pcd_range: Tuple[float, float, float, float, float, float],  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: Optional[int] = None,
     use_fps: bool = True,
-    process_seg: bool = False,
     verbose: bool = False,
 ) -> Tuple[th.Tensor, Optional[th.Tensor]]:
+    """
+    Given a dictionary of observations, process the fused point cloud from all cameras and return the final point cloud tensor in robot base frame.
+    Args:
+        obs (dict): Dictionary of observations containing point cloud data from different cameras.
+        camera_intrinsics (Dict[str, th.Tensor]): Dictionary of camera intrinsics for each camera.
+        pcd_range (Tuple[float, float, float, float, float, float]): Range of the point cloud to filter [x_min, x_max, y_min, y_max, z_min, z_max].
+        pcd_num_points (Optional[int]): Number of points to sample from the point cloud. If None, no downsampling is performed.
+        use_fps (bool): Whether to use farthest point sampling for point cloud downsampling. Default is True.
+        verbose (bool): Whether to print verbose output during processing. Default is False.
+    """
     if verbose:
         print("Processing fused point cloud from observations...")
-    rgb_pcd, seg_pcd = [], []
+    rgb_pcd = []
     for idx, (camera_name, intrinsics) in enumerate(camera_intrinsics.items()):
-        pcd = depth_to_pcd(
-            obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
-        )
-        rgb_pcd.append(
-            th.cat([obs[f"{camera_name}::rgb"] / 255.0, pcd], dim=-1).flatten(-3, -2)
-        )  # shape (B, [T], H*W, 6)
-        if process_seg:
-            seg_pcd.append(obs[f"{camera_name}::seg_semantic"].flatten(-2, -1))  # shape (B, [T], H*W)
+        if f"{camera_name}::pointcloud" in obs:
+            # should already be in robot base frame, see BaseRobot._get_obs()
+            pcd = obs[f"{camera_name}::pointcloud"]
+            rgb_pcd.append(th.cat([pcd[:, :3] / 255.0, pcd[:, 3:]], dim=-1))
+        else:
+            # need to convert from depth to point cloud in robot base frame
+            pcd = depth_to_pcd(
+                obs[f"{camera_name}::depth_linear"], obs["cam_rel_poses"][..., 7 * idx : 7 * idx + 7], intrinsics
+            )
+            rgb_pcd.append(
+                th.cat([obs[f"{camera_name}::rgb"][..., :3] / 255.0, pcd], dim=-1).flatten(-3, -2)
+            )  # shape (B, [T], H*W, 6)
     # Fuse all point clouds together
     fused_pcd_all = th.cat(rgb_pcd, dim=-2).to(device="cuda")
     # Now, clip the point cloud to the specified range
@@ -527,23 +553,18 @@ def process_fused_point_cloud(
         & (fused_pcd_all[..., 5] <= z_max)
     )
     fused_pcd_all[~mask] = 0.0
-    if process_seg:
-        seg_pcd = th.cat(seg_pcd, dim=-1)
-        seg_pcd = seg_pcd[mask]  # shape (N, [T])
     # Now, downsample the point cloud if needed
     if pcd_num_points is not None:
         if verbose:
             print(
                 f"Downsampling point cloud to {pcd_num_points} points using {'FPS' if use_fps else 'random sampling'}"
             )
-        fused_pcd, sampled_idx = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)
+        fused_pcd = downsample_pcd(fused_pcd_all, pcd_num_points, use_fps=use_fps)[0]
         fused_pcd = fused_pcd.float()
-        if process_seg:
-            fused_seg = th.gather(seg_pcd, 1, sampled_idx.cpu())
     else:
         fused_pcd = fused_pcd_all.float()
 
-    return fused_pcd, fused_seg if process_seg else None
+    return fused_pcd
 
 
 def rgbd_vid_to_pcd(
@@ -562,7 +583,6 @@ def rgbd_vid_to_pcd(
         1.5,
     ),  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int = 4096,
-    process_seg: bool = False,
     batch_size: int = 500,
     use_fps: bool = False,
 ):
@@ -577,7 +597,6 @@ def rgbd_vid_to_pcd(
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
         pcd_num_points (int): Number of points to sample from the point cloud.
-        process_seg (bool): Whether to process the segmentation map.
         batch_size (int): Number of frames to process in each batch.
         use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
     """
@@ -597,19 +616,11 @@ def rgbd_vid_to_pcd(
             shape=(data_size, pcd_num_points, 6),
             compression="lzf",
         )
-        if process_seg:
-            pcd_semantic_dset = out_f.create_dataset(
-                f"data/demo_{episode_id}/robot_r1::pcd_semantic",
-                shape=(data_size, pcd_num_points),
-                compression="lzf",
-            )
         # get observation loaders
         obs_loaders = {}
         for camera_id, robot_camera_name in robot_camera_names.items():
             resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
             keys = ["rgb", "depth_linear"]
-            if process_seg:
-                keys.append("seg_semantic_id")
             for key in keys:
                 kwargs = {}
                 if key == "seg_semantic_id":
@@ -645,24 +656,17 @@ def rgbd_vid_to_pcd(
                 camera_intrinsics[robot_camera_name][-1, -1] = 1.0
                 obs[f"{robot_camera_name}::rgb"] = next(obs_loaders[f"{robot_camera_name}::rgb"]).movedim(-3, -1)
                 obs[f"{robot_camera_name}::depth_linear"] = next(obs_loaders[f"{robot_camera_name}::depth_linear"])
-                if process_seg:
-                    obs[f"{robot_camera_name}::seg_semantic"] = next(
-                        obs_loaders[f"{robot_camera_name}::seg_semantic_id"]
-                    )
             # process the fused point cloud
-            pcd, seg = process_fused_point_cloud(
+            pcd = process_fused_point_cloud(
                 obs=obs,
                 camera_intrinsics=camera_intrinsics,
                 pcd_range=pcd_range,
                 pcd_num_points=pcd_num_points,
                 use_fps=use_fps,
-                process_seg=process_seg,
                 verbose=True,
             )
             logger.info("Saving point cloud data...")
             fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-            if process_seg:
-                pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     logger.info("Point cloud data saved!")
 

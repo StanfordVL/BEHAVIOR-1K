@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="3.7.0",
+    version="3.7.1",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
@@ -50,7 +50,7 @@ setup(
         "matplotlib>=3.0.0",
         "lxml>=5.2.2",
         "numba>=0.59.1",
-        "cffi>=1.16.0",
+        "cffi~=1.17.1",
         "pillow~=11.0.0",
     ],
     extras_require={
@@ -68,8 +68,8 @@ setup(
             "mkdocs-literate-nav",
             "mkdocs-redirects",
             "mkdocs-include-markdown-plugin",
-            "telemoma~=0.2.0",
-            "gspread",
+            "telemoma~=0.3.0",
+            "gspread>=6.2.1",
         ],
         "primitives": [
             "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",

@@ -1,4 +1,5 @@
 import argparse
+import csv
 import gspread
 import h5py
 import json
@@ -55,10 +56,12 @@ class BehaviorDataPlaybackWrapper(DataPlaybackWrapper):
         cam_rel_poses = []
         for camera_name in ROBOT_CAMERA_NAMES["R1Pro"].values():
             assert camera_name.split("::")[1] in robot.sensors, f"Camera {camera_name} not found in robot sensors"
-            # remove seg semantic map (Alternatively, change this line to store seg semantic instead)
-            obs.pop(f"{camera_name}::seg_semantic")
-            # move seg instance maps to cpu
-            obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
+            if f"{camera_name}::seg_semantic" in obs:
+                # remove seg semantic map (Alternatively, change this line to store seg semantic instead)
+                obs.pop(f"{camera_name}::seg_semantic")
+            if f"{camera_name}::seg_instance_id" in obs:
+                # move seg instance maps to cpu
+                obs[f"{camera_name}::seg_instance_id"] = obs[f"{camera_name}::seg_instance_id"].cpu()
             # store camera pose
             cam_pose = robot.sensors[camera_name.split("::")[1]].get_position_orientation()
             cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
@@ -166,21 +169,21 @@ def replay_hdf5_file(
             full_scene_file = os.path.join(task_scene_file_folder, file)
     assert full_scene_file is not None, f"No full scene file found in {task_scene_file_folder}"
     # optimizations for data replay
-    credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
-    gc = gspread.service_account(filename=credentials_path)
     load_room_instances = None
-    for _ in range(3):
-        try:
-            sh = gc.open("B50 Task Misc")
-            worksheet = sh.worksheet("Task Misc").get_all_values()
-            for row in worksheet[1:]:
-                if row and task_name in row[1]:
+    try:
+        with open(
+            f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_task_misc.csv", newline="", encoding="utf-8"
+        ) as f:
+            task_misc_csv = csv.reader(f, delimiter=",", quotechar='"')
+            for row in task_misc_csv:
+                if task_name in row[1]:
                     load_room_instances = row[2].strip().split("\n")
                     break
-            break
-        except Exception as e:
-            log.error(f"Error occurred while reading Google Sheet: {e}")
-            time.sleep(60)
+    except FileNotFoundError as e:
+        log.error(
+            "No B50_task_misc.csv file found in 2025-challenge-task-instances/metadata folder. Please ensure the dataset is up to date."
+        )
+        raise e
     assert load_room_instances is not None, "load room instance not found!"
     env = BehaviorDataPlaybackWrapper.create_from_hdf5(
         input_path=f"{data_folder}/2025-challenge-rawdata/task-{task_id:04d}/episode_{demo_id:08d}.hdf5",
@@ -319,21 +322,17 @@ def replay_hdf5_file(
                     stream_options={"x265-params": "log-level=none"},
                 )
                 # read task relevant objects from google sheet
-                credentials_path = f"{os.environ.get('HOME')}/Documents/credentials/google_credentials.json"
-                gc = gspread.service_account(filename=credentials_path)
-                for _ in range(3):
-                    try:
-                        sh = gc.open("Object Instance ID to be annotated for B50 tasks")
-                        worksheet = sh.worksheet("Sheet1").get_all_values()
-                        task_relevant_objs = None
-                        for row in worksheet[1:]:
-                            if row and row[0] == task_name:
-                                task_relevant_objs = row[1] + row[2]
-                                break
-                        break
-                    except Exception as e:
-                        log.error(f"Error occurred while reading Google Sheet: {e}")
-                        time.sleep(60)
+                task_relevant_objs = None
+                with open(
+                    f"{gm.DATA_PATH}/2025-challenge-task-instances/metadata/B50_object_instance_ID.csv",
+                    newline="",
+                    encoding="utf-8",
+                ) as f:
+                    oi_csv = csv.reader(f, delimiter=",", quotechar='"')
+                    for row in oi_csv:
+                        if row[0] == task_name:
+                            task_relevant_objs = row[1] + row[2]
+                            break
                 assert task_relevant_objs is not None, "Task relevant objects not found!"
                 instance_id_mapping = json.loads(env.hdf5_file[f"data/demo_{episode_id}"].attrs["ins_id_mapping"])
                 instance_id_mapping = {int(k): v for k, v in instance_id_mapping.items()}
@@ -392,7 +391,7 @@ def generate_low_dim_data(
     """
     makedirs_with_mode(f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}")
     makedirs_with_mode(f"{data_folder}/2025-challenge-demos/meta/episodes/task-{task_id:04d}")
-    with h5py.File(f"{data_folder}/2025-challenge-demos/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
+    with h5py.File(f"{data_folder}/replayed/episode_{demo_id:08d}.hdf5", "r") as replayed_f:
         actions = np.array(replayed_f["data"][f"demo_{episode_id}"]["action"][:], dtype=np.float32)
         proprio = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::proprio"][:], dtype=np.float32)
         task_info = np.array(replayed_f["data"][f"demo_{episode_id}"]["obs"]["task::low_dim"][:], dtype=np.float32)
@@ -458,7 +457,6 @@ def rgbd_gt_to_pcd(
         1.5,
     ),  # x_min, x_max, y_min, y_max, z_min, z_max
     pcd_num_points: int = 4096,
-    process_seg: bool = False,
     batch_size: int = 500,
     use_fps: bool = False,
 ):
@@ -473,7 +471,6 @@ def rgbd_gt_to_pcd(
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
         pcd_num_points (int): Number of points to sample from the point cloud.
-        process_seg (bool): Whether to process the segmentation map.
         batch_size (int): Number of frames to process in each batch.
         use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
     """
@@ -491,12 +488,6 @@ def rgbd_gt_to_pcd(
                 shape=(data_size, pcd_num_points, 6),
                 compression="lzf",
             )
-            if process_seg:
-                pcd_semantic_dset = out_f.create_dataset(
-                    f"data/demo_{episode_id}/robot_r1::pcd_semantic",
-                    shape=(data_size, pcd_num_points),
-                    compression="lzf",
-                )
             # We batch process every batch_size frames
             for i in range(0, data_size, batch_size):
                 log.info(f"Processing batch {i} of {data_size}...")
@@ -522,26 +513,17 @@ def rgbd_gt_to_pcd(
                         mode="nearest-exact",
                     ).squeeze(0)
 
-                    if process_seg:
-                        obs[f"{robot_camera_name}::seg_semantic"] = F.interpolate(
-                            th.from_numpy(data[f"{robot_camera_name}::seg_semantic"][i : i + batch_size]).unsqueeze,
-                            size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
-                            mode="nearest-exact",
-                        ).squeeze(0)
                 # process the fused point cloud
-                pcd, seg = process_fused_point_cloud(
+                pcd = process_fused_point_cloud(
                     obs=obs,
                     camera_intrinsics=camera_intrinsics,
                     pcd_range=pcd_range,
                     pcd_num_points=pcd_num_points,
                     use_fps=use_fps,
-                    process_seg=process_seg,
                     verbose=True,
                 )
                 log.info("Saving point cloud data...")
                 fused_pcd_dset[i : i + batch_size] = pcd.cpu()
-                if process_seg:
-                    pcd_semantic_dset[i : i + batch_size] = seg.cpu()
 
     log.info("Point cloud data saved!")
 
@@ -564,7 +546,7 @@ def main():
     )
     parser.add_argument("--seg", action="store_true", help="Include this flag to generate segmentation maps")
     parser.add_argument("--bbox", action="store_true", help="Include this flag to generate bounding box data")
-    # the following arguments are for Google Sheets integration
+    # [Internal use only] the following arguments are for Google Sheets integration
     parser.add_argument("--update_sheet", action="store_true", help="Include this flag to update the Google Sheet")
     parser.add_argument("--row", type=int, required=False, help="Row number to update")
 
@@ -605,7 +587,9 @@ def main():
             data_folder=args.data_folder, task_id=task_id, demo_id=args.demo_id, episode_id=episode_id
         )
     if args.pcd_gt or args.pcd_vid:
-        with open(f"{os.path.dirname(os.path.dirname(__file__))}/configs/task/behavior.yaml") as f:
+        with open(
+            f"{os.path.dirname(os.path.dirname(os.path.dirname(__file__)))}/omnigibson/learning/configs/task/behavior.yaml"
+        ) as f:
             pcd_range = tuple(yaml.safe_load(f)["pcd_range"])
         if args.pcd_gt:
             rgbd_gt_to_pcd(
@@ -619,7 +603,6 @@ def main():
                 pcd_num_points=4096,
                 batch_size=1000,
                 use_fps=True,
-                process_seg=False,
             )
         if args.pcd_vid:
             rgbd_vid_to_pcd(
@@ -633,7 +616,6 @@ def main():
                 pcd_num_points=4096,
                 batch_size=1000,
                 use_fps=True,
-                process_seg=False,
             )
 
     # remove replayed hdf5 to free up storage

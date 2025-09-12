@@ -11,7 +11,6 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.envs.env_wrapper import EnvironmentWrapper, create_wrapper
-from omnigibson.learning.utils.obs_utils import write_video
 from omnigibson.macros import gm, macros
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.sensors.vision_sensor import VisionSensor
@@ -26,6 +25,12 @@ from omnigibson.controllers.controller_base import ControlType
 # Create module logger
 log = create_module_logger(module_name=__name__)
 log.setLevel(logging.INFO)
+
+
+try:
+    from omnigibson.learning.utils.obs_utils import write_video
+except ImportError:
+    write_video = None
 
 h5py.get_config().track_order = True
 
@@ -795,6 +800,8 @@ class DataPlaybackWrapper(DataWrapper):
         # Set scene file and disable online object sampling if BehaviorTask is being used
         if config["task"]["type"] == "BehaviorTask":
             config["task"]["online_object_sampling"] = False
+            # Don't use presampled robot pose
+            config["task"]["use_presampled_robot_pose"] = False
 
         # Because we're loading directly from the cached scene file, we need to disable any additional objects that are being added since
         # they will already be cached in the original scene file
@@ -1126,18 +1133,17 @@ class DataPlaybackWrapper(DataWrapper):
             if k in nested_keys:
                 obs_grp = traj_grp.create_group(k)
                 for mod, step_mod_data in dat.items():
-                    if mod.split("::")[-1] != "seg_semantic":  # Don't store seg semantic for now
-                        if video_writers is None or mod not in video_writers.keys():
-                            traj_dsets[k][mod] = obs_grp.create_dataset(
-                                mod,
-                                shape=(num_samples, *step_mod_data.shape),
-                                dtype=step_mod_data.numpy().dtype,
-                                **self.compression,
-                                chunks=(1, *step_mod_data.shape),
-                                shuffle=True,
-                            )
-                        else:
-                            log.info(f"Skipping storing {mod} in h5, writing to video instead.")
+                    if video_writers is None or mod not in video_writers.keys():
+                        traj_dsets[k][mod] = obs_grp.create_dataset(
+                            mod,
+                            shape=(num_samples, *step_mod_data.shape),
+                            dtype=step_mod_data.numpy().dtype,
+                            **self.compression,
+                            chunks=(1, *step_mod_data.shape),
+                            shuffle=True,
+                        )
+                    else:
+                        log.info(f"Skipping storing {mod} in h5, writing to video instead.")
             else:
                 traj_dsets[k] = traj_grp.create_dataset(
                     k, shape=(num_samples, *dat.shape), dtype=dat.numpy().dtype, **self.compression, shuffle=True
@@ -1163,6 +1169,9 @@ class DataPlaybackWrapper(DataWrapper):
             for key, dat in self.current_traj_history[0].items():
                 for mod in dat.keys():
                     if video_writers is not None and mod in video_writers.keys():
+                        assert (
+                            write_video is not None
+                        ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
                         # write to video
                         write_video(
                             self.current_traj_history[0][key][mod].unsqueeze(0).numpy(),
@@ -1186,6 +1195,9 @@ class DataPlaybackWrapper(DataWrapper):
                                 [self.current_traj_history[i][key][mod] for i in range(obs_data_length)], dim=0
                             )
                             if video_writers is not None and mod in video_writers.keys():
+                                assert (
+                                    write_video is not None
+                                ), "video_writers not imported! Please make sure you have omnigibson setup with eval dependencies!"
                                 # write to video
                                 write_video(
                                     data_to_write.numpy(),

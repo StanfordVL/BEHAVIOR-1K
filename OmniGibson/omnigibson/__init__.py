@@ -17,18 +17,30 @@ from omnigibson.tasks import REGISTERED_TASKS
 
 
 # Create logger
-class RelativeSeconds(logging.Formatter):
+RESET = "\033[0m"
+
+
+class LogFormatter(logging.Formatter):
+    COLORS = {
+        logging.DEBUG: "\033[32m",  # green
+        logging.INFO: RESET,
+        logging.WARNING: "\033[33m",  # yellow
+        logging.ERROR: "\033[31m",  # red
+        logging.CRITICAL: "\033[31m" + "\033[1m",  # bold red
+    }
+
     def format(self, record):
+        color = self.COLORS.get(record.levelno, RESET)
         total_seconds = record.relativeCreated / 1000.0
         hours = int(total_seconds // 3600)
         minutes = int((total_seconds % 3600) // 60)
         seconds = total_seconds % 60
         # Format as HH:MM:SS.sss, with leading zeros
         record.relativeCreated_hms = f"{hours:02d}:{minutes:02d}:{seconds:06.3f}"
-        return super().format(record)
+        return f"{color}{super().format(record)}{RESET}"
 
 
-formatter = RelativeSeconds("[%(relativeCreated_hms)s] [%(levelname)s] [%(name)s] %(message)s")
+formatter = LogFormatter("[%(relativeCreated_hms)s] [%(levelname)s] [%(name)s] %(message)s")
 logging.basicConfig()
 logging.root.handlers[0].setFormatter(formatter)
 log = logging.getLogger(__name__)
@@ -37,7 +49,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.7.0"
+__version__ = "3.7.1"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 

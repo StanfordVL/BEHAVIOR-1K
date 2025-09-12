@@ -584,7 +584,13 @@ def download_behavior_1k_assets(accept_license=False):
 
 def download_2025_challenge_task_instances():
     if os.path.exists(get_dataset_path("2025-challenge-task-instances")):
-        print("2025 BEHAVIOR Challenge Tasks dataset already installed.")
+        # cd and git pull
+        subprocess.run(
+            ["git", "-C", get_dataset_path("2025-challenge-task-instances"), "pull"],
+            shell=False,
+            check=True,
+        )
+        print("2025 BEHAVIOR Challenge Tasks Instances updated.")
     else:
         download_and_unpack_zipped_dataset("2025-challenge-task-instances")
 

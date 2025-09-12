@@ -77,17 +77,23 @@ PROPRIOCEPTION_INDICES = {
     ),
     "R1Pro": OrderedDict(
         {
-            "joint_qpos": np.s_[0:28],
-            "joint_qpos_sin": np.s_[28:56],
-            "joint_qpos_cos": np.s_[56:84],
+            "joint_qpos": np.s_[
+                0:28
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
+            "joint_qpos_sin": np.s_[
+                28:56
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
+            "joint_qpos_cos": np.s_[
+                56:84
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
             "joint_qvel": np.s_[84:112],
             "joint_qeffort": np.s_[112:140],
-            "robot_pos": np.s_[140:143],
-            "robot_ori_cos": np.s_[143:146],
-            "robot_ori_sin": np.s_[146:149],
-            "robot_2d_ori": np.s_[149:150],
-            "robot_2d_ori_cos": np.s_[150:151],
-            "robot_2d_ori_sin": np.s_[151:152],
+            "robot_pos": np.s_[140:143],  # Global pos, this is NOT allowed in standard track
+            "robot_ori_cos": np.s_[143:146],  # Global ori, this is NOT allowed in standard track
+            "robot_ori_sin": np.s_[146:149],  # Global ori, this is NOT allowed in standard track
+            "robot_2d_ori": np.s_[149:150],  # 2D global ori, this is NOT allowed in standard track
+            "robot_2d_ori_cos": np.s_[150:151],  # 2D global ori, this is NOT allowed in standard track
+            "robot_2d_ori_sin": np.s_[151:152],  # 2D global ori, this is NOT allowed in standard track
             "robot_lin_vel": np.s_[152:155],
             "robot_ang_vel": np.s_[155:158],
             "arm_left_qpos": np.s_[158:165],
@@ -96,24 +102,22 @@ PROPRIOCEPTION_INDICES = {
             "arm_left_qvel": np.s_[179:186],
             "eef_left_pos": np.s_[186:189],
             "eef_left_quat": np.s_[189:193],
-            "grasp_left": np.s_[193:194],
-            "gripper_left_qpos": np.s_[194:196],
-            "gripper_left_qvel": np.s_[196:198],
-            "arm_right_qpos": np.s_[198:205],
-            "arm_right_qpos_sin": np.s_[205:212],
-            "arm_right_qpos_cos": np.s_[212:219],
-            "arm_right_qvel": np.s_[219:226],
-            "eef_right_pos": np.s_[226:229],
-            "eef_right_quat": np.s_[229:233],
-            "grasp_right": np.s_[233:234],
-            "gripper_right_qpos": np.s_[234:236],
-            "gripper_right_qvel": np.s_[236:238],
-            "trunk_qpos": np.s_[238:242],
-            "trunk_qvel": np.s_[242:246],
-            "base_qpos": np.s_[246:249],
-            "base_qpos_sin": np.s_[249:252],
-            "base_qpos_cos": np.s_[252:255],
-            "base_qvel": np.s_[255:258],
+            "gripper_left_qpos": np.s_[193:195],
+            "gripper_left_qvel": np.s_[195:197],
+            "arm_right_qpos": np.s_[197:204],
+            "arm_right_qpos_sin": np.s_[204:211],
+            "arm_right_qpos_cos": np.s_[211:218],
+            "arm_right_qvel": np.s_[218:225],
+            "eef_right_pos": np.s_[225:228],
+            "eef_right_quat": np.s_[228:232],
+            "gripper_right_qpos": np.s_[232:234],
+            "gripper_right_qvel": np.s_[234:236],
+            "trunk_qpos": np.s_[236:240],
+            "trunk_qvel": np.s_[240:244],
+            "base_qpos": np.s_[244:247],  # Base joint position, this is NOT allowed in standard track
+            "base_qpos_sin": np.s_[247:250],  # Base joint position, this is NOT allowed in standard track
+            "base_qpos_cos": np.s_[250:253],  # Base joint position, this is NOT allowed in standard track
+            "base_qvel": np.s_[253:256],
         }
     ),
 }

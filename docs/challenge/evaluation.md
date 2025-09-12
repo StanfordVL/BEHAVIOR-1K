@@ -7,10 +7,10 @@
 For the 1st BEHAVIOR-1K Challenge, We will have the following two tracks for the 1st challenge:
 
 - **Standard track:** Participants are restricted to using the state observations we provided in the demonstration dataset for their policy models.
-    - RGB + depth + segmentation + proprioception information
+    - RGB + depth + segmentation (semantic, instance, instance id) + proprioception information (Note that robot global poses are NOT allowed)
     - No object state
 
-- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, scene point cloud, etc, and use such information for the policy models.
+- **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, full-scene point cloud (Note: point cloud obtained from on-board vision sensor (e.g. estimated through rgbd) is fine for stanford track), robot global poses, etc, and use such information for the policy models.
 
 We will select the top three winning teams from each track, they will share the challenge prizes, and will be invited to present their approaches at the challenge workshop!
  🏆 Prizes for each track: 🥇 $1,000 🥈 $500 🥉 $300
@@ -20,19 +20,27 @@ We will select the top three winning teams from each track, they will share the 
 
 We provide a unified entry point for running evaluation:
 ```
-python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
+python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
 Here is a brief explanation of the arguments:
 
+- `$LOG_PATH` is the path to where the evaluator will store the logs (metrics json file and recorded rollout videos)
+
 - `$TASK_NAME` is the name of the task, a full list of tasks can be found in the demo gallery, as well as `TASK_TO_NAME_INDICES` under `OmniGibson/omnigibson/learning/utils/eval_utils.py`
 
-- `WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. For standard track, you MUST use the following command to start the evaluator:
+- `$WRAPPER_MODULE` is the full module path of the environment wrapper that will be used. By default, running the following command will use `omnigibson.learning.wrappers.RGBLowResWrapper`:
     ```
-    python OmniGibson/omnigibson/eval.py policy=websocket task.name=$TASK_NAME
+    python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME
     ```
-Here, it will use the default `omnigibson.envs.EnvironmentWrapper`, which is a barebone wrapper that does not provide anything beyond our standard rgbd, segmentation, proprioception info. The evaluator will load the task and spawn a server listening on `0.0.0.0:80`. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` to serve your policy and communicate with the Evaluator. 
+which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
-For privileged information track, you are allowed to design your own environment wrapper, within which you can arbitrarily query the environment instance for privileged information. We provided an example wrapper at `omnigibson.learning.wrappers.RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relavant objects at every frame. The custom wrapper you wrote needs to submitted for inspection to make sure you have not abused the environment by any way (e.g. teleporting the robot, or changing object states directly). 
+    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in standard track. 
+    - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track, but evaluation will be considerably slower compared to `RGBLowResWrapper`. 
+    - `RichObservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
+
+After launching, the evaluator will load the task and spawn a server listening on `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
+
+You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. For privileged information track, you can arbitrarily query the environment instance for privileged information within the wrapper, as shown in the example `RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relevant objects at every frame. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission is on the right track, and you have not abused the environment by any means (e.g. teleporting the robot, or changing object states directly). 
 
 
 As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the baselines section for more information.
@@ -43,7 +51,7 @@ As a starter, we provided a codebase of common imitation learning algorithms for
 We will calculate the following metric during policy rollout:
 
 ### Primary Metric (Ranking)
-- **Task success score rate:** Averaged across 50 tasks.
+- **Task success score:** Averaged across 50 tasks.
 - **Calculation:** Partial successes = (Number of goal BDDL predicates satisfied at episode end) / (Total number of goal predicates).
 
 ### Secondary Metrics (Efficiency)
@@ -60,9 +68,9 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 20 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 5 times (with time-outs, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
 
-- **Final evaluation:** We will hold out 20 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
+- **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 
 - Each instance differs in terms of:
     - Initial object states
@@ -79,7 +87,7 @@ We will calculate the following metric during policy rollout:
 
 **Submission details**
 
-When running the eval script, an json file will be outputed after each rollout episode containing the results. Here is a sample output json file for one episode of evaluation:
+After running the eval script, there will be two output files: an json file containing the metric results, and a mp4 video recording of the rollout trajectory. Here is a sample output json file for one episode of evaluation:
 
 ```
 {
@@ -105,9 +113,10 @@ When running the eval script, an json file will be outputed after each rollout e
 ```
 
 - Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7).
-    - To self-report your performance, check our [evaluation guide](./evaluation.md). 
     - You can view the leaderboard [here](./leaderboard.md).
     - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
+
+- **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
 
 - Final model submission and evaluation:
     - Submitted models and our compute specs
@@ -116,9 +125,39 @@ When running the eval script, an json file will be outputed after each rollout e
     - The same model with different checkpoints from the same team will be considered as a single entry.
 
 
-** YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON IN ANY WAY **. Since each tasks will be evaluated on 20 instances and 5 rollout each, there should be 5k json files after the full evaluation. Zip them all and upload through google form. For privileged information track participants, zip your wrapper code and submit together with the result json files.
+- **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
+
+1. All the json files, one for each rollout you performed (up to 500);
+2. All the mp4 videos, one for each rollout you performed (up to 500);
+3. Wrapper code you used during evaluation;
+4. [Optional] Model docker files;
+5. A readme file that specifies details to perform evaluation with your policy.
 
 
 **Challenge office hours**
 
-- Every Monday and Thursday, 4:30pm-6:00pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+- Every Monday and Thursday, 4:30pm-5:30pm, PST, over [Zoom](https://stanford.zoom.us/j/92909660940?pwd=RgFrdC8XeB3nVxABqb1gxrK96BCRBa.1).
+
+## Performance Benchmarks
+
+### System Spec
+
+The following benchmarks were measured on:
+
+- **GPU:** NVIDIA RTX 4090 (24GB VRAM)
+- **CPU:** AMD Ryzen 9 7950X 16-Core Processor (32 threads)
+- **RAM:** 128GB
+- **OS:** Ubuntu 22.04.5 LTS
+
+**Scene Load Time:** Approximately 150-300 seconds (one-time cost per trial, varies by scene complexity)
+
+### Evaluation Frame Rate with Random Actions
+
+The following table records the approximate frames per second (FPS) performance when running evaluation with random actions across different settings:
+
+| Sensor Modality | Resolution (Head, Wrist)| FPS |
+|---------|------------|-----|
+| RGB | 224x224, 224x224 | 24.55 |
+| RGB | 720x720, 480x480 | 20.62 |
+| RGB + depth + segmentation | 224x224, 224x224 | 16.55 |
+| RGB + depth + segmentation | 720x720, 480x480 | 13.52 |
