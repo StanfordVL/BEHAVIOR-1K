@@ -37,7 +37,7 @@ Choose your installation method:
 
                 ```shell
                 # Clone the latest stable release (recommended)
-                git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
+                git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
                 cd BEHAVIOR-1K
                 ```
 
@@ -45,7 +45,7 @@ Choose your installation method:
 
                 ```powershell
                 # Clone the latest stable release (recommended)
-                git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
+                git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
                 cd BEHAVIOR-1K
                 ```
             
@@ -72,7 +72,7 @@ Choose your installation method:
                 # Full installation with all components
                 ./setup.sh --new-env --omnigibson --bddl --joylo --dataset --eval --primitives
 
-                # Core components only (without teleoperation)
+                # Core components only (without evaluation and teleoperation)
                 ./setup.sh --new-env --omnigibson --bddl --dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)
@@ -89,7 +89,7 @@ Choose your installation method:
                 # Full installation with all components
                 .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset -Eval -Primitives
 
-                # Core components only (without teleoperation)
+                # Core components only (without evaluation and teleoperation)
                 .\setup.ps1 -NewEnv -OmniGibson -BDDL -Dataset
 
                 # Headless/automated installation (auto-accepts Conda TOS, NVIDIA Isaac Sim EULA, and BEHAVIOR Dataset License)

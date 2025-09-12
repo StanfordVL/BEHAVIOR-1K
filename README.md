@@ -19,12 +19,12 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 
 ## Quick Start
 
-For most users, we recommend installing the latest stable release (v3.7.0) with all components:
+For most users, we recommend installing the latest stable release (v3.7.1) with all components:
 
 ### Linux
 ```bash
 # Clone the latest stable release (recommended)
-git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
+git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
 
 # Run the setup script
@@ -34,7 +34,7 @@ cd BEHAVIOR-1K
 ### Windows
 ```powershell
 # Clone the latest stable release (recommended)
-git clone -b v3.7.0 https://github.com/StanfordVL/BEHAVIOR-1K.git
+git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
 
 # Run the setup script
