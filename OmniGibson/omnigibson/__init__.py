@@ -49,7 +49,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
 
-__version__ = "3.7.0"
+__version__ = "3.7.1"
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
