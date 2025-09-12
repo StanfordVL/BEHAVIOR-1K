@@ -68,9 +68,9 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 20 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
 
-- **Final evaluation:** We will hold out 20 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
+- **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 
 - Each instance differs in terms of:
     - Initial object states
@@ -116,7 +116,7 @@ After running the eval script, there will be two output files: an json file cont
     - You can view the leaderboard [here](./leaderboard.md).
     - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
 
-- **Partial submission is allowed**: Since each tasks will be evaluated on 20 instances and 1 rollout each, there should be 1k json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
+- **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
 
 - Final model submission and evaluation:
     - Submitted models and our compute specs
@@ -127,8 +127,8 @@ After running the eval script, there will be two output files: an json file cont
 
 - **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
 
-1. All the json files, one for each rollout you performed (up to 1000);
-2. All the mp4 videos, one for each rollout you performed (up to 1000);
+1. All the json files, one for each rollout you performed (up to 500);
+2. All the mp4 videos, one for each rollout you performed (up to 500);
 3. Wrapper code you used during evaluation;
 4. [Optional] Model docker files;
 5. A readme file that specifies details to perform evaluation with your policy.
