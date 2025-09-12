@@ -43,7 +43,7 @@ from typing import Any, Tuple, List
 
 m = create_module_macros(module_path=__file__)
 m.NUM_EVAL_EPISODES = 1
-m.NUM_EVAL_INSTANCES = 20
+m.NUM_EVAL_INSTANCES = 10
 
 
 # set global variables to boost performance
