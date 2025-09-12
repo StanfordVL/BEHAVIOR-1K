@@ -125,7 +125,7 @@ After running the eval script, there will be two output files: an json file cont
     - The same model with different checkpoints from the same team will be considered as a single entry.
 
 
-**YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
+- **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
 
 1. All the json files, one for each rollout you performed (up to 1000);
 2. All the mp4 videos, one for each rollout you performed (up to 1000);
