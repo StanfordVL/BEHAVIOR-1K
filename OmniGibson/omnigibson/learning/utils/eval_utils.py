@@ -77,17 +77,23 @@ PROPRIOCEPTION_INDICES = {
     ),
     "R1Pro": OrderedDict(
         {
-            "joint_qpos": np.s_[0:28],
-            "joint_qpos_sin": np.s_[28:56],
-            "joint_qpos_cos": np.s_[56:84],
+            "joint_qpos": np.s_[
+                0:28
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
+            "joint_qpos_sin": np.s_[
+                28:56
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
+            "joint_qpos_cos": np.s_[
+                56:84
+            ],  # Full robot joint positions, the first 6 are base joints, which is NOT allowed in standard track
             "joint_qvel": np.s_[84:112],
             "joint_qeffort": np.s_[112:140],
-            "robot_pos": np.s_[140:143],
-            "robot_ori_cos": np.s_[143:146],
-            "robot_ori_sin": np.s_[146:149],
-            "robot_2d_ori": np.s_[149:150],
-            "robot_2d_ori_cos": np.s_[150:151],
-            "robot_2d_ori_sin": np.s_[151:152],
+            "robot_pos": np.s_[140:143],  # Global pos, this is NOT allowed in standard track
+            "robot_ori_cos": np.s_[143:146],  # Global ori, this is NOT allowed in standard track
+            "robot_ori_sin": np.s_[146:149],  # Global ori, this is NOT allowed in standard track
+            "robot_2d_ori": np.s_[149:150],  # 2D global ori, this is NOT allowed in standard track
+            "robot_2d_ori_cos": np.s_[150:151],  # 2D global ori, this is NOT allowed in standard track
+            "robot_2d_ori_sin": np.s_[151:152],  # 2D global ori, this is NOT allowed in standard track
             "robot_lin_vel": np.s_[152:155],
             "robot_ang_vel": np.s_[155:158],
             "arm_left_qpos": np.s_[158:165],
@@ -108,9 +114,9 @@ PROPRIOCEPTION_INDICES = {
             "gripper_right_qvel": np.s_[234:236],
             "trunk_qpos": np.s_[236:240],
             "trunk_qvel": np.s_[240:244],
-            "base_qpos": np.s_[244:247],
-            "base_qpos_sin": np.s_[247:250],
-            "base_qpos_cos": np.s_[250:253],
+            "base_qpos": np.s_[244:247],  # Base joint position, this is NOT allowed in standard track
+            "base_qpos_sin": np.s_[247:250],  # Base joint position, this is NOT allowed in standard track
+            "base_qpos_cos": np.s_[250:253],  # Base joint position, this is NOT allowed in standard track
             "base_qvel": np.s_[253:256],
         }
     ),
