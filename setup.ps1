@@ -450,7 +450,7 @@ if ($Eval) {
     $TorchVersion = (pip show torch | Select-String "Version" | ForEach-Object { $_.ToString().Split(" ")[-1] })
     pip install torch-cluster -f "https://data.pyg.org/whl/torch-$TorchVersion.html"
     conda install av -c conda-forge -y
-
+}
 
 # Install asset pipeline
 if ($AssetPipeline) {
