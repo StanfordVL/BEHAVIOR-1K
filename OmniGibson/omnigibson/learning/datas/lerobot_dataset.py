@@ -1,3 +1,4 @@
+import datasets
 import json
 import os
 import numpy as np
@@ -5,6 +6,7 @@ import packaging.version
 import torch as th
 from collections import defaultdict
 from collections.abc import Callable
+from datasets import load_dataset
 from huggingface_hub import snapshot_download
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION
@@ -28,7 +30,7 @@ from lerobot.datasets.utils import (
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
-from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
+from omnigibson.learning.utils.lerobot_utils import hf_transform_to_torch, decode_video_frames, aggregate_stats
 from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
@@ -276,6 +278,18 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             ignore_patterns=ignore_patterns,
             max_workers=os.cpu_count() - 2,
         )
+
+    def load_hf_dataset(self) -> datasets.Dataset:
+        """hf_dataset contains all the observations, states, actions, rewards, etc."""
+        if self.episodes is None:
+            path = str(self.root / "data")
+            hf_dataset = load_dataset("parquet", data_dir=path, split="train")
+        else:
+            files = [str(self.root / self.meta.get_data_file_path(ep_idx)) for ep_idx in self.episodes]
+            hf_dataset = load_dataset("parquet", data_files=files, split="train")
+
+        hf_dataset.set_transform(hf_transform_to_torch)
+        return hf_dataset
 
     def __getitem__(self, idx) -> dict:
         if not self._chunk_streaming_using_keyframe:
