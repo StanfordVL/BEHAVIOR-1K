@@ -16,6 +16,7 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 - **RAM**: 32GB+ recommended
 - **VRAM**: 8GB+
 - **GPU**: NVIDIA RTX 2080+
+- **DISK:** 100GB+ free space
 
 ## Quick Start
 
