@@ -42,8 +42,114 @@ After launching, the evaluator will load the task and spawn a server listening o
 
 You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. For privileged information track, you can arbitrarily query the environment instance for privileged information within the wrapper, as shown in the example `RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relevant objects at every frame. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission is on the right track, and you have not abused the environment by any means (e.g. teleporting the robot, or changing object states directly). 
 
-
 As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the baselines section for more information.
+
+
+## Configure Robot Action Space
+
+By default, the evaluator will take in absolute joint angles for all the robot joints (23-dim). Participants are allowed to modify the `controllers` section in the robot config yaml file [OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml) to suit their needs. By default the configuration is empty:
+
+```
+controllers:
+```
+
+Which is equivalant to absolute base velocity, absolute torso joint angles, absolute arm joint angles, 1-dim continuous gripper actions, as specified in [R1_CONTROLLER_CONFIG](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/joylo/gello/robots/sim_robot/og_teleop_cfg.py#L180-L232):
+
+
+```
+controllers:
+  base:
+    name: HolonomicBaseJointController
+    motor_type: velocity
+    vel_kp: 150
+    command_input_limits: [[-1, -1, -1], [1, 1, 1]]
+    command_output_limits: [[-0.75, -0.75, -1], [1, 1, 1]]
+    use_impedances: false
+  trunk:
+    name: JointController
+    motor_type: position
+    pos_kp: 150
+    command_input_limits: null
+    command_output_limits: null
+    use_impedances: false
+    use_delta_commands: false
+  arm_left:
+    name: JointController
+    motor_type: position
+    pos_kp: 150
+    command_input_limits: null
+    command_output_limits: null
+    use_impedances: false
+    use_delta_commands: false
+  arm_right:
+    name: JointController
+    motor_type: position
+    pos_kp: 150
+    command_input_limits: null
+    command_output_limits: null
+    use_impedances: false
+    use_delta_commands: false
+  gripper_left:
+    name: MultiFingerGripperController
+    mode: smooth
+    command_input_limits: default
+    command_output_limits: default
+  gripper_right:
+    name: MultiFingerGripperController
+    mode: smooth
+    command_input_limits: default
+    command_output_limits: default
+```
+
+For more information regarding how to set robot controllers, please take a look at our [robot controller documentation](https://behavior.stanford.edu/omnigibson/controllers.html). The robot configuration yaml file (`r1pro.yaml`) needs to be included in your final submission. Below we provide some examples on modifying this config:
+	
+1. delta arm joint angles:
+
+    ```
+    arm_left:
+      name: JointController
+      motor_type: position
+      pos_kp: 150
+      command_input_limits: null
+      command_output_limits: null
+      use_impedances: false
+      use_delta_commands: true
+    ```
+
+    Notice the change in `use_delta_commands`.
+
+2. absolute EEF poses (in robot base frame) with IK Controller:
+
+    ```
+    arm_left:
+      name: InverseKinematicsController
+      command_input_limits: null
+      command_output_limits: null
+      mode: absolute_pose
+    ```
+
+3. delta EEF poses (in robot base frame) with IK Controller:
+  
+    ```
+    arm_left:
+      name: InverseKinematicsController
+      command_input_limits: null
+      mode: pose_delta_ori
+    ```
+
+    Notice the change in `mode`.
+
+4.  absolute normalized gripper joint angles
+
+    ```
+    gripper_left:
+      name: JointController
+      motor_type: position
+      command_input_limits: default
+      command_output_limits: default
+      use_impedances: false
+      use_delta_commands: false
+    ```
 
 
 ## Metrics and Results
@@ -129,9 +235,10 @@ After running the eval script, there will be two output files: an json file cont
 
 1. All the json files, one for each rollout you performed (up to 500);
 2. All the mp4 videos, one for each rollout you performed (up to 500);
-3. Wrapper code you used during evaluation;
+3. Wrapper code (.py) used during evaluation;
+4. Robot (R1Pro) config file (.yaml) used during evaluation;
 4. [Optional] Model docker files;
-5. A readme file that specifies details to perform evaluation with your policy.
+5. A readme file (.md) that specifies details to perform evaluation with your policy.
 
 
 **Challenge office hours**

@@ -20,6 +20,7 @@ except ImportError:
     # Fallback for websockets < 13.0
     import websockets.server as _server
 from copy import deepcopy
+from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class WebsocketClientPolicy:
         return self._server_metadata
 
     def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
-        logging.info(f"Waiting for server at {self._uri}...")
+        logger.info(f"Waiting for server at {self._uri}...")
         while True:
             try:
                 headers = {"Authorization": f"Api-Key {self._api_key}"} if self._api_key else None
@@ -54,21 +55,22 @@ class WebsocketClientPolicy:
                     self._uri, compression=None, max_size=None, additional_headers=headers
                 )
                 metadata = unpackb(conn.recv())
+                logger.info("Connected to server!")
                 return conn, metadata
             except ConnectionRefusedError:
-                logging.info("Still waiting for server...")
+                logger.info("Still waiting for server...")
                 time.sleep(5)
 
     def act(self, obs: Dict) -> th.Tensor:
         data = self._packer.pack(obs)
-        try:
-            self._ws.send(data)
-            response = self._ws.recv()
-        except websockets.exceptions.ConnectionClosedError:
-            logging.warning("Connection to server lost, attempting to reconnect...")
-            self._ws, self._server_metadata = self._wait_for_server()
-            self._ws.send(data)
-            response = self._ws.recv()
+        while True:
+            try:
+                self._ws.send(data)
+                response = self._ws.recv()
+                break
+            except websockets.exceptions.ConnectionClosedError:
+                logger.warning("Connection to server lost, attempting to reconnect...")
+                self._ws, self._server_metadata = self._wait_for_server()
         if isinstance(response, str):
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
@@ -153,7 +155,9 @@ class WebsocketPolicyServer:
                 logger.info(f"Connection from {websocket.remote_address} closed")
                 break
             except Exception:
-                await websocket.send(traceback.format_exc())
+                logger.error(f"Error in connection from {websocket.remote_address}:\n{traceback.format_exc()}")
+                if gm.DEBUG:
+                    await websocket.send(traceback.format_exc())
                 try:
                     # Try new websockets API first
                     await websocket.close(
