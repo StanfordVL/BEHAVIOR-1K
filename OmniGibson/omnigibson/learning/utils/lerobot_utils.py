@@ -20,9 +20,36 @@ from omnigibson.learning.utils.obs_utils import (
     DEPTH_SHIFT,
 )
 from pathlib import Path
+from PIL import Image as PILImage
+from torchvision import transforms
 from torchvision.io import VideoReader
 from typing import Any, Dict, Tuple
 from tqdm import tqdm
+
+
+def hf_transform_to_torch(items_dict: dict[th.Tensor | None]):
+    """
+    Adapted from lerobot.datasets.utils.hf_transform_to_torch
+    Preserve float64 for timestamp to avoid precision issues
+    Below is the original docstring:
+    Get a transform function that convert items from Hugging Face dataset (pyarrow)
+    to torch tensors. Importantly, images are converted from PIL, which corresponds to
+    a channel last representation (h w c) of uint8 type, to a torch image representation
+    with channel first (c h w) of float32 type in range [0,1].
+    """
+    for key in items_dict:
+        if key == "timestamp":
+            items_dict[key] = [x if isinstance(x, str) else th.tensor(x, dtype=th.float64) for x in items_dict[key]]
+        else:
+            first_item = items_dict[key][0]
+            if isinstance(first_item, PILImage.Image):
+                to_tensor = transforms.ToTensor()
+                items_dict[key] = [to_tensor(img) for img in items_dict[key]]
+            elif first_item is None:
+                pass
+            else:
+                items_dict[key] = [x if isinstance(x, str) else th.tensor(x) for x in items_dict[key]]
+    return items_dict
 
 
 def decode_video_frames(
@@ -105,7 +132,7 @@ def decode_video_frames_torchvision(
         f"\nqueried timestamps: {query_ts}"
         f"\nloaded timestamps: {loaded_ts}"
         f"\nvideo: {video_path}"
-        f"\nbackend: pyav"
+        f"\nbackend: {backend}"
     )
 
     # get closest frames to the query timestamps
