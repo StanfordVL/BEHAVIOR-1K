@@ -47,13 +47,13 @@ As a starter, we provided a codebase of common imitation learning algorithms for
 
 ## Configure Robot Action Space
 
-By default, the evaluator will take in absolute joint angles for all the robot joints (23-dim). Participants are allowed to modify the `controllers` section in the robot config yaml file [OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml) to suite their need. By default the configuration is empty:
+By default, the evaluator will take in absolute joint angles for all the robot joints (23-dim). Participants are allowed to modify the `controllers` section in the robot config yaml file [OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/robot/r1pro.yaml) to suit their needs. By default the configuration is empty:
 
 ```
 controllers:
 ```
 
-Which is equivelant to absolute base velocity, absolute torso joint angles, absolute arm joint angles, 1-dim continuous gripper actions, as specified in [R1_CONTROLLER_CONFIG](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/joylo/gello/robots/sim_robot/og_teleop_cfg.py#L180-L232):
+Which is equivalant to absolute base velocity, absolute torso joint angles, absolute arm joint angles, 1-dim continuous gripper actions, as specified in [R1_CONTROLLER_CONFIG](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/joylo/gello/robots/sim_robot/og_teleop_cfg.py#L180-L232):
 
 
 ```
@@ -134,7 +134,7 @@ For more information regarding how to set robot controllers, please take a look 
     arm_left:
       name: InverseKinematicsController
       motor_type: position
-        command_input_limits: null
+      command_input_limits: null
       mode: pose_delta_ori
     ```
 
