@@ -123,8 +123,8 @@ For more information regarding how to set robot controllers, please take a look 
     ```
     arm_left:
       name: InverseKinematicsController
-      motor_type: position
       command_input_limits: null
+      command_output_limits: null
       mode: absolute_pose
     ```
 
@@ -133,7 +133,6 @@ For more information regarding how to set robot controllers, please take a look 
     ```
     arm_left:
       name: InverseKinematicsController
-      motor_type: position
       command_input_limits: null
       mode: pose_delta_ori
     ```
@@ -146,7 +145,6 @@ For more information regarding how to set robot controllers, please take a look 
     gripper_left:
       name: JointController
       motor_type: position
-      pos_kp: 150
       command_input_limits: default
       command_output_limits: default
       use_impedances: false
