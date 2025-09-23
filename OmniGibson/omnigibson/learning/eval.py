@@ -396,7 +396,7 @@ if __name__ == "__main__":
                 evaluator.reset()
                 done = False
                 if config.write_video:
-                    video_name = str(video_path) + f"/video_{idx}_{epi}.mp4"
+                    video_name = str(video_path) + f"/{config.task.name}_{idx}_{epi}.mp4"
                     evaluator.video_writer = create_video_writer(
                         fpath=video_name,
                         resolution=(448, 672),
@@ -422,7 +422,7 @@ if __name__ == "__main__":
                 # gather metric results and write to file
                 for metric in evaluator.metrics:
                     metrics.update(metric.gather_results())
-                with open(metrics_path / f"{config.task.name}::{idx}::{epi}.json", "w") as f:
+                with open(metrics_path / f"{config.task.name}_{idx}_{epi}.json", "w") as f:
                     json.dump(metrics, f)
                 # reset video writer
                 if config.write_video:
