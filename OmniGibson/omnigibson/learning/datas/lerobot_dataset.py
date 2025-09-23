@@ -302,6 +302,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             rng = np.random.default_rng(self.seed + worker_id)
             rng.shuffle(self.chunks)
             self.current_streaming_chunk_idx = rng.integers(0, len(self.chunks)).item()
+            self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
         # Current chunk iterated, move to next chunk
         if self.current_streaming_frame_idx >= self.chunks[self.current_streaming_chunk_idx][1]:
             self.current_streaming_chunk_idx += 1
