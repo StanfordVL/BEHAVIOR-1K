@@ -8,6 +8,8 @@ env_wrapper:
   _target_: omnigibson.learning.wrappers.RGBLowResWrapper
 policy_name: ???  # filled by policy
 headless: true  # whether to run in headless mode (no GUI)
+eval_on_train_instances: true  # whether to eval on training instances
 eval_instance_ids: null  # specific list of instance ids to eval on, if null test on all instances
 write_video: true # whether we record videos during rollout
+partial_scene_load: true  # whether to only load task-relevant rooms for a specific task
 log_path: ???

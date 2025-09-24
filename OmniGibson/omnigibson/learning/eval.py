@@ -13,8 +13,10 @@ import traceback
 from av.container import Container
 from av.stream import Stream
 from gello.robots.sim_robot.og_teleop_utils import (
+    augment_rooms,
     load_available_tasks,
     generate_robot_config,
+    get_task_relevant_room_types,
 )
 from hydra.utils import instantiate
 from inspect import getsourcefile
@@ -43,6 +45,7 @@ from typing import Any, Tuple, List
 
 m = create_module_macros(module_path=__file__)
 m.NUM_EVAL_EPISODES = 1
+m.NUM_TRAIN_INSTANCES = 200
 m.NUM_EVAL_INSTANCES = 10
 
 
@@ -115,6 +118,11 @@ class Evaluator:
         robot_type = self.cfg.robot.type
         assert robot_type == "R1Pro", f"Got invalid robot type: {robot_type}, only R1Pro is supported."
         cfg = generate_basic_environment_config(task_name=task_name, task_cfg=task_cfg)
+        if self.cfg.partial_scene_load:
+            relevant_rooms = get_task_relevant_room_types(activity_name=task_name)
+            relevant_rooms = augment_rooms(relevant_rooms, task_cfg["scene_model"], task_name)
+            cfg["scene"]["load_room_types"] = relevant_rooms
+
         cfg["robots"] = [
             generate_robot_config(
                 task_name=task_name,
@@ -364,23 +372,40 @@ if __name__ == "__main__":
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
     # get run instances
-    instances_to_run = (
-        config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
-    )
-    assert set(instances_to_run).issubset(
-        set(range(m.NUM_EVAL_INSTANCES))
-    ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
-    # load csv file
-    task_instance_csv_path = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
-    )
-    with open(task_instance_csv_path, "r") as f:
-        lines = list(csv.reader(f))[1:]
-    assert (
-        lines[TASK_NAMES_TO_INDICES[config.task.name]][1] == config.task.name
-    ), f"Task name from config {config.task.name} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task.name]][1]}"
-    test_instances = lines[TASK_NAMES_TO_INDICES[config.task.name]][2].strip().split(",")
-    instances_to_run = [int(test_instances[i]) for i in instances_to_run]
+    if config.eval_on_train_instances:
+        logger.info(
+            "You are evaluating on training instances, set eval_on_train_instances to False for test instances."
+        )
+        task_idx = TASK_NAMES_TO_INDICES[config.task.name]
+        with open(os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
+            episodes = [json.loads(line) for line in f]
+        instances_to_run = []
+        for episode in episodes:
+            if episode["episode_index"] // 1e4 == task_idx:
+                instances_to_run.append(str(int((episode["episode_index"] // 10) % 1e3)))
+                if config.eval_instance_ids:
+                    assert set(config.eval_instance_ids).issubset(
+                        set(range(m.NUM_TRAIN_INSTANCES))
+                    ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+                    instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+    else:
+        instances_to_run = (
+            config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
+        )
+        assert set(instances_to_run).issubset(
+            set(range(m.NUM_EVAL_INSTANCES))
+        ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
+        # load csv file
+        task_instance_csv_path = os.path.join(
+            gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
+        )
+        with open(task_instance_csv_path, "r") as f:
+            lines = list(csv.reader(f))[1:]
+        assert (
+            lines[TASK_NAMES_TO_INDICES[config.task.name]][1] == config.task.name
+        ), f"Task name from config {config.task.name} does not match task name from csv {lines[TASK_NAMES_TO_INDICES[config.task.name]][1]}"
+        test_instances = lines[TASK_NAMES_TO_INDICES[config.task.name]][2].strip().split(",")
+        instances_to_run = [int(test_instances[i]) for i in instances_to_run]
     # establish metrics
     metrics = {}
     metrics_path = Path(config.log_path).expanduser() / "metrics"
