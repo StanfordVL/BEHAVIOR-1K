@@ -12,4 +12,5 @@ eval_on_train_instances: false  # whether to eval on training instances
 eval_instance_ids: null  # specific list of instance ids to eval on, if null test on all instances
 write_video: true # whether we record videos during rollout
 partial_scene_load: false  # whether to only load task-relevant rooms for a specific task
+max_steps: null  # max steps per rollout episode, setting to null will use the default value (2 x average human demo completion steps)
 log_path: ???
