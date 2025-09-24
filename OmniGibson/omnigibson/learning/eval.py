@@ -96,6 +96,24 @@ class Evaluator:
         available_tasks = load_available_tasks()
         task_name = self.cfg.task.name
         assert task_name in available_tasks, f"Got invalid task name: {task_name}"
+        # Now, get human stats of the task
+        task_idx = TASK_NAMES_TO_INDICES[task_name]
+        self.human_stats = {
+            "length": [],
+            "distance_traveled": [],
+            "left_eef_displacement": [],
+            "right_eef_displacement": [],
+        }
+        with open(os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r") as f:
+            episodes = [json.loads(line) for line in f]
+        for episode in episodes:
+            if episode["episode_index"] // 1e4 == task_idx:
+                for k in self.human_stats.keys():
+                    self.human_stats[k].append(episode[k])
+        # take a mean
+        for k in self.human_stats.keys():
+            self.human_stats[k] = sum(self.human_stats[k]) / len(self.human_stats[k])
+
         # Load the seed instance by default
         task_cfg = available_tasks[task_name][0]
         robot_type = self.cfg.robot.type
@@ -118,25 +136,6 @@ class Evaluator:
         if self.cfg.robot.controllers is not None:
             cfg["robots"][0]["controller_config"].update(self.cfg.robot.controllers)
         if self.cfg.max_steps is None:
-            # Now, get human stats of the task
-            task_idx = TASK_NAMES_TO_INDICES[task_name]
-            self.human_stats = {
-                "length": [],
-                "distance_traveled": [],
-                "left_eef_displacement": [],
-                "right_eef_displacement": [],
-            }
-            with open(
-                os.path.join(gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "episodes.jsonl"), "r"
-            ) as f:
-                episodes = [json.loads(line) for line in f]
-            for episode in episodes:
-                if episode["episode_index"] // 1e4 == task_idx:
-                    for k in self.human_stats.keys():
-                        self.human_stats[k].append(episode[k])
-            # take a mean
-            for k in self.human_stats.keys():
-                self.human_stats[k] = sum(self.human_stats[k]) / len(self.human_stats[k])
             logger.info(
                 f"Setting timeout to be 2x the average length of human demos: {int(self.human_stats['length'] * 2)}"
             )
