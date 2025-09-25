@@ -34,7 +34,7 @@ from omnigibson.learning.utils.lerobot_utils import hf_transform_to_torch, decod
 from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, get_worker_info
 from typing import Iterable, List, Tuple
 
 
@@ -118,6 +118,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        self.seed = seed
         if modalities is None:
             modalities = ["rgb", "depth", "seg_instance_id"]
         if "seg_instance_id" in modalities:
@@ -165,13 +166,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             self.chunks = self._get_keyframe_chunk_indices()
             # Now, we randomly permute the episodes if shuffle is True
             if shuffle:
-                rng = np.random.default_rng(seed)
-                rng.shuffle(self.chunks)
-                self.current_streaming_chunk_idx = np.random.default_rng().integers(0, len(self.chunks)).item()
+                self.current_streaming_chunk_idx = None
+                self.current_streaming_frame_idx = None
             else:
                 self.current_streaming_chunk_idx = 0
+                self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
             self.obs_loaders = dict()
-            self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
             self._should_obs_loaders_reload = True
         # record the positional index of each episode index within self.episodes
         self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
@@ -295,8 +295,18 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         if not self._chunk_streaming_using_keyframe:
             return super().__getitem__(idx)
         # Streaming mode: we will load the episode at the current streaming index, and then increment the index for next call
+        # Randomize chunk index on first call
+        if self.current_streaming_chunk_idx is None:
+            worker_info = get_worker_info()
+            worker_id = 0 if worker_info is None else worker_info.id
+            rng = np.random.default_rng(self.seed + worker_id)
+            rng.shuffle(self.chunks)
+            self.current_streaming_chunk_idx = rng.integers(0, len(self.chunks)).item()
+            self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
+        # Current chunk iterated, move to next chunk
         if self.current_streaming_frame_idx >= self.chunks[self.current_streaming_chunk_idx][1]:
             self.current_streaming_chunk_idx += 1
+            # All data iterated, restart from beginning
             if self.current_streaming_chunk_idx >= len(self.chunks):
                 self.current_streaming_chunk_idx = 0
             self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
