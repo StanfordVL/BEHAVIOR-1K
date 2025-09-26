@@ -73,6 +73,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
         local_only: bool = False,
+        check_timestamp_sync: bool = True,
         chunk_streaming_using_keyframe: bool = True,
         shuffle: bool = True,
         seed: int = 42,
@@ -91,6 +92,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             local_only (bool): whether to only use local data (not download from HuggingFace).
                 NOTE: set this to False and force_cache_sync to True if you want to force re-syncing the local cache with the remote dataset.
                 For more details, please refer to the `force_cache_sync` argument in the base class.
+            check_timestamp_sync (bool): whether to check timestamp synchronization between different modalities and the state/action data.
+                While it is set to True in the original LeRobotDataset and is set to True here by default, it can be set to False to skip the check for faster loading.
+                This will especially save time if you are loading the complete challenge demo dataset.
             chunk_streaming_using_keyframe (bool): whether to use chunk streaming mode for loading the dataset using keyframes.
                 When this is enabled, the dataset will pseudo-randomly load data in chunks based on keyframes, allowing for faster access to the data.
                 NOTE: As B1K challenge demos has GOP size of 250 frames for efficient storage, it is STRONGLY recommended to set this to True if you don't need true frame-level random access.
@@ -199,10 +203,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
 
         # Check timestamps
-        timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
-        episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
-        ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
-        check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
+        if check_timestamp_sync:
+            timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
+            episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
+            ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
+            check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
 
         # Setup delta_indices
         if self.delta_timestamps is not None:
@@ -349,7 +354,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
 
         query_indices = None
         if self.delta_indices is not None:
-            query_indices, padding = self._get_query_indices(idx, ep_idx)
+            query_indices, padding = self._get_query_indices(self.current_streaming_frame_idx, ep_idx)
             query_result = self._query_hf_dataset(query_indices)
             item = {**item, **padding}
             for key, val in query_result.items():
