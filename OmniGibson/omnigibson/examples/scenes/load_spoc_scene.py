@@ -240,7 +240,7 @@ def process_scene(scene):
     process_objects(scene["objects"])
 
     og.sim.play()
-    for _ in range(500):
+    for _ in range(30):
         og.sim.step()
 
 
