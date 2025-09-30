@@ -1,8 +1,9 @@
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_behavior_1k_scenes
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
 # Configure macros for maximum performance
 gm.USE_GPU_DYNAMICS = False
@@ -25,8 +26,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     scene_type = "InteractiveTraversableScene"  # choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
     # Choose the scene model to load
-    scenes = get_available_og_scenes() if scene_type == "InteractiveTraversableScene" else get_available_g_scenes()
-    scene_model = "house_single_floor"  # choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
+    scenes = get_available_behavior_1k_scenes()
+    scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
 
     cfg = {
         "scene": {
@@ -35,23 +36,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         },
     }
 
-    # If the scene type is interactive, also check if we want to quick load or full load the scene
-    if scene_type == "InteractiveTraversableScene":
-        load_options = {
-            "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
-            "Full": "Load all interactive objects in the scene",
-        }
-        load_mode = "Full"  # choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
-        if load_mode == "Quick":
-            cfg["scene"]["load_object_categories"] = [
-                "floors",
-                "walls",
-                "ceilings",
-                "lawn",
-                "driveway",
-                "roof",
-                "rail_fence",
-            ]
+    # Check if we want to quick load or full load the scene
+    load_options = {
+        "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
+        "Full": "Load all interactive objects in the scene",
+    }
+    load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
+    if load_mode == "Quick":
+        cfg["scene"]["load_object_categories"] = list(STRUCTURE_CATEGORIES)
 
     # Load the environment
     env = og.Environment(configs=cfg)

@@ -48,6 +48,7 @@ data:
             "seg_semantic": np.array(...),
             "seg_instance": np.array(...),
             "seg_instance_id": np.array(...)
+            "point_cloud": np.array(...)
         },
         "proprio": np.array(...)
     }
@@ -210,6 +211,18 @@ Vision observations are captured by the [`VisionSensor`](../reference/sensors/vi
         </td>
         <td>
             <img src="../assets/sensor_asset/bbox_3d.png" alt="3D Bounding Box">
+        </td>
+    </tr>
+    <tr>
+        <td valign="top" width="60%">
+            <strong>Point Cloud</strong><br><br>  
+            Point cloud obtained from the camera.<br><br>
+            Size: (height, width, 6), numpy.uint8<br>
+            Last dimension is (r, g, b, x, y, z)<br>
+            NOTE: coordinates are in camera frame<br>
+        </td>
+        <td>
+            <img src="../assets/sensor_asset/pcd.png" alt="Point Cloud">
         </td>
     </tr>
 </table>

@@ -1,5 +1,6 @@
 import math
 from enum import Enum
+from typing import Dict, Any, Optional
 
 import torch as th  # MUST come before importing omni!!!
 
@@ -423,7 +424,12 @@ class CuRoboMotionGenerator:
             kc.fixed_transforms[link_idx] = cf_to_pf_pose
 
     def solve_ik_batch(
-        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuRoboEmbodimentSelection.DEFAULT
+        self,
+        start_state: Any,
+        goal_pose: Any,
+        plan_config: Any,
+        link_poses: Optional[Any] = None,
+        emb_sel=CuRoboEmbodimentSelection.DEFAULT,
     ):
         """Find IK solutions to reach a batch of goal poses from a batch of start joint states.
 
@@ -464,7 +470,12 @@ class CuRoboMotionGenerator:
         return result, success, joint_state
 
     def plan_batch(
-        self, start_state, goal_pose, plan_config, link_poses=None, emb_sel=CuRoboEmbodimentSelection.DEFAULT
+        self,
+        start_state: Any,
+        goal_pose: Any,
+        plan_config: Any,
+        link_poses: Optional[Any] = None,
+        emb_sel=CuRoboEmbodimentSelection.DEFAULT,
     ):
         """Plan a batch of trajectories from a batch of start joint states to a batch of goal poses.
 
@@ -813,7 +824,7 @@ class CuRoboMotionGenerator:
         cmd_plan = self.mg[emb_sel].get_full_js(path) if get_full_js else path
         return cmd_plan.get_ordered_joint_state(self.robot_joint_names).position
 
-    def add_linearly_interpolated_waypoints(self, traj, max_inter_dist=0.01):
+    def add_linearly_interpolated_waypoints(self, traj: th.Tensor, max_inter_dist=0.01):
         """
         Adds waypoints to the joint trajectory so that the joint position distance
         between each pairs of neighboring waypoints is less than @max_inter_dist
@@ -836,7 +847,9 @@ class CuRoboMotionGenerator:
         interpolated_plan.append(traj[-1])
         return th.stack(interpolated_plan)
 
-    def path_to_eef_trajectory(self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT):
+    def path_to_eef_trajectory(
+        self, path, return_axisangle=False, emb_sel=CuRoboEmbodimentSelection.DEFAULT
+    ) -> Dict[str, th.Tensor]:
         """
         Converts raw path from motion generator into end-effector trajectory sequence in the robot frame.
         This trajectory sequence can be executed by an IKController, although there is no guaranteee that

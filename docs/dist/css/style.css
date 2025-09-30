@@ -80,10 +80,10 @@ body:has(.body-wrap) .md-main {
     display: none !important;
 }
 
-/* .md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
+.md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
     font-weight: bold !important;
     color: #FFD700 !important;
-} */
+}
 
 /* ==========================================================================
    BUTTONS

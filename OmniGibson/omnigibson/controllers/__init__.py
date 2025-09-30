@@ -1,3 +1,5 @@
+from typing import Any
+
 from omnigibson.controllers.controller_base import (
     REGISTERED_CONTROLLERS,
     REGISTERED_LOCOMOTION_CONTROLLERS,
@@ -18,7 +20,7 @@ from omnigibson.controllers.osc_controller import OperationalSpaceController
 from omnigibson.utils.python_utils import assert_valid_key
 
 
-def create_controller(name, **kwargs):
+def create_controller(name, **kwargs: Any):
     """
     Creates a controller of type @name with corresponding necessary keyword arguments @kwargs
 

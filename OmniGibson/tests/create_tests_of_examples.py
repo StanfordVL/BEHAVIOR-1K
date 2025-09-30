@@ -6,9 +6,9 @@ from string import Template
 
 import omnigibson
 from omnigibson import examples
-from omnigibson.utils.asset_utils import download_assets
+from omnigibson.utils.asset_utils import download_omnigibson_robot_assets
 
-download_assets()
+download_omnigibson_robot_assets()
 
 EXAMPLES_TO_SKIP = [
     "action_primitives.rs_int_example",

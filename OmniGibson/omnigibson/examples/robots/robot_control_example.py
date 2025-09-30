@@ -159,15 +159,20 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     max_steps = -1 if not short_exec else 100
     step = 0
 
+    random_action = None
     while step != max_steps:
-        action = (
-            action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        )
+        if control_mode == "random":
+            # Sample new random action every 30 steps
+            if step % 30 == 0:
+                random_action = action_generator.get_random_action() * 0.05
+            action = random_action
+        else:
+            action = action_generator.get_teleop_action()
         env.step(action=action)
         step += 1
 
     # Always shut down the environment cleanly at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

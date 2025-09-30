@@ -2,6 +2,9 @@
 icon: material/graph-outline
 ---
 
+!!! warning "Deprecated"
+    This information is about BEHAVIOR-100, a legacy version of BEHAVIOR built on iGibson and kept for posterity reasons. We recommend all new users to use BEHAVIOR-1K, which features 1,000 human-grounded household activities (vs. 100), 50 diverse scenes, thousands of annotated objects, and runs on the more powerful OmniGibson simulator with richer physics and visual realism.
+
 <iframe 
   src="https://player.vimeo.com/video/1101627941?badge=0&autopause=0&autoplay=1&muted=1&loop=1&title=0&byline=0&portrait=0&controls=0" 
   width="640" 
@@ -24,11 +27,11 @@ Building BEHAVIOR-100 poses three fundamental difficulties for each activity: de
 
 Do you want to benchmark your solution? Follow the instructions [here](https://stanfordvl.github.io/behavior/installation.html) to get started. The main components are:
 
-##### BEHAVIOR-100 benchmark [codebase](https://github.com/StanfordVL/behavior) and [documentation](https://stanfordvl.github.io/behavior/intro.html).
+##### BEHAVIOR-100 benchmark [documentation](https://stanfordvl.github.io/behavior/intro.html).
 ##### iGibson simulator [codebase](https://github.com/StanfordVL/iGibson) and [documentation](http://svl.stanford.edu/igibson/docs/).
 ##### Combined BEHAVIOR-100 iGibson2.0 [scene and object assets](https://storage.googleapis.com/gibson_scenes/behavior_data_bundle.zip).
 ##### BDDL specification language [codebase and documentation](https://github.com/StanfordVL/bddl).
-##### BEHAVIOR-100 VR human demonstration [dataset](https://behavior.stanford.edu/vr-demos).
+##### BEHAVIOR-100 VR human demonstration [dataset](./dataset.md).
 
 <!-- You will download and install the required infrastructure: [a new version of iGibson](http://svl.stanford.edu/igibson/docs/installation.html), our simulation environment for interactive tasks extended now to new object states for BEHAVIOR, the BEHAVIOR Dataset of Objects and the iGibson2.0 Dataset of Scenes (combined in our [benchmarking bundle](https://storage.googleapis.com/gibson_scenes/behavior_data_bundle.zip)), with object and house models to use the benchmark, and our [starter code](https://github.com/StanfordVL/behavior/), with examplest to train againts in the tasks.  -->
 
@@ -43,7 +46,7 @@ Do you want to benchmark your solution? Follow the instructions [here](https://s
             frameborder="0" allowfullscreen>
     </iframe>
     
-    **Resources:** [Activity list](https://behavior.stanford.edu/activity_list.html) | [Activity images and videos](https://behavior.stanford.edu/behavior-gallery/activity.html)
+    **Resources:** [Activity images and videos](./demo_gallery.md)
 
 !!! warning "🤖 Decision Making based on Onboard Sensing for Navigation and Manipulation"
     

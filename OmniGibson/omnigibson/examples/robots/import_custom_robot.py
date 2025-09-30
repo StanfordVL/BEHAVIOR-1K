@@ -1,5 +1,5 @@
 """
-Helper script to download OmniGibson dataset and assets.
+Helper script to download BEHAVIOR-1K dataset and assets.
 """
 
 import xml.etree.ElementTree as ET

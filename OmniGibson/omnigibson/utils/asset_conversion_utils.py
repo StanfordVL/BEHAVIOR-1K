@@ -25,6 +25,7 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.urdfpy_utils import URDF
 from omnigibson.utils.usd_utils import create_primitive_mesh
@@ -726,7 +727,7 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
     """
     Imports metadata for a given object model from the dataset. This metadata consist of information
     that is NOT included in the URDF file and instead included in the various JSON files shipped in
-    iGibson and OmniGibson datasets.
+    iGibson and BEHAVIOR-1K datasets.
 
     Args:
         usd_path (str): Path to USD file
@@ -739,7 +740,7 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
         ValueError: If the bounding box size is not found in the metadata.
 
     Returns:
-        None
+        bool: Success status of the conversion
     """
     usd_path = pathlib.Path(usd_path)
     usd_dir = usd_path.parent
@@ -879,7 +880,6 @@ def import_obj_metadata(usd_path, obj_category, obj_model, dataset_root, force_a
     for i, mat_prim in enumerate(mat_prims):
         mat = MaterialPrim(mat_prim.GetPrimPath().pathString, f"mat{i}")
         mat.load(DummyScene)
-        mat.shader_update_asset_paths_with_root_path(root_path=str(usd_path.parent), relative=True)
 
     # Save stage
     stage.Save()
@@ -1002,7 +1002,7 @@ def convert_urdf_to_usd(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_root=gm.CUSTOM_DATASET_PATH,
+    dataset_name="custom_dataset",
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -1014,7 +1014,7 @@ def convert_urdf_to_usd(
         urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
-        dataset_root (str): The root directory of the dataset.
+        dataset_name (str): The name of the dataset.
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
@@ -1026,6 +1026,7 @@ def convert_urdf_to_usd(
             - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for meta links
+    dataset_root = get_dataset_path(dataset_name)
     urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
@@ -1624,7 +1625,7 @@ def _load_scene_from_urdf(urdf):
                 continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
-                    ".usd", ".encrypted.usd"
+                    ".usdz", ".usdz.encrypted"
                 )
             ):
                 log.warning("Missing object", obj_name)
@@ -1639,7 +1640,8 @@ def _load_scene_from_urdf(urdf):
             raise ValueError(f"Failed to load object {obj_name}") from e
 
     # Take a sim step
-    og.sim.step()
+    with og.sim.slowed():
+        og.sim.step()
 
 
 def _get_objects_config_from_scene_urdf(urdf):
@@ -1882,7 +1884,7 @@ def generate_collision_meshes(
         hull_count (int): If @method="coacd", this sets the max number of hulls to generate
         discard_not_volume (bool): If @method="coacd" and set to True, this discards any generated hulls
             that are not proper volumes
-        error_handling: If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead
+        error_handling (bool): If true, will run coacd_runner.py and handle the coacd assertion fault by using convex hull instead
 
     Returns:
         List[trimesh.Trimesh]: The collision meshes.
@@ -2161,17 +2163,17 @@ def generate_urdf_for_mesh(
     Each submesh in articulated files (glb, gltf) will be extracted as a separate link.
 
     Args:
-        asset_path: Path to the input mesh file (.obj, .glb, .gltf)
-        out_dir: Output directory
-        category: Category name for the object
-        mdl: Model name
-        collision_method: Method for generating collision meshes ("convex", "coacd", or None)
-        hull_count: Maximum number of convex hulls for COACD method
-        up_axis: Up axis for the model ("y" or "z")
-        scale: User choice scale, will be overwritten if check_scale and rescale
-        check_scale: Whether to check mesh size based on heuristic
-        rescale: Whether to rescale mesh if check_scale
-        overwrite: Whether to overwrite existing files
+        asset_path (str): Path to the input mesh file (.obj, .glb, .gltf)
+        out_dir (str): Output directory
+        category (str): Category name for the object
+        mdl (str): Model name
+        collision_method (str or None): Method for generating collision meshes ("convex", "coacd", or None)
+        hull_count (int): Maximum number of convex hulls for COACD method
+        up_axis (str): Up axis for the model ("y" or "z")
+        scale (float): User choice scale, will be overwritten if check_scale and rescale
+        check_scale (bool): Whether to check mesh size based on heuristic
+        rescale (bool): Whether to rescale mesh if check_scale
+        overwrite (bool): Whether to overwrite existing files
     """
 
     # Convert out_dir to Path object

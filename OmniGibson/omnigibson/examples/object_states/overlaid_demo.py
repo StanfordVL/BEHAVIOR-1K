@@ -1,9 +1,11 @@
 import torch as th
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.object_states import Overlaid
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.ui_utils import KeyboardEventHandler
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
@@ -29,8 +31,8 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "type": "DatasetObject",
                 "name": "carpet",
                 "category": "carpet",
-                "model": "ctclvd",
-                "bounding_box": [1.346, 0.852, 0.017],
+                "model": "vlccww",
+                "scale": 0.5,
                 "prim_type": PrimType.CLOTH,
                 "abilities": {"cloth": {}},
                 "position": [0, 0, 1.0],
@@ -50,6 +52,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the environment
     env = og.Environment(configs=cfg)
 
+    KeyboardEventHandler.add_keyboard_callback(
+        key=lazy.carb.input.KeyboardInput.ESCAPE,
+        callback_fn=lambda: og.shutdown(),
+    )
+
     # Grab object references
     carpet = env.scene.object_registry("name", "carpet")
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
@@ -67,11 +74,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     while steps != max_steps:
         print(f"Overlaid {carpet.states[Overlaid].get_value(breakfast_table)}    ", end="\r")
-        env.step(th.empty(0))
+        env.step([])
         steps += 1
 
     # Shut down env at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

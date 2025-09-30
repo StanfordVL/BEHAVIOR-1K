@@ -24,10 +24,10 @@ def get_grasp_poses_for_object_sticky(target_obj):
     The grasp pose should be in the world frame.
 
     Args:
-        target_object (StatefulObject): Object to get a grasp pose for
+        target_obj (StatefulObject): Object to get a grasp pose for
 
     Returns:
-        List of grasp poses.
+        list: List of grasp poses.
     """
 
     aabb_min_world, aabb_max_world = target_obj.aabb
@@ -53,10 +53,10 @@ def get_grasp_poses_for_object_sticky_from_arbitrary_direction(target_obj):
     Obtain a grasp pose for an object from an arbitrary direction to be used with sticky grasping.
 
     Args:
-        target_object (StatefulObject): Object to get a grasp pose for
+        target_obj (StatefulObject): Object to get a grasp pose for
 
     Returns:
-        List of grasp candidates, where each grasp candidate is a tuple containing the grasp pose and the approach direction.
+        list: List of grasp candidates, where each grasp candidate is a tuple containing the grasp pose and the approach direction.
     """
     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
         visual=False
@@ -105,11 +105,11 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
     Computes the grasp position for opening or closing a joint.
 
     Args:
-      robot: the robot object
-      target_obj: the object to open/close a joint of
-      should_open: a boolean indicating whether we are opening or closing
-      relevant_joint: the joint to open/close if we want to do a particular one in advance
-      num_waypoints: the number of waypoints to interpolate between the start and end poses (default is "default")
+      robot (BaseRobot): the robot object
+      target_obj (BaseObject): the object to open/close a joint of
+      should_open (bool): a boolean indicating whether we are opening or closing
+      relevant_joint (Joint or None): the joint to open/close if we want to do a particular one in advance
+      num_waypoints (int or str): the number of waypoints to interpolate between the start and end poses (default is "default")
 
     Returns:
       None (if no grasp was found), or Tuple, containing:
@@ -158,11 +158,11 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     Computes the grasp position for opening or closing a prismatic joint.
 
     Args:
-      robot: the robot object
-      target_obj: the object to open
-      relevant_joint: the prismatic joint to open
-      should_open: a boolean indicating whether we are opening or closing
-      num_waypoints: the number of waypoints to interpolate between the start and end poses (default is "default")
+      robot (BaseRobot): the robot object
+      target_obj (BaseObject): the object to open
+      relevant_joint (Joint): the prismatic joint to open
+      should_open (bool): a boolean indicating whether we are opening or closing
+      num_waypoints (int or str): the number of waypoints to interpolate between the start and end poses (default is "default")
 
     Returns:
       Tuple, containing:
@@ -321,10 +321,10 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     Computes the grasp position for opening or closing a revolute joint.
 
     Args:
-      robot: the robot object
-      target_obj: the object to open
-      relevant_joint: the revolute joint to open
-      should_open: a boolean indicating whether we are opening or closing
+      robot (BaseRobot): the robot object
+      target_obj (BaseObject): the object to open
+      relevant_joint (Joint): the revolute joint to open
+      should_open (bool): a boolean indicating whether we are opening or closing
 
     Returns:
       Tuple, containing:

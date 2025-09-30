@@ -102,7 +102,7 @@ def main():
     random.shuffle(fillables)
 
     for cat, mdl in tqdm.tqdm(fillables[:BATCH_SIZE]):
-        if not os.path.exists(DatasetObject.get_usd_path(cat, mdl).replace(".usd", ".encrypted.usd")):
+        if not os.path.exists(DatasetObject.get_usd_path(cat, mdl).replace(".usdz", ".usdz.encrypted")):
             print(f"Skipping {cat}/{mdl} because it does not exist")
             continue
         view_object(cat, mdl)

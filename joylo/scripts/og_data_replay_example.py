@@ -185,15 +185,19 @@ def replay_hdf5_file(hdf_input_path):
     robot_camera_names = ['robot_r1::robot_r1:left_realsense_link:Camera:0::rgb', 
                         'robot_r1::robot_r1:right_realsense_link:Camera:0::rgb']
     for robot_camera_name in robot_camera_names:
-        video_writers.append(env.create_video_writer(fpath=f"{video_dir}/{robot_camera_name}.mp4"))
+        video_writers.append(env.create_video_writer(
+            fpath=f"{video_dir}/{robot_camera_name}.mp4",
+            resolution=(RESOLUTION_WRIST, RESOLUTION_WRIST),    
+        ))
         video_rgb_keys.append(robot_camera_name)
-    
     # Create video writers for external cameras
     for i in range(len(external_sensors_config)):
         camera_name = f"external_sensor{i}"
-        video_writers.append(env.create_video_writer(fpath=f"{video_dir}/{camera_name}.mp4"))
+        video_writers.append(env.create_pyav_writer(
+            fpath=f"{video_dir}/{camera_name}.mp4",
+            resolution=(RESOLUTION_DEFAULT, RESOLUTION_DEFAULT),    
+        ))
         video_rgb_keys.append(f"external::{camera_name}::rgb")
-    
     # Playback the dataset with all video writers
     # We avoid calling playback_dataset and call playback_episode individually in order to manually
     # aggregate per-episode metrics
@@ -203,7 +207,7 @@ def replay_hdf5_file(hdf_input_path):
             episode_id=episode_id,
             record_data=False,
             video_writers=video_writers,
-            video_rgb_keys=video_rgb_keys,
+            video_keys=video_rgb_keys,
         )
         if RUN_QA:
             episode_metrics = env.aggregate_metrics(flatten=True)
@@ -212,8 +216,12 @@ def replay_hdf5_file(hdf_input_path):
             metrics[f"episode_{episode_id}"] = episode_metrics
     
     # Close all video writers
-    for writer in video_writers:
-        writer.close()
+    for container, stream in video_writers:
+        # Flush any remaining packets
+        for packet in stream.encode():
+            container.mux(packet)
+        # Close the container
+        container.close()
 
     env.save_data()
 

@@ -10,7 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.asset_utils import get_all_object_category_models, get_og_avg_category_specs
+from omnigibson.utils.asset_utils import get_all_object_category_models, get_avg_category_specs, get_dataset_path
 from omnigibson.utils.constants import (
     DEFAULT_PRISMATIC_JOINT_FRICTION,
     DEFAULT_REVOLUTE_JOINT_FRICTION,
@@ -42,7 +42,7 @@ class DatasetObject(USDObject):
         relative_prim_path=None,
         category="object",
         model=None,
-        dataset_type="og_dataset",
+        dataset_name="behavior-1k-assets",
         scale=None,
         visible=True,
         fixed_base=False,
@@ -67,11 +67,11 @@ class DatasetObject(USDObject):
             model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
 
-                    {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+                    {gm.DATA_PATH}/{dataset_name}/objects/{category}/{model}/usd/{model}.usd
 
                 Otherwise, will randomly sample a model given @category
-            dataset_type (str): Dataset to search for this object. Default is og_dataset, corresponding to the
-                proprietary (encrypted) BEHAVIOR-1K dataset (gm.DATASET_PATH). Any other dataset names are searched for
+            dataset_name (str): Dataset to search for this object. Default is behavior-1k-assets, corresponding to the
+                proprietary (encrypted) BEHAVIOR-1K dataset. Any other dataset names are searched for
                 under the gm.DATA_PATH directory.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
@@ -115,7 +115,7 @@ class DatasetObject(USDObject):
         # Add info to load config
         load_config = dict() if load_config is None else load_config
         load_config["bounding_box"] = bounding_box
-        load_config["dataset_type"] = dataset_type
+        load_config["dataset_name"] = dataset_name
         # All DatasetObjects should have xform properties pre-loaded
         # TODO: enable this after next dataset release
         load_config["xform_props_pre_loaded"] = False
@@ -127,13 +127,13 @@ class DatasetObject(USDObject):
             model = random.choice(available_models)
 
         self._model = model
-        usd_path = self.get_usd_path(category=category, model=model, dataset_type=dataset_type)
+        usd_path = self.get_usd_path(category=category, model=model, dataset_name=dataset_name)
 
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
             usd_path=usd_path,
-            encrypted=dataset_type == "og_dataset",
+            encrypted=dataset_name == "behavior-1k-assets",
             name=name,
             category=category,
             scale=scale,
@@ -152,7 +152,7 @@ class DatasetObject(USDObject):
         )
 
     @classmethod
-    def get_usd_path(cls, category, model, dataset_type="og_dataset"):
+    def get_usd_path(cls, category, model, dataset_name="behavior-1k-assets"):
         """
         Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
@@ -161,13 +161,13 @@ class DatasetObject(USDObject):
         Args:
             category (str): Category for the object
             model (str): Specific model ID of the object
-            dataset_type (str): Dataset type, used to infer dataset directory to search for @category and @model
+            dataset_name (str): Dataset type, used to infer dataset directory to search for @category and @model
 
         Returns:
             str: Absolute filepath to the corresponding USD asset file
         """
-        dataset_path = gm.DATASET_PATH if dataset_type == "og_dataset" else os.path.join(gm.DATA_PATH, dataset_type)
-        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
+        dataset_path = get_dataset_path(dataset_name)
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usdz")
 
     def sample_orientation(self):
         """
@@ -248,7 +248,7 @@ class DatasetObject(USDObject):
         super()._post_load()
 
         # Get the average mass/density for this object category
-        avg_specs = get_og_avg_category_specs()
+        avg_specs = get_avg_category_specs()
         if self.category in avg_specs:
             category_mass = avg_specs[self.category]["mass"]
             category_density = avg_specs[self.category]["density"]

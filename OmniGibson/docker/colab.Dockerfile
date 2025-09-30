@@ -13,7 +13,7 @@ RUN sed -i "s/49100/80/g" /isaac-sim/extscache/omni.services.streamclient.webrtc
 RUN apt-get update && apt-get install -y nginx && apt-get clean
 
 # Download the demo dataset and the assets
-RUN python -m omnigibson.utils.asset_utils --download_assets --download_demo_data --accept_license
+RUN python -m omnigibson.utils.asset_utils --download_omnigibson_robot_assets --download_behavior_1k_assets --accept_license
 
 # Add the nginx configuration file
 ADD docker/nginx.conf /etc/nginx/sites-available/default

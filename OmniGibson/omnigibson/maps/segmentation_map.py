@@ -5,6 +5,7 @@ import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import torch_delete
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -63,7 +64,7 @@ class SegmentationMap(BaseMap):
         img_ins = th.tensor(cv2.resize(img_ins, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
         img_sem = th.tensor(cv2.resize(img_sem, (map_size, map_size), interpolation=cv2.INTER_NEAREST))
 
-        room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
+        room_categories = os.path.join(get_dataset_path("behavior-1k-assets"), "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
             room_cats = [line.rstrip() for line in fp.readlines()]
 

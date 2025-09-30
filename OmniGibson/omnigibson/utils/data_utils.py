@@ -17,13 +17,13 @@ def merge_scene_files(scene_a, scene_b, keep_robot_from="b"):
     - For system registry, we always use Scene B's version (no merging)
 
     Args:
-        scene_a: First scene file
-        scene_b: Second scene file (considered the most up-to-date version for conflicts)
-        keep_robot_from: Which scene to keep the robot from ('a', 'b', or None)
+        scene_a (dict): First scene file
+        scene_b (dict): Second scene file (considered the most up-to-date version for conflicts)
+        keep_robot_from (str or None): Which scene to keep the robot from ('a', 'b', or None)
             If None, no robot will be included
 
     Returns:
-        Merged scene file
+        dict: Merged scene file
     """
     assert isinstance(scene_a, dict), "Scene A must be a dictionary"
     assert isinstance(scene_b, dict), "Scene B must be a dictionary"
@@ -135,9 +135,9 @@ def sanity_check_object_compatibility(obj_name, obj_a, obj_b):
     This is only applied to objects_info, not to states.
 
     Args:
-        obj_name: Name of the object
-        obj_a: Object definition from scene_a
-        obj_b: Object definition from scene_b
+        obj_name (str): Name of the object
+        obj_a (dict): Object definition from scene_a
+        obj_b (dict): Object definition from scene_b
 
     Raises:
         AssertionError: If objects are incompatible
@@ -154,8 +154,10 @@ def sanity_check_object_compatibility(obj_name, obj_a, obj_b):
     assert args_a["name"] == args_b["name"], f"Object {obj_name} has different name in args"
     assert args_a["category"] == args_b["category"], f"Object {obj_name} has different category in args"
     assert args_a["model"] == args_b["model"], f"Object {obj_name} has different model in args"
-    assert args_a["fixed_base"] == args_b["fixed_base"], f"Object {obj_name} has different fixed_base in args"
-    assert args_a["visual_only"] == args_b["visual_only"], f"Object {obj_name} has different visual_only in args"
+    if "fixed_base" in args_a or "fixed_base" in args_b:
+        assert args_a["fixed_base"] == args_b["fixed_base"], f"Object {obj_name} has different fixed_base in args"
+    if "visual_only" in args_a or "visual_only" in args_b:
+        assert args_a["visual_only"] == args_b["visual_only"], f"Object {obj_name} has different visual_only in args"
     assert args_a["in_rooms"] == args_b["in_rooms"], f"Object {obj_name} has different in_rooms in args"
 
     # For scale, they should be identical
@@ -170,8 +172,8 @@ def validate_merged_scene(scene, require_robot=True):
     Validate that the merged scene is coherent and complete.
 
     Args:
-        scene: Scene to validate
-        require_robot: Whether to require exactly one robot
+        scene (dict): Scene to validate
+        require_robot (bool): Whether to require exactly one robot
     """
     # Check that all objects in objects_info have corresponding state
     for obj_name in scene["objects_info"]["init_info"]:

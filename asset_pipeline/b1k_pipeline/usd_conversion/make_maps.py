@@ -61,13 +61,12 @@ def map_to_world(xy, trav_map_resolution, trav_map_size):
     return np.flip((xy - trav_map_size / 2.0) * trav_map_resolution, axis=axis)
 
 
-def generate_maps_for_current_scene(scene_id):
+def generate_maps_for_current_scene(save_path):
     import omnigibson as og
     from omnigibson.macros import gm
     import omnigibson.object_states as object_states
 
     # Create the output directory
-    save_path = os.path.join(gm.DATASET_PATH, "scenes", scene_id, "layout")
     os.makedirs(save_path, exist_ok=True)
 
     # Get the room type to room id mapping

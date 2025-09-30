@@ -1,5 +1,5 @@
 """
-Helper script to download OmniGibson dataset and assets.
+Helper script to download BEHAVIOR-1K dataset and assets.
 Improved version that can import obj file and articulated file (glb, gltf).
 """
 
@@ -28,7 +28,7 @@ from omnigibson.utils.asset_conversion_utils import (
     "--model",
     required=True,
     type=click.STRING,
-    help="Model name to assign to the imported asset. This MUST be a 6-character long string that exclusively contains letters, and must be unique.",
+    help="Model name to assign to the imported asset. This must be unique within the dataset.",
 )
 @click.option(
     "--collision-method",
@@ -63,7 +63,7 @@ def import_custom_object(
 ):
     """
     Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
-    files to the custom dataset directory (gm.CUSTOM_DATASET_PATH)
+    files to the selected dataset directory.
     """
 
     assert len(model) == 6 and model.isalpha(), "Model name must be 6 characters long and contain only letters."

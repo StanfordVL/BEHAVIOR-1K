@@ -35,61 +35,65 @@ We can optionally define some objects to load into our scene:
 ```{.python .annotate}
 cfg["objects"] = [ # (1)!
     {
-        "type": "USDObject", # (2)!
-        "name": "ghost_stain", # (3)!
-        "usd_path": f"{gm.ASSET_PATH}/models/stain/stain.usd",
-        "category": "stain", # (4)!
-        "visual_only": True, # (5)!
-        "scale": [1.0, 1.0, 1.0], # (6)!
-        "position": [1.0, 2.0, 0.001], # (7)!
-        "orientation": [0, 0, 0, 1.0], # (8)!
-    },
-    {
-        "type": "DatasetObject", # (9)!
+        "type": "DatasetObject", # (2)!
         "name": "delicious_apple",
-        "category": "apple",
-        "model": "agveuv", # (10)!
-        "position": [0, 0, 1.0],
+        "category": "apple", # (3)!
+        "model": "agveuv", # (4)!
+        "position": [0, 0, 1.0], # (5)!
     },
     {
-        "type": "PrimitiveObject", # (11)!
+        "type": "PrimitiveObject", # (6)!
         "name": "incredible_box",
-        "primitive_type": "Cube", # (12)!
-        "rgba": [0, 1.0, 1.0, 1.0], # (13)!
-        "scale": [0.5, 0.5, 0.1],
-        "fixed_base": True, # (14)!
+        "primitive_type": "Cube", # (7)!
+        "rgba": [0, 1.0, 1.0, 1.0], # (8)!
+        "scale": [0.5, 0.5, 0.1], # (9)!
+        "fixed_base": True, # (10)!
         "position": [-1.0, 0, 1.0],
-        "orientation": [0, 0, 0.707, 0.707],
+        "orientation": [0, 0, 0.707, 0.707], # (11)!
     },
     {
-        "type": "LightObject", # (15)!
+        "type": "LightObject", # (12)!
         "name": "brilliant_light",
-        "light_type": "Sphere", # (16)!
-        "intensity": 50000, # (17)!
-        "radius": 0.1, # (18)!
+        "light_type": "Sphere", # (13)!
+        "intensity": 50000, # (14)!
+        "radius": 0.1, # (15)!
         "position": [3.0, 3.0, 4.0],
     },
 ]
+
+# Note: USDObject loading is also supported if you have custom USD objects
+# However, all objects in our dataset are encrypted and must be loaded via DatasetObject
+# Below is an example of how you would load a custom USD object:
+usd_cfg = {
+    "type": "USDObject",
+    "name": "awesome_custom_usd",
+    "usd_path": "/path/to/your/custom.usd",
+    "category": "my_category",
+    "visual_only": True, # (17)!
+    "scale": [1.0, 1.0, 1.0],
+    "position": [1.0, 2.0, 1.0],
+    "orientation": [0, 0, 0, 1.0],
+},
 ```
 
 1. Unlike the `"scene"` sub-config, we can define an arbitrary number of objects to load, so this is a `list` of `dict` istead of a single nested `dict`.
-2. **`OmniGibson`** supports multiple object classes, and we showcase an instance of each core class here. A [`USDObject`](../reference/objects/usd_object.md) is our most generic object class, and generates an object sourced from the `usd_path` argument.
-3. All objects **must** define the `name` argument! This is because **`OmniGibson`** enforces a global unique naming scheme, and so any created objects must have unique names assigned to them.
-4. `category` is used by all object classes to assign semantic segmentation IDs.
-5. `visual_only` is used by all object classes and defines whether the object is subject to both gravity and collisions.
-6. `scale` is used by all object classes and defines the global (x,y,z) relative scale of the object.
-7. `position` is used by all object classes and defines the initial (x,y,z) position of the object in the global frame.
-8. `orientation` is used by all object classes and defines the initial (x,y,z,w) quaternion orientation of the object in the global frame.
-9. A [`DatasetObject`](../reference/objects/dataset_object.md) is an object pulled directly from our **BEHAVIOR** dataset. It includes metadata and annotations not found on a generic `USDObject`. Note that these assets are encrypted, and thus cannot be created via the `USDObject` class.
-10. Instead of explicitly defining the hardcoded path to the dataset USD model, `model` (in conjunction with `category`) is used to infer the exact dataset object to load. In this case this is the exact same underlying raw USD asset that was loaded above as a `USDObject`!
-11. A [`PrimitiveObject`](../reference/objects/primitive_object.md) is a programmatically generated object defining a convex primitive shape.
-12. `primitive_type` defines what primitive shape to load -- see [`PrimitiveObject`](../reference/objects/primitive_object.md) for available options!
-13. Because this object is programmatically generated, we can also specify the color to assign to this primitive object.
-14. `fixed_base` is used by all object classes and determines whether the generated object is fixed relative to the world frame. Useful for fixing in place large objects, such as furniture or structures.
-15. A [`LightObject`](../reference/objects/light_object.md) is a programmatically generated light source. It is used to directly illuminate the given scene.
-16. `light_type` defines what light shape to load -- see [`LightObject`](../reference/objects/light_object.md) for available options!
-17. `intensity` defines how bright the generated light source should be.
-18. `radius` is used by `Sphere` lights and determines their relative size.
+2. **`OmniGibson`** supports multiple object classes, and we showcase an instance of each core class here. A [`DatasetObject`](../reference/objects/dataset_object.md) is the default way to load objects from our **BEHAVIOR** dataset. It includes metadata and annotations not found on generic objects. Note that these assets are encrypted, and thus cannot be loaded via the `USDObject` class.
+3. `category` is used by all object classes to assign semantic segmentation IDs.
+4. Instead of explicitly defining the hardcoded path to the dataset USD model, `model` (in conjunction with `category`) is used to infer the exact dataset object to load. All objects **must** define the `name` argument! This is because **`OmniGibson`** enforces a global unique naming scheme.
+5. `position` is used by all object classes and defines the initial (x,y,z) position of the object in the global frame.
+6. A [`PrimitiveObject`](../reference/objects/primitive_object.md) is a programmatically generated object defining a convex primitive shape.
+7. `primitive_type` defines what primitive shape to load -- see [`PrimitiveObject`](../reference/objects/primitive_object.md) for available options!
+8. Because this object is programmatically generated, we can also specify the color to assign to this primitive object.
+9. `scale` is used by all object classes and defines the global (x,y,z) relative scale of the object.
+10. `fixed_base` is used by all object classes and determines whether the generated object is fixed relative to the world frame. Useful for fixing in place large objects, such as furniture or structures.
+11. `orientation` is used by all object classes and defines the initial (x,y,z,w) quaternion orientation of the object in the global frame.
+12. A [`LightObject`](../reference/objects/light_object.md) is a programmatically generated light source. It is used to directly illuminate the given scene.
+13. `light_type` defines what light shape to load -- see [`LightObject`](../reference/objects/light_object.md) for available options!
+14. `intensity` defines how bright the generated light source should be.
+15. `radius` is used by `Sphere` lights and determines their relative size.
+16. `visual_only` is used by all object classes and defines whether the object is subject to both gravity and collisions.
+
+**Note on other object types:** In addition to the objects shown above, **`OmniGibson`** also supports [`USDObject`](../reference/objects/usd_object.md) for loading custom USD files. This is our most generic object class and generates an object sourced from a `usd_path` argument. However, since all objects in our dataset are encrypted, they must be loaded using `DatasetObject`. If you have your own custom USD objects, you can load them using `USDObject` by providing the path to your USD file. We've included a commented example at the end of the object list above to show how this would work.
 
 ## :material-robot-excited: **Defining robots**
 We can also optionally define robots to load into our scene:
@@ -99,7 +103,7 @@ cfg["robots"] = [ # (1)!
     {
         "type": "Fetch", # (2)!
         "name": "baby_robot",
-        "obs_modalities": ["scan", "rgb", "depth"], # (3)!
+        "obs_modalities": ["rgb", "depth"], # (3)!
     },
 ]
 ```
@@ -157,16 +161,6 @@ obs, rew, terminated, truncated, info = env.step(env.action_space.sample())
     # Define objects
     cfg["objects"] = [
         {
-            "type": "USDObject",
-            "name": "ghost_stain",
-            "usd_path": f"{gm.ASSET_PATH}/models/stain/stain.usd",
-            "category": "stain",
-            "visual_only": True,
-            "scale": [1.0, 1.0, 1.0],
-            "position": [1.0, 2.0, 0.001],
-            "orientation": [0, 0, 0, 1.0],
-        },
-        {
             "type": "DatasetObject",
             "name": "delicious_apple",
             "category": "apple",
@@ -197,8 +191,8 @@ obs, rew, terminated, truncated, info = env.step(env.action_space.sample())
     cfg["robots"] = [
         {
             "type": "Fetch",
-            "name": "skynet_robot",
-            "obs_modalities": ["scan", "rgb", "depth"],
+            "name": "baby_robot",
+            "obs_modalities": ["rgb", "depth"],
         },
     ]
     

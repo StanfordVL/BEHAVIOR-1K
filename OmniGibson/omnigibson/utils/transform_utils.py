@@ -369,7 +369,7 @@ def quat2mat(quaternion):
     Convert quaternions into rotation matrices.
 
     Args:
-        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (x, y, z, w).
 
     Returns:
         torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
@@ -498,7 +498,7 @@ def decompose_mat(hmat):
     """Batched decompose_mat function - assumes input is already batched
 
     Args:
-        hmat: (B, 4, 4) batch of homogeneous matrices
+        hmat (torch.Tensor): (B, 4, 4) batch of homogeneous matrices
 
     Returns:
         scale: (B, 3) scale factors
@@ -908,10 +908,10 @@ def pose_transform(pos1, quat1, pos0, quat0):
     pose1 @ pose0, NOT pose0 @ pose1
 
     Args:
-        pos1: (x,y,z) position to transform
-        quat1: (x,y,z,w) orientation to transform
-        pos0: (x,y,z) initial position
-        quat0: (x,y,z,w) initial orientation
+        pos1 (torch.Tensor): (x,y,z) position to transform
+        quat1 (torch.Tensor): (x,y,z,w) orientation to transform
+        pos0 (torch.Tensor): (x,y,z) initial position
+        quat0 (torch.Tensor): (x,y,z,w) initial orientation
 
     Returns:
         2-tuple:
@@ -932,8 +932,8 @@ def invert_pose_transform(pos, quat):
     Inverts a pose transform
 
     Args:
-        pos: (x,y,z) position to transform
-        quat: (x,y,z,w) orientation to transform
+        pos (torch.Tensor): (x,y,z) position to transform
+        quat (torch.Tensor): (x,y,z,w) orientation to transform
 
     Returns:
         2-tuple:
@@ -955,10 +955,10 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     pose1 = pose0 @ transform
 
     Args:
-        pos1: (x,y,z) position to transform
-        quat1: (x,y,z,w) orientation to transform
-        pos0: (x,y,z) initial position
-        quat0: (x,y,z,w) initial orientation
+        pos1 (torch.Tensor): (x,y,z) position to transform
+        quat1 (torch.Tensor): (x,y,z,w) orientation to transform
+        pos0 (torch.Tensor): (x,y,z) initial position
+        quat0 (torch.Tensor): (x,y,z,w) initial orientation
 
     Returns:
         2-tuple:
@@ -1434,11 +1434,11 @@ def transform_points(points: torch.Tensor, matrix: torch.Tensor, translate: bool
 
     Arguments:
         points : (n, dim) torch.Tensor
-        Points where `dim` is 2 or 3.
+            Points where `dim` is 2 or 3.
         matrix : (3, 3) or (4, 4) torch.Tensor
-        Homogeneous rotation matrix.
+            Homogeneous rotation matrix.
         translate : bool
-        Apply translation from matrix or not.
+            Apply translation from matrix or not.
 
     Returns:
         transformed : (n, dim) torch.Tensor
