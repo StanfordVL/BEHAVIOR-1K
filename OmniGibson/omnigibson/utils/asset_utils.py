@@ -290,7 +290,7 @@ def get_all_object_category_models_with_abilities(category, abilities):
 
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
-        usd_path = usd_path.replace(".usd", ".usd.encrypted")
+        usd_path = usd_path.replace(".usd", ".encrypted.usd")
         with decrypted(usd_path) as fpath:
             stage = lazy.pxr.Usd.Stage.Open(fpath)
             prim = stage.GetDefaultPrim()
@@ -316,7 +316,7 @@ def get_attachment_meta_links(category, model):
     from omnigibson.objects.dataset_object import DatasetObject
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
-    usd_path = usd_path.replace(".usd", ".usd.encrypted")
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
     with decrypted(usd_path) as fpath:
         stage = lazy.pxr.Usd.Stage.Open(fpath)
         prim = stage.GetDefaultPrim()

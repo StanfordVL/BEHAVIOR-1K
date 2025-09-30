@@ -110,7 +110,7 @@ def process_object(cat, mdl, out_path):
 
     # First get the native bounding box of the object
     usd_path = DatasetObject.get_usd_path(category=cat, model=mdl)
-    usd_path = usd_path.replace(".usd", ".usd.encrypted")
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
     with decrypted(usd_path) as fpath:
         stage = lazy.pxr.Usd.Stage.Open(fpath)
         prim = stage.GetDefaultPrim()

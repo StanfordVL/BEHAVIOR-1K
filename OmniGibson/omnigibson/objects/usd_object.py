@@ -105,7 +105,7 @@ class USDObject(StatefulObject):
 
         if self._encrypted:
             # Create a temporary file to store the decrytped asset, load it, and then delete it
-            encrypted_filename = self._usd_path.replace(".usd", ".usd.encrypted")
+            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
             self.check_hash(encrypted_filename)
             basename = os.path.basename(self._usd_path)
             tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
@@ -117,6 +117,9 @@ class USDObject(StatefulObject):
             # tempdir.
             side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
             def _update_path(asset_path):
+                if ".mdl" in asset_path:
+                    # MDL paths are searched for in a different search space, so we don't modify them
+                    return asset_path
                 return os.path.join(os.path.dirname(encrypted_filename), asset_path)
             lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
             side_stage.Save()
