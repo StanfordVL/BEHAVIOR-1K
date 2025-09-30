@@ -18,7 +18,7 @@ We will select the top three winning teams from each track, they will share the 
 
 ## Running Evaluations
 
-We provide a unified entry point for running evaluation:
+We provide a [unified entry point](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) for running evaluation:
 ```
 python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
