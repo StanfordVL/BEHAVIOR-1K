@@ -1,13 +1,37 @@
 On this page, we provide weekly updates regarding the first BEHAVIOR Challenge, including important bug fixes, announcements of new features, and clarifications regarding challenge rules.
 
 
+
+### 09/28/2025
+
+**Challenge rule clarifications:**
+
+1. There are no formal registration required to participate the challenge, feel free to submit your result directly if you have one!
+
+**Bug fixes:**
+
+1. Fixed multi-worker sharding and action chunk indexing in `BehaviorLeRobotDataset` under chunk streaming mode.
+
+2. Fixed wrong robot start pose in evaluation script.
+
+3. Provided better baselinbe checkpoints. Please refer to [baseline.md](./baselines.md)
+
+
+All fixes have been pushed to the main branch.
+
+**New features:**
+
+1. We added some more CLI arguments for evaluation, including `testing_on_train_instances`, `early stopping`, `partial scene load`. Please take a look at [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml)
+
+
+
 ### 09/19/2025
 
 **Challenge rule clarifications:**
 
-1. BDDL task definitions are allowed in the standard track. These task definitions do not change across evaluation.
+1. BDDL task definitions are allowed in the standard track. These task definitions are fixed and will be the same during evaluation.
 
-2. Collecting more data by yourself (with teleoperation, RL, scripted policies, etc.) is allowed for standard track. Do note, however, that you are recommended against collecting data on the evaluation instances, those are meant to test the generalization capability of the submitted policy. 
+2. Collecting more data by yourself (with teleoperation, RL, scripted policies, etc.) is allowed for standard track. Do note, however, that you are not allowed to collect data on the evaluation instances, those are meant to test the generalization capability of the submitted policy. 
 
 3. There are no restrictions on the form of the policy for both tracks. It could be IL, RL, TAMP, etc. Components like SLAM, querying LLMs, are also allowed. 
 
