@@ -25,21 +25,23 @@ AI2_OBJECTS = json.loads((pathlib.Path(gm.DATA_PATH) / "ai2thor" / "object_name_
 SPOC_OBJECTS = json.loads((pathlib.Path(gm.DATA_PATH) / "spoc" / "object_name_mapping.json").read_text())
 MDL_MATERIAL_ROOT = "/fsx-siro/cgokmen/og-materials/Materials/2023_2_1"
 
+
 def convert_csv_to_dict(filepath):
     """
     Converts a 2-column CSV file into a key:value dictionary.
-    
+
     Args:
         filepath (str): The path to the CSV file.
-        
+
     Returns:
         dict: A dictionary created from the CSV data.
     """
-    with open(filepath, mode='r', encoding='utf-8') as file:
+    with open(filepath, mode="r", encoding="utf-8") as file:
         reader = csv.reader(file)
         # Use a dictionary comprehension for a clean and efficient conversion
         return {row[0]: row[1] for row in reader}
-    
+
+
 AI2_MDL_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2_nvidia_material_mapping.csv"
 AI2_MDL_MAPPING = convert_csv_to_dict(AI2_MDL_MAPPING_FN)
 MDL_PATHS_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/material_paths.csv"
@@ -47,6 +49,7 @@ MDL_PATHS = convert_csv_to_dict(MDL_PATHS_FN)
 ROTATE_EVERYTHING_BY = th.as_tensor(R.from_euler("x", 90, degrees=True).as_quat())
 with open("/fsx-siro/cgokmen/procthor/assets/2023_07_28/annotations.json") as f:
     ANNOTATIONS = json.load(f)
+
 
 def load_object(mesh_name, fixed_base):
     i = len(og.sim.scenes[0].objects)
@@ -76,7 +79,6 @@ def load_object(mesh_name, fixed_base):
 
     og.sim.scenes[0].add_object(obj)
 
-
     return obj
 
 
@@ -94,12 +96,8 @@ def polygon_to_mesh(name, points, material_name, convex_hull=False):
     points = np.copy(points)
     points[:, 0] *= -1  # Invert x-coordinates
     # Create a 3D path and then convert to mesh.
-    lines = list(range(len(points))) + [
-        0
-    ]  # Close the polygon by connecting the last point to the first
-    path = trimesh.path.Path3D(
-        entities=[trimesh.path.entities.Line(lines)], vertices=points, process=False
-    )
+    lines = list(range(len(points))) + [0]  # Close the polygon by connecting the last point to the first
+    path = trimesh.path.Path3D(entities=[trimesh.path.entities.Line(lines)], vertices=points, process=False)
 
     # Convert path to 2D, triangulate, then back to 3D
     planar, to_3D = path.to_2D()
@@ -117,9 +115,7 @@ def polygon_to_mesh(name, points, material_name, convex_hull=False):
             process=False,
         )
     verts_2d, faces = planar.triangulate()
-    points_3d = np.hstack(
-        (verts_2d, np.zeros((verts_2d.shape[0], 1)))
-    )  # Add z=0 for 3D mesh
+    points_3d = np.hstack((verts_2d, np.zeros((verts_2d.shape[0], 1))))  # Add z=0 for 3D mesh
     mesh = trimesh.Trimesh(vertices=points_3d, faces=faces, process=False)
     mesh.apply_transform(to_3D)
 
@@ -176,13 +172,13 @@ def unity_euler_to_rh_quaternion(unity_euler_degrees):
     # Inverting the Z-axis flips the sign of rotations around X and Y.
     rh_euler_x = -euler_x
     rh_euler_y = -euler_y
-    rh_euler_z = euler_z # Roll around Z remains the same
+    rh_euler_z = euler_z  # Roll around Z remains the same
 
     # 3. Create a Rotation object in scipy
     # Unity's rotation order is Z-X-Y. Scipy's from_euler method needs this
     # order specified as a string 'zxy'.
     # The angles must be provided in the same order: [z, x, y].
-    rotation = R.from_euler('zxy', [rh_euler_z, rh_euler_x, rh_euler_y], degrees=True)
+    rotation = R.from_euler("zxy", [rh_euler_z, rh_euler_x, rh_euler_y], degrees=True)
 
     # 4. Get the quaternion
     # Scipy returns quaternions in [x, y, z, w] format.
@@ -190,18 +186,20 @@ def unity_euler_to_rh_quaternion(unity_euler_degrees):
 
     return quaternion
 
+
 def process_objects(objects):
     for objinfo in objects:
         try:
             obj_name = objinfo["id"]
             model = objinfo["assetId"]
             obj = load_object(model, objinfo["kinematic"])
-            position = th.tensor(
-                [-objinfo["position"]["x"], objinfo["position"]["y"], objinfo["position"]["z"]]
+            position = th.tensor([-objinfo["position"]["x"], objinfo["position"]["y"], objinfo["position"]["z"]])
+            orn = th.as_tensor(
+                unity_euler_to_rh_quaternion(
+                    [objinfo["rotation"]["x"], objinfo["rotation"]["y"], objinfo["rotation"]["z"]]
+                ),
+                dtype=th.float32,
             )
-            orn = th.as_tensor(unity_euler_to_rh_quaternion(
-                [objinfo["rotation"]["x"], objinfo["rotation"]["y"], objinfo["rotation"]["z"]]
-            ), dtype=th.float32)
 
             rotated_pos, rotated_orn = T.pose_transform(th.zeros(3), ROTATE_EVERYTHING_BY, position, orn)
 
@@ -223,8 +221,10 @@ def process_scene(scene):
         polygon_to_mesh(
             f"room_{i}_floor",
             np.array([[pt["x"], pt["y"], pt["z"]] for pt in room["floorPolygon"]]),
-            room["floorMaterial"]["name"] if "floorMaterial" in room and "name" in room["floorMaterial"] else "Parquet_Floor",
-            convex_hull=False
+            room["floorMaterial"]["name"]
+            if "floorMaterial" in room and "name" in room["floorMaterial"]
+            else "Parquet_Floor",
+            convex_hull=False,
         )
 
     print("Processing walls...")
@@ -233,7 +233,7 @@ def process_scene(scene):
             f"wall_{i}",
             np.array([[pt["x"], pt["y"], pt["z"]] for pt in wall["polygon"]]),
             wall["material"]["name"] if "material" in wall and "name" in wall["material"] else "Plaster",
-            convex_hull=True
+            convex_hull=True,
         )
 
     print("Processing objects...")
@@ -266,7 +266,7 @@ if __name__ == "__main__":
         og.clear()
     else:
         og.launch()
-        
+
     load_spoc_scene("val_3")
 
     while True:

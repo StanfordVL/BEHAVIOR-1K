@@ -21,6 +21,7 @@ log = create_module_logger(module_name=__name__)
 
 gm.HEADLESS = True
 
+
 def main():
     dataset_name = sys.argv[1]
     input_glob = sys.argv[2]

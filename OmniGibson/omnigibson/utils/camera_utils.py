@@ -220,6 +220,7 @@ def unproject_depth(depth: torch.Tensor, intrinsics: torch.Tensor, is_ortho: boo
 
     return points_xyz
 
+
 def _axis_angle_rotation(axis: Literal["X", "Y", "Z"], angle: torch.Tensor) -> torch.Tensor:
     """Return the rotation matrices for one of the rotations about an axis of which Euler angles describe,
     for each value of the angle given.

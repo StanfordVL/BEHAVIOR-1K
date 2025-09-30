@@ -19,6 +19,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 log = create_module_logger(module_name=__name__)
 
+
 def load_habitat_scene(dataset_name, scene_input_json):
     scene_input_json = pathlib.Path(scene_input_json)
 

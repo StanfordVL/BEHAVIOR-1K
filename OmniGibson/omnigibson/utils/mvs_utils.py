@@ -1,6 +1,7 @@
 import numpy as np
 import pycolmap
 
+
 def batch_np_matrix_to_pycolmap_wo_track(
     points3d,
     points_xyf,
@@ -123,6 +124,7 @@ def build_pycolmap_intri(fidx, intrinsics, camera_type, extra_params=None):
         raise ValueError(f"Camera type {camera_type} is not supported yet")
 
     return pycolmap_intri
+
 
 def create_pixel_coordinate_grid(num_frames, height, width):
     """

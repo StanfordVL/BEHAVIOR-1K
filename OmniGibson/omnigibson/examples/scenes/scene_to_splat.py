@@ -64,6 +64,7 @@ def main():
     env = og.Environment(configs=cfg)
 
     import omnigibson.lazy as lazy
+
     # lazy.omni.replicator.core.settings.set_render_pathtraced(samples_per_pixel=64)
     lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "PathTracing")
     lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
@@ -79,7 +80,7 @@ def main():
     # trav_map = env.scene.trav_map._erode_trav_map(trav_map)
 
     index = 0
-    
+
     TOTAL_IMAGES = 1000
     FLUSH_EVERY = 10
     HEIGHT = og.sim.viewer_height
@@ -89,12 +90,12 @@ def main():
     hdf5_path = os.path.join(output_dir, "camera_data.hdf5")
     images_dir = os.path.join(output_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
-    with h5py.File(hdf5_path, 'w') as f:
-        f.create_dataset('rgb', shape=(TOTAL_IMAGES, HEIGHT, WIDTH, 4), dtype='uint8')
-        f.create_dataset('depth', shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype='float32')
-        f.create_dataset('segmentation', shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype='int32')
+    with h5py.File(hdf5_path, "w") as f:
+        f.create_dataset("rgb", shape=(TOTAL_IMAGES, HEIGHT, WIDTH, 4), dtype="uint8")
+        f.create_dataset("depth", shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype="float32")
+        f.create_dataset("segmentation", shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype="int32")
 
-        f.create_dataset('camera_pose', shape=(TOTAL_IMAGES, 4, 4), dtype='float32')
+        f.create_dataset("camera_pose", shape=(TOTAL_IMAGES, 4, 4), dtype="float32")
 
         # Warm up.
         for _ in range(5):
@@ -197,11 +198,11 @@ def main():
                 Image.fromarray(rgb).save(os.path.join(images_dir, image_file))
 
                 # Save the data into hdf5
-                f['rgb'][index] = rgb
-                f['depth'][index] = depth
-                f['segmentation'][index] = seg
+                f["rgb"][index] = rgb
+                f["depth"][index] = depth
+                f["segmentation"][index] = seg
 
-                f['camera_pose'][index] = T.pose2mat(og.sim.viewer_camera.get_position_orientation()).cpu().numpy()
+                f["camera_pose"][index] = T.pose2mat(og.sim.viewer_camera.get_position_orientation()).cpu().numpy()
 
                 # Flush every N entries
                 if index % FLUSH_EVERY == 0:
@@ -214,7 +215,7 @@ def main():
                     break
 
         # Record the segmentation keys
-        f.attrs['segmentation_labels'] = json.dumps(og.sim.viewer_camera.get_obs()[1]['seg_instance'])
+        f.attrs["segmentation_labels"] = json.dumps(og.sim.viewer_camera.get_obs()[1]["seg_instance"])
 
     # Always close the environment at the end
     og.clear()
