@@ -31,27 +31,29 @@ class TaskMetric(MetricBase):
         self.timesteps += 1
 
     def end_callback(self, env):
+        # If task is fully complete, return perfect score
+        if env.task.success:
+            self.final_q_score = 1.0
+            return
+
+        # Otherwise calculate partial credit based on newly satisfied predicates
         candidate_q_score = []
         for i, option in enumerate(env.task.ground_goal_state_options):
             # Compare current predicate states with initial states
             initial_states = self.initial_predicate_states[i]
+            total_predicates = len(option)
 
             # Count predicates that weren't initially satisfied and are now satisfied
             newly_satisfied_count = 0
-            initially_unsatisfied_count = 0
 
             for j, predicate in enumerate(option):
                 initial_state = initial_states[j]
-                if not initial_state:
-                    initially_unsatisfied_count += 1
-                    # Check if it's now satisfied
-                    if predicate.evaluate():
-                        newly_satisfied_count += 1
+                # Only count progress - predicates that changed from False to True
+                if not initial_state and predicate.evaluate():
+                    newly_satisfied_count += 1
 
-            # Calculate score as proportion of initially unsatisfied predicates that are now satisfied
-            option_score = (
-                newly_satisfied_count / initially_unsatisfied_count if initially_unsatisfied_count > 0 else 0.0
-            )
+            # Calculate score as proportion of newly satisfied predicates over total predicates
+            option_score = newly_satisfied_count / total_predicates if total_predicates > 0 else 0.0
             candidate_q_score.append(option_score)
 
         self.final_q_score = float(np.max(candidate_q_score))
