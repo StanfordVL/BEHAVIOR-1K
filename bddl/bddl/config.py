@@ -21,8 +21,3 @@ def get_definition_filename(behavior_activity, instance, domain=False):
 
 def get_domain_filename(domain_name):
     return os.path.join(ACTIVITY_CONFIGS_PATH, f"domain_{domain_name}.bddl")
-
-
-# MISC
-GROUND_GOALS_MAX_OPTIONS = None  # No limit - generates all combinations
-GROUND_GOALS_MAX_PERMUTATIONS = None  # No limit - generates all permutations
