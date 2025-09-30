@@ -19,14 +19,13 @@ class TaskMetric(MetricBase):
         self.timesteps = 0
         self.render_timestep = og.sim.get_rendering_dt()
 
-        # Calculate initially satisfied predicates for each option
-        self.initial_satisfied_per_option = []
+        # Store the initial state (true/false) of each predicate for each option
+        self.initial_predicate_states = []
         for option in env.task.ground_goal_state_options:
-            initial_satisfied_count = 0
+            option_states = []
             for predicate in option:
-                if predicate.evaluate():
-                    initial_satisfied_count += 1
-            self.initial_satisfied_per_option.append(initial_satisfied_count)
+                option_states.append(predicate.evaluate())
+            self.initial_predicate_states.append(option_states)
 
     def step_callback(self, env):
         self.timesteps += 1
@@ -34,27 +33,26 @@ class TaskMetric(MetricBase):
     def end_callback(self, env):
         candidate_q_score = []
         for i, option in enumerate(env.task.ground_goal_state_options):
-            # Count currently satisfied predicates
-            currently_satisfied_count = 0
-            for predicate in option:
-                if predicate.evaluate():
-                    currently_satisfied_count += 1
+            # Compare current predicate states with initial states
+            initial_states = self.initial_predicate_states[i]
 
-            # Calculate score: newly satisfied predicates / total predicates
-            # Offset by initially satisfied predicates and cap at 0
-            total_predicates = len(option)
-            newly_satisfied = max(0, currently_satisfied_count - self.initial_satisfied_per_option[i])
+            # Count predicates that weren't initially satisfied (these are the ones we need to complete)
+            predicates_to_complete = sum(1 for was_satisfied in initial_states if not was_satisfied)
 
-            # Calculate the partial credit score for this option
-            if total_predicates > 0:
-                # Only count predicates that weren't initially satisfied
-                predicates_to_complete = total_predicates - self.initial_satisfied_per_option[i]
-                if predicates_to_complete > 0:
-                    option_score = newly_satisfied / predicates_to_complete
-                else:
-                    # All predicates were already satisfied initially
-                    option_score = 0.0
+            if predicates_to_complete > 0:
+                # Count predicates that are now satisfied but weren't initially
+                newly_satisfied_count = 0
+                for j, predicate in enumerate(option):
+                    current_state = predicate.evaluate()
+                    initial_state = initial_states[j]
+                    # Only count if it went from False to True
+                    if current_state and not initial_state:
+                        newly_satisfied_count += 1
+
+                # Calculate score as proportion of initially unsatisfied predicates that are now satisfied
+                option_score = newly_satisfied_count / predicates_to_complete
             else:
+                # All predicates were already satisfied initially, no progress to measure
                 option_score = 0.0
 
             candidate_q_score.append(option_score)
