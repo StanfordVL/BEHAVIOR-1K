@@ -10,7 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.utils.asset_utils import get_all_object_category_models, get_avg_category_specs, get_dataset_path
+from omnigibson.utils.asset_utils import check_minimum_behavior_1k_assets_version, get_all_object_category_models, get_avg_category_specs, get_dataset_path
 from omnigibson.utils.constants import (
     DEFAULT_PRISMATIC_JOINT_FRICTION,
     DEFAULT_REVOLUTE_JOINT_FRICTION,
@@ -167,7 +167,17 @@ class DatasetObject(USDObject):
             str: Absolute filepath to the corresponding USD asset file
         """
         dataset_path = get_dataset_path(dataset_name)
-        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usdz")
+
+        # Here, we assert the minimum version of the BEHAVIOR-1K dataset this is compatible with.
+        # This requirement was placed by the fact that we switched from USDZ back to USD due to 
+        # speed and caching issues.
+        if dataset_name == "behavior-1k-assets":
+            assert check_minimum_behavior_1k_assets_version("3.7.2rc1"), \
+                "This version of BEHAVIOR-1K requires at least version 3.7.2rc1 of the behavior-1k-assets dataset! \n" \
+                "Please update your dataset by deleting datasets/behavior-1k-assets and running the below command to reinstall. \n\n" \
+                'python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=True)"'
+
+        return os.path.join(dataset_path, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
         """
