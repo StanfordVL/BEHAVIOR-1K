@@ -116,11 +116,13 @@ class USDObject(StatefulObject):
             # relative paths are relative to the encrypted file and not the decrypted file in the
             # tempdir.
             side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
             def _update_path(asset_path):
                 if ".mdl" in asset_path:
                     # MDL paths are searched for in a different search space, so we don't modify them
                     return asset_path
                 return os.path.join(os.path.dirname(encrypted_filename), asset_path)
+
             lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
             side_stage.Save()
             del side_stage
