@@ -29,6 +29,7 @@ if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+
 def is_dot_file(p):
     """
     Check if a filename starts with a dot.
@@ -400,7 +401,7 @@ def get_behavior_1k_assets_version():
         return (Path(get_dataset_path("behavior-1k-assets")) / "VERSION").read_text().strip()
     except FileNotFoundError:
         return None
-    
+
 
 def check_minimum_behavior_1k_assets_version(min_version_str):
     current_version = get_behavior_1k_assets_version()
@@ -444,7 +445,11 @@ def download_and_unpack_zipped_dataset(dataset_name):
 
     tempdir = tempfile.mkdtemp()
     real_target = get_dataset_path(dataset_name)
-    online_filename = f"behavior-1k-assets-{BEHAVIOR_1K_DATASET_VERSION}.zip" if dataset_name == "behavior-1k-assets" else f"{dataset_name}.zip"
+    online_filename = (
+        f"behavior-1k-assets-{BEHAVIOR_1K_DATASET_VERSION}.zip"
+        if dataset_name == "behavior-1k-assets"
+        else f"{dataset_name}.zip"
+    )
     local_path = hf_hub_download(
         repo_id="behavior-1k/zipped-datasets",
         filename=online_filename,
