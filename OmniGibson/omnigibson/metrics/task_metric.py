@@ -36,25 +36,22 @@ class TaskMetric(MetricBase):
             # Compare current predicate states with initial states
             initial_states = self.initial_predicate_states[i]
 
-            # Count predicates that weren't initially satisfied (these are the ones we need to complete)
-            predicates_to_complete = sum(1 for was_satisfied in initial_states if not was_satisfied)
+            # Count predicates that weren't initially satisfied and are now satisfied
+            newly_satisfied_count = 0
+            initially_unsatisfied_count = 0
 
-            if predicates_to_complete > 0:
-                # Count predicates that are now satisfied but weren't initially
-                newly_satisfied_count = 0
-                for j, predicate in enumerate(option):
-                    current_state = predicate.evaluate()
-                    initial_state = initial_states[j]
-                    # Only count if it went from False to True
-                    if current_state and not initial_state:
+            for j, predicate in enumerate(option):
+                initial_state = initial_states[j]
+                if not initial_state:
+                    initially_unsatisfied_count += 1
+                    # Check if it's now satisfied
+                    if predicate.evaluate():
                         newly_satisfied_count += 1
 
-                # Calculate score as proportion of initially unsatisfied predicates that are now satisfied
-                option_score = newly_satisfied_count / predicates_to_complete
-            else:
-                # All predicates were already satisfied initially, no progress to measure
-                option_score = 0.0
-
+            # Calculate score as proportion of initially unsatisfied predicates that are now satisfied
+            option_score = (
+                newly_satisfied_count / initially_unsatisfied_count if initially_unsatisfied_count > 0 else 0.0
+            )
             candidate_q_score.append(option_score)
 
         self.final_q_score = float(np.max(candidate_q_score))
