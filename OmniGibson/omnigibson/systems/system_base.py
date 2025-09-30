@@ -1049,7 +1049,7 @@ def create_system_from_metadata(system_name):
         has_asset = len(particle_assets) > 0
         if has_asset:
             model = sorted(particle_assets)[0]
-            asset_path = os.path.join(system_dir, model, "usd", f"{model}.usdz")
+            asset_path = os.path.join(system_dir, model, "usd", f"{model}.usd")
         else:
             asset_path = None
 
@@ -1057,7 +1057,7 @@ def create_system_from_metadata(system_name):
             if system_type == "macro_visual_particle":
                 # Fallback to stain asset
                 asset_path = os.path.join(
-                    get_dataset_path("behavior-1k-assets"), "systems", "stain", "ahkjul", "usd", "ahkjul.usdz"
+                    get_dataset_path("behavior-1k-assets"), "systems", "stain", "ahkjul", "usd", "ahkjul.usd"
                 )
                 has_asset = True
         if has_asset:

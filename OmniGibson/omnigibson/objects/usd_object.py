@@ -99,38 +99,29 @@ class USDObject(StatefulObject):
             **kwargs,
         )
 
-    def prebuild(self, stage):
-        # Load the object into the given USD stage
+    def _prepare_to_load(self):
+        """Prepare to load the USD by decrypting, correcting paths, and checking hashes."""
         usd_path = self._usd_path
 
         if self._encrypted:
             # Create a temporary file to store the decrytped asset, load it, and then delete it
-            encrypted_filename = self._usd_path.replace(".usdz", ".usdz.encrypted")
+            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
             self.check_hash(encrypted_filename)
             basename = os.path.basename(self._usd_path)
             tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
-            usdz_path = os.path.join(tempdir_path, f"{basename}.usdz")
-            decrypt_file(encrypted_filename, usdz_path)
+            usd_path = os.path.join(tempdir_path, f"{basename}.usd")
+            decrypt_file(encrypted_filename, usd_path)
 
-            # TODO: Undo this when we switch to Isaac Sim 5.0
-            # On Isaac 4.5, if you add a USDZ reference, the textures don't load correctly.
-            # So for now we unpack the USDZ and load the USD instead.
-            with zipfile.ZipFile(usdz_path, "r") as zip_ref:
-                zip_ref.extractall(tempdir_path)
-            os.unlink(usdz_path)
-
-            # There should be exactly one USD file there now.
-            usd_files = list(glob.glob(os.path.join(tempdir_path, "*.usd")))
-            assert len(usd_files) == 1, f"Expected exactly one USD file in {tempdir_path}, found {usd_files}"
-            usd_path = usd_files[0]
-
-            # Patch the weird MDL 0 prefix issue.
+            # Update the paths of all assets to be the absolute path. This is important because the
+            # relative paths are relative to the encrypted file and not the decrypted file in the
+            # tempdir.
             side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
 
             def _update_path(asset_path):
-                if asset_path.endswith(".mdl"):
-                    return os.path.basename(asset_path)
-                return asset_path
+                if ".mdl" in asset_path:
+                    # MDL paths are searched for in a different search space, so we don't modify them
+                    return asset_path
+                return os.path.join(os.path.dirname(encrypted_filename), asset_path)
 
             lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
             side_stage.Save()
@@ -138,62 +129,20 @@ class USDObject(StatefulObject):
         else:
             self.check_hash(usd_path)
 
-        # object_stage = lazy.pxr.Usd.Stage.Open(usd_path)
-        # root_prim = object_stage.GetDefaultPrim()
+        return usd_path
 
+    def prebuild(self, stage):
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
         prim_path = "/World" + self._relative_prim_path
-
-        # TODO: maybe deep copy the prim tree EXCEPT the visual meshes. How?
+        usd_path = self._prepare_to_load()
         prim = stage.GetPrimAtPath(prim_path)
-        if not prim.IsValid():
-            prim = stage.DefinePrim(prim_path, "Xform")
+        assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
+        prim = stage.DefinePrim(prim_path, "Xform")
         assert prim.GetReferences().AddReference(usd_path)
 
     def _load(self):
-        """
-        Load the object into pybullet and set it to the correct pose
-        """
-        usd_path = self._usd_path
-
-        if self._encrypted:
-            # Create a temporary file to store the decrytped asset, load it, and then delete it
-            encrypted_filename = self._usd_path.replace(".usdz", ".usdz.encrypted")
-            self.check_hash(encrypted_filename)
-            basename = os.path.basename(self._usd_path)
-            tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
-            usdz_path = os.path.join(tempdir_path, f"{basename}.usdz")
-            decrypt_file(encrypted_filename, usdz_path)
-
-            # TODO: Undo this when we switch to Isaac Sim 5.0
-            # On Isaac 4.5, if you add a USDZ reference, the textures don't load correctly.
-            # So for now we unpack the USDZ and load the USD instead.
-            with zipfile.ZipFile(usdz_path, "r") as zip_ref:
-                zip_ref.extractall(tempdir_path)
-            os.unlink(usdz_path)
-
-            # There should be exactly one USD file there now.
-            usd_files = list(glob.glob(os.path.join(tempdir_path, "*.usd")))
-            assert len(usd_files) == 1, f"Expected exactly one USD file in {tempdir_path}, found {usd_files}"
-            usd_path = usd_files[0]
-
-            # Patch the weird MDL 0 prefix issue.
-            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
-
-            def _update_path(asset_path):
-                if asset_path.endswith(".mdl"):
-                    return os.path.basename(asset_path)
-                return asset_path
-
-            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
-            side_stage.Save()
-            del side_stage
-        else:
-            self.check_hash(usd_path)
-
-        prim = add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
-
-        return prim
+        usd_path = self._prepare_to_load()
+        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
 
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs
