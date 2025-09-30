@@ -1625,7 +1625,7 @@ def _load_scene_from_urdf(urdf):
                 continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
-                    ".usdz", ".usdz.encrypted"
+                    ".usd", ".encrypted.usd"
                 )
             ):
                 log.warning("Missing object", obj_name)
