@@ -36,27 +36,15 @@ class TaskMetric(MetricBase):
             self.final_q_score = 1.0
             return
 
-        # Otherwise calculate partial credit based on newly satisfied predicates
-        candidate_q_score = []
-        for i, option in enumerate(env.task.ground_goal_state_options):
-            # Compare current predicate states with initial states
-            initial_states = self.initial_predicate_states[i]
-            total_predicates = len(option)
-
-            # Count predicates that weren't initially satisfied and are now satisfied
-            newly_satisfied_count = 0
-
-            for j, predicate in enumerate(option):
-                initial_state = initial_states[j]
-                # Only count progress - predicates that changed from False to True
-                if not initial_state and predicate.evaluate():
-                    newly_satisfied_count += 1
-
-            # Calculate score as proportion of newly satisfied predicates over total predicates
-            option_score = newly_satisfied_count / total_predicates if total_predicates > 0 else 0.0
-            candidate_q_score.append(option_score)
-
-        self.final_q_score = float(np.max(candidate_q_score))
+        # Otherwise calculate partial credit based on newly satisfied predicates. The partial credit is the maximum progress
+        # made, across any of the groundings, from the initial state of the task.
+        self.final_q_score = max(
+            sum(
+                int(not initially_true and pred.evaluate())
+                for pred, initially_true in zip(option, option_previous_state)
+            ) / len(option)
+            for option, option_previous_state in zip(env.task.ground_goal_state_options, self.initial_predicate_states)
+        )
 
     def gather_results(self):
         return {
