@@ -24,5 +24,5 @@ def get_domain_filename(domain_name):
 
 
 # MISC
-GROUND_GOALS_MAX_OPTIONS = 20
-GROUND_GOALS_MAX_PERMUTATIONS = 10
+GROUND_GOALS_MAX_OPTIONS = None  # No limit - generates all combinations
+GROUND_GOALS_MAX_PERMUTATIONS = None  # No limit - generates all permutations

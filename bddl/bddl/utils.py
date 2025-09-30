@@ -5,69 +5,82 @@ from bddl.config import GROUND_GOALS_MAX_OPTIONS, GROUND_GOALS_MAX_PERMUTATIONS
 
 
 def truncated_product(*sequences, max_options=GROUND_GOALS_MAX_OPTIONS):
-    """Breadth-first search cartesian product 
-       Source: https://stackoverflow.com/questions/42288203/generate-itertools-product-in-different-order
+    """Cartesian product with optional truncation.
 
-    :yields (tuple): elements of cartesian product 
+    If max_options is None, generates all combinations using itertools.product.
+    Otherwise, uses breadth-first search to generate up to max_options combinations.
+
+    :yields (tuple): elements of cartesian product
     """
-    # sequences = tuple(tuple(seq) for seqin sequences)
-    counter = 0
+    # If no limit specified, use regular itertools.product
+    if max_options is None:
+        yield from itertools.product(*sequences)
+    else:
+        # Truncated breadth-first search through combinations
+        counter = 0
 
-    def partitions(n, k):
-        for c in itertools.combinations(range(n + k - 1), k - 1):
-            yield (b - a - 1 for a, b in zip((-1,) + c, c + (n + k -1,)))
+        def partitions(n, k):
+            for c in itertools.combinations(range(n + k - 1), k - 1):
+                yield (b - a - 1 for a, b in zip((-1,) + c, c + (n + k -1,)))
 
-    max_position = [len(i) - 1 for i in sequences]
-    for i in range(sum(max_position)):
-        if counter >= max_options:
-            break 
-        for positions in partitions(i, len(sequences)):
-            try:
-                if counter < max_options:
-                    counter += 1
-                    yield tuple(map(lambda seq, pos: seq[pos], sequences, positions))
-                else: 
-                    break
-            except IndexError:
-                continue
-    # print("next try:", tuple(map(lambda seq, pos: seq[pos], sequences, max_position)))
-    if counter < max_options:
-        counter += 1
-        yield tuple(map(lambda seq, pos: seq[pos], sequences, max_position))
+        max_position = [len(i) - 1 for i in sequences]
+        for i in range(sum(max_position)):
+            if counter >= max_options:
+                break
+            for positions in partitions(i, len(sequences)):
+                try:
+                    if counter < max_options:
+                        counter += 1
+                        yield tuple(map(lambda seq, pos: seq[pos], sequences, positions))
+                    else:
+                        break
+                except IndexError:
+                    continue
+        if counter < max_options:
+            counter += 1
+            yield tuple(map(lambda seq, pos: seq[pos], sequences, max_position))
 
 
 def truncated_permutations(iterable, r=None, max_permutations=GROUND_GOALS_MAX_PERMUTATIONS):
-    """Adapted from https://docs.python.org/3/library/itertools.html#itertools.permutations
-    """
-    pool = tuple(iterable)
-    n = len(pool)
-    r = n if r is None else r 
-    if r > n:
-        return 
-    indices = list(range(n))
-    cycles = list(range(n, n - r, -1))
+    """Permutations with optional truncation.
 
-    counter = 0
-    if counter < max_permutations:
-        counter += 1
-        yield tuple(pool[i] for i in indices[:r])
-    while n:
-        for i in reversed(range(r)):
-            cycles[i] -= 1
-            if cycles[i] == 0:
-                indices[i:] = indices[i + 1:] + indices[i : i + 1]
-                cycles[i] = n - i
-            else:
-                j = cycles[i]
-                indices[i], indices[-j] = indices[-j], indices[i]
-                if counter < max_permutations:
-                    counter += 1
-                    yield tuple(pool[i] for i in indices[:r])
-                else:
-                    return 
-                break
-        else:
+    If max_permutations is None, generates all permutations using itertools.permutations.
+    Otherwise, generates up to max_permutations permutations.
+    """
+    # If no limit specified, use regular itertools.permutations
+    if max_permutations is None:
+        yield from itertools.permutations(iterable, r)
+    else:
+        # Truncated permutation generation
+        pool = tuple(iterable)
+        n = len(pool)
+        r = n if r is None else r
+        if r > n:
             return
+        indices = list(range(n))
+        cycles = list(range(n, n - r, -1))
+
+        counter = 0
+        if counter < max_permutations:
+            counter += 1
+            yield tuple(pool[i] for i in indices[:r])
+        while n:
+            for i in reversed(range(r)):
+                cycles[i] -= 1
+                if cycles[i] == 0:
+                    indices[i:] = indices[i + 1:] + indices[i : i + 1]
+                    cycles[i] = n - i
+                else:
+                    j = cycles[i]
+                    indices[i], indices[-j] = indices[-j], indices[i]
+                    if counter < max_permutations:
+                        counter += 1
+                        yield tuple(pool[i] for i in indices[:r])
+                    else:
+                        return
+                    break
+            else:
+                return
 
 
 ########## CUSTOM ERRORS ############
