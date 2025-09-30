@@ -42,7 +42,8 @@ class TaskMetric(MetricBase):
             sum(
                 int(not initially_true and pred.evaluate())
                 for pred, initially_true in zip(option, option_previous_state)
-            ) / len(option)
+            )
+            / len(option)
             for option, option_previous_state in zip(env.task.ground_goal_state_options, self.initial_predicate_states)
         )
 
