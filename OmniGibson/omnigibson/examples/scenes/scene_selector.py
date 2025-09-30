@@ -31,9 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = {
         "scene": {
             "type": "InteractiveTraversableScene",
-            "scene_model": "ProcTHOR-Val-982",
-            "scene_instance": "ProcTHOR-Val-982_best",
-            "dataset_type": "ai2thor",
+            "scene_model": "Rs_int",
         },
     }
 

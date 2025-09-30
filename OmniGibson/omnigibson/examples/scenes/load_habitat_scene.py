@@ -89,7 +89,7 @@ if __name__ == "__main__":
     else:
         og.launch()
 
-    load_habitat_scene("ai2thor", "/home/cgokmen/Downloads/ProcTHOR-Train-1001.scene_instance.json")
+    load_habitat_scene("ai2thor", "/home/cgokmen/Downloads/ProcTHOR-Val-982.scene_instance.json")
 
     while True:
-        og.sim.render()
+        og.sim.step()

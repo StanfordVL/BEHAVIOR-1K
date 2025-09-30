@@ -15,25 +15,6 @@ import tqdm
 import fpsample
 
 
-def intrinsic_matrix(width, height):
-    """
-    Returns:
-        n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
-            produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
-    """
-    focal_length = 17.0
-    horizontal_aperture = 20.995
-    horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
-    vertical_fov = horizontal_fov * height / width
-
-    fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
-    fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
-    cx = width / 2
-    cy = height / 2
-
-    intrinsic_matrix = np.array([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=np.float32)
-    return intrinsic_matrix
-
 def hdf5_to_colmap(scene_dir):
     images_dir = os.path.join(scene_dir, "images")
     if not os.path.exists(images_dir):
@@ -52,7 +33,6 @@ def hdf5_to_colmap(scene_dir):
         segmentation_data = f['segmentation']  # shape: (TOTAL_IMAGES, HEIGHT, WIDTH), dtype: int32
         
         camera_pose_data = f['camera_pose']       # shape: (TOTAL_IMAGES, 4, 4), dtype: float32
-        # camera_intrinsics_data = f['camera_intrinsics']  # shape: (TOTAL_IMAGES, 3, 3), dtype: float32
 
         # Load the segmentation labels (stored as a JSON string in the file attributes)
         # segmentation_labels = json.loads(f.attrs['segmentation_labels'])
@@ -81,11 +61,7 @@ def hdf5_to_colmap(scene_dir):
         extrinsics = []
         depth_params = {}
 
-        if "camera_intrinsics" in f.attrs:
-            cam_intrinsics = np.array(json.loads(f.attrs["camera_intrinsics"]), dtype=np.float32)[None, :, :]
-        else:
-            # TODO: Remove this temporary fix for bad intrinsics data
-            cam_intrinsics = intrinsic_matrix(rgb_data.shape[2], rgb_data.shape[1])[None, :, :]
+        cam_intrinsics = np.array(json.loads(f.attrs["camera_intrinsics"]), dtype=np.float32)[None, :, :]
 
         # Total number of desired points
         MAX_POINTS = 1000000
@@ -98,7 +74,6 @@ def hdf5_to_colmap(scene_dir):
             depth = depth_data[i]
             seg = segmentation_data[i]
             cam_pose = camera_pose_data[i]
-            # cam_intrinsics = camera_intrinsics_data[i]
             cam_pos, cam_orn = T.mat2pose(torch.tensor(cam_pose))
 
             # Generate point cloud
