@@ -21,8 +21,7 @@ class TaskMetric(MetricBase):
 
         # Store the initial state (true/false) of each predicate for each option
         self.initial_predicate_states = [
-            [pred.evaluate() for pred in option]
-            for option in env.task.ground_goal_state_options
+            [pred.evaluate() for pred in option] for option in env.task.ground_goal_state_options
         ]
 
     def step_callback(self, env):
