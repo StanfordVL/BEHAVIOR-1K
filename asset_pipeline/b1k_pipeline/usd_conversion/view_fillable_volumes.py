@@ -736,7 +736,7 @@ def main():
     ]
 
     for cat, mdl in tqdm.tqdm(fillables):
-        if not os.path.exists(DatasetObject.get_usd_path(cat, mdl).replace(".usdz", ".usdz.encrypted")):
+        if not os.path.exists(DatasetObject.get_usd_path(cat, mdl).replace(".usd", ".usd.encrypted")):
             print(f"Skipping {cat}/{mdl} because it does not exist")
             continue
         view_object(cat, mdl)

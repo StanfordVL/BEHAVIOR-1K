@@ -894,7 +894,7 @@ class BatchQAViewer:
             has_valid_model = False
             for model in batch:
                 usd_path = DatasetObject.get_usd_path(category=category, model=model)
-                usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
+                usd_path = usd_path.replace(".usd", ".usd.encrypted")
                 with decrypted(usd_path) as fpath:
                     stage = lazy.pxr.Usd.Stage.Open(fpath)
                     prim = stage.GetDefaultPrim()
