@@ -15,7 +15,9 @@ def check_progress(env, check_specs):
         if check_type == "near":
             # ("near", obj1_key, obj2_key)
             obj1, obj2 = objs[spec[1]].unwrapped, objs[spec[2]].unwrapped
-            dist = th.linalg.norm(obj1.get_position_orientation()[0] - obj2.get_position_orientation()[0])
+            pos1, pos2 = obj1.get_position_orientation()[0], obj2.get_position_orientation()[0]
+            # Only consider x and y coordinates (horizontal distance)
+            dist = th.linalg.norm(pos1[:2] - pos2[:2])
             results[name] = bool(dist < ROBOT_OBJECT_DISTANCE_THRESHOLD)
 
         elif check_type == "state":
