@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Objects{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        dom: 'Bfrtip',
+        buttons: ['csv'],
+        paging: false,
+        searchPanes: {
+            viewTotal: true,
+            columns: [2, 3]
+        },
+        columnDefs: [
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Matched',
+                  value: function(rowData, rowIdx) {return rowData[2] !== "";}
+                },
+                {
+                  label: 'Unmatched',
+                  value: function(rowData, rowIdx) {return rowData[2] === "";}
+                },
+              ]
+            },
+            targets: [2]
+          },
+        ],
+      });
+      table.searchPanes.container().prependTo(table.table().container());
+      table.searchPanes.resizePanes();
+  });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Objects{% endif %}</h1>
+  <h4 class="text-center">Total count: {{ object_list | length }}</h4>
+  <br>
+  {% from "table_modules/object_table.html" import render_object_table %}
+  {{ render_object_table(object_list) }}
+{% endblock %}

@@ -48,7 +48,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 break
 
     # Always close the environment at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

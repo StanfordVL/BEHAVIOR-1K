@@ -345,6 +345,8 @@ class CollisionGeomPrim(GeomPrim):
             # Set the approximation to be convex hull by default
             self.set_collision_approximation(approximation_type="convexHull")
 
+        self.collision_enabled = not gm.VISUAL_ONLY
+
     @property
     def collision_enabled(self):
         """

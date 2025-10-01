@@ -87,7 +87,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Let apple settle
     for _ in range(50):
-        env.step(th.empty(0))
+        env.step([])
 
     knife.keep_still()
     knife.set_position_orientation(
@@ -100,13 +100,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Step simulation for a bit so that apple is diced
     for _ in range(1000):
-        env.step(th.empty(0))
+        env.step([])
 
     if not short_exec:
         input("Apple has been diced! Press [ENTER] to terminate the demo.")
 
     # Always close simulator at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

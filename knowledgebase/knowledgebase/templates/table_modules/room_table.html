@@ -1,0 +1,46 @@
+{% macro render_room_table(rooms, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Room Name</th>
+      <th>Objects</th>
+      <th>Object Counts</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for room in rooms|sort %}
+    <tr>
+      <td>{{ room.name }}</td>
+      <td>
+        {% for roomobject in room.roomobjects %}
+          <a href="{{ url_for('object_detail', name=roomobject.object.name) }}">{{ roomobject.object }}</a><br>
+        {% endfor %}
+      </td>
+      <td>
+        {% for roomobject in room.roomobjects %}
+          {{ roomobject.count }}<br>
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true
+      }
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

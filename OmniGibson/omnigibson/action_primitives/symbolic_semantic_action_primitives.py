@@ -6,6 +6,7 @@ objects directly into their post-condition states. Useful for learning high-leve
 
 import torch as th
 from aenum import IntEnum, auto
+from typing import Any
 
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
@@ -59,7 +60,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             SymbolicSemanticActionPrimitiveSet.RELEASE: self._release,
         }
 
-    def apply_ref(self, primitive, *args, attempts=3):
+    def apply_ref(self, primitive, *args: Any, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 

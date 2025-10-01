@@ -1,6 +1,5 @@
-import math
-
 import gymnasium as gym
+import numpy as np
 import torch as th
 
 import omnigibson as og
@@ -50,11 +49,11 @@ class VisionSensor(BaseSensor):
     Args:
         relative_prim_path (str): Scene-local prim path of the Sensor to encapsulate or create.
         name (str): Name for the object. Names need to be unique per scene.
-        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb".
-        Otherwise, valid options should be part of cls.all_modalities.
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "rgb". "all" will enable all
+            Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
                 {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
-                bbox_2d_loose, bbox_3d, camera}
+                bbox_2d_loose, bbox_3d, camera_params}
         enabled (bool): Whether this sensor should be enabled by default
         noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -83,6 +82,7 @@ class VisionSensor(BaseSensor):
         "bbox_2d_loose",
         "bbox_3d",
         "camera_params",
+        "pointcloud",
     )
 
     # Documentation for the different types of segmentation for particle systems:
@@ -165,13 +165,17 @@ class VisionSensor(BaseSensor):
             bbox_2d_loose="bounding_box_2d_loose",
             bbox_3d="bounding_box_3d",
             camera_params="camera_params",
+            pointcloud="pointcloud",
         )
 
         assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(
             self.all_modalities
         ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
 
-        modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
+        if modalities == "all":
+            modalities = self.all_modalities
+        else:
+            modalities = set([modalities]) if isinstance(modalities, str) else set(modalities)
 
         # 1) seg_instance and seg_instance_id require seg_semantic to be enabled (for rendering particle systems)
         # 2) bounding box observations require seg_semantic to be enabled (for remapping bounding box semantic IDs)
@@ -305,8 +309,20 @@ class VisionSensor(BaseSensor):
         for modality in reordered_modalities:
             raw_obs = self._annotators[modality].get_data(device=og.sim.device)
 
-            # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
-            obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
+            if modality == "pointcloud":
+                # Pointcloud is a special case where we need to concatenate the point xyz coordinates with the rgb values
+                # Note: rgb values are in the range of [0, 255], xyz is in world frame
+                concatenated = np.concatenate([raw_obs["pointRgb"][:, :3], raw_obs["data"]], axis=1)
+                # Pad to match gym space dimensions (self.image_height * self.image_width)
+                target_rows = self.image_height * self.image_width
+                if concatenated.shape[0] < target_rows:
+                    pad_width = ((0, target_rows - concatenated.shape[0]), (0, 0))
+                    obs[modality] = np.pad(concatenated, pad_width, mode="constant", constant_values=0)
+                else:
+                    obs[modality] = concatenated
+            else:
+                # Obs is either a dictionary of {"data":, ..., "info": ...} or a direct array
+                obs[modality] = raw_obs["data"] if isinstance(raw_obs, dict) else raw_obs
 
             if og.sim.device == "cpu":
                 obs[modality] = self._preprocess_cpu_obs(obs[modality], modality)
@@ -322,7 +338,7 @@ class VisionSensor(BaseSensor):
     def _preprocess_cpu_obs(self, obs, modality):
         # All segmentation modalities return uint32 numpy arrays on cpu, but PyTorch doesn't support it
         if "seg_" in modality:
-            obs = obs.astype(NumpyTypes.INT32)
+            obs = obs.astype(NumpyTypes.INT64)  # Convert to int64 first to avoid overflow
         return th.from_numpy(obs) if "bbox_" not in modality else obs
 
     def _preprocess_gpu_obs(self, obs, modality):
@@ -651,10 +667,9 @@ class VisionSensor(BaseSensor):
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
-            # Requires 3 render updates for camera params annotator to decome active
+            # Requires 3 render updates for camera params annotator to become active
             for _ in range(3):
                 render()
-
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
 
@@ -871,19 +886,14 @@ class VisionSensor(BaseSensor):
             n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
                 produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
         """
-        focal_length = self.camera_parameters["cameraFocalLength"]
+        P = self.camera_parameters["cameraProjection"].reshape(4, 4)
         width, height = self.camera_parameters["renderProductResolution"]
-        horizontal_aperture = self.camera_parameters["cameraAperture"][0]
-        horizontal_fov = 2 * math.atan(horizontal_aperture / (2 * focal_length))
-        vertical_fov = horizontal_fov * height / width
-
-        fx = (width / 2.0) / math.tan(horizontal_fov / 2.0)
-        fy = (height / 2.0) / math.tan(vertical_fov / 2.0)
-        cx = width / 2
-        cy = height / 2
-
-        intrinsic_matrix = th.tensor([[fx, 0.0, cx], [0.0, fy, cy], [0.0, 0.0, 1.0]], dtype=th.float)
-        return intrinsic_matrix
+        fx = P[0, 0] * width / 2.0
+        fy = P[1, 1] * height / 2.0
+        cx = (1.0 - P[0, 2]) * width / 2.0
+        cy = (1.0 - P[1, 2]) * height / 2.0
+        K = th.tensor([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+        return K
 
     @property
     def _obs_space_mapping(self):
@@ -932,6 +942,7 @@ class VisionSensor(BaseSensor):
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,
+            pointcloud=((self.image_height * self.image_width, 6), -float("inf"), float("inf"), NumpyTypes.FLOAT32),
         )
 
         return obs_space_mapping

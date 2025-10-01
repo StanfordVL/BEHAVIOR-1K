@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>{% block title %} {% endblock %}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha384-tsQFqpEReu7ZLhBV2VZlAu7zcOV+rXbYlF2cqB8txI/8aZajjp4Bqd+V6D5IgvKT" crossorigin="anonymous"></script>    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.14.7/dist/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    
+    {#
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/searchpanes/2.1.2/js/dataTables.searchPanes.min.js"></script>
+    <script src="https://cdn.datatables.net/searchpanes/2.1.2/js/searchPanes.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/select/1.6.2/js/dataTables.select.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/searchpanes/2.1.2/css/searchPanes.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/select/1.6.2/css/select.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.3.6/css/buttons.dataTables.min.css">
+    #}
+
+    <!-- Stuff that powers the search bar -->
+    <style>
+    #search-results {
+      top: 100%;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid rgba(0,0,0,.125);
+      border-radius: .25rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,.2);
+      z-index: 1000;
+    }
+    
+    .search-result-item {
+      padding: .75rem 1rem;
+      border-bottom: 1px solid rgba(0,0,0,.125);
+      cursor: pointer;
+    }
+    
+    .search-result-item:last-child {
+      border-bottom: none;
+    }
+    
+    .search-result-item:hover {
+      background-color: #f8f9fa;
+    }
+    
+    .highlight {
+      background-color: #fff3cd;
+      padding: 0 2px;
+    }
+    </style>
+    <script>
+      // Wait for the DOM to be ready
+      $(document).ready(function() {
+        // First, load Fuse.js for fuzzy search
+        const fusejsScript = document.createElement('script');
+        fusejsScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js';
+        document.head.appendChild(fusejsScript);
+      
+        fusejsScript.onload = () => {
+          let searchData = [];
+          let fuse; // Declare fuse here
+      
+          const searchInput = $('#search-input');
+          const searchResults = $('#search-results');
+      
+          // Load the search data
+          $.getJSON("{{ url_for('searchable_items_list') }}", function(data) {
+            console.log("Search data loaded."); // Good for debugging
+            searchData = data;
+            // Initialize Fuse.js *after* data is loaded
+            fuse = new Fuse(searchData, {
+              keys: ['title'],
+              // includeScore: true, // Optional: useful for debugging relevance
+              // threshold: 0.4,   // Optional: adjust sensitivity
+            });
+            console.log("Fuse.js initialized."); // Good for debugging
+      
+            // --- Attach listeners ONLY after fuse is ready ---
+      
+            // Handle input changes to show results
+            searchInput.on('input', function() {
+              const query = $(this).val().trim();
+      
+              if (query.length < 2) {
+                searchResults.addClass('d-none');
+                return;
+              }
+      
+              // Ensure fuse is actually initialized
+              if (!fuse) {
+                  console.warn("Fuse not ready yet during input.");
+                  searchResults.addClass('d-none');
+                  return;
+              }
+      
+              const results = fuse.search(query).slice(0, 20); // Limit to 20 results
+              // console.log("Search results:", results); // Uncomment for debugging
+      
+              if (results.length > 0) {
+                searchResults.html(results.map(result => `
+                  <div class="search-result-item" data-url="${result.item.url}">
+                    <div style="font-weight: bold; font-size: small; color: darkgray;">${result.item.type}</div>
+                    <div style="font-size: small;">${highlightText(result.item.title, query)}</div>
+                  </div>
+                `).join('')).removeClass('d-none');
+              } else {
+                searchResults.html('<div class="search-result-item">No results found</div>').removeClass('d-none');
+              }
+            });
+      
+            // **** NEW: Handle 'Enter' key press in search input ****
+            searchInput.on('keydown', function(event) {
+                // Check if the pressed key is Enter (key code 13 or key 'Enter')
+                if (event.key === 'Enter' || event.keyCode === 13) {
+                    event.preventDefault(); // Prevent default form submission or other Enter behavior
+      
+                    // Check if results are visible and there's at least one actual result item
+                    if (!searchResults.hasClass('d-none') && searchResults.find('.search-result-item[data-url]').length > 0) {
+                        // Find the very first result item that has a data-url attribute
+                        const firstResult = searchResults.find('.search-result-item[data-url]:first');
+                        const url = firstResult.data('url');
+      
+                        if (url) {
+                            console.log("Enter pressed, navigating to first result:", url);
+                            window.location.href = url; // Navigate to the URL
+                        }
+                    } else {
+                        console.log("Enter pressed, but no results visible or available to navigate to.");
+                    }
+                }
+            });
+            // **** END NEW SECTION ****
+      
+      
+            // Handle click on search result item
+            searchResults.on('click', '.search-result-item', function() {
+              // Only navigate if the item has a URL (ignores "No results found")
+              const url = $(this).data('url');
+              if (url) {
+                window.location.href = url;
+              }
+            });
+      
+            // --- End of listeners attached after fuse is ready ---
+      
+          }).fail(function(jqXHR, textStatus, errorThrown) {
+              // Handle potential errors loading the search data
+              console.error("Failed to load search data:", textStatus, errorThrown);
+              searchInput.prop('placeholder', 'Search unavailable');
+              searchInput.prop('disabled', true);
+          });
+      
+          // Close results when clicking outside
+          $(document).on('click', function(e) {
+            // Check if the click is outside the search input AND outside the search results
+            if (!$(e.target).closest('#search-input').length && !$(e.target).closest('#search-results').length) {
+              searchResults.addClass('d-none');
+            }
+          });
+      
+          // Highlight matching text
+          function highlightText(text, query) {
+            if (!query) return text;
+            // Escape special characters in the query for regex
+            const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+            const regex = new RegExp(`(${escapedQuery})`, 'gi');
+            return text.replace(regex, '<span class="highlight">$1</span>');
+          }
+        };
+      
+        fusejsScript.onerror = () => {
+            // Handle potential errors loading Fuse.js
+            console.error("Failed to load Fuse.js script.");
+            $('#search-input').prop('placeholder', 'Search unavailable');
+            $('#search-input').prop('disabled', true);
+        };
+      }); // End of $(document).ready
+    </script>
+
+    <!-- Stuff that powers the mermaid diagrams -->
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ startOnLoad: false });
+      import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
+      window.addEventListener('load', function () {
+        mermaid.run();
+        var svgs = d3.selectAll(".mermaid svg");
+        svgs.each(function() {
+          var svg = d3.select(this);
+          svg.html("<g>" + svg.html() + "</g>");
+          var inner = svg.select("g");
+          var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+          });
+          svg.call(zoom);
+        });
+      });
+    </script>
+    <style type="text/css">
+      .mermaid>svg {
+        width: 100%;
+        aspect-ratio: 1.0;
+      }
+    </style>
+    {% block customstyle %}{% endblock %}
+  </head>
+  <body>
+    <nav class="navbar navbar-static-top navbar-expand-lg navbar-dark bg-dark">
+      <div class="container">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+          <img src="https://behavior.stanford.edu/assets/behavior_logo3.png" height="30" alt="BEHAVIOR Logo">
+        </a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('task_list') }}">Tasks</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('synset_list') }}">Synsets</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('object_list') }}">Objects</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('category_list') }}">Categories</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('scene_list') }}">Scenes</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('transition_rule_list') }}">Transitions</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('attachment_pair_list') }}">Attachments</a>
+            </li>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                Misc
+              </a>
+              <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                <a class="dropdown-item" href="{{ url_for('profile_plot_view') }}">Profile Plot</a>
+                <a class="dropdown-item" href="{{ url_for('profile_badge_view') }}">Profile Badge</a>
+                <a class="dropdown-item" href="{{ url_for('challenge_tasks') }}">Chl. Task List</a>
+              </div>
+            </li>
+          </ul>
+          <form class="form-inline my-2 my-lg-0 position-relative ml-auto d-flex align-items-center">
+            <input id="search-input" class="form-control mr-sm-2" type="search" placeholder="Search" aria-label="Search">
+            <div id="search-results" class="position-absolute w-100 mt-1 d-none">
+              <!-- Results will be populated here -->
+            </div>
+          </form>
+        </div>
+      </div>
+    </nav>
+    <div class="container-fluid mt-4">
+      {% block content %}{% endblock %}
+    </div>
+    {% block customscript %}{% endblock %}
+  </body>
+</html>

@@ -8,7 +8,7 @@ from omnigibson.utils.ui_utils import choose_from_options
 
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.USE_GPU_DYNAMICS = True
+gm.USE_GPU_DYNAMICS = False
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -30,12 +30,18 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Load the pre-selected configuration and set the online_sampling flag
-    config_filename = os.path.join(og.example_config_path, "fetch_behavior.yaml")
+    config_filename = os.path.join(og.example_config_path, "r1pro_behavior.yaml")
     cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     cfg["task"]["online_object_sampling"] = should_sample
+    cfg["task"]["use_presampled_robot_pose"] = not should_sample
 
     # Load the environment
     env = og.Environment(configs=cfg)
+
+    # Move camera to a good position
+    og.sim.viewer_camera.set_position_orientation(
+        position=[1.6, 6.15, 1.5], orientation=[-0.2322, 0.5895, 0.7199, -0.2835]
+    )
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
@@ -46,14 +52,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         og.log.info("Resetting environment")
         env.reset()
         for i in range(100):
-            action = env.action_space.sample()
-            state, reward, terminated, truncated, info = env.step(action)
+            action = env.robots[0].action_space.sample()
+            state, reward, terminated, truncated, info = env.step(action * 0.1)
             if terminated or truncated:
                 og.log.info("Episode finished after {} timesteps".format(i + 1))
                 break
 
     # Always close the environment at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

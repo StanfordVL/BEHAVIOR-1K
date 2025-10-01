@@ -1,0 +1,22 @@
+{% macro render_complaint_table(complaints, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Complaint Type</th>
+      <th>Complaint Object</th>
+      <th>Complaint Prompt</th>
+      <th>Complaint Message</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for complaint in complaints %}
+    <tr>
+      <td><a href="{{ url_for('complaint_type_detail', name=complaint.complaint_type.name) }}">{{ complaint.complaint_type.name }}</a></td>
+      <td><a href="{{ url_for('object_detail', name=complaint.object.name) }}">{{ complaint.object }}</a></td>
+      <td>{{ complaint.prompt_additional_info }}</td>
+      <td>{{ complaint.response }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}

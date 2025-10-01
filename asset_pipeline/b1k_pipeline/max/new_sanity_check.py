@@ -3,6 +3,7 @@
 
 import csv
 import functools
+import re
 import sys
 import time
 
@@ -145,6 +146,8 @@ def get_providers():
         / "pipeline"
         / "object_inventory.json"
     )
+    if not inventory_path.exists():
+        return None
     with open(inventory_path, "r") as f:
         return {k.split("-")[-1]: v for k, v in json.load(f)["providers"].items()}
 
@@ -171,7 +174,11 @@ class SanityCheck:
     def __init__(self):
         self.reset()
         self._existing_categories, self._approved_categories = get_approved_categories()
-        self._providers = get_providers()
+
+        self.providers = get_providers()
+        if self.providers is None:
+            self.expect(False, "Could not load providers because inventory file is missing. The provider-related errors you see may or may not be accurate. When run as part of the pipeline, this error will resolve, but other new errors may show up.")
+            self.providers = {}
 
     def expect(self, condition, message, level="ERROR"):
         if not condition:
@@ -253,7 +260,7 @@ class SanityCheck:
 
     def get_recorded_vertex_and_face_count(self, model_id):
         # Look the provider up from the inventory file
-        provider = self._providers.get(model_id, None)
+        provider = self.providers.get(model_id, None)
         self.expect(
             provider is not None,
             f"{model_id} has no provider in the inventory file.",
@@ -270,6 +277,12 @@ class SanityCheck:
             / "artifacts"
             / "object_list.json"
         )
+        if not object_list.exists():
+            self.expect(
+                False,
+                f"Cannot find object list file for provider {provider}. When run as part of the pipeline, this error will resolve, but other new errors may show up.",
+            )
+            return
         with open(object_list, "r") as f:
             object_list_data = json.load(f)
         vertex_and_face_counts = object_list_data["mesh_fingerprints"]
@@ -1196,6 +1209,18 @@ class SanityCheck:
 
     def run(self):
         self.reset()
+
+        # current_path = pathlib.Path(rt.maxFilePath).resolve() / rt.maxFileName
+        # try:
+        #     cad_path = b1k_pipeline.utils.PIPELINE_ROOT / "cad"
+        #     path_relative_to_cad = current_path.relative_to(cad_path)
+        #     self.expect(path_relative_to_cad.parts[0] in ('scenes', 'objects'), f"Cad file should be in 'scenes' or 'objects' directory, not in {path_relative_to_cad.parts[0]}.")
+        #     directory = path_relative_to_cad.parts[1]
+        #     self.expect(re.fullmatch(r"^[a-z0-9_]+-[a-z0-9]{2}$", directory), f"Cad file should be in a directory with lowercase alphanumeric characters and a two-character suffix, not {directory}.")
+        #     self.expect(path_relative_to_cad.name == "processed.max", f"Cad file should be called processed.max, not {path_relative_to_cad.name}.")
+        #     self.expect(len(path_relative_to_cad.parts) == 3, f"Cad file should be directly in the target directory, not {len(path_relative_to_cad.parts)}. Expected format: scenes/[target]/processed.max")
+        # except ValueError:
+        #     self.expect(False, f"The cad file should be placed under the BEHAVIOR_1K/asset_pipeline/cad directory, within one of the scenes/ or objects/ directories, in a subdirectory named with lowercase alphanumeric characters and a two-character suffix, and named processed.max. Current path: {current_path}")
 
         self.expect(rt.units.systemScale == 1, "System scale not set to 1mm.")
 

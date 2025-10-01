@@ -15,7 +15,7 @@ import tqdm
 
 from b1k_pipeline.utils import ParallelZipFS, PipelineFS, TMP_DIR
 
-WORKER_COUNT = 2
+WORKER_COUNT = 6
 BATCH_SIZE = 64
 MAX_TIME_PER_PROCESS = 5 * 60  # 5 minutes
 

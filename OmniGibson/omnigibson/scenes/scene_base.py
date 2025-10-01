@@ -15,7 +15,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import m as robot_macros
+from omnigibson.robots.robot_base import REGISTERED_ROBOTS, m as robot_macros
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -27,6 +27,7 @@ from omnigibson.systems.system_base import (
     get_all_system_names,
 )
 from omnigibson.transition_rules import TransitionRuleAPI
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.config_utils import TorchEncoder
 from omnigibson.utils.constants import STRUCTURAL_DOOR_CATEGORIES
 from omnigibson.utils.python_utils import (
@@ -37,7 +38,6 @@ from omnigibson.utils.python_utils import (
     create_object_from_init_info,
     get_uuid,
     recursively_convert_to_torch,
-    torch_compile,
 )
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
@@ -66,6 +66,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         floor_plane_visible=True,
         floor_plane_color=(1.0, 1.0, 1.0),
         use_skybox=True,
+        include_robots=True,
     ):
         """
         Args:
@@ -77,6 +78,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
                 to the generated floor plane
             use_skybox (bool): whether to load a skybox into the simulator
+            include_robots (bool): whether to also include the robot(s) defined in the scene
         """
         # Store internal variables
         self.scene_file = scene_file
@@ -95,6 +97,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._available_systems = None
         self._pose_info = None
         self._updated_state_objects = None
+        self._include_robots = include_robots
+        self._task_metadata = {}
 
         # Call super init
         super().__init__()
@@ -136,6 +140,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 # Create object class instance
                 obj = create_object_from_init_info(obj_info)
                 self._init_objs[obj_name] = obj
+
+            # Store presampled robot poses from metadata
+            for key, data in task_metadata.items():
+                self.write_task_metadata(key=key, data=data)
 
     @property
     def registry(self):
@@ -310,7 +318,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         pass
 
     def _load_systems(self):
-        system_dir = os.path.join(gm.DATASET_PATH, "systems")
+        system_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "systems")
 
         available_systems = (
             {
@@ -404,14 +412,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Write the metadata
         for key, data in scene_info.get("metadata", dict()).items():
-            self.write_metadata(key=key, data=data)
+            self.write_task_metadata(key=key, data=data)
 
     def _should_load_object(self, obj_info, task_metadata):
         """
         Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
         objects based on, e.g., their category, size, etc.
 
-        Subclasses can implement additional logic. By default, this returns True
+        By default, this checks whether robot should be loaded.
+        Subclasses should call super and implement additional logic.
 
         Args:
             obj_info (dict): Dictionary of object kwargs that will be used to load the object
@@ -419,7 +428,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             bool: Whether this object should be loaded or not
         """
-        return True
+        # Check whether this is an agent and we allow agents
+        return self._include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
     def load(self, idx, **kwargs):
         """
@@ -756,15 +766,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                     "version": omnigibson.utils.asset_utils.get_bddl_version(),
                     "git_hash": omnigibson.utils.asset_utils.get_bddl_git_hash(),
                 },
-                "og_dataset": {
-                    "version": omnigibson.utils.asset_utils.get_og_dataset_version(),
+                "behavior-1k-assets": {
+                    "version": omnigibson.utils.asset_utils.get_behavior_1k_assets_version(),
                 },
-                "assets": {
-                    "version": omnigibson.utils.asset_utils.get_asset_version(),
-                    "git_hash": omnigibson.utils.asset_utils.get_asset_git_hash(),
+                "omnigibson-robot-assets": {
+                    "version": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_version(),
+                    "git_hash": omnigibson.utils.asset_utils.get_omnigibson_robot_asset_git_hash(),
                 },
             },
-            "metadata": self._scene_prim.prim.GetCustomData(),
+            "metadata": self._task_metadata,
             "state": self.dump_state(serialized=False),
             "init_info": self.get_init_info(),
             "objects_info": self.get_objects_info(),
@@ -807,6 +817,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # The saved state are lists, convert them to torch tensors
         state = recursively_convert_to_torch(scene_info["state"])
 
+        # Recover metadata
+        for key, data in scene_info.get("metadata", dict()).items():
+            self.write_task_metadata(key=key, data=data)
+
         # Make sure the class type is the same
         if self.__class__.__name__ != init_info["class_name"]:
             log.error(
@@ -847,24 +861,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if update_initial_file:
             self.update_initial_file(scene_file=scene_file)
 
-    def write_metadata(self, key, data):
-        """
-        Writes metadata @data to the current global metadata dict using key @key
+    def get_task_metadata(self, key):
+        return self._task_metadata.get(key, None)
 
-        Args:
-            key (str): Keyword entry in the global metadata dictionary to use
-            data (dict): Data to write to @key in the global metadata dictionary
-        """
-        self._scene_prim.prim.SetCustomDataByKey(key, data)
-
-    def get_metadata(self, key):
-        """
-        Grabs metadata from the current global metadata dict using key @key
-
-        Args:
-            key (str): Keyword entry in the global metadata dictionary to use
-        """
-        return self._scene_prim.prim.GetCustomDataByKey(key)
+    def write_task_metadata(self, key, data):
+        self._task_metadata[key] = data
 
     def get_position_orientation(self):
         """
@@ -1085,7 +1086,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the height of the given floor. Default is 0.0, since we only have a single floor
 
         Args:
-            floor: an integer identifying the floor
+            floor (int): an integer identifying the floor
 
         Returns:
             int: height of the given floor

@@ -82,15 +82,15 @@ def main():
             script_name = entrypoint.replace(".py", "")
             script_human_readable_name = script_name.replace("_", " ").title()
 
-            # Check if it already exists
-            existing_menu_items_with_name = [x for x in range(subMenu.numItems()) if subMenu.getItem(x + 1).getTitle() == script_human_readable_name]
-            if existing_menu_items_with_name:
-                continue
-
             # Create the script
             entrypoint_fullname = str((this_dir / entrypoint).absolute())
             script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
             rt.macros.new("SVL_Tools", script_name, tooltip, script_human_readable_name, script)
+
+            # Check if it already exists
+            existing_menu_items_with_name = [x for x in range(subMenu.numItems()) if subMenu.getItem(x + 1).getTitle() == script_human_readable_name]
+            if existing_menu_items_with_name:
+                continue
 
             # Create a menu item that calls the sample macroScript
             actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")

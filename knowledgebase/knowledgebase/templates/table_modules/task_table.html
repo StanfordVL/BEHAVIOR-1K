@@ -1,0 +1,95 @@
+{% macro render_task_table(tasks, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Task Name</th>
+      <th>Synsets</th>
+      <th>Matched Scenes</th>
+      <th>Predicates</th>
+      <th>Required Features</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for task in tasks|sort %}
+    <tr>
+      <td><a href="{{ url_for('task_detail', name=task.name) }}">{{ task.name }}</a></td>
+      <td class="bg-{{- task.synset_state|tocolor -}}">
+        {% for synset in task.synsets %}
+          {{ synset.name }}, 
+        {% endfor %}
+      </td>
+      <td>
+        {% for scene, state in task.scene_matching_dict.items() %}
+          {% if state.matched %}
+            <span class="text-success">{{ scene.name }},</span>
+          {% endif %}
+        {% endfor %}
+      </td>
+      <td>
+        {% for predicate in task.uses_predicates %}
+          {{ predicate.name }}, 
+        {% endfor %}
+      </td>
+      <td>
+        {% if task.uses_transition %}transition, {% endif %}
+        {% if task.uses_visual_substance %}visual substance, {% endif %}
+        {% if task.uses_physical_substance %}physical substance, {% endif %}
+        {% if task.uses_attachment %}attachment, {% endif %}
+        {% if task.uses_cloth %}cloth, {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [1, 2, 3, 4]
+      },
+      columnDefs: [
+        {
+          searchPanes: {
+            options: [
+              {
+                label: 'Ready',
+                value: function(rowData, rowIdx) {return rowData[1] === "";}
+              },
+              {
+                label: 'Not Ready',
+                value: function(rowData, rowIdx) {return rowData[1] !== "";}
+              },
+            ]
+          },
+          targets: [1]
+        },
+        {
+          searchPanes: {
+            options: [
+              {
+                label: 'Required',
+                value: function(rowData, rowIdx) {return rowData[3] !== "";}
+              },
+              {
+                label: 'Not Required',
+                value: function(rowData, rowIdx) {return rowData[3] === "";}
+              },
+            ]
+          },
+          targets: [3]
+        },
+      ],
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

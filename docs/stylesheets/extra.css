@@ -1,0 +1,29 @@
+:root {
+    --md-admonition-icon--code: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc.--><path d="M392.8 1.2c-17-4.9-34.7 5-39.6 22l-128 448c-4.9 17 5 34.7 22 39.6s34.7-5 39.6-22l128-448c4.9-17-5-34.7-22-39.6zm80.6 120.1c-12.5 12.5-12.5 32.8 0 45.3l89.3 89.4-89.4 89.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0l112-112c12.5-12.5 12.5-32.8 0-45.3l-112-112c-12.5-12.5-32.8-12.5-45.3 0zm-306.7 0c-12.5-12.5-32.8-12.5-45.3 0l-112 112c-12.5 12.5-12.5 32.8 0 45.3l112 112c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L77.3 256l89.4-89.4c12.5-12.5 12.5-32.8 0-45.3z"/></svg>')
+}
+.md-typeset .admonition.code,
+.md-typeset details.code {
+    border-color: rgb(134, 130, 245);
+}
+.md-typeset .code > .admonition-title,
+.md-typeset .code > summary {
+    background-color: rgba(134, 130, 245, 0.1);
+}
+.md-typeset .code > .admonition-title::before,
+.md-typeset .code > summary::before {
+    background-color: rgb(134, 130, 245);
+    -webkit-mask-image: var(--md-admonition-icon--code);
+    mask-image: var(--md-admonition-icon--code);
+}
+
+/* Make the 2025 BEHAVIOR Challenge navigation item bold and golden */
+.md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
+    font-weight: bold !important;
+    color: #B8860B !important;
+}
+
+/* Add spacing between FontAwesome icons and text in navigation */
+.md-nav__item i[class*="fa-"], 
+.md-tabs__item i[class*="fa-"] {
+    margin-right: 8px;
+}

@@ -50,7 +50,7 @@ stages:
       - cad/${item}/processed.max
       - b1k_pipeline/max/new_sanity_check.py
       - artifacts/pipeline/object_list.success
-      # - artifacts/pipeline/object_inventory.json
+      - artifacts/pipeline/object_inventory.json
       outs:
       - cad/${item}/artifacts/sanitycheck.json
 
@@ -268,6 +268,15 @@ stages:
   #   - b1k_pipeline/check_success.py
   #   outs:
   #   - artifacts/pipeline/validate_scenes.success
+
+  export_glbs:
+    cmd: 'python -m b1k_pipeline.export_glbs'
+    deps:
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_objs.success
+    - b1k_pipeline/export_glbs.py
+    outs:
+    - artifacts/parallels/objects_glb.zip
 
   usdify_objects:
     cmd: 'python -m b1k_pipeline.usd_conversion.usdify_objects'

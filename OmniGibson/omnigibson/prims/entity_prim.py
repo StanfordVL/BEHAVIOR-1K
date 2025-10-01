@@ -136,7 +136,7 @@ class EntityPrim(XFormPrim):
             self._load_config["visual_only"]
             if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
             else False
-        )
+        ) or gm.VISUAL_ONLY
 
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
@@ -1440,11 +1440,11 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         return isinstance(self.root_link, RigidKinematicPrim)
-    
+
     @property
     def collision_points_world(self):
         """Get all collision points in world coordinates.
-        
+
         For cloth objects, returns particle positions.
         For rigid objects, returns collision boundary points from all links.
         """

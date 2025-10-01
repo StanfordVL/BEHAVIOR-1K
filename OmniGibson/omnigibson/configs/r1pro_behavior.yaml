@@ -1,0 +1,114 @@
+env:
+  device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
+  automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
+  flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
+  flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
+  use_external_obs: false               # (bool): Whether to use external observations or not
+  initial_pos_z_offset: 0.1
+  external_sensors:                     # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
+    - sensor_type: VisionSensor
+      name: external_sensor0
+      relative_prim_path: /external_sensor0
+      modalities: [rgb, depth]
+      sensor_kwargs:
+        image_height: 128
+        image_width: 128
+      position: [0, 0, 1.0]
+      orientation: [0.707, 0.0, 0.0, 0.707]
+      pose_frame: parent
+
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: house_double_floor_lower
+  trav_map_resolution: 0.1
+  default_erosion_radius: 0.0
+  trav_map_with_objects: true
+  num_waypoints: 1
+  waypoint_resolution: 0.2
+  not_load_object_categories: null
+  load_room_types: ["living_room", "kitchen"]
+  load_room_instances: null
+  seg_map_resolution: 1.0
+  scene_source: OG
+  include_robots: true
+
+robots: 
+  - type: R1Pro
+    obs_modalities: [rgb, depth]
+    include_sensor_names: null
+    exclude_sensor_names: null
+    scale: 1.0
+    self_collision: false
+    action_normalize: true
+    action_type: continuous
+    grasping_mode: physical
+    default_reset_mode: tuck
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+    controller_config:
+      base:
+        name: HolonomicBaseJointController
+        motor_type: velocity
+        vel_kp: 150
+        command_input_limits: default
+        command_output_limits: default
+        use_impedances: false
+      trunk:
+        name: JointController
+        motor_type: position
+        pos_kp: 150
+        command_input_limits: default
+        command_output_limits: default
+        use_impedances: false
+        use_delta_commands: false
+      arm_left:
+        name: JointController
+        motor_type: position
+        pos_kp: 150
+        command_input_limits: default
+        command_output_limits: default
+        use_impedances: false
+        use_delta_commands: false
+      arm_right:
+        name: JointController
+        motor_type: position
+        pos_kp: 150
+        command_input_limits: default
+        command_output_limits: default
+        use_impedances: false
+        use_delta_commands: false
+      gripper_left:
+        name: MultiFingerGripperController
+        mode: smooth
+        command_input_limits: default
+        command_output_limits: default
+      gripper_right:
+        name: MultiFingerGripperController
+        mode: smooth
+        command_input_limits: default
+        command_output_limits: default
+
+objects: []
+
+task:
+  type: BehaviorTask
+  activity_name: picking_up_trash
+  activity_definition_id: 0
+  activity_instance_id: 0
+  predefined_problem: null
+  online_object_sampling: false
+  debug_object_sampling: null
+  highlight_task_relevant_objects: false
+  use_presampled_robot_pose: true
+  termination_config:
+    max_steps: 500
+  reward_config:
+    r_potential: 1.0

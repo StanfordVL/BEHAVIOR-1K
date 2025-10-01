@@ -1,0 +1,46 @@
+{% macro render_scene_matching_table(scene_matching_dict, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Scene</th>
+      <th>Status</th>
+      <th>Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for scene, info in scene_matching_dict|dictsort %}
+    <tr>
+      <td><a href="{{ url_for('scene_detail', name=scene.name) }}">{{ scene.name }}</a></td>
+      <td class="{% if info.matched %}bg-success{% else %}bg-danger{% endif %}">
+        {% if info.matched %}Matched
+        {% else %}Unmatched{% endif %}
+      </td>
+      <td>
+        {% if not info.matched %}
+          {{ info.reason }}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [1]
+      }
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

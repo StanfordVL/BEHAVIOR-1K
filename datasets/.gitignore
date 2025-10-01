@@ -1,0 +1,8 @@
+# Ignore everything
+*
+
+# Re-include the .gitignore file itself
+!.gitignore
+
+# Also include the README
+!README

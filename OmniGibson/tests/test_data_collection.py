@@ -30,6 +30,7 @@ def test_data_collect_and_playback():
             # BehaviorTask-specific
             "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
+            "use_presampled_robot_pose": False,
         },
     }
 

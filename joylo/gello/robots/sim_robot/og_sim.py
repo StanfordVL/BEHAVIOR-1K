@@ -24,6 +24,7 @@ from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjec
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
+from omnigibson.utils.asset_utils import get_task_instance_path
 
 from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
 
@@ -865,7 +866,7 @@ class OGRobotServer:
                 activity_definition_id=self.env.task.activity_definition_id,
                 activity_instance_id=self.instance_id,
             )
-            tro_file_path = f"{gm.DATASET_PATH}/scenes/{scene_model}/json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json"
+            tro_file_path = os.path.join(get_task_instance_path(scene_model), f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json")
             # check if tro_file_path exists, if not, then presumbaly we are done
             if not os.path.exists(tro_file_path):
                 print(f"Task {self.env.task.activity_name} instance id: {self.instance_id} does not exist")
@@ -874,15 +875,18 @@ class OGRobotServer:
             with open(tro_file_path, "r") as f:
                 tro_state = recursively_convert_to_torch(json.load(f))
             self.env.scene.reset()
-            for bddl_name, obj_state in tro_state.items():
-                if "agent" in bddl_name:
+            for tro_key, tro_state in tro_state.items():
+                if tro_key == "robot_poses":
+                    presampled_robot_poses = tro_state
                     # Only set pose (we assume this is a holonomic robot, so ignore Rx / Ry and only take Rz component
                     # for orientation
-                    robot_pos = obj_state["joint_pos"][:3] + obj_state["root_link"]["pos"]
-                    robot_quat = T.euler2quat(th.tensor([0, 0, obj_state["joint_pos"][5]]))
-                    self.env.task.object_scope[bddl_name].set_position_orientation(robot_pos, robot_quat)
+                    robot_pos = presampled_robot_poses[self.robot.model_name][0]["position"]
+                    robot_quat = presampled_robot_poses[self.robot.model_name][0]["orientation"]
+                    self.robot.set_position_orientation(robot_pos, robot_quat)
+                    # Write robot poses to scene metadata
+                    self.env.scene.write_task_metadata(key=tro_key, data=tro_state)
                 else:
-                    self.env.task.object_scope[bddl_name].load_state(obj_state, serialized=False)
+                    self.env.task.object_scope[tro_key].load_state(tro_state, serialized=False)
                     
             # Try to ensure that all task-relevant objects are stable
             # They should already be stable from the sampled instance, but there is some issue where loading the state

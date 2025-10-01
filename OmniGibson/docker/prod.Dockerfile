@@ -14,10 +14,7 @@ RUN /isaac-sim/python.sh -m pip install click~=8.1.3
 
 # Mount the data directory
 VOLUME ["/data"]
-ENV OMNIGIBSON_DATASET_PATH /data/og_dataset
-ENV OMNIGIBSON_ASSET_PATH /data/assets
-ENV GIBSON_DATASET_PATH /data/g_dataset
-ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
+ENV OMNIGIBSON_DATA_PATH /data
 
 # Install Mamba (light conda alternative)
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C / bin/micromamba

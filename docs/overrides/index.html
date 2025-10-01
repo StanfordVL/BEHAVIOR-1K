@@ -1,0 +1,467 @@
+{% extends "main.html" %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="dist/css/style.css">
+{% endblock %}
+
+{% block tabs %}
+  {{ super() }}
+  <div class="body-wrap">
+    <header class="site-header">
+      <section class="hero">
+        <div class="container">
+          <div class="hero-inner">
+            <div class="hero-copy">
+              <img src="assets/behavior_logo2.png" alt="BEHAVIOR-1K" class="hero-logo mt-0" />
+              <p class="hero-paragraph">1000 realistic, full-length household tasks</p>
+              <div class="hero-cta">
+                <a class="button button-primary" href="./getting_started/installation.html">Get Started</a>
+                <a class="button" href="https://github.com/StanfordVL/BEHAVIOR-1K">Source Code</a>
+              </div>
+              <div class="hero-announcement">
+                <p>🏆 <strong>2025 BEHAVIOR Challenge is launched!</strong></p>
+                <a class="button button-primary" href="./challenge">Explore Challenge</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </header>
+    
+    <!-- Introduction Section -->
+    <section class="intro-section">
+      <div class="intro-container">
+        <p class="intro-text">
+          BEHAVIOR-1K is the first simulation benchmark grounded in real human needs. Based on extensive surveys asking "what do you want robots to do for you?", we present 1,000 household activities that people actually spend time on and want help with.
+        </p>
+        <p class="intro-text">
+          The benchmark introduces long-horizon mobile manipulation challenges in realistic environments, providing a crucial tool to help bridge the gap between current research and real-world, human-centric applications.
+        </p>
+      </div>
+    </section>
+
+    <!-- Video Gallery Section -->
+    <section class="video-gallery-section">
+      <div class="video-gallery-container">
+        <div class="video-gallery">
+          <button class="gallery-nav gallery-nav-prev" onclick="changeVideo(-1)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+          
+          <div class="video-gallery-display">
+            <div class="gallery-video-frame">
+              <iframe id="gallery-video"
+                      src="https://player.vimeo.com/video/1104802075?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+            </div>
+          </div>
+          
+          <button class="gallery-nav gallery-nav-next" onclick="changeVideo(1)">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="video-gallery-caption">
+          <p id="gallery-caption">Single Family House 1</p>
+        </div>
+        
+        <div class="video-gallery-indicators">
+          <button class="gallery-indicator active" onclick="setVideo(0)"></button>
+          <button class="gallery-indicator" onclick="setVideo(1)"></button>
+          <button class="gallery-indicator" onclick="setVideo(2)"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+      <div class="features-container">
+        <!-- Scenes and Objects -->
+        <div class="scenes-objects-section">
+          <h3 class="subsection-title">1,000 activities, instantiated in 50 fully interactive scenes with 10,000+ objects</h3>
+          <div class="scenes-objects-grid">
+            <div class="feature-card">
+              <div class="bg-scenes"></div>
+            </div>
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630870?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+            </div>
+          </div>
+        </div>
+        
+        <!-- OmniGibson Features -->
+        <div class="omnigibson-features-section">
+          <h3 class="subsection-title">OmniGibson: Realism in perception, physics, and interactions</h3>
+          <div class="features-grid">
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630917?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Fluids</h5>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630821?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Deformables</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630856?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Transparency</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630827?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Thermal effects</h5>
+              </div>
+            </div>
+
+                         <div class="feature-card">
+               <iframe class="feature-video" 
+                       src="https://player.vimeo.com/video/1101630845?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                       frameborder="0" allowfullscreen>
+               </iframe>
+               <div class="card-slate">
+                 <h5>Interact with fluids</h5>
+               </div>
+             </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630805?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Grasp cloth</h5>
+              </div>
+            </div>
+            
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630889?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Grasp rigid objects</h5>
+              </div>
+            </div>
+
+            <div class="feature-card">
+              <iframe class="feature-video" 
+                      src="https://player.vimeo.com/video/1101630902?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0"
+                      frameborder="0" allowfullscreen>
+              </iframe>
+              <div class="card-slate">
+                <h5>Transitions</h5>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Team Section -->
+    <section class="team-section">
+      <div class="team-container">
+        <!-- Core Team -->
+        <div class="team-category">
+          <h4 class="team-title">Core Team</h4>
+          <div class="team-grid">
+            <div class="team-member">
+              <a href="http://jowo.me" class="team-avatar">
+                <img alt="Josiah Wong" src="assets/people/josiah_wong.jpg">
+              </a>
+              <small class="team-name">Josiah Wong</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.cemgokmen.com/" class="team-avatar">
+                <img alt="Cem Gokmen" src="assets/people/cemgokmen.jpg">
+              </a>
+              <small class="team-name">Cem Gokmen</small>
+            </div>
+            <div class="team-member">
+              <a href="https://hang-yin.github.io" class="team-avatar">
+                <img alt="Hang Yin" src="assets/people/hang_yin.png">
+              </a>
+              <small class="team-name">Hang Yin</small>
+            </div>
+            <div class="team-member">
+              <a href="http://wensi-ai.github.io/" class="team-avatar">
+                <img alt="Wensi Ai" src="assets/people/wensi_ai.jpg">
+              </a>
+              <small class="team-name">Wensi Ai</small>
+            </div>
+            <div class="team-member">
+              <a href="https://yunfanj.com/" class="team-avatar">
+                <img alt="Yunfan Jiang" src="assets/people/yunfan_jiang.jpg">
+              </a>
+              <small class="team-name">Yunfan Jiang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://mxu34.github.io/" class="team-avatar">
+                <img alt="Mengdi Xu" src="assets/people/mengdi_xu.jpg">
+              </a>
+              <small class="team-name">Mengdi Xu</small>
+            </div>
+            <div class="team-member">
+              <a href="http://chengshuli.me" class="team-avatar">
+                <img alt="Chengshu (Eric) Li" src="assets/people/chengshu.jpg">
+              </a>
+              <small class="team-name">Chengshu (Eric) Li</small>
+            </div>
+          </div>
+          <div class="team-grid" style="margin-bottom: 2rem;">
+            <div class="team-member">
+              <a href="https://ai.stanford.edu/~zharu/" class="team-avatar">
+                <img alt="Ruohan Zhang" src="assets/people/ruohan_zhang.jpg">
+              </a>
+              <small class="team-name">Ruohan Zhang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://qingh097.github.io/" class="team-avatar">
+                <img alt="Raven Huang" src="assets/people/raven_huang.png">
+              </a>
+              <small class="team-name">Raven Huang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://jiajunwu.com/" class="team-avatar">
+                <img alt="Jiajun Wu" src="assets/people/jiajun_wu.jpg">
+              </a>
+              <small class="team-name">Jiajun Wu</small>
+            </div>
+            <div class="team-member">
+              <a href="https://engineering.stanford.edu/people/fei-fei-li" class="team-avatar">
+                <img alt="Li Fei-Fei" src="assets/people/li_fei_fei.jpg">
+              </a>
+              <small class="team-name">Li Fei-Fei</small>
+            </div>
+          </div>    
+        </div>
+        
+        <!-- Supporting Team -->
+        <div class="team-category">
+          <h4 class="team-title">Supporting Team</h4>
+          <div class="team-grid" style="margin-bottom: 2rem;">
+            <div class="team-member">
+              <a href="https://wenlong.page/" class="team-avatar">
+                <img alt="Wenlong Huang" src="assets/people/wenlong_huang.jpg">
+              </a>
+              <small class="team-name">Wenlong Huang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://arpitrf.github.io/" class="team-avatar">
+                <img alt="Arpit Bahety" src="assets/people/arpit_bahety.jpg">
+              </a>
+              <small class="team-name">Arpit Bahety</small>
+            </div>
+            <div class="team-member">
+              <a href="https://jianghanxiao.github.io/" class="team-avatar">
+                <img alt="Hanxiao Jiang" src="assets/people/hanxiao_jiang.jpg">
+              </a>
+              <small class="team-name">Hanxiao Jiang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://robo-alex.github.io/" class="team-avatar">
+                <img alt="Mingtong Zhang" src="assets/people/mingtong_zhang.jpg">
+              </a>
+              <small class="team-name">Mingtong Zhang</small>
+            </div>
+            <div class="team-member">
+              <a href="https://niklasvainio.com/" class="team-avatar">
+                <img alt="Niklas Vainio" src="assets/people/niklas_vainio.png">
+              </a>
+              <small class="team-name">Niklas Vainio</small>
+            </div>
+            <div class="team-member">
+              <a href="https://scholar.google.com/citations?hl=en&user=HXED4kIAAAAJ&view_op=list_works&sortby=pubdate" class="team-avatar">
+                <img alt="Evans Han" src="assets/people/evans_han.jpg">
+              </a>
+              <small class="team-name">Evans Han</small>
+            </div>
+            <div class="team-member">
+              <a href="https://www.weiyuliu.com/" class="team-avatar">
+                <img alt="Weiyu Liu" src="assets/people/weiyu_liu.jpg">
+              </a>
+              <small class="team-name">Weiyu Liu</small>
+            </div>
+          </div>
+          <div class="team-grid">
+            <div class="team-member">
+              <a href="https://limanling.github.io/" class="team-avatar">
+                <img alt="Manling Li" src="assets/people/manling_li.jpg">
+              </a>
+              <small class="team-name">Manling Li</small>
+            </div>
+            <div class="team-member">
+              <a href="https://yunzhuli.github.io/" class="team-avatar">
+                <img alt="Yunzhu Li" src="assets/people/yunzhu_li.jpg">
+              </a>
+              <small class="team-name">Yunzhu Li</small>
+            </div>
+            <div class="team-member">
+              <a href="https://robertomartinmartin.com/" class="team-avatar">
+                <img alt="Roberto Martín-Martín" src="assets/people/roberto_martinmartin.jpg">
+              </a>
+              <small class="team-name">Roberto Martín-Martín</small>
+            </div>
+            <div class="team-member">
+              <a href="http://cvgl.stanford.edu/silvio/" class="team-avatar">
+                <img alt="Silvio Savarese" src="assets/people/silvio_savarese.jpg">
+              </a>
+              <small class="team-name">Silvio Savarese</small>
+            </div>
+            <div class="team-member">
+              <a href="https://web.stanford.edu/~hyo/Home.html" class="team-avatar">
+                <img alt="Hyowon Gweon" src="assets/people/hyowon_gweon.jpg">
+              </a>
+              <small class="team-name">Hyowon Gweon</small>
+            </div>
+            <div class="team-member">
+              <a href="https://profiles.stanford.edu/c-karen-liu" class="team-avatar">
+                <img alt="Karen Liu" src="assets/people/Karen.png">
+              </a>
+              <small class="team-name">Karen Liu</small>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Alumni -->
+        <div class="team-category">
+          <h4 class="team-title">Alumni</h4>
+          <div class="alumni-list">
+            <a href="https://www.linkedin.com/in/sanjana-srivastava5/" class="alumni-name">Sanjana Srivastava</a>
+            <a href="https://www.chenwangjeremy.net/" class="alumni-name">Chen Wang</a>
+            <a href="https://www.gabrael.io/" class="alumni-name">Gabrael Levine</a>
+            <a href="https://github.com/mjlbach/" class="alumni-name">Michael Lingelbach</a>
+            <a href="https://monaanvari.github.io/portfolio/" class="alumni-name">Mona Anvari</a>
+            <a href="https://www.linkedin.com/in/arman-aydin-915035185/?trk=public_profile_like_view_actor-name" class="alumni-name">Arman Aydin</a>
+            <a href="https://dhruvabansal.com/" class="alumni-name">Dhruva Bansal</a>
+            <a href="https://cs.stanford.edu/~shyamal" class="alumni-name">Shyamal Buch</a>
+            <a href="https://rogerdai1217.github.io/" class="alumni-name">Roger Dai</a>
+            <a href="https://sujaygarlanka.com/" class="alumni-name">Sujay Garlanka</a>
+            <a href="https://misoshiruseijin.github.io/" class="alumni-name">Ayano Hiranaka</a>
+            <span class="alumni-name">Samuel Hunter</span>
+            <a href="https://mj-hwang.github.io/" class="alumni-name">Minjune Hwang</a>
+            <a href="http://emilyjin.me/" class="alumni-name">Emily Jin</a>
+            <a href="https://kykim0.github.io/" class="alumni-name">Kyu-Young Kim</a>
+            <a href="https://profiles.stanford.edu/zheng-lian" class="alumni-name">Zheng Lian</a>
+            <a href="https://icme.stanford.edu/people/alan-lou" class="alumni-name">Alan Lou</a>
+            <a href="https://www.linkedin.com/in/benjamin-j-martinez/" class="alumni-name">Benjamin Martinez</a>
+            <a href="https://www.linkedin.com/in/caleb-matthews/" class="alumni-name">Caleb Matthews</a>
+            <a href="https://github.com/manasi-sharma" class="alumni-name">Manasi Sharma</a>
+            <a href="http://web.stanford.edu/~jksun/" class="alumni-name">Jiankai Sun</a>
+            <span class="alumni-name">Claire Tang</span>
+            <a href="https://www.linkedin.com/in/jerry-tang-b37026162/" class="alumni-name">Jerry Tang</a>
+            <a href="https://www.linkedin.com/in/kent-vainio-4749b0145/?originalSubdomain=ch" class="alumni-name">Kent Vainio</a>
+            <a href="https://www.linkedin.com/in/ivillare/" class="alumni-name">Ivan Villa-Renteria</a>
+            <a href="https://fxia22.github.io" class="alumni-name">Fei Xia</a>
+            <a href="https://yyf20001230.github.io/frank_yang/" class="alumni-name">Frank Yang</a>
+          </div>
+        </div>
+        
+        <!-- Contact Section -->
+        <div class="team-category">
+          <h4 class="team-title">Contact</h4>
+          <div style="text-align: left;">
+            <p style="margin-bottom: 0.5rem; color: #333; font-size: 14px;">
+              For technical support, please join our <a href="https://discord.gg/bccR5vGFEx" target="_blank" style="color: #5865F2; text-decoration: none;">Discord</a>
+            </p>
+            <p style="margin-bottom: 0; color: #333; font-size: 14px;">
+              For other purposes, please email <a href="mailto:behavior-contact@googlegroups.com" style="color: #007bff; text-decoration: none;">behavior-contact@googlegroups.com</a>
+            </p>
+          </div>
+        </div>       
+      </div>
+    </section> 
+  </div>
+{% endblock %}
+
+{% block content %}{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+// Video Gallery functionality
+const videos = [
+  'https://player.vimeo.com/video/1104802075?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0',
+  'https://player.vimeo.com/video/1104802064?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0',
+  'https://player.vimeo.com/video/1104802056?autoplay=1&loop=1&autopause=0&muted=1&controls=0&title=0&byline=0&portrait=0&badge=0'
+];
+
+const captions = [
+  'Single Family House 1',
+  'Single Family House 2',
+  'Hotel'
+];
+
+let currentVideoIndex = 0;
+
+function changeVideo(direction) {
+  currentVideoIndex += direction;
+  
+  if (currentVideoIndex >= videos.length) {
+    currentVideoIndex = 0;
+  } else if (currentVideoIndex < 0) {
+    currentVideoIndex = videos.length - 1;
+  }
+  
+  updateVideo();
+}
+
+function setVideo(index) {
+  currentVideoIndex = index;
+  updateVideo();
+}
+
+function updateVideo() {
+  const videoFrame = document.getElementById('gallery-video');
+  const captionElement = document.getElementById('gallery-caption');
+  const indicators = document.querySelectorAll('.gallery-indicator');
+  
+  // Update video source
+  videoFrame.src = videos[currentVideoIndex];
+  
+  // Update caption
+  captionElement.textContent = captions[currentVideoIndex];
+  
+  // Update indicators
+  indicators.forEach((indicator, index) => {
+    if (index === currentVideoIndex) {
+      indicator.classList.add('active');
+    } else {
+      indicator.classList.remove('active');
+    }
+  });
+}
+
+// Optional: Auto-advance videos every 10 seconds
+// setInterval(() => {
+//   changeVideo(1);
+// }, 10000);
+</script>
+{% endblock %}

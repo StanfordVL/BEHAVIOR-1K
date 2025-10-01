@@ -1,0 +1,55 @@
+{% macro render_usage_table(synset, enable_search=True, enable_csv=True) %}
+<table class="table table-striped" id="datatable">
+  <thead>
+    <tr>
+      <th>Usage Type</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Used as Substance</td>
+      <td class="{% if synset.is_used_as_substance %}bg-success{% else %}bg-danger{% endif %}">
+        {% if synset.is_used_as_substance %}YES{% else %}NO{% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Used as Non-Substance</td>
+      <td class="{% if synset.is_used_as_non_substance %}bg-success{% else %}bg-danger{% endif %}">
+        {% if synset.is_used_as_non_substance %}YES{% else %}NO{% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Used as Fillable</td>
+      <td class="{% if synset.is_used_as_fillable %}bg-success{% else %}bg-danger{% endif %}">
+        {% if synset.is_used_as_fillable %}YES{% else %}NO{% endif %}
+      </td>
+    </tr>
+    {% for predicate in synset.used_in_predicates|sort %}
+    <tr>
+      <td>Used in Predicate</td>
+      <td>{{ predicate.name }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{#
+{% if enable_search %}
+<script>
+  $(document).ready(function() {
+    var table = $('#datatable').DataTable({
+      {% if enable_csv %}dom: 'Bfrtip', buttons: ['csv'],{% endif %}
+      paging: false,
+      searchPanes: {
+        viewTotal: true,
+        columns: [0, 1]
+      }
+    });
+    table.searchPanes.container().prependTo(table.table().container());
+    table.searchPanes.resizePanes();
+  });
+</script>
+{% endif %}
+#}
+{% endmacro %}

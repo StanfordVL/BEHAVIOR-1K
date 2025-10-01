@@ -6,6 +6,7 @@ import omnigibson.lazy as lazy
 class NumpyTypes:
     FLOAT32 = np.float32
     INT32 = np.int32
+    INT64 = np.int64
     UINT8 = np.uint8
     UINT32 = np.uint32
 

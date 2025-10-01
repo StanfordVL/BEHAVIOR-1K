@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Transition Rule {{ transition_rule.name }} Details{% endblock %}
+{% block content %}
+  <h1 class="text-center">{{ transition_rule.name }}</h1>
+  <hr>
+  <h2>Input Synsets</h2>
+  {% from "table_modules/synset_table.html" import render_synset_table %}
+  {{ render_synset_table(transition_rule.input_synsets, enable_search=False, enable_csv=False) }}
+
+  <h2>Machine Synsets</h2>
+  {{ render_synset_table(transition_rule.machine_synsets, enable_search=False, enable_csv=False) }}
+
+  <h2>Output Synsets</h2>
+  {{ render_synset_table(transition_rule.output_synsets, enable_search=False, enable_csv=False) }}
+
+  <h2>Transition Rule Graph</h2>
+  <div class="mermaid">
+    graph TD;
+      {% for node in transition_rule.subgraph.nodes %}
+        {{ node|slugify }}({{ node }});
+      {% endfor %}
+      {% for edge in transition_rule.subgraph.edges %}
+        {{ edge.0|slugify }} --> {{ edge.1|slugify }};
+      {% endfor %}
+  </div>
+{% endblock %}

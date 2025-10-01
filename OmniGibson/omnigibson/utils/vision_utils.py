@@ -4,6 +4,7 @@ import torch as th
 import numpy as np
 import open3d as o3d
 from PIL import Image, ImageDraw
+import omnigibson.utils.transform_utils as T
 
 try:
     import accimage
@@ -68,14 +69,14 @@ class Remapper:
     """
 
     def __init__(self):
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")  # Initialize the key_array as empty
+        self.key_array = None  # Will be initialized with the correct device on first use
         self.known_ids = set()
         self.unlabelled_ids = set()
         self.warning_printed = set()
 
     def clear(self):
         """Resets the key_array to empty."""
-        self.key_array = th.empty(0, dtype=th.int32, device="cuda")
+        self.key_array = None  # Will be reinitialized with the correct device on next use
         self.known_ids = set()
         self.unlabelled_ids = set()
 
@@ -102,13 +103,20 @@ class Remapper:
             th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
         image_max_key = max(th.max(image).item(), max(old_mapping.keys()))
-        key_array_max_key = len(self.key_array) - 1
-        if image_max_key > key_array_max_key:
-            prev_key_array = self.key_array.clone()
-            # We build a new key array and use max int32 as the default value.
-            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device="cuda")
-            # Copy the previous key array into the new key array
-            self.key_array[: len(prev_key_array)] = prev_key_array
+
+        if self.key_array is None:
+            # First time initialization
+            self.key_array = th.full((image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device=image.device)
+        else:
+            key_array_max_key = len(self.key_array) - 1
+            if image_max_key > key_array_max_key:
+                prev_key_array = self.key_array.clone()
+                # We build a new key array and use max int32 as the default value.
+                self.key_array = th.full(
+                    (image_max_key + 1,), th.iinfo(th.int32).max, dtype=th.int32, device=image.device
+                )
+                # Copy the previous key array into the new key array
+                self.key_array[: len(prev_key_array)] = prev_key_array
 
         # Retrospectively inspect our cached ids against the old mapping and update the key array
         updated_ids = set()
@@ -117,9 +125,45 @@ class Remapper:
                 # If an object was previously unlabelled but now has a label, we need to update the key array
                 updated_ids.add(unlabelled_id)
         self.unlabelled_ids -= updated_ids
-        self.known_ids -= updated_ids
+
+        # For updated ids, we need to update their key_array entries and then mark them as known
+        for updated_id in updated_ids:
+            label = old_mapping[updated_id]
+            new_key = next((k for k, v in new_mapping.items() if v == label), None)
+            assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
+            self.key_array[updated_id] = new_key
+
+        # Add updated ids to known_ids since they now have valid mappings
+        self.known_ids.update(updated_ids)
+
+        # Check if any objects in known_ids have changed their labels and need updating
+        changed_known_ids = set()
+        for known_id in self.known_ids:
+            if known_id in old_mapping:
+                # Get the current label from old_mapping
+                current_label = old_mapping[known_id]
+                # Get the currently mapped value from key_array
+                current_mapped_value = self.key_array[known_id].item()
+                # Find what label this mapped value corresponds to
+                current_mapped_label = None
+                for k, v in new_mapping.items():
+                    if k == current_mapped_value:
+                        current_mapped_label = v
+                        break
+
+                # If the labels don't match, we need to update this known_id
+                if current_mapped_label != current_label:
+                    changed_known_ids.add(known_id)
+
+        # Update the key_array for changed known_ids
+        for changed_id in changed_known_ids:
+            label = old_mapping[changed_id]
+            new_key = next((k for k, v in new_mapping.items() if v == label), None)
+            assert new_key is not None, f"Could not find a new key for label {label} in new_mapping!"
+            self.key_array[changed_id] = new_key
 
         new_keys = old_mapping.keys() - self.known_ids
+
         if new_keys:
             self.known_ids.update(new_keys)
             # Populate key_array with new keys
@@ -386,3 +430,31 @@ def visualize_pcd(rgb, depth, intrinsic_matrix, extrinsic_matrix=np.eye(4)):
     o3d_pcd = generate_point_cloud_from_depth(depth, intrinsic_matrix, mask, extrinsic_matrix)
     # show pcd in open3d
     o3d.visualization.draw_geometries([o3d_pcd])
+
+def change_pcd_frame(pcd: th.Tensor, rel_pose: th.Tensor) -> th.Tensor:
+    """
+    Transform point cloud from one frame to another frame.
+
+    Args:
+        pcd: (N, 6) point cloud tensor in world frame
+        rel_pose: (7) relative pose tensor [pos, quat] from current to target frame
+    Returns:
+        th.Tensor: (B, N, 6) point cloud tensor in target frame
+    """
+    rel_pos = rel_pose[:3]
+    rel_quat = rel_pose[3:]
+    rel_rot = T.quat2mat(rel_quat)
+
+    # Create transformation matrix
+    tf = th.eye(4)
+    tf[:3, :3] = rel_rot
+    tf[:3, 3] = rel_pos
+
+    # Add homogeneous coordinate to point cloud
+    xyz = pcd[..., 3:]  # (N, 3)
+    xyz_homo = th.cat([xyz, th.ones_like(xyz[..., :1])], dim=-1)  # (N, 4)
+
+    # Transform point cloud from camera frame to base frame
+    new_xyz = th.matmul(xyz_homo, th.inverse(tf).T)  # (N, 4)
+    pcd[..., 3:] = new_xyz[..., :3]
+    return pcd

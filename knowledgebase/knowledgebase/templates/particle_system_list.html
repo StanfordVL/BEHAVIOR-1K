@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Particle Systems{% endif %}{% endblock %}
+{% block customstyle %}
+  <style>
+    table {
+      border: 0.3vh solid #dee2e6;
+    }
+    td, th {
+      border: 0.3vh solid #dee2e6;
+    }
+    td a{
+      display: block;
+      color: black;
+    }
+    a:hover {
+      cursor: pointer;
+      color: darkorange;
+    }
+  </style>
+  <!-- datatable search -->
+  <script>
+    $(document).ready(function() {
+      var table = $('#datatable').DataTable({
+        paging: false,
+        searchPanes: {
+            viewTotal: true,
+            columns: [2]
+        },
+        columnDefs: [
+          {
+            searchPanes: {
+              options: [
+                {
+                  label: 'Has Objects',
+                  value: function(rowData, rowIdx) {return rowData[2] > 0;}
+                },
+                {
+                  label: 'Has No Objects',
+                  value: function(rowData, rowIdx) {return rowData[2] == 0;}
+                },
+              ]
+            },
+            targets: [2]
+          },
+        ],
+      });
+      table.searchPanes.container().prependTo(table.table().container());
+      table.searchPanes.resizePanes();
+  });
+  </script>
+{% endblock %}
+{% block content %}
+  <h1 class="text-center">{% if view.page_title %}{{ view.page_title }}{% else %}BEHAVIOR-1K Particle Systems{% endif %}</h1>
+  <h4 class="text-center">Total count: {{ particle_system_list | length }}</h4>
+  <br>
+  {% from "table_modules/particle_system_table.html" import render_particle_system_table %}
+  {{ render_particle_system_table(particle_system_list) }}
+{% endblock %}

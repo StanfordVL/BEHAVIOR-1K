@@ -545,8 +545,33 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if self._scene_graph_builder is not None:
             info["scene_graph"] = self.get_scene_graph()
 
+    def _convert_action_to_tensor(self, action):
+        """Convert action to torch tensor format.
+
+        Args:
+            action: Action in various formats (dict, numpy array, list, torch tensor)
+
+        Returns:
+            Converted action (dict with tensor values or flattened tensor)
+        """
+        if isinstance(action, dict):
+            # Convert iterable values in dict to tensors
+            return {
+                k: th.as_tensor(v, dtype=th.float).flatten()
+                if isinstance(v, Iterable) and not isinstance(v, (dict, OrderedDict, str))
+                else v
+                for k, v in action.items()
+            }
+        elif isinstance(action, Iterable):
+            # Convert numpy arrays and lists to tensors
+            return th.as_tensor(action, dtype=th.float).flatten()
+        return action
+
     def _pre_step(self, action):
         """Apply the pre-sim-step part of an environment step, i.e. apply the robot actions."""
+        # Convert action to tensor format
+        action = self._convert_action_to_tensor(action)
+
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
             action_dict = dict()
@@ -617,10 +642,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - dict: info, i.e. dictionary with any useful information
         """
         # Pre-processing before stepping simulation
-        if isinstance(action, Iterable) and not isinstance(action, (dict, OrderedDict)):
-            # Convert numpy arrays and lists to tensors
-            # Skip dict action
-            action = th.as_tensor(action, dtype=th.float).flatten()
+        action = self._convert_action_to_tensor(action)
         self._pre_step(action)
 
         # Step simulation
@@ -673,9 +695,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._reset_variables()
 
         if get_obs:
-            # Run a single simulator step to make sure we can grab updated observations
+            # Run a single simulator step and a replicator step
             og.sim.step()
-
+            # Render 3 times to make sure we can grab updated observations
+            for _ in range(3):
+                og.sim.render()
             # Grab and return observations
             obs, info = self.get_obs()
 

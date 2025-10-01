@@ -1,0 +1,7 @@
+pybadges~=3.0.1
+matplotlib~=3.7.1
+requests~=2.28.2
+python-dateutil~=2.8.2
+pillow~=9.4.0
+jinja2~=3.1.2
+tqdm~=4.65.0

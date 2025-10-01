@@ -4,7 +4,7 @@ from copy import deepcopy
 import torch as th
 
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros, gm
+from omnigibson.macros import create_module_macros
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.sensors import (
@@ -14,13 +14,14 @@ from omnigibson.sensors import (
     VisionSensor,
     create_sensor,
 )
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.usd_utils import ControllableObjectViewAPI, absolute_prim_path_to_scene_relative
-from omnigibson.utils.vision_utils import segmentation_to_rgb
+from omnigibson.utils.vision_utils import segmentation_to_rgb, change_pcd_frame
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()
@@ -312,6 +313,13 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         info_dict = dict()
         for sensor_name, sensor in self._sensors.items():
             obs_dict[sensor_name], info_dict[sensor_name] = sensor.get_obs()
+            for key in obs_dict[sensor_name]:
+                if "pointcloud" in key:
+                    # convert point cloud from world frame to robot base frame
+                    obs_dict[sensor_name][key] = change_pcd_frame(
+                        pcd=obs_dict[sensor_name][key],
+                        rel_pose=th.cat(self.get_position_orientation()),
+                    )
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
@@ -345,7 +353,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         pos, quat = cb.to_torch(cb.copy(pos)), cb.to_torch(cb.copy(quat))
         ori = T.quat2euler(quat)
 
-        ori_2d = T.z_angle_from_quat(quat)
+        ori_2d = T.z_angle_from_quat(quat).unsqueeze(0)  # Convert to 1D tensor
 
         # Pack everything together
         return dict(
@@ -615,7 +623,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def usd_path(self):
         # By default, sets the standardized path
         model = self.model_name.lower()
-        return os.path.join(gm.ASSET_PATH, f"models/{model}/usd/{model}.usda")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/usd/{model}.usda")
 
     @property
     def urdf_path(self):
@@ -625,7 +633,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         # By default, sets the standardized path
         model = self.model_name.lower()
-        return os.path.join(gm.ASSET_PATH, f"models/{model}/urdf/{model}.urdf")
+        return os.path.join(get_dataset_path("omnigibson-robot-assets"), f"models/{model}/urdf/{model}.urdf")
 
     @classproperty
     def _do_not_register_classes(cls):

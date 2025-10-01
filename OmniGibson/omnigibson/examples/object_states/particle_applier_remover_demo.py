@@ -155,7 +155,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set the modifier object to be in position to modify particles
     if modifier_type == "particleRemover" and method_type == "Projection":
         tool.set_position_orientation(
-            position=[0, 0.3, 1.45],
+            position=[0, 0.3, 1.47],
             orientation=[0, 0, 0, 1.0],
         )
     elif modifier_type == "particleRemover" and method_type == "Adjacency":
@@ -171,7 +171,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         tool.set_position_orientation(
             position=[0, 0.3, 1.5],
-            orientation=[0.7071, 0, 0.7071, 0],
+            orientation=[0.0, 0.0, 0.0, 1.0],
         )
 
     # Move object in square around table
@@ -187,7 +187,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             env.step(th.empty(0))
 
     # Always shut down environment at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ combined:
 - objects/legacy_batch-10
 - objects/legacy_batch-11
 - objects/legacy_batch-12
+- objects/ping_pong-ab
 - objects/procedural-aa
 - objects/school_objects-aa
 - objects/substances-01
@@ -171,6 +172,7 @@ objects:
 - objects/legacy_batch-10
 - objects/legacy_batch-11
 - objects/legacy_batch-12
+- objects/ping_pong-ab
 - objects/procedural-aa
 - objects/school_objects-aa
 - objects/substances-01

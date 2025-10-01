@@ -24,6 +24,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -251,6 +252,10 @@ class ManipulationRobot(BaseRobot):
 
     def _initialize(self):
         super()._initialize()
+
+        # make eef link not visible
+        for arm in self.arm_names:
+            self._links[self.eef_link_names[arm]].visible = False
 
         # Infer relevant link properties, e.g.: fingertip location, AG grasping points
         # We use a try / except to maintain backwards-compatibility with robots that do not follow our
@@ -553,8 +558,9 @@ class ManipulationRobot(BaseRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
+                parent frame: set position relative to the object parent.
+                scene frame: set position relative to the scene.
         """
 
         # Store the original EEF poses.
@@ -1228,7 +1234,7 @@ class ManipulationRobot(BaseRobot):
         )
         # Stack the start points and repeat the end points, and add these values to the raycast dicts
         raycast_startpoints = th.tile(start_and_end_points[:n_start_points], (n_end_points, 1))
-        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0)
+        raycast_endpoints = th.repeat_interleave(start_and_end_points[n_start_points:], n_start_points, dim=0) + 1e-8
         ray_data = set()
         # Calculate raycasts from each start point to end point -- this is n_startpoints * n_endpoints total rays
         for result in raytest_batch(raycast_startpoints, raycast_endpoints, only_closest=True):
@@ -1267,7 +1273,8 @@ class ManipulationRobot(BaseRobot):
         model = self.model_name.lower()
         return {
             emb_sel: os.path.join(
-                gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml"
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml",
             )
             for emb_sel in CuRoboEmbodimentSelection
         }
