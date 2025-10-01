@@ -66,8 +66,7 @@ def main():
     lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
     lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
     lazy.carb.settings.get_settings().set_bool("/rtx/post/histogram/enabled", True)
-    lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.)
-
+    lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.0)
 
     # Do 100 steps of rendering
     for _ in range(5):

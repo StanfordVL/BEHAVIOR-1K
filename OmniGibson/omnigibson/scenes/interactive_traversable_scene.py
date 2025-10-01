@@ -123,7 +123,7 @@ class InteractiveTraversableScene(TraversableScene):
         for c in candidates:
             if os.path.exists(c):
                 return c
-            
+
         raise ValueError(f"Could not find scene file for instance {scene_instance} in either {candidates}")
 
     def filter_rooms_and_object_categories(
