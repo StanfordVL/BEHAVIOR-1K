@@ -114,12 +114,17 @@ class InteractiveTraversableScene(TraversableScene):
             str: Absolute path to the desired scene file (.json) to load
         """
         if scene_instance is None:
-            # Load default "best" scene from scene directory
-            fname = f"{scene_model}_with_clutter"
-            return os.path.join(self.scene_dir, "json", f"{fname}.json")
-        else:
-            # Load specific instance from task instance directory
-            return os.path.join(self.task_dir, "json", f"{scene_instance}.json")
+            scene_instance = f"{scene_model}_with_clutter"
+
+        candidates = [
+            os.path.join(self.scene_dir, "json", f"{scene_instance}.json"),
+            os.path.join(self.task_dir, "json", f"{scene_instance}.json"),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+            
+        raise ValueError(f"Could not find scene file for instance {scene_instance} in either {candidates}")
 
     def filter_rooms_and_object_categories(
         self, load_object_categories, not_load_object_categories, load_room_types, load_room_instances

@@ -112,7 +112,6 @@ def get_scene_path(scene_name, dataset_name="behavior-1k-assets"):
     """
     dataset_path = get_dataset_path(dataset_name)
     scenes_path = os.path.join(dataset_path, "scenes")
-    log.info("Scene name: {}".format(scene_name))
     assert scene_name in os.listdir(scenes_path), "Scene {} does not exist".format(scene_name)
     return os.path.join(scenes_path, scene_name)
 
@@ -128,12 +127,7 @@ def get_task_instance_path(scene_name):
         str: file path to the scene name
     """
     task_instances_path = os.path.join(gm.DATA_PATH, "2025-challenge-task-instances")
-    scenes_path = os.path.join(task_instances_path, "scenes")
-    log.info("Scene name: {}".format(scene_name))
-    if scene_name in os.listdir(scenes_path):
-        return os.path.join(scenes_path, scene_name)
-    else:
-        return None
+    return os.path.join(task_instances_path, "scenes", scene_name)
 
 
 def get_category_path(category_name, dataset_name="behavior-1k-assets"):

@@ -3,19 +3,16 @@ import math
 import os
 import random
 import sys
-from typing import Literal
 
 import numpy as np
 import tqdm
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.camera_utils import convert_camera_frame_orientation_convention
 
-import h5py
 import torch as th
+from scipy.spatial.transform import Rotation as R
 from PIL import Image
 
 # Configure macros for maximum performance
@@ -38,14 +35,14 @@ def main():
 
     cfg = {
         "render": {
-            "viewer_width": 1600,
-            "viewer_height": 1200,
+            "viewer_width": 1280,
+            "viewer_height": 720,
         },
         "scene": {
             "type": "InteractiveTraversableScene",
-            "scene_model": "102817200",
-            "dataset_type": "hssd",
-            "scene_instance": "102817200_best",
+            "scene_model": "Rs_int",
+            "dataset_name": "behavior-1k-assets",
+            "scene_instance": "Rs_int_with_clutter",
             # "load_object_categories": [
             #     "floors",
             #     "walls",
@@ -55,7 +52,6 @@ def main():
             #     "roof",
             #     "rail_fence",
             # ],
-            "default_erosion_radius": 0.5,  # Erosion radius for the traversable map
             "use_skybox": False,
         },
     }
@@ -67,70 +63,57 @@ def main():
 
     # lazy.omni.replicator.core.settings.set_render_pathtraced(samples_per_pixel=64)
     lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "PathTracing")
+    lazy.carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)
     lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
-    lazy.carb.settings.get_settings().set_bool("/rtx/autoExposure/enabled", True)
+    lazy.carb.settings.get_settings().set_bool("/rtx/post/histogram/enabled", True)
+    lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.)
+
 
     # Do 100 steps of rendering
     for _ in range(5):
         og.sim.render()
 
-    # Get the rooms in the scene and the eroded traversable map
-    # rooms = list(env.scene.seg_map.room_ins_name_to_ins_id.keys())
-    # trav_map = th.clone(env.scene.trav_map.floor_map[0])
-    # trav_map = env.scene.trav_map._erode_trav_map(trav_map)
-
     index = 0
 
-    TOTAL_IMAGES = 1000
-    FLUSH_EVERY = 10
-    HEIGHT = og.sim.viewer_height
-    WIDTH = og.sim.viewer_width
+    TOTAL_IMAGES = 5000
 
     output_dir = sys.argv[1]
-    hdf5_path = os.path.join(output_dir, "camera_data.hdf5")
+
     images_dir = os.path.join(output_dir, "images")
     os.makedirs(images_dir, exist_ok=True)
-    with h5py.File(hdf5_path, "w") as f:
-        f.create_dataset("rgb", shape=(TOTAL_IMAGES, HEIGHT, WIDTH, 4), dtype="uint8")
-        f.create_dataset("depth", shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype="float32")
-        f.create_dataset("segmentation", shape=(TOTAL_IMAGES, HEIGHT, WIDTH), dtype="int32")
 
-        f.create_dataset("camera_pose", shape=(TOTAL_IMAGES, 4, 4), dtype="float32")
+    depth_dir = os.path.join(output_dir, "depth")
+    os.makedirs(depth_dir, exist_ok=True)
 
-        # Warm up.
-        for _ in range(5):
-            og.sim.render()
+    segmentation_dir = os.path.join(output_dir, "seg")
+    os.makedirs(segmentation_dir, exist_ok=True)
 
-        # Record the camera intrinsics
-        K = og.sim.viewer_camera.intrinsic_matrix.cpu().numpy()
-        f.attrs["camera_intrinsics"] = json.dumps(K.tolist())
+    metadata_dir = os.path.join(output_dir, "metadata")
+    os.makedirs(metadata_dir, exist_ok=True)
 
-        # Calculate scene AABB
-        scene_aabb_min, scene_aabb_max = None, None
-        for obj in env.scene.objects:
-            aabb_min, aabb_max = obj.aabb
-            if scene_aabb_min is None:
-                scene_aabb_min = aabb_min
-                scene_aabb_max = aabb_max
-            else:
-                scene_aabb_min = th.minimum(scene_aabb_min, aabb_min)
-                scene_aabb_max = th.maximum(scene_aabb_max, aabb_max)
+    # Warm up.
+    for _ in range(5):
+        og.sim.render()
 
-        # with tqdm.tqdm(total=TOTAL_IMAGES, desc="Collecting images") as pbar:
+    # Record the camera intrinsics
+    K = og.sim.viewer_camera.intrinsic_matrix.cpu().numpy()
+    np.save(os.path.join(output_dir, "camera_intrinsics.npy"), K)
+
+    # Calculate scene AABB
+    scene_aabb_min, scene_aabb_max = None, None
+    for obj in env.scene.objects:
+        aabb_min, aabb_max = obj.aabb
+        if scene_aabb_min is None:
+            scene_aabb_min = aabb_min
+            scene_aabb_max = aabb_max
+        else:
+            scene_aabb_min = th.minimum(scene_aabb_min, aabb_min)
+            scene_aabb_max = th.maximum(scene_aabb_max, aabb_max)
+
+    poses_so_far = []
+    with tqdm.tqdm(total=TOTAL_IMAGES, desc="Collecting images") as pbar:
         while index < TOTAL_IMAGES:
-            # Pick a room from the scene, uniformly
-            # room_name = random.choice(rooms)
-            # if room_name in ("garden_0", "sauna_0", "garage_0"):
-            #     continue
-
-            # _, camera_point = env.scene.seg_map.get_random_point_by_room_instance(room_name)
-            # if camera_point is None:
-            #     continue
-
-            # Check if the camera point is valid (e.g. not within 10cm of a wall)
-            # map_coords = env.scene.trav_map.world_to_map(camera_point[:2])
-            # if trav_map[map_coords[0], map_coords[1]] == 0:
-            #     continue
+            # Pick a random point in the scene AABB
             camera_point = scene_aabb_min + th.rand(3) * (scene_aabb_max - scene_aabb_min)
 
             # Pick a random height
@@ -147,75 +130,72 @@ def main():
             rotation = T.euler2quat(th.tensor([0, pitch * DEG2RAD, yaw * DEG2RAD], dtype=th.float32))
             rotation = convert_camera_frame_orientation_convention(rotation, "world", "opengl")
 
-            # Get the rotation as a quaternion
-            for jitter_idx in range(1):
-                jittered_position = camera_point.clone()
-                jittered_rotation = rotation.clone()
+            # Set the camera pose
+            og.sim.viewer_camera.set_position_orientation(position=camera_point, orientation=rotation)
 
-                if jitter_idx > 0:
-                    # Jitter the camera position slightly by up to 10cm in any direction
-                    position_jitter = th.rand(3) * 0.2 - 0.1  # Random jitter in [-0.1, 0.1] meters
-                    jittered_position += position_jitter
+            # Render 5 times to ensure the camera is stable
+            for _ in range(5):
+                og.sim.render()
 
-                    # Jitter the orientation too. Randomly sample an axis and a small angle.
-                    axis = th.rand(3)
-                    axis /= th.norm(axis)
-                    angle = th.deg2rad(th.rand(1) * 20 - 10)  # Random angle of up to 10 degrees
-                    rotation_jitter = T.axisangle2quat(axis * angle)
-                    jittered_rotation = T.quat_multiply(jittered_rotation, rotation_jitter)
+            # Get the observation from the viewer camera sensor
+            obs, obs_info = og.sim.viewer_camera.get_obs()
+            rgb = obs["rgb"].detach().cpu().numpy()
+            depth = obs["depth_linear"].detach().cpu().numpy()
+            seg = obs["seg_instance"].detach().cpu().numpy()
 
-                # Set the camera pose
-                og.sim.viewer_camera.set_position_orientation(position=jittered_position, orientation=jittered_rotation)
+            # Check that in any given image at least 3 different objects are visible by at least 1% of the total area
+            unique_objects, counts = np.unique(seg.flatten(), return_counts=True)
+            if len(unique_objects) < 3:
+                continue
+            counts = counts[unique_objects > 0]  # Ignore background
+            object_areas = counts / (rgb.shape[0] * rgb.shape[1])
+            # if np.sum(object_areas > 0.01) < 3:
+            #     continue
 
-                # Render 5 times to ensure the camera is stable
-                for _ in range(5):
-                    og.sim.render()
+            # Check that no object takes up more than 90% of the image area
+            if np.any(object_areas > 0.9):
+                continue
 
-                # Get the observation from the viewer camera sensor
-                rgb = og.sim.viewer_camera.get_obs()[0]["rgb"].detach().clone().cpu().numpy()
-                depth = og.sim.viewer_camera.get_obs()[0]["depth_linear"].detach().clone().cpu().numpy()
-                seg = og.sim.viewer_camera.get_obs()[0]["seg_instance"].detach().clone().cpu().numpy()
+            # Check that the average depth is not less than a constant.
+            if np.mean(depth) < 1:
+                continue
 
-                # Check that in any given image at least 3 different objects are visible by at least 1% of the total area
-                unique_objects, counts = np.unique(seg.flatten(), return_counts=True)
-                if len(unique_objects) < 3:
-                    continue
-                counts = counts[unique_objects > 0]  # Ignore background
-                object_areas = counts / (rgb.shape[0] * rgb.shape[1])
-                # if np.sum(object_areas > 0.01) < 3:
-                #     continue
-
-                # Check that no object takes up more than 90% of the image area
-                if np.any(object_areas > 0.9):
-                    continue
-
-                # Check that the average depth is not less than a constant.
-                if np.mean(depth) < 2:
-                    continue
-
-                # Save the image to a file
-                image_file = f"camera_{index:04d}_yaw_{yaw}_pitch_{int(pitch)}.png"
-                Image.fromarray(rgb).save(os.path.join(images_dir, image_file))
-
-                # Save the data into hdf5
-                f["rgb"][index] = rgb
-                f["depth"][index] = depth
-                f["segmentation"][index] = seg
-
-                f["camera_pose"][index] = T.pose2mat(og.sim.viewer_camera.get_position_orientation()).cpu().numpy()
-
-                # Flush every N entries
-                if index % FLUSH_EVERY == 0:
-                    f.flush()
-
-                index += 1
-                print(index)
-
-                if index >= TOTAL_IMAGES:
+            # Check if we are too close to any particular pose (within 5cm and 15 degrees)
+            too_close = False
+            rot_obj = R.from_quat(rotation.numpy())
+            inv_rot_obj = rot_obj.inv()
+            for prev_pos, prev_rot in poses_so_far:
+                pos_difference = th.norm(prev_pos - camera_point).item()
+                orn_difference = (inv_rot_obj * prev_rot).magnitude()
+                if pos_difference < 0.05 and orn_difference < 15 * DEG2RAD:
+                    too_close = True
                     break
+            if too_close:
+                continue
 
-        # Record the segmentation keys
-        f.attrs["segmentation_labels"] = json.dumps(og.sim.viewer_camera.get_obs()[1]["seg_instance"])
+            # Save the image to a file
+            image_file = f"{index:05d}.png"
+            Image.fromarray(rgb).save(os.path.join(images_dir, image_file))
+
+            # Save the depth and segmentation as numpy arrays
+            np.save(os.path.join(depth_dir, image_file.replace(".png", ".npy")), depth)
+            np.save(os.path.join(segmentation_dir, image_file.replace(".png", ".npy")), seg)
+
+            # Save other metadata
+            camera_pose = T.pose2mat(og.sim.viewer_camera.get_position_orientation()).cpu().numpy()
+            metadata = {"pose": camera_pose.tolist(), "yaw": yaw, "pitch": pitch}
+            with open(os.path.join(metadata_dir, image_file.replace(".png", ".json")), "w") as f:
+                json.dump(metadata, f, indent=4)
+
+            # Record the pose for checking later
+            poses_so_far.append((camera_point, rot_obj))
+
+            index += 1
+            pbar.update(1)
+
+            # Overwrite the segmentation keys
+            with open(os.path.join(output_dir, "segmentation_keys.json"), "w") as f:
+                json.dump(obs_info["seg_instance"], f)
 
     # Always close the environment at the end
     og.clear()
