@@ -150,17 +150,6 @@ def _launch_app():
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
-    # TODO (Cem): Currently remove texture cache folder
-    try:
-        log.info("Texture cache folder found, removing...")
-        shutil.rmtree(os.path.join(os.path.expanduser("~"), ".cache", "ov", "texturecache"))
-    except FileNotFoundError:
-        log.info("Texture cache folder not found, no need to remove")
-    except PermissionError:
-        log.info("Permission error when removing texture cache. Ignoring")
-    except Exception as e:
-        log.info(f"Unexpected error when removing texture cache: {e}. Ignoring")
-
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
