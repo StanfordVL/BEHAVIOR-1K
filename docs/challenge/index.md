@@ -111,4 +111,7 @@ We gratefully acknowledge the support of our sponsors who make this challenge po
   <a href="https://tsffoundation.org/" title="Schmidt Family Foundation" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
     <img src="../assets/challenge_2025/schmidt_family_foundation_logo.png" alt="Schmidt Family Foundation" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
   </a>
+  <a href="https://www.nvidia.com/" title="NVIDIA" style="display: flex; align-items: center; justify-content: center; width: 200px; height: 100px;">
+    <img src="../assets/challenge_2025/nvidia_logo.png" alt="NVIDIA" style="max-height: 100%; max-width: 100%; width: auto; height: auto; object-fit: contain;" />
+  </a>
 </div>

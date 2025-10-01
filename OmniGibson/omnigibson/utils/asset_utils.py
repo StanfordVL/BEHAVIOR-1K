@@ -4,6 +4,7 @@ from importlib.metadata import version
 import inspect
 import json
 import os
+from packaging.version import Version
 import pathlib
 import shutil
 import subprocess
@@ -16,7 +17,6 @@ import zipfile
 
 import bddl
 from huggingface_hub import hf_hub_download
-import progressbar
 from cryptography.fernet import Fernet
 
 import omnigibson as og
@@ -28,22 +28,6 @@ if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
-
-pbar = None
-
-
-def show_progress(block_num, block_size, total_size):
-    global pbar
-    if pbar is None:
-        pbar = progressbar.ProgressBar(maxval=total_size)
-        pbar.start()
-
-    downloaded = block_num * block_size
-    if downloaded < total_size:
-        pbar.update(downloaded)
-    else:
-        pbar.finish()
-        pbar = None
 
 
 def is_dot_file(p):
@@ -307,13 +291,12 @@ def get_all_object_category_models_with_abilities(category, abilities):
 
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
-        usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-        with decrypted(usd_path) as dpath:
-            with extracted(dpath, usd_only=True) as fpath:
-                stage = lazy.pxr.Usd.Stage.Open(fpath)
-                prim = stage.GetDefaultPrim()
-                if supports_abilities(abilities_info, prim):
-                    valid_models.append(model)
+        usd_path = usd_path.replace(".usd", ".encrypted.usd")
+        with decrypted(usd_path) as fpath:
+            stage = lazy.pxr.Usd.Stage.Open(fpath)
+            prim = stage.GetDefaultPrim()
+            if supports_abilities(abilities_info, prim):
+                valid_models.append(model)
 
     return valid_models
 
@@ -334,17 +317,16 @@ def get_attachment_meta_links(category, model):
     from omnigibson.objects.dataset_object import DatasetObject
 
     usd_path = DatasetObject.get_usd_path(category=category, model=model)
-    usd_path = usd_path.replace(".usdz", ".usdz.encrypted")
-    with decrypted(usd_path) as dpath:
-        with extracted(dpath, usd_only=True) as fpath:
-            stage = lazy.pxr.Usd.Stage.Open(fpath)
-            prim = stage.GetDefaultPrim()
-            attachment_meta_links = []
-            for child in prim.GetChildren():
-                if child.GetTypeName() == "Xform":
-                    if any(meta_link_type in child.GetName() for meta_link_type in AttachedTo.meta_link_types):
-                        attachment_meta_links.append(child.GetName())
-            return attachment_meta_links
+    usd_path = usd_path.replace(".usd", ".encrypted.usd")
+    with decrypted(usd_path) as fpath:
+        stage = lazy.pxr.Usd.Stage.Open(fpath)
+        prim = stage.GetDefaultPrim()
+        attachment_meta_links = []
+        for child in prim.GetChildren():
+            if child.GetTypeName() == "Xform":
+                if any(meta_link_type in child.GetName() for meta_link_type in AttachedTo.meta_link_types):
+                    attachment_meta_links.append(child.GetName())
+        return attachment_meta_links
 
 
 def get_omnigibson_robot_asset_git_hash():
@@ -421,6 +403,14 @@ def get_behavior_1k_assets_version():
         return None
 
 
+def check_minimum_behavior_1k_assets_version(min_version_str):
+    current_version = get_behavior_1k_assets_version()
+    if current_version is None:
+        return False
+
+    return Version(current_version) >= Version(min_version_str)
+
+
 def get_texture_file(mesh_file):
     """
     Get texture file
@@ -450,11 +440,19 @@ def get_texture_file(mesh_file):
 
 
 def download_and_unpack_zipped_dataset(dataset_name):
+    # The current version of the dataset that should be downloaded
+    BEHAVIOR_1K_DATASET_VERSION = "3.7.2rc1"
+
     tempdir = tempfile.mkdtemp()
     real_target = get_dataset_path(dataset_name)
+    online_filename = (
+        f"behavior-1k-assets-{BEHAVIOR_1K_DATASET_VERSION}.zip"
+        if dataset_name == "behavior-1k-assets"
+        else f"{dataset_name}.zip"
+    )
     local_path = hf_hub_download(
         repo_id="behavior-1k/zipped-datasets",
-        filename=f"{dataset_name}.zip",
+        filename=online_filename,
         repo_type="dataset",
         local_dir=tempdir,
     )
@@ -557,7 +555,7 @@ def download_key():
             )
         )
         path = ___
-        assert urlretrieve(path, get_key_path(), show_progress), "Key download failed."
+        assert urlretrieve(path, get_key_path()), "Key download failed."
 
 
 def download_behavior_1k_assets(accept_license=False):
@@ -636,22 +634,6 @@ def decrypted(encrypted_filename):
     decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
     yield decrypted_filename
     os.remove(decrypted_filename)
-
-
-@contextlib.contextmanager
-def extracted(usdz_filename, usd_only=False):
-    out_dir = tempfile.mkdtemp(prefix=os.path.basename(usdz_filename), dir=og.tempdir)
-    with zipfile.ZipFile(usdz_filename, "r") as zip_ref:
-        if usd_only:
-            usds = [f for f in zip_ref.namelist() if f.endswith(".usd")]
-            zip_ref.extractall(out_dir, members=usds)
-        else:
-            zip_ref.extractall(out_dir)
-    usd_file = [f for f in os.listdir(out_dir) if f.endswith(".usd")]
-    assert len(usd_file) == 1, "Expected exactly one USD file in USDZ archive, found {}".format(usd_file)
-    usd_file = os.path.join(out_dir, usd_file[0])
-    yield usd_file
-    shutil.rmtree(out_dir)
 
 
 if __name__ == "__main__":
