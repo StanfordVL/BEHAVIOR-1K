@@ -81,7 +81,7 @@ def main():
             stage_instance = os.path.basename(scene_contents["stage_instance"]["template_name"])
             stage_category, stage_model = object_mapping[stage_instance]
             tmpl = DatasetObject(
-                name="stage", category=stage_category, model=stage_model, fixed_base=True, dataset_type=dataset_name
+                name="stage", category=stage_category, model=stage_model, fixed_base=True, dataset_name=dataset_name
             )
             scene.add_object(tmpl)
             tmpl.set_position_orientation(position=th.zeros(3), orientation=ROTATE_EVERYTHING_BY)
@@ -105,7 +105,7 @@ def main():
                         model=model,
                         scale=scale,
                         fixed_base=True,
-                        dataset_type=dataset_name,
+                        dataset_name=dataset_name,
                     )
                 except:
                     print("Skipping object", obj_instance)

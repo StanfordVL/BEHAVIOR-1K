@@ -60,7 +60,7 @@ def load_object(mesh_name, fixed_base):
             category=category,
             model=model,
             fixed_base=fixed_base,
-            dataset_type="ai2thor",
+            dataset_name="ai2thor",
             # scale=th.tensor([-1., 1., 1.])
         )
     elif mesh_name in SPOC_OBJECTS:
@@ -71,7 +71,7 @@ def load_object(mesh_name, fixed_base):
             category=category,
             model=model,
             fixed_base=fixed_base,
-            dataset_type="spoc",
+            dataset_name="spoc",
             scale=scale,
         )
     else:

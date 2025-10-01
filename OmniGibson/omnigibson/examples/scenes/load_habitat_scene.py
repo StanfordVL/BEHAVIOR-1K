@@ -40,7 +40,7 @@ def load_habitat_scene(dataset_name, scene_input_json):
     stage_instance = os.path.basename(scene_contents["stage_instance"]["template_name"])
     stage_category, stage_model = object_mapping[stage_instance]
     tmpl = DatasetObject(
-        name="stage", category=stage_category, model=stage_model, fixed_base=True, dataset_type=dataset_name
+        name="stage", category=stage_category, model=stage_model, fixed_base=True, dataset_name=dataset_name
     )
     scene.add_object(tmpl)
 
@@ -66,7 +66,7 @@ def load_habitat_scene(dataset_name, scene_input_json):
                 model=model,
                 scale=scale,
                 fixed_base=obj_instance["motion_type"] == "STATIC",
-                dataset_type=dataset_name,
+                dataset_name=dataset_name,
             )
         except:
             print("Skipping object", obj_instance)
