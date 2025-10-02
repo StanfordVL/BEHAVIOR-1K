@@ -80,9 +80,9 @@ CHALLENGE_TASKS_PROGRESS_APPROXIMATION = {
             "pumpkin_2_picked_up": ("state", "pumpkin.n.02_2", OnTop, "floor.n.01_1", False),
             "pumpkin_1_in_cabinet": ("state", "pumpkin.n.02_1", Inside, "cabinet.n.01_1", True),
             "pumpkin_2_in_cabinet": ("state", "pumpkin.n.02_2", Inside, "cabinet.n.01_1", True),
-            "robot_near_caldron": ("near", "agent.n.01_1", "cauldron.n.01_1"),
-            "caldron_picked_up": ("state", "cauldron.n.01_1", OnTop, "floor.n.01_1", False),
-            "cauldron_next_to_table": ("state", "cauldron.n.01_1", NextTo, "table.n.02_1", True),
+            "robot_near_caldron": ("near", "agent.n.01_1", "caldron.n.01_1"),
+            "caldron_picked_up": ("state", "caldron.n.01_1", OnTop, "floor.n.01_1", False),
+            "caldron_next_to_table": ("state", "caldron.n.01_1", NextTo, "table.n.02_1", True),
         },
     ),
     # TODO: add more tasks here
