@@ -11,7 +11,7 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.asset_utils import get_og_dataset_version
+from omnigibson.utils.asset_utils import get_behavior_1k_assets_version
 from omnigibson.utils.constants import PrimType
 
 # Params to be set as needed.
@@ -35,7 +35,7 @@ og.launch(physics_dt=1 / 60.0, rendering_dt=1 / 60.0)
 
 
 def benchmark_scene(scene_name, non_rigid_simulation=False, import_robot=True):
-    assets_version = get_og_dataset_version()
+    assets_version = get_behavior_1k_assets_version()
     print("dataset version", assets_version)
     scene = InteractiveTraversableScene(scene_name)
     start = time.time()

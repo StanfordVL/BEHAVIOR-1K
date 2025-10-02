@@ -34,6 +34,7 @@ class StaticTraversableScene(TraversableScene):
         trav_map_with_objects=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
+        include_robots=True,
     ):
         """
         Args:
@@ -45,6 +46,7 @@ class StaticTraversableScene(TraversableScene):
             trav_map_with_objects (bool): whether to use objects or not when constructing graph
             num_waypoints (int): number of way points returned
             waypoint_resolution (float): resolution of adjacent way points
+            include_robots (bool): whether to also include the robot(s) defined in the scene
         """
         # Store and initialize additional variables
         self._floor_heights = None
@@ -61,6 +63,7 @@ class StaticTraversableScene(TraversableScene):
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=True,
+            include_robots=include_robots,
         )
 
     def _load(self):

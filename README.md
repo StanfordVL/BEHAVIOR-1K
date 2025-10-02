@@ -19,21 +19,32 @@ BEHAVIOR-1K provides an installation script that handles all dependencies and co
 
 ## Quick Start
 
-For most users, we recommend the full installation. You can either create a new conda environment or use your existing Python environment:
+For most users, we recommend installing the latest stable release (v3.7.1) with all components:
 
 ### Linux
 ```bash
-git clone https://github.com/StanfordVL/BEHAVIOR-1K
+# Clone the latest stable release (recommended)
+git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
-./setup.sh --new-env --omnigibson --bddl --teleop --dataset
+
+# Run the setup script
+./setup.sh --new-env --omnigibson --bddl --joylo --dataset
 ```
 
 ### Windows
 ```powershell
-git clone https://github.com/StanfordVL/BEHAVIOR-1K
+# Clone the latest stable release (recommended)
+git clone -b v3.7.1 https://github.com/StanfordVL/BEHAVIOR-1K.git
 cd BEHAVIOR-1K
-.\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+
+# Run the setup script
+.\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset
 ```
+
+> **Development Branch**: If you want the latest development features (potentially less stable), clone the main branch instead:
+> ```bash
+> git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+> ```
 
 > **Note**: Run PowerShell as Administrator and set execution policy if needed: `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
@@ -45,7 +56,7 @@ cd BEHAVIOR-1K
 |-----------|------|-------------|
 | **OmniGibson** | `--omnigibson` | Core physics simulator and robotics environment |
 | **BDDL** | `--bddl` | Behavior Domain Definition Language for task specification |
-| **Teleoperation** | `--teleop` | JoyLo interface for robot teleoperation |
+| **JoyLo** | `--joylo` | JoyLo interface for robot teleoperation |
 
 ### Additional Options
 
@@ -54,6 +65,7 @@ cd BEHAVIOR-1K
 | **New Environment** | `--new-env` | Create a new conda environment named `behavior` (requires conda) |
 | **Datasets** | `--dataset` | Download BEHAVIOR datasets (requires `--omnigibson`) |
 | **Primitives** | `--primitives` | Install OmniGibson with action primitives support |
+| **Eval** | `--eval` | Install evaluation support for OmniGibson |
 | **Development** | `--dev` | Install development dependencies |
 | **CUDA Version** | `--cuda-version X.X` | Specify CUDA version (default: 12.4) |
 | **No Conda Confirmation** | `--confirm-no-conda` | Skip confirmation prompt when not in a conda environment |
@@ -64,16 +76,16 @@ If you prefer to use your existing Python environment (system Python, venv, etc.
 
 ```bash
 # Linux
-./setup.sh --omnigibson --bddl --teleop --dataset
+./setup.sh --omnigibson --bddl --joylo --dataset
 
 # Windows
-.\setup.ps1 -OmniGibson -BDDL -Teleop -Dataset
+.\setup.ps1 -OmniGibson -BDDL -JoyLo -Dataset
 ```
 
 If you're not in a conda environment, the script will prompt for confirmation. To skip this prompt (useful for CI/CD):
 
 ```bash
-./setup.sh --omnigibson --bddl --teleop --dataset --confirm-no-conda
+./setup.sh --omnigibson --bddl --joylo --dataset --confirm-no-conda
 ```
 
 ### Terms of Service & License Acceptance
@@ -89,7 +101,7 @@ BEHAVIOR-1K installation may require acceptance of various terms of service and 
 For automated/CI environments, you can bypass all prompts:
 
 ```bash
-./setup.sh --new-env --omnigibson --bddl --teleop --dataset \
+./setup.sh --new-env --omnigibson --bddl --joylo --dataset \
            --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 ```
 

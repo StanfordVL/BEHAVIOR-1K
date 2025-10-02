@@ -31,7 +31,7 @@ class FKSolver:
         Given @joint_positions, get poses of the desired links (specified by @link_names)
 
         Args:
-            joint positions (n-array): Joint positions in configuration space
+            joint_positions (n-array): Joint positions in configuration space
             link_names (list): List of robot link names we want to specify (e.g. "gripper_link")
 
         Returns:

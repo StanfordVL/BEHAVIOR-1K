@@ -37,9 +37,17 @@ class VectorEnvironment:
             infos.append(info)
         return observations, rewards, terminates, truncates, infos
 
-    def reset(self):
-        for env in self.envs:
-            env.reset()
+    def reset(self, get_obs=True, **kwargs):
+        if get_obs:
+            observations, infos = [], []
+            for env in self.envs:
+                obs, info = env.reset(get_obs=get_obs, **kwargs)
+                observations.append(obs)
+                infos.append(info)
+            return observations, infos
+        else:
+            for env in self.envs:
+                env.reset(get_obs=get_obs, **kwargs)
 
     def close(self):
         pass

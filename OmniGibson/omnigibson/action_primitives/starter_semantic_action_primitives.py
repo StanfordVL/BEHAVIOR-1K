@@ -9,6 +9,7 @@ runnable examples.
 import inspect
 import math
 import random
+from typing import Any
 
 import cv2
 import gymnasium as gym
@@ -170,9 +171,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot (BaseRobot): The robot that the primitives will run on.
             enable_head_tracking (bool): Whether to enable head tracking. Defaults to True.
             always_track_eef (bool, optional): Whether to always track the end effector, as opposed
-              to switching between target object and end effector based on context. Defaults to False.
+                to switching between target object and end effector based on context. Defaults to False.
             task_relevant_objects_only (bool): Whether to only consider objects relevant to the task
-              when computing the action space. Defaults to False.
+                when computing the action space. Defaults to False.
             curobo_batch_size (int): The batch size for curobo motion planning and collision checking. Defaults to 3.
             debug_visual_marker (PrimitiveObject): The object to use for debug visual markers. Defaults to None.
             skip_curobo_initilization (bool): Whether to skip curobo initialization. Defaults to False.
@@ -291,7 +292,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
 
-    def apply_ref(self, primitive, *args, attempts=5):
+    def apply_ref(self, primitive, *args: Any, attempts=5):
         """
         Yields action for robot to execute the primitive with the given arguments.
 

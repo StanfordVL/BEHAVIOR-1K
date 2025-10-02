@@ -24,6 +24,7 @@ from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -579,8 +580,9 @@ class ManipulationRobot(BaseRobot):
                 Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
                 Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world".parent frame
-            set position relative to the object parent. scene frame set position relative to the scene.
+            frame (Literal): frame to set the pose with respect to, defaults to "world".
+                parent frame: set position relative to the object parent.
+                scene frame: set position relative to the scene.
         """
 
         # Store the original EEF poses.
@@ -1293,7 +1295,8 @@ class ManipulationRobot(BaseRobot):
         model = self.model_name.lower()
         return {
             emb_sel: os.path.join(
-                gm.ASSET_PATH, f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml"
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/{model}/curobo/{model}_description_curobo_{emb_sel.value}.yaml",
             )
             for emb_sel in CuRoboEmbodimentSelection
         }

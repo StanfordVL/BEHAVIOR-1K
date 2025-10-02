@@ -60,10 +60,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Step through the environment
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        env.step(th.empty(0))
+        env.step([])
 
     # Always close the environment at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

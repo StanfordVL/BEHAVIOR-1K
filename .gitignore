@@ -10,3 +10,6 @@ gha-creds-*.json
 
 *.json
 *.log
+# training
+outputs/
+/*.ipynb

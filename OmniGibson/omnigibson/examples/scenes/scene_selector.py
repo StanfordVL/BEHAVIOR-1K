@@ -1,8 +1,9 @@
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_behavior_1k_scenes
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardEventHandler
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 
 # Configure macros for maximum performance
 gm.USE_GPU_DYNAMICS = True
@@ -18,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose the scene model to load
-    scenes = get_available_og_scenes()
+    scenes = get_available_behavior_1k_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
 
     cfg = {
@@ -35,15 +36,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
     load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
     if load_mode == "Quick":
-        cfg["scene"]["load_object_categories"] = [
-            "floors",
-            "walls",
-            "ceilings",
-            "lawn",
-            "driveway",
-            "roof",
-            "rail_fence",
-        ]
+        cfg["scene"]["load_object_categories"] = list(STRUCTURE_CATEGORIES)
 
     # Load the environment
     env = og.Environment(configs=cfg)

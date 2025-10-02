@@ -92,18 +92,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     if not short_exec:
         input("\nObject will be frozen. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(-50)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Notify user that we're about to cook the object, and then cook the object
     if not short_exec:
         input("\nObject will be cooked. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(100)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Notify user that we're about to burn the object, and then burn the object
     if not short_exec:
         input("\nObject will be burned. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(250)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Notify user that we're about to reset the object to its default state, and then reset state
@@ -111,18 +117,24 @@ def main(random_selection=False, headless=False, short_exec=False):
         input("\nObject will be reset to default state. Press ENTER to continue.")
     obj.states[object_states.Temperature].set_value(macros.object_states.temperature.DEFAULT_TEMPERATURE)
     obj.states[object_states.MaxTemperature].set_value(macros.object_states.temperature.DEFAULT_TEMPERATURE)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Notify user that we're about to soak the object, and then soak the object
     if not short_exec:
         input("\nObject will be saturated with water. Press ENTER to continue.")
     obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), True)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Notify user that we're about to unsoak the object, and then unsoak the object
     if not short_exec:
         input("\nObject will be unsaturated with water. Press ENTER to continue.")
     obj.states[object_states.Saturated].set_value(env.scene.get_system("water"), False)
+    for _ in range(50):
+        og.sim.render()
     report_states()
 
     # Close environment at the end

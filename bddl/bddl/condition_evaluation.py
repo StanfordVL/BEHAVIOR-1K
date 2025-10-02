@@ -5,11 +5,7 @@ import numpy as np
 
 import bddl
 from bddl.logic_base import Expression
-from bddl.utils import (
-    UnsupportedPredicateError,
-    truncated_permutations,
-    truncated_product,
-)
+from bddl.utils import UnsupportedPredicateError
 
 #################### RECURSIVE PREDICATES ####################
 
@@ -42,7 +38,7 @@ class Conjunction(Expression):
         return all(self.child_values)
 
     def get_ground_options(self):
-        options = list(truncated_product(*[child.flattened_condition_options for child in self.children]))
+        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
         self.flattened_condition_options = []
         for option in options:
             self.flattened_condition_options.append(list(itertools.chain(*option)))
@@ -112,7 +108,7 @@ class Universal(Expression):
 
     def get_ground_options(self):
         # Accept just a few possible options
-        options = list(truncated_product(*[child.flattened_condition_options for child in self.children]))
+        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
         self.flattened_condition_options = []
         for option in options:
             self.flattened_condition_options.append(list(itertools.chain(*option)))
@@ -187,7 +183,7 @@ class NQuantifier(Expression):
 
     def get_ground_options(self):
         # Accept just a few possible options
-        options = list(truncated_product(*[child.flattened_condition_options for child in self.children]))
+        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
         self.flattened_condition_options = []
         for option in options:
             # for combination in [combo for num_el in range(self.N - 1, len(option)) for combo in itertools.combinations(option, num_el + 1)]:
@@ -239,8 +235,8 @@ class ForPairs(Expression):
         self.flattened_condition_options = []
         M, N = len(self.children), len(self.children[0])
         L, G = min(M, N), max(M, N)
-        all_L_choices = truncated_permutations(range(L))
-        all_G_choices = truncated_permutations(range(G), r=L)
+        all_L_choices = itertools.permutations(range(L))
+        all_G_choices = itertools.permutations(range(G), r=L)
         for lchoice in all_L_choices:
             for gchoice in all_G_choices:
                 if M < N:
@@ -251,7 +247,7 @@ class ForPairs(Expression):
                     all_child_options = [
                         self.children[gchoice[l]][lchoice[l]].flattened_condition_options for l in range(L)
                     ]
-                choice_options = truncated_product(*all_child_options)
+                choice_options = itertools.product(*all_child_options)
                 unpacked_choice_options = []
                 for choice_option in choice_options:
                     unpacked_choice_options.append(list(itertools.chain(*choice_option)))
@@ -301,14 +297,14 @@ class ForNPairs(Expression):
         P, Q = len(self.children), len(self.children[0])
         L = min(P, Q)
         assert self.N <= L, "ForNPairs asks for more pairs than instances available"
-        all_P_choices = truncated_permutations(range(P), r=self.N)
-        all_Q_choices = truncated_permutations(range(Q), r=self.N)
+        all_P_choices = itertools.permutations(range(P), r=self.N)
+        all_Q_choices = itertools.permutations(range(Q), r=self.N)
         for pchoice in all_P_choices:
             for qchoice in all_Q_choices:
                 all_child_options = [
                     self.children[pchoice[n]][qchoice[n]].flattened_condition_options for n in range(self.N)
                 ]
-                choice_options = truncated_product(*all_child_options)
+                choice_options = itertools.product(*all_child_options)
                 unpacked_choice_options = []
                 for choice_option in choice_options:
                     unpacked_choice_options.append(list(itertools.chain(*choice_option)))
@@ -353,7 +349,7 @@ class Negation(Expression):
                 negated_conds.append(["not", cond])
             negated_options.append(negated_conds)
         # only picking one condition from each set of disjuncts
-        for negated_option_selections in truncated_product(*negated_options):
+        for negated_option_selections in itertools.product(*negated_options):
             self.flattened_condition_options.append(list(itertools.chain(negated_option_selections)))
 
 
@@ -402,7 +398,7 @@ class Implication(Expression):
             for cond in option:
                 negated_conds.append(["not", cond])
             negated_options.append(negated_conds)
-        for negated_option_selections in truncated_product(*negated_options):
+        for negated_option_selections in itertools.product(*negated_options):
             flattened_neg_antecedent_options.append(list(itertools.chain(negated_option_selections)))
 
         flattened_consequent_options = self.children[1].flattened_condition_options
@@ -497,7 +493,7 @@ def evaluate_state(compiled_state):
 
 def get_ground_state_options(compiled_state, backend, scope=None, object_map=None):
     all_options = list(
-        truncated_product(*[compiled_condition.flattened_condition_options for compiled_condition in compiled_state])
+        itertools.product(*[compiled_condition.flattened_condition_options for compiled_condition in compiled_state])
     )
     all_unpacked_options = [list(itertools.chain(*option)) for option in all_options]
 

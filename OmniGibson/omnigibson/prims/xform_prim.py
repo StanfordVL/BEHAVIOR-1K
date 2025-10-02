@@ -252,11 +252,9 @@ class XFormPrim(BasePrim):
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Args:
+            frame (Literal): frame to get the pose with respect to. Default to world.
+                parent frame: get position relative to the object parent.
+                scene frame: get position relative to the scene.
             clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:

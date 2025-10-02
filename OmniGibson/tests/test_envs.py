@@ -21,6 +21,7 @@ def task_tester(task_type):
             # BehaviorTask-specific
             "activity_name": "laying_wood_floors",
             "online_object_sampling": True,
+            "use_presampled_robot_pose": False,
         },
     }
 

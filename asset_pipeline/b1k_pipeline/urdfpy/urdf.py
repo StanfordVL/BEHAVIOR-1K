@@ -1236,17 +1236,20 @@ class Inertial(URDFType):
         origin = parse_origin(node)
         mass = float(node.find('mass').attrib['value'])
         n = node.find('inertia')
-        xx = float(n.attrib['ixx'])
-        xy = float(n.attrib['ixy'])
-        xz = float(n.attrib['ixz'])
-        yy = float(n.attrib['iyy'])
-        yz = float(n.attrib['iyz'])
-        zz = float(n.attrib['izz'])
-        inertia = np.array([
-            [xx, xy, xz],
-            [xy, yy, yz],
-            [xz, yz, zz]
-        ], dtype=np.float64)
+        if n:
+            xx = float(n.attrib['ixx'])
+            xy = float(n.attrib['ixy'])
+            xz = float(n.attrib['ixz'])
+            yy = float(n.attrib['iyy'])
+            yz = float(n.attrib['iyz'])
+            zz = float(n.attrib['izz'])
+            inertia = np.array([
+                [xx, xy, xz],
+                [xy, yy, yz],
+                [xz, yz, zz]
+            ], dtype=np.float64)
+        else:
+            inertia = np.eye(3, dtype=np.float64) * 1e-3
         return Inertial(mass=mass, inertia=inertia, origin=origin)
 
     def _to_xml(self, parent, path):

@@ -4,6 +4,8 @@ Script to import scene and objects
 import glob
 import os
 import pathlib
+import shutil
+import subprocess
 import sys
 
 from omnigibson.macros import gm
@@ -21,7 +23,7 @@ import omnigibson.lazy as lazy
 from omnigibson.prims import ClothPrim
 from omnigibson.scenes import Scene
 from omnigibson.utils.asset_utils import encrypt_file
-from omnigibson.utils.asset_conversion_utils import import_obj_metadata, import_obj_urdf
+from omnigibson.utils.asset_conversion_utils import import_obj_metadata, convert_urdf_to_usd
 from bddl.object_taxonomy import ObjectTaxonomy
 
 if __name__ == "__main__":
@@ -50,7 +52,7 @@ if __name__ == "__main__":
         model_dir = pathlib.Path(dataset_root) / "objects" / obj_category / obj_model
         assert model_dir.exists()
         print(f"IMPORTING CATEGORY/MODEL {obj_category}/{obj_model}...")
-        import_obj_urdf(
+        convert_urdf_to_usd(
             urdf_path=str(model_dir / "urdf" / f"{obj_model}.urdf"), obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
         )
         print("Importing metadata")
@@ -60,7 +62,7 @@ if __name__ == "__main__":
             obj_category=obj_category,
             obj_model=obj_model,
             dataset_root=dataset_root,
-            import_render_channels=True,
+            force_asset_pipeline_materials=True,
         )
         print("Done importing metadata")
 

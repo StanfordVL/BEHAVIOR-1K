@@ -19,8 +19,10 @@ from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.prim_base import BasePrim
+from omnigibson.systems import MicroParticleSystem
 from omnigibson.systems.system_base import PhysicalParticleSystem
-from omnigibson.systems.micro_particle_system import MicroParticleSystem
+
+# from omnigibson.systems.micro_particle_system import MicroParticleSystem
 from omnigibson.utils.constants import ParticleModifyCondition, ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import (
     get_particle_positions_from_frame,
@@ -480,8 +482,8 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                 indicator_mesh.load(self.obj.scene)
                 indicator_mesh.initialize()
                 indicator_mesh.visible = True
-                # Scale is 10% of the full scale
-                indicator_mesh_rel_scale = 0.1
+                # Scale is 5% of the full scale
+                indicator_mesh_rel_scale = 0.05
                 indicator_mesh.scale = self._projection_mesh_params["extents"] * indicator_mesh_rel_scale
                 indicator_z_offset = (
                     0.0
