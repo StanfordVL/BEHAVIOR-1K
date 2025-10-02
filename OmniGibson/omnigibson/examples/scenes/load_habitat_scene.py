@@ -1,3 +1,4 @@
+import csv
 import hashlib
 import pathlib
 import traceback
@@ -19,6 +20,23 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 log = create_module_logger(module_name=__name__)
 
+def convert_csv_to_dict(filepath):
+    """
+    Converts a 2-column CSV file into a key:value dictionary.
+
+    Args:
+        filepath (str): The path to the CSV file.
+
+    Returns:
+        dict: A dictionary created from the CSV data.
+    """
+    with open(filepath, mode="r", encoding="utf-8") as file:
+        reader = csv.reader(file)
+        # Use a dictionary comprehension for a clean and efficient conversion
+        return {row[0]: row[1] for row in reader}
+
+AI2_FIXEDNESS_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2thor-fixedness.csv"
+AI2_FIXEDNESS_MAPPING = {k: str(v).lower() == "true" for k, v in convert_csv_to_dict(AI2_FIXEDNESS_MAPPING_FN).items()}
 
 def load_habitat_scene(dataset_name, scene_input_json):
     scene_input_json = pathlib.Path(scene_input_json)
@@ -60,12 +78,19 @@ def load_habitat_scene(dataset_name, scene_input_json):
             orn = th.as_tensor(obj_instance["rotation"])[[1, 2, 3, 0]]
             scale = th.as_tensor(obj_instance["non_uniform_scale"])
 
+            # Is the dataset ai2thor? If so, we don't trust its fixedness flag.
+            if dataset_name == "ai2thor":
+                fixed_base = not AI2_FIXEDNESS_MAPPING[category]
+                print("Object", category, "fixedness", fixed_base)
+            else:
+                fixed_base = obj_instance["motion_type"] == "STATIC"
+
             obj = DatasetObject(
                 name=f"{category}_{i}",
                 category=category,
                 model=model,
                 scale=scale,
-                fixed_base=obj_instance["motion_type"] == "STATIC",
+                fixed_base=fixed_base,
                 dataset_name=dataset_name,
             )
         except:
@@ -90,7 +115,7 @@ if __name__ == "__main__":
     else:
         og.launch()
 
-    load_habitat_scene("ai2thor", "/home/cgokmen/Downloads/ProcTHOR-Val-982.scene_instance.json")
+    load_habitat_scene("ai2thor", "/home/cgokmen/Downloads/ProcTHOR-Train-1001.scene_instance.json")
 
     while True:
         og.sim.step()
