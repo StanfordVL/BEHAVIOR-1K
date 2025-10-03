@@ -17,7 +17,7 @@ If you want to modify or create new task definitions, you'll need to install the
 
 2. **Install the package:**
    ```bash
-   conda activate behavior
+   conda activate enact
    cd bddl
    pip install -e .
    ```

@@ -28,7 +28,7 @@ Usage: .\setup.ps1 [OPTIONS]
 
 Options:
   -Help                   Display this help message
-  -NewEnv                 Create a new conda environment 'behavior'
+  -NewEnv                 Create a new conda environment 'enact'
   -OmniGibson             Install OmniGibson (core physics simulator)
   -BDDL                   Install BDDL (Behavior Domain Definition Language)
   -JoyLo                  Install JoyLo (teleoperation interface)
@@ -220,7 +220,7 @@ function Invoke-CondaActivate {
 
 # Create conda environment
 if ($NewEnv) {
-    Write-Host "Creating conda environment 'behavior'..."
+    Write-Host "Creating conda environment 'enact'..."
     
     # Check if conda is available
     try {
@@ -238,9 +238,9 @@ if ($NewEnv) {
     }
     
     # Check if environment already exists and exit with instructions
-    if (Test-CondaEnvironment "behavior") {
+    if (Test-CondaEnvironment "enact") {
         Write-Host ""
-        Write-Host "ERROR: Conda environment 'behavior' already exists!"
+        Write-Host "ERROR: Conda environment 'enact' already exists!"
         Write-Host ""
         Write-Host "Please remove or rename the existing environment and re-run this script."
         Write-Host ""
@@ -248,10 +248,10 @@ if ($NewEnv) {
     }
     
     # Create environment with only Python 3.10
-    conda create -n behavior python=3.10 -c conda-forge -y
+    conda create -n enact python=3.10 -c conda-forge -y
     
     # Activate environment
-    Invoke-CondaActivate "behavior"
+    Invoke-CondaActivate "enact"
     
     # Install PyTorch via pip with CUDA support
     Write-Host "Installing PyTorch with CUDA $CudaVersion support..."
@@ -508,7 +508,7 @@ if ($Dataset) {
 # Installation summary
 Write-Host ""
 Write-Host "=== Installation Complete! ==="
-if ($NewEnv) { Write-Host "Created conda environment 'behavior'" }
+if ($NewEnv) { Write-Host "Created conda environment 'enact'" }
 if ($OmniGibson) { Write-Host "Installed OmniGibson + Isaac Sim" }
 if ($BDDL) { Write-Host "Installed BDDL" }
 if ($JoyLo) { Write-Host "Installed JoyLo" }
@@ -517,4 +517,4 @@ if ($Eval) { Write-Host "Installed evaluation support" }
 if ($AssetPipeline) { Write-Host "Installed asset pipeline" }
 if ($Dataset) { Write-Host "Downloaded datasets" }
 Write-Host ""
-if ($NewEnv) { Write-Host "To activate: conda activate behavior" }
+if ($NewEnv) { Write-Host "To activate: conda activate enact" }

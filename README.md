@@ -62,7 +62,7 @@ cd BEHAVIOR-1K
 
 | Option | Flag | Description |
 |--------|------|-------------|
-| **New Environment** | `--new-env` | Create a new conda environment named `behavior` (requires conda) |
+| **New Environment** | `--new-env` | Create a new conda environment named `enact` (requires conda) |
 | **Datasets** | `--dataset` | Download BEHAVIOR datasets (requires `--omnigibson`) |
 | **Primitives** | `--primitives` | Install OmniGibson with action primitives support |
 | **Eval** | `--eval` | Install evaluation support for OmniGibson |

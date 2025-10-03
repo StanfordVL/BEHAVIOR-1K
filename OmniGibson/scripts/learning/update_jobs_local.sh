@@ -6,7 +6,7 @@ CHECK_INTERVAL=$((5 * 60)) # check every 5 minutes
 LOG_DIR="$HOME/Documents/logs/update_jobs"
 SCRIPT_DIR="$HOME/Research/BEHAVIOR-1K"
 PYTHON_SCRIPT="OmniGibson/omnigibson/learning/scripts/update_jobs.py"
-CONDA_ENV="behavior"
+CONDA_ENV="enact"
 
 # === SETUP ===
 # Source conda

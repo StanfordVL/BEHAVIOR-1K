@@ -105,18 +105,18 @@ Choose your installation method:
             === "Linux"
 
                 ```shell
-                conda activate behavior
+                conda activate enact
                 ```
 
             === "Windows"
 
                 ```powershell
-                conda activate behavior
+                conda activate enact
                 ```
 
         !!! info "What does the setup script do?"
             
-            - Creates a new conda environment named `behavior` (when using `--new-env`)
+            - Creates a new conda environment named `enact` (when using `--new-env`)
             - Installs all selected components in editable mode
             - Downloads Isaac Sim and BEHAVIOR datasets (if requested)
 
