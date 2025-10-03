@@ -24,6 +24,7 @@ from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 __all__ = ["WebsocketClientPolicy", "WebsocketPolicyServer"]
@@ -101,7 +102,6 @@ class WebsocketPolicyServer:
         self._host = host
         self._port = port
         self._metadata = metadata or {}
-        logging.getLogger("websockets.server").setLevel(logging.INFO)
 
     def serve_forever(self) -> None:
         asyncio.run(self.run())
