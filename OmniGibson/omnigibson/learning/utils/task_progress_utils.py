@@ -28,12 +28,30 @@ def check_progress(env, check_specs):
         check_type = spec[0]
 
         if check_type == "near":
-            # ("near", obj1_key, obj2_key)
-            obj1, obj2 = objs[spec[1]].unwrapped, objs[spec[2]].unwrapped
-            pos1, pos2 = obj1.get_position_orientation()[0], obj2.get_position_orientation()[0]
-            # Only consider x and y coordinates (horizontal distance)
-            dist = th.linalg.norm(pos1[:2] - pos2[:2])
-            results[name] = bool(dist < ROBOT_OBJECT_DISTANCE_THRESHOLD)
+            # ("near", robot_key, obj_key) - robot should always be first
+            robot, obj = objs[spec[1]].unwrapped, objs[spec[2]].unwrapped
+
+            # Get all robot links to check: root_link and all eef_links
+            robot_links_to_check = [robot.root_link] + list(robot.eef_links.values())
+
+            # Get all object links
+            obj_links = list(obj.links.values())
+
+            # Check minimum distance between any robot link and any object link
+            is_near = False
+            for robot_link in robot_links_to_check:
+                robot_pos = robot_link.get_position_orientation()[0]
+                for obj_link in obj_links:
+                    obj_pos = obj_link.get_position_orientation()[0]
+                    # Only consider x and y coordinates (horizontal distance)
+                    dist = th.linalg.norm(robot_pos[:2] - obj_pos[:2])
+                    if dist < ROBOT_OBJECT_DISTANCE_THRESHOLD:
+                        is_near = True
+                        break
+                if is_near:
+                    break
+
+            results[name] = is_near
 
         elif check_type == "state":
             # Check if it's a relational or non-relational state based on argument pattern
