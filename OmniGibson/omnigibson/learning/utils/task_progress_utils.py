@@ -57,20 +57,37 @@ def check_progress(env, check_specs):
             # Check if it's a relational or non-relational state based on argument pattern
             if len(spec) == 4 and isinstance(spec[3], bool):
                 # ("state", obj_key, state_name, expected_bool) - non-relational state, e.g. ToggledOn, Open
-                obj = objs[spec[1]].unwrapped
-                results[name] = obj.states[spec[2]].get_value() == spec[3]
+                obj = objs[spec[1]]
+                results[name] = obj.exists and obj.unwrapped.states[spec[2]].get_value() == spec[3]
             elif len(spec) == 5:
                 # ("state", obj1_key, state_name, obj2_key, expected_bool) - relational state with explicit bool, e.g. Inside, OnTop
-                obj1, obj2 = objs[spec[1]].unwrapped, objs[spec[3]].unwrapped
-                results[name] = obj1.states[spec[2]].get_value(obj2) == spec[4]
+                if spec[3] not in objs:
+                    # Special case: e.g. category "tree.n.01" is not in object scope
+                    all_instances = [
+                        inst for inst, category in env.task.object_instance_to_category.items() if category == spec[3]
+                    ]
+                    assert len(all_instances) > 0, f"Could not find any instances for category {spec[3]}"
+                    obj1 = objs[spec[1]]
+                    results[name] = any(
+                        obj1.exists
+                        and objs[inst].exists
+                        and obj1.unwrapped.states[spec[2]].get_value(objs[inst].unwrapped) == spec[4]
+                        for inst in all_instances
+                    )
+                else:
+                    obj1, obj2 = objs[spec[1]], objs[spec[3]]
+                    results[name] = (
+                        obj1.exists
+                        and obj2.exists
+                        and obj1.unwrapped.states[spec[2]].get_value(obj2.unwrapped) == spec[4]
+                    )
             else:
                 raise ValueError(f"Invalid state spec: {spec}")
 
         elif check_type == "exists":
             # ("exists", obj_key, expected_bool) - check if object exists
             if len(spec) == 3 and isinstance(spec[2], bool):
-                obj = objs[spec[1]].unwrapped
-                results[name] = obj.exists == spec[2]
+                results[name] = objs[spec[1]].exists == spec[2]
             else:
                 raise ValueError(f"Invalid exists spec: {spec}")
 
