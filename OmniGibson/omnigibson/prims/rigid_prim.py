@@ -6,6 +6,7 @@ import torch as th
 from scipy.spatial import ConvexHull
 
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -112,7 +113,6 @@ class RigidPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
 
-
         self.update_meshes()
 
         # Possibly set the mass / density
@@ -127,7 +127,7 @@ class RigidPrim(XFormPrim):
 
         # Set the visual-only attribute
         # This automatically handles setting collisions / gravity appropriately
-        self.visual_only = self._visual_only
+        self.visual_only = self._visual_only or gm.VISUAL_ONLY
 
     def _initialize(self):
         # Run super method first
@@ -167,6 +167,7 @@ class RigidPrim(XFormPrim):
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
         coms, vols = [], []
+
         # Need to explicitly check for instanced children here since they may include instanced meshes
         def set_non_instanced(prim):
             # Make sure all nested children are NOT instanceable, because it breaks backwards-compatibility

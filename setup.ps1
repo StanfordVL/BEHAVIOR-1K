@@ -4,9 +4,11 @@ param(
     [switch]$NewEnv,
     [switch]$OmniGibson,
     [switch]$BDDL,
-    [switch]$Teleop,
+    [switch]$JoyLo,
     [switch]$Dataset,
     [switch]$Primitives,
+    [switch]$Eval,
+    [switch]$AssetPipeline,
     [switch]$Dev,
     [string]$CudaVersion = "12.4",
     [switch]$AcceptCondaTos,
@@ -29,9 +31,11 @@ Options:
   -NewEnv                 Create a new conda environment 'behavior'
   -OmniGibson             Install OmniGibson (core physics simulator)
   -BDDL                   Install BDDL (Behavior Domain Definition Language)
-  -Teleop                 Install JoyLo (teleoperation interface)
+  -JoyLo                  Install JoyLo (teleoperation interface)
   -Dataset                Download BEHAVIOR datasets (requires -OmniGibson)
   -Primitives             Install OmniGibson with primitives support
+  -Eval                   Install evaluation dependencies
+  -AssetPipeline          Install the 3D scene and object asset pipeline
   -Dev                    Install development dependencies
   -CudaVersion VERSION    Specify CUDA version (default: 12.4)
   -AcceptCondaTos         Automatically accept Conda Terms of Service
@@ -39,7 +43,7 @@ Options:
   -AcceptDatasetTos       Automatically accept BEHAVIOR Dataset Terms
   -ConfirmNoConda         Skip confirmation prompt when not in a conda environment
 
-Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -Teleop -Dataset
+Example: .\setup.ps1 -NewEnv -OmniGibson -BDDL -JoyLo -Dataset
 Example (non-interactive): .\setup.ps1 -NewEnv -OmniGibson -Dataset -AcceptCondaTos -AcceptNvidiaEula -AcceptDatasetTos
 "@
     exit 0
@@ -51,14 +55,17 @@ if ($OmniGibson -and -not $BDDL) {
     exit 1
 }
 
-if ($Dataset -and -not $OmniGibson) {
-    Write-Error "ERROR: -Dataset requires -OmniGibson"
-    exit 1
-}
-
 if ($Primitives -and -not $OmniGibson) {
     Write-Error "ERROR: -Primitives requires -OmniGibson"
     exit 1
+}
+
+if ($Eval -and -not $OmniGibson) {
+    Write-Error "ERROR: -Eval requires -OmniGibson"
+}
+
+if ($Eval -and -not $JoyLo) {
+    Write-Error "ERROR: -Eval requires -JoyLo"
 }
 
 if ($NewEnv -and $ConfirmNoConda) {
@@ -94,9 +101,9 @@ function Prompt-ForTerms {
     Write-Host ""
     
     # Check what terms need to be accepted
-    $NeedsCondaTos = $false
-    $NeedsNvidiaEula = $false
-    $NeedsDatasetTos = $false
+    $script:NeedsCondaTos = $false
+    $script:NeedsNvidiaEula = $false
+    $script:NeedsDatasetTos = $false
     
     if ($NewEnv -and -not $AcceptCondaTos) {
         $script:NeedsCondaTos = $true
@@ -142,7 +149,7 @@ function Prompt-ForTerms {
         Write-Host @"
 3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
     Last revision: December 8, 2022
-    This License Agreement is for the BEHAVIOR Data Bundle ("Data"). It works with OmniGibson ("Software") which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. 
+    This License Agreement is for the BEHAVIOR Data Bundle ("Data"). It works with OmniGibson ("Software") which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K. 
     The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images ("Third Party Content") from third parties with restrictions on redistribution. 
     It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
     Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement ("Agreement"):
@@ -172,7 +179,7 @@ function Prompt-ForTerms {
     if ($script:NeedsDatasetTos) { $script:AcceptDatasetTos = $true }
     
     Write-Host ""
-    Write-Host "✓ All terms accepted. Proceeding with installation..."
+    Write-Host "All terms accepted. Proceeding with installation..."
     Write-Host ""
 }
 
@@ -227,7 +234,7 @@ if ($NewEnv) {
     # Set auto-accept environment variable if user agreed to TOS
     if ($AcceptCondaTos) {
         $env:CONDA_PLUGINS_AUTO_ACCEPT_TOS = "yes"
-        Write-Host "✓ Conda TOS auto-acceptance enabled"
+        Write-Host "Conda TOS auto-acceptance enabled"
     }
     
     # Check if environment already exists and exit with instructions
@@ -249,7 +256,7 @@ if ($NewEnv) {
     # Install PyTorch via pip with CUDA support
     Write-Host "Installing PyTorch with CUDA $CudaVersion support..."
     
-    # Determine the CUDA version string for pip URL (e.g., cu126, cu118, etc.)
+    # Determine the CUDA version string for pip URL (e.g., cu124, cu118, etc.)
     $CudaVerShort = $CudaVersion -replace '\.', ''  # Convert 12.4 to 124
     
     # Install numpy and setuptools via pip
@@ -258,68 +265,7 @@ if ($NewEnv) {
     
     pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url "https://download.pytorch.org/whl/cu$CudaVerShort"
     
-    Write-Host "✓ PyTorch installation completed"
-}
-
-# Setup Isaac Sim conda environment helper functions
-function Set-IsaacSimCondaEnv {
-    param(
-        [string]$IsaacSimPath,
-        [string]$CondaPrefix
-    )
-    
-    # Create directories
-    $activateDir = Join-Path $CondaPrefix "etc\conda\activate.d"
-    $deactivateDir = Join-Path $CondaPrefix "etc\conda\deactivate.d"
-    
-    New-Item -ItemType Directory -Path $activateDir -Force | Out-Null
-    New-Item -ItemType Directory -Path $deactivateDir -Force | Out-Null
-    
-    # Create empty files
-    foreach ($dir in @($activateDir, $deactivateDir)) {
-        foreach ($file in @("env_vars.bat", "env_vars.ps1")) {
-            $filePath = Join-Path $dir $file
-            if (-not (Test-Path $filePath)) {
-                New-Item -ItemType File -Path $filePath -Force | Out-Null
-            }
-        }
-    }
-    
-    # Setup CMD activation script
-    $cmdActFile = Join-Path $activateDir "env_vars.bat"
-    @"
-@echo off
-set PYTHONPATH_OLD=%PYTHONPATH%
-set PYTHONPATH=%PYTHONPATH%;$IsaacSimPath\site
-set CARB_APP_PATH=$IsaacSimPath\kit
-set EXP_PATH=$IsaacSimPath\apps
-set ISAAC_PATH=$IsaacSimPath
-"@ | Out-File -FilePath $cmdActFile -Encoding ascii
-    
-    # Setup CMD deactivation script
-    $cmdDeactFile = Join-Path $deactivateDir "env_vars.bat"
-    @"
-@echo off
-set PYTHONPATH=%PYTHONPATH_OLD%
-set PYTHONPATH_OLD=""
-"@ | Out-File -FilePath $cmdDeactFile -Encoding ascii
-    
-    # Setup PowerShell activation script
-    $psActFile = Join-Path $activateDir "env_vars.ps1"
-    @"
-`$env:PYTHONPATH_OLD="`$env:PYTHONPATH"
-`$env:PYTHONPATH="`$env:PYTHONPATH;$IsaacSimPath\site"
-`$env:CARB_APP_PATH="$IsaacSimPath\kit"
-`$env:EXP_PATH="$IsaacSimPath\apps"
-`$env:ISAAC_PATH="$IsaacSimPath"
-"@ | Out-File -FilePath $psActFile -Encoding utf8
-    
-    # Setup PowerShell deactivation script
-    $psDeactFile = Join-Path $deactivateDir "env_vars.ps1"
-    @"
-`$env:PYTHONPATH="`$env:PYTHONPATH_OLD"
-`$env:PYTHONPATH_OLD=`$null
-"@ | Out-File -FilePath $psDeactFile -Encoding utf8
+    Write-Host "PyTorch installation completed"
 }
 
 # Find Isaac Sim installation
@@ -376,12 +322,19 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
     }
     
     # Build extras string
+$extrasList = @()
+
+if ($Dev) { $extrasList += "dev" }
+if ($Primitives) { $extrasList += "primitives" }
+if ($Eval) { $extrasList += "eval" }
+
+if ($extrasList.Count -gt 0) {
+    $extras = "[" + ($extrasList -join ",") + "]"
+} else {
     $extras = ""
-    if ($Dev -and $Primitives) { $extras = "[dev,primitives]" }
-    elseif ($Dev) { $extras = "[dev]" }
-    elseif ($Primitives) { $extras = "[primitives]" }
+}
     
-    pip install -e "$WorkDir\OmniGibson$extras"
+    pip install -e "${WorkDir}\OmniGibson${extras}"
     
     # Install pre-commit for dev setup
     if ($Dev) {
@@ -412,7 +365,7 @@ Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart.
         Write-Host "Installing Isaac Sim via pip..."
     }
     
-if (-not $isaacInstalled) {
+    if (-not $isaacInstalled) {
         # Isaac Sim packages to install
         $packages = @(
             "omniverse_kit-106.5.0.162521", "isaacsim_kernel-4.5.0.0", "isaacsim_app-4.5.0.0",
@@ -432,7 +385,7 @@ if (-not $isaacInstalled) {
         try {
             foreach ($pkg in $packages) {
                 $pkgParts = $pkg -split "-"
-                $pkgName = ($pkgParts[0..$($pkgParts.Length-2)] -join "-").Replace("_", "-")
+                $pkgName = ($pkgParts[0..($pkgParts.Length-2)] -join "-").Replace("_", "-")
                 $filename = "$pkg-cp310-none-win_amd64.whl"
                 $url = "https://pypi.nvidia.com/$pkgName/$filename"
                 $filepath = Join-Path $tempDir $filename
@@ -474,53 +427,11 @@ if (-not $isaacInstalled) {
         }
     }
     
-    # Install datasets
-    if ($Dataset) {
-        Write-Host "Installing datasets..."
-        
-        # Determine if we should accept dataset license automatically
-        $DatasetAcceptFlag = "False"
-        if ($AcceptDatasetTos) {
-            $DatasetAcceptFlag = "True"
-        }
-        
-        $pythonScript = @"
-import os
-os.environ['OMNI_KIT_ACCEPT_EULA'] = 'YES'
-try:
-    from omnigibson.macros import gm
-    from omnigibson.utils.asset_utils import download_assets, download_og_dataset
-    
-    dataset_exists = os.path.exists(gm.DATASET_PATH)
-    assets_exist = os.path.exists(gm.ASSET_PATH)
-    
-    if not (dataset_exists and assets_exist):
-        print(f'Installing data to:')
-        print(f'  Dataset (~25GB): {gm.DATASET_PATH}')
-        print(f'  Assets (~2.5GB): {gm.ASSET_PATH}')
-        
-        if not dataset_exists:
-            print('Downloading dataset...')
-            download_og_dataset(accept_license=$DatasetAcceptFlag)
-        
-        if not assets_exist:
-            print('Downloading assets...')
-            download_assets()
-    else:
-        print('Datasets already exist, skipping download.')
-except Exception as e:
-    print(f'ERROR: Dataset installation failed: {e}')
-    exit(1)
-"@
-        
-        python -c $pythonScript
-    }
-    
     Write-Host "OmniGibson installation completed successfully!"
 }
 
 # Install JoyLo
-if ($Teleop) {
+if ($Joylo) {
     Write-Host "Installing JoyLo..."
     
     if (-not (Test-Path "joylo")) {
@@ -531,13 +442,79 @@ if ($Teleop) {
     pip install -e "$WorkDir\joylo"
 }
 
+# Install Eval
+if ($Eval) {
+    Write-Host "Installing evaluation dependencies..."
+
+    # get torch version via pip
+    $TorchVersion = (pip show torch | Select-String "Version" | ForEach-Object { $_.ToString().Split(" ")[-1] })
+    pip install torch-cluster -f "https://data.pyg.org/whl/torch-$TorchVersion.html"
+    conda install av -c conda-forge -y
+}
+
+# Install asset pipeline
+if ($AssetPipeline) {
+    Write-Host "Installing asset pipeline..."
+    
+    if (-not (Test-Path "asset_pipeline")) {
+        Write-Error "ERROR: asset_pipeline directory not found"
+        exit 1
+    }
+    
+    pip install -r "$WorkDir\asset_pipeline\requirements.txt"
+}
+
+# Install datasets
+if ($Dataset) {
+
+    python -c "import omnigibson"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: OmniGibson import failed, please make sure you have omnigibson installed before downloading datasets"
+        exit 1
+    }
+
+    Write-Host "Installing datasets..."
+    
+    # Determine if we should accept dataset license automatically
+    $DatasetAcceptFlag = "False"
+    if ($AcceptDatasetTos) {
+        $DatasetAcceptFlag = "True"
+    }
+    
+    $env:OMNI_KIT_ACCEPT_EULA = "YES"
+
+    Write-Host "Downloading OmniGibson robot assets..."
+    python -c "from omnigibson.utils.asset_utils import download_omnigibson_robot_assets; download_omnigibson_robot_assets()"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: OmniGibson robot assets installation failed"
+        exit 1
+    }
+
+    Write-Host "Downloading BEHAVIOR-1K assets..."
+    python -c "from omnigibson.utils.asset_utils import download_behavior_1k_assets; download_behavior_1k_assets(accept_license=$DatasetAcceptFlag)"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Dataset installation failed"
+        exit 1
+    }
+
+    Write-Host "Downloading 2025 BEHAVIOR Challenge Task Instances..."
+    python -c "from omnigibson.utils.asset_utils import download_2025_challenge_task_instances; download_2025_challenge_task_instances()"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: 2025 BEHAVIOR Challenge Task Instances installation failed"
+        exit 1
+    }
+}
+
 # Installation summary
 Write-Host ""
 Write-Host "=== Installation Complete! ==="
-if ($NewEnv) { Write-Host "✓ Created conda environment 'behavior'" }
-if ($OmniGibson) { Write-Host "✓ Installed OmniGibson + Isaac Sim" }
-if ($BDDL) { Write-Host "✓ Installed BDDL" }
-if ($Teleop) { Write-Host "✓ Installed JoyLo" }
-if ($Dataset) { Write-Host "✓ Downloaded datasets" }
+if ($NewEnv) { Write-Host "Created conda environment 'behavior'" }
+if ($OmniGibson) { Write-Host "Installed OmniGibson + Isaac Sim" }
+if ($BDDL) { Write-Host "Installed BDDL" }
+if ($JoyLo) { Write-Host "Installed JoyLo" }
+if ($Primitives) { Write-Host "Installed primitives support" }
+if ($Eval) { Write-Host "Installed evaluation support" }
+if ($AssetPipeline) { Write-Host "Installed asset pipeline" }
+if ($Dataset) { Write-Host "Downloaded datasets" }
 Write-Host ""
 if ($NewEnv) { Write-Host "To activate: conda activate behavior" }

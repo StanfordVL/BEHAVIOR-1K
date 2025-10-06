@@ -1,14 +1,17 @@
 import torch as th
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.object_states import Folded, Unfolded
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import multi_dim_linspace
+from omnigibson.utils.ui_utils import KeyboardEventHandler
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_TRANSITION_RULES = False
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -59,6 +62,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the environment
     env = og.Environment(configs=cfg)
+
+    KeyboardEventHandler.add_keyboard_callback(
+        key=lazy.carb.input.KeyboardInput.ESCAPE,
+        callback_fn=lambda: og.shutdown(),
+    )
 
     # Grab object references
     carpet = env.scene.object_registry("name", "carpet")
@@ -148,12 +156,11 @@ def main(random_selection=False, headless=False, short_exec=False):
                 print_state()
 
         while True:
-            env.step(th.empty(0))
+            env.step([])
             print_state()
 
     # Shut down env at the end
-    print()
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

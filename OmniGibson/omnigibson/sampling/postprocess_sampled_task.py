@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.tasks import BehaviorTask
 from omnigibson.macros import gm
@@ -28,7 +29,7 @@ def main():
         activity_definition_id=0,
         activity_instance_id=0,
     )
-    json_dir = f"{gm.DATASET_PATH}/scenes/{args.scene_model}/json"
+    json_dir = os.path.join(get_dataset_path("behavior-1k-assets"), f"scenes/{args.scene_model}/json")
     full_scene_full_json = f"{json_dir}/{args.scene_model}_stable.json"
     sampled_scene_partial_json = f"{json_dir}/{task_name}-partial_rooms.json"
     with open(full_scene_full_json, "r") as f:

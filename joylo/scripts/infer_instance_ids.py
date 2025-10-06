@@ -8,6 +8,7 @@ from gello.utils.qa_utils import *
 import inspect
 from datetime import datetime
 from omnigibson.utils.python_utils import h5py_group_to_torch, recursively_convert_to_torch
+from omnigibson.utils.asset_utils import get_dataset_path
 
 RUN_QA = True
 
@@ -45,7 +46,7 @@ def infer_instance_ids_from_hdf5_file(hdf_input_path):
 
     # Load the instances data
     instance_init_states = dict()
-    instances_dir = os.path.join(gm.DATASET_PATH, "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{env.task.activity_name}_instances")
+    instances_dir = os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", env.task.scene_name, "json", f"{env.task.scene_name}_task_{env.task.activity_name}_instances")
     for fname in os.listdir(instances_dir):
         # name should be <SCENE>_task_<ACTIVITY>_0_<INSTANCE_ID>_template-tro_state.json
         instance_id = int(fname.split("_0_")[-1].split("_")[0])

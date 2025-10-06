@@ -67,7 +67,9 @@ class XFormPrim(BasePrim):
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # Note that if this is an instanceable prim, we also don't need write these properties
         # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
-        assert not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy(), "Support for instanceable prims has not been implemented yet!"
+        assert (
+            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
+        ), "Support for instanceable prims has not been implemented yet!"
         if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
             self._set_xform_properties()
 
@@ -255,11 +257,9 @@ class XFormPrim(BasePrim):
         Gets prim's pose with respect to the specified frame.
 
         Args:
-            frame (Literal): frame to get the pose with respect to. Default to world. parent frame
-            get position relative to the object parent. scene frame get position relative to the scene.
-            clone (bool): Whether to clone the internal buffer or not when grabbing data
-
-        Args:
+            frame (Literal): frame to get the pose with respect to. Default to world.
+                parent frame: get position relative to the object parent.
+                scene frame: get position relative to the scene.
             clone (bool): Whether to clone the internal buffer or not when grabbing data
 
         Returns:

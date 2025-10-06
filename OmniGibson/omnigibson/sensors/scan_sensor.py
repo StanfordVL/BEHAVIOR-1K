@@ -162,7 +162,7 @@ class ScanSensor(BaseSensor):
         Get local occupancy grid based on current 1D scan
 
         Args:
-            n-array: 1D LiDAR scan
+            scan (array): 1D LiDAR scan
 
         Returns:
             2D-array: (occupancy_grid_resolution, occupancy_grid_resolution)-sized numpy array of the local occupancy grid

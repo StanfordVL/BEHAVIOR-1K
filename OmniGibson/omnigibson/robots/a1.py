@@ -5,6 +5,7 @@ import torch as th
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.utils.asset_utils import get_dataset_path
 
 
 class A1(ManipulationRobot):
@@ -223,7 +224,7 @@ class A1(ManipulationRobot):
     @property
     def usd_path(self):
         if self.end_effector == "inspire":
-            return os.path.join(gm.ASSET_PATH, "models/a1/usd/a1_inspire.usda")
+            return os.path.join(get_dataset_path("omnigibson-robot-assets"), "models/a1/usd/a1_inspire.usda")
         return super().usd_path
 
     @property

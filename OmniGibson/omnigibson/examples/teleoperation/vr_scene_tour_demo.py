@@ -9,7 +9,7 @@ import torch as th
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_available_og_scenes
+from omnigibson.utils.asset_utils import get_available_behavior_1k_scenes
 from omnigibson.utils.teleop_utils import OVXRSystem
 from omnigibson.utils.ui_utils import KeyboardEventHandler, choose_from_options
 
@@ -25,7 +25,7 @@ def main(scene_model: Optional[str] = None):
 
     # Choose the scene model to load
     if not scene_model:
-        scenes = get_available_og_scenes()
+        scenes = get_available_behavior_1k_scenes()
         scene_model = choose_from_options(options=scenes, name="scene model")
 
     # Create the config for generating the environment we want

@@ -26,6 +26,7 @@ from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
+from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.bddl_utils import (
     BEHAVIOR_ACTIVITIES,
     BDDLEntity,
@@ -85,7 +86,7 @@ class BehaviorTask(BaseTask):
         activity_instance_id=0,
         predefined_problem=None,
         online_object_sampling=False,
-        use_presampled_robot_pose=False,
+        use_presampled_robot_pose=True,
         randomize_presampled_pose=False,
         sampling_whitelist=None,
         sampling_blacklist=None,
@@ -106,6 +107,11 @@ class BehaviorTask(BaseTask):
         else:
             # Infer activity name
             activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
+
+        # Make sure to not use presampled robot pose if we're using online object sampling
+        assert not (
+            online_object_sampling and use_presampled_robot_pose
+        ), "Cannot use presampled robot pose if online_object_sampling is True!"
 
         # Initialize relevant variables
 
@@ -451,7 +457,7 @@ class BehaviorTask(BaseTask):
         Updates the task metadata with the current instance-to-name mapping for all existing entities.
 
         Args:
-            env: The environment containing the scene to update
+            env (Environment): The environment containing the scene to update
         """
         env.scene.write_task_metadata(
             key="inst_to_name", data={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists}
@@ -604,14 +610,18 @@ class BehaviorTask(BaseTask):
         Args:
             env (og.Environment): OmniGibson active environment
             save_dir (None or str): If specified, absolute fpath to the desired directory to write the .json. Default is
-                <gm.DATASET_PATH>/scenes/<SCENE_MODEL>/json/...>
+                {gm.DATA_PATH}/behavior-1k-assets/scenes/<SCENE_MODEL>/json/...>
             override (bool): Whether to override any files already found at the path to write the task .json
             task_relevant_only (bool): Whether to only save the task relevant object scope states. If True, will only
                 call dump_state() on all the BDDL instances in self.object_scope, else will save the entire sim state
                 via env.scene.save()
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
-        save_dir = os.path.join(gm.DATASET_PATH, "scenes", self.scene_name, "json") if save_dir is None else save_dir
+        save_dir = (
+            os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", self.scene_name, "json")
+            if save_dir is None
+            else save_dir
+        )
         assert self.scene_name is not None, "Scene name must be set in order to save task"
         fname = self.get_cached_activity_scene_filename(
             scene_model=self.scene_name,
