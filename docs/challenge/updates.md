@@ -12,6 +12,8 @@ On this page, we provide weekly updates regarding the first BEHAVIOR Challenge, 
 
 2. Reverted assets from USDZ to USD for loading speed improvements. Please re-download the assets to take advantage of the speed improvements. 
 
+3. Fixed partial credit assignment during evaluation.
+
 
 All fixes have been pushed to the main branch.
 
@@ -19,6 +21,13 @@ All fixes have been pushed to the main branch.
 
 1. We added a sample submission docker for reference. Please take a look at [this docker file](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile)
 
+2. We are glad to announce that [Nvidia](https://www.nvidia.com/en-us/) will be sponsoring our challenge! The prize pool has now been updated:
+
+    - First Place: $1000+GeForce 5080
+
+    - Second Place: $500+ (Jetson Orin Nano Super or $1000 Brev Credits)
+    
+    - Third Place: $300+$500 Brev Credits
 
 
 ### 09/28/2025
