@@ -38,4 +38,7 @@ RUN pip install -e bddl
 # Install omnigibson (editable)
 RUN pip install -e OmniGibson[eval]
 
-CMD ["conda", "run", "-n", "behavior", "python", "-u", "-c", "from omnigibson.learning.utils.network_utils import WebsocketPolicyServer; from omnigibson.learning.policies import LocalPolicy; server = WebsocketPolicyServer(LocalPolicy(action_dim=23)); server.serve_forever()"]
+ENV PATH=/opt/conda/envs/behavior/bin:$PATH
+ENV CONDA_DEFAULT_ENV=behavior
+
+CMD ["python", "-u", "-c", "from omnigibson.learning.utils.network_utils import WebsocketPolicyServer; from omnigibson.learning.policies import LocalPolicy; server = WebsocketPolicyServer(LocalPolicy(action_dim=23)); server.serve_forever()"]
