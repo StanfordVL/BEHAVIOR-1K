@@ -1,5 +1,24 @@
 On this page, we provide weekly updates regarding the first BEHAVIOR Challenge, including important bug fixes, announcements of new features, and clarifications regarding challenge rules.
 
+### 10/06/2025
+
+**Challenge rule clarifications:**
+
+1. During evaluation, only task-relevant object pose and robot initial pose will change, the instance of the objects, pose of background scene-level objects will remain the same. 
+
+**Bug fixes:**
+
+1. Fixed gripper joint range bug in `eval_utils.py`.
+
+2. Reverted assets from USDZ to USD for loading speed improvements. Please re-download the assets to take advantage of the speed improvements. 
+
+
+All fixes have been pushed to the main branch.
+
+**New features:**
+
+1. We added a sample submission docker for reference. Please take a look at [this docker file](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile)
+
 
 
 ### 09/28/2025
