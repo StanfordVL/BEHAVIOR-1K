@@ -253,18 +253,22 @@ class BehaviorTask(BaseTask):
         if self.use_presampled_robot_pose:
             robot = self.get_agent(env)
             presampled_poses = env.scene.get_task_metadata(key="robot_poses")
-            assert (
-                robot.model_name in presampled_poses
-            ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
+            # TODO: Backwards compatibility for scenes that do not have presampled robot poses
+            if presampled_poses:
+                assert (
+                    robot.model_name in presampled_poses
+                ), f"{robot.model_name} presampled pose is not found in task metadata; please set use_presampled_robot_pose to False in task config"
 
-            # Select pose based on randomize_presampled_pose flag
-            available_poses = presampled_poses[robot.model_name]
-            if self.randomize_presampled_pose:
-                robot_pose = random.choice(available_poses)
+                # Select pose based on randomize_presampled_pose flag
+                available_poses = presampled_poses[robot.model_name]
+                if self.randomize_presampled_pose:
+                    robot_pose = random.choice(available_poses)
+                else:
+                    robot_pose = available_poses[0]  # Use first presampled pose
+
+                robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
             else:
-                robot_pose = available_poses[0]  # Use first presampled pose
-
-            robot.set_position_orientation(robot_pose["position"], robot_pose["orientation"])
+                log.warning("No presampled robot poses found in scene metadata; skipping setting robot pose...")
 
         # Force wake objects
         for obj in self.object_scope.values():
