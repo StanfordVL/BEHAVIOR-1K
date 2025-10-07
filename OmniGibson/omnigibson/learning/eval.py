@@ -160,6 +160,9 @@ class Evaluator:
             BaseRobot: The robot instance loaded from the environment.
         """
         robot = self.env.scene.object_registry("name", "robot_r1")
+        # Set a big mass to robot base to prevent it from tipping over
+        with og.sim.stopped():
+            robot.base_footprint_link.mass = 250.0
         return robot
 
     def load_policy(self) -> Any:
@@ -424,6 +427,7 @@ if __name__ == "__main__":
         logger.info("Starting evaluation...")
 
         for idx in instances_to_run:
+            evaluator.reset()
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(m.NUM_EVAL_EPISODES):
