@@ -160,9 +160,6 @@ class Evaluator:
             BaseRobot: The robot instance loaded from the environment.
         """
         robot = self.env.scene.object_registry("name", "robot_r1")
-        # Set a big mass to robot base to prevent it from tipping over
-        with og.sim.stopped():
-            robot.base_footprint_link.mass = 250.0
         return robot
 
     def load_policy(self) -> Any:
