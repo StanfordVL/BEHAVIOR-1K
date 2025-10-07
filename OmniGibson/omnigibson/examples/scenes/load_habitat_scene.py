@@ -20,6 +20,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 log = create_module_logger(module_name=__name__)
 
+
 def convert_csv_to_dict(filepath):
     """
     Converts a 2-column CSV file into a key:value dictionary.
@@ -35,8 +36,10 @@ def convert_csv_to_dict(filepath):
         # Use a dictionary comprehension for a clean and efficient conversion
         return {row[0]: row[1] for row in reader}
 
+
 AI2_FIXEDNESS_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2thor-fixedness.csv"
 AI2_FIXEDNESS_MAPPING = {k: str(v).lower() == "true" for k, v in convert_csv_to_dict(AI2_FIXEDNESS_MAPPING_FN).items()}
+
 
 def load_habitat_scene(dataset_name, scene_input_json):
     scene_input_json = pathlib.Path(scene_input_json)
