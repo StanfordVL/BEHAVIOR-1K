@@ -178,7 +178,7 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
 
 - **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 
