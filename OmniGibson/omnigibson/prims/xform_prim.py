@@ -67,7 +67,9 @@ class XFormPrim(BasePrim):
         # Pre-created OG objects' prims always have these things set up ahead of time.
         # Note that if this is an instanceable prim, we also don't need write these properties
         # TODO: This still breaks things downstream so we assert here to make sure we have backwards-compatibility with the expected prim types
-        assert not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy(), "Support for instanceable prims has not been implemented yet!"
+        assert (
+            not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy()
+        ), "Support for instanceable prims has not been implemented yet!"
         if not self._xform_props_pre_loaded and not self._prim.IsInstanceable() and not self._prim.IsInstanceProxy():
             self._set_xform_properties()
 
@@ -271,7 +273,7 @@ class XFormPrim(BasePrim):
         elif frame == "scene":
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
             return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
-        else:       # parent
+        else:  # parent
             position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
             return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
 

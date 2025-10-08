@@ -178,10 +178,19 @@ class BasePrim(Serializable, Recreatable, ABC):
         _root = self.prim if _root is None else _root
         prims = dict() if return_nested_dict else []
         # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-        children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies()) if include_instances else _root.GetChildren()
+        children = (
+            _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
+            if include_instances
+            else _root.GetChildren()
+        )
         if recursive:
             for child in children:
-                descendants = self.get_children_prims(recursive=recursive, include_instances=include_instances, return_nested_dict=return_nested_dict, _root=child)
+                descendants = self.get_children_prims(
+                    recursive=recursive,
+                    include_instances=include_instances,
+                    return_nested_dict=return_nested_dict,
+                    _root=child,
+                )
                 if return_nested_dict:
                     prims[child] = descendants
                 else:
@@ -215,15 +224,20 @@ class BasePrim(Serializable, Recreatable, ABC):
         """
         _root = self.prim if _root is None else _root
         # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-        children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies()) \
-            if include_instances else _root.GetChildren()
+        children = (
+            _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
+            if include_instances
+            else _root.GetChildren()
+        )
         should_continue = True
         for child in children:
             should_continue = fcn(child)
             if not should_continue:
                 break
             if recursive:
-                should_continue = self.modify_children_prims(fcn=fcn, recursive=recursive, include_instances=include_instances, _root=child)
+                should_continue = self.modify_children_prims(
+                    fcn=fcn, recursive=recursive, include_instances=include_instances, _root=child
+                )
                 if not should_continue:
                     break
         return should_continue

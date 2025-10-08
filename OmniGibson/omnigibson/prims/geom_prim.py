@@ -65,7 +65,6 @@ class GeomPrim(XFormPrim):
         super()._post_load()
         self._mesh_type = self.prim.GetTypeName()
 
-
     def get_position_orientation(self, frame: Literal["world", "scene", "parent", "link"] = "world", clone=True):
         """
         Gets prim's pose with respect to the specified frame.
@@ -83,7 +82,12 @@ class GeomPrim(XFormPrim):
                 - th.Tensor: (x,y,z) position in the specified frame
                 - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
         """
-        assert frame in ["world", "parent", "scene", "link"], f"Invalid frame '{frame}'. Must be 'world', 'parent', 'scene', or 'link'."
+        assert frame in [
+            "world",
+            "parent",
+            "scene",
+            "link",
+        ], f"Invalid frame '{frame}'. Must be 'world', 'parent', 'scene', or 'link'."
         if frame == "world":
             return PoseAPI.get_world_pose(self.prim_path)
         elif frame == "scene":
@@ -91,11 +95,12 @@ class GeomPrim(XFormPrim):
             return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
         elif frame == "link":
             assert self._link is not None, "Cannot get position and orientation relative to link without a link"
-            return T.mat2pose(T.pose2mat(self._link.get_position_orientation()) @ T.pose2mat(PoseAPI.get_world_pose(self.prim_path)))
-        else:       # parent
+            return T.mat2pose(
+                T.pose2mat(self._link.get_position_orientation()) @ T.pose2mat(PoseAPI.get_world_pose(self.prim_path))
+            )
+        else:  # parent
             position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
             return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
-
 
     @property
     def purpose(self):

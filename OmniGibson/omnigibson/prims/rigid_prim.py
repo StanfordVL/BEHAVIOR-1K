@@ -113,7 +113,6 @@ class RigidPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
 
-
         self.update_meshes()
 
         # Possibly set the mass / density
@@ -167,6 +166,7 @@ class RigidPrim(XFormPrim):
         additional bodies are added manually
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
+
         # Need to explicitly check for instanced children here since they may include instanced meshes
         def set_non_instanced(prim):
             # Make sure all nested children are NOT instanceable, because it breaks backwards-compatibility
@@ -238,7 +238,8 @@ class RigidPrim(XFormPrim):
                         # boundingCube approximation for the underlying collision approximation for GPU compatibility
                         if not check_extent_radius_ratio(mesh, com):
                             log.warning(
-                                f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
+                                f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation"
+                            )
                             mesh.set_collision_approximation("boundingCube")
                     else:
                         self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
@@ -253,7 +254,9 @@ class RigidPrim(XFormPrim):
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
-        vols, coms = _infer_meshes_recursively(prims_dict=prims_to_check, current_local_tf=th.eye(4), current_scale=th.ones(3))
+        vols, coms = _infer_meshes_recursively(
+            prims_dict=prims_to_check, current_local_tf=th.eye(4), current_scale=th.ones(3)
+        )
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)

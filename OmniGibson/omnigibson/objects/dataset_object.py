@@ -265,7 +265,6 @@ class DatasetObject(USDObject):
 
         if self._prim_type == PrimType.RIGID:
             if self._load_config["dataset_name"] == "behavior-1k-assets":
-
                 # Get the average mass/density for this object category
                 avg_specs = get_og_avg_category_specs()
                 assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
