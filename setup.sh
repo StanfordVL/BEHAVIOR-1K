@@ -358,8 +358,12 @@ if [ "$OMNIGIBSON" = true ]; then
             rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
         fi
 
-        # Remove packaging, there is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
-        # TODO; located at: /home/josiahw/miniforge3/envs/b1k/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging
+        # Fix packaging conflict - remove conflicting version
+        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
+            echo "Fixing packaging conflict..."
+            rm -rf "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
+        fi
 
     fi
     
