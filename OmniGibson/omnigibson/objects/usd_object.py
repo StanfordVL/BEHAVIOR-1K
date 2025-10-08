@@ -1,8 +1,11 @@
+import glob
 import hashlib
 import os
 import tempfile
+import zipfile
 
 import omnigibson as og
+import omnigibson.lazy as lazy
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
@@ -96,72 +99,50 @@ class USDObject(StatefulObject):
             **kwargs,
         )
 
-    def prebuild(self, stage):
-        # Load the object into the given USD stage
+    def _prepare_to_load(self):
+        """Prepare to load the USD by decrypting, correcting paths, and checking hashes."""
         usd_path = self._usd_path
 
         if self._encrypted:
             # Create a temporary file to store the decrytped asset, load it, and then delete it
             encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
             self.check_hash(encrypted_filename)
-            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self._usd_path), dir=og.tempdir)
-            os.close(decrypted_fd)
+            basename = os.path.basename(self._usd_path)
+            tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
+            usd_path = os.path.join(tempdir_path, f"{basename}.usd")
             decrypt_file(encrypted_filename, usd_path)
+
+            # Update the paths of all assets to be the absolute path. This is important because the
+            # relative paths are relative to the encrypted file and not the decrypted file in the
+            # tempdir.
+            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
+            def _update_path(asset_path):
+                if ".mdl" in asset_path:
+                    # MDL paths are searched for in a different search space, so we don't modify them
+                    return asset_path
+                return os.path.join(os.path.dirname(encrypted_filename), asset_path)
+
+            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+            side_stage.Save()
+            del side_stage
         else:
             self.check_hash(usd_path)
 
-        # object_stage = lazy.pxr.Usd.Stage.Open(usd_path)
-        # root_prim = object_stage.GetDefaultPrim()
+        return usd_path
 
+    def prebuild(self, stage):
         # The /World in the scene USD will be mapped to /World/scene_i in Isaac Sim.
         prim_path = "/World" + self._relative_prim_path
-
-        # TODO: maybe deep copy the prim tree EXCEPT the visual meshes. How?
+        usd_path = self._prepare_to_load()
         prim = stage.GetPrimAtPath(prim_path)
-        if not prim.IsValid():
-            prim = stage.DefinePrim(prim_path, "Xform")
+        assert not prim.IsValid(), f"Prim path {prim_path} already exists in the stage!"
+        prim = stage.DefinePrim(prim_path, "Xform")
         assert prim.GetReferences().AddReference(usd_path)
 
-        # TODO: After we switch to a deep copy, we can enable this to remove the temporary file
-        # del object_stage
-        # if self._encrypted:
-        #     os.remove(usd_path)
-
     def _load(self):
-        """
-        Load the object into pybullet and set it to the correct pose
-        """
-        usd_path = self._usd_path
-
-        if self._encrypted:
-            # Create a temporary file to store the decrytped asset, load it, and then delete it
-            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
-            self.check_hash(encrypted_filename)
-            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self._usd_path), dir=og.tempdir)
-            decrypt_file(encrypted_filename, usd_path)
-        else:
-            self.check_hash(usd_path)
-
-        prim = add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
-
-        if self._encrypted:
-            os.close(decrypted_fd)
-            # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
-            if os.name == "posix":
-                os.remove(usd_path)
-
-        return prim
-
-    def _post_load(self):
-        super()._post_load()
-
-        if self._encrypted:
-            # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
-            # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
-            # original USD folder, i.e. <category>/<model>/usd.
-            root_path = os.path.dirname(self._usd_path)
-            for material in self.materials:
-                material.shader_update_asset_paths_with_root_path(root_path)
+        usd_path = self._prepare_to_load()
+        return add_asset_to_stage(asset_path=usd_path, prim_path=self.prim_path)
 
     def _create_prim_with_same_kwargs(self, relative_prim_path, name, load_config):
         # Add additional kwargs

@@ -2,6 +2,7 @@ import colorsys
 
 import torch as th
 from PIL import Image, ImageDraw
+import omnigibson.utils.transform_utils as T
 
 try:
     import accimage
@@ -328,3 +329,32 @@ def colorize_bboxes_3d(bbox_3d_data, rgb_image, camera_params):
     draw_lines_and_points_for_boxes(rgb, corners_2d)
 
     return th.tensor(rgb)
+
+
+def change_pcd_frame(pcd: th.Tensor, rel_pose: th.Tensor) -> th.Tensor:
+    """
+    Transform point cloud from one frame to another frame.
+
+    Args:
+        pcd: (N, 6) point cloud tensor in world frame
+        rel_pose: (7) relative pose tensor [pos, quat] from current to target frame
+    Returns:
+        th.Tensor: (B, N, 6) point cloud tensor in target frame
+    """
+    rel_pos = rel_pose[:3]
+    rel_quat = rel_pose[3:]
+    rel_rot = T.quat2mat(rel_quat)
+
+    # Create transformation matrix
+    tf = th.eye(4)
+    tf[:3, :3] = rel_rot
+    tf[:3, 3] = rel_pos
+
+    # Add homogeneous coordinate to point cloud
+    xyz = pcd[..., 3:]  # (N, 3)
+    xyz_homo = th.cat([xyz, th.ones_like(xyz[..., :1])], dim=-1)  # (N, 4)
+
+    # Transform point cloud from camera frame to base frame
+    new_xyz = th.matmul(xyz_homo, th.inverse(tf).T)  # (N, 4)
+    pcd[..., 3:] = new_xyz[..., :3]
+    return pcd

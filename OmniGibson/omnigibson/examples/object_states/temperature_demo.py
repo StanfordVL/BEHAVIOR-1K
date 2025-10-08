@@ -1,8 +1,11 @@
+import math
+
 import torch as th
 
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
+import omnigibson.utils.transform_utils as T
 
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
@@ -38,9 +41,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name="stove",
             category="stove",
-            model="yhjzwg",
-            bounding_box=[1.185, 0.978, 1.387],
-            position=[0, 0, 0.69],
+            model="ykretu",
+            position=[0, 0, 0.61],
+            orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
         )
     )
 
@@ -50,9 +53,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name="microwave",
             category="microwave",
-            model="hjjxmi",
-            bounding_box=[0.384, 0.256, 0.196],
-            position=[2.5, 0, 0.10],
+            model="abzvij",
+            position=[2.5, 0, 0.15],
+            orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
         )
     )
 
@@ -62,9 +65,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name="oven",
             category="oven",
-            model="wuinhm",
-            bounding_box=[1.075, 0.926, 1.552],
-            position=[-1.25, 0, 0.88],
+            model="ffitak",
+            position=[-1.25, 0, 0.36],
+            orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
         )
     )
 
@@ -75,8 +78,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             name="tray",
             category="tray",
             model="xzcnjq",
-            bounding_box=[0.319, 0.478, 0.046],
-            position=[-0.25, -0.12, 1.26],
+            position=[-2.25, -0.12, 0.05],
         )
     )
 
@@ -86,15 +88,15 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name="fridge",
             category="fridge",
-            model="hivvdf",
-            bounding_box=[1.065, 1.149, 1.528],
+            model="petcxr",
             abilities={
                 "coldSource": {
                     "temperature": -100.0,
                     "requires_inside": True,
                 }
             },
-            position=[1.25, 0, 0.81],
+            position=[1.25, 0, 1.0],
+            orientation=T.euler2quat(th.tensor([0.0, 0.0, -math.pi / 2.0])),
         )
     )
 
@@ -106,7 +108,6 @@ def main(random_selection=False, headless=False, short_exec=False):
                 name=f"apple{i}",
                 category="apple",
                 model="agveuv",
-                bounding_box=[0.065, 0.065, 0.077],
                 position=[0, i * 0.1, 5.0],
             )
         )
@@ -132,7 +133,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([0.46938863, -3.97887141, 1.64106008]),
+        position=th.tensor([0.1759, -4.8260, 1.7778]),
         orientation=th.tensor([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
     )
 
@@ -161,17 +162,19 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = -1 if not short_exec else 1000
 
     # Main recording loop
-    locations = [f"{loc:>20}" for loc in ["Inside oven", "On stove", "On tray", "Inside fridge", "Inside microwave"]]
+    locations = ["Oven", "Stove", "Tray", "Fridge", "Microwave"]
     print()
-    print(f"{'Apple location:':<20}", *locations)
     while steps != max_steps:
         env.step(th.empty(0))
-        temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
-        print(f"{'Apple temperature:':<20}", *temps, end="\r")
+        temp_info = [
+            f"{loc}: {apple.states[object_states.Temperature].get_value():.1f}°C"
+            for loc, apple in zip(locations, apples)
+        ]
+        print(f"Apple temps: {' | '.join(temp_info):<80}", end="\r")
         steps += 1
 
     # Always close env at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

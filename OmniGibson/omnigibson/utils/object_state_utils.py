@@ -99,7 +99,7 @@ def sample_kinematics(
     max_trials=None,
     z_offset=0.05,
     skip_falling=False,
-    use_last_ditch_effort=True,
+    use_last_ditch_effort=False,
     use_trav_map=True,
 ):
     """

@@ -1,0 +1,562 @@
+{
+  "tasks": [
+    {
+      "id": "turning_on_radio",
+      "name": "Turning On Radio",
+      "instruction": "Turn on the radio receiver that’s on the table in the living room.",
+      "rooms": [
+        "living_room"
+      ],
+      "duration": 72,
+      "thumbnail": "https://vumbnail.com/1109198872.jpg",
+      "video": "https://player.vimeo.com/video/1109198872"
+    },
+    {
+      "id": "picking_up_trash",
+      "name": "Picking Up Trash",
+      "instruction": "Put the three can of soda from the living room inside the tash can in the kitchen.",
+      "rooms": [
+        "kitchen",
+        "living_room"
+      ],
+      "duration": 176,
+      "thumbnail": "https://vumbnail.com/1109202972.jpg",
+      "video": "https://player.vimeo.com/video/1109202972"
+    },
+    {
+      "id": "putting_away_Halloween_decorations",
+      "name": "Putting Away Halloween Decorations",
+      "instruction": "Place each of the two pumpkins and all three candles from the living room inside a cabinet in the living room (use any cabinet), then make sure every cabinet is closed, and position the cauldron so it is next to a table in the living room.",
+      "rooms": [
+        "living_room"
+      ],
+      "duration": 460,
+      "thumbnail": "https://vumbnail.com/1114054409.jpg",
+      "video": "https://player.vimeo.com/video/1114054409"
+    },
+    {
+      "id": "cleaning_up_plates_and_food",
+      "name": "Cleaning Up Plates and Food",
+      "instruction": "From the breakfast table in the kitchen, move both pizzas - keeping each on its plate - into the same refrigerator, put both bowls into one sink, and make sure the refrigerator is closed.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 457,
+      "thumbnail": "https://vumbnail.com/1114054554.jpg",
+      "video": "https://player.vimeo.com/video/1114054554"
+    },
+    {
+      "id": "can_meat",
+      "name": "Can Meat",
+      "instruction": "Open the kitchen cabinet, take out the two hinged jars, open them, place exactly two cooked bratwursts from the chopping board on the countertop into each jar, then close both jars, put them back inside the cabinet, and close the cabinet.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 395,
+      "thumbnail": "https://vumbnail.com/1114054618.jpg",
+      "video": "https://player.vimeo.com/video/1114054618"
+    },
+    {
+      "id": "setting_mousetraps",
+      "name": "Setting Mousetraps",
+      "instruction": "Take the four mousetraps from the cabinet in the bathroom and place them on the bathroom floor. Make sure all four end up on the same floor surface, and ensure that at least two of them are either under or directly next to the same bathroom sink.",
+      "rooms": [
+        "bathroom"
+      ],
+      "duration": 339,
+      "thumbnail": "https://vumbnail.com/1114054686.jpg",
+      "video": "https://player.vimeo.com/video/1114054686"
+    },
+    {
+      "id": "hiding_Easter_eggs",
+      "name": "Hiding Easter Eggs",
+      "instruction": "Take the three Easter eggs out of the wicker basket on the lawn in the garden, then place them on the lawn next to a single tree (choose any tree) so that all three eggs are next to the same tree and none are left in the basket.",
+      "rooms": [
+        "garden"
+      ],
+      "duration": 254,
+      "thumbnail": "https://vumbnail.com/1114055436.jpg",
+      "video": "https://player.vimeo.com/video/1114055436"
+    },
+    {
+      "id": "picking_up_toys",
+      "name": "Picking Up Toys",
+      "instruction": "Put all the toys in the child’s room - the three board games (two on the bed and one on the table), the two jigsaw puzzles on the table, and the tennis ball on the table - inside the toy box on the table in the child’s room.",
+      "rooms": [
+        "childs_room"
+      ],
+      "duration": 630,
+      "thumbnail": "https://vumbnail.com/1114054920.jpg",
+      "video": "https://player.vimeo.com/video/1114054920"
+    },
+    {
+      "id": "rearranging_kitchen_furniture",
+      "name": "Rearranging Kitchen Furniture",
+      "instruction": "Move the toaster, food processor, and French press from the kitchen countertop into the same kitchen cabinet, and make sure that cabinet is closed at the end.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 298,
+      "thumbnail": "https://vumbnail.com/1114056046.jpg",
+      "video": "https://player.vimeo.com/video/1114056046"
+    },
+    {
+      "id": "putting_up_Christmas_decorations_inside",
+      "name": "Putting Up Christmas Decorations Inside",
+      "instruction": "In the living room, take the wreath, three candy canes, and two pillar candles out of the wicker basket. Place the wreath and two of the candy canes on the same living-room sofa. Put the remaining candy cane on top of a dining-room table. Put both pillar candles together on top of one dining-room table (they can share the same table). Finally, place all three gift boxes under or right next to the Christmas tree in the living room.",
+      "rooms": [
+        "kitchen",
+        "living_room"
+      ],
+      "duration": 457,
+      "thumbnail": "https://vumbnail.com/1114056731.jpg",
+      "video": "https://player.vimeo.com/video/1114056731"
+    },
+    {
+      "id": "set_up_a_coffee_station_in_your_kitchen",
+      "name": "Set Up A Coffee Station In Your Kitchen",
+      "instruction": "Set up a coffee station on the kitchen countertop: keep the coffee maker on the countertop, move the bottle of coffee from the kitchen shelf to the counter next to the coffee maker, place a paper coffee filter on top of the coffee maker, put the saucer next to the coffee maker with the coffee cup on the saucer, and place the electric kettle next to the coffee maker.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 209,
+      "thumbnail": "https://vumbnail.com/1114056931.jpg",
+      "video": "https://player.vimeo.com/video/1114056931"
+    },
+    {
+      "id": "putting_dishes_away_after_cleaning",
+      "name": "Putting Dishes Away After Cleaning",
+      "instruction": "In the kitchen, gather all eight plates from the two countertops, place them all inside a single cabinet (either one), and make sure all cabinets are closed when you’re done.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 365,
+      "thumbnail": "https://vumbnail.com/1114057082.jpg",
+      "video": "https://player.vimeo.com/video/1114057082"
+    },
+    {
+      "id": "preparing_lunch_box",
+      "name": "Preparing Lunch Box",
+      "instruction": "Put both apple halves, the club sandwich, and the chocolate chip cookie from the chopping board on the kitchen countertop into the packing box on the countertop. Then take the bottle of tea out of the refrigerator, put it into the same box, and close the refrigerator when you’re done.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 275,
+      "thumbnail": "https://vumbnail.com/1114057330.jpg",
+      "video": "https://player.vimeo.com/video/1114057330"
+    },
+    {
+      "id": "loading_the_car",
+      "name": "Loading The Car",
+      "instruction": "Put the digital camera from the living room table into the container on the living room floor. Then take the container and the tennis racket to the garage, place both in the car trunk, and close it.",
+      "rooms": [
+        "living_room",
+        "garage"
+      ],
+      "duration": 641,
+      "thumbnail": "https://vumbnail.com/1114057519.jpg",
+      "video": "https://player.vimeo.com/video/1114057519"
+    },
+    {
+      "id": "carrying_in_groceries",
+      "name": "Carrying in Groceries",
+      "instruction": "Take the sack of groceries out of the car trunk in the garage, bring it to the kitchen, and put both the tomato and the carton of milk into the refrigerator in the kitchen. When you’re done, close the car trunk and make sure the refrigerator in the kitchen is closed.",
+      "rooms": [
+        "kitchen",
+        "garage"
+      ],
+      "duration": 476,
+      "thumbnail": "https://vumbnail.com/1114057919.jpg",
+      "video": "https://player.vimeo.com/video/1114057919"
+    },
+    {
+      "id": "bringing_in_wood",
+      "name": "Bringing in Wood",
+      "instruction": "Bring the three plywood sheets from the garden into the corridor and place them on the floor there.",
+      "rooms": [
+        "garden",
+        "corridor"
+      ],
+      "duration": 451,
+      "thumbnail": "https://vumbnail.com/1114058068.jpg",
+      "video": "https://player.vimeo.com/video/1114058068"
+    },
+    {
+      "id": "moving_boxes_to_storage",
+      "name": "Moving Boxes To Storage",
+      "instruction": "Move the two storage containers from the living room to the garage. In the garage, place one container on the floor and stack the other container on top of it (either order is fine).",
+      "rooms": [
+        "living_room",
+        "garage"
+      ],
+      "duration": 487,
+      "thumbnail": "https://vumbnail.com/1114058315.jpg",
+      "video": "https://player.vimeo.com/video/1114058315"
+    },
+    {
+      "id": "bringing_water",
+      "name": "Bringing Water",
+      "instruction": "Retrieve the two bottles from the refrigerator in the kitchen, bring them to the living room, and place both on the coffee table. Make sure the refrigerator is closed when you finish.",
+      "rooms": [
+        "living_room",
+        "kitchen"
+      ],
+      "duration": 315,
+      "thumbnail": "https://vumbnail.com/1114058418.jpg",
+      "video": "https://player.vimeo.com/video/1114058418"
+    },
+    {
+      "id": "tidying_bedroom",
+      "name": "Tidying Bedroom",
+      "instruction": "In the bedroom, move the book from the bed onto either nightstand, and place the two sandals side by side next to the bed.",
+      "rooms": [
+        "bedroom"
+      ],
+      "duration": 368,
+      "thumbnail": "https://vumbnail.com/1114058519.jpg",
+      "video": "https://player.vimeo.com/video/1114058519"
+    },
+    {
+      "id": "outfit_a_basic_toolbox",
+      "name": "Outfit A Basic Toolbox",
+      "instruction": "In the utility room, put the drill, pliers, flashlight, Allen wrench, and screwdriver from the tabletop into the toolbox, keep the toolbox on the tabletop, and close the toolbox.",
+      "rooms": [
+        "utility_room"
+      ],
+      "duration": 355,
+      "thumbnail": "https://vumbnail.com/1114058641.jpg",
+      "video": "https://player.vimeo.com/video/1114058641"
+    },
+    {
+      "id": "sorting_vegetables",
+      "name": "Sorting Vegetables",
+      "instruction": "Sort the vegetables from the two wicker baskets on the kitchen floor into the mixing bowls on the kitchen countertop: put all three bok choy and all three Vidalia onions together into one mixing bowl; put both leeks and both broccoli together into a second mixing bowl; and put all three sweet corn into a third mixing bowl.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 397,
+      "thumbnail": "https://vumbnail.com/1114058741.jpg",
+      "video": "https://player.vimeo.com/video/1114058741"
+    },
+    {
+      "id": "collecting_childrens_toys",
+      "name": "Collecting Children's Toys",
+      "instruction": "Pick up the two dice from the bed, the two teddy bears from the floor, and the two board games (one from the desk and one from the bed), and place them all inside the same bookcase in the child’s room.",
+      "rooms": [
+        "childs_room"
+      ],
+      "duration": 640,
+      "thumbnail": "https://vumbnail.com/1114058872.jpg",
+      "video": "https://player.vimeo.com/video/1114058872"
+    },
+    {
+      "id": "putting_shoes_on_rack",
+      "name": "Putting Shoes On Rack",
+      "instruction": "Pick up the two gym shoes and the two sandals from the corridor floor and place them onto the hallstand (shoe rack) in the corridor, making sure they are on the rack and not on the floor. Arrange them so the two gym shoes are next to each other and the two sandals are next to each other.",
+      "rooms": [
+        "corridor"
+      ],
+      "duration": 258,
+      "thumbnail": "https://vumbnail.com/1114058985.jpg",
+      "video": "https://player.vimeo.com/video/1114058985"
+    },
+    {
+      "id": "boxing_books_up_for_storage",
+      "name": "Boxing Books Up for Storage",
+      "instruction": "Put all six books from the bookcases in the living room into the box on the living room floor.",
+      "rooms": [
+        "living_room"
+      ],
+      "duration": 808,
+      "thumbnail": "https://vumbnail.com/1114059113.jpg",
+      "video": "https://player.vimeo.com/video/1114059113"
+    },
+    {
+      "id": "storing_food",
+      "name": "Storing Food",
+      "instruction": "Put away all the food on the kitchen countertop by storing it inside the kitchen cabinets: move the two boxes of oatmeal, two bags of chips, two bottles of olive oil, and two jars of sugar from the countertop into the kitchen cabinets (each item can go into either cabinet).",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 662,
+      "thumbnail": "https://vumbnail.com/1114059272.jpg",
+      "video": "https://player.vimeo.com/video/1114059272"
+    },
+    {
+      "id": "clearing_food_from_table_into_fridge",
+      "name": "Clearing Food from Table into Fridge",
+      "instruction": "Pack the half chicken and the half apple pie from the plates on the breakfast table into the two tupperware containers from the countertop, then put both tupperware containers inside the refrigerator in the kitchen and make sure the refrigerator is closed at the end.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 436,
+      "thumbnail": "https://vumbnail.com/1114059394.jpg",
+      "video": "https://player.vimeo.com/video/1114059394"
+    },
+    {
+      "id": "assembling_gift_baskets",
+      "name": "Assembling Gift Baskets",
+      "instruction": "Place one candle, one butter cookie, one piece of Swiss cheese, and one bow from the table into each of the four wicker baskets on the floor in the living room.",
+      "rooms": [
+        "living_room"
+      ],
+      "duration": 869,
+      "thumbnail": "https://vumbnail.com/1114059476.jpg",
+      "video": "https://player.vimeo.com/video/1114059476"
+    },
+    {
+      "id": "sorting_household_items",
+      "name": "Sorting Household Items",
+      "instruction": "From the two baskets on the bedroom floor, take out the items and organize them in the bathroom: place both detergent bottles under the bathroom sink next to each other; put the box of sanitary napkins on the bathroom shelf; set the soap dispenser on the sink; make sure the cup remains on the sink; put both the toothpaste tube and the toothbrush inside the cup.",
+      "rooms": [
+        "bedroom",
+        "bathroom"
+      ],
+      "duration": 527,
+      "thumbnail": "https://vumbnail.com/1114059574.jpg",
+      "video": "https://player.vimeo.com/video/1114059574"
+    },
+    {
+      "id": "getting_organized_for_work",
+      "name": "Getting Organized For Work",
+      "instruction": "In the bedroom, organize the workspace by keeping the computer under the desk, ensuring the monitor is on the desk, placing the keyboard on the desk next to the monitor, placing the mouse on the desk next to the keyboard, moving the folder from the swivel chair onto the desk next to the mouse, stacking the notebook on top of the folder with the pen on top of the notebook, and positioning the swivel chair next to the desk.",
+      "rooms": [
+        "bedroom"
+      ],
+      "duration": 522,
+      "thumbnail": "https://vumbnail.com/1114059683.jpg",
+      "video": "https://player.vimeo.com/video/1114059683"
+    },
+    {
+      "id": "clean_up_your_desk",
+      "name": "Clean Up Your Desk",
+      "instruction": "In the child’s room, clean up the desk: put both folders and both paperback books into the bookcase; put the pencil and both pens into the pencil case and leave the case on the desk; take the stapler out of the bookcase and place it on the desk; move the laptop from the bed onto the desk and close it.",
+      "rooms": [
+        "childs_room"
+      ],
+      "duration": 714,
+      "thumbnail": "https://vumbnail.com/1114059839.jpg",
+      "video": "https://player.vimeo.com/video/1114059839"
+    },
+    {
+      "id": "setting_the_fire",
+      "name": "Setting The Fire",
+      "instruction": "In the living room, place the newspaper from the table into the wood fireplace, then put both pieces of firewood from the floor on top of the newspaper. Use the cigar lighter to ignite any one of the items so that the whole pile catches fire, and then turn the lighter off.",
+      "rooms": [
+        "living_room"
+      ],
+      "duration": 304,
+      "thumbnail": "https://vumbnail.com/1114059945.jpg",
+      "video": "https://player.vimeo.com/video/1114059945"
+    },
+    {
+      "id": "clean_boxing_gloves",
+      "name": "Clean Boxing Gloves",
+      "instruction": "Wash the two dusty boxing gloves from the countertop in the utility room in the washer until they are no longer covered with dust.",
+      "rooms": [
+        "utility_room"
+      ],
+      "duration": 275,
+      "thumbnail": "https://vumbnail.com/1114060008.jpg",
+      "video": "https://player.vimeo.com/video/1114060008"
+    },
+    {
+      "id": "wash_a_baseball_cap",
+      "name": "Wash A Baseball Cap",
+      "instruction": "Wash the two baseball caps on the countertop in the utility room using the washer until they are no longer dirty.",
+      "rooms": [
+        "utility_room"
+      ],
+      "duration": 278,
+      "thumbnail": "https://vumbnail.com/1114060147.jpg",
+      "video": "https://player.vimeo.com/video/1114060147"
+    },
+    {
+      "id": "wash_dog_toys",
+      "name": "Wash Dog Toys",
+      "instruction": "In the utility room, take the two teddy toys, the tennis ball, and the softball out of the cabinet and wash them in the washer so that both teddies are free of dirt and dust, the tennis ball has no debris, and the softball has no dirt.",
+      "rooms": [
+        "utility_room"
+      ],
+      "duration": 374,
+      "thumbnail": "https://vumbnail.com/1114060219.jpg",
+      "video": "https://player.vimeo.com/video/1114060219"
+    },
+    {
+      "id": "hanging_pictures",
+      "name": "Hanging Pictures",
+      "instruction": "Pick up the poster from the kitchen countertop and hang it on one of the wall nails in the kitchen.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 80,
+      "thumbnail": "https://vumbnail.com/1114060330.jpg",
+      "video": "https://player.vimeo.com/video/1114060330"
+    },
+    {
+      "id": "attach_a_camera_to_a_tripod",
+      "name": "Attach a Camera to a Tripod",
+      "instruction": "Attach the digital camera to the camera tripod in the bedroom.",
+      "rooms": [
+        "bedroom"
+      ],
+      "duration": 130,
+      "thumbnail": "https://vumbnail.com/1114060393.jpg",
+      "video": "https://player.vimeo.com/video/1114060393"
+    },
+    {
+      "id": "clean_a_patio",
+      "name": "Clean a Patio",
+      "instruction": "Pick up the broom in the garden and sweep the mud off the patio floor until the floor is no longer covered in mud.",
+      "rooms": [
+        "garden"
+      ],
+      "duration": 402,
+      "thumbnail": "https://vumbnail.com/1114060492.jpg",
+      "video": "https://player.vimeo.com/video/1114060492"
+    },
+    {
+      "id": "clean_a_trumpet",
+      "name": "Clean a Trumpet",
+      "instruction": "In the bedroom, pick up the scrub brush from the desk and scrub the cornet (trumpet) on the desk until it’s no longer covered in dust.",
+      "rooms": [
+        "bedroom"
+      ],
+      "duration": 177,
+      "thumbnail": "https://vumbnail.com/1114060606.jpg",
+      "video": "https://player.vimeo.com/video/1114060606"
+    },
+    {
+      "id": "spraying_for_bugs",
+      "name": "Spraying For Bugs",
+      "instruction": "Pick up the pesticide atomizer in the garden and spray insectifuge to fully cover both potted plants in the garden.",
+      "rooms": [
+        "garden"
+      ],
+      "duration": 216,
+      "thumbnail": "https://vumbnail.com/1114060681.jpg",
+      "video": "https://player.vimeo.com/video/1114060681"
+    },
+    {
+      "id": "spraying_fruit_trees",
+      "name": "Spraying Fruit Trees",
+      "instruction": "In the garden, pick up the pesticide atomizer on the floor and spray pesticide onto both trees until each tree trunk is fully covered.",
+      "rooms": [
+        "garden"
+      ],
+      "duration": 278,
+      "thumbnail": "https://vumbnail.com/1114060748.jpg",
+      "video": "https://player.vimeo.com/video/1114060748"
+    },
+    {
+      "id": "make_microwave_popcorn",
+      "name": "Make Microwave Popcorn",
+      "instruction": "In the kitchen, take the popcorn bag from the countertop, put it into the microwave, and heat it until the popcorn is cooked so the cooked popcorn ends up inside the bag.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 108,
+      "thumbnail": "https://vumbnail.com/1114060842.jpg",
+      "video": "https://player.vimeo.com/video/1114060842"
+    },
+    {
+      "id": "cook_cabbage",
+      "name": "Cook Cabbage",
+      "instruction": "From the kitchen refrigerator, take the cabbage and the chili, dice them on the chopping board with the knife, cook the diced cabbage and diced chili in the frying pan on the stove, and leave the cooked, diced cabbage and cooked, diced chili in the frying pan.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 471,
+      "thumbnail": "https://vumbnail.com/1114060935.jpg",
+      "video": "https://player.vimeo.com/video/1114060935"
+    },
+    {
+      "id": "chop_an_onion",
+      "name": "Chop an Onion",
+      "instruction": "In the kitchen, take the Vidalia onion out of the sink, dice it on the chopping board with the paring knife, put the diced onion into the bowl on the countertop, then place both the paring knife and the chopping board into the sink.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 213,
+      "thumbnail": "https://vumbnail.com/1114061062.jpg",
+      "video": "https://player.vimeo.com/video/1114061062"
+    },
+    {
+      "id": "slicing_vegetables",
+      "name": "Slicing Vegetables",
+      "instruction": "From the refrigerator in the kitchen, take out the two bell peppers, the two beets, and the zucchini. Then, on either chopping board on the countertop, use the parer to dice all of them so that only diced bell pepper, diced beet, and diced zucchini remain. Make sure the refrigerator is closed when you finish.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 495,
+      "thumbnail": "https://vumbnail.com/1114061183.jpg",
+      "video": "https://player.vimeo.com/video/1114061183"
+    },
+    {
+      "id": "chopping_wood",
+      "name": "Chopping Wood",
+      "instruction": "Chop the four logs on the driveway in the garden into eight half logs using the axe and the chopping block.",
+      "rooms": [
+        "garden"
+      ],
+      "duration": 358,
+      "thumbnail": "https://vumbnail.com/1114061262.jpg",
+      "video": "https://player.vimeo.com/video/1114061262"
+    },
+    {
+      "id": "cook_hot_dogs",
+      "name": "Cook Hot Dogs",
+      "instruction": "Take the two hot dogs out of the refrigerator in the kitchen and cook them in the microwave until both are cooked.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 305,
+      "thumbnail": "https://vumbnail.com/1114061371.jpg",
+      "video": "https://player.vimeo.com/video/1114061371"
+    },
+    {
+      "id": "cook_bacon",
+      "name": "Cook Bacon",
+      "instruction": "Take the tray with six slices of bacon out of the refrigerator in the kitchen, cook all six slices in the frying pan on the stove until they’re cooked, and make sure the refrigerator is closed when you’re done.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 256,
+      "thumbnail": "https://vumbnail.com/1114061497.jpg",
+      "video": "https://player.vimeo.com/video/1114061497"
+    },
+    {
+      "id": "freeze_pies",
+      "name": "Freeze Pies",
+      "instruction": "In the kitchen, take the two apple pies from the plates on the countertop, put each pie into a separate tupperware container taken from the cabinet, place both tupperwares inside the refrigerator, close the refrigerator, and leave them until the pies are frozen.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 415,
+      "thumbnail": "https://vumbnail.com/1114061625.jpg",
+      "video": "https://player.vimeo.com/video/1114061625"
+    },
+    {
+      "id": "canning_food",
+      "name": "Canning Food",
+      "instruction": "In the kitchen, open the refrigerator and the cabinet. Take the steak and the pineapple out of the refrigerator and take two bowls from the cabinet. On the chopping board on the countertop, use the carving knife to dice the steak and to dice the pineapple. Put only the diced steak into one bowl and only the diced pineapple into the other bowl - do not mix them. Place both bowls back inside the cabinet, then close the refrigerator and close the cabinet.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 766,
+      "thumbnail": "https://vumbnail.com/1114061821.jpg",
+      "video": "https://player.vimeo.com/video/1114061821"
+    },
+    {
+      "id": "make_pizza",
+      "name": "Make Pizza",
+      "instruction": "Make a pizza on the cookie sheet in the kitchen: take the grated cheese, the four pieces of pepperoni, and the two mushrooms from their tupperware containers in the refrigerator; chop the Vidalia onion on the chopping board with the knife, and also chop the two whole mushrooms in half; top the pizza dough that’s already on the cookie sheet with the cheese, pepperoni, halved mushrooms, and chopped onion; bake it in the oven until it becomes a pizza, and leave the finished pizza on the cookie sheet.",
+      "rooms": [
+        "kitchen"
+      ],
+      "duration": 640,
+      "thumbnail": "https://vumbnail.com/1114061917.jpg",
+      "video": "https://player.vimeo.com/video/1114061917"
+    }
+  ]
+}

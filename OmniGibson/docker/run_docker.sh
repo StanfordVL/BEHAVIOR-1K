@@ -27,14 +27,6 @@ do
     esac
 done
 
-# Move directories from their legacy paths.
-if [ -e "${DATA_PATH}/og_dataset" ]; then
-    mv "${DATA_PATH}/og_dataset" "${DATA_PATH}/datasets/og_dataset"
-fi
-if [ -e "${DATA_PATH}/assets" ]; then
-    mv "${DATA_PATH}/assets" "${DATA_PATH}/datasets/assets"
-fi
-
 echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
 echo -e "You can change this path by providing your desired path as an argument"
 echo -e "to the run_docker script you are using. Also note that Docker containers"

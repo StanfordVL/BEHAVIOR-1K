@@ -1941,6 +1941,76 @@ def get_sdf_value_type_name(val):
     raise ValueError(f"Unsupported input type: {type(val)}")
 
 
+def replace_collision_blocks(old_usd_path: str, new_usd_path: str, output_usd_path: str):
+    """
+    Replace all collisions blocks in new_usd_path with those from old_usd_path.
+    """
+
+    def extract_collision_blocks(text):
+        """
+        Extract all top-level 'def [Mesh] "collisions"' blocks using brace matching.
+        Returns a list of (start_idx, end_idx, block_text)
+        """
+        blocks = []
+        lines = text.splitlines(keepends=True)
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            if line.startswith("def") and '"collisions"' in line:
+                start = i
+                brace_count = 0
+                # Find the opening brace
+                while "{" not in lines[i]:
+                    i += 1
+                    if i >= len(lines):
+                        break
+                if i >= len(lines):
+                    break
+                brace_count += lines[i].count("{") - lines[i].count("}")
+                i += 1
+                # Count braces to find block end
+                while brace_count > 0 and i < len(lines):
+                    brace_count += lines[i].count("{") - lines[i].count("}")
+                    i += 1
+                end = i
+                block_text = "".join(lines[start:end])
+                blocks.append((start, end, block_text))
+            else:
+                i += 1
+        return blocks
+
+    # Load USDA files
+    with open(old_usd_path, "r") as f:
+        source_usda = f.read()
+    with open(new_usd_path, "r") as f:
+        target_usda = f.read()
+
+    # Extract collision blocks
+    source_collision_blocks = extract_collision_blocks(source_usda)
+    target_blocks = extract_collision_blocks(target_usda)
+
+    # Replace in target
+    if len(target_blocks) != len(source_collision_blocks):
+        print(f"Warning: Replacing {min(len(target_blocks), len(source_collision_blocks))} blocks due to mismatch.")
+
+    new_lines = []
+    last_idx = 0
+    target_lines = target_usda.splitlines(keepends=True)
+    for (start, end, _), (_, _, new_block) in zip(target_blocks, source_collision_blocks):
+        new_lines.extend(target_lines[last_idx:start])
+        new_lines.append(new_block)
+        last_idx = end
+    new_lines.extend(target_lines[last_idx:])
+
+    new_usda_text = "".join(new_lines)
+
+    # Save result
+    with open(output_usd_path, "w") as f:
+        f.write(new_usda_text)
+
+    print(f"Finished replacing all {len(source_collision_blocks)} collision blocks.")
+
+
 @torch_compile
 def _compute_relative_poses_torch(
     idx: int,

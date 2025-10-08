@@ -37,9 +37,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name="stove",
             category="stove",
-            model="yhjzwg",
-            bounding_box=[1.185, 0.978, 1.387],
-            position=[0, 0, 0.69],
+            model="ykretu",
+            position=[0, 0, 0.61],
         )
     )
 
@@ -51,8 +50,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 name=f"apple{i}",
                 category="apple",
                 model="agveuv",
-                bounding_box=[0.065, 0.065, 0.077],
-                position=[0, i * 0.07, 2.0],
+                position=[-0.1 * i, -0.2, 1.0],
                 abilities={"flammable": {"ignition_temperature": 100, "distance_threshold": 0.5}},
             )
         )
@@ -74,13 +72,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
-        position=th.tensor([-0.42246569, -0.34745704, 1.56810353]),
-        orientation=th.tensor([0.50083786, -0.10407796, -0.17482619, 0.84128772]),
+        position=th.tensor([1.2299, -0.8270, 1.4666]),
+        orientation=th.tensor([0.4831, 0.2451, 0.3803, 0.7497]),
     )
 
     # Let objects settle
     for _ in range(10):
-        env.step(th.empty(0))
+        env.step([])
 
     # Turn on the stove
     stove.states[object_states.ToggledOn].set_value(True)
@@ -102,13 +100,13 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Main recording loop
     while steps != max_steps:
-        env.step(th.empty(0))
+        env.step([])
         temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
         print(f"{'Apple temperature:':<20}", *temps, end="\r")
         steps += 1
 
     # Always close env at the end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

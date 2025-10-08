@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="joylo",
-    version="3.7.0-alpha",
+    version="3.7.0",
     author="Stanford University",
     description="JoyLo for OmniGibson",
     long_description=long_description,
@@ -37,7 +37,7 @@ setuptools.setup(
         "termcolor",
         "tyro",
         "zmq",
-        "telemoma~=0.2.0",
+        "telemoma~=0.3.0",
     ],
     extras_require={
         "dev": [

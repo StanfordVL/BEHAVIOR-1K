@@ -17,10 +17,10 @@
 }
 
 /* Make the 2025 BEHAVIOR Challenge navigation item bold and golden */
-/* .md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
+.md-tabs__list .md-tabs__item:nth-child(2) .md-tabs__link {
     font-weight: bold !important;
     color: #B8860B !important;
-} */
+}
 
 /* Add spacing between FontAwesome icons and text in navigation */
 .md-nav__item i[class*="fa-"], 

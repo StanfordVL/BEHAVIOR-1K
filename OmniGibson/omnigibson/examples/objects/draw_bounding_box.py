@@ -23,7 +23,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="banana",
         category="banana",
         model="vvyyyv",
-        bounding_box=[0.643, 0.224, 0.269],
+        visual_only=True,
         position=[-0.906661, -0.545106, 0.136824],
         orientation=[0, 0, 0.76040583, -0.6494482],
     )
@@ -33,9 +33,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="door",
         category="door",
         model="ohagsq",
-        bounding_box=[1.528, 0.064, 1.299],
-        position=[-2.0, 0, 0.70000001],
-        orientation=[0, 0, -0.38268343, 0.92387953],
+        visual_only=True,
+        position=[-1.0, 1.2, 1.45],
+        orientation=[0.0, 0.0, 0.0, 1.0],
     )
 
     # Create the scene config to load -- empty scene with a few objects
@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a few steps to let objects settle
     for i in range(100):
-        env.step(th.empty(0))
+        env.step([])
 
     # Grab observations from viewer camera and write them to disk
     obs, _ = cam.get_obs()
@@ -84,7 +84,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")
 
     # Always close environment down at end
-    og.clear()
+    og.shutdown()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,25 @@
+type: R1Pro
+# multi_view_cameras are used by BehaviorIterableDataset
+multi_view_cameras:
+  left_wrist: 
+    name: robot_r1::robot_r1:left_realsense_link:Camera:0
+    resolution: [240, 240]
+  right_wrist: 
+    name: robot_r1::robot_r1:right_realsense_link:Camera:0
+    resolution: [240, 240]
+  head: 
+    name: robot_r1::robot_r1:zed_link:Camera:0
+    resolution: [240, 240]
+# action_keys and action_key_dims are used by the baselines in il_lib repo 
+# You don't need to modify this if you are not training il_lib baselines
+action_keys: [base, torso, left_arm, left_gripper, right_arm, right_gripper]
+action_key_dims:
+  base: 3
+  torso: 4
+  left_arm: 7
+  left_gripper: 1
+  right_arm: 7
+  right_gripper: 1
+
+# Overwrite below to modify the robot controller 
+controllers:

@@ -269,6 +269,15 @@ stages:
   #   outs:
   #   - artifacts/pipeline/validate_scenes.success
 
+  export_glbs:
+    cmd: 'python -m b1k_pipeline.export_glbs'
+    deps:
+    - artifacts/parallels/objects.zip
+    - artifacts/pipeline/export_objs.success
+    - b1k_pipeline/export_glbs.py
+    outs:
+    - artifacts/parallels/objects_glb.zip
+
   usdify_objects:
     cmd: 'python -m b1k_pipeline.usd_conversion.usdify_objects'
     deps:

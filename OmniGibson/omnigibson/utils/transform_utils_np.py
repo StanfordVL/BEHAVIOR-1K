@@ -380,7 +380,7 @@ def _quat2mat(quaternion):
     Convert quaternions into rotation matrices.
 
     Args:
-        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (w, x, y, z).
+        quaternion (torch.Tensor): A tensor of shape (..., 4) representing batches of quaternions (x, y, z, w).
 
     Returns:
         torch.Tensor: A tensor of shape (..., 3, 3) representing batches of rotation matrices.
@@ -506,7 +506,7 @@ def decompose_mat(hmat):
     """Batched decompose_mat function - assumes input is already batched
 
     Args:
-        hmat: (B, 4, 4) batch of homogeneous matrices
+        hmat (np.ndarray): (B, 4, 4) batch of homogeneous matrices
 
     Returns:
         scale: (B, 3) scale factors
@@ -804,10 +804,10 @@ def pose_transform(pos1, quat1, pos0, quat0):
     pose1 @ pose0, NOT pose0 @ pose1
 
     Args:
-        pos1: (x,y,z) position to transform
-        quat1: (x,y,z,w) orientation to transform
-        pos0: (x,y,z) initial position
-        quat0: (x,y,z,w) initial orientation
+        pos1 (np.ndarray): (x,y,z) position to transform
+        quat1 (np.ndarray): (x,y,z,w) orientation to transform
+        pos0 (np.ndarray): (x,y,z) initial position
+        quat0 (np.ndarray): (x,y,z,w) initial orientation
 
     Returns:
         2-tuple:
@@ -827,8 +827,8 @@ def invert_pose_transform(pos, quat):
     Inverts a pose transform
 
     Args:
-        pos: (x,y,z) position to transform
-        quat: (x,y,z,w) orientation to transform
+        pos (np.ndarray): (x,y,z) position to transform
+        quat (np.ndarray): (x,y,z,w) orientation to transform
 
     Returns:
         2-tuple:
@@ -849,10 +849,10 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     pose1 = pose0 @ transform
 
     Args:
-        pos1: (x,y,z) position to transform
-        quat1: (x,y,z,w) orientation to transform
-        pos0: (x,y,z) initial position
-        quat0: (x,y,z,w) initial orientation
+        pos1 (np.ndarray): (x,y,z) position to transform
+        quat1 (np.ndarray): (x,y,z,w) orientation to transform
+        pos0 (np.ndarray): (x,y,z) initial position
+        quat0 (np.ndarray): (x,y,z,w) initial orientation
 
     Returns:
         2-tuple:
