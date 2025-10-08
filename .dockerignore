@@ -7,6 +7,6 @@ gha-creds-*.json
 outputs/
 /*.ipynb
 
-# Datset
+# Dataset
 datasets/*
 !datasets/README
