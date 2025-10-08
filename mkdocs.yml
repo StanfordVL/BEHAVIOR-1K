@@ -106,6 +106,7 @@ nav:
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md
+    - Submission Guidelines: challenge/submission.md
     - Demo Gallery: challenge/tasks/
   - Documentation:
     - Installation: getting_started/installation.md
