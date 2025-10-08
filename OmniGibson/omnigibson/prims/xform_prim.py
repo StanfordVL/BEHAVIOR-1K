@@ -273,7 +273,7 @@ class XFormPrim(BasePrim):
         elif frame == "scene":
             assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
             return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
-        else:
+        else:       # parent
             position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
             return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
 

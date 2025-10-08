@@ -1,4 +1,5 @@
 from functools import cached_property
+from typing import Literal
 
 from scipy.spatial import Delaunay
 import torch as th
@@ -17,7 +18,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.numpy_utils import vtarray_to_torch
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh
+from omnigibson.utils.usd_utils import mesh_prim_shape_to_trimesh_mesh, PoseAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -34,6 +35,9 @@ class GeomPrim(XFormPrim):
         name (str): Name for the object. Names need to be unique per scene.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this mesh prim, the below values can be specified:
+        link (None or RigidPrim): If specified, should be reference to the rigid body link that owns this geom prim,
+            enabling additional features such as pose calculations with respect to this link. Default is None, which
+            results in no ownership assumptions about this geom
     """
 
     def __init__(
@@ -41,8 +45,10 @@ class GeomPrim(XFormPrim):
         relative_prim_path,
         name,
         load_config=None,
+        link=None,
     ):
         self._mesh_type = None
+        self._link = link
 
         # Run super method
         super().__init__(
@@ -58,6 +64,38 @@ class GeomPrim(XFormPrim):
     def _post_load(self):
         super()._post_load()
         self._mesh_type = self.prim.GetTypeName()
+
+
+    def get_position_orientation(self, frame: Literal["world", "scene", "parent", "link"] = "world", clone=True):
+        """
+        Gets prim's pose with respect to the specified frame.
+
+        Args:
+            frame (Literal): frame to get the pose with respect to. Default to world
+            get position relative to the object parent. scene frame get position relative to the scene.
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
+        Args:
+            clone (bool): Whether to clone the internal buffer or not when grabbing data
+
+        Returns:
+            2-tuple:
+                - th.Tensor: (x,y,z) position in the specified frame
+                - th.Tensor: (x,y,z,w) quaternion orientation in the specified frame
+        """
+        assert frame in ["world", "parent", "scene", "link"], f"Invalid frame '{frame}'. Must be 'world', 'parent', 'scene', or 'link'."
+        if frame == "world":
+            return PoseAPI.get_world_pose(self.prim_path)
+        elif frame == "scene":
+            assert self.scene is not None, "Cannot get position and orientation relative to scene without a scene"
+            return self.scene.convert_world_pose_to_scene_relative(*PoseAPI.get_world_pose(self.prim_path))
+        elif frame == "link":
+            assert self._link is not None, "Cannot get position and orientation relative to link without a link"
+            return T.mat2pose(T.pose2mat(self._link.get_position_orientation()) @ T.pose2mat(PoseAPI.get_world_pose(self.prim_path)))
+        else:       # parent
+            position, orientation = lazy.isaacsim.core.utils.xforms.get_local_pose(self.prim_path)
+            return th.as_tensor(position, dtype=th.float32), th.as_tensor(orientation[[1, 2, 3, 0]], dtype=th.float32)
+
 
     @property
     def purpose(self):
@@ -302,6 +340,7 @@ class CollisionGeomPrim(GeomPrim):
         relative_prim_path,
         name,
         load_config=None,
+        link=None,
     ):
         # Store values created at runtime
         self._collision_api = None
@@ -314,6 +353,7 @@ class CollisionGeomPrim(GeomPrim):
             relative_prim_path=relative_prim_path,
             name=name,
             load_config=load_config,
+            link=link,
         )
 
     def _post_load(self):
