@@ -50,6 +50,7 @@ class WebsocketClientPolicy:
         return self._server_metadata
 
     def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
+        # TODO [Wensi]: use URL parser instead of this
         # Extract host and port for health check
         host_port = self._uri.replace("ws://", "").replace("wss://", "")
         if ":" in host_port:
