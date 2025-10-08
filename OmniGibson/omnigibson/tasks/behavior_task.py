@@ -248,7 +248,6 @@ class BehaviorTask(BaseTask):
 
     def reset(self, env):
         super().reset(env)
-
         # Use presampled robot pose if specified (only available for officially supported mobile manipulators)
         if self.use_presampled_robot_pose:
             robot = self.get_agent(env)
@@ -618,7 +617,7 @@ class BehaviorTask(BaseTask):
             suffix (None or str): If specified, suffix to add onto the end of the scene filename that will be saved
         """
         save_dir = (
-            os.path.join(get_dataset_path("behavior-1k-assets"), "scenes", self.scene_name, "json")
+            os.path.join(get_dataset_path("2025-challenge-task-instances"), "scenes", self.scene_name, "json")
             if save_dir is None
             else save_dir
         )

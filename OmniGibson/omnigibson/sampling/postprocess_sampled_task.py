@@ -4,7 +4,6 @@ import os
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.data_utils import merge_scene_files
 from omnigibson.tasks import BehaviorTask
-from omnigibson.macros import gm
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--scene_model", type=str, default=None, help="Scene model to sample tasks in")
@@ -23,15 +22,19 @@ parser.add_argument(
 
 def main():
     args = parser.parse_args()
+
     task_name = BehaviorTask.get_cached_activity_scene_filename(
         scene_model=args.scene_model,
         activity_name=args.activity,
         activity_definition_id=0,
         activity_instance_id=0,
     )
-    json_dir = os.path.join(get_dataset_path("behavior-1k-assets"), f"scenes/{args.scene_model}/json")
-    full_scene_full_json = f"{json_dir}/{args.scene_model}_stable.json"
+
+    json_dir = os.path.join(get_dataset_path("2025-challenge-task-instances"), f"scenes/{args.scene_model}/json")
     sampled_scene_partial_json = f"{json_dir}/{task_name}-partial_rooms.json"
+    full_scene_json_dir = os.path.join(get_dataset_path("behavior-1k-assets"), f"scenes/{args.scene_model}/json")
+    full_scene_full_json = f"{full_scene_json_dir}/{args.scene_model}_stable.json"
+
     with open(full_scene_full_json, "r") as f:
         scene_a = json.load(f)
     with open(sampled_scene_partial_json, "r") as f:
