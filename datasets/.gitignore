@@ -3,6 +3,7 @@
 
 # Re-include the .gitignore file itself
 !.gitignore
+!.dockerignore
 
 # Also include the README
 !README

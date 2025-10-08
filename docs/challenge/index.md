@@ -46,7 +46,7 @@ Pre-implemented training & evaluation pipelines for:
 
 **Privileged information track:** May query simulator for any information (object poses, scene point clouds, etc.).
 
-🏆 **Prizes per track:** 🥇 $1,000 | 🥈 $500 | 🥉 $300
+🏆 **Prizes per track:** 🥇 $1,000 + GeForce 5080 | 🥈 $500 + (Jetson Orin Nano Super or $1000 Brev Credits) | 🥉 $300 + $500 Brev Credits
 
 Top 3 teams from each track will be invited to present at the workshop!
 

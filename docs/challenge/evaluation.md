@@ -18,7 +18,7 @@ We will select the top three winning teams from each track, they will share the 
 
 ## Running Evaluations
 
-We provide a [unified entry point](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) for running evaluation:
+We provide a [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/eval.py) as a unified entry point for running evaluation:
 ```
 python OmniGibson/omnigibson/learning/eval.py policy=websocket log_path=$LOG_PATH task.name=$TASK_NAME env_wrapper._target_=$WRAPPER_MODULE
 ```
@@ -40,11 +40,13 @@ which is a barebone wrapper that does not provide anything beyond low resolution
 
 There are some more optional arguments, see [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml). 
 
-After launching, the evaluator will load the task and spawn a server listening on `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. Feel free to use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
+After launching, the evaluator will try to listen to `0.0.0.0:80`. The IP and port can be changed in `omnigibson/learning.configs/policy/websocket.yaml`. You can then use `omnigibson.learning.utils.network_utils.WebsocketPolicyServer` (adapted from [openpi](https://github.com/Physical-Intelligence/openpi)) to serve your policy and communicate with the Evaluator. 
+
+There are other arguments that you can overwrite in CLI. For example, `partial_scene_load` will only load objects in the task-relevant rooms, which will help speed up loading and evaluation time. `testing_on_train_instances` will load the training instances instead of testing instances, which is helpful for debugging model overfitting. `max_steps` can be set to enable early stopping for rollouts (setting it to null will use the default timeout, which is 2 * average human task completion time within the demo dataset). See `omnigibson/learning/configs/base_config.yaml` for more available arguments that you can overwrite. 
 
 You are welcome to use the wrappers we provided, or implement custom wrappers for your own use case. For privileged information track, you can arbitrarily query the environment instance for privileged information within the wrapper, as shown in the example `RichObservationWrapper`, which added `normal` and `flow` as additional visual observation modalities, as well as query for the pose of task relevant objects at every frame. We ask that you also include the wrapper code when submitting your result. The wrapper code will be manually inspected by our team to make sure the submission is on the right track, and you have not abused the environment by any means (e.g. teleporting the robot, or changing object states directly). 
 
-As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the baselines section for more information.
+As a starter, we provided a codebase of common imitation learning algorithms for you to get started. Please refer to the [baselines section](./baselines.md) for more information.
 
 
 ## Configure Robot Action Space
@@ -176,7 +178,7 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form below. You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
 
 - **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 
@@ -192,55 +194,6 @@ We will calculate the following metric during policy rollout:
   allow="autoplay; fullscreen" 
   allowfullscreen>
 </iframe>
-
-**Submission details**
-
-After running the eval script, there will be two output files: an json file containing the metric results, and a mp4 video recording of the rollout trajectory. Here is a sample output json file for one episode of evaluation:
-
-```
-{
-    "agent_distance": {
-        "base": 9.703554042062024e-06, 
-        "left": 0.019627160858362913, 
-        "right": 0.015415858360938728
-    }, 
-    "normalized_agent_distance": {
-        "base": 4.93031697036899e-06, 
-        "left": 0.006022007241065448, 
-        "right": 0.0037894888066205374
-    }, 
-    "q_score": {
-        "final": 0.0
-    }, 
-    "time": {
-        "simulator_steps": 6, 
-        "simulator_time": 0.2, 
-        "normalized_time": 0.002791165032284476
-    }
-}
-```
-
-- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7).
-    - You can view the leaderboard [here](./leaderboard.md).
-    - We encourage you to submit intermediate results and models to be showcased on our leaderboard.
-
-- **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
-
-- Final model submission and evaluation:
-    - Submitted models and our compute specs
-        - The model should run on a single 24GB VRAM GPU. We will use the following GPUs to perform the final evaluation: RTX 3090, A5000, TitanRTX
-    - IP address-based evaluation: You can serve your models and provide us with corresponding IP addresses that allow us to query your models for evaluation. We recommend common model serving libraries, such as [TorchServe](https://docs.pytorch.org/serve/), [LitServe](https://lightning.ai/docs/litserve/home), [vLLM](https://docs.vllm.ai/en/latest/index.html), [NVIDIA Triton](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/index.html), etc.
-    - The same model with different checkpoints from the same team will be considered as a single entry.
-
-
-- **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON AND VIDEOS IN ANY WAY**. Your final submission will be zip file containing the following:
-
-1. All the json files, one for each rollout you performed (up to 500);
-2. All the mp4 videos, one for each rollout you performed (up to 500);
-3. Wrapper code (.py) used during evaluation;
-4. Robot (R1Pro) config file (.yaml) used during evaluation;
-4. [Optional] Model docker files;
-5. A readme file (.md) that specifies details to perform evaluation with your policy.
 
 
 **Challenge office hours**
