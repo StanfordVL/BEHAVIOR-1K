@@ -4,7 +4,7 @@ On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge
 
 ---
 
-### 10/06/2025
+### 10/08/2025
 
 **Challenge rule clarifications:**
 
