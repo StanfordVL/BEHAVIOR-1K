@@ -52,7 +52,7 @@ All fixes have been pushed to the `main` branch.
 **New features:**
 
 1. Added several new CLI arguments for evaluation, including  
-   `testing_on_train_instances`, `early_stopping`, and `partial_scene_load`.  
+   `testing_on_train_instances`, `max_steps`, and `partial_scene_load`.  
    See [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml) for more details.
 
 ---
