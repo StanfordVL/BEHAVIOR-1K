@@ -18,6 +18,7 @@ from gello.robots.sim_robot.og_teleop_utils import (
     generate_robot_config,
     get_task_relevant_room_types,
 )
+from gello.robots.sim_robot.og_teleop_cfg import DISABLED_TRANSITION_RULES
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
@@ -92,6 +93,9 @@ class Evaluator:
         Read the environment config file and create the environment.
         The config file is located in the configs/envs directory.
         """
+        # Disable a subset of transition rules for data collection
+        for rule in DISABLED_TRANSITION_RULES:
+            rule.ENABLED = False
         # Load config file
         available_tasks = load_available_tasks()
         task_name = self.cfg.task.name
@@ -420,6 +424,7 @@ if __name__ == "__main__":
         logger.info("Starting evaluation...")
 
         for idx in instances_to_run:
+            evaluator.reset()
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(m.NUM_EVAL_EPISODES):

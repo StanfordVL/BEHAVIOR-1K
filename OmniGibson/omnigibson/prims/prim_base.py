@@ -159,7 +159,7 @@ class BasePrim(Serializable, Recreatable, ABC):
         """
         raise NotImplementedError()
 
-    def get_children_prims(self, recursive=False, include_instances=False, _root=None):
+    def get_children_prims(self, recursive=False, include_instances=False, return_nested_dict=False, _root=None):
         """
         Retrieves all children owned by this prim, optionally including instances and recursively searching as well.
         NOTE: This traversal does DFS, not BFS
@@ -167,6 +167,8 @@ class BasePrim(Serializable, Recreatable, ABC):
         Args:
             recursive (bool): If True, return all nested children owned by this prim
             include_instances (bool): If True, include instanceable prims owned by this prim
+            return_nested_dict (bool): Whether to keep results as nested dict of children prims or flattened.
+                Default is False, which results in flattened list of all children
             _root (None or Usd.Prim): If specified, get the children from the specified root prim. Otherwise, defaults
                 to this prim.
 
@@ -174,14 +176,31 @@ class BasePrim(Serializable, Recreatable, ABC):
             list of Usd.Prim: Owned children of this prim
         """
         _root = self.prim if _root is None else _root
-        prims = []
+        prims = dict() if return_nested_dict else []
         # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-        children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies()) \
-            if include_instances else _root.GetChildren()
-        prims += children
+        children = (
+            _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
+            if include_instances
+            else _root.GetChildren()
+        )
         if recursive:
             for child in children:
-                prims += self.get_children_prims(recursive=recursive, include_instances=include_instances, _root=child)
+                descendants = self.get_children_prims(
+                    recursive=recursive,
+                    include_instances=include_instances,
+                    return_nested_dict=return_nested_dict,
+                    _root=child,
+                )
+                if return_nested_dict:
+                    prims[child] = descendants
+                else:
+                    prims += [child] + descendants
+        else:
+            if return_nested_dict:
+                for child in children:
+                    prims[child] = dict()
+            else:
+                prims += children
         return prims
 
     def modify_children_prims(self, fcn, recursive=False, include_instances=False, _root=None):
@@ -205,15 +224,20 @@ class BasePrim(Serializable, Recreatable, ABC):
         """
         _root = self.prim if _root is None else _root
         # See https://openusd.org/docs/api/_usd__page__scenegraph_instancing.html ("Traversing Into Instances with Instance Proxies")
-        children = _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies()) \
-            if include_instances else _root.GetChildren()
+        children = (
+            _root.GetFilteredChildren(lazy.pxr.Usd.TraverseInstanceProxies())
+            if include_instances
+            else _root.GetChildren()
+        )
         should_continue = True
         for child in children:
             should_continue = fcn(child)
             if not should_continue:
                 break
             if recursive:
-                should_continue = self.modify_children_prims(fcn=fcn, recursive=recursive, include_instances=include_instances, _root=child)
+                should_continue = self.modify_children_prims(
+                    fcn=fcn, recursive=recursive, include_instances=include_instances, _root=child
+                )
                 if not should_continue:
                     break
         return should_continue

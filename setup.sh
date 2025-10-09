@@ -152,7 +152,7 @@ EOF
         cat << EOF
 3. BEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT
     Last revision: December 8, 2022
-    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K. 
+    This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/BEHAVIOR-1K.
     The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. 
     It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. 
     Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):
@@ -375,8 +375,12 @@ if [ "$OMNIGIBSON" = true ]; then
             rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
         fi
 
-        # Remove packaging, there is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
-        # TODO; located at: /home/josiahw/miniforge3/envs/b1k/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging
+        # Fix packaging conflict - remove conflicting version
+        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
+            echo "Fixing packaging conflict..."
+            rm -rf "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
+        fi
 
     fi
     
@@ -398,7 +402,7 @@ if [ "$EVAL" = true ]; then
     # install av and ffmpeg
     conda install av "numpy<2" -c conda-forge -y
 fi
-    
+
 # Install asset pipeline
 if [ "$ASSET_PIPELINE" = true ]; then
     echo "Installing asset pipeline..."
@@ -412,9 +416,9 @@ if [ "$DATASET" = true ]; then
         echo "ERROR: OmniGibson import failed, please make sure you have omnigibson installed before downloading datasets"
         exit 1
     }
-    
+
     echo "Installing datasets..."
-    
+
     # Determine if we should accept dataset license automatically
     DATASET_ACCEPT_FLAG=""
     if [ "$ACCEPT_DATASET_TOS" = true ]; then

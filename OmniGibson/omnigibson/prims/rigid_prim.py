@@ -166,7 +166,6 @@ class RigidPrim(XFormPrim):
         additional bodies are added manually
         """
         self._collision_meshes, self._visual_meshes = dict(), dict()
-        coms, vols = [], []
 
         # Need to explicitly check for instanced children here since they may include instanced meshes
         def set_non_instanced(prim):
@@ -187,54 +186,82 @@ class RigidPrim(XFormPrim):
         # self.modify_children_prims(fcn=set_non_instanced, recursive=False, include_instances=True)
 
         # Now iterate again and grab all the (potentially updated, newly non-instanced) meshes
-        prims_to_check = self.get_children_prims(recursive=True, include_instances=True)
+        prims_to_check = self.get_children_prims(recursive=True, include_instances=True, return_nested_dict=True)
 
-        for prim in prims_to_check:
-            mesh_type = prim.GetPrimTypeInfo().GetTypeName()
-            if mesh_type in GEOM_TYPES:
-                # Raw meshes themselves could be nested, and share the same name so we convert their (unique) prim path
-                # into a string we'll use for their name
-                mesh_path = prim.GetPrimPath().__str__()
-                mesh_name = mesh_path.split(self.prim_path)[-1].replace("/", "_")
-                is_collision = prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
-                mesh_kwargs = {
-                    "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, mesh_path),
-                    "name": mesh_name,
-                    "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
-                }
-                if is_collision:
-                    mesh = CollisionGeomPrim(**mesh_kwargs)
-                    mesh.load(self.scene)
-                    # We also modify the collision mesh's contact and rest offsets, since omni's default values result
-                    # in lightweight objects sometimes not triggering contacts correctly
-                    mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
-                    mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
-                    self._collision_meshes[mesh_name] = mesh
-
-                    volume, com = get_mesh_volume_and_com(prim)
-                    # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
-                    local_pos, local_orn = mesh.get_position_orientation(frame="parent")
-                    vols.append(volume * th.prod(mesh.scale))
-                    coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
-                    # boundingCube approximation for the underlying collision approximation for GPU compatibility
-                    if not check_extent_radius_ratio(mesh, com):
-                        log.warning(f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation")
-                        mesh.set_collision_approximation("boundingCube")
+        def _infer_meshes_recursively(prims_dict, current_local_tf, current_scale):
+            vols, coms = [], []
+            # Iterate through each prim, subsequent children in prims_dict
+            for prim, children_dict in prims_dict.items():
+                prim_type = prim.GetPrimTypeInfo().GetTypeName()
+                prim_path = prim.GetPrimPath().pathString
+                # Record this transform, if it has one
+                if prim.GetProperty("xformOp:translate").IsValid():
+                    prim_pos, prim_quat = lazy.isaacsim.core.utils.xforms.get_local_pose(prim_path)
+                    prim_pos = th.as_tensor(prim_pos, dtype=th.float32)
+                    prim_quat = th.as_tensor(prim_quat[[1, 2, 3, 0]], dtype=th.float32)
+                    prim_local_tf = T.pose2mat((prim_pos, prim_quat))
+                    prim_local_scale = th.tensor(prim.GetAttribute("xformOp:scale").Get())
+                    # Compute nested scale now because we're going to modify prim_local_tf in place
+                    nested_scale = current_scale * prim_local_tf[:3, :3] @ prim_local_scale
+                    prim_local_tf[:3, :3] *= prim_local_scale.unsqueeze(-1)
+                    nested_tf = current_local_tf @ prim_local_tf
                 else:
-                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-                    self._visual_meshes[mesh_name].load(self.scene)
+                    nested_tf = current_local_tf
+                    nested_scale = current_scale
+                if prim_type in GEOM_TYPES:
+                    assert len(children_dict) == 0, "No children prims should be owned by a Mesh prim!"
+                    # Raw meshes themselves could be nested, and share the same name so we convert their (unique) prim path
+                    # into a string we'll use for their name
+                    mesh_name = prim_path.split(self.prim_path)[-1].replace("/", "_")
+                    is_collision = prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
+                    mesh_kwargs = {
+                        "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, prim_path),
+                        "name": mesh_name,
+                        "load_config": {"xform_props_pre_loaded": self._load_config["xform_props_pre_loaded"]},
+                        "link": self,
+                    }
+                    if is_collision:
+                        mesh = CollisionGeomPrim(**mesh_kwargs)
+                        mesh.load(self.scene)
+                        # We also modify the collision mesh's contact and rest offsets, since omni's default values result
+                        # in lightweight objects sometimes not triggering contacts correctly
+                        mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
+                        mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
+                        self._collision_meshes[mesh_name] = mesh
+
+                        volume, com = get_mesh_volume_and_com(prim)
+                        # We need to transform the volume and CoM from the mesh's local frame to the link's local frame
+                        vols.append(volume * th.prod(nested_scale))
+                        com_link_frame = (nested_tf @ th.cat([com, th.tensor([1.0])]))[:3]
+                        coms.append(com_link_frame)
+                        # If the ratio between the max extent and min radius is too large (i.e. shape too oblong), use
+                        # boundingCube approximation for the underlying collision approximation for GPU compatibility
+                        if not check_extent_radius_ratio(mesh, com):
+                            log.warning(
+                                f"Got overly oblong collision mesh: {mesh.name}; use boundingCube approximation"
+                            )
+                            mesh.set_collision_approximation("boundingCube")
+                    else:
+                        self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+                        self._visual_meshes[mesh_name].load(self.scene)
+
+                # Iterate through all nested descendants
+                nested_vols, nested_cols = _infer_meshes_recursively(children_dict, nested_tf, nested_scale)
+                vols += nested_vols
+                coms += nested_cols
+
+            return vols, coms
 
         # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
         # for this link
+        vols, coms = _infer_meshes_recursively(
+            prims_dict=prims_to_check, current_local_tf=th.eye(4), current_scale=th.ones(3)
+        )
         if len(coms) > 0:
             coms_tensor = th.stack(coms)
             vols_tensor = th.tensor(vols).unsqueeze(1)
             com = th.sum(coms_tensor * vols_tensor, dim=0) / th.sum(vols_tensor)
             self.center_of_mass = com
-
-            # TODO: Fix COM calculation -- underlying issue is bad pose computation using "local" with new prim hierarchy
-            # TODO: May be slow, but just sanity check using explicit local transform
 
     def enable_collisions(self):
         """

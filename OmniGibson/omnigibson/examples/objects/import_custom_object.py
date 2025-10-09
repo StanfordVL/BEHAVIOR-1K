@@ -50,7 +50,6 @@ from omnigibson.utils.asset_conversion_utils import (
 @click.option("--overwrite", is_flag=True, help="Overwrite any pre-existing files")
 @click.option("--no_keep_instanceable", is_flag=True, help="Do not keep instanceable meshes if set")
 @click.option("--no_import_inertia", is_flag=True, help="Do not import native inertia tensor if set")
-@click.option("--n_submesh", type=int, help="Maximum of submesh numnber")
 def import_custom_object(
     asset_path: str,
     category: str,
@@ -65,7 +64,6 @@ def import_custom_object(
     overwrite: bool,
     no_keep_instanceable: bool,
     no_import_inertia: bool,
-    n_submesh: int,
 ):
     """
     Imports a custom-defined object asset into an OmniGibson-compatible USD format and saves the imported asset
