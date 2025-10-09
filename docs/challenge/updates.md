@@ -24,7 +24,7 @@ All fixes have been pushed to the `main` branch.
 
 **New features:**
 
-1. We updated the [submission guildeline](./submission.md) and added a [sample submission Dockerfile](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile) for reference.  
+1. We updated the [submission guideline](./submission.md) and added a [sample submission Dockerfile](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile) for reference.  
 2. We are excited to announce that [NVIDIA](https://www.nvidia.com/en-us/) will be sponsoring our challenge!  
    The updated prize pool is as follows:
     - **First Place:** $1000 + GeForce 5080  
