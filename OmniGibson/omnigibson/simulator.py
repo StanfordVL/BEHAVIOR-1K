@@ -45,6 +45,7 @@ from omnigibson.utils.ui_utils import (
     print_logo,
     suppress_omni_log,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 from omnigibson.utils.usd_utils import (
     CollisionAPI,
     ControllableObjectViewAPI,
@@ -709,11 +710,7 @@ def _launch_simulator(*args, **kwargs):
             self._floor_plane.load(None)
 
             # Assign floors category to the floor plane
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=self._floor_plane.prim,
-                semantic_label="floors",
-                type_label="class",
-            )
+            add_semantic_label(prim=self._floor_plane.prim, label="floors")
 
         def add_skybox(self):
             """
