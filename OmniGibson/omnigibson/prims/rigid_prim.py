@@ -212,7 +212,7 @@ class RigidPrim(XFormPrim):
                     assert len(children_dict) == 0, "No children prims should be owned by a Mesh prim!"
                     # Raw meshes themselves could be nested, and share the same name so we convert their (unique) prim path
                     # into a string we'll use for their name
-                    mesh_name = prim_path.split(self.prim_path)[-1].replace("/", "_")
+                    mesh_name = prim_path.split(self.prim_path)[-1].strip("/").replace("/", "_")
                     is_collision = prim.HasAPI(lazy.pxr.UsdPhysics.CollisionAPI)
                     mesh_kwargs = {
                         "relative_prim_path": absolute_prim_path_to_scene_relative(self.scene, prim_path),
