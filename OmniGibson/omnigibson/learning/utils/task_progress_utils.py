@@ -522,6 +522,24 @@ CHALLENGE_TASKS_PROGRESS_APPROXIMATION = {
             "sandals_paired": ("state", "sandal.n.01_1", NextTo, "sandal.n.01_2", True),
         },
     ),
+    "boxing_books_up_for_storage": lambda env: check_progress(
+        env,
+        {
+            "robot_near_box": ("near", "agent.n.01_1", "box.n.01_1"),
+            "book_1_retrieved": ("state", "book.n.02_1", Inside, "bookcase.n.01", False),
+            "book_2_retrieved": ("state", "book.n.02_2", Inside, "bookcase.n.01", False),
+            "book_3_retrieved": ("state", "book.n.02_3", Inside, "bookcase.n.01", False),
+            "book_4_retrieved": ("state", "book.n.02_4", Inside, "bookcase.n.01", False),
+            "book_5_retrieved": ("state", "book.n.02_5", Inside, "bookcase.n.01", False),
+            "book_6_retrieved": ("state", "book.n.02_6", Inside, "bookcase.n.01", False),
+            "book_1_in_box": ("state", "book.n.02_1", Inside, "box.n.01_1", True),
+            "book_2_in_box": ("state", "book.n.02_2", Inside, "box.n.01_1", True),
+            "book_3_in_box": ("state", "book.n.02_3", Inside, "box.n.01_1", True),
+            "book_4_in_box": ("state", "book.n.02_4", Inside, "box.n.01_1", True),
+            "book_5_in_box": ("state", "book.n.02_5", Inside, "box.n.01_1", True),
+            "book_6_in_box": ("state", "book.n.02_6", Inside, "box.n.01_1", True),
+        },
+    ),
     "storing_food": lambda env: check_progress(
         env,
         {
