@@ -4,12 +4,10 @@ import math
 import os
 import pathlib
 import shutil
-import tempfile
 import xml.etree.ElementTree as ET
 from collections import OrderedDict
 from copy import deepcopy
 from datetime import datetime
-from os.path import exists
 from pathlib import Path
 from xml.dom import minidom
 
@@ -20,7 +18,6 @@ import trimesh
 import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
-from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.scenes import Scene
@@ -1080,7 +1077,6 @@ def convert_urdf_to_usd(
     configuration_dir = usd_dir / "configuration"
     physics_usd_path = configuration_dir / f"{obj_model}_physics.usd"
     sensor_usd_path = configuration_dir / f"{obj_model}_sensor.usd"
-    base_usd_path = configuration_dir / f"{obj_model}_base.usd"
 
     # Remove the mixed and sensor files
     usd_path.unlink()

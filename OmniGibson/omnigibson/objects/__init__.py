@@ -10,7 +10,6 @@ __all__ = [
     "BaseObject",
     "ControllableObject",
     "DatasetObject",
-    "DatasetType",
     "LightObject",
     "PrimitiveObject",
     "REGISTERED_OBJECTS",

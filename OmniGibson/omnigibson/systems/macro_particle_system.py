@@ -15,6 +15,7 @@ from omnigibson.utils.usd_utils import (
     absolute_prim_path_to_scene_relative,
     scene_relative_prim_path_to_absolute,
 )
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -459,11 +460,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 path_to=prim_path,
             )
             prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path)
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=prim,
-                semantic_label=self.name,
-                type_label="class",
-            )
+            add_semantic_label(prim=prim, label=self.name)
         result = VisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
         return result
@@ -1219,11 +1216,7 @@ class MacroPhysicalParticleSystem(MacroParticleSystem, PhysicalParticleSystem):
             lazy.pxr.UsdPhysics.RigidBodyAPI.Apply(prim)
             mass_api = lazy.pxr.UsdPhysics.MassAPI.Apply(prim)
             mass_api.GetDensityAttr().Set(self.particle_density)
-            lazy.isaacsim.core.utils.semantics.add_update_semantics(
-                prim=prim,
-                semantic_label=self.name,
-                type_label="class",
-            )
+            add_semantic_label(prim=prim, label=self.name)
         result = CollisionVisualGeomPrim(relative_prim_path=relative_prim_path, name=name)
         result.load(self.scene)
         result.apply_physics_material(self.particle_physics_material)

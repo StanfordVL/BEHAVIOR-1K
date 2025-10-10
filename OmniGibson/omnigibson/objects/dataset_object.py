@@ -1,7 +1,6 @@
 import math
 import os
 import random
-from enum import IntEnum
 
 import torch as th
 
@@ -266,10 +265,16 @@ class DatasetObject(USDObject):
         if self._prim_type == PrimType.RIGID:
             if self._load_config["dataset_name"] == "behavior-1k-assets":
                 # Get the average mass/density for this object category
-                avg_specs = get_og_avg_category_specs()
-                assert self.category in avg_specs, f"Category {self.category} not found in average object specs!"
-                category_mass = avg_specs[self.category]["mass"]
-                category_density = avg_specs[self.category]["density"]
+                avg_specs = get_avg_category_specs()
+                if self.category in avg_specs:
+                    category_mass = avg_specs[self.category]["mass"]
+                    category_density = avg_specs[self.category]["density"]
+                else:
+                    log.warning(
+                        f"Category {self.category} not found in average object specs! Defaulting to unit mass or density."
+                    )
+                    category_mass = 1.0
+                    category_density = 1.0
 
                 total_volume = sum(link.volume for link in self._links.values())
                 for link in self._links.values():

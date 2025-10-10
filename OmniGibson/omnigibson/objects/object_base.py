@@ -14,6 +14,7 @@ from omnigibson.utils.constants import PrimType, OBJECT_CATEGORIES
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.vision_utils import add_semantic_label
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
@@ -241,11 +242,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 self._link_physics_materials[link_name] = physics_mat
 
         # Add semantics
-        lazy.isaacsim.core.utils.semantics.add_update_semantics(
-            prim=self._prim,
-            semantic_label=self.category,
-            type_label="class",
-        )
+        add_semantic_label(prim=self._prim, label=self.category)
 
     def _initialize(self):
         # Run super first
