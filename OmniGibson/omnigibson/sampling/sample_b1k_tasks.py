@@ -14,20 +14,15 @@ from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
 from bddl.activity import Conditions
 from utils import (
-    ACTIVITY_TO_ROW,
     create_stable_scene_json,
-    validate_scene_can_be_sampled,
     get_scene_compatible_activities,
-    get_unsuccessful_activities,
     get_rooms,
     get_predicates,
     get_valid_tasks,
     hide_all_lights,
     parse_task_mapping_new,
     UNSUPPORTED_PREDICATES,
-    USER,
     validate_task,
-    worksheet,
 )
 import numpy as np
 import random
@@ -165,6 +160,23 @@ TASK_CUSTOM_LISTS = {
         },
         "blacklist": None,
     },
+    ("datagen_picking_up_trash", "house_double_floor_lower"): {
+        "whitelist": {
+            "can__of__soda.n.01": {
+                "can_of_soda": {
+                    "itolcg": None,
+                    "lugwcz": None,
+                    "opivig": None
+                }
+            },
+            "ashcan.n.01": {
+                "trash_can": {
+                    "wkxtxh": None
+                }
+            }
+        },
+        "blacklist": None,
+    },
 }
 
 # with open("task_custom_lists.json", "r") as f:
@@ -199,12 +211,6 @@ parser.add_argument(
     "--overwrite_existing",
     action="store_true",
     help="If set, will overwrite any existing tasks that are found. Otherwise, will skip.",
-)
-parser.add_argument(
-    "--offline", action="store_true", help="If set, will sample offline, and will not sync / check with google sheets"
-)
-parser.add_argument(
-    "--ignore_in_progress", action="store_true", help="If set and --offline is False, will in progress flag"
 )
 
 # gm.HEADLESS = False
@@ -246,29 +252,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         args.randomize = os.environ.get("SAMPLING_RANDOMIZE") in {"1", "true", "True"}
     if not args.overwrite_existing:
         args.overwrite_existing = os.environ.get("SAMPLING_OVERWRITE_EXISTING") in {"1", "true", "True"}
-    if not args.ignore_in_progress:
-        args.ignore_in_progress = os.environ.get("SAMPLING_IGNORE_IN_PROGRESS") in {"1", "true", "True"}
-
-    # Make sure scene can be sampled by current user
-    scene_row = None if args.offline else validate_scene_can_be_sampled(scene=args.scene_model)
-
-    if not args.offline and not args.randomize:
-        completed = worksheet.get(f"W{scene_row}")
-        if completed and completed[0] and str(completed[0][0]) == "1":
-            # If completed is set, then immediately return
-            print(f"\nScene {args.scene_model} already completed sampling, terminating immediately!\n")
-            return
-
-        # Potentially update start_at based on current task observed
-        # Current task is either an empty list [] or a filled list [['<ACTIVITY>']]
-        current_task = worksheet.get(f"Y{scene_row}")
-        if not args.randomize and args.start_at is None and current_task and current_task[0]:
-            args.start_at = current_task[0][0]
-            # Also clear the in_progress bar in case this is from a failed run
-            worksheet.update_acell(f"B{ACTIVITY_TO_ROW[args.start_at]}", "")
-
-        # Set the thread id for the given scene
-        worksheet.update_acell(f"X{scene_row}", args.thread_id)
 
     # If we want to create a stable scene config, do that now
     default_scene_fpath = os.path.join(
@@ -306,11 +289,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         ],
     }
 
-    # Currently our sampling script always samples partial rooms so we specify there to delineate between full
-    # scene templates
-    task_suffix = "partial_rooms"
+    # Default to sampling full scene unless room_types is specified
+    task_suffix = None
     if args.room_types is not None:
         cfg["scene"]["load_room_types"] = args.room_types.split(",")
+        task_suffix = "partial_rooms"
     else:
         activities = args.activities.split(",")
         assert len(activities) == 1
@@ -324,10 +307,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         if args.activities is None
         else args.activities.split(",")
     )
-
-    # if we're not offline, only keep the failure cases
-    if not args.offline:
-        activities = list(set(activities).intersection(get_unsuccessful_activities()))
 
     # Create the environment
     # Attempt to sample the activity
@@ -373,38 +352,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Don't sample any invalid activities
         if activity not in valid_tasks:
             continue
-
-        if not args.offline:
-            if activity not in ACTIVITY_TO_ROW:
-                continue
-
-            # Get info from spreadsheet
-            row = ACTIVITY_TO_ROW[activity]
-
-            in_progress, success, validated, scene_id, user, reason, exception, misc = worksheet.get(f"B{row}:I{row}")[
-                0
-            ]
-
-            # If we manually do not want to sample the task (DO NOT SAMPLE == "DNS", skip)
-            if success.lower() == "dns":
-                continue
-
-            # Only sample stuff which is fixed
-            # if "fixed" not in misc.lower():
-            #     continue
-
-            # If we've already sampled successfully (success is populated with a 1) and we don't want to overwrite the
-            # existing sampling result, skip
-            if success != "" and int(success) == 1 and not args.overwrite_existing:
-                continue
-
-            # If another thread is already in the process of sampling, skip
-            if not args.ignore_in_progress and in_progress not in {None, ""}:
-                continue
-
-            # Reserve this task by marking in_progress = 1
-            worksheet.update_acell(f"B{row}", args.thread_id)
-            worksheet.update_acell(f"Y{scene_row}", activity)
 
         should_sample, success, reason = True, False, ""
 
@@ -456,7 +403,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                         obj.visible = active
 
                 og.log.info(f"Sampling task: {activity}")
-                env._load_task()
+                original_task_cfg = env.task_config
+                original_task_cfg["use_presampled_robot_pose"] = False
+                env._load_task(original_task_cfg)
                 assert og.sim.is_stopped()
 
                 success, feedback = env.task.feedback is None, env.task.feedback
@@ -508,7 +457,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                     env.scene.update_initial_file()
                     print("sampling succeed")
                     breakpoint()
-                    env.task.save_task(env=env, override=True, task_relevant_only=False, suffix=task_suffix)
+                    save_dir = os.path.join(get_dataset_path("2025-challenge-task-instances"), "scenes", env.task.scene_name, "json")
+                    os.makedirs(save_dir, exist_ok=True)
+                    env.task.save_task(env=env, save_dir=save_dir, override=True, task_relevant_only=False, suffix=task_suffix)
                     og.log.info(f"\n\nSampling success: {activity}\n\n")
                     reason = ""
                 else:
@@ -520,16 +471,6 @@ def main(random_selection=False, headless=False, short_exec=False):
                 og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
 
             assert og.sim.is_stopped()
-
-            # Write to google sheets
-            if not args.offline:
-                # Check if another thread succeeded already
-                already_succeeded = worksheet.get(f"C{row}")
-                if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
-                    cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list, ("", int(success), "", args.scene_model, USER, reason, "")):
-                        cell.value = val
-                    worksheet.update_cells(cell_list)
 
             # Clear task callbacks if sampled
             if should_sample:
@@ -559,16 +500,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             print("exception")
             breakpoint()
-
-            if not args.offline:
-                # Check if another thread succeeded already
-                already_succeeded = worksheet.get(f"C{row}")
-                if not (already_succeeded and already_succeeded[0] and str(already_succeeded[0][0]) == "1"):
-                    # Clear the in_progress reservation and note the exception
-                    cell_list = worksheet.range(f"B{row}:H{row}")
-                    for cell, val in zip(cell_list, ("", 0, "", args.scene_model, USER, reason, traceback_str)):
-                        cell.value = val
-                    worksheet.update_cells(cell_list)
 
             try:
                 # Stop sim, clear simulator, and re-create environment
@@ -605,11 +536,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             env.task_config["online_object_sampling"] = True
 
     print("Successful shutdown!")
-
-    if not args.offline:
-        # Record when we successfully complete all the activities
-        worksheet.update_acell(f"W{scene_row}", 1)
-        worksheet.update_acell(f"Y{scene_row}", "")
 
 
 if __name__ == "__main__":

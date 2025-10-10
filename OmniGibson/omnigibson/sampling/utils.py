@@ -11,67 +11,11 @@ import csv
 import json
 import os
 import bddl
-import gspread
-import getpass
 import copy
-import time
 from omnigibson.macros import gm, macros
 import omnigibson.utils.transform_utils as T
 
-"""
-1. gcloud auth login
-2. gcloud auth application-default login
-3. gcloud config set project lucid-inquiry-205018
-4. gcloud iam service-accounts create cremebrule
-5. gcloud iam service-accounts keys create key.json --iam-account=cremebrule@lucid-inquiry-205018.iam.gserviceaccount.com
-6. mv key.json /home/cremebrule/.config/gcloud/key.json
-"""
-
 folder_path = os.path.dirname(os.path.abspath(__file__))
-
-SAMPLING_SHEET_KEY = "1Vt5s3JrFZ6_iCkfzZr0eb9SBt2Pkzx3xxzb4wtjEaDI"
-CREDENTIALS = os.environ.get("CREDENTIALS_FPATH", os.path.join(folder_path, "key.json"))
-WORKSHEET = "GTC2024 - 8dd81c"
-
-if os.path.exists(CREDENTIALS):
-    USER = getpass.getuser()
-
-    for _ in range(120):
-        try:
-            client = gspread.service_account(filename=CREDENTIALS)
-            worksheet = client.open_by_key(SAMPLING_SHEET_KEY).worksheet(WORKSHEET)
-            break
-        except:
-            time.sleep(1.0)
-
-    class RetryWrapper:
-        def __init__(self, obj, retries=120, delay=1.0):
-            self.obj = obj
-            self.retries = retries
-            self.delay = delay
-
-        def __getattr__(self, attr):
-            orig_attr = getattr(self.obj, attr)
-
-            def wrapped(*args, **kwargs):
-                for _ in range(self.retries):
-                    try:
-                        result = orig_attr(*args, **kwargs)
-                        return result
-                    except Exception as e:
-                        print(f"Exception caught: {e}")
-                        time.sleep(self.delay)
-                raise Exception(f"Failed after {self.retries} retries")
-
-            return wrapped
-
-    worksheet = RetryWrapper(worksheet)
-
-    ACTIVITY_TO_ROW = {activity: i + 2 for i, activity in enumerate(worksheet.col_values(1)[1:])}
-else:
-    USER = None
-    worksheet = None
-    ACTIVITY_TO_ROW = None
 
 SCENE_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Scenes.csv")
 TASK_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Tasks.csv")
@@ -79,91 +23,6 @@ SYNSET_INFO_FPATH = os.path.join(folder_path, "BEHAVIOR-1K Synsets.csv")
 
 
 UNSUPPORTED_PREDICATES = {"broken", "assembled"}
-
-
-# CAREFUL!! Only run this ONCE before starting sampling!!!
-def write_activities_to_spreadsheet():
-    valid_tasks_sorted = sorted(get_valid_tasks())
-    n_tasks = len(valid_tasks_sorted)
-    cell_list = worksheet.range(f"A{2}:A{2 + n_tasks - 1}")
-    for cell, task in zip(cell_list, valid_tasks_sorted):
-        cell.value = task
-    worksheet.update_cells(cell_list)
-
-
-# CAREFUL!! Only run this ONCE before starting sampling!!!
-def write_scenes_to_spreadsheet():
-    # Get scenes
-    scenes_sorted = get_scenes()
-    n_scenes = len(scenes_sorted)
-    cell_list = worksheet.range(f"R{2}:R{2 + n_scenes - 1}")
-    for cell, scene in zip(cell_list, scenes_sorted):
-        cell.value = scene
-    worksheet.update_cells(cell_list)
-
-
-def get_successful_activities():
-    n_tasks = len(ACTIVITY_TO_ROW)
-    cell_list = worksheet.range(f"A{2}:C{2 + n_tasks - 1}")
-    successful_activities = set()
-    for activity, status in zip(cell_list[::3], cell_list[2::3]):
-        if ".bddl" in activity.value or str(status.value) == "1":
-            successful_activities.add(activity.value)
-
-    return successful_activities
-
-
-def get_successful_activities_to_scenes():
-    n_tasks = len(ACTIVITY_TO_ROW)
-    cell_list = worksheet.range(f"A{2}:E{2 + n_tasks - 1}")
-    activity_to_scene = {}
-    for activity, status, scene in zip(cell_list[::5], cell_list[2::5], cell_list[4::5]):
-        if ".bddl" not in activity.value and str(status.value) == "1":
-            activity_to_scene[activity.value] = scene.value
-    return activity_to_scene
-
-
-def get_unsuccessful_activities():
-    return sorted(set(ACTIVITY_TO_ROW.keys()) - get_successful_activities())
-
-
-def get_worksheet_scene_row(scene_model):
-    scenes_sorted = get_scenes()
-
-    # Fill in this value to reserve it
-    idx = scenes_sorted.index(scene_model)
-    scene_row = 2 + idx
-
-    return scene_row
-
-
-def validate_scene_can_be_sampled(scene):
-    scenes_sorted = get_scenes()
-    n_scenes = len(scenes_sorted)
-
-    # Sanity check scene -- only scenes are allowed that whose user field is either:
-    # (a) blank or (b) filled with USER
-    # scene_user_list = worksheet.range(f"R{2}:S{2 + n_scenes - 1}")
-    def get_user(val):
-        return None if (len(val) == 1 or val[1] == "") else val[1]
-
-    scene_user_mapping = {val[0]: get_user(val) for val in worksheet.get(f"T{2}:U{2 + n_scenes - 1}")}
-
-    # Make sure scene is valid
-    assert scene in scene_user_mapping, f"Got invalid scene name to sample: {scene}"
-
-    # Assert user is None or is USER, else False
-    scene_user = scene_user_mapping[scene]
-    assert (
-        scene_user is None or scene_user == USER
-    ), f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
-
-    # Fill in this value to reserve it
-    idx = scenes_sorted.index(scene)
-    scene_row = 2 + idx
-    worksheet.update_acell(f"U{scene_row}", USER)
-
-    return scene_row
 
 
 def prune_unevaluatable_predicates(init_conditions):
@@ -236,7 +95,6 @@ def get_valid_tasks():
 
 
 def get_notready_synsets():
-    return set()
     notready_synsets = set()
     with open(SYNSET_INFO_FPATH) as csvfile:
         reader = csv.reader(csvfile, delimiter=",", quotechar='"')
@@ -319,20 +177,6 @@ def parse_task_mapping_new():
     return mapping
 
 
-def get_dns_activities():
-    n_tasks = len(get_valid_tasks())
-    return {
-        val[0]
-        for val in worksheet.get(f"A{2}:C{2 + n_tasks - 1}")
-        if val[-1] is not None and str(val[-1]).lower() == "dns"
-    }
-
-
-def get_non_misc_activities():
-    n_tasks = len(get_valid_tasks())
-    return {val[0] for val in worksheet.get(f"A{2}:I{2 + n_tasks - 1}") if val[-1] == "-"}
-
-
 def get_scene_compatible_activities(scene_model, mapping):
     return [activity for activity, scenes in mapping.items() if scene_model in scenes]
 
@@ -397,8 +241,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
         # record this feedback if requested
         if record_feedback:
             feedback = "\n".join(invalid_msgs)
-            scene_row = get_worksheet_scene_row(scene_model=scene_model)
-            worksheet.update_acell(f"AA{scene_row}", feedback)
+            print(f"Scene stability feedback: {feedback}")
         raise ValueError("Scene is not stable!")
 
     for obj in env.scene.objects:
@@ -413,8 +256,7 @@ def create_stable_scene_json(scene_model, record_feedback=False):
 
     # record this feedback if requested
     if record_feedback:
-        scene_row = get_worksheet_scene_row(scene_model=scene_model)
-        worksheet.update_acell(f"Z{scene_row}", 1)
+        print(f"Scene {scene_model} is stable")
 
     og.sim.stop()
     og.clear()
@@ -467,6 +309,8 @@ def validate_task(task, task_scene_dict, default_scene_dict):
                     continue
             else:
                 if key == "ori":
+                    val = th.tensor(val) if not isinstance(val, th.Tensor) else val
+                    obj_val = th.tensor(obj_val) if not isinstance(obj_val, th.Tensor) else obj_val
                     # Grab the axis angle representation to compute magnitude difference
                     obj_val = th.norm(T.quat2axisangle(T.quat_distance(val, obj_val)))
                     val = 0.0

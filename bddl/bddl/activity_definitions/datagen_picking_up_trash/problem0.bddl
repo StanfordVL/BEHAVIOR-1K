@@ -1,0 +1,25 @@
+(define (problem datagen_picking_up_trash-0)
+    (:domain omnigibson)
+
+    (:objects
+        ashcan.n.01_1 - ashcan.n.01
+        can__of__soda.n.01_1 - can__of__soda.n.01
+        table.n.02_1 - table.n.02
+        floor.n.01_1 - floor.n.01
+        agent.n.01_1 - agent.n.01
+    )
+    
+    (:init 
+        (ontop ashcan.n.01_1 floor.n.01_1) 
+        (ontop can__of__soda.n.01_1 table.n.02_1) 
+        (inroom table.n.02_1 kitchen) 
+        (inroom floor.n.01_1 kitchen) 
+        (ontop agent.n.01_1 floor.n.01_1)
+    )
+    
+    (:goal 
+        (and 
+            (inside ?can__of__soda.n.01_1 ?ashcan.n.01_1)
+        )
+    )
+)
