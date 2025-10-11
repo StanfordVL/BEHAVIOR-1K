@@ -12,8 +12,17 @@ For the 1st BEHAVIOR-1K Challenge, We will have the following two tracks for the
 
 - **Privileged information track:** Participants are allowed to query the simulator for any privileged information, such as target object poses, full-scene point cloud (Note: point cloud obtained from on-board vision sensor (e.g. estimated through rgbd) is fine for stanford track), robot global poses, etc, and use such information for the policy models.
 
+For both tracks, you are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using them during standard track evaluation. BDDL task definitions can be used for both tracks and are identical during evaluation. You may also collect additional data yourself (via teleoperation, RL, scripted policies, etc.) for both tracks. However, you may **not** collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.
+
+There are no restrictions on the type of policy used for either track. Methods such as IL, RL, or TAMP are all allowed. Additional components like SLAM or LLM-based querying are also permitted.
+
 We will select the top three winning teams from each track, they will share the challenge prizes, and will be invited to present their approaches at the challenge workshop!
- 🏆 Prizes for each track: 🥇 $1,000 🥈 $500 🥉 $300
+
+ 🏆 Prizes for each track: 
+
+  1. 🥇 $1,000 + GeForce 5080
+  2. 🥈 $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)
+  3. 🥉 $300 + $500 Brev Credits
 
 
 ## Running Evaluations
@@ -171,6 +180,7 @@ We will calculate the following metric during policy rollout:
 
 *Secondary metrics will be normalized using human averages from 200 demonstrations per task.*
 
+The success score (**Q**) is the metric used for ranking submissions. If two submissions achieve the same score, secondary metrics will be used to break ties. 
 
 ## Evaluation Protocol and Logistics
 
@@ -178,7 +188,8 @@ We will calculate the following metric during policy rollout:
 
 - **Training:** The training instances and human demonstrations (200 per task) are released to the public.
 
-- **Self-evaluation and report:** We have prepared 10 additional instances for validation. Participants should report their performance on the validation instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance.
+- **Self-evaluation and report:** In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the **first 10** instances for evaluation results. Participants should report their performance on theese 10 instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance. The **remaining 10** instances are not used for evaluation and may serve as a test set before evaluating your final policy.
+
 
 - **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
 

@@ -73,7 +73,7 @@ All fixes have been pushed to the `main` branch.
 5. The timeout for each evaluation is set to **2× the mean task completion time** of the 200 human demonstrations and thus varies across tasks.  
 6. In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task.  
    Use the **first 10** instances for evaluation results (see [evaluation.md](./evaluation.md#evaluation-protocol-and-logistics));  
-   the **remaining 10** are not used for evaluation and may serve as a validation set before submitting your final policy.
+   the **remaining 10** are not used for evaluation and may serve as a test set before evaluating your final policy.
 
 **Bug fixes:**
 
