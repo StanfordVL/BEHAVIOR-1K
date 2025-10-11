@@ -9,14 +9,14 @@
 !!! info "🗓️ 10/08/2025 — Rule Clarifications, Bug Fixes & NVIDIA Sponsorship"
     Key updates this week:
     
-    - Clarified evaluation setup: only task-relevant object and robot poses will be randomized.  
-    - Privileged info allowed during training even in standard track.  
+    - Clarified evaluation setup: only task-relevant object poses and the robot’s initial pose will be randomized.  
+    - Privileged info allowed during training for both tracks.  
     - Multiple bug fixes (`eval_utils.py`, USD asset format, partial credit).  
-    - Updated [submission guideline](./submission.md) + sample Dockerfile.  
+    - Updated [submission guidelines](./submission.md) + sample Dockerfile.  
     - **New sponsor:** [NVIDIA](https://www.nvidia.com/en-us/)!  
     - 💰 Prize pool updated:
-        - 1st: $1000 + GeForce 5080  
-        - 2nd: $500 + Jetson Orin Nano Super or $1000 Brev Credits  
+        - 1st: $1,000 + GeForce 5080  
+        - 2nd: $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)   
         - 3rd: $300 + $500 Brev Credits  
 
     [Read full details →](./updates.md#10082025)
@@ -90,7 +90,7 @@ Pre-implemented training & evaluation pipelines for:
 🏆 **Prizes per track:**
 
 1. 🥇 $1,000 + GeForce 5080
-2. 🥈 $500 + (Jetson Orin Nano Super or $1000 Brev Credits)
+2. 🥈 $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)
 3. 🥉 $300 + $500 Brev Credits
 
 Top 3 teams from each track will be invited to present at the workshop!
