@@ -1465,7 +1465,10 @@ class EntityPrim(XFormPrim):
             return self.root_link.compute_particle_positions()
         else:
             points_world = [link.visual_boundary_points_world for link in self._links.values()]
-            return th.cat([p for p in points_world if p is not None and len(p) != 0], dim=0)
+            points_world = [p for p in points_world if p is not None and len(p) != 0]
+            if not points_world:
+                raise ValueError(f"{self.prim_path} has no visual mesh to compute visual points from!")
+            return th.cat(points_world, dim=0)
 
     @property
     def aabb(self):

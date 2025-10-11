@@ -100,6 +100,9 @@ class Remapper:
         assert th.all(
             th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
         ), "New mapping contains default unmapped value!"
+        if image.numel() == 0:
+            return image, {}
+
         image_max_key = max(th.max(image).item(), max(old_mapping.keys()))
 
         if self.key_array is None:
