@@ -1,5 +1,8 @@
 # Dataset
 
+### **NOTE: The [joint efforts data](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/eval_utils.py#L90) in the robot state entry of the parquet files are wrong. This is because we do not store observations during our initial data collection, and all observations are collected through a round of "data replay" in which we restore sim state every step without steping physics, and thus the joint effort reading is wrong. Please do not use them for training. They will be removed in the next dataset release.**
+
+
 ## Dataset Access
 
 We host our dataset on Hugging Face:
@@ -14,12 +17,12 @@ For the 2025 NeurlIPS challenge, we provide the following datasets:
 
 1. [2025-challenge-demos](https://huggingface.co/datasets/behavior-1k/2025-challenge-demos): 10000 human-collected teleoperation demos across 50 tasks. It follows the [LeRobot](https://huggingface.co/lerobot) format with some customizations for better data handling. The dataset has the following structure:
 
-    | Folder       | Description                                                    |
-    |--------------|----------------------------------------------------------------|
-    | annotations  | language annotations for each episode                          |
+    | Folder       | Description                                                                  |
+    |--------------|------------------------------------------------------------------------------|
+    | annotations  | language annotations for each episode                                        |
     | data         | low dim data, including proprioceptions, actions, privileged task info, etc. |
     | meta         | metadata folder containing episode-level information                         |
-    | videos       | visual observations, including rgb, depth, seg_instance_id     |
+    | videos       | visual observations, including rgb, depth, seg_instance_id                   |
 
 2. [2025-challenge-rawdata](https://huggingface.co/datasets/behavior-1k/2025-challenge-rawdata): the original raw HDF5 data of the 10k teleoperation demos. These files contains everything needed to replay the exact trajectory in OmniGibson. We use this alongside with `OmniGibson/scripts/replay_obs.py` to replay the trajectory and collect addition visual observations.
 
