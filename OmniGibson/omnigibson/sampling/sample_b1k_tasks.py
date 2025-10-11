@@ -13,7 +13,7 @@ from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.python_utils import clear as clear_pu
 from omnigibson.utils.constants import PrimType
 from bddl.activity import Conditions
-from utils import (
+from .utils import (
     create_stable_scene_json,
     get_scene_compatible_activities,
     get_rooms,

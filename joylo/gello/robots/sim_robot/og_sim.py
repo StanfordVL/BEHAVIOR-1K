@@ -24,7 +24,8 @@ from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjec
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import recursively_convert_to_torch
-from omnigibson.utils.asset_utils import get_task_instance_path
+from omnigibson.utils.asset_utils import get_task_instance_path, get_dataset_path
+from omnigibson.sampling.sample_b1k_tasks import TASK_CUSTOM_LISTS
 
 from gello.robots.sim_robot.zmq_server import ZMQRobotServer, ZMQServerThread
 
@@ -48,10 +49,71 @@ class OGRobotServer:
         ghosting: bool = True,
     ):      
         if task_name is not None:
-            available_tasks = utils.load_available_tasks()
-            assert task_name in available_tasks, f"Task {task_name} not found in available tasks"
             self.task_name = task_name
-            self.task_cfg = available_tasks[self.task_name][0] # Regardless of whether we have multiple instances, we always load the seed instance by default; we will handle randomization for different instances during reset
+            # Locate the scene model from TASK_CUSTOM_LISTS
+            # Find matching task and extract scene_model
+            # NOTE: this is a very specific setup for MoMaGen, not the general behavior setup
+            scene_model = None
+            for (task, scene), _ in TASK_CUSTOM_LISTS.items():
+                if task == task_name:
+                    scene_model = scene
+                    break
+
+            # Fallback: check task_custom_lists.json file if not found in TASK_CUSTOM_LISTS
+            if scene_model is None:
+                task_custom_lists_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)),
+                    "../../../BEHAVIOR-1K/OmniGibson/omnigibson/sampling/task_custom_lists.json"
+                )
+                if os.path.exists(task_custom_lists_path):
+                    with open(task_custom_lists_path, 'r') as f:
+                        task_custom_lists_json = json.load(f)
+
+                    if task_name in task_custom_lists_json:
+                        # Find the first key that is not "room_types" (this will be the scene model)
+                        for key in task_custom_lists_json[task_name].keys():
+                            if key != "room_types":
+                                scene_model = key
+                                break
+
+            assert scene_model is not None, f"Task {task_name} not found in TASK_CUSTOM_LISTS or task_custom_lists.json. Available tasks in TASK_CUSTOM_LISTS: {[task for task, _ in TASK_CUSTOM_LISTS.keys()]}"
+
+            # Locate the task template file
+            task_template_path = os.path.join(
+                get_dataset_path("2025-challenge-task-instances"),
+                "scenes",
+                scene_model,
+                "json",
+                f"{scene_model}_task_{task_name}_0_0_template.json"
+            )
+            assert os.path.exists(task_template_path), f"Task template file not found at {task_template_path}"
+
+            # Load the task template file and extract robot start pose
+            with open(task_template_path, 'r') as f:
+                json_content = json.load(f)
+
+            # Extract robot information
+            robot_name = json_content['metadata']['inst_to_name']['agent.n.01_1']
+            robot_root_link_position = json_content['state']['registry']['object_registry'][robot_name]['root_link']['pos']
+            robot_base_link_position = json_content['state']['registry']['object_registry'][robot_name]['joint_pos'][:3]
+
+            # Calculate robot_start_position
+            robot_start_position = [
+                robot_root_link_position[0] + robot_base_link_position[0],
+                robot_root_link_position[1] + robot_base_link_position[1],
+                robot_root_link_position[2] + robot_base_link_position[2]
+            ]
+
+            # Calculate robot_start_orientation
+            robot_joint_orientation = json_content['state']['registry']['object_registry'][robot_name]['joint_pos'][3:6]
+            robot_start_orientation = T.euler2quat(th.tensor(robot_joint_orientation)).tolist()
+
+            # Regardless of whether we have multiple instances, we always load the seed instance by default; we will handle randomization for different instances during reset
+            self.task_cfg = {
+                "scene_model": scene_model,
+                "robot_start_position": robot_start_position,
+                "robot_start_orientation": robot_start_orientation,
+            }
             # Case 1: Both task name and instance id are provided; this is for formal data collection with domain randomization
             if instance_id is not None:
                 assert task_name in VALIDATED_TASKS, f"Task {task_name} is not in the list of validated tasks: {VALIDATED_TASKS}"
