@@ -241,10 +241,17 @@ def process_scene(scene):
     process_objects(scene["objects"])
 
     og.sim.play()
-    
+
     # Wait for stability
     for _ in range(5000):
-        if all([th.all(obj.get_linear_velocity() < 1e-4).item() for obj in og.sim.scenes[0].objects for link in obj.links.values() if isinstance(link, RigidDynamicPrim)]):
+        if all(
+            [
+                th.all(obj.get_linear_velocity() < 1e-4).item()
+                for obj in og.sim.scenes[0].objects
+                for link in obj.links.values()
+                if isinstance(link, RigidDynamicPrim)
+            ]
+        ):
             break
         og.sim.step()
     else:
