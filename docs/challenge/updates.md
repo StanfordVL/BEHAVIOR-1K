@@ -4,13 +4,13 @@ On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge
 
 ---
 
-### 10/08/2025
+### 10/08/2025 {#10082025}
 
 **Challenge rule clarifications:**
 
-1. During evaluation, only the task-relevant object poses and the robot’s initial pose will change.  
+1. During evaluation, only the task-relevant object poses and the robot’s initial pose will be randomized.  
    The object instances and the poses of background, scene-level objects will remain the same. 
-2. For standard track, you are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using them during evaluation.
+2. For both tracks, you are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using them during evaluation.
 
 **Bug fixes:**
 
@@ -33,7 +33,7 @@ All fixes have been pushed to the `main` branch.
 
 ---
 
-### 09/28/2025
+### 09/28/2025 {#09282025}
 
 **Challenge rule clarifications:**
 
@@ -57,13 +57,13 @@ All fixes have been pushed to the `main` branch.
 
 ---
 
-### 09/19/2025
+### 09/19/2025 {#09192025}
 
 **Challenge rule clarifications:**
 
-1. BDDL task definitions are allowed in the standard track.  
+1. BDDL task definitions are allowed to be used in both tracks.  
    These definitions are fixed and will remain the same during evaluation.  
-2. You may collect additional data yourself (via teleoperation, RL, scripted policies, etc.) for the standard track.  
+2. You may collect additional data yourself (via teleoperation, RL, scripted policies, etc.) for both tracks.  
    However, you may **not** collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.  
 3. There are no restrictions on the type of policy used for either track.  
    Methods such as IL, RL, or TAMP are all allowed.  
