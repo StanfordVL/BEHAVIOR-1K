@@ -32,7 +32,7 @@ After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/
 }
 ```
 
-- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7). We encourage you to submit intermediate results and models to be showcased on our leaderboard. The same model with different checkpoints from the same team will be considered as a single entry.
+- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7). No formal registration is required to participate in the challenge. We encourage you to submit intermediate results and models to be showcased on our leaderboard. The same model with different checkpoints from the same team will be considered as a single entry.
 
 - **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
 
