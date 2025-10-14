@@ -52,6 +52,8 @@ There are two ways to submit your model for evaluation:
     2. build the dockerfile: `docker build -f OmniGibson/docker/submission.Dockerfile -t b1k-challenge-example .`
     3. run the docker container: `docker run -p 8000:8000 b1k-challenge-example`
 
+    **NOTE: the OmniGibson installation inside the submission docker is only used as a utility library, you should not directly launch OG within this container.**
+
     We will use this similar pipeline for our evaluation, except for the second step the submitted docker image will be pulled. 
     
     The model should run on a single 24GB VRAM GPU. We will use the following GPUs to perform the final evaluation: RTX 3090, A5000, TitanRTX
