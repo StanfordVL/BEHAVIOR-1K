@@ -370,16 +370,17 @@ if [ "$OMNIGIBSON" = true ]; then
         install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         
         # Fix cryptography conflict - remove conflicting version
-        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
+        if [ -d "$CONDA_PREFIX/lib/python3.11/site_packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
             echo "Fixing cryptography conflict..."
-            rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
+            rm -rf "$CONDA_PREFIX/lib/python3.11/site_packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography"
         fi
 
         # Fix packaging conflict - remove conflicting version
         # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
-        echo "Fixing packaging conflict..."
-        rm -rf "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
-
+        if [ -d "$CONDA_PREFIX/lib/python3.11/site_packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
+            echo "Fixing packaging conflict..."
+            rm -rf "$CONDA_PREFIX/lib/python3.11/site_packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
+        fi
     fi
     
     echo "OmniGibson installation completed successfully!"
