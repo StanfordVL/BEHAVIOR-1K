@@ -52,6 +52,8 @@ There are two ways to submit your model for evaluation:
     2. build the dockerfile: `docker build -f OmniGibson/docker/submission.Dockerfile -t b1k-challenge-example .`
     3. run the docker container: `docker run -p 8000:8000 b1k-challenge-example`
 
+    **NOTE: While this Docker image contains a copy of OmniGibson for use in your policy code as a utility library if you so desire, the OmniGibson simulation should NOT be launched inside the container.** Isaac Sim is not installed in the container and as such cannot be used to run simulation. For evaluation, we will run OmniGibson **outside** the container and connect to your policy inside the container using the WebSocket policy client. You should perform your testing under this setup, too.
+
     We will use this similar pipeline for our evaluation, except for the second step the submitted docker image will be pulled. 
     
     The model should run on a single 24GB VRAM GPU. We will use the following GPUs to perform the final evaluation: RTX 3090, A5000, TitanRTX
