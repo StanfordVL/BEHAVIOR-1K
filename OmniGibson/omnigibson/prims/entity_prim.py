@@ -957,19 +957,30 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
+<<<<<<< HEAD:OmniGibson/omnigibson/prims/entity_prim.py
     def get_joint_position_targets(self, normalized=False):
         """
         Grabs this entity's joint position targets
+=======
+    def get_applied_joint_efforts(self, normalized=False):
+        """
+        Grabs this entity's joint actuation efforts
+>>>>>>> rl-experiments:omnigibson/prims/entity_prim.py
 
         Args:
             normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
 
         Returns:
+<<<<<<< HEAD:OmniGibson/omnigibson/prims/entity_prim.py
             n-array: n-DOF length array of position targets
+=======
+            n-array: n-DOF length array of actuation efforts
+>>>>>>> rl-experiments:omnigibson/prims/entity_prim.py
         """
         # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
+<<<<<<< HEAD:OmniGibson/omnigibson/prims/entity_prim.py
         joint_positions = self._articulation_view.get_joint_position_targets().view(self.n_dof)
 
         # Possibly normalize values when returning
@@ -994,6 +1005,14 @@ class EntityPrim(XFormPrim):
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
 
     def set_linear_velocity(self, velocity: th.Tensor):
+=======
+        joint_efforts = self._articulation_view.get_applied_joint_efforts().reshape(self.n_dof)
+
+        # Possibly normalize values when returning
+        return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
+
+    def set_linear_velocity(self, velocity: np.ndarray):
+>>>>>>> rl-experiments:omnigibson/prims/entity_prim.py
         """
         Sets the linear velocity of the root prim in stage.
 

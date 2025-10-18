@@ -437,6 +437,7 @@ class SerializableRegistry(Registry, Serializable):
         # the state might contain additional information about objects that are NOT in the scene. For both cases, state
         # loading will be skipped.
         for obj in self.objects:
+<<<<<<< HEAD:OmniGibson/omnigibson/utils/registry_utils.py
             if self._load_filter(obj):
                 if obj.name not in state:
                     log.debug(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
@@ -444,6 +445,12 @@ class SerializableRegistry(Registry, Serializable):
                         obj.keep_still()
                     continue
                 obj.load_state(state[obj.name], serialized=False)
+=======
+            if obj.name not in state:
+                # log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                continue
+            obj.load_state(state[obj.name], serialized=False)
+>>>>>>> rl-experiments:omnigibson/utils/registry_utils.py
 
     def serialize(self, state):
         # Iterate over the entire dict and flatten

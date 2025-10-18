@@ -61,7 +61,7 @@ class ScanSensor(BaseSensor):
         min_range=0.05,
         max_range=10.0,
         horizontal_fov=360.0,
-        vertical_fov=1.0,
+        vertical_fov=0.0,
         yaw_offset=0.0,
         horizontal_resolution=1.0,
         vertical_resolution=1.0,
@@ -115,7 +115,6 @@ class ScanSensor(BaseSensor):
     def _load(self):
         # Define a LIDAR prim at the current stage
         result, lidar = lazy.omni.kit.commands.execute("RangeSensorCreateLidar", path=self.prim_path)
-
         return lidar.GetPrim()
 
     def _post_load(self):
@@ -133,6 +132,7 @@ class ScanSensor(BaseSensor):
         self.rotation_rate = self._load_config["rotation_rate"]
         self.draw_points = self._load_config["draw_points"]
         self.draw_lines = self._load_config["draw_lines"]
+        self.high_lod = True if self._load_config["vertical_fov"] > 0 else False
 
     def _initialize(self):
         # run super first
@@ -254,7 +254,6 @@ class ScanSensor(BaseSensor):
             # Optionally add occupancy grid info
             if "occupancy_grid" in self._modalities:
                 obs["occupancy_grid"] = self.get_local_occupancy_grid(scan=obs["scan"])
-
         return obs, info
 
     @property
@@ -271,7 +270,7 @@ class ScanSensor(BaseSensor):
         Returns:
             int: Number of vertical rays for this range sensor
         """
-        return int(self.vertical_fov // self.vertical_resolution)
+        return int(self.vertical_fov // self.vertical_resolution) + 1
 
     @property
     def min_range(self):
@@ -474,6 +473,26 @@ class ScanSensor(BaseSensor):
             rate (float): rotation rate for this range sensor in degrees per second
         """
         self.set_attribute("rotationRate", rate)
+
+    @property
+    def high_lod(self):
+        """
+        Gets this range sensor's high LOD setting.
+
+        Returns:
+            float: rotation rate for this range sensor in degrees per second
+        """
+        return self.get_attribute("highLod")
+
+    @high_lod.setter
+    def high_lod(self, enable):
+        """
+        Enables/disables high LOD for this range sensor.
+
+        Args:
+            enable (bool): rotation rate for this range sensor in degrees per second
+        """
+        self.set_attribute("highLod", enable)
 
     @classproperty
     def all_modalities(cls):

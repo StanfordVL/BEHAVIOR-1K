@@ -21,6 +21,8 @@ class PointGoalReward(BaseRewardFunction):
 
     def _step(self, task, env, action):
         # Reward received the pointgoal success condition is met
+        self._pointgoal.step(task, env, action)
         reward = self._r_pointgoal if self._pointgoal.success else 0.0
+        info = {"pointgoal_success": self._pointgoal.success}
 
-        return reward, {}
+        return reward, info

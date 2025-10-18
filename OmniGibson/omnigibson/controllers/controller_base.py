@@ -4,8 +4,12 @@ from enum import IntEnum
 
 import torch as th
 
+<<<<<<< HEAD:OmniGibson/omnigibson/controllers/controller_base.py
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
+=======
+from omnigibson.utils.constants import MAGIC_DEFAULT
+>>>>>>> rl-experiments:omnigibson/controllers/controller_base.py
 from omnigibson.utils.python_utils import Recreatable, Registerable, Serializable, assert_valid_key, classproperty
 
 # Create settings for this module

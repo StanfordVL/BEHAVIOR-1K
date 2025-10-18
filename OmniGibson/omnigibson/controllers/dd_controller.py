@@ -1,5 +1,9 @@
 from omnigibson.controllers import ControlType, LocomotionController
+<<<<<<< HEAD:OmniGibson/omnigibson/controllers/dd_controller.py
 from omnigibson.utils.backend_utils import _compute_backend as cb
+=======
+from omnigibson.utils.constants import MAGIC_DEFAULT
+>>>>>>> rl-experiments:omnigibson/controllers/dd_controller.py
 
 
 class DifferentialDriveController(LocomotionController):

@@ -15,6 +15,14 @@ MAX_CLASS_COUNT = th.iinfo(th.int32).max
 MAX_VIEWER_SIZE = 2048
 
 
+class strWithCompare(str):
+    def __eq__(self, other):
+        return isinstance(other, str) and str.__eq__(self, other)
+
+
+MAGIC_DEFAULT = strWithCompare("default")
+
+
 class ViewerMode(IntEnum):
     NAVIGATION = 0
     MANIPULATION = 1

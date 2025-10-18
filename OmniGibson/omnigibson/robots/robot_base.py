@@ -1,4 +1,9 @@
+<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
 import os
+=======
+import collections
+from abc import abstractmethod
+>>>>>>> rl-experiments:omnigibson/robots/robot_base.py
 from copy import deepcopy
 
 import torch as th
@@ -12,6 +17,7 @@ from omnigibson.sensors import (
     SENSOR_PRIMS_TO_SENSOR_CLS,
     ScanSensor,
     VisionSensor,
+    VoxelSensor,
     create_sensor,
 )
 from omnigibson.utils.asset_utils import get_dataset_path
@@ -211,10 +217,39 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         obs_modalities = set()
         for link_name, link in self._links.items():
             # Search through all children prims and see if we find any sensor
-            sensor_counts = {p: 0 for p in SENSOR_PRIMS_TO_SENSOR_CLS.keys()}
+            sensor_counts = collections.Counter()
+
+            # For EEF, add voxel sensor if the modality is there
+            if link in self.eef_links.values():
+                if "scan" in self._obs_modalities or self._obs_modalities == "all":
+                    sensor_cls = ScanSensor
+                    scan_prim_path = f"{link.prim_path}/scan_sensor"
+                    sensor_kwargs = self._sensor_config[sensor_cls.__name__]
+                    if "modalities" not in sensor_kwargs:
+                        sensor_kwargs["modalities"] = (
+                            sensor_cls.all_modalities
+                            if self._obs_modalities == "all"
+                            else sensor_cls.all_modalities.intersection(self._obs_modalities)
+                        )
+                    # If the modalities list is empty, don't import the sensor.
+                    if not sensor_kwargs["modalities"]:
+                        continue
+                    obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
+                    # Create the sensor and store it internally
+                    sensor = create_sensor(
+                        sensor_type=sensor_cls.__name__,
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, scan_prim_path),
+                        name=f"{self.name}:{link_name}:{sensor_cls.__name__}:{sensor_counts[sensor_cls]}",
+                        **sensor_kwargs,
+                    )
+                    sensor.load(self.scene)
+                    self._sensors[sensor.name] = sensor
+                    sensor_counts[sensor_cls] += 1
+
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
                     # Possibly filter out the sensor based on name
                     prim_path = str(prim.GetPrimPath())
                     not_blacklisted = self._exclude_sensor_names is None or not any(
@@ -235,8 +270,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                         continue
 
                     # Infer what obs modalities to use for this sensor
+=======
+>>>>>>> rl-experiments:omnigibson/robots/robot_base.py
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]
+                    if sensor_cls == ScanSensor:
+                        continue
                     if "modalities" not in sensor_kwargs:
                         sensor_kwargs["modalities"] = (
                             sensor_cls.all_modalities
@@ -251,13 +290,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
+<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
                         relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim_path),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
+=======
+                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
+                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[sensor_cls]}",
+>>>>>>> rl-experiments:omnigibson/robots/robot_base.py
                         **sensor_kwargs,
                     )
                     sensor.load(self.scene)
                     self._sensors[sensor.name] = sensor
-                    sensor_counts[prim_type] += 1
+                    sensor_counts[sensor_cls] += 1
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
         if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
@@ -363,6 +407,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
+<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
             robot_ori_cos=th.cos(ori),
             robot_ori_sin=th.sin(ori),
             robot_2d_ori=ori_2d,
@@ -374,6 +419,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_ang_vel=cb.to_torch(
                 cb.copy(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path))
             ),
+=======
+            robot_ori_cos=np.cos(ori),
+            robot_ori_sin=np.sin(ori),
+            robot_2d_ori=np.array([ori_2d]),
+            robot_2d_ori_cos=np.cos(ori_2d),
+            robot_2d_ori_sin=np.sin(ori_2d),
+            robot_lin_vel=ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path),
+            robot_ang_vel=ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path),
+>>>>>>> rl-experiments:omnigibson/robots/robot_base.py
         )
 
     def _load_observation_space(self):
@@ -576,6 +630,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 "sensor_kwargs": {
                     "image_height": 128,
                     "image_width": 128,
+                },
+            },
+            "VoxelSensor": {
+                "enabled": True,
+                "noise_type": None,
+                "noise_kwargs": None,
+                "sensor_kwargs": {
+                    "dist": 0.5,
+                    "cell_count": 5,
                 },
             },
             "ScanSensor": {

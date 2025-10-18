@@ -169,6 +169,7 @@ def _launch_app():
         except ImportError:
             pass
 
+<<<<<<< HEAD:OmniGibson/omnigibson/simulator.py
         # Find a more elegant way to prune omni logging
         if gm.NO_OMNI_LOGS:
             sys.argv.append("--/log/level=error")
@@ -183,6 +184,18 @@ def _launch_app():
         import isaacsim  # noqa: F401
     except ImportError:
         pass
+=======
+    # Copy the OmniGibson kit file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
+    # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
+    # ensure that the kit file is always up to date.
+    assert "EXP_PATH" in os.environ, "The EXP_PATH variable is not set. Are you in an Isaac Sim installed environment?"
+    # kit_file = Path(__file__).parent / "omnigibson.kit"
+    # kit_file_target = Path(os.environ["EXP_PATH"]) / "omnigibson.kit"
+    # try:
+    #     shutil.copy(kit_file, kit_file_target)
+    # except Exception as e:
+    #     raise e from ValueError("Failed to copy omnigibson.kit to Isaac Sim apps directory.")
+>>>>>>> rl-experiments:omnigibson/simulator.py
 
     # First obtain the Isaac Sim version
     isaac_path = os.environ["ISAAC_PATH"]
@@ -217,10 +230,14 @@ def _launch_app():
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
     with launch_context(None):
+<<<<<<< HEAD:OmniGibson/omnigibson/simulator.py
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
 
     # Close the stage so that we can create a new one when a Simulator Instance is created
     assert lazy.isaacsim.core.utils.stage.close_stage()
+=======
+        app = lazy.omni.isaac.kit.SimulationApp(config_kwargs)
+>>>>>>> rl-experiments:omnigibson/simulator.py
 
     # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
     # TODO: Remove this once omniverse fixes it
@@ -488,6 +505,7 @@ def _launch_simulator(*args, **kwargs):
 
             # Set the viewer camera, and then set its default pose
             if gm.RENDER_VIEWER_CAMERA:
+<<<<<<< HEAD:OmniGibson/omnigibson/simulator.py
                 self._set_viewer_camera()
                 self.viewer_camera.set_position_orientation(
                     position=th.tensor(m.DEFAULT_VIEWER_CAMERA_POS),
@@ -495,6 +513,11 @@ def _launch_simulator(*args, **kwargs):
                 )
                 self.viewer_width = viewer_width
                 self.viewer_height = viewer_height
+=======
+                pass
+                # self.viewer_width = viewer_width
+                # self.viewer_height = viewer_height
+>>>>>>> rl-experiments:omnigibson/simulator.py
 
             # Acquire contact sensor interface
             self._contact_sensor = lazy.isaacsim.sensors.physics._sensor.acquire_contact_sensor_interface()

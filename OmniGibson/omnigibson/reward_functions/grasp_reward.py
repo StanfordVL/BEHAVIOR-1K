@@ -33,6 +33,7 @@ class GraspReward(BaseRewardFunction):
         self,
         obj_name,
         dist_coeff,
+        dist_slope_coeff,
         grasp_reward,
         collision_penalty,
         eef_position_penalty_coef,
@@ -46,6 +47,7 @@ class GraspReward(BaseRewardFunction):
         self.obj_name = obj_name
         self.obj = None
         self.dist_coeff = dist_coeff
+        self.dist_slope_coeff = dist_slope_coeff
         self.grasp_reward = grasp_reward
         self.collision_penalty = collision_penalty
         self.eef_position_penalty_coef = eef_position_penalty_coef
@@ -68,8 +70,13 @@ class GraspReward(BaseRewardFunction):
         # and is currently grasping the desired object
         reward = 0.0
 
+<<<<<<< HEAD:OmniGibson/omnigibson/reward_functions/grasp_reward.py
         # Penalize large actions
         action_mag = th.sum(th.abs(action))
+=======
+        # Penalize large accelerations
+        action_mag = np.linalg.norm(robot.get_applied_joint_efforts())
+>>>>>>> rl-experiments:omnigibson/reward_functions/grasp_reward.py
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
         info["regularization_penalty_factor"] = action_mag
@@ -119,7 +126,7 @@ class GraspReward(BaseRewardFunction):
             # TODO: If we dropped the object recently, penalize for that
             obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(eef_pos, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
+            dist_reward = math.exp(-self.dist_slope_coeff * dist) * self.dist_coeff
             reward += dist_reward
             info["pregrasp_dist"] = dist
             info["pregrasp_dist_reward_factor"] = math.exp(-dist)
@@ -134,7 +141,7 @@ class GraspReward(BaseRewardFunction):
             robot_center = robot.links["torso_lift_link"].get_position_orientation()[0]
             obj_center = self.obj.get_position_orientation()[0]
             dist = T.l2_distance(robot_center, obj_center)
-            dist_reward = math.exp(-dist) * self.dist_coeff
+            dist_reward = math.exp(-self.dist_slope_coeff * dist) * self.dist_coeff
             reward += dist_reward
             info["postgrasp_dist"] = dist
             info["postgrasp_dist_reward_factor"] = math.exp(-dist)

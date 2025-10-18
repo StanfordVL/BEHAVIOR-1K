@@ -82,12 +82,28 @@ class GraspTask(BaseTask):
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
+<<<<<<< HEAD:OmniGibson/omnigibson/tasks/grasp_task.py
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
             robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
             robot.set_position_orientation(position=robot_pos, orientation=robot_orn, frame="scene")
+=======
+            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            robot_pose = random.choice(self._reset_poses)
+            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            robot_pos = np.array(robot_pose["base_pos"])
+            robot_orn = np.array(robot_pose["base_ori"])
+
+            # Specific position
+            # robot_pos = [-0.433881, -0.210183, 0.01]
+            # robot_orn = [0, 0, -0.7173561, 0.6967067]
+
+            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
+            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
+            robot.set_position_orientation(robot_pos, robot_orn)
+>>>>>>> rl-experiments:omnigibson/tasks/grasp_task.py
 
         # Otherwise, reset using the primitive controller.
         else:
@@ -205,8 +221,10 @@ class GraspTask(BaseTask):
         obj = env.scene.object_registry("name", self.obj_name)
         robot = env.robots[0]
         relative_pos, _ = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
-
-        return {"obj_pos": relative_pos}, dict()
+        relative_pos_eef, _ = T.relative_pose_transform(
+            *obj.get_position_orientation(), robot.get_eef_position(), robot.get_orientation()
+        )
+        return {"obj_pos": relative_pos, "relative_pos_eef": relative_pos_eef}, dict()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -225,9 +243,10 @@ class GraspTask(BaseTask):
     def default_reward_config(cls):
         return {
             "dist_coeff": 0.1,
+            "dist_slope_coeff": 10.0,
             "grasp_reward": 1.0,
             "collision_penalty": 1.0,
             "eef_position_penalty_coef": 0.01,
             "eef_orientation_penalty_coef": 0.001,
-            "regularization_coef": 0.01,
+            "regularization_coef": 0.001,
         }
