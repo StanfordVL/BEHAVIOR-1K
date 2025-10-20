@@ -43,9 +43,9 @@ Here is a brief explanation of the arguments:
     ```
 which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
-    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in both standard track and priveleged track. 
+    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in both standard track and priveleged track.
     - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track, but evaluation will be considerably slower compared to `RGBLowResWrapper`. 
-    - `HeavyRobotWrapper`: wrapper with the RGB low resolution observation config, and heavy robot base mass (250kg) used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in both standard track and privileged track. 
+    - `HeavyRobotWrapper`: wrapper with the RGB low resolution observation config, and heavy robot base mass (250kg) used during data collection. This wrapper is ok to use in both standard track and privileged track. 
     - `RichObservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
 
 There are some more optional arguments, see [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml). 
