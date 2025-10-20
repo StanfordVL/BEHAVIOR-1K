@@ -1,6 +1,6 @@
 # Dataset
 
-### **NOTE: The [joint efforts data](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/eval_utils.py#L90) in the robot state entry of the parquet files are wrong. This is because we do not store observations during our initial data collection, and all observations are collected through a round of "data replay" in which we restore sim state every step without stepping physics, and thus the joint effort reading is wrong. Please do not use them for training. They will be removed in the next dataset release.**
+**NOTE: The [joint efforts data](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/eval_utils.py#L90) in the robot state entry of the parquet files are wrong. This is because we do not store observations during our initial data collection, and all observations are collected through a round of "data replay" in which we restore sim state every step without stepping physics, and thus the joint effort reading is wrong. Please do not use them for training. They will be removed in the next dataset release.**
 
 
 ## Dataset Access
@@ -84,6 +84,45 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
 | Avg. Skills per Trajectory | 27.06 |
 | Avg. Trajectory Duration | 397.04 seconds / 6.6 minutes |
 
+<details>
+<summary><b>Show unique skills breakdown</b></summary>
+
+<ul>
+<li>attach</li>
+<li>chop</li>
+<li>close door</li>
+<li>close drawer</li>
+<li>close lid</li>
+<li>hand over</li>
+<li>hang</li>
+<li>hold</li>
+<li>ignite</li>
+<li>insert</li>
+<li>move to</li>
+<li>open door</li>
+<li>open drawer</li>
+<li>open lid</li>
+<li>pick up from</li>
+<li>place in</li>
+<li>place in next to</li>
+<li>place on</li>
+<li>place on next to</li>
+<li>place under</li>
+<li>pour</li>
+<li>press</li>
+<li>push to</li>
+<li>release</li>
+<li>spray</li>
+<li>sweep surface</li>
+<li>tip over</li>
+<li>turn off switch</li>
+<li>turn on switch</li>
+<li>turn to</li>
+<li>wipe hard</li>
+</ul>
+
+</details>
+
 ### Overall Demo Duration
 
 ![Overall Demo Duration](../assets/challenge_2025/overall_demo_duration.png)
@@ -91,5 +130,3 @@ The dataset includes 3 visual modalities: RGB (rgb), Depth (depth_linear), and M
 ### Per Task Demo Duration
 
 ![Per Task Demo Duration](../assets/challenge_2025/per_task_demo_duration.png)
-
-Note: Language annotations will be released gradually and will be available soon. Currently, 15 tasks are fully annotated across all demonstrations, with the remaining annotations in the final stages of QA before release. 
