@@ -27,6 +27,7 @@ m.HOLONOMIC_BASE_PRISMATIC_JOINT_LIMIT = {
     "rs_int": [[-5.0, 5.0], [-5.0, 5.0]],  # min-max x-axis, mim-max y-axis in meters
     "empty": [[-5.0, 5.0], [-5.0, 5.0]],
     "house_single_floor": [[3.0, 10.0], [-3.0, 3.0]],
+    "house_double_floor_lower": [[0.0, 10.0], [-5.0, 5.0]],
 }
 m.HOLONOMIC_BASE_REVOLUTE_JOINT_LIMIT = math.pi * 2  # radians
 
@@ -227,6 +228,7 @@ class CuRoboMotionGenerator:
                 eyes_target_pos = None
                 eyes_target_quat = None
 
+            # print("emb_sel: ", emb_sel, "target_pos: ", target_pos)
             self.compute_trajectories(
                 target_pos=target_pos,
                 target_quat=target_quat,

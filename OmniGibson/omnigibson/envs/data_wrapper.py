@@ -960,7 +960,7 @@ class DataPlaybackWrapper(DataWrapper):
         step_data["truncated"] = truncated
         return step_data
 
-    def playback_episode(self, episode_id, record_data=True, video_writers=None, callback=None):
+    def playback_episode(self, episode_id, record_data=True, video_writers=None, callback=None, replay_for_annotation=False, break_after_n_steps=100):
         """
         Playback episode @episode_id, and optionally record observation data if @record is True
 
@@ -969,6 +969,7 @@ class DataPlaybackWrapper(DataWrapper):
                 data hdf5 file
             record_data (bool): Whether to record data during playback or not
             video_writers (Any): Optional video writers to record the playback
+            replay_for_annotation (bool): If True, replay the dataset to break after X steps to note down the MP_end_step and subtask_term_step for each subtask
         """
         data_grp = self.input_hdf5["data"]
         assert f"demo_{episode_id}" in data_grp, f"No valid episode with ID {episode_id} found!"
@@ -1035,9 +1036,22 @@ class DataPlaybackWrapper(DataWrapper):
             step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
             self.current_traj_history.append(step_data)
 
+        # Print all object names in the scene
+        if replay_for_annotation:
+            print(f"================= object names in the scene =================")
+            all_objs = og.sim.scenes[0].objects
+            print([o.name for o in all_objs])
+
         for i, (a, s, ss, r, te, tr) in enumerate(
             zip(action, state[1:], state_size[1:], reward, terminated, truncated)
         ):
+            if replay_for_annotation:
+                if i % break_after_n_steps == 0:
+                    print(f"================= simulation step {i} =================")
+                    # Note: You can use the following to step the rendering in OG: for _ in range(500): og.sim.render()
+                    # And then you can click on objects in the viewer to get the OG specific name of the object
+                    breakpoint()
+
             # Execute any transitions that should occur at this current step
             if str(i) in transitions:
                 cur_transitions = transitions[str(i)]
@@ -1241,7 +1255,7 @@ class DataPlaybackWrapper(DataWrapper):
             writer.close()
 
     def playback_dataset(
-        self, record_data=False, video_writers=None, video_rgb_keys=None, callback=None, demo_ids=None
+        self, record_data=False, video_writers=None, video_rgb_keys=None, callback=None, demo_ids=None, replay_for_annotation=False
     ):
         """
         Playback all episodes from the input HDF5 file, and optionally record observation data if @record is True
@@ -1252,6 +1266,7 @@ class DataPlaybackWrapper(DataWrapper):
             video_rgb_keys (None or list of str): If specified, observation key representing the RGB frames to write to video.
                 If @video_writer is specified, this must also be specified!
             demo_ids (None or list of int): If specified, a list of episode IDs to playback. If None, all episodes will be played
+            replay_for_annotation (bool): If True, replay the dataset to break after X steps to note down the MP_end_step and subtask_term_step for each subtask
         """
         results = []
         if demo_ids is None:
@@ -1261,8 +1276,8 @@ class DataPlaybackWrapper(DataWrapper):
                         episode_id=episode_id,
                         record_data=record_data,
                         video_writers=video_writers,
-                        video_rgb_keys=video_rgb_keys,
                         callback=callback,
+                        replay_for_annotation=replay_for_annotation,
                     )
                 )
         else:
@@ -1272,8 +1287,8 @@ class DataPlaybackWrapper(DataWrapper):
                         episode_id=episode_id,
                         record_data=record_data,
                         video_writers=video_writers,
-                        video_rgb_keys=video_rgb_keys,
                         callback=callback,
+                        replay_for_annotation=replay_for_annotation,
                     )
                 )
         return results
