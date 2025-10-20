@@ -223,7 +223,7 @@ def _launch_app():
 
     global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
     global_cache_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_cache={str(global_cache_dir)}")
+    sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
 
     global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
     global_data_dir.mkdir(parents=True, exist_ok=True)
