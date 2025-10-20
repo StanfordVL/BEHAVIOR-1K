@@ -392,11 +392,11 @@ if __name__ == "__main__":
         for episode in episodes:
             if episode["episode_index"] // 1e4 == task_idx:
                 instances_to_run.append(str(int((episode["episode_index"] // 10) % 1e3)))
-                if config.eval_instance_ids:
-                    assert set(config.eval_instance_ids).issubset(
-                        set(range(m.NUM_TRAIN_INSTANCES))
-                    ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
-                    instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+        if config.eval_instance_ids:
+            assert set(config.eval_instance_ids).issubset(
+                set(range(m.NUM_TRAIN_INSTANCES))
+            ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+            instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
     else:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
