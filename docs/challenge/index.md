@@ -4,6 +4,45 @@
 
 ---
 
+## 📣 **Announcements**
+
+!!! info "🗓️ 10/08/2025 — Rule Clarifications, Bug Fixes & NVIDIA Sponsorship"
+    Key updates this week:
+    
+    - Clarified evaluation setup: only task-relevant object poses and the robot’s initial pose will be randomized.  
+    - Privileged info allowed during training for both tracks.  
+    - Multiple bug fixes (`eval_utils.py`, USD asset format, partial credit).  
+    - Updated [submission guidelines](./submission.md) + sample Dockerfile.  
+    - **New sponsor:** [NVIDIA](https://www.nvidia.com/en-us/)!  
+    - 💰 Prize pool updated:
+        - 1st: $1,000 + GeForce 5080  
+        - 2nd: $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)   
+        - 3rd: $300 + $500 Brev Credits  
+
+    [Read full details →](./updates.md#10082025)
+
+!!! info "🗓️ 09/28/2025 — Dataset Fixes & CLI Improvements"
+    Highlights:
+    
+    - No formal registration required — submit directly!  
+    - Fixed dataset sharding, robot start poses, and improved baseline checkpoints.  
+    - Added new CLI args for evaluation (`testing_on_train_instances`, `max_steps`, `partial_scene_load`).  
+
+    [Read full details →](./updates.md#09282025)
+
+!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol, & Tutorial"
+    Highlights:
+    
+    - BDDL task definitions can be used for both tracks and are identical during evaluation.  
+    - Additional self-collected data allowed for both tracks.
+    - Defined evaluation timeout and success score metrics.  
+    - Various bug fixes (Windows setup, dataset timestamp, evaluation scripts).  
+    - Added new tutorial: [Configure robot action space](./evaluation.md#configure-robot-action-space).  
+
+    [Read full details →](./updates.md#09192025)
+
+---
+
 ## :material-graph-outline: **Overview**
 
 **BEHAVIOR** is a robotics challenge for everyday household tasks. It's a large-scale, human-grounded benchmark that tests a robot's capability in high-level reasoning, long-range locomotion, and dexterous bimanual manipulation in house-scale scenes.
@@ -14,6 +53,8 @@ This year's challenge features:
 - **10,000 teleoperated demonstrations** (1200+ hours) for training
 
 BEHAVIOR challenge is co-hosted with the [Embodied Agent Interface Competition](https://foundation-models-meet-embodied-agents.github.io/eai_challenge/) at NeurIPS 2025.
+
+---
 
 ## :material-database: **Dataset & Baselines**
 
@@ -46,7 +87,11 @@ Pre-implemented training & evaluation pipelines for:
 
 **Privileged information track:** May query simulator for any information (object poses, scene point clouds, etc.).
 
-🏆 **Prizes per track:** 🥇 $1,000 + GeForce 5080 | 🥈 $500 + (Jetson Orin Nano Super or $1000 Brev Credits) | 🥉 $300 + $500 Brev Credits
+🏆 **Prizes per track:**
+
+1. 🥇 $1,000 + GeForce 5080
+2. 🥈 $500 + (Jetson Orin Nano Super or $1,000 Brev Credits)
+3. 🥉 $300 + $500 Brev Credits
 
 Top 3 teams from each track will be invited to present at the workshop!
 

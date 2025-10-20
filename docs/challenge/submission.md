@@ -32,7 +32,7 @@ After running the [evaluation script](https://github.com/StanfordVL/BEHAVIOR-1K/
 }
 ```
 
-- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7). We encourage you to submit intermediate results and models to be showcased on our leaderboard. The same model with different checkpoints from the same team will be considered as a single entry.
+- Submit your results and models at [Google Form](https://forms.gle/54tVqi5zs3ANGutn7). No formal registration is required to participate in the challenge. We encourage you to submit intermediate results and models to be showcased on our leaderboard. The same model with different checkpoints from the same team will be considered as a single entry.
 
 - **Partial submission is allowed**: Since each tasks will be evaluated on 10 instances and 1 rollout each, there should be 500 json files after the full evaluation. However, you are allowed to evaluate your policy on a subset of the tasks (or instances). Any rollout instances not submitted will be counted as zero when calculating the final score of the submission. 
 
@@ -51,6 +51,8 @@ There are two ways to submit your model for evaluation:
     ```
     2. build the dockerfile: `docker build -f OmniGibson/docker/submission.Dockerfile -t b1k-challenge-example .`
     3. run the docker container: `docker run -p 8000:8000 b1k-challenge-example`
+
+    **NOTE: While this Docker image contains a copy of OmniGibson for use in your policy code as a utility library if you so desire, the OmniGibson simulation should NOT be launched inside the container.** Isaac Sim is not installed in the container and as such cannot be used to run simulation. For evaluation, we will run OmniGibson **outside** the container and connect to your policy inside the container using the WebSocket policy client. You should perform your testing under this setup, too.
 
     We will use this similar pipeline for our evaluation, except for the second step the submitted docker image will be pulled. 
     
