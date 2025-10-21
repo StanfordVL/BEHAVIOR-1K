@@ -127,6 +127,12 @@ def determine_data_path():
 # can override assets_path and dataset_path from environment variable
 gm.DATA_PATH = determine_data_path()
 
+# Where the appdata should be stored. Omniverse uses this for a variety of purposes: logging, caching,
+# pointers for extensions, etc. - we default this to be in the OmniGibson directory for easy access
+# but on HPC clusters like SLURM you ideally want to put this in a local path rather than a networked
+# filesystem where read/writes are slow and race conditions can occur.
+gm.APPDATA_PATH = os.getenv("OMNIGIBSON_APPDATA_PATH", str(pathlib.Path(__file__).parents[1] / "appdata"))
+
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
 # integer or string-form integer
 gm.GPU_ID = os.getenv("OMNIGIBSON_GPU_ID", None)
