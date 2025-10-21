@@ -40,40 +40,12 @@ jobs:
         working-directory: OmniGibson
         run: pip install -e .[dev]
 
-      - name: Build docs
-        run: mkdocs build   # TODO: Shouldn't we copy over the src directory here?
-
-      # # See if we need to rebuild the whole thing
-      # - name: Get BDDL hash
-      #   id: bddl-hash
-      #   working-directory: bddl
-      #   run: echo hash=$(git rev-parse HEAD) >> "$GITHUB_OUTPUT"
-
-      # - name: Get knowledgebase hash
-      #   id: website-hash
-      #   working-directory: knowledgebase
-      #   run: echo hash=$(git rev-parse HEAD) >> "$GITHUB_OUTPUT"
-
-      # - name: Check cache for overall data
-      #   id: cache-knowledgebase
-      #   uses: actions/cache@v3
-      #   with:
-      #     key: knowledgebase-${{ steps.website-hash.outputs.hash }}-${{ steps.bddl-hash.outputs.hash }}
-      #     path: README.md
-      #     lookup-only: true
-
-      # - if: ${{ steps.cache-knowledgebase.outputs.cache-hit != 'true' }}
-      - name: Install other dependencies
+      - name: Generate knowledgebase markdown files
         working-directory: knowledgebase
-        run: pip install -r requirements.txt
+        run: python build_mkdocs_markdown.py
 
-      # - if: ${{ steps.cache-knowledgebase.outputs.cache-hit != 'true' }}
-      - name: Generate static knowledgebase site
-        working-directory: knowledgebase
-        run: python build_static_site.py
-
-      - name: Move knowledgebase to combined site
-        run: cp -R knowledgebase/build/knowledgebase site
+      - name: Build complete site with MkDocs
+        run: mkdocs build
 
       - name: Upload pages artifact
         uses: actions/upload-pages-artifact@v3

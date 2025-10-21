@@ -52,7 +52,11 @@ markdown_extensions:
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.highlight:
@@ -159,7 +163,17 @@ nav:
       - Contributing: other/contributing.md
     - API Reference: reference/*
     - Changelog: https://github.com/StanfordVL/OmniGibson/releases
-  - Knowledgebase: https://behavior.stanford.edu/knowledgebase/
+  - Knowledgebase:
+    - Overview: knowledgebase/index.md
+    - Tasks: knowledgebase/tasks/index.md
+    - Synsets: knowledgebase/synsets/index.md
+    - Objects: knowledgebase/objects/index.md
+    - Categories: knowledgebase/categories/index.md
+    - Scenes: knowledgebase/scenes/index.md
+    - Transition Rules: knowledgebase/transition_rules/index.md
+    - Particle Systems: knowledgebase/particle_systems/index.md
+    - Attachment Pairs: knowledgebase/attachment_pairs/index.md
+    - Complaints: knowledgebase/complaint_types/index.md
   - Research: other/related_research.md
   - Workshops:
     - workshops/overview.md
@@ -170,6 +184,17 @@ nav:
     - VR Dataset: behavior_100/dataset.md
     - Demo Gallery: behavior_100/demo_gallery.md
   - <i class="fa-brands fa-discord"></i>  Support: https://discord.gg/bccR5vGFEx
+
+not_in_nav: |
+  /knowledgebase/tasks/*.md
+  /knowledgebase/synsets/*.md
+  /knowledgebase/objects/*.md
+  /knowledgebase/categories/*.md
+  /knowledgebase/scenes/*.md
+  /knowledgebase/transition_rules/*.md
+  /knowledgebase/particle_systems/*.md
+  /knowledgebase/attachment_pairs/*.md
+  /knowledgebase/complaint_types/*.md
 
 extra:
   analytics:
