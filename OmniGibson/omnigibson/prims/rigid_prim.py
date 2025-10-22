@@ -327,10 +327,8 @@ class RigidPrim(XFormPrim):
             float: total volume of all the collision meshes of the rigid body in m^3.
         """
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
-        return sum(
-            get_mesh_volume_and_com(collision_mesh.prim, world_frame=True)[0]
-            for collision_mesh in self._collision_meshes.values()
-        )
+        meshes = self._visual_meshes.values() if self.is_meta_link else self._collision_meshes.values()
+        return sum(get_mesh_volume_and_com(mesh.prim, world_frame=True)[0] for mesh in meshes)
 
     @property
     def ccd_enabled(self):
