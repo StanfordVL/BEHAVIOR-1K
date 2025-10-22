@@ -4,6 +4,7 @@ set -e
 # Parse arguments
 HELP=false
 NEW_ENV=false
+NEW_ENV_NAME="behavior"
 OMNIGIBSON=false
 BDDL=false
 JOYLO=false
@@ -23,7 +24,17 @@ CONFIRM_NO_CONDA=false
 while [[ $# -gt 0 ]]; do
     case $1 in
         -h|--help) HELP=true; shift ;;
-        --new-env) NEW_ENV=true; shift ;;
+        --new-env)
+            NEW_ENV=true
+            # support: --new-env NAME  or just --new-env (use default)
+            if [[ -n "$2" && ! "$2" =~ ^- ]]; then
+                NEW_ENV_NAME="$2"
+                shift 2
+            else
+                NEW_ENV_NAME="behavior"
+                shift 1
+            fi
+            ;;
         --omnigibson) OMNIGIBSON=true; shift ;;
         --bddl) BDDL=true; shift ;;
         --joylo) JOYLO=true; shift ;;
@@ -32,12 +43,12 @@ while [[ $# -gt 0 ]]; do
         --eval) EVAL=true; shift ;;
         --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
-        --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
+        --cuda-version) CUDA_VERSION="$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
         --confirm-no-conda) CONFIRM_NO_CONDA=true; shift ;;
-        *) echo "Unknown option: \$1"; exit 1 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
@@ -48,7 +59,7 @@ Usage: ./setup.sh [OPTIONS]
 
 Options:
   -h, --help              Display this help message
-  --new-env               Create a new conda environment 'behavior'
+  --new-env NEW_ENV_NAME   Create a new conda environment 'NEW_ENV_NAME' (default: behavior)
   --omnigibson            Install OmniGibson (core physics simulator)
   --bddl                  Install BDDL (Behavior Domain Definition Language)
   --joylo                 Install JoyLo (teleoperation interface)
@@ -57,7 +68,7 @@ Options:
   --eval                  Install evaluation dependencies
   --asset-pipeline        Install the 3D scene and object asset pipeline
   --dev                   Install development dependencies
-  --cuda-version VERSION  Specify CUDA version (default: 12.4)
+  --cuda-version VERSION  Specify CUDA version (default: 12.8)
   --accept-conda-tos      Automatically accept Conda Terms of Service
   --accept-nvidia-eula    Automatically accept NVIDIA Isaac Sim EULA
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
@@ -191,7 +202,7 @@ prompt_for_terms
 
 # Create conda environment
 if [ "$NEW_ENV" = true ]; then
-    echo "Creating conda environment 'behavior'..."
+    echo "Creating conda environment '$NEW_ENV_NAME'..."
     command -v conda >/dev/null || { echo "ERROR: Conda not found"; exit 1; }
     
     # Set auto-accept environment variable if user agreed to TOS
@@ -203,9 +214,9 @@ if [ "$NEW_ENV" = true ]; then
     source "$(conda info --base)/etc/profile.d/conda.sh"
     
     # Check if environment already exists and exit with instructions
-    if conda env list | grep -q "^behavior "; then
+    if conda env list | grep -q "^$NEW_ENV_NAME "; then
         echo ""
-        echo "ERROR: Conda environment 'behavior' already exists!"
+        echo "ERROR: Conda environment '$NEW_ENV_NAME' already exists!"
         echo ""
         echo "Please remove or rename the existing environment and re-run this script."
         echo ""
@@ -213,10 +224,10 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     # Create environment with only Python 3.11
-    conda create -n behavior python=3.11 -c conda-forge -y
-    conda activate behavior
+    conda create -n "$NEW_ENV_NAME" python=3.11 -c conda-forge -y
+    conda activate "$NEW_ENV_NAME"
     
-    [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
+    [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
     
     # Install numpy and setuptools via pip
     echo "Installing numpy and setuptools..."
@@ -370,16 +381,17 @@ if [ "$OMNIGIBSON" = true ]; then
         install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         
         # Fix cryptography conflict - remove conflicting version
-        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
+        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
             echo "Fixing cryptography conflict..."
-            rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
+            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography"
         fi
 
         # Fix packaging conflict - remove conflicting version
-        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0????? Why????
-        echo "Fixing packaging conflict..."
-        rm -rf "$ISAAC_PATH/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
-
+        # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
+        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging" ]; then
+            echo "Fixing packaging conflict..."
+            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/packaging"
+        fi
     fi
     
     echo "OmniGibson installation completed successfully!"
@@ -448,7 +460,7 @@ fi
 
 echo ""
 echo "=== Installation Complete! ==="
-if [ "$NEW_ENV" = true ]; then echo "✓ Created conda environment 'behavior'"; fi
+if [ "$NEW_ENV" = true ]; then echo "✓ Created conda environment '$NEW_ENV_NAME'"; fi
 if [ "$OMNIGIBSON" = true ]; then echo "✓ Installed OmniGibson + Isaac Sim"; fi
 if [ "$BDDL" = true ]; then echo "✓ Installed BDDL"; fi
 if [ "$JOYLO" = true ]; then echo "✓ Installed JoyLo"; fi
@@ -456,4 +468,4 @@ if [ "$PRIMITIVES" = true ]; then echo "✓ Installed OmniGibson with primitives
 if [ "$EVAL" = true ]; then echo "✓ Installed evaluation support"; fi
 if [ "$DATASET" = true ]; then echo "✓ Downloaded datasets"; fi
 echo ""
-if [ "$NEW_ENV" = true ]; then echo "To activate: conda activate behavior"; fi
+if [ "$NEW_ENV" = true ]; then echo "To activate: conda activate '$NEW_ENV_NAME'"; fi

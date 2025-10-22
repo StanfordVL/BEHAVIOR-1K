@@ -1,0 +1,12 @@
+gha-creds-*.json
+/site
+.vscode
+.DS_Store
+
+# training
+outputs/
+/*.ipynb
+
+# Dataset
+datasets/*
+!datasets/README

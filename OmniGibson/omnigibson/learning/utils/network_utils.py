@@ -11,6 +11,8 @@ import numpy as np
 import time
 import torch as th
 import traceback
+import urllib.request
+import urllib.error
 import websockets.sync.client
 import websockets
 
@@ -24,6 +26,7 @@ from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 __all__ = ["WebsocketClientPolicy", "WebsocketPolicyServer"]
@@ -47,7 +50,27 @@ class WebsocketClientPolicy:
         return self._server_metadata
 
     def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
-        logger.info(f"Waiting for server at {self._uri}...")
+        # TODO [Wensi]: use URL parser instead of this
+        # Extract host and port for health check
+        host_port = self._uri.replace("ws://", "").replace("wss://", "")
+        if ":" in host_port:
+            host, port = host_port.split(":")
+            health_url = f"http://{host}:{port}/healthz"
+        else:
+            health_url = f"http://{host_port}/healthz"
+
+        # First, wait for the health check to pass
+        while True:
+            try:
+                with urllib.request.urlopen(health_url, timeout=2) as response:
+                    if response.status == 200:
+                        logger.info("Health check passed, attempting websocket connection...")
+                        break
+            except (urllib.error.URLError, OSError):
+                logger.info("Health check failed, waiting for server...")
+                time.sleep(5)
+
+        # Now attempt websocket connection (rest of the code remains the same)
         while True:
             try:
                 headers = {"Authorization": f"Api-Key {self._api_key}"} if self._api_key else None
@@ -57,8 +80,8 @@ class WebsocketClientPolicy:
                 metadata = unpackb(conn.recv())
                 logger.info("Connected to server!")
                 return conn, metadata
-            except ConnectionRefusedError:
-                logger.info("Still waiting for server...")
+            except (ConnectionRefusedError, websockets.exceptions.InvalidMessage, EOFError) as e:
+                logger.info(f"Websocket connection failed ({e}), retrying...")
                 time.sleep(5)
 
     def act(self, obs: Dict) -> th.Tensor:
@@ -94,19 +117,19 @@ class WebsocketPolicyServer:
         self,
         policy: Any,
         host: str = "0.0.0.0",
-        port: int | None = None,
+        port: int = 8000,
         metadata: dict | None = None,
     ) -> None:
         self._policy = policy
         self._host = host
         self._port = port
         self._metadata = metadata or {}
-        logging.getLogger("websockets.server").setLevel(logging.INFO)
 
     def serve_forever(self) -> None:
         asyncio.run(self.run())
 
     async def run(self):
+        logger.info(f"Starting websocket server on {self._host}:{self._port}...")
         async with _server.serve(
             self._handler,
             self._host,
