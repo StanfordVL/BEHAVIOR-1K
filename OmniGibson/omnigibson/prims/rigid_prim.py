@@ -211,8 +211,9 @@ class RigidPrim(XFormPrim):
                 if prim_type in GEOM_TYPES:
                     # Only GeomSubsets are allowed to be children (used for mapping to different materials)
                     for child in children_dict.keys():
-                        assert child.GetPrimTypeInfo().GetTypeName() == "GeomSubset", \
-                            f"Only 'GeomSubset' prims should be owned by a Mesh prim, but found other prims at: {prim_path}"
+                        assert (
+                            child.GetPrimTypeInfo().GetTypeName() == "GeomSubset"
+                        ), f"Only 'GeomSubset' prims should be owned by a Mesh prim, but found other prims at: {prim_path}"
                     # Raw meshes themselves could be nested, and share the same name so we convert their (unique) prim path
                     # into a string we'll use for their name
                     mesh_name = prim_path.split(self.prim_path)[-1].strip("/").replace("/", "_")
