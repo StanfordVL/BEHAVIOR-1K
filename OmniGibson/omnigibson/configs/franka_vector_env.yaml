@@ -47,8 +47,6 @@ robots:
           image_width: 128
     controller_config:
       arm_0:
-<<<<<<< HEAD:OmniGibson/omnigibson/configs/franka_vector_env.yaml
-=======
         name: JointController
         motor_type: position
         command_input_limits: null
@@ -56,18 +54,13 @@ robots:
         use_delta_commands: true
         use_impedances: false
       gripper_0:
->>>>>>> rl-experiments:omnigibson/configs/fetch_primitives.yaml
-        name: JointController
-        motor_type: position
-        command_input_limits: default
-        command_output_limits: default
-        use_delta_commands: false
-        use_impedances: False
-      gripper_0:
         name: MultiFingerGripperController
         mode: smooth
         command_input_limits: default
         command_output_limits: default
+      camera:
+        name: JointController
+        use_delta_commands: False
 objects: []
 
 task:
