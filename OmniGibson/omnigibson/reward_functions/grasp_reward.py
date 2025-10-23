@@ -71,7 +71,7 @@ class GraspReward(BaseRewardFunction):
         reward = 0.0
 
         # Penalize large actions
-        action=th.tensor(action)
+        action = th.tensor(action)
         action_mag = th.sum(th.abs(action))
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty

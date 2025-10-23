@@ -211,7 +211,9 @@ class PointNavigationTask(BaseTask):
         Update the initial and goal positions for the environment
         """
         robot = env.robots[self._robot_idn]
-        self._initial_pos, _ = T.pose_transform(*robot.scene.prim.get_position_orientation(), self._initial_pos, [0, 0, 0, 1])
+        self._initial_pos, _ = T.pose_transform(
+            *robot.scene.prim.get_position_orientation(), self._initial_pos, [0, 0, 0, 1]
+        )
         self._goal_pos, _ = T.pose_transform(*robot.scene.prim.get_position_orientation(), self._goal_pos, [0, 0, 0, 1])
 
     def _load_visualization_markers(self, env):

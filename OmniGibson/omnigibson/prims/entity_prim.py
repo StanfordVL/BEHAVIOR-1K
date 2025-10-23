@@ -1010,6 +1010,7 @@ class EntityPrim(XFormPrim):
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
+
     def set_linear_velocity(self, velocity: th.Tensor):
         """
         Sets the linear velocity of the root prim in stage.

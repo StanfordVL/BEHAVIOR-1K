@@ -71,7 +71,7 @@ def main():
         for _ in range(100):
             a = vec_env.action_space.sample()
             obs, _, _, _ = vec_env.step([a for _ in range(n_envs)])
-        
+
         fps = 100 / (time.time() - start_time)
         print("fps", fps)
         print("effective fps", fps * n_envs)

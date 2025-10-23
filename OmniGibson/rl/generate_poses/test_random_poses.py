@@ -131,7 +131,6 @@ def main(iterations):
         reset_poses = json.load(file)
 
     for i in tqdm(range(iterations)):
-
         reset = random.choice(reset_poses)
 
         robot_joint_pos = reset["joint_pos"]

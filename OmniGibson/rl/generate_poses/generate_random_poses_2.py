@@ -44,7 +44,7 @@ def append_to_json(file_path, data):
     # Check if the file exists
     if not os.path.exists(file_path):
         # Create the file and initialize it with an empty list
-        with open(file_path, 'w') as file:
+        with open(file_path, "w") as file:
             json.dump([], file)
 
     # Open the file in read/write mode ('r+')
@@ -57,6 +57,7 @@ def append_to_json(file_path, data):
         append_format = stringify_data[1:-1]
         file.write(append_format)  # Convert the dictionary to JSON and write it
         file.write("]")  # Close the JSON array
+
 
 @profile
 def main(iterations, file_path):
@@ -168,7 +169,7 @@ def main(iterations, file_path):
         ("oven_wuinhm_0", object_states.OnTop),
         ("straight_chair_amgwaw_0", object_states.OnTop),
         ("breakfast_table_skczfi_0", object_states.OnTop),
-        ("bottom_cabinet_jhymlr_0", object_states.OnTop)
+        ("bottom_cabinet_jhymlr_0", object_states.OnTop),
     ]
     for name, placement in objects_name:
         o = env.scene.object_registry("name", name)

@@ -40,7 +40,6 @@ def get_random_joint_position(robot):
 
 
 def main():
-
     cfg = {
         "env": {
             "action_frequency": 10,
@@ -138,7 +137,6 @@ def main():
         obj.set_position_orientation(*selected_obj_pose)
         for i in range(3000):
             og.sim.step()
-
 
     # Open the file and load the data
     # with open("reset_poses_varied.json", "r") as file:

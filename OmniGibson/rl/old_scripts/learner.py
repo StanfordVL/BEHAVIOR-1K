@@ -23,7 +23,6 @@ class PolicyWrapper:
         rollout_buffer.reset()
 
         while n_steps < n_rollout_steps:
-
             with th.no_grad():
                 # Convert to pytorch tensor or to TensorDict
                 obs_tensor = obs_as_tensor(self._last_obs, self.device)
@@ -58,7 +57,6 @@ class PolicyWrapper:
         rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
 
     def _learn(self):
-
         total_timesteps, callback = self.PPO._setup_learn(
             total_timesteps,
             None,

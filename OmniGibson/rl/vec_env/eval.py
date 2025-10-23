@@ -44,17 +44,19 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "rl.yaml"))
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
 
+
 NUM_EVAL_EPISODES = 10
 reset_poses_path = os.path.dirname(__file__) + "/../reset_poses.json"
 
-def train():
 
+def train():
     import omnigibson as og
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
     from omnigibson.macros import gm

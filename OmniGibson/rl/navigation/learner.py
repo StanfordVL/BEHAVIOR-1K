@@ -33,11 +33,13 @@ from stable_baselines3.common.vec_env import DummyVecEnv, VecFrameStack, VecMoni
 from wandb import AlertLevel
 from wandb.integration.sb3 import WandbCallback
 
+
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "nav.yaml"))
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
+
 
 EVAL_EVERY_N_EPISODES = 5
 NUM_EVAL_EPISODES = 5
@@ -55,14 +57,16 @@ class AfterEvalCallback(BaseCallback):
 
         return True
 
-class Run():
+
+class Run:
     def __init__(self):
         import uuid
+
         # generate uuid
         self.id = str(uuid.uuid4())[:8]
 
-def train():
 
+def train():
     import omnigibson as og
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
     from omnigibson.macros import gm

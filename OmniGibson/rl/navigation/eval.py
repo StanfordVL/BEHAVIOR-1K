@@ -45,18 +45,19 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+
 def _get_env_config():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.normpath(os.path.join(script_dir, "nav.yaml"))
     config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
     return config
 
+
 NUM_EVAL_EPISODES = 10
 num_success = 0
 
 
 def train():
-
     import omnigibson as og
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
     from omnigibson.macros import gm
@@ -102,7 +103,9 @@ def train():
     # ceiling.visible = False
     model = PPO.load(args.checkpoint)
     print("Starting evaluation...")
-    mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=NUM_EVAL_EPISODES, callback=_log_success_callback)
+    mean_reward, std_reward = evaluate_policy(
+        model, env, n_eval_episodes=NUM_EVAL_EPISODES, callback=_log_success_callback
+    )
     print("Finished evaluation!")
     print(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
     print(num_success)

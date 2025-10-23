@@ -126,7 +126,6 @@ class AfterEvalCallback(BaseCallback):
 
 
 def train():
-
     import omnigibson as og
     from omnigibson.envs.sb3_vec_env import SB3VectorEnvironment
     from omnigibson.macros import gm

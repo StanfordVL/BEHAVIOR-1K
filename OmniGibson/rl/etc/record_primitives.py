@@ -33,6 +33,7 @@ state_queue.connect("tcp://127.0.0.1:5556")
 # Subscribe to all messages
 state_queue.setsockopt_string(zmq.SUBSCRIBE, "")
 
+
 def execute_controller(ctrl_gen, env):
     episode_data = []
     for action in ctrl_gen:
@@ -42,6 +43,7 @@ def execute_controller(ctrl_gen, env):
         if terminated or truncated:
             data_queue.send(pickle.dumps(episode_data))
             break
+
 
 def main():
     """
