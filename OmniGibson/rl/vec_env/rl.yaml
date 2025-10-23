@@ -10,8 +10,8 @@ env:
       sensor_kwargs:
         image_height: 224
         image_width: 224
-      local_position: [-0.5, -2.0, 1.0]
-      local_orientation: [0.707, 0.0, 0.0, 0.707]
+      position: [-0.5, -2.0, 1.0]
+      orientation: [0.707, 0.0, 0.0, 0.707]
 scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
@@ -21,6 +21,7 @@ scene:
     - coffee_table
 robots:
   - type: Fetch
+    name: fetch
     obs_modalities:
       - proprio
       - scan
@@ -56,7 +57,7 @@ robots:
     controller_config:
       base:
         name: NullJointController
-        default_command: [0, 0]
+        default_goal: [0, 0]
       arm_0:
         name: JointController
         motor_type: position
@@ -72,7 +73,7 @@ robots:
         command_output_limits: null
       camera:
         name: NullJointController
-        default_command: [0.0, 0.45]
+        default_goal: [0.0, 0.45]
 task:
   type: GraspTask
   obj_name: cologne

@@ -72,14 +72,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = self.env_config["automatic_reset"]
         self._flatten_action_space = self.env_config["flatten_action_space"]
         self._flatten_obs_space = self.env_config["flatten_obs_space"]
-<<<<<<< HEAD:OmniGibson/omnigibson/envs/env_base.py
-=======
         self.physics_frequency = self.env_config["physics_frequency"]
         self.action_frequency = self.env_config["action_frequency"]
-        self.use_floor_plane = self.env_config["use_floor_plane"]
-        self.floor_plane_visible = self.env_config["floor_plane_visible"]
-        self.floor_plane_color = self.env_config["floor_plane_color"]
->>>>>>> rl-experiments:omnigibson/envs/env_base.py
+        
         self.device = self.env_config["device"] if self.env_config["device"] else "cpu"
         self._initial_pos_z_offset = self.env_config[
             "initial_pos_z_offset"

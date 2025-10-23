@@ -87,8 +87,8 @@ class SB3VectorEnvironment(DummyVecEnv):
 
             return (
                 self._obs_from_buf(),
-                th.clone(self.buf_rews),
-                th.clone(self.buf_dones),
+                self.buf_rews.copy(),  # Return as NumPy array
+                self.buf_dones.copy(),  # Return as NumPy array
                 copy.deepcopy(self.buf_infos),
             )
 
@@ -108,6 +108,7 @@ class SB3VectorEnvironment(DummyVecEnv):
             # Get the new obs
             for env_idx in range(self.num_envs):
                 obs, info = self.envs[env_idx].get_obs()
+                # breakpoint()
                 self._save_obs(env_idx, obs)
 
             # Seeds and options are only used once

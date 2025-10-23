@@ -1,9 +1,5 @@
-<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
 import os
-=======
 import collections
-from abc import abstractmethod
->>>>>>> rl-experiments:omnigibson/robots/robot_base.py
 from copy import deepcopy
 
 import torch as th
@@ -249,7 +245,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
-<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
                     # Possibly filter out the sensor based on name
                     prim_path = str(prim.GetPrimPath())
                     not_blacklisted = self._exclude_sensor_names is None or not any(
@@ -270,8 +265,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                         continue
 
                     # Infer what obs modalities to use for this sensor
-=======
->>>>>>> rl-experiments:omnigibson/robots/robot_base.py
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
                     sensor_kwargs = self._sensor_config[sensor_cls.__name__]
                     if sensor_cls == ScanSensor:
@@ -290,13 +283,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     # Create the sensor and store it internally
                     sensor = create_sensor(
                         sensor_type=prim_type,
-<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
                         relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim_path),
                         name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[prim_type]}",
-=======
-                        relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, str(prim.GetPrimPath())),
-                        name=f"{self.name}:{link_name}:{prim_type}:{sensor_counts[sensor_cls]}",
->>>>>>> rl-experiments:omnigibson/robots/robot_base.py
                         **sensor_kwargs,
                     )
                     sensor.load(self.scene)
@@ -407,7 +395,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
-<<<<<<< HEAD:OmniGibson/omnigibson/robots/robot_base.py
             robot_ori_cos=th.cos(ori),
             robot_ori_sin=th.sin(ori),
             robot_2d_ori=ori_2d,
@@ -419,15 +406,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_ang_vel=cb.to_torch(
                 cb.copy(ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path))
             ),
-=======
-            robot_ori_cos=np.cos(ori),
-            robot_ori_sin=np.sin(ori),
-            robot_2d_ori=np.array([ori_2d]),
-            robot_2d_ori_cos=np.cos(ori_2d),
-            robot_2d_ori_sin=np.sin(ori_2d),
-            robot_lin_vel=ControllableObjectViewAPI.get_linear_velocity(self.articulation_root_path),
-            robot_ang_vel=ControllableObjectViewAPI.get_angular_velocity(self.articulation_root_path),
->>>>>>> rl-experiments:omnigibson/robots/robot_base.py
         )
 
     def _load_observation_space(self):

@@ -75,6 +75,7 @@ class GraspTask(BaseTask):
         return rewards
 
     def _reset_agent(self, env):
+        # breakpoint()
         robot = env.robots[0]
         for arm in robot.arm_names:
             robot.release_grasp_immediately(arm=arm)
@@ -82,28 +83,13 @@ class GraspTask(BaseTask):
         # If available, reset the robot with cached reset poses.
         # This is significantly faster than randomizing using the primitives.
         if self._reset_poses is not None:
-<<<<<<< HEAD:OmniGibson/omnigibson/tasks/grasp_task.py
             joint_control_idx = th.cat([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
             robot_pose = random.choice(self._reset_poses)
-            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
+            robot.set_joint_positions(th.tensor(robot_pose["joint_pos"]), joint_control_idx)
+            # breakpoint()
             robot_pos = th.tensor(robot_pose["base_pos"])
             robot_orn = th.tensor(robot_pose["base_ori"])
             robot.set_position_orientation(position=robot_pos, orientation=robot_orn, frame="scene")
-=======
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            robot_pose = random.choice(self._reset_poses)
-            robot.set_joint_positions(robot_pose["joint_pos"], joint_control_idx)
-            robot_pos = np.array(robot_pose["base_pos"])
-            robot_orn = np.array(robot_pose["base_ori"])
-
-            # Specific position
-            # robot_pos = [-0.433881, -0.210183, 0.01]
-            # robot_orn = [0, 0, -0.7173561, 0.6967067]
-
-            # Move it to the appropriate scene. TODO: The scene should provide a function for this.
-            robot_pos, robot_orn = T.pose_transform(*robot.scene.prim.get_position_orientation(), robot_pos, robot_orn)
-            robot.set_position_orientation(robot_pos, robot_orn)
->>>>>>> rl-experiments:omnigibson/tasks/grasp_task.py
 
         # Otherwise, reset using the primitive controller.
         else:
@@ -192,6 +178,7 @@ class GraspTask(BaseTask):
         # Try up to 20 times.
         for _ in range(20):
             try:
+                # breakpoint()
                 self._reset_scene(env)
                 self._reset_agent(env)
                 break

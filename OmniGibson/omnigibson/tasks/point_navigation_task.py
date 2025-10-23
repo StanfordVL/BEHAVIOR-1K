@@ -85,12 +85,9 @@ class PointNavigationTask(BaseTask):
         reward_type="l2",
         termination_config=None,
         reward_config=None,
-<<<<<<< HEAD:OmniGibson/omnigibson/tasks/point_navigation_task.py
         include_obs=True,
-=======
         obj_name=None,
         objects_config=None,
->>>>>>> rl-experiments:omnigibson/tasks/point_navigation_task.py
     ):
         # Store inputs
         self._robot_idn = robot_idn

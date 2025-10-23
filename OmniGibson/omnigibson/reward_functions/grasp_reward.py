@@ -70,13 +70,9 @@ class GraspReward(BaseRewardFunction):
         # and is currently grasping the desired object
         reward = 0.0
 
-<<<<<<< HEAD:OmniGibson/omnigibson/reward_functions/grasp_reward.py
         # Penalize large actions
+        action=th.tensor(action)
         action_mag = th.sum(th.abs(action))
-=======
-        # Penalize large accelerations
-        action_mag = np.linalg.norm(robot.get_applied_joint_efforts())
->>>>>>> rl-experiments:omnigibson/reward_functions/grasp_reward.py
         regularization_penalty = -(action_mag * self.regularization_coef)
         reward += regularization_penalty
         info["regularization_penalty_factor"] = action_mag
@@ -94,16 +90,16 @@ class GraspReward(BaseRewardFunction):
             info["position_penalty"] = position_penalty
         self.prev_eef_pos = eef_pos
 
-        eef_quat = robot.get_eef_orientation(robot.default_arm)
+        eef_rot = robot.get_eef_orientation(robot.default_arm)
         info["rotation_penalty_factor"] = 0.0
         info["rotation_penalty"] = 0.0
-        if self.prev_eef_quat is not None:
-            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_quat, eef_quat)
+        if self.prev_eef_rot is not None:
+            delta_rot = T.get_orientation_diff_in_radian(self.prev_eef_rot, eef_rot)
             rotation_penalty = -delta_rot * self.eef_orientation_penalty_coef
             reward += rotation_penalty
             info["rotation_penalty_factor"] = delta_rot.item()
             info["rotation_penalty"] = rotation_penalty.item()
-        self.prev_eef_quat = eef_quat
+        self.prev_eef_rot = eef_rot
 
         # Penalize robot for colliding with an object
         info["collision_penalty_factor"] = 0.0

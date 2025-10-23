@@ -133,11 +133,11 @@ def train():
 
     gm.ENABLE_FLATCACHE = True
     gm.USE_GPU_DYNAMICS = False
-    # gm.HEADLESS = True
+    gm.HEADLESS = False  # Enable rendering mode
 
     # Decide whether to use a local environment or remote
     # n_envs = args.n_envs
-    n_envs = 64
+    n_envs = 4
     env_config = _get_env_config()
     env_config["task"]["precached_reset_pose_path"] = reset_poses_path
     del env_config["env"]["external_sensors"]
@@ -155,31 +155,31 @@ def train():
     prefix = ""
     seed = 0
     # run = wandb.init(sync_tensorboard=True, monitor_gym=True)
-    run = wandb.init(
-        entity="behavior-rl",
-        project="sb3",
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        monitor_gym=True,  # auto-upload the videos of agents playing the game
-        # save_code=True,  # optional
-    )
-    if "dist_coeff" in wandb.config:
-        task_config = _get_env_config()["task"]
-        task_config["precached_reset_pose_path"] = reset_poses_path
-        task_config["reward_config"]["dist_coeff"] = wandb.config.dist_coeff
-        task_config["reward_config"]["dist_slope_coeff"] = wandb.config.dist_slope_coeff
-        task_config["reward_config"]["grasp_reward"] = wandb.config.grasp_reward
-        task_config["reward_config"]["collision_penalty"] = wandb.config.collision_penalty
-        task_config["reward_config"]["eef_position_penalty_coef"] = wandb.config.eef_position_penalty_coef
-        task_config["reward_config"]["eef_orientation_penalty_coef"] = (
-            wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
-        )
-        task_config["reward_config"]["regularization_coef"] = wandb.config.regularization_coef
-        env.env_method("update_task", task_config)
-        eval_env.env_method("update_task", task_config)
+    # run = wandb.init(
+    #     entity="behavior-rl",
+    #     project="sb3",
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     monitor_gym=True,  # auto-upload the videos of agents playing the game
+    #     # save_code=True,  # optional
+    # )
+    # if "dist_coeff" in wandb.config:
+    #     task_config = _get_env_config()["task"]
+    #     task_config["precached_reset_pose_path"] = reset_poses_path
+    #     task_config["reward_config"]["dist_coeff"] = wandb.config.dist_coeff
+    #     task_config["reward_config"]["dist_slope_coeff"] = wandb.config.dist_slope_coeff
+    #     task_config["reward_config"]["grasp_reward"] = wandb.config.grasp_reward
+    #     task_config["reward_config"]["collision_penalty"] = wandb.config.collision_penalty
+    #     task_config["reward_config"]["eef_position_penalty_coef"] = wandb.config.eef_position_penalty_coef
+    #     task_config["reward_config"]["eef_orientation_penalty_coef"] = (
+    #         wandb.config.eef_orientation_penalty_coef_relative * wandb.config.eef_position_penalty_coef
+    #     )
+    #     task_config["reward_config"]["regularization_coef"] = wandb.config.regularization_coef
+    #     env.env_method("update_task", task_config)
+    #     eval_env.env_method("update_task", task_config)
 
     eval_env = VecVideoRecorder(
         eval_env,
-        f"videos/{run.id}",
+        f"videos/test_run",
         record_video_trigger=lambda x: x % (NUM_EVAL_EPISODES * STEPS_PER_EPISODE) == 0,
         video_length=STEPS_PER_EPISODE,
     )
@@ -255,7 +255,7 @@ def train():
                 "net_arch": [128, 64],
             },
         }
-        tensorboard_log_dir = f"runs/{run.id}"
+        tensorboard_log_dir = f"runs/test_run"
         # if args.checkpoint is None:
         if True:
             model = PPO(
@@ -283,10 +283,10 @@ def train():
             model = PPO.load(args.checkpoint, env=env)
         report_infos_callback = ReportInfosCallback()
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        wandb_callback = WandbCallback(
-            model_save_path=tensorboard_log_dir,
-            verbose=2,
-        )
+        # wandb_callback = WandbCallback(
+        #     model_save_path=tensorboard_log_dir,
+        #     verbose=2,
+        # )
         # stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=20, verbose=1)
         after_eval_callback = AfterEvalCallback(env, eval_env)
         eval_callback = EvalCallback(
@@ -302,7 +302,7 @@ def train():
         callback = CallbackList(
             [
                 report_infos_callback,
-                wandb_callback,
+                # wandb_callback,
                 checkpoint_callback,
                 eval_callback,
             ]
@@ -312,7 +312,7 @@ def train():
         log.debug(model.policy)
         log.info(f"model: {model}")
         log.info("Starting training...")
-        wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
+        # wandb.alert(title="Run launched", text=f"Run ID: {wandb.run.id}", level=AlertLevel.INFO)
         model.learn(total_timesteps=30_000_000, callback=callback, log_interval=4)
         log.info("Finished training!")
 
