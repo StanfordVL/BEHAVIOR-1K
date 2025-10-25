@@ -9,13 +9,23 @@ import omnigibson.utils.transform_utils as TT
 import omnigibson.utils.transform_utils_np as NT
 from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
+from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
+from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Set some macros
+m = create_module_macros(module_path=__file__)
+m.IK_POS_TOLERANCE = 0.002
+m.IK_POS_WEIGHT = 1.0
+m.IK_ORN_TOLERANCE = 0.01
+m.IK_ORN_WEIGHT = 0.05
+m.IK_MAX_ITERATIONS = 10
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -60,6 +70,7 @@ class InverseKinematicsController(JointController, ManipulationController):
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
         condition_on_current_position=True,
+        use_local_approximation=True,
     ):
         """
         Args:
@@ -126,6 +137,8 @@ class InverseKinematicsController(JointController, ManipulationController):
                 values, and the returned tuple is the processed (pos, quat) command.
             condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
                 Otherwise, will use the reset_joint_pos as the initial guess.
+            use_local_approximation (bool): if True, will use a local approximation using the Jacobian to compute the IK solution.
+                If False, will use Lula IK solver for absolute IK solutions.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -146,6 +159,20 @@ class InverseKinematicsController(JointController, ManipulationController):
         self.task_name = task_name
         self.reset_joint_pos = reset_joint_pos[dof_idx]
         self.condition_on_current_position = condition_on_current_position
+        self.use_local_approximation = use_local_approximation
+
+        self.solver = None
+        if not self.use_local_approximation:
+            # Create the lula IKSolver
+            assert robot_description_path is not None, "robot_description_path must be provided when use_local_approximation is False"
+            assert robot_urdf_path is not None, "robot_urdf_path must be provided when use_local_approximation is False"
+            assert eef_name is not None, "eef_name must be provided when use_local_approximation is False"
+            self.solver = IKSolver(
+                robot_description_path=robot_description_path,
+                robot_urdf_path=robot_urdf_path,
+                eef_name=eef_name,
+                reset_joint_pos=self.reset_joint_pos,
+            )
 
         # Other variables that will be filled in at runtime
         self._fixed_quat_target = None
@@ -324,21 +351,46 @@ class InverseKinematicsController(JointController, ManipulationController):
         """
         # Calculate and return IK-backed out joint angles
         q = control_dict["joint_position"][self.dof_idx]
-        j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
+        target_pos = goal_dict["target_pos"]
+        target_quat = cb.T.mat2quat(goal_dict["target_ori_mat"])
 
-        # Calculate desired joint positions
-        target_joint_pos = cb.get_custom_method("compute_ik_qpos")(
-            q=q,
-            j_eef=j_eef,
-            ee_pos=cb.as_float32(ee_pos),
-            ee_mat=cb.as_float32(cb.T.quat2mat(ee_quat)),
-            goal_pos=goal_dict["target_pos"],
-            goal_ori_mat=goal_dict["target_ori_mat"],
-            q_lower_limit=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
-            q_upper_limit=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
-        )
+        # Check if goal is close enough to skip computation (avoids drift)
+        if cb.allclose(ee_pos, target_pos, atol=1e-4) and cb.allclose(ee_quat, target_quat, atol=1e-4):
+            target_joint_pos = q
+        else:
+            # Compute IK solution
+            if self.use_local_approximation:
+                # Use differential IK with Jacobian
+                j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
+                target_joint_pos = cb.get_custom_method("compute_ik_qpos")(
+                    q=q,
+                    j_eef=j_eef,
+                    ee_pos=cb.as_float32(ee_pos),
+                    ee_mat=cb.as_float32(goal_dict["target_ori_mat"]),
+                    goal_pos=target_pos,
+                    goal_ori_mat=goal_dict["target_ori_mat"],
+                    q_lower_limit=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
+                    q_upper_limit=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
+                )
+            else:
+                # Use Lula for absolute IK solution
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    tolerance_quat=m.IK_ORN_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    weight_quat=m.IK_ORN_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                    initial_joint_pos=q if self.condition_on_current_position else None,
+                )
+
+                # If solver failed, use current position as fallback
+                if target_joint_pos is None:
+                    log.warning("Lula IK solver failed to find valid solution. Using current joint position.")
+                    target_joint_pos = q
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:
