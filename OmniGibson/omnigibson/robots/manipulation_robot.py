@@ -1289,6 +1289,24 @@ class ManipulationRobot(BaseRobot):
         return {eef_link_name: f"attached_object_{eef_link_name}" for eef_link_name in self.eef_link_names.values()}
 
     @property
+    def robot_arm_descriptor_yamls(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to file path to the descriptor
+                of the robot for IK Controller (Lula). By default, sets the standardized path based on
+                model name.
+        """
+        # By default, sets the standardized path
+        model = self.model_name.lower()
+        return {
+            arm: os.path.join(
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/{model}/{model}_{arm}_descriptor.yaml",
+            )
+            for arm in self.arm_names
+        }
+
+    @property
     def _default_arm_joint_controller_configs(self):
         """
         Returns:
@@ -1321,6 +1339,9 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "InverseKinematicsController",
                 "task_name": f"eef_{arm}",
+                "robot_description_path": self.robot_arm_descriptor_yamls[arm],
+                "robot_urdf_path": self.urdf_path,
+                "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
                 "reset_joint_pos": self.reset_joint_pos,
                 "control_limits": self.control_limits,

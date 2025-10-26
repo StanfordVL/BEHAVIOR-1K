@@ -71,6 +71,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         workspace_pose_limiter=None,
         condition_on_current_position=True,
         use_local_approximation=True,
+        robot_description_path=None,
+        robot_urdf_path=None,
+        eef_name=None,
     ):
         """
         Args:
@@ -139,6 +142,9 @@ class InverseKinematicsController(JointController, ManipulationController):
                 Otherwise, will use the reset_joint_pos as the initial guess.
             use_local_approximation (bool): if True, will use a local approximation using the Jacobian to compute the IK solution.
                 If False, will use Lula IK solver for absolute IK solutions.
+            robot_description_path (None or str): path to robot descriptor yaml file. Required when use_local_approximation is False.
+            robot_urdf_path (None or str): path to robot urdf file. Required when use_local_approximation is False.
+            eef_name (None or str): end effector frame name. Required when use_local_approximation is False.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -164,7 +170,9 @@ class InverseKinematicsController(JointController, ManipulationController):
         self.solver = None
         if not self.use_local_approximation:
             # Create the lula IKSolver
-            assert robot_description_path is not None, "robot_description_path must be provided when use_local_approximation is False"
+            assert (
+                robot_description_path is not None
+            ), "robot_description_path must be provided when use_local_approximation is False"
             assert robot_urdf_path is not None, "robot_urdf_path must be provided when use_local_approximation is False"
             assert eef_name is not None, "eef_name must be provided when use_local_approximation is False"
             self.solver = IKSolver(
@@ -296,7 +304,15 @@ class InverseKinematicsController(JointController, ManipulationController):
             target_pos = command[:3]
         else:
             dpos = command[:3]
-            target_pos = pos_relative + dpos
+            # For Lula IK: If we have an existing goal and are using absolute IK solver,
+            # we should add the delta to the previous target, not the current position.
+            # This prevents the target from continuously drifting forward.
+            if not self.use_local_approximation and self._goal is not None:
+                # Add delta to the previous target position
+                target_pos = self._goal["target_pos"] + dpos
+            else:
+                # For differential IK or first command, add delta to current position
+                target_pos = pos_relative + dpos
 
         # Compute orientation
         if self.mode == "position_fixed_ori":
@@ -313,7 +329,12 @@ class InverseKinematicsController(JointController, ManipulationController):
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
             dori = cb.T.quat2mat(cb.T.axisangle2quat(command[3:6]))
-            target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
+            # For Lula IK with delta orientation, apply delta to previous target orientation
+            if not self.use_local_approximation and self._goal is not None:
+                prev_target_quat = cb.T.mat2quat(self._goal["target_ori_mat"])
+                target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(prev_target_quat))
+            else:
+                target_quat = cb.T.mat2quat(dori @ cb.T.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
         if self.workspace_pose_limiter is not None:

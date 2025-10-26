@@ -3,7 +3,6 @@ from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.asset_utils import get_dataset_path
 
@@ -302,6 +301,22 @@ class FrankaPanda(ManipulationRobot):
             get_dataset_path("omnigibson-robot-assets"),
             "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml",
         )
+
+    @property
+    def robot_arm_descriptor_yamls(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to file path to the descriptor
+                of the robot for IK Controller (Lula). Overrides default to include franka/ prefix.
+        """
+        model = self.model_name.lower()
+        return {
+            arm: os.path.join(
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/franka/{model}/{model}_{arm}_descriptor.yaml",
+            )
+            for arm in self.arm_names
+        }
 
     @cached_property
     def curobo_attached_object_link_names(self):
