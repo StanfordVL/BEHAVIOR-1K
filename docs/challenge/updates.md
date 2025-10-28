@@ -4,6 +4,27 @@ On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge
 
 ---
 
+### 10/28/2025 {#10282025}
+
+**Challenge rule clarifications:**
+
+1. For standard track, you are allowed to use any offline-stored info during training, as long as you don't query the simulator for privileged informatin during evaluation.
+
+**Bug fixes:**
+
+1. Fixed various bugs in evaluation script. 
+2. Fixed OpenVLA proprioception indices.
+
+All fixes have been pushed to the `main` branch.
+
+**New features:**
+
+1. We updated the demo dataset to include annotations for 48 tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
+2. We have included task id as part of the observatin dict. 
+3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed to robot base mass to the same value used during data collection. 
+
+---
+
 ### 10/08/2025 {#10082025}
 
 **Challenge rule clarifications:**
