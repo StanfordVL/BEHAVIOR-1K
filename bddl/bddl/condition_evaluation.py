@@ -38,10 +38,10 @@ class Conjunction(Expression):
         return all(self.child_values)
 
     def get_ground_options(self):
-        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
-        self.flattened_condition_options = []
-        for option in options:
-            self.flattened_condition_options.append(list(itertools.chain(*option)))
+        options = itertools.product(*[child.flattened_condition_options for child in self.children])
+        self.flattened_condition_options = [
+            list(itertools.chain(*option)) for option in options
+        ]
 
 class Disjunction(Expression):
     def __init__(self, scope, backend, body, object_map, generate_ground_options=True):
@@ -107,10 +107,10 @@ class Universal(Expression):
 
     def get_ground_options(self):
         # Accept just a few possible options
-        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
-        self.flattened_condition_options = []
-        for option in options:
-            self.flattened_condition_options.append(list(itertools.chain(*option)))
+        options = itertools.product(*[child.flattened_condition_options for child in self.children])
+        self.flattened_condition_options = [
+            list(itertools.chain(*option)) for option in options
+        ]
 
 
 class Existential(Expression):
@@ -181,12 +181,9 @@ class NQuantifier(Expression):
         return sum(self.child_values) == self.N
 
     def get_ground_options(self):
-        # Accept just a few possible options
-        options = list(itertools.product(*[child.flattened_condition_options for child in self.children]))
+        options = itertools.product(*[child.flattened_condition_options for child in self.children])
         self.flattened_condition_options = []
         for option in options:
-            # for combination in [combo for num_el in range(self.N - 1, len(option)) for combo in itertools.combinations(option, num_el + 1)]:
-            # Use a minimal solution (exactly N fulfilled, rather than >=N fulfilled)
             for combination in itertools.combinations(option, self.N):
                 self.flattened_condition_options.append(list(itertools.chain(*combination)))
 
@@ -349,8 +346,7 @@ class Negation(Expression):
             negated_options.append(negated_conds)
         # only picking one condition from each set of disjuncts
         for negated_option_selections in itertools.product(*negated_options):
-            self.flattened_condition_options.append(list(itertools.chain(negated_option_selections)))
-
+            self.flattened_condition_options.append(list(itertools.chain(*negated_option_selections)))
 
 # IMPLICATION
 class Implication(Expression):
@@ -398,7 +394,7 @@ class Implication(Expression):
                 negated_conds.append(["not", cond])
             negated_options.append(negated_conds)
         for negated_option_selections in itertools.product(*negated_options):
-            flattened_neg_antecedent_options.append(list(itertools.chain(negated_option_selections)))
+            flattened_neg_antecedent_options.append(list(itertools.chain(*negated_option_selections)))
 
         flattened_consequent_options = self.children[1].flattened_condition_options
 
@@ -491,28 +487,29 @@ def evaluate_state(compiled_state):
 
 
 def get_ground_state_options(compiled_state, backend, scope=None, object_map=None):
-    all_options = list(
-        itertools.product(*[compiled_condition.flattened_condition_options for compiled_condition in compiled_state])
+    """
+    Generate ground state options lazily using generators.
+    Yields options one at a time instead of creating full list in memory.
+    """
+    # Generator: no list() call
+    all_options = itertools.product(
+        *[compiled_condition.flattened_condition_options for compiled_condition in compiled_state]
     )
-    all_unpacked_options = [list(itertools.chain(*option)) for option in all_options]
-
-    # Remove all unsatisfiable options (those that contain some (cond1 and not cond1))
-    consistent_unpacked_options = []
-    for option in all_unpacked_options:
+    
+    # Unpack and filter inconsistent options lazily
+    for option in all_options:
+        unpacked_option = list(itertools.chain(*option))
+        
+        # Check consistency
         consistent = True
-        for cond1, cond2 in itertools.combinations(option, 2):
+        for cond1, cond2 in itertools.combinations(unpacked_option, 2):
             if (cond1[0] == "not" and cond1[1] == cond2) or (cond2[0] == "not" and cond2[1] == cond1):
                 consistent = False
                 break
-        if not consistent:
-            continue
-        consistent_unpacked_options.append(option)
+        
+        if consistent:
+            yield compile_state(unpacked_option, backend, scope=scope, object_map=object_map)
 
-    consistent_unpacked_options = [
-        compile_state(option, backend, scope=scope, object_map=object_map)
-        for option in sorted(consistent_unpacked_options, key=len)
-    ]
-    return consistent_unpacked_options
 
 
 #################### UTIL ######################
