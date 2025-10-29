@@ -18,6 +18,7 @@ from gello.robots.sim_robot.og_teleop_utils import (
     generate_robot_config,
     get_task_relevant_room_types,
 )
+from gello.robots.sim_robot.og_teleop_cfg import DISABLED_TRANSITION_RULES
 from hydra.utils import instantiate
 from inspect import getsourcefile
 from omegaconf import DictConfig, OmegaConf
@@ -92,6 +93,9 @@ class Evaluator:
         Read the environment config file and create the environment.
         The config file is located in the configs/envs directory.
         """
+        # Disable a subset of transition rules for data collection
+        for rule in DISABLED_TRANSITION_RULES:
+            rule.ENABLED = False
         # Load config file
         available_tasks = load_available_tasks()
         task_name = self.cfg.task.name
@@ -301,6 +305,8 @@ class Evaluator:
                 cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
                 cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
+        # append task id to obs
+        obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
         return obs
 
     def _write_video(self) -> None:
@@ -388,11 +394,11 @@ if __name__ == "__main__":
         for episode in episodes:
             if episode["episode_index"] // 1e4 == task_idx:
                 instances_to_run.append(str(int((episode["episode_index"] // 10) % 1e3)))
-                if config.eval_instance_ids:
-                    assert set(config.eval_instance_ids).issubset(
-                        set(range(m.NUM_TRAIN_INSTANCES))
-                    ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
-                    instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+        if config.eval_instance_ids:
+            assert set(config.eval_instance_ids).issubset(
+                set(range(m.NUM_TRAIN_INSTANCES))
+            ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+            instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
     else:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
@@ -420,6 +426,7 @@ if __name__ == "__main__":
         logger.info("Starting evaluation...")
 
         for idx in instances_to_run:
+            evaluator.reset()
             evaluator.load_task_instance(idx)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(m.NUM_EVAL_EPISODES):

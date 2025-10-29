@@ -14,7 +14,7 @@ class DefaultWrapper(EnvironmentWrapper):
 
     def __init__(self, env: Environment):
         super().__init__(env=env)
-        # Note that from eval.py we already set the robot to include rgb + depth + seg_instance_id modalities
+        # Note that from eval.py we only set rgb modality, here we include more (depth + seg_instance_id)
         # Here, we change the camera resolution and head camera aperture to match the one we used in data collection
         robot = env.robots[0]
         # Update robot sensors:
