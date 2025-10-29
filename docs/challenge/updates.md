@@ -4,7 +4,7 @@ On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge
 
 ---
 
-### 10/28/2025 {#10282025}
+### 10/29/2025 {#10292025}
 
 **Challenge rule clarifications:**
 
@@ -19,7 +19,7 @@ All fixes have been pushed to the `main` branch.
 
 **New features:**
 
-1. We updated the demo dataset to include annotations for 48 tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
+1. We updated the demo dataset to include annotations for all tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
 2. We have included task id as part of the observatin dict. 
 3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed to robot base mass to the same value used during data collection. 
 
