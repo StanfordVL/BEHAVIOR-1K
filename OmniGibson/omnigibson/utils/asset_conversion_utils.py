@@ -1017,7 +1017,7 @@ def convert_urdf_to_usd(
     urdf_path,
     obj_category,
     obj_model,
-    dataset_name="custom_dataset",
+    dataset_root,
     use_omni_convex_decomp=False,
     use_usda=False,
     merge_fixed_joints=False,
@@ -1030,7 +1030,7 @@ def convert_urdf_to_usd(
         urdf_path (str): Path to URDF file to import
         obj_category (str): The category of the object.
         obj_model (str): The model name of the object.
-        dataset_name (str): The name of the dataset.
+        dataset_root (str): Dataset root directory to use for writing imported USD file.
         use_omni_convex_decomp (bool): Whether to use omniverse's built-in convex decomposer for collision meshes
         use_usda (bool): If set, will write files to .usda files instead of .usd
             (bigger memory footprint, but human-readable)
@@ -1043,7 +1043,6 @@ def convert_urdf_to_usd(
             - str: Absolute path to the imported USD file
     """
     # Preprocess input URDF to account for meta links
-    dataset_root = get_dataset_path(dataset_name)
     urdf_path = _add_meta_links_to_urdf(
         urdf_path=urdf_path, obj_category=obj_category, obj_model=obj_model, dataset_root=dataset_root
     )
@@ -2405,7 +2404,7 @@ def record_obj_metadata_from_urdf(urdf_path, obj_dir, joint_setting="zero", over
 def import_og_asset_from_urdf(
     category,
     model,
-    dataset_root,
+    dataset_name,
     urdf_path=None,
     collision_method="coacd",
     coacd_links=None,
@@ -2421,13 +2420,13 @@ def import_og_asset_from_urdf(
 ):
     """
     Imports an asset from URDF format into OmniGibson-compatible USD format. This will write the new USD
-    (and copy the URDF if it does not already exist within @dataset_root) to @dataset_root
+    (and copy the URDF if it does not already exist within @dataset_name) to @dataset_name
 
     Args:
         category (str): Category to assign to imported asset
         model (str): Model name to assign to imported asset
         urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
-            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
+            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_name dir
         collision_method (None or str): If specified, collision decomposition method to use to generate
             OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
         coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
@@ -2438,8 +2437,7 @@ def import_og_asset_from_urdf(
         keep_instanceable (bool): Whether to keep the instanceable attributes from the imported USD object or not
         merge_fixed_joints (bool): Whether to merge fixed joints or not
         import_inertia_tensor (bool): Whether to import the URDF's native inertia tensor or not
-        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is custom dataset
-            path set from the global macros
+        dataset_name (str): Dataset name to which the USD will be written. Lives in get_dataset_path(dataset_name)
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
             Only relevant if @collision_method is "coacd"
         overwrite (bool): If set, will overwrite any pre-existing files
@@ -2453,6 +2451,7 @@ def import_og_asset_from_urdf(
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
     # Make sure all scaling is positive
+    dataset_root = get_dataset_path(dataset_name)
     model_dir = os.path.join(dataset_root, "objects", category, model)
     os.makedirs(model_dir, exist_ok=overwrite)
     # urdf_path = make_asset_positive(urdf_fpath=urdf_path)
@@ -2493,9 +2492,6 @@ def import_og_asset_from_urdf(
         merge_fixed_joints=merge_fixed_joints,
         import_inertia_tensor=import_inertia_tensor,
     )
-
-    # Copy meta links URDF to original name of object model
-    shutil.copy2(urdf_path, os.path.join(dataset_root, "objects", category, model, "urdf", f"{model}.urdf"))
 
     prim = import_obj_metadata(
         usd_path=usd_path,
