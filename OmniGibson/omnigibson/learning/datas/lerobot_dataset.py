@@ -482,7 +482,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         valid_task_indices = [idx for idx, name in self.task_names.items() if name in self.task_name_candidates]
         self.task_names = set([self.task_names[idx] for idx in valid_task_indices])
         self.tasks = {idx: self.tasks[idx] for idx in valid_task_indices}
-        self.task_to_task_index = {k: v for k, v in self.tasks.items()}
+        self.task_to_task_index = {v: k for k, v in self.tasks.items()}
 
         self.episodes = self.load_episodes(self.root)
         if self._version < packaging.version.parse("v2.1"):
