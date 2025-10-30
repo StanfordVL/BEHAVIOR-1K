@@ -785,7 +785,7 @@ if __name__ == "__main__":
     #     task_ws = tracking_spreadsheet.worksheet(f"{task_index} - {task_name}")
     #     assign_test_instances(task_ws, misc_ws, misc_values)
     #     time.sleep(1)
-    extract_annotations(
-        "/scr/behavior/2025-challenge-demos", "/home/svl/Downloads/annotations", remove_memory_prefix=True
-    )
+    # extract_annotations(
+    #     "/scr/behavior/2025-challenge-demos", "/home/svl/Downloads/annotations", remove_memory_prefix=True
+    # )
     og.shutdown()

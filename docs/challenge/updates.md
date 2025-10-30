@@ -8,7 +8,7 @@ On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge
 
 **Challenge rule clarifications:**
 
-1. For standard track, you are allowed to use any offline-stored info during training, as long as you don't query the simulator for privileged informatin during evaluation.
+1. For standard track, you are allowed to use any offline-stored info during training, as long as you don't query the simulator for privileged information during evaluation.
 
 **Bug fixes:**
 
@@ -20,8 +20,8 @@ All fixes have been pushed to the `main` branch.
 **New features:**
 
 1. We updated the demo dataset to include annotations for more tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
-2. We have included task id as part of the observatin dict. 
-3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed to robot base mass to the same value used during data collection. 
+2. We have included task id as part of the observation dict. 
+3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. 
 
 ---
 
