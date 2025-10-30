@@ -233,12 +233,13 @@ class Evaluator:
             container.close()
         self._video_writer = video_writer
 
-    def load_task_instance(self, instance_id: int) -> None:
+    def load_task_instance(self, instance_id: int, test_hidden: bool = False) -> None:
         """
         Loads the configuration for a specific task instance.
 
         Args:
             instance_id (int): The ID of the task instance to load.
+            test_hidden (bool): [Interal use only] Whether to load the hidden test instance.
         """
         scene_model = self.env.task.scene_name
         tro_filename = self.env.task.get_cached_activity_scene_filename(
@@ -247,10 +248,18 @@ class Evaluator:
             activity_definition_id=self.env.task.activity_definition_id,
             activity_instance_id=instance_id,
         )
-        tro_file_path = os.path.join(
-            get_task_instance_path(scene_model),
-            f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
-        )
+        if test_hidden:
+            tro_file_path = os.path.join(
+                gm.DATA_PATH,
+                "2025-challenge-test-instances",
+                self.env.task.activity_name,
+                f"{tro_filename}-tro_state.json",
+            )
+        else:
+            tro_file_path = os.path.join(
+                get_task_instance_path(scene_model),
+                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
+            )
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
         for tro_key, tro_state in tro_state.items():
@@ -382,6 +391,11 @@ if __name__ == "__main__":
     if config.write_video:
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
+    assert not (
+        config.eval_on_train_instances and config.test_hidden
+    ), "Cannot eval on train instances and test hidden instances simultaneously."
+    if config.test_hidden:
+        logger.info("You are evaluating on hidden test instances! This is for internal use only.")
     # get run instances
     if config.eval_on_train_instances:
         logger.info(
@@ -399,6 +413,13 @@ if __name__ == "__main__":
                 set(range(m.NUM_TRAIN_INSTANCES))
             ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
             instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+    elif config.test_hidden:
+        instances_to_run = (
+            config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
+        )
+        assert set(instances_to_run).issubset(
+            set(range(m.NUM_EVAL_INSTANCES))
+        ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
     else:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
@@ -427,7 +448,7 @@ if __name__ == "__main__":
 
         for idx in instances_to_run:
             evaluator.reset()
-            evaluator.load_task_instance(idx)
+            evaluator.load_task_instance(idx, test_hidden=config.test_hidden)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(m.NUM_EVAL_EPISODES):
                 evaluator.reset()
