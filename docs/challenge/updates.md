@@ -20,8 +20,9 @@ All fixes have been pushed to the `main` branch.
 **New features:**
 
 1. We updated the demo dataset to include annotations for more tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
-2. We have included task id as part of the observation dict. 
+2. We have included `task id` as part of the observation dict. 
 3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. 
+4. We have included [submission_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/submission_utils.py) that you can run to pre-validate your submission. 
 
 ---
 
