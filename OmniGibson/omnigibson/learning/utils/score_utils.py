@@ -11,6 +11,7 @@ def compute_final_q_score(input_dir: str, output_dir: str, final_score_only: boo
     Compute the final Q score from the evaluation result json files stored in the given path.
     Args:
         input_dir (str): Path to the directory containing evaluation result json files.
+            Should be of the form <track>.<team>.<affiliation>.<date>/ containing all result json files.
         output_dir (str): Path to save the computed final scores json file.
         final_score_only (bool): Whether to only save the final scores, or also per-rollout scores.
     """
