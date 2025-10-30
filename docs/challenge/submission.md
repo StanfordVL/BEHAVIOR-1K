@@ -72,4 +72,4 @@ There are two ways to submit your model for evaluation:
     - Please also include any other information you deem necessary to help us evaluation your policy
 
 
-In addition, we require you to submit a link to all the mp4 videos, one for each rollout you performed (up to 500). See our submission google form for more details. 
+In addition, we require you to submit a link to all the mp4 videos, one for each rollout you performed (up to 500). See our submission [Google Form](https://forms.gle/54tVqi5zs3ANGutn7) for more details. 

@@ -75,7 +75,7 @@ BEHAVIOR challenge is co-hosted with the [Embodied Agent Interface Competition](
 Pre-implemented training & evaluation pipelines for:
 
 - **Behavioral Cloning baselines**: ACT, Diffusion Policy, BC-RNN, WB-VIMA - these are diverse imitation learning approaches that learn from the provided demonstrations.
-- **Pre-trained Visuo-Language Action models**: OpenVLA and π0.  These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
+- **Pre-trained Visuo-Language Action models**: OpenVLA and π0. These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
 
 [Baselines details →](./baselines.md)
 

@@ -16,6 +16,7 @@ On this page, we provide updates regarding the first **BEHAVIOR Challenge**, inc
 
 1. Fixed various bugs in evaluation script. 
 2. Fixed OpenVLA proprioception indices.
+3. Updated submission google form. 
 
 All fixes have been pushed to the `main` branch.
 
@@ -24,7 +25,7 @@ All fixes have been pushed to the `main` branch.
 1. We updated the demo dataset to include annotations for all 50 tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
 2. We have included `task id` as part of the observation dict. 
 3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. This could help minimize the phsyics gap between data collection and policy rollout. 
-4. We have included [submission_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/submission_utils.py) that you can run to pre-validate your submission. 
+4. We have included [score_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/score_utils.py) script that you can run to pre-validate your submission. 
 
 ---
 
