@@ -8,24 +8,24 @@ On this page, we provide updates regarding the first **BEHAVIOR Challenge**, inc
 
 **Challenge rule clarifications:**
 
-1. For standard track, you are allowed to use any offline-stored info during training, as long as you don't query the simulator for privileged information during evaluation.
-2. For docker submission, you can do whatever you want (push to public or private), as long as we are able to evaluate your policy, and you give us clear instructions on how to access and run eval with your submission. The simpler the access is, the better.
-3. For running baselines, please always use the latest main branch for `BEHAVIOR_1K` repo (which we will use for our internal policy evaluation), and the latest branch for the baseline repos. 
+1. For the Standard track, you are allowed to use any offline-stored information during training, as long as you don't query the simulator for privileged information during evaluation.
+2. For Docker submissions, you can use any hosting (public or private), as long as we are able to evaluate your policy and you provide clear instructions on how to access and run evaluation with your submission. The simpler the access is, the better.
+3. For running baselines, please always use the latest main branch of the `BEHAVIOR-1K` repo (which we will use for our internal policy evaluation), and the latest branch of the baseline repositories.
 
 **Bug fixes:**
 
-1. Fixed various bugs in evaluation script. 
+1. Fixed various bugs in the evaluation script.
 2. Fixed OpenVLA proprioception indices.
-3. Updated submission google form. 
+3. Updated submission Google Form.
 
-All fixes have been pushed to the `main` branch.
+All fixes have been pushed to the main branch.
 
 **New features:**
 
-1. We updated the demo dataset to include annotations for all 50 tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
-2. We have included `task id` as part of the observation dict. 
-3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. This could help minimize the phsyics gap between data collection and policy rollout. 
-4. We have included [score_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/score_utils.py) script that you can run to pre-validate your submission. 
+1. We have released language annotations for all 50 tasks. Note: the memory prefix has been temporarily removed; we will add it back once QA is complete.  
+2. We have included the task ID as part of the observation dict. 
+3. We added [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changes the robot base mass to the value used during data collection. This can help minimize the physics gap between data collection and policy rollout. 
+4. We added a [score_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/score_utils.py) script that you can run to pre-validate your submission. 
 
 ---
 
@@ -35,7 +35,7 @@ All fixes have been pushed to the `main` branch.
 
 1. During evaluation, only the task-relevant object poses and the robot’s initial pose will be randomized.  
    The object instances and the poses of background, scene-level objects will remain the same. 
-2. For both tracks, you are allowed to use privileged information during training (e.g. other observation modalities, task info, etc.), so long as you are not using them during evaluation.
+2. For both tracks, you are allowed to use privileged information during training (e.g., other observation modalities, task info, etc.), as long as you are not using them during evaluation.
 
 **Bug fixes:**
 
@@ -45,16 +45,16 @@ All fixes have been pushed to the `main` branch.
 3. Fixed partial credit assignment during evaluation.
 4. Fixed robot initial pose mismatch across evaluation rollouts.
 
-All fixes have been pushed to the `main` branch.
+All fixes have been pushed to the main branch.
 
 **New features:**
 
 1. We updated the [submission guideline](./submission.md) and added a [sample submission Dockerfile](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/docker/submission.Dockerfile) for reference.  
 2. We are excited to announce that [NVIDIA](https://www.nvidia.com/en-us/) will be sponsoring our challenge!  
    The updated prize pool is as follows:
-    - **First Place:** $1000 + GeForce 5080  
-    - **Second Place:** $500 + (Jetson Orin Nano Super *or* $1000 Brev Credits)  
-    - **Third Place:** $300 + $500 Brev Credits  
+    - First Place: $1000 + GeForce 5080  
+    - Second Place: $500 + (Jetson Orin Nano Super or $1000 Brev Credits)  
+    - Third Place: $300 + $500 Brev Credits  
 
 ---
 
@@ -72,7 +72,7 @@ All fixes have been pushed to the `main` branch.
 3. Provided improved baseline checkpoints.  
    Please refer to [baselines.md](./baselines.md) for details.
 
-All fixes have been pushed to the `main` branch.
+All fixes have been pushed to the main branch.
 
 **New features:**
 
@@ -89,25 +89,25 @@ All fixes have been pushed to the `main` branch.
 1. BDDL task definitions are allowed to be used in both tracks.  
    These definitions are fixed and will remain the same during evaluation.  
 2. You may collect additional data yourself (via teleoperation, RL, scripted policies, etc.) for both tracks.  
-   However, you may **not** collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.  
+   However, you may not collect data on evaluation instances, as these are reserved for testing the generalization capability of your submitted policy.  
 3. There are no restrictions on the type of policy used for either track.  
    Methods such as IL, RL, or TAMP are all allowed.  
    Additional components like SLAM or LLM-based querying are also permitted.  
-4. Currently, the success score (**Q**) is the only metric used for ranking submissions.  
+4. Currently, the success score (Q) is the only metric used for ranking submissions.  
    If two submissions achieve the same score, secondary metrics will be used to break ties.  
-5. The timeout for each evaluation is set to **2× the mean task completion time** of the 200 human demonstrations and thus varies across tasks.  
+5. The timeout for each evaluation is set to 2× the mean task completion time of the 200 human demonstrations and thus varies across tasks.  
 6. In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task.  
-   Use the **first 10** instances for evaluation results (see [evaluation.md](./evaluation.md#evaluation-protocol-and-logistics));  
-   the **remaining 10** are not used for evaluation and may serve as a test set before evaluating your final policy.
+   Use the first 10 instances for evaluation results (see [evaluation.md](./evaluation.md#evaluation-protocol-and-logistics));  
+   the remaining 10 are not used for evaluation and may serve as a test set before evaluating your final policy.
 
 **Bug fixes:**
 
 1. Fixed the Windows installation setup script.  
 2. Fixed timestamp type mismatch in `BehaviorLeRobotDataset`.  
-3. Improved connection loss handling in `WebsocketClientPolicy`.  
+3. Improved connection-loss handling in `WebsocketClientPolicy`.  
 4. Fixed various evaluation-related bugs.
 
-All fixes have been pushed to the `main` branch.
+All fixes have been pushed to the main branch.
 
 **New features:**
 

@@ -6,6 +6,15 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 10/30/2025 — Rule Clarifications & Features Update"
+    Key updates this week:
+    
+    - We have released language annotations for all 50 tasks.
+    - We have included task id as part of the observation dict that the policy will receive. 
+    - Added more utilities (HeavyRobotWrapper, score_utils, etc.)
+
+    [Read full details →](./updates.md#10302025)
+
 !!! info "🗓️ 10/08/2025 — Rule Clarifications, Bug Fixes & NVIDIA Sponsorship"
     Key updates this week:
     
@@ -30,7 +39,7 @@
 
     [Read full details →](./updates.md#09282025)
 
-!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol, & Tutorial"
+!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol & Tutorial"
     Highlights:
     
     - BDDL task definitions can be used for both tracks and are identical during evaluation.  
