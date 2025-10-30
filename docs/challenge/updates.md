@@ -1,10 +1,10 @@
-# BEHAVIOR Challenge Weekly Updates
+# BEHAVIOR Challenge Updates
 
-On this page, we provide weekly updates regarding the first **BEHAVIOR Challenge**, including important bug fixes, new feature announcements, and clarifications about challenge rules.
+On this page, we provide updates regarding the first **BEHAVIOR Challenge**, including important bug fixes, new feature announcements, and clarifications about challenge rules.
 
 ---
 
-### 10/29/2025 {#10292025}
+### 10/30/2025 {#10302025}
 
 **Challenge rule clarifications:**
 
