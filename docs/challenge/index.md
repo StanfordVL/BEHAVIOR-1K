@@ -81,6 +81,8 @@ Pre-implemented training & evaluation pipelines for:
 
 ## :material-chart-box: **Evaluation & Rules**
 
+The organizers reserve the right of final interpretation of the challenge rules. 
+
 ### Challenge Tracks
 
 **Standard track:** Limited to provided robot onboard observations (RGB + depth + instance segmentation + proprioception).
