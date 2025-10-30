@@ -9,6 +9,8 @@ On this page, we provide updates regarding the first **BEHAVIOR Challenge**, inc
 **Challenge rule clarifications:**
 
 1. For standard track, you are allowed to use any offline-stored info during training, as long as you don't query the simulator for privileged information during evaluation.
+2. For docker submission, you can do whatever you want (push to public or private), as long as we are able to evaluate your policy, and you give us clear instructions on how to access and run eval with your submission. The simpler the access is, the better.
+3. For running baselines, please always use the latest main branch for `BEHAVIOR_1K` repo (which we will use for our internal policy evaluation), and the latest branch for the baseline repos. 
 
 **Bug fixes:**
 
@@ -21,7 +23,7 @@ All fixes have been pushed to the `main` branch.
 
 1. We updated the demo dataset to include annotations for all 50 tasks. NOTE: memory prefix has been temporarily removed, we will add them back once the QA is complete.  
 2. We have included `task id` as part of the observation dict. 
-3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. 
+3. We included [HeavyRobotWrapper](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/wrappers/heavy_robot_wrapper.py), which changed the robot base mass to the same value used during data collection. This could help minimize the phsyics gap between data collection and policy rollout. 
 4. We have included [submission_utils](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/utils/submission_utils.py) that you can run to pre-validate your submission. 
 
 ---

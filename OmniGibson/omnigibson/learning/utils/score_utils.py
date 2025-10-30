@@ -111,7 +111,7 @@ def compute_final_q_score(input_dir: str, output_dir: str, final_score_only: boo
             "left_distance_score": left_distance_score,
             "right_distance_score": right_distance_score,
         }
-    with open(f"{output_dir}/{track}/{base_name}.json", "w") as f:
+    with open(f"{output_dir}/{track}/{team}.{affiliation}.{date}.json", "w") as f:
         json.dump(output_json, f, indent=4)
 
     print("Total rollouts:", n_rollouts)
@@ -120,7 +120,7 @@ def compute_final_q_score(input_dir: str, output_dir: str, final_score_only: boo
     print("Final Base Distance Score:", overall_base_distance_score)
     print("Final Left Distance Score:", overall_left_distance_score)
     print("Final Right Distance Score:", overall_right_distance_score)
-    print(f"Final scores saved to {output_dir}/{track}/{base_name}.json")
+    print(f"Final scores saved to {output_dir}/{track}/{team}.{affiliation}.{date}.json")
 
 
 if __name__ == "__main__":
