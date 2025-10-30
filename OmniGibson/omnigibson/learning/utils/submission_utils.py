@@ -6,12 +6,13 @@ from omnigibson.macros import gm
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 
-def compute_final_q_score(input_dir: str, output_dir: str) -> None:
+def compute_final_q_score(input_dir: str, output_dir: str, final_score_only: bool = True) -> None:
     """
     Compute the final Q score from the evaluation result json files stored in the given path.
     Args:
         input_dir (str): Path to the directory containing evaluation result json files.
         output_dir (str): Path to save the computed final scores json file.
+        final_score_only (bool): Whether to only save the final scores, or also per-rollout scores.
     """
     input_dir = os.path.expanduser(input_dir)
     output_dir = os.path.expanduser(output_dir)
@@ -94,21 +95,22 @@ def compute_final_q_score(input_dir: str, output_dir: str) -> None:
             "left_distance_score": overall_left_distance_score,
             "right_distance_score": overall_right_distance_score,
         },
-        "task_average_scores": {
+    }
+    if not final_score_only:
+        output_json["per_task_scores"] = {
             "q_score": q_score_avg,
             "time_score": time_score_avg,
             "base_distance_score": base_distance_score_avg,
             "left_distance_score": left_distance_score_avg,
             "right_distance_score": right_distance_score_avg,
-        },
-        "per_rollout_scores": {
+        }
+        output_json["per_rollout_scores"] = {
             "q_score": q_score,
             "time_score": time_score,
             "base_distance_score": base_distance_score,
             "left_distance_score": left_distance_score,
             "right_distance_score": right_distance_score,
-        },
-    }
+        }
     with open(f"{output_dir}/{track}/{base_name}.json", "w") as f:
         json.dump(output_json, f, indent=4)
 
@@ -134,4 +136,4 @@ if __name__ == "__main__":
         "--output_dir", "-o", type=str, required=True, help="Path to save the computed final scores json file."
     )
     args = parser.parse_args()
-    compute_final_q_score(args.input_dir, args.output_dir)
+    compute_final_q_score(args.input_dir, args.output_dir, final_score_only=True)
