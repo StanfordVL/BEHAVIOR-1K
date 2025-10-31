@@ -1,0 +1,7 @@
+name: Tiago
+module_path: omnigibson.robots.robot_configs.tiago
+description: Tiago robot (YAML replacement; add properties as needed)
+capabilities:
+  - holonomic_base
+  - articulated_trunk
+  - active_camera

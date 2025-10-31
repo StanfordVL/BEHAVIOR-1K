@@ -1,0 +1,4 @@
+name: Turtlebot
+module_path: omnigibson.robots.robot_configs.turtlebot
+description: Turtlebot robot (YAML replacement; add properties as needed)
+capabilities: []

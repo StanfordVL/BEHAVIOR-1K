@@ -1,0 +1,4 @@
+name: VX300S
+module_path: omnigibson.robots.robot_configs.vx300s
+description: VX300S robot (YAML replacement; add properties as needed)
+capabilities: []

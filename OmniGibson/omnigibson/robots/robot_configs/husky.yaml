@@ -1,0 +1,4 @@
+name: Husky
+module_path: omnigibson.robots.robot_configs.husky
+description: Husky robot (YAML replacement; add properties as needed)
+capabilities: []

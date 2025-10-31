@@ -1,0 +1,4 @@
+name: Freight
+module_path: omnigibson.robots.robot_configs.freight
+description: Freight robot (YAML replacement; add properties as needed)
+capabilities: []

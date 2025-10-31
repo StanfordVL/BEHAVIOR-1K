@@ -1,0 +1,4 @@
+name: Locobot
+module_path: omnigibson.robots.robot_configs.locobot
+description: Locobot robot (YAML replacement; add properties as needed)
+capabilities: []

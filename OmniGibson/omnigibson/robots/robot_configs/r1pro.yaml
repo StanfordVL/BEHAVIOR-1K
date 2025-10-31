@@ -1,0 +1,7 @@
+name: R1Pro
+module_path: omnigibson.robots.robot_configs.r1pro
+description: R1Pro robot (YAML replacement; add properties as needed)
+capabilities:
+  - holonomic_base
+  - articulated_trunk
+  - mobile_manipulation

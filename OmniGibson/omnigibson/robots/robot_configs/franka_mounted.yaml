@@ -1,0 +1,5 @@
+name: FrankaMounted
+module_path: omnigibson.robots.robot_configs.franka_mounted
+description: Franka Mounted robot (YAML replacement; add properties as needed)
+capabilities:
+  - manipulation

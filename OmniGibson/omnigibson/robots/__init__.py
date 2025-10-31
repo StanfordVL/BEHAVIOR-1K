@@ -18,6 +18,9 @@ from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.vx300s import VX300S
 
+# Load YAML-defined robot classes and expose them for import-compatibility
+import omnigibson.robots.robot_config_parser  # noqa: F401
+
 __all__ = [
     "A1",
     "ActiveCameraRobot",

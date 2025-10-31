@@ -1,0 +1,5 @@
+name: FrankaPanda
+module_path: omnigibson.robots.robot_configs.franka
+description: Franka Panda robot (YAML replacement; add properties as needed)
+capabilities:
+  - manipulation
