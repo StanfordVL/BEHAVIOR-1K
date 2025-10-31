@@ -16,6 +16,7 @@ from omnigibson.robots.stretch import Stretch
 from omnigibson.robots.tiago import Tiago
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.robots.ur5e import UR5e
 from omnigibson.robots.vx300s import VX300S
 
 __all__ = [
@@ -38,5 +39,6 @@ __all__ = [
     "Tiago",
     "Turtlebot",
     "TwoWheelRobot",
+    "UR5e",
     "VX300S",
 ]
