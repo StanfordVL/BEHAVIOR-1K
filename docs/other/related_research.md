@@ -1,6 +1,6 @@
 # :material-book-plus: **Related Research**
 
-### :fontawesome-solid-robot: [MoMaGen](https://momagen-rss.github.io/)
+### :fontawesome-solid-robot: [MoMaGen](https://momagen.github.io/)
 
 MoMaGen automatically generates diverse training datasets for bimanual mobile manipulation by solving constrained optimization problems that ensure robot reachability and camera visibility from minimal human demonstrations.
 
