@@ -9,7 +9,7 @@ from omnigibson.utils.transform_utils import euler2quat
 
 class UR5e(ManipulationRobot):
     """
-    The UR5e-6DOF arm equipped with a Robotiq-85mm gripper
+    The UR5e-6DOF arm equipped with a Robotiq-2F85 gripper
     """
 
     def __init__(
@@ -134,7 +134,7 @@ class UR5e(ManipulationRobot):
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        raise ValueError("VX300S does not support discrete actions!")
+        raise ValueError("UR5e does not support discrete actions!")
 
     @property
     def _raw_controller_order(self):
@@ -149,11 +149,25 @@ class UR5e(ManipulationRobot):
 
     @property
     def _default_joint_pos(self):
-        return th.tensor([
-            math.pi / 2, -math.pi / 2, math.pi / 2, -math.pi / 2, -math.pi / 2, 0, # arm
-            #,0.0, -math.pi / 2, math.pi / 2, -math.pi / 2, -math.pi / 2, -math.pi / 2, # arm
-            0, 0, 0, 0, 0, 0, 0, 0,   # gripper
-            ])
+        return th.tensor(
+            [
+                math.pi / 2,
+                -math.pi / 2,
+                math.pi / 2,
+                -math.pi / 2,
+                -math.pi / 2,
+                0,  # arm
+                # ,0.0, -math.pi / 2, math.pi / 2, -math.pi / 2, -math.pi / 2, -math.pi / 2, # arm
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,  # gripper
+            ]
+        )
 
     @cached_property
     def arm_link_names(self):
@@ -188,16 +202,18 @@ class UR5e(ManipulationRobot):
 
     @cached_property
     def finger_link_names(self):
-        return {self.default_arm: [
-            # "left_driver_joint_jointbody",
-            # "left_coupler_joint_jointbody",
-            # "left_spring_link_joint_jointbody",
-            "left_follower_joint_jointbody",
-            # "right_driver_joint_jointbody",
-            # "right_coupler_joint_jointbody",
-            # "right_spring_link_joint_jointbody",
-            "right_follower_joint_jointbody",
-        ]}
+        return {
+            self.default_arm: [
+                # "left_driver_joint_jointbody",
+                # "left_coupler_joint_jointbody",
+                # "left_spring_link_joint_jointbody",
+                "left_follower_joint_jointbody",
+                # "right_driver_joint_jointbody",
+                # "right_coupler_joint_jointbody",
+                # "right_spring_link_joint_jointbody",
+                "right_follower_joint_jointbody",
+            ]
+        }
 
     @cached_property
     def finger_joint_names(self):

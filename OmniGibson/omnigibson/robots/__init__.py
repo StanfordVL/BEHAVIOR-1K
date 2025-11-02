@@ -6,6 +6,7 @@ from omnigibson.robots.franka import FrankaPanda
 from omnigibson.robots.franka_mounted import FrankaMounted
 from omnigibson.robots.freight import Freight
 from omnigibson.robots.husky import Husky
+from omnigibson.robots.kinova import Kinova
 from omnigibson.robots.locobot import Locobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot
@@ -29,6 +30,7 @@ __all__ = [
     "FrankaPanda",
     "Freight",
     "Husky",
+    "Kinova",
     "Locobot",
     "LocomotionRobot",
     "ManipulationRobot",
