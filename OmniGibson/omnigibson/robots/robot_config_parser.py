@@ -28,7 +28,16 @@ CAPABILITY_BASES = {
     "locomotion": LocomotionRobot,
 }
 
-
+EXPECTED_PROPS = {
+    "two_wheel_locomotion": {"wheel_radius", "wheel_axle_length"},
+    "untucked_arm_pose": {"default_arm_poses"},
+    "mobile_manipulation": {"tucked_default_joint_pos","untucked_default_joint_pos"},
+    "manipulation": {"arm_link_names","arm_joint_names","eef_link_names","gripper_link_names","finger_link_names","finger_joint_names","arm_workspace_range"},
+    "locomotion":{"floor_touching_base_link_names", "base_joint_names"},
+    "holonomic_base":{"base_footprint_link_name"},
+    "articulated_trunk": {"trunk_link_names","trunk_joint_names"},
+    "active_camera":{"camera_joint_names"},
+}
 # Allowed top-level YAML keys and whether they are required
 ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "name": True,                # name of the robot class
@@ -36,10 +45,27 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "module_path": True,         # fully qualified module to expose the class (e.g., omnigibson.robots.robot_configs.fetch)
     "extends": False,            # optional import path "omnigibson.robots.r1:R1" or "omnigibson.robots.r1.R1"
     "capabilities": False,       # list[str] matching CAPABILITY_BASES keys
-    "class_attributes": False,   # dict[str, Any] set as class attributes
     "properties": False,         # dict[str, Any] exposed via @property returning the literal
-    "tensor_properties": False,  # list[str] keys in properties to convert to th.tensor
 }
+
+def _set_default_controllers(config, robot_cls):
+    """
+    Resets/overrides the _default_controllers property on robot_cls by calling super() and applying updates from config.
+    This will override any existing _default_controllers property that might already exist on the class.
+    """
+    updates = config.get("properties", {}).get("default_controllers")
+    updates_dict = updates.copy()
+    
+    def _make_property(update_dict=updates_dict):
+        @property
+        def prop_func(self):
+            controllers = getattr(super(robot_cls, self), "_default_controllers")
+            controllers = dict(controllers)
+            for key, value in update_dict.items():
+                controllers[key] = value
+            return controllers
+        return prop_func
+    setattr(robot_cls, "_default_controllers", _make_property())
 
 
 def _validate_config(cfg: Dict[str, Any]) -> None:
@@ -49,24 +75,27 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
     missing = [k for k, req in ALLOWED_TOP_KEYS.items() if req and k not in cfg]
     if missing:
         raise ValueError(f"Missing required keys in robot YAML: {missing}")
-    if "capabilities" in cfg and not isinstance(cfg["capabilities"], list):
-        raise TypeError("capabilities must be a list of strings")
-    if "class_attributes" in cfg and not isinstance(cfg["class_attributes"], dict):
-        raise TypeError("class_attributes must be a mapping of name->value")
+    # check to see if all required props are provided
     if "properties" in cfg and not isinstance(cfg["properties"], dict):
         raise TypeError("properties must be a mapping of name->value")
-    if "tensor_properties" in cfg and not isinstance(cfg["tensor_properties"], list):
-        raise TypeError("tensor_properties must be a list of property names")
+    properties = cfg.get("properties", {})
     for cap in cfg.get("capabilities", []):
         if cap not in CAPABILITY_BASES:
             raise ValueError(f"Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
-    for sec in ("class_attributes", "properties"):
-        for key in cfg.get(sec, {}).keys():
-            if not str(key).isidentifier():
-                raise ValueError(f"Invalid {sec} name '{key}' (must be a valid identifier)")
-
+        if cap in EXPECTED_PROPS:
+            required_props = EXPECTED_PROPS[cap]
+            missing_props = required_props - set(properties.keys())
+            if missing_props:
+                raise ValueError(
+                    f"Capability '{cap}' requires the following properties in YAML: {sorted(list(required_props))}. "
+                    f"Missing: {sorted(list(missing_props))}"
+                )
 
 def _import_class(import_path: str):
+    """
+    Used when a robot config uses the extends key to inherit 
+    from another robot class specified as a string path.
+    """
     if ":" in import_path:
         module_path, cls_name = import_path.split(":", 1)
     elif "." in import_path:
@@ -77,12 +106,11 @@ def _import_class(import_path: str):
     module = importlib.import_module(module_path)
     return getattr(module, cls_name)
 
-def _tensorize(val: Any) -> th.Tensor:
-    return val if isinstance(val, th.Tensor) else th.tensor(val)
-
-
 def _inject_module(module_path: str, class_name: str, cls: type) -> None:
-    """Expose the generated class at module_path so imports like `from X import Class` work."""
+    """
+    Expose the generated class at module_path,
+    so imports like `from X import Class` work.
+    """
     mod = ModuleType(module_path)
     setattr(mod, class_name, cls)
     mod.__all__ = [class_name]
@@ -103,25 +131,14 @@ def create_robot_class_from_yaml(config_path: Path):
     if not bases:
         bases = [BaseRobot]
 
-    # tensor_props = set(cfg.get("tensor_properties", []))
-    # properties = cfg.get("properties", {})
     class_attrs: Dict[str, Any] = {"__doc__": cfg.get("description", ""), "_yaml_config": cfg}
 
     for key, value in (cfg.get("class_attributes", {}) or {}).items():
         class_attrs[key] = value
 
-    # for key, value in (properties or {}).items():
-    #     literal = _coerce_property_value(value)
-    #     if key in tensor_props:
-    #         def _make_tensor_prop(v):
-    #             return property(lambda self, _v=v: _maybe_tensorize(_v))
-    #         class_attrs[key] = _make_tensor_prop(literal)
-    #     else:
-    #         def _make_prop(v):
-    #             return property(lambda self, _v=v: _v)
-    #         class_attrs[key] = _make_prop(literal)
-
     robot_cls = type(cfg["name"], tuple(bases), class_attrs)
+
+    # if cfg["support_discrete_action"] is false, then set a property 
 
     # Register in registry
     REGISTERED_ROBOTS[robot_cls.__name__] = robot_cls
