@@ -1,11 +1,14 @@
 from pathlib import Path
 import importlib
+import math
 import sys
 from types import ModuleType
 from typing import Any, Dict, List, Tuple
 
 import torch as th
 import yaml
+from omnigibson.utils.transform_utils import euler2quat
+
 
 from omnigibson.robots.robot_base import BaseRobot, REGISTERED_ROBOTS
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
@@ -45,7 +48,8 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "module_path": True,         # fully qualified module to expose the class (e.g., omnigibson.robots.robot_configs.fetch)
     "extends": False,            # optional import path "omnigibson.robots.r1:R1" or "omnigibson.robots.r1.R1"
     "capabilities": False,       # list[str] matching CAPABILITY_BASES keys
-    "properties": False,         # dict[str, Any] exposed via @property returning the literal
+    "property": False,         # dict[str, Any] exposed via @property returning the literal
+    "cached_property": False,   # dict[str, Any] exposed via @cached_property returning the literal
 }
 
 def _set_default_controllers(config, robot_cls):
@@ -67,6 +71,53 @@ def _set_default_controllers(config, robot_cls):
         return prop_func
     setattr(robot_cls, "_default_controllers", _make_property())
 
+def _set_teleop_rotation_offset(cfg, robot_cls):
+    def _convert_to_quat(li):
+        ret = []
+        for element in li:
+            if element == "pi":
+                ret.append(math.pi)
+            elif element == "-pi":
+                ret.append(-math.pi)
+            else:
+                ret.append(element)
+        return euler2quat(th.tensor(ret))
+    if "teleop_rotation_offset" not in cfg:
+        return
+    value = cfg["teleop_rotation_offset"]
+    if isinstance(value, list):
+        value = _convert_to_quat(value)
+    elif isinstance(value, dict):
+        value =  {key: _convert_to_quat(val) for key, val in value.items()}
+    setattr(robot_cls, "teleop_rotation_offset", value)
+
+def _set_discrete_action_prop(robot_cls, cfg):
+    """
+    - _create_discrete_action_space: If value is like ValueError("message"), creates a method that raises that exception
+    - discrete_action_list: If value is NotImplementedError, creates a property that raises NotImplementedError
+    """
+    if "_create_discrete_action_space" in cfg:
+        value = cfg["_create_discrete_action_space"]
+        if isinstance(value, list) and value[0].endswith("Error"):
+            exception_type_name = value[0]
+            exception_message = value[1]
+            exception_class = getattr(__builtins__, exception_type_name, None)
+            if exception_class is None or not issubclass(exception_class, BaseException):
+                raise ValueError(f"Unknown error type: {exception_type_name}")
+            def _create_method():
+                def method():
+                    raise exception_class(exception_message)
+                return method()
+            setattr(robot_cls, "_create_discrete_action_space", _create_method())
+    
+    properties = cfg.get("property", {})
+    if "discrete_action_list" in properties:
+        if properties["discrete_action_list"] == "NotImplementedError":
+            @property
+            def discrete_action_list_prop(self):
+                raise NotImplementedError()
+            setattr(robot_cls, "discrete_action_list", discrete_action_list_prop)
+    
 
 def _validate_config(cfg: Dict[str, Any]) -> None:
     unknown = set(cfg.keys()) - set(ALLOWED_TOP_KEYS.keys())
