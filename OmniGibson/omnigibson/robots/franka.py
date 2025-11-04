@@ -122,15 +122,19 @@ class FrankaPanda(ManipulationRobot):
             self._model_name = "franka_robotiq"
             self._gripper_control_idx = th.arange(7, 9)
             self._eef_link_names = "eef_link"
-            self._finger_link_names = ["panda_leftfinger", "panda_rightfinger"]
-            self._finger_joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
-            self._default_robot_model_joint_pos = th.tensor([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.04, 0.04])
+            self._finger_link_names = ["left_silicone_pad", "right_silicone_pad"]
+            self._finger_joint_names = ["left_driver_joint", "right_driver_joint"]
+            self._default_robot_model_joint_pos = th.tensor(
+                [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            )
             self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
             self._ag_start_points = [
-                GraspingPoint(link_name="panda_rightfinger", position=th.tensor([0.0, 0.001, 0.045])),
+                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.032])),
+                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.008])),
             ]
             self._ag_end_points = [
-                GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),
+                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.032])),
+                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.008])),
             ]
         elif end_effector == "allegro":
             self._model_name = "franka_allegro"
@@ -231,7 +235,7 @@ class FrankaPanda(ManipulationRobot):
             finger_static_friction=finger_static_friction,
             finger_dynamic_friction=finger_dynamic_friction,
             grasping_direction=(
-                "lower" if end_effector in {"gripper", "robotiq"} else "upper"
+                "lower" if end_effector == "gripper" else "upper"
             ),  # gripper grasps in the opposite direction
             **kwargs,
         )
@@ -352,5 +356,23 @@ class FrankaPanda(ManipulationRobot):
             collision_pairs.append(["link_12_0", "part_studio_link"])
         elif self.end_effector == "inspire":
             collision_pairs.append(["base_link", "link12"])
+        elif self.end_effector == "robotiq":
+            # disable all robotiq gripper internal collisions
+            links = [
+                "left_driver",
+                "left_follower",
+                "left_pad",
+                "left_silicone_pad",
+                "left_coupler",
+                "right_driver",
+                "right_follower",
+                "right_pad",
+                "right_silicone_pad",
+                "right_coupler",
+                "base_gripper",
+            ]
+            for i, link1 in enumerate(links):
+                for link2 in links[i + 1 :]:
+                    collision_pairs.append([link1, link2])
 
         return collision_pairs

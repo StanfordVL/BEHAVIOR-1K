@@ -7,9 +7,9 @@ from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobo
 from omnigibson.utils.transform_utils import euler2quat
 
 
-class UR5e(ManipulationRobot):
+class Kinova(ManipulationRobot):
     """
-    The UR5e-6DOF arm equipped with a Robotiq-2F85 gripper
+    The Kinova Gen 3 7DOF arm equipped with a Robotiq-2f85 gripper
     """
 
     def __init__(
@@ -124,6 +124,7 @@ class UR5e(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            grasping_direction="upper",
             finger_static_friction=finger_static_friction,
             finger_dynamic_friction=finger_dynamic_friction,
             **kwargs,
@@ -134,7 +135,7 @@ class UR5e(ManipulationRobot):
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        raise ValueError("UR5e does not support discrete actions!")
+        raise ValueError("Kinova does not support discrete actions!")
 
     @property
     def _raw_controller_order(self):
@@ -151,13 +152,13 @@ class UR5e(ManipulationRobot):
     def _default_joint_pos(self):
         return th.tensor(
             [
+                0.0,
+                math.pi / 6,
+                0,
                 math.pi / 2,
-                -math.pi / 2,
-                math.pi / 2,
-                -math.pi / 2,
-                -math.pi / 2,
-                0,  # arm
-                # ,0.0, -math.pi / 2, math.pi / 2, -math.pi / 2, -math.pi / 2, -math.pi / 2, # arm
+                0,
+                math.pi / 3,
+                -math.pi / 2,  # arm
                 0,
                 0,
                 0,
@@ -173,13 +174,13 @@ class UR5e(ManipulationRobot):
     def arm_link_names(self):
         return {
             self.default_arm: [
-                "world",
-                "shoulder_pan_joint_jointbody",
-                "shoulder_lift_joint_jointbody",
-                "elbow_joint_jointbody",
-                "wrist_1_joint_jointbody",
-                "wrist_2_joint_jointbody",
-                "wrist_3_joint_jointbody",
+                "gen3_base_link",
+                "gen3_shoulder_link",
+                "gen3_half_arm_1_link",
+                "gen3_half_arm_2_link",
+                "gen3_forearm_link",
+                "gen3_spherical_wrist_1_link",
+                "gen3_spherical_wrist_2_link",
             ]
         }
 
@@ -187,12 +188,13 @@ class UR5e(ManipulationRobot):
     def arm_joint_names(self):
         return {
             self.default_arm: [
-                "shoulder_pan_joint",
-                "shoulder_lift_joint",
-                "elbow_joint",
-                "wrist_1_joint",
-                "wrist_2_joint",
-                "wrist_3_joint",
+                "gen3_joint_1",
+                "gen3_joint_2",
+                "gen3_joint_3",
+                "gen3_joint_4",
+                "gen3_joint_5",
+                "gen3_joint_6",
+                "gen3_joint_7",
             ]
         }
 
