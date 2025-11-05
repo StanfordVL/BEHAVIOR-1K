@@ -57,10 +57,14 @@ def _set_default_controllers(config, robot_cls):
     Resets/overrides the _default_controllers property on robot_cls by calling super() and applying updates from config.
     This will override any existing _default_controllers property that might already exist on the class.
     """
-    updates = config.get("properties", {}).get("default_controllers")
+    properties = config.get("property", {})
+    updates = properties.get("_default_controllers")
+    if updates is None:
+        return
+    
     updates_dict = updates.copy()
     
-    def _make_property(update_dict=updates_dict):
+    def _make_property(update_dict):
         @property
         def prop_func(self):
             controllers = getattr(super(robot_cls, self), "_default_controllers")
@@ -69,18 +73,36 @@ def _set_default_controllers(config, robot_cls):
                 controllers[key] = value
             return controllers
         return prop_func
-    setattr(robot_cls, "_default_controllers", _make_property())
+    setattr(robot_cls, "_default_controllers", _make_property(updates_dict))
+
+def _convert_to_math_pi(ele):
+    """
+    Convert string expressions involving pi (e.g., "pi/8", "0.5*pi", "-pi/2") 
+    to their numeric values.
+    """
+    if not isinstance(ele, str) or "pi" not in ele:
+        return ele
+    
+    expression = ele.replace("-pi", f"(-{math.pi})")
+    expression = expression.replace("pi", str(math.pi))
+    safe_dict = {
+        "__builtins__": {},
+        "math": math,
+        "abs": abs,
+        "round": round,
+    }
+    
+    try:
+        result = eval(expression, safe_dict)
+        return result
+    except (SyntaxError, NameError, ZeroDivisionError) as e:
+        return ele
 
 def _set_teleop_rotation_offset(cfg, robot_cls):
     def _convert_to_quat(li):
         ret = []
         for element in li:
-            if element == "pi":
-                ret.append(math.pi)
-            elif element == "-pi":
-                ret.append(-math.pi)
-            else:
-                ret.append(element)
+            ret.append(float(_convert_to_math_pi(element)))
         return euler2quat(th.tensor(ret))
     if "teleop_rotation_offset" not in cfg:
         return
@@ -117,7 +139,22 @@ def _set_discrete_action_prop(robot_cls, cfg):
             def discrete_action_list_prop(self):
                 raise NotImplementedError()
             setattr(robot_cls, "discrete_action_list", discrete_action_list_prop)
-    
+
+def _set_default_joint_pos(robot_cls, cfg):
+    properties = cfg.get("property", {})
+    if "_default_joint_pos" in properties:
+        val = properties["_default_joint_pos"]
+        if isinstance(val, list):
+            li = []
+            for ele in val:
+                li.append(float(_convert_to_math_pi(ele)))
+            val = th.tensor(li)
+            setattr(robot_cls, "_default_joint_pos", val)
+        elif val == 0:
+            @property
+            def _default_joint_pos_prop(self):
+                return th.zeros(self.n_joints)
+            setattr(robot_cls, "_default_joint_pos", _default_joint_pos_prop)
 
 def _validate_config(cfg: Dict[str, Any]) -> None:
     unknown = set(cfg.keys()) - set(ALLOWED_TOP_KEYS.keys())

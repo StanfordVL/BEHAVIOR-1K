@@ -1,4 +1,13 @@
 name: Turtlebot
 module_path: omnigibson.robots.robot_configs.turtlebot
-description: Turtlebot robot (YAML replacement; add properties as needed)
-capabilities: []
+description: |
+  Turtlebot robot
+  Reference: http://wiki.ros.org/Robots/TurtleBot
+  Uses joint velocity control
+capabilities: [two_wheel]
+property:
+  wheel_radius: 0.038
+  wheel_axle_length: 0.23
+  _default_joint_pos: 0
+cached_property:
+  base_joint_names: ["wheel_left_joint", "wheel_right_joint"]
