@@ -41,7 +41,7 @@ class FrankaPanda(ManipulationRobot):
         finger_static_friction=None,
         finger_dynamic_friction=None,
         # Unique to Franka
-        end_effector="gripper",
+        end_effector="robotiq",
         **kwargs,
     ):
         """
@@ -125,7 +125,7 @@ class FrankaPanda(ManipulationRobot):
             self._finger_link_names = ["left_silicone_pad", "right_silicone_pad"]
             self._finger_joint_names = ["left_driver_joint", "right_driver_joint"]
             self._default_robot_model_joint_pos = th.tensor(
-                [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             )
             self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
             self._ag_start_points = [
