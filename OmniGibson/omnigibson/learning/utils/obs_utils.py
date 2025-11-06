@@ -287,7 +287,7 @@ class VideoLoader:
         self._current_frame = self._start_frame
         self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
         self._frame_iter = self.container.decode(self.stream)
-        if self._start_frame > 0 and not self._start_idx_is_keyframe:
+        if self._start_frame > 0:
             # Decode forward until we find the start frame
             for frame in self._frame_iter:
                 if frame.pts is None:
