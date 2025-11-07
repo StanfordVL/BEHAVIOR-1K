@@ -1,7 +1,45 @@
 name: R1Pro
-module_path: omnigibson.robots.robot_configs.r1pro
-description: R1Pro robot (YAML replacement; add properties as needed)
-capabilities:
-  - holonomic_base
-  - articulated_trunk
-  - mobile_manipulation
+module_path: omnigibson.robots.r1pro
+description: R1 Pro Robot
+capabilities: []
+extends: omnigibson.robots.r1
+property:
+  untucked_default_joint_pos:
+    arm_control_idx:
+      left: [0.0, 1.57, 0.0, -1.57, 1.57, 0.0, 0.0]
+      right: [0.0, -1.57, 0.0, -1.57, -1.57, 0.0, 0.0]
+  floor_touching_base_link_names: ["wheel_motor_link1", "wheel_motor_link2", "wheel_motor_link3"]
+  arm_link_names:
+    left: [left_arm_link1, left_arm_link2, left_arm_link3, left_arm_link4, left_arm_link5, left_arm_link6, left_arm_link7, left_arm_link8, left_arm_link9, left_arm_link10, left_arm_link11, left_arm_link12, left_arm_link13, left_arm_link14, left_arm_link15, left_arm_link16, left_arm_link17]
+    right: [right_arm_link1, right_arm_link2, right_arm_link3, right_arm_link4, right_arm_link5, right_arm_link6, right_arm_link7]
+  arm_joint_names:
+    left: [left_arm_joint1, left_arm_joint2, left_arm_joint3, left_arm_joint4, left_arm_joint5, left_arm_joint6, left_arm_joint7]
+    right: [right_arm_joint1, right_arm_joint2, right_arm_joint3, right_arm_joint4, right_arm_joint5, right_arm_joint6, right_arm_joint7]
+  gripper_link_names:
+    left: [left_gripper_link, left_realsense_link]
+    right: [right_gripper_link, right_realsense_link]
+  finger_link_names:
+    left: [left_gripper_finger_link1, left_gripper_finger_link2]
+    right: [right_gripper_finger_link1, right_gripper_finger_link2]
+  finger_joint_names:
+    left: [left_gripper_finger_joint1, left_gripper_finger_joint2]
+    right: [right_gripper_finger_joint1, right_gripper_finger_joint2]
+  arm_workspace_range:
+    left: [-45, 45]
+    right: [-45, 45]
+
+  disabled_collision_pairs:
+    - ["left_arm_link1", "torso_link4"]
+    - ["left_arm_link2", "torso_link4"]
+    - ["right_arm_link1", "torso_link4"]
+    - ["right_arm_link2", "torso_link4"]
+    - ["left_arm_link5", "left_arm_link7"]
+    - ["right_arm_link5", "right_arm_link7"]
+    - ["left_gripper_finger_link1", "left_realsense_link"]
+    - ["right_gripper_finger_link1", "right_realsense_link"]
+    - ["left_gripper_finger_link1", "left_gripper_finger_link2"]
+    - ["right_gripper_finger_link1", "right_gripper_finger_link2"]
+    - ["base_link", "wheel_motor_link1"]
+    - ["base_link", "wheel_motor_link2"]
+    - ["base_link", "wheel_motor_link3"]
+    - ["torso_link2", "torso_link4"]

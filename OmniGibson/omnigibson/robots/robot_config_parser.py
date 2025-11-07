@@ -52,6 +52,51 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "cached_property": False,   # dict[str, Any] exposed via @cached_property returning the literal
 }
 
+def _set_post_load(cfg, robot_cls):
+    """
+    Creates _post_load method based on robot name.
+    Only work for tiago, r1 and r1pro for now.
+    
+    """
+    robot_name = cfg.get("name", "").lower()
+    
+    if robot_name in ["r1", "r1pro"]:
+        def _post_load(self):
+            super(robot_cls, self)._post_load()
+            # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels
+            # We need to manually set it back to sphere approximation
+            for wheel_name in self.floor_touching_base_link_names:
+                wheel_link = self.links[wheel_name]
+                assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+                wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+        setattr(robot_cls, "_post_load", _post_load)
+    
+    elif robot_name == "tiago":
+        def _post_load(self):
+            super(robot_cls, self)._post_load()
+            # The eef gripper links should be visual-only. They only contain a "ghost" box volume 
+            # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
+            for arm in self.arm_names:
+                self.eef_links[arm].visual_only = True
+                self.eef_links[arm].visible = False
+        setattr(robot_cls, "_post_load", _post_load)
+
+
+def _set_arm_control_idx(robot_cls,cfg):
+    if "arm_control_idx" in cfg.keys():
+        arm_control_idx = cfg['arm_control_idx']
+        for k in arm_control_idx.keys():
+            arm_control_idx[k]=th.tensor(arm_control_idx[k])
+    setattr(robot_cls, "arm_control_idx", arm_control_idx)
+
+def _set_arm_workspace_range(cfg, robot_cls):
+    if "arm_workspace_range" not in cfg.keys():
+        return
+    arm_workspace_range = cfg["arm_workspace_range"]
+    for k in arm_workspace_range:
+        arm_workspace_range[k]=th.deg2rad(th.tensor(arm_workspace_range[k], dtype=th.float32))
+    setattr(robot_cls, "arm_workspace_range", arm_workspace_range)
+
 def _set_default_controllers(config, robot_cls):
     """
     Resets/overrides the _default_controllers property on robot_cls by calling super() and applying updates from config.
@@ -156,6 +201,42 @@ def _set_default_joint_pos(robot_cls, cfg):
                 return th.zeros(self.n_joints)
             setattr(robot_cls, "_default_joint_pos", _default_joint_pos_prop)
 
+def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
+    """
+    Creates untucked_default_joint_pos property
+    """
+    properties = cfg.get("property", {}) 
+    if k not in properties:
+        return
+    updates = properties[k]
+    if not isinstance(updates, dict):
+        return
+    
+    def _make_property(update_dict=updates):
+        @property
+        def prop_func(self):
+            if "init" in update_dict.keys():
+                pos = th.zeros(self.n_dof)
+            else:
+                pos = getattr(robot_cls, k)
+            
+            for key, value in update_dict.items():
+                if key == "base_idx" and value == "current":
+                    pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+                elif key == "gripper_control_idx":
+                    for arm in update_dict[key].keys():
+                        pos[self.gripper_control_idx[arm]] = th.tensor(update_dict[key][arm])
+                elif key == "arm_control_idx" and isinstance(value, dict):
+                    for arm in update_dict[key].keys():
+                        pos[self.arm_control_idx[arm]] = th.tensor(update_dict[key][arm])
+                else:
+                    # Direct index update
+                    pos[key] = value
+            return pos
+        return prop_func
+    
+    setattr(robot_cls, k, _make_property())
+
 def _validate_config(cfg: Dict[str, Any]) -> None:
     unknown = set(cfg.keys()) - set(ALLOWED_TOP_KEYS.keys())
     if unknown:
@@ -226,7 +307,15 @@ def create_robot_class_from_yaml(config_path: Path):
 
     robot_cls = type(cfg["name"], tuple(bases), class_attrs)
 
-    # if cfg["support_discrete_action"] is false, then set a property 
+    # Set up special properties that need dynamic creation
+    _set_default_controllers(cfg, robot_cls)
+    _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "tucked_default_joint_pos")
+    _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "untucked_default_joint_pos")
+    _set_default_joint_pos(robot_cls, cfg)
+    _set_discrete_action_prop(robot_cls, cfg.get("property", {}))
+    _set_teleop_rotation_offset(cfg.get("property", {}), robot_cls)
+    _set_arm_workspace_range(cfg.get("property", {}), robot_cls)
+    _set_post_load(cfg, robot_cls)
 
     # Register in registry
     REGISTERED_ROBOTS[robot_cls.__name__] = robot_cls
