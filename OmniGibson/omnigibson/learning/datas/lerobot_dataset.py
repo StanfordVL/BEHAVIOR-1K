@@ -344,7 +344,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                         camera_id=vid_key.split(".")[-1],
                         demo_id=f"{ep_idx:08d}",
                         start_idx=self.chunks[self.current_streaming_chunk_idx][2],
-                        start_idx_is_keyframe=True,
+                        start_idx_is_keyframe=False,  # TODO (Wensi): Change this to True after figuring out the correct keyframe indices
                         batch_size=1,
                         stride=1,
                         **kwargs,

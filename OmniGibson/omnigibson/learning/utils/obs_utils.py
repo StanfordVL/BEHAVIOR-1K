@@ -240,7 +240,7 @@ class VideoLoader:
         self._downsample_factor = downsample_factor
         # Note that unless start idx is keyframe, we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
-        start_frame = max(0, self._start_frame - 5)
+        start_frame = self._start_frame if self._start_idx_is_keyframe else max(0, self._start_frame - 5)
         self._start_pts = int(start_frame / self._fps / self._time_base)
         self.reset()
 
@@ -287,7 +287,7 @@ class VideoLoader:
         self._current_frame = self._start_frame
         self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
         self._frame_iter = self.container.decode(self.stream)
-        if self._start_frame > 0:
+        if self._start_frame > 0 and not self._start_idx_is_keyframe:
             # Decode forward until we find the start frame
             for frame in self._frame_iter:
                 if frame.pts is None:
