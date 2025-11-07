@@ -5,7 +5,6 @@ description: |
   Reference: https://hello-robot.com/stretch-3-product
 capabilities: [manipulation, two_wheel, active_camera]
 property:
-  discrete_action_list: NotImplementedError
   _raw_controller_order: ["base", "camera", "arm_0", "gripper_0"]
   _default_controllers:
     base: DifferentialDriveController

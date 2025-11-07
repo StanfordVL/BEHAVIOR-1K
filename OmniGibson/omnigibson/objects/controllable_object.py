@@ -382,16 +382,16 @@ class ControllableObject(BaseObject):
         # Override the reset joint state based on reset values
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
 
-    @abstractmethod
     def _create_discrete_action_space(self):
         """
-        Create a discrete action space for this object. Should be implemented by the subclass (if a subclass does not
-        support this type of action space, it should raise an error).
+        Create a discrete action space for this object. 
+        By default, subclass does not support this type of action space.
+        If otherwise, should be implemented by the subclass.
 
         Returns:
             gym.space: Object-specific discrete action space
         """
-        raise NotImplementedError
+        raise ValueError("Does not support discrete actions!")
 
     def _create_continuous_action_space(self):
         """

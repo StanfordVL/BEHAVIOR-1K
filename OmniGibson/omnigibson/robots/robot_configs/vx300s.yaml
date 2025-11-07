@@ -15,8 +15,6 @@ property:
     0: ["waist","shoulder","elbow","forearm_roll","wrist_angle","wrist_rotate"]
   teleop_rotation_offset:
     0: [-pi, 0, 0]
-  discrete_action_list: NotImplementedError
-
 
 cached_property:
   eef_link_names:

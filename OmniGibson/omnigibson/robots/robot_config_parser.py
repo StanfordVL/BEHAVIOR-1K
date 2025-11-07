@@ -81,14 +81,6 @@ def _set_post_load(cfg, robot_cls):
                 self.eef_links[arm].visible = False
         setattr(robot_cls, "_post_load", _post_load)
 
-
-def _set_arm_control_idx(robot_cls,cfg):
-    if "arm_control_idx" in cfg.keys():
-        arm_control_idx = cfg['arm_control_idx']
-        for k in arm_control_idx.keys():
-            arm_control_idx[k]=th.tensor(arm_control_idx[k])
-    setattr(robot_cls, "arm_control_idx", arm_control_idx)
-
 def _set_arm_workspace_range(cfg, robot_cls):
     if "arm_workspace_range" not in cfg.keys():
         return
@@ -157,33 +149,6 @@ def _set_teleop_rotation_offset(cfg, robot_cls):
     elif isinstance(value, dict):
         value =  {key: _convert_to_quat(val) for key, val in value.items()}
     setattr(robot_cls, "teleop_rotation_offset", value)
-
-def _set_discrete_action_prop(robot_cls, cfg):
-    """
-    - _create_discrete_action_space: If value is like ValueError("message"), creates a method that raises that exception
-    - discrete_action_list: If value is NotImplementedError, creates a property that raises NotImplementedError
-    """
-    if "_create_discrete_action_space" in cfg:
-        value = cfg["_create_discrete_action_space"]
-        if isinstance(value, list) and value[0].endswith("Error"):
-            exception_type_name = value[0]
-            exception_message = value[1]
-            exception_class = getattr(__builtins__, exception_type_name, None)
-            if exception_class is None or not issubclass(exception_class, BaseException):
-                raise ValueError(f"Unknown error type: {exception_type_name}")
-            def _create_method():
-                def method():
-                    raise exception_class(exception_message)
-                return method()
-            setattr(robot_cls, "_create_discrete_action_space", _create_method())
-    
-    properties = cfg.get("property", {})
-    if "discrete_action_list" in properties:
-        if properties["discrete_action_list"] == "NotImplementedError":
-            @property
-            def discrete_action_list_prop(self):
-                raise NotImplementedError()
-            setattr(robot_cls, "discrete_action_list", discrete_action_list_prop)
 
 def _set_default_joint_pos(robot_cls, cfg):
     properties = cfg.get("property", {})
@@ -312,7 +277,6 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "tucked_default_joint_pos")
     _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "untucked_default_joint_pos")
     _set_default_joint_pos(robot_cls, cfg)
-    _set_discrete_action_prop(robot_cls, cfg.get("property", {}))
     _set_teleop_rotation_offset(cfg.get("property", {}), robot_cls)
     _set_arm_workspace_range(cfg.get("property", {}), robot_cls)
     _set_post_load(cfg, robot_cls)

@@ -4,7 +4,6 @@ description: R1 Robot
 capabilities: [holonomic_base, articulated_trunk, mobile_manipulation]
 property:
   base_footprint_link_name: "base_link"
-  discrete_action_list: NotImplementedError
   tucked_default_joint_pos:
     init: 0 # initiate as pos = th.zeros(self.n_dof)
     base_idx: current # Keep the current joint positions for the base joints
