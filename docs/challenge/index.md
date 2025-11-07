@@ -6,6 +6,15 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 11/07/2025 — Rule Clarifications"
+    Key updates this week:
+    
+    - Documentation updates
+    - Bug fixes & Hidden test logic addition. 
+
+    [Read full details →](./updates.md#11072025)
+
+
 !!! info "🗓️ 10/30/2025 — Rule Clarifications & Features Update"
     Key updates this week:
     
