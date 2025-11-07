@@ -1,4 +1,12 @@
 name: Freight
-module_path: omnigibson.robots.robot_configs.freight
-description: Freight robot (YAML replacement; add properties as needed)
-capabilities: []
+module_path: omnigibson.robots.freight
+description: |
+  Freight Robot
+  Reference: https://fetchrobotics.com/robotics-platforms/freight-base/
+  Uses joint velocity control
+capabilities: [two_wheel]
+property:
+  wheel_radius: 0.0613
+  wheel_axle_length: 0.372
+  base_joint_names: ["l_wheel_joint", "r_wheel_joint"]
+  _default_joint_pos: 0
