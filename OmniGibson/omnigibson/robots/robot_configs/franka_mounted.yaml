@@ -1,5 +1,15 @@
 name: FrankaMounted
-module_path: omnigibson.robots.robot_configs.franka_mounted
-description: Franka Mounted robot (YAML replacement; add properties as needed)
-capabilities:
-  - manipulation
+module_path: omnigibson.robots.franka_mounted
+description: The Franka Emika Panda robot mounted on a custom chassis with a custom gripper
+capabilities: []
+extends: omnigibson.robots.FrankaPanda
+property:
+  _raw_controller_order: ["arm_0", "gripper_0"]
+
+  _default_controllers:
+    "arm_0": "InverseKinematicsController"
+    "gripper_0": "MultiFingerGripperController"
+
+  usd_path: "models/franka/franka_mounted/usd/franka_mounted.usda"
+  urdf_path: "models/franka/franka_mounted/urdf/franka_mounted.urdf"
+  curobo_path: "models/franka/franka_mounted/curobo/franka_mounted_description_curobo_default.yaml"

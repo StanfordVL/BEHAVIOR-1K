@@ -281,6 +281,18 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_arm_workspace_range(cfg.get("property", {}), robot_cls)
     _set_post_load(cfg, robot_cls)
 
+    if cfg['name'] in ['FrankaPanda','A1']:
+        @property
+        def _assisted_grasp_start_points(self):
+            return {self.default_arm: self._ag_start_points}
+        setattr(robot_cls, "_assisted_grasp_start_points", _assisted_grasp_start_points)
+
+        @property
+        def _assisted_grasp_end_points(self):
+            return {self.default_arm: self._ag_end_points}
+        setattr(robot_cls, "_assisted_grasp_end_points", _assisted_grasp_end_points)
+
+
     # Register in registry
     REGISTERED_ROBOTS[robot_cls.__name__] = robot_cls
 
