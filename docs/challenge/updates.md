@@ -8,7 +8,7 @@ On this page, we provide updates regarding the first **BEHAVIOR Challenge**, inc
 
 **Challenge rule clarifications:**
 
-1. 
+1. To ensure a smooth and timely evaluation for the hidden test cases, we would like to estimate the number of expected submissions. If you plan on submitting your results, please take a moment to fill out this [short, anonymous form](https://forms.gle/HBRHAGxKrwLFSo578)
 
 **Bug fixes:**
 
@@ -16,11 +16,11 @@ On this page, we provide updates regarding the first **BEHAVIOR Challenge**, inc
 2. Fixed keyframe-only loading bug for `obs_loaders`.
 3. Fixed `task_to_task_index` in LeRobot Metadata.
 
+All fixes have been pushed to the main branch.
+
 **New features:**
 
 1. Added MoMaGen / JoyLo Documentation. 
-
-All fixes have been pushed to the main branch.
 
 ---
 
