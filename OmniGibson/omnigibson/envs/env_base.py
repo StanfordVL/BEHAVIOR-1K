@@ -602,7 +602,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
     def _post_step(self, action):
         """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""
         # Grab observations
-        obs, obs_info = self.get_obs()
+        if self.in_vec_env:
+            # In a vec env, we skip observation calculation here since the vec env will handle it
+            obs, obs_info = None, None
+        else:
+            obs, obs_info = self.get_obs()
 
         # Step the scene graph builder if necessary
         if self._scene_graph_builder is not None:

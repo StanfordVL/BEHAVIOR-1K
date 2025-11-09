@@ -2,6 +2,7 @@ import copy
 import omnigibson as og
 from omnigibson.sensors import TiledSensor
 from tqdm import trange
+import time
 
 
 class VectorEnvironment:
@@ -16,7 +17,7 @@ class VectorEnvironment:
             og.Environment(configs=copy.deepcopy(config), in_vec_env=True)
             for _ in trange(num_envs, desc="Loading environments")
         ]
-        self.tiled_sensor = TiledSensor(modalities=["rgb", "depth"])
+        self.tiled_sensor = TiledSensor(modalities=["rgb"])
 
         # Play, and finish loading all the envs
         og.sim.play()
@@ -27,7 +28,9 @@ class VectorEnvironment:
         observations, rewards, terminates, truncates, infos = [], [], [], [], []
         for i, action in enumerate(actions):
             self.envs[i]._pre_step(action)
+        a = time.time()
         og.sim.step()
+        print("Sim step time:", time.time() - a)
 
         # tiled_buffer = self.tiled_sensor.get_obs()
         # rgb_tile = tiled_buffer["rgb"].cpu().numpy()

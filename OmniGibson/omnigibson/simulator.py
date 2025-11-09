@@ -8,6 +8,7 @@ import signal
 import socket
 import sys
 import tempfile
+import time
 import traceback
 from collections import defaultdict
 from contextlib import nullcontext
@@ -1242,10 +1243,12 @@ def _launch_simulator(*args, **kwargs):
             # Only do this if we're not in the warmup phase
             if not lazy.isaacsim.core.simulation_manager.SimulationManager._warmup_needed:
                 # Run the controller step on every controllable object
+                a = time.time()
                 for scene in self.scenes:
                     for obj in scene.objects:
                         if isinstance(obj, ControllableObject):
                             obj.step()
+                print("Controller step time:", time.time() - a)
 
                 # Flush the controls from the ControllableObjectViewAPI
                 ControllableObjectViewAPI.flush_control()
