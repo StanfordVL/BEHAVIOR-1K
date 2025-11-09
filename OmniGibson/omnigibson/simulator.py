@@ -976,9 +976,10 @@ def _launch_simulator(*args, **kwargs):
             Args:
                 objs (Iterable[BaseObject]): list of objects to remove
             """
-            with self.removing_objects(objs=objs):
-                for obj in objs:
-                    obj.scene.remove_object(obj, _batched_call=True)
+            if objs != []:
+                with self.removing_objects(objs=objs):
+                    for obj in objs:
+                        obj.scene.remove_object(obj, _batched_call=True)
 
         def remove_prim(self, prim):
             """

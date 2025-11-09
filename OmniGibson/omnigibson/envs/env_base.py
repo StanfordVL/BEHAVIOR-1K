@@ -434,6 +434,17 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_task()
         self._load_external_sensors()
 
+        # hide sensors if is in vec env
+        if self.in_vec_env:
+            if self._external_sensors is not None:
+                for sensor in self._external_sensors.values():
+                    if isinstance(sensor, VisionSensor):
+                        sensor.viewer_visibility = False
+            for robot in self.robots:
+                for sensor in robot.sensors.values():
+                    if isinstance(sensor, VisionSensor):
+                        sensor.viewer_visibility = False
+
     def post_play_load(self):
         """Complete loading tasks that require the simulator to be playing."""
         # Run any additional task post-loading behavior
