@@ -43,7 +43,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
 
         # First, check our current state
         current_state = self.get_value(system)
-
+        print(f"Current state: {current_state}, New value: {new_value}", isinstance(system, MacroParticleSystem))
         # Only do something if we're changing state
         if current_state != new_value:
             contained_particles_state = self.obj.states[ContainedParticles]

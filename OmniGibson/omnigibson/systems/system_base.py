@@ -854,6 +854,8 @@ class PhysicalParticleSystem(BaseSystem):
         # and generate a grid of points based on the sampling distance
         try:
             low, high = link.visual_aabb
+            # low[2] = low[2] - 0.05
+            # high[2] = high[2] + 0.05
             extent = link.visual_aabb_extent
         except ValueError:
             low, high = obj.aabb
@@ -872,6 +874,7 @@ class PhysicalParticleSystem(BaseSystem):
 
         # Generate 3D-rectangular grid of points
         particle_positions = th.stack([arr.flatten() for arr in th.meshgrid(*arrs)]).T
+        print("----------- Before check_points_in_volume", particle_positions.shape)
         # Check which points are inside the volume and only keep those
         particle_positions = particle_positions[
             th.where(
@@ -881,6 +884,7 @@ class PhysicalParticleSystem(BaseSystem):
                 )
             )[0]
         ]
+        print("----------- After check_points_in_volume", particle_positions.shape)
 
         # Also prune any that in contact with anything if requested
         if check_contact:

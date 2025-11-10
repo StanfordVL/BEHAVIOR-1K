@@ -129,7 +129,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         self.value = new_value
 
         # Choose which color to apply to the toggle marker
-        self.visual_marker.color = th.tensor([0, 1.0, 0]) if self.value else th.tensor([1.0, 0, 0])
+        if self.visual_marker is not None:
+            self.visual_marker.color = th.tensor([0, 1.0, 0]) if self.value else th.tensor([1.0, 0, 0])
+        else:
+            print(f"Visual marker is None for object {self.obj.name}")
 
         return True
 

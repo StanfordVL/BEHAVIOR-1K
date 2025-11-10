@@ -205,6 +205,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         # Populate sensor config
         self._sensor_config = self._generate_sensor_config(custom_config=self._sensor_config)
+        # breakpoint()
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = dict()
@@ -215,6 +216,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             for prim in link.prim.GetChildren():
                 prim_type = prim.GetPrimTypeInfo().GetTypeName()
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+                    # print("link_name", link_name, sensor_counts, prim_type)
                     # Possibly filter out the sensor based on name
                     prim_path = str(prim.GetPrimPath())
                     not_blacklisted = self._exclude_sensor_names is None or not any(
@@ -249,6 +251,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
                     obs_modalities = obs_modalities.union(sensor_kwargs["modalities"])
                     # Create the sensor and store it internally
+                    # breakpoint()
                     sensor = create_sensor(
                         sensor_type=prim_type,
                         relative_prim_path=absolute_prim_path_to_scene_relative(self.scene, prim_path),
@@ -280,7 +283,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                 for this object
         """
         sensor_config = {} if custom_config is None else deepcopy(custom_config)
-
         # Merge the sensor dictionaries
         sensor_config = merge_nested_dicts(
             base_dict=self._default_sensor_config,

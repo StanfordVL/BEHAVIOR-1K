@@ -913,7 +913,7 @@ class KeyboardRobotController:
         # TODO: this currently conflicts with omniverse logging and spams the window
         # Print out the user what is being pressed / controlled
         # sys.stdout.write("\033[K")
-        # keypress_str = self.current_keypress.__str__().split(".")[-1]
+        keypress_str = self.current_keypress.__str__().split(".")[-1]
         # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         # sys.stdout.write("\033[F")
 
