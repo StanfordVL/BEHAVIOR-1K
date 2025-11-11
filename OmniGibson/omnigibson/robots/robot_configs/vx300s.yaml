@@ -2,6 +2,30 @@ name: VX300S
 module_path: omnigibson.robots.robot_configs.vx300s
 description: The VX300-6DOF arm from Trossen Robotics. (https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html)
 capabilities: [manipulation]
+init:
+  name: null
+  relative_prim_path: null
+  scale: null
+  visible: true
+  visual_only: false
+  self_collisions: true
+  link_physics_materials: null
+  load_config: null
+  fixed_base: true
+  abilities: null
+  control_freq: null
+  controller_config: null
+  action_type: "continuous"
+  action_normalize: true
+  reset_joint_pos: null
+  obs_modalities: ["rgb", "proprio"]
+  include_sensor_names: null
+  exclude_sensor_names: null
+  proprio_obs: "default"
+  sensor_config: null
+  grasping_mode: "physical"
+  finger_static_friction: null
+  finger_dynamic_friction: null
 
 property:
   
