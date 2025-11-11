@@ -895,7 +895,6 @@ class ManipulationRobot(BaseRobot):
             dict: Dictionary mapping arm appendage name to robot links corresponding to
                 that arm's finger links
         """
-        breakpoint()
         return {arm: [self._links[link] for link in self.finger_link_names[arm]] for arm in self.arm_names}
 
     @cached_property

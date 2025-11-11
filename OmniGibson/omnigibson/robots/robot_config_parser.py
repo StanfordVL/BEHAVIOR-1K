@@ -98,6 +98,18 @@ def _set_arm_workspace_range(cfg, robot_cls):
         return arm_workspace_range
     setattr(robot_cls, "arm_workspace_range", arm_workspace_range_prop)
 
+def _set_default_arm_poses(cfg, robot_cls):
+    properties = cfg.get("property", {})
+    if "default_arm_poses" not in properties:
+        return
+    default_arm_poses = properties["default_arm_poses"].copy()
+    for k in default_arm_poses:
+        default_arm_poses[k] = th.tensor(default_arm_poses[k])
+    @property
+    def default_arm_poses_prop(self):
+        return default_arm_poses
+    setattr(robot_cls, "default_arm_poses", default_arm_poses_prop)
+    
 def _set_general_properties(cfg, robot_cls):
     """
     Set all properties from the 'property' section of YAML config as @property.
@@ -113,6 +125,7 @@ def _set_general_properties(cfg, robot_cls):
         "untucked_default_joint_pos",
         "teleop_rotation_offset",
         "arm_workspace_range",
+        "default_arm_poses"
     }
     
     # For A1 and FrankaPanda, skip end_effector-specific configs (sub-dictionaries)
@@ -265,7 +278,9 @@ def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
             if "init" in update_dict.keys():
                 pos = th.zeros(self.n_dof)
             else:
-                pos = getattr(robot_cls, k)
+                # Call the parent class's property to get the actual tensor value
+                # (not the property descriptor)
+                pos = getattr(super(robot_cls, self), k).clone()
             
             for key, value in update_dict.items():
                 if key == "base_idx" and value == "current":
@@ -276,6 +291,10 @@ def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
                 elif key == "arm_control_idx" and isinstance(value, dict):
                     for arm in update_dict[key].keys():
                         pos[self.arm_control_idx[arm]] = th.tensor(update_dict[key][arm])
+                elif key == "trunk_control_idx":
+                        pos[self.trunk_control_idx] = value
+                elif key == "camera_control_idx":
+                    pos[self.camera_control_idx] = th.tensor(value)
                 else:
                     # Direct index update
                     pos[key] = value
@@ -339,6 +358,7 @@ def _create_init_method(cfg, robot_cls, bases):
                 valid_variants = ("default", "wrist_cam")
                 if value not in valid_variants:
                     raise ValueError(f"Invalid Tiago variant specified {value}! Must be one of {valid_variants}")
+                self._variant = value
           
         # Call super().__init__ with all kwargs (including overridden defaults)
         super(robot_cls, self).__init__(*args, **kwargs)
@@ -459,6 +479,7 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_default_joint_pos(robot_cls, cfg)
     _set_teleop_rotation_offset(cfg, robot_cls)
     _set_arm_workspace_range(cfg, robot_cls)
+    _set_default_arm_poses(cfg, robot_cls)
     _set_post_load(cfg, robot_cls)
     
     # Set all other properties from 'property' section as @property
