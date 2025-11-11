@@ -50,6 +50,7 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "capabilities": False,       # list[str] matching CAPABILITY_BASES keys
     "property": False,         # dict[str, Any] exposed via @property returning the literal
     "classproperty": False,   # dict[str, Any] exposed via @cached_property returning the literal
+    "init": False,              # dict[str, Any] for __init__ method parameters and default values
 }
 
 def _set_post_load(cfg, robot_cls):
@@ -82,12 +83,81 @@ def _set_post_load(cfg, robot_cls):
         setattr(robot_cls, "_post_load", _post_load)
 
 def _set_arm_workspace_range(cfg, robot_cls):
-    if "arm_workspace_range" not in cfg.keys():
+    properties = cfg.get("property", {})
+    if "arm_workspace_range" not in properties:
         return
-    arm_workspace_range = cfg["arm_workspace_range"]
+    arm_workspace_range = properties["arm_workspace_range"].copy()
     for k in arm_workspace_range:
-        arm_workspace_range[k]=th.deg2rad(th.tensor(arm_workspace_range[k], dtype=th.float32))
-    setattr(robot_cls, "arm_workspace_range", arm_workspace_range)
+        arm_workspace_range[k] = th.deg2rad(th.tensor(arm_workspace_range[k], dtype=th.float32))
+    
+    # Create a property that returns the processed arm_workspace_range
+    # This is necessary because arm_workspace_range must be a @property
+    # (required by ManipulationRobot's @property definition)
+    @property
+    def arm_workspace_range_prop(self):
+        return arm_workspace_range
+    setattr(robot_cls, "arm_workspace_range", arm_workspace_range_prop)
+
+def _set_general_properties(cfg, robot_cls):
+    """
+    Set all properties from the 'property' section of YAML config as @property.
+    This handles properties that haven't been specially processed by other functions.
+    """
+    properties = cfg.get("property", {})
+    
+    # List of properties that are handled by special functions
+    special_properties = {
+        "_default_controllers",
+        "_default_joint_pos",
+        "tucked_default_joint_pos",
+        "untucked_default_joint_pos",
+        "teleop_rotation_offset",
+        "arm_workspace_range",
+    }
+    
+    # For A1 and FrankaPanda, skip end_effector-specific configs (sub-dictionaries)
+    # These are handled in __init__ based on end_effector parameter
+    is_a1_or_franka = cfg.get("name", "") in ["A1", "FrankaPanda"]
+
+    for prop_name, prop_value in properties.items():
+        # Skip properties that are handled specially
+        if prop_name in special_properties:
+            continue
+        
+        # Skip end_effector-specific configs for A1 and FrankaPanda
+        if is_a1_or_franka and (prop_name in ["gripper","inspire", "allegro"] or "leap" in prop_name):
+            continue
+        
+        # Create a property that returns the literal value
+        # We need to capture the value in a closure with a default argument
+        # to avoid late binding issues in loops
+        def _make_property(name, value):
+            @property
+            def prop_func(self):
+                return value
+            return prop_func
+        
+        setattr(robot_cls, prop_name, _make_property(prop_name, prop_value))
+
+def _set_classproperties(cfg, robot_cls):
+    """
+    Set all properties from the 'classproperty' section of YAML config as @classproperty.
+    """
+    from omnigibson.utils.python_utils import classproperty
+    
+    classproperties = cfg.get("classproperty", {})
+    
+    for prop_name, prop_value in classproperties.items():
+        # Create a classproperty that returns the literal value
+        # We need to capture the value in a closure with a default argument
+        # to avoid late binding issues in loops
+        def _make_classproperty(name, value):
+            @classproperty
+            def prop_func(cls):
+                return value
+            return prop_func
+        
+        setattr(robot_cls, prop_name, _make_classproperty(prop_name, prop_value))
 
 def _set_default_controllers(config, robot_cls):
     """
@@ -141,14 +211,22 @@ def _set_teleop_rotation_offset(cfg, robot_cls):
         for element in li:
             ret.append(float(_convert_to_math_pi(element)))
         return euler2quat(th.tensor(ret))
-    if "teleop_rotation_offset" not in cfg:
+    properties = cfg.get("property", {})
+    if "teleop_rotation_offset" not in properties:
         return
-    value = cfg["teleop_rotation_offset"]
+    value = properties["teleop_rotation_offset"]
     if isinstance(value, list):
         value = _convert_to_quat(value)
     elif isinstance(value, dict):
-        value =  {key: _convert_to_quat(val) for key, val in value.items()}
-    setattr(robot_cls, "teleop_rotation_offset", value)
+        value = {key: _convert_to_quat(val) for key, val in value.items()}
+    
+    # Create a property that returns the processed teleop_rotation_offset
+    # This is necessary because teleop_rotation_offset must be a @property
+    # (required by ManipulationRobot's @property definition)
+    @property
+    def teleop_rotation_offset_prop(self):
+        return value
+    setattr(robot_cls, "teleop_rotation_offset", teleop_rotation_offset_prop)
 
 def _set_default_joint_pos(robot_cls, cfg):
     properties = cfg.get("property", {})
@@ -158,8 +236,12 @@ def _set_default_joint_pos(robot_cls, cfg):
             li = []
             for ele in val:
                 li.append(float(_convert_to_math_pi(ele)))
-            val = th.tensor(li)
-            setattr(robot_cls, "_default_joint_pos", val)
+            tensor_val = th.tensor(li)
+            
+            @property
+            def _default_joint_pos_prop(self):
+                return tensor_val
+            setattr(robot_cls, "_default_joint_pos", _default_joint_pos_prop)
         elif val == 0:
             @property
             def _default_joint_pos_prop(self):
@@ -201,6 +283,66 @@ def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
         return prop_func
     
     setattr(robot_cls, k, _make_property())
+
+def _create_init_method(cfg, robot_cls, bases):
+    """
+    Create __init__ method from YAML 'init' section.
+    The init section should contain parameter names and their default values.
+    These can override parent class defaults or add new parameters.
+    """
+    init_params = cfg.get("init", {})
+    if not init_params:
+        # No custom __init__ specified, use base class __init__
+        return
+    
+    # Get the signature of the first base class __init__ to understand parameter order
+    import inspect
+    base_init = None
+    for base in bases:
+        if hasattr(base, "__init__") and base.__init__ is not object.__init__:
+            base_init = base.__init__
+            break
+    
+    if base_init is None:
+        # No base __init__ found, create a simple one
+        def __init__(self, **kwargs):
+            for key, value in init_params.items():
+                setattr(self, f"_{key}", kwargs.get(key, value))
+        setattr(robot_cls, "__init__", __init__)
+        return
+    
+    # Get base __init__ signature to identify which params are custom
+    try:
+        sig = inspect.signature(base_init)
+        base_params = set(sig.parameters.keys())
+        base_params.discard('self')  # Remove 'self'
+    except (ValueError, TypeError):
+        # Can't inspect signature, assume all are base params
+        base_params = set()
+    
+    # Identify custom parameters (not in base __init__)
+    custom_params = {k: v for k, v in init_params.items() if k not in base_params}
+    
+    # Create __init__ method
+    def __init__(self, *args, **kwargs):
+        # Apply defaults from YAML init section (overrides parent defaults)
+        for param_name, default_value in init_params.items():
+            if param_name not in kwargs:
+                kwargs[param_name] = default_value
+        
+        # Store custom parameters as instance attributes before calling super
+        # Also handle special validation for known parameters
+        for param_name, default_value in custom_params.items():
+            value = kwargs.get(param_name, default_value)
+            
+            if param_name == "variant" and cfg["name"] == "Tiago":
+                valid_variants = ("default", "wrist_cam")
+                if value not in valid_variants:
+                    raise ValueError(f"Invalid Tiago variant specified {value}! Must be one of {valid_variants}")
+          
+        # Call super().__init__ with all kwargs (including overridden defaults)
+        super(robot_cls, self).__init__(*args, **kwargs)
+    setattr(robot_cls, "__init__", __init__)
 
 def _validate_config(cfg: Dict[str, Any]) -> None:
     unknown = set(cfg.keys()) - set(ALLOWED_TOP_KEYS.keys())
@@ -306,6 +448,10 @@ def create_robot_class_from_yaml(config_path: Path):
 
     robot_cls = type(cfg["name"], tuple(bases), class_attrs)
 
+    # Create __init__ method from YAML 'init' section if specified
+    _create_init_method(cfg, robot_cls, bases)
+    
+    
     # Set up special properties that need dynamic creation
     _set_default_controllers(cfg, robot_cls)
     _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "tucked_default_joint_pos")
@@ -314,18 +460,12 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_teleop_rotation_offset(cfg, robot_cls)
     _set_arm_workspace_range(cfg, robot_cls)
     _set_post_load(cfg, robot_cls)
-
-    # edge case
-    if cfg['name'] in ['FrankaPanda','A1']:
-        @property
-        def _assisted_grasp_start_points(self):
-            return {self.default_arm: self._ag_start_points}
-        setattr(robot_cls, "_assisted_grasp_start_points", _assisted_grasp_start_points)
-
-        @property
-        def _assisted_grasp_end_points(self):
-            return {self.default_arm: self._ag_end_points}
-        setattr(robot_cls, "_assisted_grasp_end_points", _assisted_grasp_end_points)
+    
+    # Set all other properties from 'property' section as @property
+    _set_general_properties(cfg, robot_cls)
+    
+    # Set all properties from 'classproperty' section as @classproperty
+    _set_classproperties(cfg, robot_cls)
 
 
     # Register in registry
