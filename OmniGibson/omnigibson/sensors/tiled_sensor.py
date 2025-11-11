@@ -1,96 +1,163 @@
 import math
-
-import torch as th
-
 import omnigibson.lazy as lazy
+import torch as th
 from omnigibson.sensors.vision_sensor import VisionSensor
+from typing import Any, Tuple, List
 
 
-class TiledSensor:
+class TiledVisionSensor:
     """
+    Tiled vision sensor that leverages Omniverse Replicator to render tiled images from multiple cameras
     Args:
-        modalities (list of str): Modality(s) supported by this sensor. Default is "rgb", can also include "depth".
+        envs (Iterable[og.Environment]): List of environments to create tiled sensors for.
+        tile_all_sensors (bool): Whether to tile all cameras in the envs or only those with matching names. Defaults to False.
+            NOTE: If True, all cameras must have the same modalities and resolution.
     """
 
-    def __init__(
-        self,
-        modalities=["rgb"],
-    ):
-        self.modalities = modalities
-        self._camera_resolution = None
-        camera_prim_paths = []
-        for sensor in VisionSensor.SENSORS.values():
-            if self._camera_resolution is None:
-                self._camera_resolution = (sensor.image_width, sensor.image_height)
-            else:
-                assert self._camera_resolution == (
-                    sensor.image_width,
-                    sensor.image_height,
-                ), "All cameras must have the same resolution!"
-            camera_prim_paths.append(sensor.prim_path)
+    def __init__(self, envs: List[Any], tile_all_sensors: bool = False) -> None:
+        camera_prim_paths = dict()
+        self.modalities = dict()
+        self._camera_resolution = dict()
+        self._camera_prims = dict()
+        self._annotators = dict()
+
         stage = lazy.omni.usd.get_context().get_stage()
-        self._camera_prims = []
-        for path in camera_prim_paths:
-            camera_prim = stage.GetPrimAtPath(path)
-            self._camera_prims.append(lazy.pxr.UsdGeom.Camera(camera_prim))
-        tiled_camera = lazy.omni.replicator.core.create.tiled_sensor(
-            cameras=camera_prim_paths,
-            camera_resolution=self._camera_resolution,
-            tiled_resolution=self._tiled_img_shape(),
-            output_types=self.modalities,
-        )
-        self._render_product_path = lazy.omni.replicator.core.create.render_product(
-            camera=tiled_camera, resolution=self._tiled_img_shape()
-        )
-        self._annotator = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
-            "RtxSensorGpu", device="cuda:0", do_array_copy=False
-        )
-        self._annotator.attach([self._render_product_path])
+        for env in envs:
+            for robot in env.robots:
+                for sensor_name, sensor in robot.sensors.items():
+                    if tile_all_sensors:
+                        sensor_name = "sensor"
+                    if isinstance(sensor, VisionSensor):
+                        if sensor_name not in camera_prim_paths:
+                            camera_prim_paths[sensor_name] = []
+                            self.modalities[sensor_name] = sensor.modalities
+                            self._camera_resolution[sensor_name] = (sensor.image_width, sensor.image_height)
+                            self._camera_prims[sensor_name] = []
+                        assert (
+                            sensor.modalities == self.modalities[sensor_name]
+                        ), f"All sensors named {sensor_name} must have the same modalities!"
+                        assert self._camera_resolution[sensor_name] == (
+                            sensor.image_width,
+                            sensor.image_height,
+                        ), f"All sensors named {sensor_name} must have the same resolution!"
+                        camera_prim_paths[sensor_name].append(sensor.prim_path)
+                        camera_prim = stage.GetPrimAtPath(sensor.prim_path)
+                        self._camera_prims[sensor_name].append(lazy.pxr.UsdGeom.Camera(camera_prim))
+        self._render_product_paths = {
+            sensor_name: lazy.omni.replicator.core.create.render_product_tiled(
+                cameras=camera_prim_paths[sensor_name], tile_resolution=self._camera_resolution[sensor_name]
+            )
+            for sensor_name in camera_prim_paths
+        }
+        self._create_annotators()
+        # Attach the annotator to the render product
+        for sensor_name in self._annotators:
+            for modality in self._annotators[sensor_name]:
+                self._annotators[sensor_name][modality].attach([self._render_product_paths[sensor_name]])
 
+        # Create internal buffers
+        self._create_buffers()
+
+    def _create_annotators(self) -> None:
+        self._annotators = dict()
+        for sensor_name in self.modalities:
+            self._annotators[sensor_name] = dict()
+            for modality in self.modalities[sensor_name]:
+                annotator_type = VisionSensor.RAW_SENSOR_TYPES[modality]
+                annotator = lazy.omni.replicator.core.AnnotatorRegistry.get_annotator(
+                    annotator_type, device="cuda:0", do_array_copy=False
+                )
+                self._annotators[sensor_name][modality] = annotator
+
+    def _create_buffers(self, device: str = "cuda:0") -> None:
         self._output_buffer = dict()
-        if "rgb" in self.modalities:
-            self._output_buffer["rgb"] = th.zeros(
-                (self._camera_count(), self._camera_resolution[1], self._camera_resolution[0], 3), device="cuda:0"
-            ).contiguous()
-        if "depth" in self.modalities:
-            self._output_buffer["depth"] = th.zeros(
-                (self._camera_count(), self._camera_resolution[1], self._camera_resolution[0], 1), device="cuda:0"
-            ).contiguous()
+        for sensor_name in self._camera_prims:
+            self._output_buffer[sensor_name] = dict()
+            for modality in self.modalities[sensor_name]:
+                if modality == "rgb" or modality == "normal":
+                    self._output_buffer[sensor_name][modality] = th.zeros(
+                        (
+                            self._camera_count(sensor_name=sensor_name),
+                            self._camera_resolution[sensor_name][1],
+                            self._camera_resolution[sensor_name][0],
+                            3,
+                        ),
+                        device=device,
+                        dtype=th.uint8,
+                    ).contiguous()
+                elif modality == "depth" or modality == "depth_linear":
+                    self._output_buffer[sensor_name][modality] = th.zeros(
+                        (
+                            self._camera_count(sensor_name=sensor_name),
+                            self._camera_resolution[sensor_name][1],
+                            self._camera_resolution[sensor_name][0],
+                            1,
+                        ),
+                        device=device,
+                        dtype=th.float32,
+                    ).contiguous()
+                elif modality == "seg_semantic" or modality == "seg_instance" or modality == "seg_instance_id":
+                    self._output_buffer[sensor_name][modality] = th.zeros(
+                        (
+                            self._camera_count(sensor_name=sensor_name),
+                            self._camera_resolution[sensor_name][1],
+                            self._camera_resolution[sensor_name][0],
+                            1,
+                        ),
+                        device=device,
+                        dtype=th.uint32,
+                    ).contiguous()
+                elif modality == "flow":
+                    self._output_buffer[sensor_name][modality] = th.zeros(
+                        (
+                            self._camera_count(sensor_name=sensor_name),
+                            self._camera_resolution[sensor_name][1],
+                            self._camera_resolution[sensor_name][0],
+                            2,
+                        ),
+                        device=device,
+                        dtype=th.float32,
+                    ).contiguous()
+                else:
+                    raise ValueError(f"Unsupported modality {modality} for tiled vision sensor!")
 
-        super().__init__()
+    def _camera_count(self, sensor_name: str) -> int:
+        return len(self._camera_prims[sensor_name])
 
-    def _camera_count(self):
-        return len(self._camera_prims)
-
-    def _tiled_grid_shape(self):
-        cols = round(math.sqrt(self._camera_count()))
-        rows = math.ceil(self._camera_count() / cols)
+    def _tiled_grid_shape(self, sensor_name: str) -> Tuple[int, int]:
+        cols = round(math.sqrt(self._camera_count(sensor_name=sensor_name)))
+        rows = math.ceil(self._camera_count(sensor_name=sensor_name) / cols)
         return (cols, rows)
 
-    def _tiled_img_shape(self):
-        cols, rows = self._tiled_grid_shape()
-        width, height = self._camera_resolution
+    def _tiled_img_shape(self, sensor_name: str) -> Tuple[int, int]:
+        cols, rows = self._tiled_grid_shape(sensor_name=sensor_name)
+        width, height = self._camera_resolution[sensor_name]
         return (width * cols, height * rows)
 
     def get_obs(self):
-        # TODO: somehow isaac 4.1.0 introduced a bug: this always return a warp array on cpu instead of gpu, even when explicitly specifying device="cuda:0"
-        tiled_data = self._annotator.get_data().to(device="cuda:0")
-        breakpoint()
         from omnigibson.utils.deprecated_utils import reshape_tiled_image
 
-        for modality in self.modalities:
-            lazy.warp.launch(
-                kernel=reshape_tiled_image,
-                dim=(self._camera_count(), self._camera_resolution[1], self._camera_resolution[0]),
-                inputs=[
-                    tiled_data,
-                    lazy.warp.from_torch(self._output_buffer[modality]),  # zero-copy alias
-                    *list(self._output_buffer[modality].shape[1:]),  # height, width, num_channels
-                    self._tiled_grid_shape()[0],  # num_tiles_x
-                    (
-                        self._output_buffer["rgb"].numel() if "depth" in self.modalities else 0
-                    ),  # rgb always comes first; needs an offset for depth
-                ],
-                device="cuda:0",
-            )
+        for sensor_name in self._annotators:
+            for modality in self.modalities[sensor_name]:
+                tiled_data_buffer = self._annotators[sensor_name][modality].get_data().to("cuda:0")
+                # For flow, we only require the first two channels of the tiled buffer
+                # Note: Not doing this breaks the alignment of the data (check: https://github.com/isaac-sim/IsaacLab/issues/2003)
+                if modality == "flow":
+                    tiled_data_buffer = tiled_data_buffer[:, :, :2].contiguous()
+                lazy.warp.launch(
+                    kernel=reshape_tiled_image,
+                    dim=(
+                        self._camera_count(sensor_name=sensor_name),
+                        self._camera_resolution[sensor_name][1],
+                        self._camera_resolution[sensor_name][0],
+                    ),
+                    inputs=[
+                        tiled_data_buffer.flatten(),
+                        lazy.warp.from_torch(self._output_buffer[sensor_name][modality]),  # zero-copy alias
+                        *list(self._output_buffer[sensor_name][modality].shape[1:]),  # height, width, num_channels
+                        self._tiled_grid_shape(sensor_name=sensor_name)[0],  # num_tiles_x
+                    ],
+                    device="cuda:0",
+                )
+
         return self._output_buffer
