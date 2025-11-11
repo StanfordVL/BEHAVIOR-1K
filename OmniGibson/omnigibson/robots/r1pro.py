@@ -20,7 +20,7 @@ class R1Pro(R1):
         return pos
 
     @property
-    def untucked_default_joint_pos(self):
+    def c(self):
         pos = th.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
         pos[self.base_idx] = self.get_joint_positions()[self.base_idx]

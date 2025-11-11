@@ -1,5 +1,5 @@
 name: FrankaPanda
-module_path: omnigibson.robots.franka
+module_path: omnigibson.robots.robot_configs.franka
 description: The Franka Emika Panda robot
 capabilities:
   - manipulation

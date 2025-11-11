@@ -1,5 +1,5 @@
 name: Tiago
-module_path: omnigibson.robots.tiago
+module_path: omnigibson.robots.robot_configs.tiago
 description: |
   Tiago Robot
   Reference: https://pal-robotics.com/robots/tiago/
@@ -128,7 +128,6 @@ property:
     - ["wrist_right_ft_tool_link", "arm_right_5_link"]
     - ["arm_left_tool_link", "wrist_left_ft_tool_link"]
     - ["arm_right_tool_link", "wrist_right_ft_tool_link"]
-cached_property:
   camera_joint_names: ["head_1_joint", "head_2_joint"]
   trunk_joint_names: ["torso_lift_joint"]
   manipulation_link_names:
@@ -183,5 +182,3 @@ cached_property:
   arm_workspace_range:
     left: [15, 75]
     right: [-75, -15]
-
-_create_discrete_action_space: ["ValueError", "Tiago does not support discrete actions!"]

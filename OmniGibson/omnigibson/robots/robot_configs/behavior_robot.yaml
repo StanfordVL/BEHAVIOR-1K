@@ -1,6 +1,0 @@
-name: BehaviorRobot
-module_path: omnigibson.robots.robot_configs.behavior_robot
-description: BehaviorRobot (YAML replacement; add properties as needed)
-capabilities:
-  - manipulation
-  - active_camera

@@ -1,5 +1,5 @@
 name: Husky
-module_path: omnigibson.robots.husky
+module_path: omnigibson.robots.robot_configs.husky
 description: |
   Husky robot
   Reference: https://clearpathrobotics.com/, http://wiki.ros.org/Robots/Husky

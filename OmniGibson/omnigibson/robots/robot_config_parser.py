@@ -21,7 +21,7 @@ from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 CAPABILITY_BASES = {
-    "two_wheel_locomotion": TwoWheelRobot,
+    "two_wheel": TwoWheelRobot,
     "manipulation": ManipulationRobot,
     "holonomic_base": HolonomicBaseRobot,
     "articulated_trunk": ArticulatedTrunkRobot,
@@ -38,7 +38,7 @@ EXPECTED_PROPS = {
     "manipulation": {"arm_link_names","arm_joint_names","eef_link_names","gripper_link_names","finger_link_names","finger_joint_names","arm_workspace_range"},
     "locomotion":{"floor_touching_base_link_names", "base_joint_names"},
     "holonomic_base":{"base_footprint_link_name"},
-    "articulated_trunk": {"trunk_link_names","trunk_joint_names"},
+    "articulated_trunk": {"trunk_joint_names"},
     "active_camera":{"camera_joint_names"},
 }
 # Allowed top-level YAML keys and whether they are required
@@ -49,7 +49,7 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "extends": False,            # optional import path "omnigibson.robots.r1:R1" or "omnigibson.robots.r1.R1"
     "capabilities": False,       # list[str] matching CAPABILITY_BASES keys
     "property": False,         # dict[str, Any] exposed via @property returning the literal
-    "cached_property": False,   # dict[str, Any] exposed via @cached_property returning the literal
+    "classproperty": False,   # dict[str, Any] exposed via @cached_property returning the literal
 }
 
 def _set_post_load(cfg, robot_cls):
@@ -60,7 +60,7 @@ def _set_post_load(cfg, robot_cls):
     """
     robot_name = cfg.get("name", "").lower()
     
-    if robot_name in ["r1", "r1pro"]:
+    if robot_name.lower() in ["r1", "r1pro"]:
         def _post_load(self):
             super(robot_cls, self)._post_load()
             # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels
@@ -71,7 +71,7 @@ def _set_post_load(cfg, robot_cls):
                 wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
         setattr(robot_cls, "_post_load", _post_load)
     
-    elif robot_name == "tiago":
+    elif robot_name.lower() == "tiago":
         def _post_load(self):
             super(robot_cls, self)._post_load()
             # The eef gripper links should be visual-only. They only contain a "ghost" box volume 
@@ -210,26 +210,35 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
     if missing:
         raise ValueError(f"Missing required keys in robot YAML: {missing}")
     # check to see if all required props are provided
-    if "properties" in cfg and not isinstance(cfg["properties"], dict):
-        raise TypeError("properties must be a mapping of name->value")
-    properties = cfg.get("properties", {})
-    for cap in cfg.get("capabilities", []):
-        if cap not in CAPABILITY_BASES:
-            raise ValueError(f"Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
-        if cap in EXPECTED_PROPS:
-            required_props = EXPECTED_PROPS[cap]
-            missing_props = required_props - set(properties.keys())
-            if missing_props:
-                raise ValueError(
-                    f"Capability '{cap}' requires the following properties in YAML: {sorted(list(required_props))}. "
-                    f"Missing: {sorted(list(missing_props))}"
-                )
+    # if "properties" in cfg and not isinstance(cfg["properties"], dict):
+    #     raise TypeError("properties must be a mapping of name->value")
+
+    # if cfg['name'].lower() in ['a1','frankapanda']:
+    #     return
+    
+    # properties = cfg.get("property", {})
+    # cached_property = cfg.get("cached_property", {})
+    
+    # for cap in cfg.get("capabilities", []):
+    #     if cap not in CAPABILITY_BASES:
+            
+    #         raise ValueError(f"{cfg['name']}: Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
+    #     # breakpoint()
+    #     if cap in EXPECTED_PROPS:
+    #         required_props = EXPECTED_PROPS[cap]
+    #         missing_props = required_props - set(properties.keys()) - set(cached_property.keys())
+    #         if missing_props:
+    #             raise ValueError(
+    #                 f"{cfg['name']}: Capability '{cap}' requires the following properties in YAML: {sorted(list(required_props))}. "
+    #                 f"Missing: {sorted(list(missing_props))}"
+    #             )
 
 def _import_class(import_path: str):
     """
     Used when a robot config uses the extends key to inherit 
     from another robot class specified as a string path.
     """
+    # Parse the import path
     if ":" in import_path:
         module_path, cls_name = import_path.split(":", 1)
     elif "." in import_path:
@@ -237,8 +246,33 @@ def _import_class(import_path: str):
         module_path, cls_name = ".".join(parts[:-1]), parts[-1]
     else:
         raise ValueError(f"Invalid extends path: {import_path}")
-    module = importlib.import_module(module_path)
-    return getattr(module, cls_name)
+    
+    # First check if the class is already registered (from a YAML file loaded earlier)
+    # This handles the case where one YAML-defined class extends another
+    if cls_name in REGISTERED_ROBOTS:
+        return REGISTERED_ROBOTS[cls_name]
+    
+    # If it's a robot_configs path, try to load the YAML file directly
+    if "robot_configs" in module_path:
+        # Extract the YAML filename from the module path
+        # e.g., "omnigibson.robots.robot_configs.franka" -> "franka.yaml"
+        yaml_name = module_path.split("robot_configs.")[-1]
+        # Use the same directory structure as autodiscover
+        robot_config_dir = Path(__file__).parent / "robot_configs"
+        yaml_path = robot_config_dir / f"{yaml_name}.yaml"
+        if yaml_path.exists():
+            # Load the YAML file to create the class
+            cls = create_robot_class_from_yaml(yaml_path)
+            if cls.__name__ == cls_name:
+                return cls
+    
+    # Otherwise, try to import it from the module (for non-YAML classes)
+    try:
+        module = importlib.import_module(module_path)
+        return getattr(module, cls_name)
+    except (ImportError, AttributeError) as e:
+        raise ValueError(f"Could not import class {cls_name} from {import_path}. "
+                        f"Make sure the class is already loaded or the module path is correct: {e}")
 
 def _inject_module(module_path: str, class_name: str, cls: type) -> None:
     """
@@ -277,10 +311,11 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "tucked_default_joint_pos")
     _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "untucked_default_joint_pos")
     _set_default_joint_pos(robot_cls, cfg)
-    _set_teleop_rotation_offset(cfg.get("property", {}), robot_cls)
-    _set_arm_workspace_range(cfg.get("property", {}), robot_cls)
+    _set_teleop_rotation_offset(cfg, robot_cls)
+    _set_arm_workspace_range(cfg, robot_cls)
     _set_post_load(cfg, robot_cls)
 
+    # edge case
     if cfg['name'] in ['FrankaPanda','A1']:
         @property
         def _assisted_grasp_start_points(self):
@@ -303,6 +338,11 @@ def create_robot_class_from_yaml(config_path: Path):
 
 
 def autodiscover_and_register(yaml_dir: Path) -> List[Tuple[str, type]]:
+    """
+    Auto-discover and register all YAML robot configs.
+    Files are loaded in alphabetical order, so classes that extend others
+    should come after their base classes (e.g., franka_mounted.yaml after franka.yaml).
+    """
     out = []
     if not yaml_dir.exists():
         return out

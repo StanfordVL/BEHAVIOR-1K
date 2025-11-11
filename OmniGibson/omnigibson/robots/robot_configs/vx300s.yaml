@@ -1,5 +1,5 @@
 name: VX300S
-module_path: omnigibson.robots.vx300s
+module_path: omnigibson.robots.robot_configs.vx300s
 description: The VX300-6DOF arm from Trossen Robotics. (https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html)
 capabilities: [manipulation]
 
@@ -16,7 +16,6 @@ property:
   teleop_rotation_offset:
     0: [-pi, 0, 0]
 
-cached_property:
   eef_link_names:
     0: "eef_link"
 
@@ -28,5 +27,3 @@ cached_property:
 
   arm_link_names:
     0: ["base_link","shoulder_link","upper_arm_link","upper_forearm_link","lower_forearm_link","wrist_link","gripper_link",]
-
-_create_discrete_action_space: [ValueError, "VX300S does not support discrete actions!"]

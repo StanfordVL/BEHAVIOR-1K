@@ -1,5 +1,5 @@
 name: R1
-module_path: omnigibson.robots.r1
+module_path: omnigibson.robots.robot_configs.r1
 description: R1 Robot
 capabilities: [holonomic_base, articulated_trunk, mobile_manipulation]
 property:
@@ -60,4 +60,3 @@ classproperty:
   n_arms: 2
   arm_names: ["left", "right"]
 
-_create_discrete_action_space: ["ValueError", "R1 does not support discrete actions!"]

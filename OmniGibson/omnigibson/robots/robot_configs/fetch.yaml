@@ -1,10 +1,10 @@
 name: Fetch
-module_path: omnigibson.robots.fetch
+module_path: omnigibson.robots.robot_configs.fetch
 description: |
   Fetch Robot
   Reference: https://fetchrobotics.com/robotics-platforms/fetch-mobile-manipulator/
 capabilities:
-  - two_wheel_locomotion
+  - two_wheel
   - articulated_trunk
   - active_camera
   - untucked_arm_pose

@@ -38,7 +38,6 @@ from omnigibson.robots import (
     R1,
     R1Pro,
     BaseRobot,
-    BehaviorRobot,
     Fetch,
     Freight,
     Husky,
@@ -68,7 +67,6 @@ m.KP_LIN_VEL = {
     Husky: 0.05,
     Freight: 0.2,
     Locobot: 1.5,
-    BehaviorRobot: 0.3,
     R1: 0.3,
     R1Pro: 0.3,
 }
@@ -80,7 +78,6 @@ m.KP_ANGLE_VEL = {
     Husky: 0.05,
     Freight: 0.1,
     Locobot: 1.0,
-    BehaviorRobot: 0.2,
     R1: 0.2,
     R1Pro: 0.2,
 }

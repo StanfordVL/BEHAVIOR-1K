@@ -1,5 +1,5 @@
 name: Locobot
-module_path: omnigibson.robots.locobot
+module_path: omnigibson.robots.robot_configs.locobot
 description: |
   Locobot robot
   Reference: https://www.trossenrobotics.com/locobot-pyrobot-ros-rover.aspx

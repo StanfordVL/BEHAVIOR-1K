@@ -1,8 +1,8 @@
 name: R1Pro
-module_path: omnigibson.robots.r1pro
+module_path: omnigibson.robots.robot_configs.r1pro
 description: R1 Pro Robot
 capabilities: []
-extends: omnigibson.robots.r1
+extends: omnigibson.robots.robot_configs.r1:R1
 property:
   untucked_default_joint_pos:
     arm_control_idx:

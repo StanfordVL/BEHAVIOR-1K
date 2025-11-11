@@ -1,5 +1,5 @@
 name: A1
-module_path: omnigibson.robots.a1
+module_path: omnigibson.robots.robot_configs.a1
 description: The A1 robot with inspire hand
 capabilities:
   - manipulation

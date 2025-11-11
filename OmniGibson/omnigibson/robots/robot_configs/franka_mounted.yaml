@@ -1,8 +1,8 @@
 name: FrankaMounted
-module_path: omnigibson.robots.franka_mounted
+module_path: omnigibson.robots.robot_configs.franka_mounted
 description: The Franka Emika Panda robot mounted on a custom chassis with a custom gripper
 capabilities: []
-extends: omnigibson.robots.FrankaPanda
+extends: omnigibson.robots.robot_configs.franka:FrankaPanda
 property:
   _raw_controller_order: ["arm_0", "gripper_0"]
 

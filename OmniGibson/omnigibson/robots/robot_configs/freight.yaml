@@ -1,5 +1,5 @@
 name: Freight
-module_path: omnigibson.robots.freight
+module_path: omnigibson.robots.robot_configs.freight
 description: |
   Freight Robot
   Reference: https://fetchrobotics.com/robotics-platforms/freight-base/

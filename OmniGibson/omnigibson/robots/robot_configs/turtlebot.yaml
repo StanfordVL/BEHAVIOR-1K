@@ -9,5 +9,4 @@ property:
   wheel_radius: 0.038
   wheel_axle_length: 0.23
   _default_joint_pos: 0
-cached_property:
   base_joint_names: ["wheel_left_joint", "wheel_right_joint"]

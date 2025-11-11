@@ -1,5 +1,5 @@
 name: Stretch
-module_path: omnigibson.robots.stretch
+module_path: omnigibson.robots.robot_configs.stretch
 description: |
   Strech Robot from Hello Robotics
   Reference: https://hello-robot.com/stretch-3-product
@@ -44,4 +44,3 @@ property:
   finger_joint_names:
     0: ["joint_gripper_finger_right", "joint_gripper_finger_left"]
 
-_create_discrete_action_space: ["ValueError","Stretch does not support discrete actions!"]
