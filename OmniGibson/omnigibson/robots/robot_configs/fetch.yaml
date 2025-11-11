@@ -23,19 +23,19 @@ property:
   camera_joint_names: ["head_pan_joint", "head_tilt_joint"]
   trunk_joint_names: ["torso_lift_joint"]
   arm_link_names:
-    0: ["shoulder_pan_link", "shoulder_lift_link", "upperarm_roll_link", "elbow_flex_link", "forearm_roll_link", "wrist_flex_link", "wrist_roll_link"]
+    "0": ["shoulder_pan_link", "shoulder_lift_link", "upperarm_roll_link", "elbow_flex_link", "forearm_roll_link", "wrist_flex_link", "wrist_roll_link"]
   arm_joint_names:
-    0: ["shoulder_pan_joint", "shoulder_lift_joint", "upperarm_roll_joint", "elbow_flex_joint", "forearm_roll_joint", "wrist_flex_joint", "wrist_roll_joint"]
+    "0": ["shoulder_pan_joint", "shoulder_lift_joint", "upperarm_roll_joint", "elbow_flex_joint", "forearm_roll_joint", "wrist_flex_joint", "wrist_roll_joint"]
   eef_link_names:
-    0: "eef_link"
+    "0": "eef_link"
   finger_link_names:
-    0: ["r_gripper_finger_link", "l_gripper_finger_link"]
+    "0": ["r_gripper_finger_link", "l_gripper_finger_link"]
   finger_joint_names:
-    0: ["r_gripper_finger_joint", "l_gripper_finger_joint"]
+    "0": ["r_gripper_finger_joint", "l_gripper_finger_joint"]
   arm_workspace_range:
-    0: [-45, 45]
+    "0": [-45, 45]
   teleop_rotation_offset:
-    0: [0, "pi/2", "pi"]
+    "0": [0, "pi/2", "pi"]
   tucked_default_joint_pos: [0.0, 0.0, 0.02, 0.0, 1.1707963267948966, 0.0, 1.4707963267948965, -0.4, 1.6707963267948966, 0.0, 1.5707963267948966, 0.0, 0.05, 0.05]
   default_arm_poses:
     vertical: [-0.94121, -0.64134, 1.55186, 1.65672, -0.93218, 1.53416, 2.14474]

@@ -10,9 +10,9 @@ property:
     "gripper_0": "MultiFingerGripperController"
   grasping_direction: "upper"
   arm_link_names:
-    0: ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7']
+    "0": ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7']
   arm_joint_names:
-    0: ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
+    "0": ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
     
 
   gripper:
@@ -22,18 +22,18 @@ property:
     _gripper_control_idx: [7,8]
     _eef_link_names: "eef_link"
     eef_link_names:
-      0: "eef_link"
+      "0": "eef_link"
     _finger_link_names: ["panda_leftfinger", "panda_rightfinger"]
     finger_link_names:
-      0: ["panda_leftfinger", "panda_rightfinger"]
+      "0": ["panda_leftfinger", "panda_rightfinger"]
     _finger_joint_names: ["panda_finger_joint1", "panda_finger_joint2"]
     finger_joint_names:
-      0: ["panda_finger_joint1", "panda_finger_joint2"]
+      "0": ["panda_finger_joint1", "panda_finger_joint2"]
     _default_robot_model_joint_pos: [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.04, 0.04]
     _default_joint_pos: [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.04, 0.04]
     _teleop_rotation_offset: [-1, 0, 0, 0]
     teleop_rotation_offset:
-      0: [-1, 0, 0, 0]
+      "0": [-1, 0, 0, 0]
     usd_path: "models/franka/franka_panda/usd/franka_panda.usda"
     urdf_path: "models/franka/franka_panda/urdf/franka_panda.urdf"
     curobo_path: "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml"
@@ -45,20 +45,20 @@ property:
     model_name: "franka_allegro"
     _eef_link_names: "palm_center"
     eef_link_names:
-      0: "palm_center"
+      "0": "palm_center"
     # thumb.proximal, ..., thumb.tip, ..., ring.tip
     _finger_link_names: ['link_0_0', 'link_1_0', 'link_2_0', 'link_3_0', 'link_4_0', 'link_5_0', 'link_6_0', 'link_7_0', 'link_8_0', 'link_9_0', 'link_10_0', 'link_11_0', 'link_12_0', 'link_13_0', 'link_14_0', 'link_15_0']
     finger_link_names:
-      0: ['link_0_0', 'link_1_0', 'link_2_0', 'link_3_0', 'link_4_0', 'link_5_0', 'link_6_0', 'link_7_0', 'link_8_0', 'link_9_0', 'link_10_0', 'link_11_0', 'link_12_0', 'link_13_0', 'link_14_0', 'link_15_0']
+      "0": ['link_0_0', 'link_1_0', 'link_2_0', 'link_3_0', 'link_4_0', 'link_5_0', 'link_6_0', 'link_7_0', 'link_8_0', 'link_9_0', 'link_10_0', 'link_11_0', 'link_12_0', 'link_13_0', 'link_14_0', 'link_15_0']
     _finger_joint_names: ['joint_12_0', 'joint_13_0', 'joint_14_0', 'joint_15_0', 'joint_8_0', 'joint_9_0', 'joint_10_0', 'joint_11_0', 'joint_4_0', 'joint_5_0', 'joint_6_0', 'joint_7_0', 'joint_0_0', 'joint_1_0', 'joint_2_0', 'joint_3_0']
     finger_joint_names:
-      0: ['joint_12_0', 'joint_13_0', 'joint_14_0', 'joint_15_0', 'joint_8_0', 'joint_9_0', 'joint_10_0', 'joint_11_0', 'joint_4_0', 'joint_5_0', 'joint_6_0', 'joint_7_0', 'joint_0_0', 'joint_1_0', 'joint_2_0', 'joint_3_0']
+      "0": ['joint_12_0', 'joint_13_0', 'joint_14_0', 'joint_15_0', 'joint_8_0', 'joint_9_0', 'joint_10_0', 'joint_11_0', 'joint_4_0', 'joint_5_0', 'joint_6_0', 'joint_7_0', 'joint_0_0', 'joint_1_0', 'joint_2_0', 'joint_3_0']
     # the robot hand at [0.5973, 0.0008, 0.6947] offset from base with palm open and facing downwards.
     _default_robot_model_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _default_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _teleop_rotation_offset: [0, 0.7071, 0, 0.7071]
     teleop_rotation_offset:
-      0: [0, 0.7071, 0, 0.7071]
+      "0": [0, 0.7071, 0, 0.7071]
     usd_path: "models/franka/franka_dexhand/franka_allegro.usd"
     curobo_attached_object_link_names: null
     disabled_collision_pairs: [["panda_link5", "panda_link7"], ["link_12_0", "part_studio_link"]]
@@ -70,20 +70,20 @@ property:
     model_name: "franka_leap_right"
     _eef_link_names: "palm_center"
     eef_link_names:
-      0: "palm_center"
+      "0": "palm_center"
     # thumb.proximal, ..., thumb.tip, ..., ring.tip
     _finger_link_names: ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
     finger_link_names:
-      0: ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
+      "0": ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
     _finger_joint_names: ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
     finger_joint_names:
-      0: ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
+      "0": ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
             # the robot hand at [0.4577, 0.0006, 0.7146] offset from base with palm open and facing downwards.
     _default_robot_model_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _default_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _teleop_rotation_offset: [-0.7071, 0.7071, 0, 0]
     teleop_rotation_offset:
-      0: [-0.7071, 0.7071, 0, 0]
+      "0": [-0.7071, 0.7071, 0, 0]
     usd_path: "models/franka/franka_dexhand/franka_leap_right.usd"
     curobo_attached_object_link_names: null
     disabled_collision_pairs: [["panda_link5", "panda_link7"]]
@@ -94,20 +94,20 @@ property:
     model_name: "franka_leap_left"
     _eef_link_names: "palm_center"
     eef_link_names:
-      0: "palm_center"
+      "0": "palm_center"
     # thumb.proximal, ..., thumb.tip, ..., ring.tip
     _finger_link_names: ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
     finger_link_names:
-      0: ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
+      "0": ['mcp_joint_1', 'pip_1', 'dip_1', 'fingertip_1', 'realtip_1', 'mcp_joint_2', 'pip_2', 'dip_2', 'fingertip_2', 'realtip_2', 'mcp_joint_3', 'pip_3', 'dip_3', 'fingertip_3', 'realtip_3', 'mcp_joint_4', 'pip_4', 'dip_4', 'fingertip_4', 'realtip_4']
     _finger_joint_names: ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
     finger_joint_names:
-      0: ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
+      "0": ['finger_joint_12', 'finger_joint_13', 'finger_joint_14', 'finger_joint_15', 'finger_joint_1', 'finger_joint_0', 'finger_joint_2', 'finger_joint_3', 'finger_joint_5', 'finger_joint_4', 'finger_joint_6', 'finger_joint_7', 'finger_joint_9', 'finger_joint_8', 'finger_joint_10', 'finger_joint_11']
             # the robot hand at [0.4577, 0.0006, 0.7146] offset from base with palm open and facing downwards.
     _default_robot_model_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _default_joint_pos: [ 0.8600, -0.2700, -0.6800, -1.5200, -0.1800,  1.2900,  1.7200,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000]
     _teleop_rotation_offset: [-0.7071, 0.7071, 0, 0]
     teleop_rotation_offset:
-      0: [-0.7071, 0.7071, 0, 0]
+      "0": [-0.7071, 0.7071, 0, 0]
     usd_path: "models/franka/franka_dexhand/franka_leap_left.usd"
     curobo_attached_object_link_names: null
     disabled_collision_pairs: [["panda_link5", "panda_link7"]]
@@ -118,20 +118,20 @@ property:
     model_name: "franka_inspire"
     _eef_link_names: "palm_center"
     eef_link_names:
-      0: "palm_center"
+      "0": "palm_center"
     # thumb.proximal, ..., thumb.tip, ..., ring.tip
     _finger_link_names: ['link11', 'link12', 'link13', 'link14', 'link21', 'link22', 'link31', 'link32', 'link41', 'link42', 'link51', 'link52']
     finger_link_names:
-      0: ['link11', 'link12', 'link13', 'link14', 'link21', 'link22', 'link31', 'link32', 'link41', 'link42', 'link51', 'link52']
+      "0": ['link11', 'link12', 'link13', 'link14', 'link21', 'link22', 'link31', 'link32', 'link41', 'link42', 'link51', 'link52']
     _finger_joint_names: ['joint11', 'joint12', 'joint13', 'joint14', 'joint21', 'joint22', 'joint31', 'joint32', 'joint41', 'joint42', 'joint51', 'joint52']
     finger_joint_names:
-      0: ['joint11', 'joint12', 'joint13', 'joint14', 'joint21', 'joint22', 'joint31', 'joint32', 'joint41', 'joint42', 'joint51', 'joint52']
+      "0": ['joint11', 'joint12', 'joint13', 'joint14', 'joint21', 'joint22', 'joint31', 'joint32', 'joint41', 'joint42', 'joint51', 'joint52']
     # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
     _default_robot_model_joint_pos: [ 0.6520, -0.2710, -0.6220, -2.7360, -0.2630,  2.4970,  1.0450,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000]
     _default_joint_pos: [ 0.6520, -0.2710, -0.6220, -2.7360, -0.2630,  2.4970,  1.0450,  0.0000, 0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000,  0.0000, 0.0000,  0.0000,  0.0000]
     _teleop_rotation_offset: [0, 0, 0.707, 0.707]
     teleop_rotation_offset:
-      0: [0, 0, 0.707, 0.707]
+      "0": [0, 0, 0.707, 0.707]
     usd_path: "models/franka/franka_dexhand/franka_inspire.usd"
     curobo_attached_object_link_names: null
     disabled_collision_pairs: [["panda_link5", "panda_link7"], ["base_link", "link12"]]

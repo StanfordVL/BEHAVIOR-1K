@@ -947,7 +947,7 @@ class ControllableObject(BaseObject):
         self._reset_joint_pos = value
 
     @property
-    @abstractmethod
+    # @abstractmethod
     def _default_joint_pos(self):
         """
         Returns:

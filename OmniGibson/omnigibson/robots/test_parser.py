@@ -23,6 +23,7 @@ scene = Scene()
 og.sim.import_scene(scene)
 
 # Not specifying `controller_config` will automatically use the default set of values
+# breakpoint()
 robot = VX300S(name="1")
 
 # Import robot and play sim
