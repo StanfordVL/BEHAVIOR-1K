@@ -72,7 +72,7 @@ m.INITIAL_SCENE_PRIM_Z_OFFSET = -100.0
 
 m.KIT_FILES = {
     # (4, 5, 0): "omnigibson_4_5_0.kit",
-    (5, 0, 0): "omnigibson_5_0_0.kit",
+    (5, 1, 0): "omnigibson_5_1_0.kit",
 }
 
 

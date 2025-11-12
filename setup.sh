@@ -241,15 +241,15 @@ pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https
 
 echo "✓ PyTorch installation completed"
 
-# Install numpy and setuptools via pip
-echo "Installing numpy and setuptools..."
-pip install "numpy<2" "setuptools<=79"
+# Install numpy <2 to avoid conflicts
+echo "Installing numpy..."
+pip install "numpy<2"
 
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
-    [ ! -d "bddl" ] && { echo "ERROR: bddl directory not found"; exit 1; }
-    pip install -e "$WORKDIR/bddl"
+    [ ! -d "BDDL" ] && { echo "ERROR: BDDL directory not found"; exit 1; }
+    pip install -e "$WORKDIR/BDDL"
 fi
 
 # Install OmniGibson with Isaac Sim
