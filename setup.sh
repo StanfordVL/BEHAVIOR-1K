@@ -228,21 +228,23 @@ if [ "$NEW_ENV" = true ]; then
     conda activate "$NEW_ENV_NAME"
     
     [[ "$CONDA_DEFAULT_ENV" != "$NEW_ENV_NAME" ]] && { echo "ERROR: Failed to activate environment '$NEW_ENV_NAME'"; exit 1; }
-    
-    # Install numpy and setuptools via pip
-    echo "Installing numpy and setuptools..."
-    pip install "numpy<2" "setuptools<=79"
-    
-    # Install PyTorch via pip with CUDA support
-    echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
-    
-    # Determine the CUDA version string for pip URL (e.g., cu126, cu124, etc.)
-    CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.6 to 126
-    
-    pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
-    
-    echo "✓ PyTorch installation completed"
+
 fi
+
+# Install PyTorch via pip with CUDA support
+echo "Installing PyTorch with CUDA $CUDA_VERSION support..."
+
+# Determine the CUDA version string for pip URL (e.g., cu128, cu126, etc.)
+CUDA_VER_SHORT=$(echo $CUDA_VERSION | sed 's/\.//g')  # e.g. convert 12.8 to 128
+
+pip install torch==2.7.0 torchvision==0.22.0 torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu${CUDA_VER_SHORT}
+
+echo "✓ PyTorch installation completed"
+
+# Install numpy and setuptools via pip
+echo "Installing numpy and setuptools..."
+pip install "numpy<2" "setuptools<=79"
+
 # Install BDDL
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
@@ -266,6 +268,21 @@ if [ "$OMNIGIBSON" = true ]; then
         exit 1
     fi
     
+    # if primitive specified and we don't have the corresponding system cuda toolkit, install cuda toolkit
+    if [ "$PRIMITIVES" = true ]; then
+        # Check if nvcc exists and reports the desired CUDA version; install toolkit if missing or mismatched
+        if ! command -v nvcc >/dev/null 2>&1 || ! nvcc -V 2>&1 | grep -q "$CUDA_VERSION"; then
+            echo "Installing CUDA Toolkit $CUDA_VERSION for primitives (curobo) support..."
+            conda install "cuda-compiler=$CUDA_VERSION" "cuda-toolkit=$CUDA_VERSION" -c conda-forge -y
+            export CUDA_HOME="$CONDA_PREFIX"
+            export CUDACXX="$CONDA_PREFIX/bin/nvcc"
+            export CUDA_PATH="$CUDA_HOME"
+            export CPATH="$CONDA_PREFIX/targets/x86_64-linux/include:$CPATH"
+            export LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LIBRARY_PATH"
+            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+        fi
+    fi
+
     # Build extras
     EXTRAS=""
     if [ "$DEV" = true ]; then
