@@ -12,7 +12,7 @@ from omnigibson.utils.transform_utils import euler2quat
 
 from omnigibson.robots.robot_base import BaseRobot, REGISTERED_ROBOTS
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
 from omnigibson.robots.articulated_trunk_robot import ArticulatedTrunkRobot
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
@@ -109,6 +109,133 @@ def _set_default_arm_poses(cfg, robot_cls):
     def default_arm_poses_prop(self):
         return default_arm_poses
     setattr(robot_cls, "default_arm_poses", default_arm_poses_prop)
+
+def _set_end_effector_properties(cfg, robot_cls):
+    """
+    Handle end-effector-specific properties for A1 and FrankaPanda robots.
+    These properties are defined under end-effector keys (e.g., "gripper", "inspire") 
+    in the YAML and need to be dynamically selected based on self.end_effector.
+    """
+    robot_name = cfg.get("name", "").lower()
+    if robot_name not in ["a1", "frankapanda"]:
+        return
+    
+    properties = cfg.get("property", {})
+    
+    # Find all end-effector configs (keys that are not standard property names)
+    # Common end-effector names: gripper, inspire, allegro, leap_right, leap_left
+    end_effector_names = ["gripper", "inspire", "allegro", "leap_right", "leap_left"]
+    end_effector_configs = {
+        name: properties[name] 
+        for name in end_effector_names 
+        if name in properties and isinstance(properties[name], dict)
+    }
+    
+    if not end_effector_configs:
+        return
+    
+    # Get property names from the first end-effector config (assuming all have same keys)
+    first_ee_config = next(iter(end_effector_configs.values()))
+    prop_names = set(first_ee_config.keys())
+    
+    # instance attributes, not @property
+    instance_attr_props = {
+        "_eef_link_names", "_finger_link_names", "_finger_joint_names",
+        "_default_robot_model_joint_pos", "_teleop_rotation_offset",
+        "_ag_start_points", "_ag_end_points", "_model_name", "_gripper_control_idx"
+    }
+    
+    tensor_props = {"_default_robot_model_joint_pos","_teleop_rotation_offset"}
+    grasping_point_props = {"_ag_start_points", "_ag_end_points"}
+    
+    # Helper function to convert list of [link_name, [x, y, z]] to GraspingPoint objects
+    def _convert_to_grasping_points(data):
+        result = []
+        for item in data:
+            link_name, position = item
+            result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
+        return result
+
+
+    # Store end-effector configs in class for access in __init__ and properties
+    robot_cls._end_effector_configs = end_effector_configs
+    
+    # Modify __init__ to set instance attributes based on end_effector
+    original_init = robot_cls.__init__
+    
+    def __init_with_end_effector(self, *args, **kwargs):
+        # Call original __init__ first (which sets self.end_effector)
+        original_init(self, *args, **kwargs)
+        
+        # Get config for current end_effector
+        ee_config = end_effector_configs.get(self.end_effector)
+        if ee_config is None:
+            return
+        
+        # Set instance attributes based on end_effector config
+        for prop_name in prop_names:
+            if prop_name not in instance_attr_props:
+                continue
+            
+            value = ee_config.get(prop_name)
+            if value is None:
+                continue
+            
+            # Apply special conversions
+            if prop_name in tensor_props:
+                # Convert list to tensor
+                if isinstance(value, list):
+                    li = []
+                    for ele in value:
+                        li.append(float(_convert_to_math_pi(ele)))
+                    value = th.tensor(li)
+            elif prop_name in grasping_point_props:
+                # Convert to GraspingPoint objects
+                value = _convert_to_grasping_points(value)
+            setattr(self, prop_name, value)
+    
+    setattr(robot_cls, "__init__", __init_with_end_effector)
+    
+    # @property that return values based on end_effector
+    import os
+    from omnigibson.utils.asset_utils import get_dataset_path
+    
+    for prop_name in prop_names:
+        if prop_name in instance_attr_props | grasping_point_props | tensor_props :
+            # Skip private properties that are already set as instance attributes
+            continue
+        
+        # Create property that dynamically returns value based on end_effector
+        def _make_dynamic_property_factory(prop_name):
+            if prop_name in ["usd_path", "urdf_path", "curobo_path"]:
+                @property
+                def prop_func(self):
+                    ee_config = end_effector_configs.get(self.end_effector)
+                    path = ee_config[prop_name]
+                    path = os.path.join(get_dataset_path("omnigibson-robot-assets"), path)
+                    return path
+            
+            else:
+                # Generic property that returns value from end_effector config
+                @property
+                def prop_func(self):
+                    ee_config = end_effector_configs.get(self.end_effector)
+                    return ee_config.get(prop_name) if ee_config else None
+            
+            return prop_func
+        
+        setattr(robot_cls, prop_name, _make_dynamic_property_factory(prop_name))
+    
+    # Add properties for _assisted_grasp_start_points and _assisted_grasp_end_points
+    # These are computed from instance attributes set in __init__
+    def _assisted_grasp_start_points_getter(self):
+        return {self.default_arm: getattr(self, "_ag_start_points", [])}
+    
+    def _assisted_grasp_end_points_getter(self):
+        return {self.default_arm: getattr(self, "_ag_end_points", [])}
+
+    setattr(robot_cls, "_assisted_grasp_start_points", property(_assisted_grasp_start_points_getter))
+    setattr(robot_cls, "_assisted_grasp_end_points", property(_assisted_grasp_end_points_getter))
     
 def _set_general_properties(cfg, robot_cls):
     """
@@ -350,7 +477,7 @@ def _create_init_method(cfg, robot_cls, bases):
                 kwargs[param_name] = default_value
         
         # Store custom parameters as instance attributes before calling super
-        # Also handle special validation for known parameters
+        # If robot class need to add special cases in init(), add them here
         for param_name, default_value in custom_params.items():
             value = kwargs.get(param_name, default_value)
             
@@ -359,6 +486,19 @@ def _create_init_method(cfg, robot_cls, bases):
                 if value not in valid_variants:
                     raise ValueError(f"Invalid Tiago variant specified {value}! Must be one of {valid_variants}")
                 self._variant = value
+            elif param_name == "end_effector" and cfg["name"].lower()=='a1':
+                if value not in ["gripper","inspire"]:
+                    raise ValueError(f"Invalid A1 end effector.")
+                self.end_effector = value
+            elif param_name == "end_effector" and cfg["name"].lower()=='frankapanda':
+                if value not in ["gripper","inspire","leap_right","leap_left","allegro"]:
+                    raise ValueError(f"Invalid A1 end effector.")
+                self.end_effector = value
+          
+        # Set grasping_direction based on end_effector for A1 and FrankaPanda
+        if cfg["name"].lower() in ['a1', 'frankapanda']:
+            end_effector_value = kwargs.get("end_effector", init_params.get("end_effector", "gripper"))
+            kwargs["grasping_direction"] = "lower" if end_effector_value == "gripper" else "upper"
           
         # Call super().__init__ with all kwargs (including overridden defaults)
         super(robot_cls, self).__init__(*args, **kwargs)
@@ -480,6 +620,7 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_teleop_rotation_offset(cfg, robot_cls)
     _set_arm_workspace_range(cfg, robot_cls)
     _set_default_arm_poses(cfg, robot_cls)
+    _set_end_effector_properties(cfg, robot_cls)  # Must be before _set_general_properties
     _set_post_load(cfg, robot_cls)
     
     # Set all other properties from 'property' section as @property

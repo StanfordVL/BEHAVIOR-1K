@@ -33,7 +33,6 @@ property:
   _default_controllers:
     "arm_0": "InverseKinematicsController"
     "gripper_0": "MultiFingerGripperController"
-  grasping_direction: "upper"
   arm_link_names:
     "0": ['arm_seg1', 'arm_seg2', 'arm_seg3', 'arm_seg4', 'arm_seg5']
   arm_joint_names:
@@ -41,7 +40,6 @@ property:
     
 
   gripper:
-    grasping_direction: lower
     _eef_link_names: "eef_link"
     eef_link_names:
       "0": "eef_link"

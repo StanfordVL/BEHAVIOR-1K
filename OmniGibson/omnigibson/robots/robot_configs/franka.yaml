@@ -33,7 +33,6 @@ property:
   _default_controllers:
     "arm_0": "InverseKinematicsController"
     "gripper_0": "MultiFingerGripperController"
-  grasping_direction: "upper"
   arm_link_names:
     "0": ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7']
   arm_joint_names:
@@ -41,7 +40,6 @@ property:
     
 
   gripper:
-    grasping_direction: lower
     _model_name: "franka_panda"
     model_name: "franka_panda"
     _gripper_control_idx: [7,8]
