@@ -205,7 +205,7 @@ class LocomotionRobot(BaseRobot):
         return th.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
 
     @property
-    @abstractmethod
+    # @abstractmethod
     def base_joint_names(self):
         """
         Returns:

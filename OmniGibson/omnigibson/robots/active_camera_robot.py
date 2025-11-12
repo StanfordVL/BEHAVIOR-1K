@@ -104,7 +104,7 @@ class ActiveCameraRobot(BaseRobot):
         return cfg
 
     @cached_property
-    @abstractmethod
+    # @abstractmethod
     def camera_joint_names(self):
         """
         Returns:

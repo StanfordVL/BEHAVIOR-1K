@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Tuple
 import torch as th
 import yaml
 from omnigibson.utils.transform_utils import euler2quat
-
+import os
+from omnigibson.utils.asset_utils import get_dataset_path
 
 from omnigibson.robots.robot_base import BaseRobot, REGISTERED_ROBOTS
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
@@ -32,13 +33,13 @@ CAPABILITY_BASES = {
 }
 
 EXPECTED_PROPS = {
-    "two_wheel_locomotion": {"wheel_radius", "wheel_axle_length"},
-    "untucked_arm_pose": {"default_arm_poses"},
-    "mobile_manipulation": {"tucked_default_joint_pos","untucked_default_joint_pos"},
-    "manipulation": {"arm_link_names","arm_joint_names","eef_link_names","gripper_link_names","finger_link_names","finger_joint_names","arm_workspace_range"},
-    "locomotion":{"floor_touching_base_link_names", "base_joint_names"},
-    "holonomic_base":{"base_footprint_link_name"},
-    "articulated_trunk": {"trunk_joint_names"},
+    "two_wheel_locomotion": {"wheel_radius", "wheel_axle_length", "base_joint_names"},
+    "untucked_arm_pose": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
+    "mobile_manipulation": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
+    "manipulation": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
+    "locomotion":{"base_joint_names"},
+    "holonomic_base": set(),  # Empty set, not empty dict
+    "articulated_trunk": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
     "active_camera":{"camera_joint_names"},
 }
 # Allowed top-level YAML keys and whether they are required
@@ -197,8 +198,7 @@ def _set_end_effector_properties(cfg, robot_cls):
     setattr(robot_cls, "__init__", __init_with_end_effector)
     
     # @property that return values based on end_effector
-    import os
-    from omnigibson.utils.asset_utils import get_dataset_path
+    
     
     for prop_name in prop_names:
         if prop_name in instance_attr_props | grasping_point_props | tensor_props :
@@ -220,7 +220,14 @@ def _set_end_effector_properties(cfg, robot_cls):
                 @property
                 def prop_func(self):
                     ee_config = end_effector_configs.get(self.end_effector)
-                    return ee_config.get(prop_name) if ee_config else None
+                    value=ee_config.get(prop_name)
+                    if prop_name in ["_default_joint_pos","teleop_rotation_offset"]:
+                        if isinstance(value, list):
+                            li = []
+                            for ele in value:
+                                li.append(float(_convert_to_math_pi(ele)))
+                            value = th.tensor(li)
+                    return value
             
             return prop_func
         
@@ -272,10 +279,18 @@ def _set_general_properties(cfg, robot_cls):
         # We need to capture the value in a closure with a default argument
         # to avoid late binding issues in loops
         def _make_property(name, value):
-            @property
-            def prop_func(self):
-                return value
-            return prop_func
+            if prop_name in ["usd_path", "urdf_path", "curobo_path"]:
+                @property
+                def prop_func(self):
+                    path = os.path.join(get_dataset_path("omnigibson-robot-assets"), value)
+                    return path
+                return prop_func
+            
+            else:
+                @property
+                def prop_func(self):
+                    return value
+                return prop_func
         
         setattr(robot_cls, prop_name, _make_property(prop_name, prop_value))
 
@@ -390,7 +405,7 @@ def _set_default_joint_pos(robot_cls, cfg):
 
 def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
     """
-    Creates untucked_default_joint_pos property
+    Creates (un)tucked_default_joint_pos property
     """
     properties = cfg.get("property", {}) 
     if k not in properties:
@@ -410,7 +425,9 @@ def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
                 pos = getattr(super(robot_cls, self), k).clone()
             
             for key, value in update_dict.items():
-                if key == "base_idx" and value == "current":
+                if key == "init":
+                    continue
+                elif key == "base_idx" and value == "current":
                     pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
                 elif key == "gripper_control_idx":
                     for arm in update_dict[key].keys():
@@ -424,7 +441,11 @@ def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
                     pos[self.camera_control_idx] = th.tensor(value)
                 else:
                     # Direct index update
-                    pos[key] = value
+                    # If key is an integer, use it directly; otherwise get the instance attribute
+                    if isinstance(key, int):
+                        pos[key] = value
+                    else:
+                        pos[getattr(self, key)] = value
             return pos
         return prop_func
     
@@ -520,20 +541,25 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
     
     # properties = cfg.get("property", {})
     # cached_property = cfg.get("cached_property", {})
+    set_of_props = set(cfg.get("property", {}).keys()) | set(cfg.get("classproperty", {}).keys())
+    if cfg['name'].lower() in ['a1','frankapanda']:
+        set_of_props = set_of_props | set(cfg['property']['gripper'].keys())
+        # return
     
-    # for cap in cfg.get("capabilities", []):
-    #     if cap not in CAPABILITY_BASES:
+    for cap in cfg.get("capabilities", []):
+        if cap not in CAPABILITY_BASES:
             
-    #         raise ValueError(f"{cfg['name']}: Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
-    #     # breakpoint()
-    #     if cap in EXPECTED_PROPS:
-    #         required_props = EXPECTED_PROPS[cap]
-    #         missing_props = required_props - set(properties.keys()) - set(cached_property.keys())
-    #         if missing_props:
-    #             raise ValueError(
-    #                 f"{cfg['name']}: Capability '{cap}' requires the following properties in YAML: {sorted(list(required_props))}. "
-    #                 f"Missing: {sorted(list(missing_props))}"
-    #             )
+            raise ValueError(f"{cfg['name']}: Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
+        # breakpoint()
+        if cap in EXPECTED_PROPS:
+            required_props = EXPECTED_PROPS[cap]
+            # print(cfg['name'],type(required_props),type(set_of_props))
+            missing_props = required_props - set_of_props
+            if missing_props:
+                raise ValueError(
+                    f"{cfg['name']}: Capability '{cap}' requires the following properties in YAML: {sorted(list(required_props))}. "
+                    f"Missing: {sorted(list(missing_props))}"
+                )
 
 def _import_class(import_path: str):
     """

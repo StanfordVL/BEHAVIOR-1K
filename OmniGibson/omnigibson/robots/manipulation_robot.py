@@ -761,7 +761,7 @@ class ManipulationRobot(BaseRobot):
         return gripper_action_idx
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def arm_link_names(self):
         """
         Returns:
@@ -774,7 +774,7 @@ class ManipulationRobot(BaseRobot):
         raise NotImplementedError
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def arm_joint_names(self):
         """
         Returns:
@@ -787,7 +787,7 @@ class ManipulationRobot(BaseRobot):
         raise NotImplementedError
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def eef_link_names(self):
         """
         Returns:
@@ -797,7 +797,7 @@ class ManipulationRobot(BaseRobot):
         raise NotImplementedError
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def gripper_link_names(self):
         """
         Returns:
@@ -810,7 +810,7 @@ class ManipulationRobot(BaseRobot):
         raise NotImplementedError
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def finger_link_names(self):
         """
         Returns:
@@ -823,7 +823,7 @@ class ManipulationRobot(BaseRobot):
         raise NotImplementedError
 
     @cached_property
-    @abstractmethod
+    #@abstractmethod
     def finger_joint_names(self):
         """
         Returns:

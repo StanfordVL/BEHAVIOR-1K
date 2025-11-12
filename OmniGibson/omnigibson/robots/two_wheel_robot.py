@@ -127,7 +127,7 @@ class TwoWheelRobot(LocomotionRobot):
         return cfg
 
     @property
-    @abstractmethod
+    # @abstractmethod
     def wheel_radius(self):
         """
         Returns:
@@ -136,7 +136,7 @@ class TwoWheelRobot(LocomotionRobot):
         raise NotImplementedError
 
     @property
-    @abstractmethod
+    # @abstractmethod
     def wheel_axle_length(self):
         """
         Returns:

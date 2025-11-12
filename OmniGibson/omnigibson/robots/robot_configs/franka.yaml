@@ -61,8 +61,8 @@ property:
     urdf_path: "models/franka/franka_panda/urdf/franka_panda.urdf"
     curobo_path: "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml"
     disabled_collision_pairs: [["panda_link5", "panda_link7"], ["panda_link5", "panda_hand"]]
-    _ag_start_points: ["panda_rightfinger", [0.0, 0.001, 0.045]]
-    _ag_end_points: ["panda_leftfinger", [0.0, 0.001, 0.045]]
+    _ag_start_points: [["panda_rightfinger", [0.0, 0.001, 0.045]]]
+    _ag_end_points: [["panda_leftfinger", [0.0, 0.001, 0.045]]]
   allegro:
     _model_name: "franka_allegro"
     model_name: "franka_allegro"
