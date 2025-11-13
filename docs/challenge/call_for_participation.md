@@ -86,7 +86,7 @@ Submissions will be made through Google Form. Teams will evaluate their solution
 
 **September 2nd, 2025:** Challenge **launch** - participants can register on our platform, download all data, and begin developing their solutions. During this phase, you can submit to the public leaderboard to see where you stand and iterate on your models.
 
-**November 15th, 2025:** **Final evaluation** - the organizers will run all qualified submissions on the hidden test set in a controlled environment. We’ll then aggregate the results and identify the top-performing solutions.
+**November 16th, 2025:** **Final evaluation** - the organizers will run all qualified submissions on the hidden test set in a controlled environment. We’ll then aggregate the results and identify the top-performing solutions.
 
 **December 6-7, 2025:** **NeurIPS 2025 Competition Event** - final results are revealed and the **winners announced** at the NeurIPS conference in San Diego. The top teams will be invited to present their approaches at the NeurIPS competition track workshop. This is a great opportunity to discuss what worked, what didn’t, and share insights with the broader research community.
 

@@ -6,6 +6,12 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 11/13/2025 — Deadline Extension"
+
+    To allow any final evaluations to complete, we're extending the submission deadline by 24 hours.
+    The new deadline will now be November 16th 11:59PM AoE. Please plan accordingly as we will not be able to accept any late submissions!
+
+
 !!! info "🗓️ 11/07/2025 — Rule Clarifications"
     Key updates this week:
     
@@ -142,7 +148,7 @@ Whether you're a robotics veteran or just entering the field, we're here to supp
 ### Important Dates
 
 - **Challenge Launch**: September 2, 2025
-- **Submission Deadline**: November 15, 2025
+- **Submission Deadline**: November 16th 11:59PM AoE, 2025
 - **Winners Announcement**: December 6-7, 2025 @ NeurIPS conference in San Diego
 
 ## :material-book-edit: **BibTeX**
