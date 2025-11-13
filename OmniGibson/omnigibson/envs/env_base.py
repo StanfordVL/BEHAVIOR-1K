@@ -503,7 +503,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         obs = dict()
         info = dict()
-
+        if self.in_vec_env:
+            return obs, info
         # Grab all observations from each robot
         for robot in self.robots:
             if maxdim(robot.observation_space) > 0:
@@ -602,11 +603,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
     def _post_step(self, action):
         """Apply the post-sim-step part of an environment step, i.e. grab observations and return the step results."""
         # Grab observations
-        if self.in_vec_env:
-            # In a vec env, we skip observation calculation here since the vec env will handle it
-            obs, obs_info = None, None
-        else:
-            obs, obs_info = self.get_obs()
+        obs, obs_info = self.get_obs()
 
         # Step the scene graph builder if necessary
         if self._scene_graph_builder is not None:

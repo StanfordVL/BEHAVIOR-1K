@@ -2,7 +2,6 @@ import copy
 import omnigibson as og
 from omnigibson.sensors import TiledVisionSensor
 from tqdm import trange
-import time
 
 
 class VectorEnvironment:
@@ -35,16 +34,14 @@ class VectorEnvironment:
         observations, rewards, terminates, truncates, infos = [], [], [], [], []
         for i, action in enumerate(actions):
             self.envs[i]._pre_step(action)
-        a = time.time()
         og.sim.step()
-        print("Sim step time:", time.time() - a)
 
-        # tiled_buffer = self.tiled_sensor.get_obs()
-
+        tiled_buffer = self.tiled_sensor.get_obs()
         for i, action in enumerate(actions):
-            # TODO: ignore camera observation here
-            # TODO: potentially, we could get the tiled image first, segment it, and then replace all the normal camera observations with the segmented tiled image
             obs, reward, terminated, truncated, info = self.envs[i]._post_step(action)
+            for sensor_name in self.tiled_sensor.modalities:
+                for modality in self.tiled_sensor.modalities[sensor_name]:
+                    obs[sensor_name + "::" + modality] = tiled_buffer[sensor_name][modality][i]
             observations.append(obs)
             rewards.append(reward)
             terminates.append(terminated)

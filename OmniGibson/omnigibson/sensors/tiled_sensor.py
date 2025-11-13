@@ -74,13 +74,13 @@ class TiledVisionSensor:
         for sensor_name in self._camera_prims:
             self._output_buffer[sensor_name] = dict()
             for modality in self.modalities[sensor_name]:
-                if modality == "rgb" or modality == "normal":
+                if modality == "rgb":
                     self._output_buffer[sensor_name][modality] = th.zeros(
                         (
                             self._camera_count(sensor_name=sensor_name),
                             self._camera_resolution[sensor_name][1],
                             self._camera_resolution[sensor_name][0],
-                            3,
+                            4,
                         ),
                         device=device,
                         dtype=th.uint8,
@@ -118,6 +118,17 @@ class TiledVisionSensor:
                         device=device,
                         dtype=th.float32,
                     ).contiguous()
+                elif modality == "normal":
+                    self._output_buffer[sensor_name][modality] = th.zeros(
+                        (
+                            self._camera_count(sensor_name=sensor_name),
+                            self._camera_resolution[sensor_name][1],
+                            self._camera_resolution[sensor_name][0],
+                            3,
+                        ),
+                        device=device,
+                        dtype=th.uint8,
+                    ).contiguous()
                 else:
                     raise ValueError(f"Unsupported modality {modality} for tiled vision sensor!")
 
@@ -125,7 +136,7 @@ class TiledVisionSensor:
         return len(self._camera_prims[sensor_name])
 
     def _tiled_grid_shape(self, sensor_name: str) -> Tuple[int, int]:
-        cols = round(math.sqrt(self._camera_count(sensor_name=sensor_name)))
+        cols = math.ceil(math.sqrt(self._camera_count(sensor_name=sensor_name)))
         rows = math.ceil(self._camera_count(sensor_name=sensor_name) / cols)
         return (cols, rows)
 
