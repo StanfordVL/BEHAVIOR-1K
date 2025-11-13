@@ -43,7 +43,7 @@ def generate_combined_leaderboard():
     
     tracks = {
         "Standard Track": "standard",
-        "Privileged Information Track": "privileged"
+        "Privileged Track": "privileged"
     }
     
     with mkdocs_gen_files.open("challenge/leaderboard.md", "w") as fd:
@@ -69,12 +69,7 @@ def generate_combined_leaderboard():
                     fd.write(f"| {i} | {sub['team']} | {sub['affiliation']} | {sub['date']} | {q_score} | {time_score} | {distance_score} |\n")
 
                 fd.write("\n")
-        
-        # Submission instructions
-        fd.write("## How to Submit\n\n")
-        fd.write("To submit your results to the leaderboard:\n\n")
-        fd.write("1. **Submit self-reported scores** through this [google form](https://forms.gle/54tVqi5zs3ANGutn7)\n")
-        fd.write("2. **Wait for review** - once approved, your results will appear on the leaderboard!\n\n")
+
 
 # Generate the leaderboard when this module is imported during mkdocs build
 generate_combined_leaderboard()
