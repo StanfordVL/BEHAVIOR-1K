@@ -3,7 +3,7 @@ module_path: omnigibson.robots.robot_configs.tiago
 description: |
   Tiago Robot
   Reference: https://pal-robotics.com/robots/tiago/
-capabilities: [holonomic_base, articulated_trunk, active_camera, untucked_arm_pose]
+capabilities: [holonomic_base, articulated_trunk, untucked_arm_pose, active_camera]
 init:
   # Override parent class default for default_arm_pose
   default_arm_pose: "diagonal15"

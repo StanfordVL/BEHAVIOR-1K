@@ -454,46 +454,43 @@ def _set_tucked_untucked_default_joint_pos(cfg, robot_cls, k):
 def _create_init_method(cfg, robot_cls, bases):
     """
     Create __init__ method from YAML 'init' section.
-    The init section should contain parameter names and their default values.
+    The init section in yaml contains the robot class' parameter names and default values for __init__().
     These can override parent class defaults or add new parameters.
+
+    Also add another attr _init_param_names_from_yaml to store all support params in the final __init__().
     """
-    init_params = cfg.get("init", {})
-    if not init_params:
+    init_params_from_yaml = cfg.get("init", {})
+
+    # Step 1: get all init() params for this robot_cls
+    
+    # Get the params of all base class' __init__()
+    import inspect
+    base_params = set()
+    for base in bases:
+        if not (hasattr(base, "__init__") and base.__init__ is not object.__init__):
+            continue
+        if hasattr(base, "_init_param_names_from_yaml"):
+            base_params |= set(base._init_param_names_from_yaml)
+        else:
+            sig = inspect.signature(base.__init__)
+            base_param |= set(sig.parameters.keys())
+    base_params.discard('self')  # Remove 'self'
+
+    robot_cls._init_param_names_from_yaml = base_params | set(init_params_from_yaml.keys())
+    
+    # Step 2: create init() for this robot_cls
+    
+    if not init_params_from_yaml:
         # No custom __init__ specified, use base class __init__
         return
-    
-    # Get the signature of the first base class __init__ to understand parameter order
-    import inspect
-    base_init = None
-    for base in bases:
-        if hasattr(base, "__init__") and base.__init__ is not object.__init__:
-            base_init = base.__init__
-            break
-    
-    if base_init is None:
-        # No base __init__ found, create a simple one
-        def __init__(self, **kwargs):
-            for key, value in init_params.items():
-                setattr(self, f"_{key}", kwargs.get(key, value))
-        setattr(robot_cls, "__init__", __init__)
-        return
-    
-    # Get base __init__ signature to identify which params are custom
-    try:
-        sig = inspect.signature(base_init)
-        base_params = set(sig.parameters.keys())
-        base_params.discard('self')  # Remove 'self'
-    except (ValueError, TypeError):
-        # Can't inspect signature, assume all are base params
-        base_params = set()
-    
+
     # Identify custom parameters (not in base __init__)
-    custom_params = {k: v for k, v in init_params.items() if k not in base_params}
+    custom_params = {k: v for k, v in init_params_from_yaml.items() if k not in base_params}
     
-    # Create __init__ method
+    # Create final __init__() for robot classs
     def __init__(self, *args, **kwargs):
         # Apply defaults from YAML init section (overrides parent defaults)
-        for param_name, default_value in init_params.items():
+        for param_name, default_value in init_params_from_yaml.items():
             if param_name not in kwargs:
                 kwargs[param_name] = default_value
         
@@ -518,7 +515,7 @@ def _create_init_method(cfg, robot_cls, bases):
           
         # Set grasping_direction based on end_effector for A1 and FrankaPanda
         if cfg["name"].lower() in ['a1', 'frankapanda']:
-            end_effector_value = kwargs.get("end_effector", init_params.get("end_effector", "gripper"))
+            end_effector_value = kwargs.get("end_effector", init_params_from_yaml.get("end_effector", "gripper"))
             kwargs["grasping_direction"] = "lower" if end_effector_value == "gripper" else "upper"
           
         # Call super().__init__ with all kwargs (including overridden defaults)

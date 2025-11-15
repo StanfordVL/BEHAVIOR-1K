@@ -191,6 +191,11 @@ def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
 def get_class_init_kwargs(cls):
     """
     Helper function to return a list of all valid keyword arguments (excluding "self") for the given @cls class.
+    
+    This function first checks if the class has a `_init_param_names_from_yaml` attribute, which is set
+    for robot classes dynamically created from YAML configs. If present, it uses that list. Otherwise, it
+    falls back to inspecting the __init__ method signature. This is necessary because YAML-defined robot classes 
+    have __init__ methods that use *args, **kwargs, making signature inspection unreliable. 
 
     Args:
         cls (object): Class from which to grab __init__ kwargs
@@ -198,6 +203,11 @@ def get_class_init_kwargs(cls):
     Returns:
         list: All keyword arguments (excluding "self") specified by @cls __init__ constructor method
     """
+    # Check if class has stored init param names from YAML config
+    if hasattr(cls, "_init_param_names_from_yaml"):
+        return cls._init_param_names_from_yaml
+    
+    # Fall back to signature inspection for regular classes
     return list(inspect.signature(cls.__init__).parameters.keys())[1:]
 
 
