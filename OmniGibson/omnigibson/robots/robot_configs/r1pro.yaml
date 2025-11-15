@@ -4,7 +4,18 @@ description: R1 Pro Robot
 capabilities: []
 extends: omnigibson.robots.robot_configs.r1:R1
 property:
+  tucked_default_joint_pos:
+    init: 0 # initiate as pos = th.zeros(self.n_dof)
+    base_idx: current # Keep the current joint positions for the base joints
+    gripper_control_idx:
+      left: [0.05, 0.05]
+      right: [0.05, 0.05]
   untucked_default_joint_pos:
+    init: 0 # initiate as pos = th.zeros(self.n_dof)
+    base_idx: current # Keep the current joint positions for the base joints
+    gripper_control_idx:
+      left: [0.05, 0.05]
+      right: [0.05, 0.05]
     arm_control_idx:
       left: [0.0, 1.57, 0.0, -1.57, 1.57, 0.0, 0.0]
       right: [0.0, -1.57, 0.0, -1.57, -1.57, 0.0, 0.0]

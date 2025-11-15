@@ -383,7 +383,7 @@ def _set_teleop_rotation_offset(cfg, robot_cls):
         return value
     setattr(robot_cls, "teleop_rotation_offset", teleop_rotation_offset_prop)
 
-def _set_default_joint_pos(robot_cls, cfg):
+def _set_default_joint_pos(cfg, robot_cls):
     properties = cfg.get("property", {})
     if "_default_joint_pos" in properties:
         val = properties["_default_joint_pos"]
@@ -403,7 +403,7 @@ def _set_default_joint_pos(robot_cls, cfg):
                 return th.zeros(self.n_joints)
             setattr(robot_cls, "_default_joint_pos", _default_joint_pos_prop)
 
-def _set_tucked_untucked_default_joint_pos(robot_cls, cfg, k):
+def _set_tucked_untucked_default_joint_pos(cfg, robot_cls, k):
     """
     Creates (un)tucked_default_joint_pos property
     """
@@ -640,9 +640,9 @@ def create_robot_class_from_yaml(config_path: Path):
     
     # Set up special properties that need dynamic creation
     _set_default_controllers(cfg, robot_cls)
-    _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "tucked_default_joint_pos")
-    _set_tucked_untucked_default_joint_pos(robot_cls, cfg, "untucked_default_joint_pos")
-    _set_default_joint_pos(robot_cls, cfg)
+    _set_tucked_untucked_default_joint_pos(cfg, robot_cls, "tucked_default_joint_pos")
+    _set_tucked_untucked_default_joint_pos(cfg, robot_cls, "untucked_default_joint_pos")
+    _set_default_joint_pos(cfg, robot_cls)
     _set_teleop_rotation_offset(cfg, robot_cls)
     _set_arm_workspace_range(cfg, robot_cls)
     _set_default_arm_poses(cfg, robot_cls)

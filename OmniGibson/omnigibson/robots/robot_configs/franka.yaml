@@ -1,8 +1,7 @@
 name: FrankaPanda
 module_path: omnigibson.robots.robot_configs.franka
 description: The Franka Emika Panda robot
-capabilities:
-  - manipulation
+capabilities: [manipulation]
 init:
   name: null
   relative_prim_path: null
