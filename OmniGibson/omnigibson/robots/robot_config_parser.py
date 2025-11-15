@@ -473,7 +473,7 @@ def _create_init_method(cfg, robot_cls, bases):
             base_params |= set(base._init_param_names_from_yaml)
         else:
             sig = inspect.signature(base.__init__)
-            base_param |= set(sig.parameters.keys())
+            base_params |= set(sig.parameters.keys())
     base_params.discard('self')  # Remove 'self'
 
     robot_cls._init_param_names_from_yaml = base_params | set(init_params_from_yaml.keys())
