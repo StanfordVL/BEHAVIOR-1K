@@ -362,10 +362,14 @@ def remove_failed_episodes(worksheet, data_dir: str) -> None:
 
 
 def extract_annotations(
-    data_dir: str, annotation_data_dir: str, credentials_path: str = "~/Documents/credentials"
+    data_dir: str,
+    annotation_data_dir: str,
+    credentials_path: str = "~/Documents/credentials",
+    remove_memory_prefix: bool = False,
 ) -> None:
     """
     Extract annotations from the annotation data directory and store in the data directory.
+    If remove_memory_prefix is True, remove "memory_prefix" field in skill annotations.
     """
     data_dir = os.path.expanduser(data_dir)
     makedirs_with_mode(f"{data_dir}/annotations")
@@ -407,9 +411,27 @@ def extract_annotations(
                         f"{data_dir}/annotations/task-{task_index:04d}/{filename}_{timestamp}.json",
                         f"{data_dir}/annotations/task-{task_index:04d}/episode_{task_index:04d}{instance_id:03d}{traj_id:01d}.json",
                     )
+                    if remove_memory_prefix:
+                        # remove "memory" in skill_annotations and primitive_annotations
+                        with open(
+                            f"{data_dir}/annotations/task-{task_index:04d}/episode_{task_index:04d}{instance_id:03d}{traj_id:01d}.json",
+                            "r",
+                        ) as f:
+                            annotation_data = json.load(f)
+                        for skill in annotation_data.get("skill_annotation", []):
+                            if "memory_prefix" in skill:
+                                del skill["memory_prefix"]
+                        for primitive in annotation_data.get("primitive_annotation", []):
+                            if "memory_prefix" in primitive:
+                                del primitive["memory_prefix"]
+                        with open(
+                            f"{data_dir}/annotations/task-{task_index:04d}/episode_{task_index:04d}{instance_id:03d}{traj_id:01d}.json",
+                            "w",
+                        ) as f:
+                            json.dump(annotation_data, f, indent=4)
             print(f"Finished processing task {task_index} - {filename}")
             task_processed += 1
-            time.sleep(1)  # to avoid rate limiting
+            time.sleep(1.5)  # to avoid rate limiting
 
     # remove __MACOSX folder
     shutil.rmtree(f"{data_dir}/annotations/__MACOSX")
@@ -753,7 +775,7 @@ def update_tracking_sheet(
 
 
 if __name__ == "__main__":
-    check_leaf_folders_have_n("~/behavior", 200)
+    # check_leaf_folders_have_n("~/behavior", 200)
     # gc = get_credentials("~/Documents/credentials")[0]
     # tracking_spreadsheet = gc.open("B1K Challenge 2025 Data Replay Tracking Sheet")
     # misc_sheet = gc.open("B50 Task Misc")
@@ -763,4 +785,7 @@ if __name__ == "__main__":
     #     task_ws = tracking_spreadsheet.worksheet(f"{task_index} - {task_name}")
     #     assign_test_instances(task_ws, misc_ws, misc_values)
     #     time.sleep(1)
+    # extract_annotations(
+    #     "/scr/behavior/2025-challenge-demos", "/home/svl/Downloads/annotations", remove_memory_prefix=True
+    # )
     og.shutdown()

@@ -43,8 +43,9 @@ Here is a brief explanation of the arguments:
     ```
 which is a barebone wrapper that does not provide anything beyond low resolution rgb and proprioception info. There are three example wrappers under `omnigibson.learning.wrappers`:
 
-    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in standard track. 
+    - `RGBLowResWrapper`: only use rgb as visual observation and camera resolutions of 224 * 224. Only using low-res RGB can help speed up the simulator and thus reduce evaluation time compared to the two other example wrappers. This wrapper is ok to use in both standard track and priveleged track.
     - `DefaultWrapper`: wrapper with the default observation config used during data collection (rgb + depth + segmentation, 720p for head camera and 480p for wrist camera). This wrapper is ok to use in standard track, but evaluation will be considerably slower compared to `RGBLowResWrapper`. 
+    - `HeavyRobotWrapper`: wrapper with the RGB low resolution observation config, and heavy robot base mass (250kg) used during data collection. This wrapper is ok to use in both standard track and privileged track. 
     - `RichObservationWrapper`: this will load additional observation modalities, such as normal and flow, as well as privileged task information. This wrapper can only be used in privileged information track. 
 
 There are some more optional arguments, see [base_config.yaml](https://github.com/StanfordVL/BEHAVIOR-1K/blob/main/OmniGibson/omnigibson/learning/configs/base_config.yaml). 
@@ -191,7 +192,7 @@ The success score (**Q**) is the metric used for ranking submissions. If two sub
 - **Self-evaluation and report:** In addition to the 200 human-collected demonstrations, we provide 20 extra configuration instances for each task. Use the **first 10** instances for evaluation results. Participants should report their performance on theese 10 instances and submit their scores using our Google Form located at the [submission page](./submission.md). You should evaluate your policy 1 time (with time-outs = 2 * average task completion time within the dataset, provided by our evaluation script) on each instance. We will update the leaderboard once we sanity-check the performance. The **remaining 10** instances are not used for evaluation and may serve as a test set before evaluating your final policy.
 
 
-- **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard on November 15th, 2025, we will evaluate the top-5 solutions on the leaderboard using these instances.
+- **Final evaluation:** We will hold out 10 more instances for final evaluation. After we freeze the leaderboard upon submission deadline, we will evaluate the top-5 solutions on the leaderboard using these instances.
 
 - Each instance differs in terms of:
     - Initial object states

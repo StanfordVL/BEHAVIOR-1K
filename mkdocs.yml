@@ -102,7 +102,7 @@ nav:
     - challenge/index.md
     - Call for Participation: challenge/call_for_participation.md
     - Announcements / Updates: challenge/updates.md
-    # - Leaderboard: challenge/leaderboard.md
+    - Leaderboard: challenge/leaderboard.md
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md

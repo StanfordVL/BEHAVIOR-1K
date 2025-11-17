@@ -6,6 +6,30 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 11/13/2025 — Deadline Extension"
+
+    To allow any final evaluations to complete, we're extending the submission deadline by 24 hours.
+    The new deadline will now be November 16th 11:59PM AoE. Please plan accordingly as we will not be able to accept any late submissions!
+
+
+!!! info "🗓️ 11/07/2025 — Rule Clarifications"
+    Key updates this week:
+    
+    - Documentation updates
+    - Bug fixes & Hidden test logic addition. 
+
+    [Read full details →](./updates.md#11072025)
+
+
+!!! info "🗓️ 10/30/2025 — Rule Clarifications & Features Update"
+    Key updates this week:
+    
+    - We have released language annotations for all 50 tasks.
+    - We have included task id as part of the observation dict that the policy will receive. 
+    - Added more utilities (HeavyRobotWrapper, score_utils, etc.)
+
+    [Read full details →](./updates.md#10302025)
+
 !!! info "🗓️ 10/08/2025 — Rule Clarifications, Bug Fixes & NVIDIA Sponsorship"
     Key updates this week:
     
@@ -30,7 +54,7 @@
 
     [Read full details →](./updates.md#09282025)
 
-!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol, & Tutorial"
+!!! info "🗓️ 09/19/2025 — Rule Clarifications, Evaluation Protocol & Tutorial"
     Highlights:
     
     - BDDL task definitions can be used for both tracks and are identical during evaluation.  
@@ -75,11 +99,13 @@ BEHAVIOR challenge is co-hosted with the [Embodied Agent Interface Competition](
 Pre-implemented training & evaluation pipelines for:
 
 - **Behavioral Cloning baselines**: ACT, Diffusion Policy, BC-RNN, WB-VIMA - these are diverse imitation learning approaches that learn from the provided demonstrations.
-- **Pre-trained Visuo-Language Action models**: OpenVLA and π0.  These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
+- **Pre-trained Visuo-Language Action models**: OpenVLA and π0. These models are pretrained by a large amount of demonstration data, giving an alternative to models that need to be trained from scratch.
 
 [Baselines details →](./baselines.md)
 
 ## :material-chart-box: **Evaluation & Rules**
+
+The organizers reserve the right of final interpretation of the challenge rules. 
 
 ### Challenge Tracks
 
@@ -122,7 +148,7 @@ Whether you're a robotics veteran or just entering the field, we're here to supp
 ### Important Dates
 
 - **Challenge Launch**: September 2, 2025
-- **Submission Deadline**: November 15, 2025
+- **Submission Deadline**: November 16th 11:59PM AoE, 2025
 - **Winners Announcement**: December 6-7, 2025 @ NeurIPS conference in San Diego
 
 ## :material-book-edit: **BibTeX**

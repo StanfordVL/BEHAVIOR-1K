@@ -1,6 +1,6 @@
 """Generate combined leaderboard page for BEHAVIOR-1K challenge."""
 
-import yaml
+import json
 from pathlib import Path
 import mkdocs_gen_files
 
@@ -12,40 +12,38 @@ def load_submissions(track_dir):
     if not track_path.exists():
         return []
     
-    for yaml_file in track_path.glob("*.yaml"):
+    for json_file in track_path.glob("*.json"):
         try:
-            with open(yaml_file) as f:
-                data = yaml.safe_load(f)
+            with open(json_file) as f:
+                data = json.load(f)
+
+            assert "overall_scores" in data, "Missing overall_scores in submission JSON"
             
-            # Calculate overall success rate
-            if 'results' in data:
-                total_rate = sum(task['success_rate'] for task in data['results'])
-                avg_rate = total_rate / len(data['results']) if data['results'] else 0
-            else:
-                avg_rate = 0
-                
             submission = {
-                'team': data.get('team', 'Unknown'),
-                'affiliation': data.get('affiliation', ''),
-                'date': data.get('date', ''),
-                'avg_success_rate': avg_rate,
-                'results': data.get('results', [])
+                "team": data.get("team", "Unknown"),
+                "affiliation": data.get("affiliation", ""),
+                "date": data.get("date", ""),
+                "overall_q_score": data["overall_scores"].get("q_score", 0),
+                "overall_time_score": data["overall_scores"].get("time_score", 0),
+                "overall_base_distance_score": data["overall_scores"].get("base_distance_score", 0),
+                "overall_left_distance_score": data["overall_scores"].get("left_distance_score", 0),
+                "overall_right_distance_score": data["overall_scores"].get("right_distance_score", 0),
             }
             submissions.append(submission)
             
         except Exception as e:
-            print(f"Error loading {yaml_file}: {e}")
+            print(f"Error loading {json_file}: {e}")
     
     # Sort by average success rate (descending)
-    submissions.sort(key=lambda x: x['avg_success_rate'], reverse=True)
+    submissions.sort(key=lambda x: x['overall_q_score'], reverse=True)
     return submissions
 
 def generate_combined_leaderboard():
     """Generate a single leaderboard page with both tracks."""
     
     tracks = {
-        "Standard Track": "standard_track",
-        "Privileged Information Track": "privileged_track"
+        "Standard Track": "standard",
+        "Privileged Track": "privileged"
     }
     
     with mkdocs_gen_files.open("challenge/leaderboard.md", "w") as fd:
@@ -61,20 +59,17 @@ def generate_combined_leaderboard():
                 fd.write("No submissions yet. Be the first to submit!\n\n")
             else:
                 # Leaderboard table
-                fd.write("| Rank | Team | Affiliation | Success Rate | Date |\n")
-                fd.write("|------|------|-------------|--------------|------|\n")
-                
+                fd.write("| Rank | Team | Affiliation | Date | Q Score (🢁) <br/> (self-reported) | Time Score (🢁) <br/> (self-reported) | Distance Score (🢁) <br/> (self-reported) |\n")
+                fd.write("|------|------|-------------|------|-----------------------------|---------------------------------|------------------------------------|\n")
+
                 for i, sub in enumerate(submissions, 1):
-                    rate_percent = f"{sub['avg_success_rate']:.1%}"
-                    fd.write(f"| {i} | {sub['team']} | {sub['affiliation']} | {rate_percent} | {sub['date']} |\n")
-                
+                    q_score = f"{sub['overall_q_score']:.4f}"
+                    time_score = f"{sub['overall_time_score']:.4f}"
+                    distance_score = f"{((sub['overall_base_distance_score'] + sub['overall_left_distance_score'] + sub['overall_right_distance_score']) / 3):.4f}"
+                    fd.write(f"| {i} | {sub['team']} | {sub['affiliation']} | {sub['date']} | {q_score} | {time_score} | {distance_score} |\n")
+
                 fd.write("\n")
-        
-        # Submission instructions
-        fd.write("## How to Submit\n\n")
-        fd.write("To submit your results to the leaderboard:\n\n")
-        fd.write("1. **Submit self-reported scores** through this [google form](https://forms.gle/54tVqi5zs3ANGutn7)\n")
-        fd.write("2. **Wait for review** - once approved, your results will appear on the leaderboard!\n\n")
+
 
 # Generate the leaderboard when this module is imported during mkdocs build
 generate_combined_leaderboard()
