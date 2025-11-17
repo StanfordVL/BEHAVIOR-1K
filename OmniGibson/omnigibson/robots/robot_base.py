@@ -181,6 +181,22 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Load the sensors
         self._load_sensors()
 
+        # special case handling
+        if self.model_name.lower() in ["r1", "r1pro"]:
+                # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels
+                # We need to manually set it back to sphere approximation
+                for wheel_name in self.floor_touching_base_link_names:
+                    wheel_link = self.links[wheel_name]
+                    assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+                    wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+        elif self.model_name.lower() == "tiago":
+            # The eef gripper links should be visual-only. They only contain a "ghost" box volume 
+            # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
+            for arm in self.arm_names:
+                self.eef_links[arm].visual_only = True
+                self.eef_links[arm].visible = False
+           
+
     def _initialize(self):
         # Run super
         super()._initialize()

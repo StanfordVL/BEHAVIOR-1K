@@ -54,35 +54,6 @@ ALLOWED_TOP_KEYS: Dict[str, bool] = {
     "init": False,              # dict[str, Any] for __init__ method parameters and default values
 }
 
-def _set_post_load(cfg, robot_cls):
-    """
-    Creates _post_load method based on robot name.
-    Only work for tiago, r1 and r1pro for now.
-    
-    """
-    robot_name = cfg.get("name", "").lower()
-    
-    if robot_name.lower() in ["r1", "r1pro"]:
-        def _post_load(self):
-            super(robot_cls, self)._post_load()
-            # R1 and R1Pro's URDFs still use the mesh type for the collision meshes of the wheels
-            # We need to manually set it back to sphere approximation
-            for wheel_name in self.floor_touching_base_link_names:
-                wheel_link = self.links[wheel_name]
-                assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
-                wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
-        setattr(robot_cls, "_post_load", _post_load)
-    
-    elif robot_name.lower() == "tiago":
-        def _post_load(self):
-            super(robot_cls, self)._post_load()
-            # The eef gripper links should be visual-only. They only contain a "ghost" box volume 
-            # for detecting objects inside the gripper, in order to activate attachments (AG for Cloths).
-            for arm in self.arm_names:
-                self.eef_links[arm].visual_only = True
-                self.eef_links[arm].visible = False
-        setattr(robot_cls, "_post_load", _post_load)
-
 def _set_arm_workspace_range(cfg, robot_cls):
     properties = cfg.get("property", {})
     if "arm_workspace_range" not in properties:
@@ -360,7 +331,7 @@ def _convert_to_math_pi(ele):
     except (SyntaxError, NameError, ZeroDivisionError) as e:
         return ele
 
-def _set_teleop_rotation_offset(cfg, robot_cls):
+def _set_teleop_rotation_offset(cfg, robot_cls, need_convert_to_quat = True):
     def _convert_to_quat(li):
         ret = []
         for element in li:
@@ -374,10 +345,7 @@ def _set_teleop_rotation_offset(cfg, robot_cls):
         value = _convert_to_quat(value)
     elif isinstance(value, dict):
         value = {key: _convert_to_quat(val) for key, val in value.items()}
-    
-    # Create a property that returns the processed teleop_rotation_offset
-    # This is necessary because teleop_rotation_offset must be a @property
-    # (required by ManipulationRobot's @property definition)
+
     @property
     def teleop_rotation_offset_prop(self):
         return value
@@ -529,28 +497,18 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
     missing = [k for k, req in ALLOWED_TOP_KEYS.items() if req and k not in cfg]
     if missing:
         raise ValueError(f"Missing required keys in robot YAML: {missing}")
-    # check to see if all required props are provided
-    # if "properties" in cfg and not isinstance(cfg["properties"], dict):
-    #     raise TypeError("properties must be a mapping of name->value")
-
-    # if cfg['name'].lower() in ['a1','frankapanda']:
-    #     return
     
-    # properties = cfg.get("property", {})
-    # cached_property = cfg.get("cached_property", {})
+    # check to see if all required props are provided by yaml
     set_of_props = set(cfg.get("property", {}).keys()) | set(cfg.get("classproperty", {}).keys())
     if cfg['name'].lower() in ['a1','frankapanda']:
         set_of_props = set_of_props | set(cfg['property']['gripper'].keys())
-        # return
     
     for cap in cfg.get("capabilities", []):
         if cap not in CAPABILITY_BASES:
             
             raise ValueError(f"{cfg['name']}: Unknown capability '{cap}'. Allowed: {sorted(list(CAPABILITY_BASES.keys()))}")
-        # breakpoint()
         if cap in EXPECTED_PROPS:
             required_props = EXPECTED_PROPS[cap]
-            # print(cfg['name'],type(required_props),type(set_of_props))
             missing_props = required_props - set_of_props
             if missing_props:
                 raise ValueError(
@@ -644,14 +602,12 @@ def create_robot_class_from_yaml(config_path: Path):
     _set_arm_workspace_range(cfg, robot_cls)
     _set_default_arm_poses(cfg, robot_cls)
     _set_end_effector_properties(cfg, robot_cls)  # Must be before _set_general_properties
-    _set_post_load(cfg, robot_cls)
     
     # Set all other properties from 'property' section as @property
     _set_general_properties(cfg, robot_cls)
     
     # Set all properties from 'classproperty' section as @classproperty
     _set_classproperties(cfg, robot_cls)
-
 
     # Register in registry
     REGISTERED_ROBOTS[robot_cls.__name__] = robot_cls
