@@ -21,6 +21,7 @@ from omnigibson.robots.mobile_manipulation_robot import MobileManipulationRobot
 from omnigibson.robots.untucked_arm_pose_robot import UntuckedArmPoseRobot
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 
+# Base class that robot can inheritate from. Should be put into capabilities field
 CAPABILITY_BASES = {
     "two_wheel": TwoWheelRobot,
     "manipulation": ManipulationRobot,
@@ -32,22 +33,24 @@ CAPABILITY_BASES = {
     "locomotion": LocomotionRobot,
 }
 
+# required props for each base class
 EXPECTED_PROPS = {
     "two_wheel_locomotion": {"wheel_radius", "wheel_axle_length", "base_joint_names"},
     "untucked_arm_pose": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
     "mobile_manipulation": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
     "manipulation": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
     "locomotion":{"base_joint_names"},
-    "holonomic_base": set(),  # Empty set, not empty dict
+    "holonomic_base": set(),  
     "articulated_trunk": {"arm_link_names","arm_joint_names","eef_link_names","finger_link_names","finger_joint_names"},
     "active_camera":{"camera_joint_names"},
 }
-# Allowed top-level YAML keys and whether they are required
+
+# Allowed YAML keys and whether they are required
 ALLOWED_TOP_KEYS: Dict[str, bool] = {
-    "name": True,                # name of the robot class
+    "name": True,                # name of the robot class. eg. Fetch
     "description": False,        # docstring of the robot class
     "module_path": True,         # fully qualified module to expose the class (e.g., omnigibson.robots.robot_configs.fetch)
-    "extends": False,            # optional import path "omnigibson.robots.r1:R1" or "omnigibson.robots.r1.R1"
+    "extends": False,            # optional parent import path. eg "omnigibson.robots.r1:R1" for R1Pro
     "capabilities": False,       # list[str] matching CAPABILITY_BASES keys
     "property": False,         # dict[str, Any] exposed via @property returning the literal
     "classproperty": False,   # dict[str, Any] exposed via @cached_property returning the literal
@@ -62,9 +65,6 @@ def _set_arm_workspace_range(cfg, robot_cls):
     for k in arm_workspace_range:
         arm_workspace_range[k] = th.deg2rad(th.tensor(arm_workspace_range[k], dtype=th.float32))
     
-    # Create a property that returns the processed arm_workspace_range
-    # This is necessary because arm_workspace_range must be a @property
-    # (required by ManipulationRobot's @property definition)
     @property
     def arm_workspace_range_prop(self):
         return arm_workspace_range
@@ -169,8 +169,6 @@ def _set_end_effector_properties(cfg, robot_cls):
     setattr(robot_cls, "__init__", __init_with_end_effector)
     
     # @property that return values based on end_effector
-    
-    
     for prop_name in prop_names:
         if prop_name in instance_attr_props | grasping_point_props | tensor_props :
             # Skip private properties that are already set as instance attributes
