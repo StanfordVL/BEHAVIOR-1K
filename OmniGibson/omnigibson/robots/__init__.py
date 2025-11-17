@@ -23,6 +23,7 @@ from omnigibson.robots.robot_configs.r1pro import R1Pro
 from omnigibson.robots.robot_configs.stretch import Stretch
 from omnigibson.robots.robot_configs.tiago import Tiago
 from omnigibson.robots.robot_configs.turtlebot import Turtlebot
+
 __all__ = [
     "A1",
     "ActiveCameraRobot",

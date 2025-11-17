@@ -384,7 +384,7 @@ class ControllableObject(BaseObject):
 
     def _create_discrete_action_space(self):
         """
-        Create a discrete action space for this object. 
+        Create a discrete action space for this object.
         By default, subclass does not support this type of action space.
         If otherwise, should be implemented by the subclass.
 
