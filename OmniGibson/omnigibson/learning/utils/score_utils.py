@@ -59,7 +59,12 @@ def compute_final_q_score(
             result = json.load(f)
         # get score
         q_score[task_name][f"{instance_id}_{rollout_id}"] = result["q_score"]["final"]
-        time_score[task_name][f"{instance_id}_{rollout_id}"] = result["time"]["normalized_time"]
+        # We compute normalized time score as human_time / simulator_steps
+        normalized_time = result["time"]["normalized_time"]
+        if normalized_time <= 1.0:
+            time_score[task_name][f"{instance_id}_{rollout_id}"] = 2 - 1 / normalized_time
+        else:
+            time_score[task_name][f"{instance_id}_{rollout_id}"] = normalized_time
         base_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["base"]
         left_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["left"]
         right_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["right"]
@@ -135,7 +140,7 @@ def compute_final_q_score(
 
 
 if __name__ == "__main__":
-    # The file expect the submission folder to be of structure:
+    # The file expects the submission folder to be of structure:
     # input_dir/
     #   <track>.<team_name>.<affiliation_name>.<date>/
     #     json/
