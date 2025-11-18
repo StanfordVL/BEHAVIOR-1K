@@ -150,7 +150,7 @@ class WebsocketPolicyServer:
         while True:
             try:
                 start_time = time.monotonic()
-                result = unpackb(await websocket.recv())
+                result = unpackb(await websocket.recv(), strict_map_key=False)
                 if "reset" in result:
                     self._policy.reset()
                     continue
