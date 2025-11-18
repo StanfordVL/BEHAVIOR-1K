@@ -288,12 +288,12 @@ function Find-IsaacSimPath {
 if ($BDDL) {
     Write-Host "Installing BDDL..."
     
-    if (-not (Test-Path "bddl")) {
+    if (-not (Test-Path "bddl3")) {
         Write-Error "ERROR: bddl directory not found"
         exit 1
     }
     
-    pip install -e "$WorkDir\bddl"
+    pip install -e "$WorkDir\bddl3"
 }
 
 # Install OmniGibson with Isaac Sim
