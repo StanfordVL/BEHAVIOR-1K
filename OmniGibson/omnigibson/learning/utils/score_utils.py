@@ -59,12 +59,7 @@ def compute_final_q_score(
             result = json.load(f)
         # get score
         q_score[task_name][f"{instance_id}_{rollout_id}"] = result["q_score"]["final"]
-        # We compute normalized time score as human_time / simulator_steps
-        normalized_time = result["time"]["normalized_time"]
-        if normalized_time <= 1.0:
-            time_score[task_name][f"{instance_id}_{rollout_id}"] = 2 - 1 / normalized_time
-        else:
-            time_score[task_name][f"{instance_id}_{rollout_id}"] = normalized_time
+        time_score[task_name][f"{instance_id}_{rollout_id}"] = 2 - 1 / result["time"]["normalized_time"]
         base_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["base"]
         left_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["left"]
         right_distance_score[task_name][f"{instance_id}_{rollout_id}"] = result["normalized_agent_distance"]["right"]

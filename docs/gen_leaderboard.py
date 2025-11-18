@@ -65,6 +65,11 @@ def generate_combined_leaderboard():
             "full completion. This makes Q-score a smoother, more reliable way to "
             "compare policies across BEHAVIOR tasks than a binary success rate.\n\n"
         )
+        fd.write(
+            '!!! banner "Submission Tracks"\n'
+            "    All standard track submissions for the 2025 BEHAVIOR challenge "
+            "will automatically be considered for prizes in the privileged track as well.\n\n"
+        )
         
         submissions = load_submissions()
         
@@ -82,7 +87,7 @@ def generate_combined_leaderboard():
                 task_sr = f"{sub['overall_task_sr']:.4f}"
                 fd.write(
                     f"| — | {sub['team']} | {sub['affiliation']} | {sub['date']} | "
-                    f"{sub['track']} | {task_sr} | **{q_score}** |\n"
+                    f"{sub['track'].capitalize()} | {task_sr} | **{q_score}** |\n"
                 )
             
             fd.write("\n")
