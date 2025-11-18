@@ -57,7 +57,7 @@ jobs:
       run: dvc unprotect artifacts/pipeline/combined_room_object_list.json artifacts/pipeline/object_inventory.json
 
     - name: Copy over pipeline files
-      run: cp asset_pipeline/artifacts/pipeline/{combined_room_object_list,object_inventory}.json bddl/bddl/generated_data
+      run: cp asset_pipeline/artifacts/pipeline/{combined_room_object_list,object_inventory}.json bddl3/bddl/generated_data
 
     - name: Combine complaint files from asset_pipeline
       run: |
@@ -74,19 +74,19 @@ jobs:
         "
 
     - name: Install BDDL
-      working-directory: bddl
+      working-directory: bddl3
       run: pip install -e .
 
     - name: Install dev requirements
-      working-directory: bddl
+      working-directory: bddl3
       run: pip install -r requirements-dev.txt
 
     - name: Refresh sheets data
-      working-directory: bddl
+      working-directory: bddl3
       run: python -m bddl.data_generation.pull_sheets
 
     - name: Refresh derivative data
-      working-directory: bddl
+      working-directory: bddl3
       run: python -m bddl.data_generation.generate_datafiles
 
     # We want to check if the knowledgebase imports correctly, and if not, we want to NOT do the pull
