@@ -68,7 +68,8 @@ def generate_combined_leaderboard():
         fd.write(
             '!!! banner "Submission Tracks"\n'
             "    All standard track submissions for the 2025 BEHAVIOR challenge "
-            "will automatically be considered for prizes in the privileged track as well.\n\n"
+            "will automatically be considered for prizes in the privileged track, as their observation "
+            "space is a subset of the privileged track.\n\n"
         )
         
         submissions = load_submissions()
