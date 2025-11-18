@@ -51,7 +51,7 @@ jobs:
 
       - name: Install BDDL
         run: pip install -e .
-        working-directory: ${{ github.workspace }}/bddl
+        working-directory: ${{ github.workspace }}/bddl3
 
       - name: Install OmniGibson
         run: pip install -e .[dev,primitives,eval] --no-build-isolation
