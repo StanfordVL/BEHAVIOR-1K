@@ -32,6 +32,8 @@ m.DEFAULT_ATTACHED_OBJECT_SCALE = 0.8
 class CuRoboEmbodimentSelection(str, Enum):
     BASE = "base"
     ARM = "arm"
+    ARM_NO_TORSO = "arm_no_torso"
+    RIGHT_ARM = "right_arm"
     DEFAULT = "default"
 
 

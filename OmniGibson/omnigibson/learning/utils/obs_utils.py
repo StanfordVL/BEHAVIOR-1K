@@ -34,12 +34,16 @@ except ImportError:
 # ==============================================
 
 MIN_DEPTH = 0.0
-MAX_DEPTH = 10.0
-DEPTH_SHIFT = 3.5
+MAX_DEPTH = 2.0
+DEPTH_SHIFT = 0.1
 
 
 def quantize_depth(
-    depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
+    depth: np.ndarray,
+    min_depth: float = MIN_DEPTH,
+    max_depth: float = MAX_DEPTH,
+    shift: float = DEPTH_SHIFT,
+    use_log: bool = True,
 ) -> np.ndarray:
     """
     Quantizes depth values to a 14-bit range (0 to 16383) based on the specified min and max depth.
@@ -48,18 +52,22 @@ def quantize_depth(
         depth (np.ndarray): Depth tensor.
         min_depth (float): Minimum depth value.
         max_depth (float): Maximum depth value.
-        shift (float): Small value to shift depth to avoid log(0).
+        shift (float): Small value to shift depth to avoid log(0). Only used if log=True.
+        use_log (bool): Whether to use logarithmic quantization. If True, uses log scale with shift. If False, uses linear quantization. Default is True.
     Returns:
         np.ndarray: Quantized depth tensor.
     """
-    qmax = (1 << 14) - 1
-    log_min = np.log(min_depth + shift)
-    log_max = np.log(max_depth + shift)
+    qmax = (1 << 12) - 1
 
-    log_depth = np.log(depth + shift)
-    log_norm = (log_depth - log_min) / (log_max - log_min)
-    quantized_depth = np.clip((log_norm * qmax).round(), 0, qmax).astype(np.uint16)
+    if use_log:
+        log_min = np.log(min_depth + shift)
+        log_max = np.log(max_depth + shift)
+        log_depth = np.log(depth + shift)
+        norm = (log_depth - log_min) / (log_max - log_min)
+    else:
+        norm = (depth - min_depth) / (max_depth - min_depth)
 
+    quantized_depth = np.clip((norm * qmax).round(), 0, qmax).astype(np.uint16)
     return quantized_depth
 
 
@@ -67,7 +75,7 @@ def dequantize_depth(
     quantized_depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
 ) -> np.ndarray:
     """
-    Dequantizes a 14-bit depth tensor back to the original depth values.
+    Dequantizes a 12-bit depth tensor back to the original depth values.
 
     Args:
         quantized_depth (np.ndarray): Quantized depth tensor.
@@ -77,7 +85,7 @@ def dequantize_depth(
     Returns:
         np.ndarray: Dequantized depth tensor.
     """
-    qmax = (1 << 14) - 1
+    qmax = (1 << 12) - 1
     log_min = np.log(min_depth + shift)
     log_max = np.log(max_depth + shift)
 
@@ -152,10 +160,15 @@ def write_video(obs, video_writer, mode="rgb", batch_size=None, **kwargs) -> Non
                 for packet in stream.encode(frame):
                     container.mux(packet)
     elif mode == "depth" or mode == "depth_linear":
+        reverse_depth = kwargs.get("reverse_depth", False)
+        use_log = kwargs.get("use_log", True)
         for i in range(0, obs.shape[0], batch_size):
-            quantized_depth = quantize_depth(obs[i : i + batch_size])
+            quantized_depth = quantize_depth(obs[i : i + batch_size], use_log=use_log)
+            if reverse_depth:
+                qmax = (1 << 16) - 1
+                quantized_depth = qmax - quantized_depth
             for frame in quantized_depth:
-                frame = av.VideoFrame.from_ndarray(frame, format="gray16le")
+                frame = av.VideoFrame.from_ndarray(frame, format="gray12le")
                 for packet in stream.encode(frame):
                     container.mux(packet)
     elif mode == "seg":
