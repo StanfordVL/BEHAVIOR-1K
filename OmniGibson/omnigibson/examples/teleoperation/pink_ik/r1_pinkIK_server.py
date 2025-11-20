@@ -7,8 +7,6 @@ Description:
     pink ik server for r1
 """
 
-
-
 import sys
 import meshcat_shapes
 import numpy as np
@@ -17,7 +15,7 @@ import qpsolvers
 
 import pink
 from pink import solve_ik
-from pink.tasks import FrameTask, PostureTask,LowAccelerationTask
+from pink.tasks import FrameTask, PostureTask, LowAccelerationTask
 
 from network_ipc_v2 import NetworkIPC
 
@@ -175,7 +173,6 @@ if __name__ == "__main__":
 
     ipc = NetworkIPC("test", config, is_server=True)
 
-
     while True:
         # --- 更新目标 ---
 
@@ -256,7 +253,4 @@ if __name__ == "__main__":
         viz.display(configuration.q)
         rate.sleep()
         t += dt
-        i+=1
-    
-   
-   
+        i += 1
