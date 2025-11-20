@@ -98,7 +98,15 @@ class WebsocketClientPolicy:
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
         action_dict = unpackb(response)
-        action_np = deepcopy(action_dict["action"])
+        try:
+            action_np = deepcopy(action_dict["action"])
+        except KeyError:
+            # We try getting action one more time before raising error
+            logger.warning("No action received from server, retrying one more time...")
+            self._ws.send(data)
+            response = self._ws.recv()
+            action_dict = unpackb(response)
+            action_np = deepcopy(action_dict["action"])
         action = th.from_numpy(action_np).to(th.float32)
         return action
 
