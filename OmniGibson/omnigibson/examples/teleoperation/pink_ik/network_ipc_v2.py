@@ -6,6 +6,7 @@ Created:   2025-11-20
 Description:
     This module uses a lightweight network-based IPC layer to exchange structured messages between processes.
 """
+
 import multiprocessing
 import time
 import numpy as np
@@ -32,6 +33,7 @@ class NetworkIPC:
 
     Security: uses pickle via send/recv_pyobj; keep to trusted networks or replace with safe serialization.
     """
+
     def __init__(self, name, config, is_server=False, host="127.0.0.1", port=5555, linger_ms=0):
         self.name = name
         self.is_server = is_server
@@ -131,7 +133,7 @@ class NetworkIPC:
             self._server_commit()
         else:
             self._client_commit()
-    
+
     def talk(self):
         self.commit()
         self.wait()
@@ -161,7 +163,7 @@ def writer_process(config, host, port):
 
         state = ipc.get("state")
         print(f"[Client] Received state mean: {state.mean():.3f}")
-    
+
     # ipc.commit()
     ipc.close()
     print("client close")
@@ -192,7 +194,7 @@ def reader_process(config, host, port):
 if __name__ == "__main__":
     # same config as your reference 2
     config = {
-        "state":    ((1, 14), np.float32),
+        "state": ((1, 14), np.float32),
         "cam_high": ((1, 224, 224, 3), np.uint8),
     }
 

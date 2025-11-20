@@ -7,7 +7,6 @@ Description:
     Example script for interacting with OmniGibson scenes with VR, pink ik and BehaviorRobot.
 """
 
-
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.teleop_utils2 import OVXRSystem
@@ -28,7 +27,7 @@ def main():
     Spawn a BehaviorRobot in Rs_int and users can navigate around and interact with the scene using VR.
     """
     # Create the config for generating the environment we want
-    cfg={
+    cfg = {
         "scene": {
             "type": "Scene",
         },
@@ -54,43 +53,41 @@ def main():
         #             "position": [1, 1, 0.58],
         #         },
         #     ],
-    
         # "scene": {
         #     "type": "InteractiveTraversableScene",
         #     "scene_model": "house_single_floor",
         #     "load_room_types": [ "kitchen"]
         #     },
-
-        "robots":[
+        "robots": [
             {
                 "type": "R1",
                 "obs_modalities": ["rgb"],
                 "controller_config": {
-                    "base":{
+                    "base": {
                         "name": "HolonomicBaseJointController",
                         # "mode": "absolute_pose",
                         # "use_delta_commands":False,
                         "command_input_limits": None,
                         "command_output_limits": None,
                     },
-                    "trunk":{
+                    "trunk": {
                         "name": "JointController",
                         # "mode": "absolute_pose",
-                        "use_delta_commands":False,
+                        "use_delta_commands": False,
                         "command_input_limits": None,
                         "command_output_limits": None,
                     },
                     "arm_left": {
                         "name": "JointController",
                         # "mode": "absolute_pose",
-                        "use_delta_commands":False,
+                        "use_delta_commands": False,
                         "command_input_limits": None,
                         "command_output_limits": None,
                     },
                     "arm_right": {
                         "name": "JointController",
                         # "mode": "absolute_pose",
-                        "use_delta_commands":False,
+                        "use_delta_commands": False,
                         "command_input_limits": None,
                         "command_output_limits": None,
                     },
@@ -125,9 +122,9 @@ def main():
                     0.0087,
                     0.0087,
                     0.0087,
-                ]
+                ],
             }
-            ],
+        ],
         # "task":{
         #     "type": "BehaviorTask",
         #     "activity_name": "putting_dishes_away_after_cleaning",
@@ -140,7 +137,6 @@ def main():
         #     "use_presampled_robot_pose": True
         # }
     }
-
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -173,19 +169,16 @@ def main():
         # update the VR system
         vrsys.update()
         # get the action from the VR system and step the environment
-        action=vrsys.get_robot_teleop_action()
+        action = vrsys.get_robot_teleop_action()
         # print(action)
-        act_new=action.clone()#
-        act1=vrsys.act1[0]
+        act_new = action.clone()  #
+        act1 = vrsys.act1[0]
 
-        act_new[3:7]  = th.as_tensor(act1[:4],  dtype=act_new.dtype, device=act_new.device)
+        act_new[3:7] = th.as_tensor(act1[:4], dtype=act_new.dtype, device=act_new.device)
         act_new[7:13] = th.as_tensor(act1[4:10], dtype=act_new.dtype, device=act_new.device)
-        act_new[14:20]= th.as_tensor(act1[10:], dtype=act_new.dtype, device=act_new.device)
-   
+        act_new[14:20] = th.as_tensor(act1[10:], dtype=act_new.dtype, device=act_new.device)
+
         env.step(act_new)
-
-
-
 
     print("Cleaning up...")
     vrsys.stop()

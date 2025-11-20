@@ -1911,7 +1911,7 @@ class ManipulationRobot(BaseRobot):
             arm_name = self.arm_names[i]
             arm_action = teleop_action[hand].clone().detach().float()
             # arm action
-            if isinstance(self._controllers[f"arm_{arm_name}"], JointController) :
+            if isinstance(self._controllers[f"arm_{arm_name}"], JointController):
                 pass
             else:
                 assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(

@@ -6,6 +6,7 @@ Created:   2025-11-20
 Description:
     Add network IPC support to teleop_utils with PinkIK backend
 """
+
 import time
 from dataclasses import dataclass, field
 from typing import Iterable, Literal, Optional, Tuple
@@ -171,14 +172,11 @@ class OVXRSystem(TeleopSystem):
             view_angle_limits (Iterable): the view angle limits for the VR system (roll, pitch, and yaw) in degrees, default is None.
         """
 
-        
-        from  omnigibson.examples.teleoperation.pink_ik.network_ipc_v2 import NetworkIPC
-        config = {
-        "state":    ((1, 16), np.float32),
-        "teleop_actions":    ((1,14), np.float32)
-        }
+        from omnigibson.examples.teleoperation.pink_ik.network_ipc_v2 import NetworkIPC
+
+        config = {"state": ((1, 16), np.float32), "teleop_actions": ((1, 14), np.float32)}
         self.ipc = NetworkIPC("test", config, is_server=False)
-        
+
         align_to_prim = isinstance(align_anchor_to, XFormPrim)
         assert (
             align_anchor_to
@@ -216,11 +214,10 @@ class OVXRSystem(TeleopSystem):
         #     self.vr_profile.get_scene_persistent_path() + "anchorMode", "custom_anchor"
         # )
         # if align_anchor_to != "touchpad":
-            # set override leveled basis to be true (if this is false, headset would not track anchor pitch orientation)
-            # lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "overrideLeveledBasis", True)
+        # set override leveled basis to be true (if this is false, headset would not track anchor pitch orientation)
+        # lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "overrideLeveledBasis", True)
         # set vr system
-        lazy.carb.settings.get_settings().set(
-            self.vr_profile.get_persistent_path() + "system/display", system)
+        lazy.carb.settings.get_settings().set(self.vr_profile.get_persistent_path() + "system/display", system)
         # set display mode
         lazy.carb.settings.get_settings().set(
             self.vr_profile.get_persistent_path() + "disableDisplayOutput", disable_display_output
@@ -462,7 +459,7 @@ class OVXRSystem(TeleopSystem):
                     #     self.raw_data["transforms"]["controllers"][arm][1],
                     # )
 
-                    controller_pose_in_robot_frame =  self.raw_data["transforms"]["controllers"][arm]
+                    controller_pose_in_robot_frame = self.raw_data["transforms"]["controllers"][arm]
                     # When trigger is pressed, this value would be 1.0, otherwise 0.0
                     # Our multi-finger gripper controller closes the gripper when the value is -1.0 and opens when > 0.0
                     # So we need to negate the value here
@@ -523,21 +520,20 @@ class OVXRSystem(TeleopSystem):
 
         # print("teleop_action",self.teleop_action)
 
-        left_np  = self.teleop_action["left"].detach().cpu().numpy()
+        left_np = self.teleop_action["left"].detach().cpu().numpy()
         right_np = self.teleop_action["right"].detach().cpu().numpy()
 
         action_np = np.concatenate([left_np, right_np])
-
 
         self.ipc.set("teleop_actions", np.array([action_np]))
 
         self.ipc.talk()  # fetch server snapshot (contains 'state')
 
-        origin_result=self.robot.teleop_data_to_action(self.teleop_action)
+        origin_result = self.robot.teleop_data_to_action(self.teleop_action)
 
-        modified_result=origin_result
+        modified_result = origin_result
 
-        self.act1=self.ipc.get("state")
+        self.act1 = self.ipc.get("state")
 
         return modified_result
 
@@ -643,9 +639,7 @@ class OVXRSystem(TeleopSystem):
         assert self.hmd is not None, "VR headset device not found"
         self.raw_data["transforms"] = {
             "head": self.xr2og(self.hmd.get_virtual_world_pose()),
-            "controllers": {
-                name: self.xr2og(controller.get_pose()) for name, controller in self.controllers.items()
-            },
+            "controllers": {name: self.xr2og(controller.get_pose()) for name, controller in self.controllers.items()},
             "trackers": {
                 index: self.xr2og(tracker.get_virtual_world_pose()) for index, tracker in self.trackers.items()
             },
