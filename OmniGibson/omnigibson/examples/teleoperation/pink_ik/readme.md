@@ -9,6 +9,7 @@ Description:
 
 This guide describes how to set up a clean Conda environment and run the PinkIK teleoperation demo using the OmniGibson example `pink_ik` server.
 
+Tested with Meta Quest 3 and Ubuntu 22.
 ---
 
 ## 📦 1. Create Conda Environment
