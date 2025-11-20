@@ -10,7 +10,6 @@ Description:
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.teleop_utils2 import OVXRSystem
-from omnigibson.utils.constants import PrimType
 import torch as th
 
 gm.ENABLE_OBJECT_STATES = True

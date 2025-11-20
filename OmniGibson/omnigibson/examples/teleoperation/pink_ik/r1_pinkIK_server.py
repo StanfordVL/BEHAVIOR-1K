@@ -164,7 +164,6 @@ if __name__ == "__main__":
     T_left, grip_left = xyz_axisangle1dof_to_SE3_and_grip(left)
     T_right, grip_right = xyz_axisangle1dof_to_SE3_and_grip(right)
 
-    import re
     import numpy as np
 
     i = 0

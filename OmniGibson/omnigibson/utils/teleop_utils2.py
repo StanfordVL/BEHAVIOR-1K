@@ -17,12 +17,10 @@ import omnigibson as og
 import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
-from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.ui_utils import KeyboardEventHandler, create_module_logger
-from omnigibson.utils.usd_utils import scene_relative_prim_path_to_absolute
 
 import numpy as np
 
