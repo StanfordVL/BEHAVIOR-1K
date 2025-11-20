@@ -44,6 +44,11 @@ class GoalPosition(Enum):
     LEN = 4
 
 
+class GoalVelocity(Enum):
+    ADDR = 104
+    LEN = 4
+
+
 class PresentVelocity(Enum):
     ADDR = 128
     LEN = 4
@@ -72,6 +77,18 @@ class Torque(Enum):
 class Comm(Enum):
     SUCCESS = 0
 
+
+class DriveMode(Enum):
+    ADDR = 10
+    LEN = 1
+    NORMAL = 0
+    REVERSE = 1
+
+
+class HomingOffset(Enum):
+    ADDR = 20
+    LEN = 4
+    
 
 # Macro for Control Table Value
 def DXL_MAKEWORD(a, b):

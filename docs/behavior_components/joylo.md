@@ -10,11 +10,13 @@ Additionally, in OmniGibson, we support more robots beyond the original R1, incl
 
 ## Hardware Setup
 
+Detailed hardware setup guides are available in the [BEHAVIOR Robot Suite](https://behavior-robot-suite.github.io/) documentation for both robot variants:
+
 ### 6 DoF R1
-For the 6dof version, please reference this [guide](https://behavior-robot-suite.github.io/docs/sections/joylo/overview.html) from the [BEHAVIOR Robot Suite](https://behavior-robot-suite.github.io/).
+For the 6 DoF version, refer to the [R1 setup guide](https://behavior-robot-suite.github.io/docs/sections/joylo/overview.html).
 
 ### 7 DoF R1-Pro
-Coming soon!
+For the 7 DoF version, refer to the [R1-Pro setup guide](https://behavior-robot-suite.github.io/docs/sections/joylo/joylo_7dof.html).
 
 ## Software Setup
 
@@ -26,20 +28,9 @@ Coming soon!
 
 ### Step 1: BEHAVIOR Environment Setup
 
-Refer to the [installation guide](../getting_started/installation.md) and setup the BEHAVIOR environment with the `--teleop` flag. 
+Refer to the [installation guide](../getting_started/installation.md) and setup the BEHAVIOR environment with the `--joylo` flag.
 
-### Step 2: Copy Over Task Instances
-
-All the sampled tasks are represented as JSON files in the `sampled_task` directory in this repo. You can check the names of all available tasks in the `available_tasks.yaml` file. Usually, tasks are stored in our dataset directory in public releases, but since we are still in the process of iterating on them, we temporarily keep them in the `joylo` repo so that we can quickly update. OmniGibson still reads from the dataset directory, so we wrote the `populate_behavior_tasks.sh` shell script to help copy these sampled task JSON files over to the dataset directory.
-
-To populate task definitions, run:
-```bash
-# Run the script to copy sampled task JSON files to the dataset directory
-./joylo/populate_behavior_tasks.sh
-```
-
-
-### Step 3: Nintendo JoyCon Configuration
+### Step 2: Nintendo JoyCon Configuration
 
 1. Configure udev rules:
 ```bash
@@ -75,7 +66,7 @@ sudo add-apt-repository universe
 sudo apt-get install blueman
 ```
 
-### Step 4: Connect JoyCons
+### Step 3: Connect JoyCons
 
 #### Method 1: Using Bluetooth Manager (Recommended)
 1. Ensure your external Bluetooth dongle is connected
@@ -95,7 +86,7 @@ connect <MAC_ADDRESS>
 ```
 2. Verify connection: JoyCon lights should be static (not flashing)
 
-### Step 5: Running the System
+### Step 4: Running the System
 
 1. Ensure JoyLo is powered on (with motors NOT connected to Dynamixel software)
 2. Ensure JoyCons are connected
@@ -124,9 +115,8 @@ python joylo/experiments/run_joylo.py --gello_model r1pro --joint_config_file jo
 
 ### Task Information
 
-- Available tasks are listed in `sampled_task/available_tasks.yaml`
-- Task definitions are stored as JSON files in the `sampled_task` directory
-- To learn about task definitions and expected goal conditions, check the corresponding `problem0.bddl` file in the BDDL repository for the task name. This file contains information about relevant objects, initial conditions, and goal conditions.
+- To learn more about available tasks, refer to the [BEHAVIOR tasks page](../challenge/tasks.md)
+- For task definitions and expected goal conditions, check the corresponding `problem0.bddl` file in the BDDL repository for the task name. This file contains information about relevant objects, initial conditions, and goal conditions.
 
 ## Troubleshooting
 

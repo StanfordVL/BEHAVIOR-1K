@@ -1,3 +1,4 @@
+import datasets
 import json
 import os
 import numpy as np
@@ -5,6 +6,7 @@ import packaging.version
 import torch as th
 from collections import defaultdict
 from collections.abc import Callable
+from datasets import load_dataset
 from huggingface_hub import snapshot_download
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION
@@ -28,11 +30,11 @@ from lerobot.datasets.utils import (
 )
 from lerobot.datasets.video_utils import get_safe_default_codec
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES, ROBOT_CAMERA_NAMES
-from omnigibson.learning.utils.lerobot_utils import decode_video_frames, aggregate_stats
+from omnigibson.learning.utils.lerobot_utils import hf_transform_to_torch, decode_video_frames, aggregate_stats
 from omnigibson.learning.utils.obs_utils import OBS_LOADER_MAP
 from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, get_worker_info
 from typing import Iterable, List, Tuple
 
 
@@ -71,6 +73,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         modalities: Iterable[str] = None,
         cameras: Iterable[str] = None,
         local_only: bool = False,
+        check_timestamp_sync: bool = True,
         chunk_streaming_using_keyframe: bool = True,
         shuffle: bool = True,
         seed: int = 42,
@@ -89,6 +92,9 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             local_only (bool): whether to only use local data (not download from HuggingFace).
                 NOTE: set this to False and force_cache_sync to True if you want to force re-syncing the local cache with the remote dataset.
                 For more details, please refer to the `force_cache_sync` argument in the base class.
+            check_timestamp_sync (bool): whether to check timestamp synchronization between different modalities and the state/action data.
+                While it is set to True in the original LeRobotDataset and is set to True here by default, it can be set to False to skip the check for faster loading.
+                This will especially save time if you are loading the complete challenge demo dataset.
             chunk_streaming_using_keyframe (bool): whether to use chunk streaming mode for loading the dataset using keyframes.
                 When this is enabled, the dataset will pseudo-randomly load data in chunks based on keyframes, allowing for faster access to the data.
                 NOTE: As B1K challenge demos has GOP size of 250 frames for efficient storage, it is STRONGLY recommended to set this to True if you don't need true frame-level random access.
@@ -116,6 +122,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.root.mkdir(exist_ok=True, parents=True)
 
         # ========== Customizations ==========
+        self.seed = seed
         if modalities is None:
             modalities = ["rgb", "depth", "seg_instance_id"]
         if "seg_instance_id" in modalities:
@@ -163,13 +170,12 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             self.chunks = self._get_keyframe_chunk_indices()
             # Now, we randomly permute the episodes if shuffle is True
             if shuffle:
-                rng = np.random.default_rng(seed)
-                rng.shuffle(self.chunks)
-                self.current_streaming_chunk_idx = np.random.default_rng().integers(0, len(self.chunks)).item()
+                self.current_streaming_chunk_idx = None
+                self.current_streaming_frame_idx = None
             else:
                 self.current_streaming_chunk_idx = 0
+                self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
             self.obs_loaders = dict()
-            self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
             self._should_obs_loaders_reload = True
         # record the positional index of each episode index within self.episodes
         self.episode_data_index_pos = {ep_idx: i for i, ep_idx in enumerate(self.episodes)}
@@ -197,10 +203,11 @@ class BehaviorLeRobotDataset(LeRobotDataset):
         self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
 
         # Check timestamps
-        timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
-        episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
-        ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
-        check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
+        if check_timestamp_sync:
+            timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
+            episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
+            ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
+            check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
 
         # Setup delta_indices
         if self.delta_timestamps is not None:
@@ -277,12 +284,34 @@ class BehaviorLeRobotDataset(LeRobotDataset):
             max_workers=os.cpu_count() - 2,
         )
 
+    def load_hf_dataset(self) -> datasets.Dataset:
+        """hf_dataset contains all the observations, states, actions, rewards, etc."""
+        if self.episodes is None:
+            path = str(self.root / "data")
+            hf_dataset = load_dataset("parquet", data_dir=path, split="train")
+        else:
+            files = [str(self.root / self.meta.get_data_file_path(ep_idx)) for ep_idx in self.episodes]
+            hf_dataset = load_dataset("parquet", data_files=files, split="train")
+
+        hf_dataset.set_transform(hf_transform_to_torch)
+        return hf_dataset
+
     def __getitem__(self, idx) -> dict:
         if not self._chunk_streaming_using_keyframe:
             return super().__getitem__(idx)
         # Streaming mode: we will load the episode at the current streaming index, and then increment the index for next call
+        # Randomize chunk index on first call
+        if self.current_streaming_chunk_idx is None:
+            worker_info = get_worker_info()
+            worker_id = 0 if worker_info is None else worker_info.id
+            rng = np.random.default_rng(self.seed + worker_id)
+            rng.shuffle(self.chunks)
+            self.current_streaming_chunk_idx = rng.integers(0, len(self.chunks)).item()
+            self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
+        # Current chunk iterated, move to next chunk
         if self.current_streaming_frame_idx >= self.chunks[self.current_streaming_chunk_idx][1]:
             self.current_streaming_chunk_idx += 1
+            # All data iterated, restart from beginning
             if self.current_streaming_chunk_idx >= len(self.chunks):
                 self.current_streaming_chunk_idx = 0
             self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
@@ -315,7 +344,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
                         camera_id=vid_key.split(".")[-1],
                         demo_id=f"{ep_idx:08d}",
                         start_idx=self.chunks[self.current_streaming_chunk_idx][2],
-                        start_idx_is_keyframe=True,
+                        start_idx_is_keyframe=False,  # TODO (Wensi): Change this to True after figuring out the correct keyframe indices
                         batch_size=1,
                         stride=1,
                         **kwargs,
@@ -325,7 +354,7 @@ class BehaviorLeRobotDataset(LeRobotDataset):
 
         query_indices = None
         if self.delta_indices is not None:
-            query_indices, padding = self._get_query_indices(idx, ep_idx)
+            query_indices, padding = self._get_query_indices(self.current_streaming_frame_idx, ep_idx)
             query_result = self._query_hf_dataset(query_indices)
             item = {**item, **padding}
             for key, val in query_result.items():
@@ -453,7 +482,7 @@ class BehaviorLerobotDatasetMetadata(LeRobotDatasetMetadata):
         valid_task_indices = [idx for idx, name in self.task_names.items() if name in self.task_name_candidates]
         self.task_names = set([self.task_names[idx] for idx in valid_task_indices])
         self.tasks = {idx: self.tasks[idx] for idx in valid_task_indices}
-        self.task_to_task_index = {k: v for k, v in self.tasks.items()}
+        self.task_to_task_index = {v: k for k, v in self.tasks.items()}
 
         self.episodes = self.load_episodes(self.root)
         if self._version < packaging.version.parse("v2.1"):

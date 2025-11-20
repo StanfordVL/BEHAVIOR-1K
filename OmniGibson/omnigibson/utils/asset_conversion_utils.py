@@ -14,7 +14,6 @@ from pathlib import Path
 from xml.dom import minidom
 
 import click
-import pymeshlab
 import torch as th
 import trimesh
 
@@ -1625,7 +1624,7 @@ def _load_scene_from_urdf(urdf):
                 continue
             if not os.path.exists(
                 DatasetObject.get_usd_path(obj_info["cfg"]["category"], obj_info["cfg"]["model"]).replace(
-                    ".usdz", ".usdz.encrypted"
+                    ".usd", ".encrypted.usd"
                 )
             ):
                 log.warning("Missing object", obj_name)
@@ -1857,6 +1856,8 @@ def simplify_convex_hull(tm, max_vertices=60, max_faces=128):
         return tm
 
     # Use pymeshlab to reduce
+    import pymeshlab  # We do this here because it's an optional dependency.
+
     ms = pymeshlab.MeshSet()
     ms.add_mesh(pymeshlab.Mesh(vertex_matrix=tm.vertices, face_matrix=tm.faces, v_normals_matrix=tm.vertex_normals))
     while len(ms.current_mesh().vertex_matrix()) > max_vertices:

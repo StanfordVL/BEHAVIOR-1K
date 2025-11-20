@@ -150,17 +150,6 @@ def _launch_app():
 
     log.info(f"{'-' * 5} Starting {logo_small()}. This will take 10-30 seconds... {'-' * 5}")
 
-    # TODO (Cem): Currently remove texture cache folder
-    try:
-        log.info("Texture cache folder found, removing...")
-        shutil.rmtree(os.path.join(os.path.expanduser("~"), ".cache", "ov", "texturecache"))
-    except FileNotFoundError:
-        log.info("Texture cache folder not found, no need to remove")
-    except PermissionError:
-        log.info("Permission error when removing texture cache. Ignoring")
-    except Exception as e:
-        log.info(f"Unexpected error when removing texture cache: {e}. Ignoring")
-
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
@@ -226,6 +215,19 @@ def _launch_app():
     os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
+
+    # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
+    local_appdata = Path(gm.APPDATA_PATH) / "local"
+    local_appdata.mkdir(parents=True, exist_ok=True)
+    sys.argv.extend(["--portable-root", str(local_appdata)])
+
+    global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
+    global_cache_dir.mkdir(parents=True, exist_ok=True)
+    sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
+
+    global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
+    global_data_dir.mkdir(parents=True, exist_ok=True)
+    sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))

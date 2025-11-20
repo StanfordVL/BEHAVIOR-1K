@@ -86,7 +86,7 @@ def main():
                     new_batch = []
                     for item in batch:
                         item_dir = dataset_fs.opendir(item)
-                        if item_dir.glob("usd/*.usdz.encrypted").count().files != 1:
+                        if item_dir.glob("usd/*.encrypted.usd").count().files != 1:
                             print("Could not find", item)
                             print("Available items:", list(item_dir.walk.files()))
                             new_batch.append(item)
@@ -124,7 +124,7 @@ def main():
 
             # Move the USDs to the output FS
             print("Copying USDs to output FS...")
-            usd_glob = [x.path for x in dataset_fs.glob("objects/*/*/usd/*.usdz.encrypted")]
+            usd_glob = [x.path for x in dataset_fs.glob("objects/*/*/usd/*.encrypted.usd")]
             for item in tqdm.tqdm(usd_glob):
                 itemdir = fs.path.dirname(item)
                 fs.copy.copy_fs(dataset_fs.opendir(itemdir), out_fs.makedirs(itemdir))

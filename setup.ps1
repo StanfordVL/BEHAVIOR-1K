@@ -288,12 +288,12 @@ function Find-IsaacSimPath {
 if ($BDDL) {
     Write-Host "Installing BDDL..."
     
-    if (-not (Test-Path "bddl")) {
+    if (-not (Test-Path "bddl3")) {
         Write-Error "ERROR: bddl directory not found"
         exit 1
     }
     
-    pip install -e "$WorkDir\bddl"
+    pip install -e "$WorkDir\bddl3"
 }
 
 # Install OmniGibson with Isaac Sim
@@ -450,7 +450,7 @@ if ($Eval) {
     $TorchVersion = (pip show torch | Select-String "Version" | ForEach-Object { $_.ToString().Split(" ")[-1] })
     pip install torch-cluster -f "https://data.pyg.org/whl/torch-$TorchVersion.html"
     conda install av -c conda-forge -y
-
+}
 
 # Install asset pipeline
 if ($AssetPipeline) {
