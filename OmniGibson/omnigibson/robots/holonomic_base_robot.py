@@ -402,7 +402,7 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
-        action[self.base_action_idx] = th.tensor(teleop_action.base).float()
+        action[self.base_action_idx] = teleop_action.base.clone().detach().float()
         return action
 
     @cached_property

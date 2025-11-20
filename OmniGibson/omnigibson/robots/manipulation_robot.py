@@ -13,6 +13,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
     ControlType,
+    JointController,
     GripperController,
     InverseKinematicsController,
     IsGraspingState,
@@ -1908,13 +1909,16 @@ class ManipulationRobot(BaseRobot):
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            arm_action = th.tensor(teleop_action[hand]).float()
+            arm_action = teleop_action[hand].clone().detach().float()
             # arm action
-            assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
-                self._controllers[f"arm_{arm_name}"], OperationalSpaceController
-            ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
-            target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
-            action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
+            if isinstance(self._controllers[f"arm_{arm_name}"], JointController) :
+                pass
+            else:
+                assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
+                    self._controllers[f"arm_{arm_name}"], OperationalSpaceController
+                ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
+                action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
             # gripper action
             assert isinstance(
                 self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
