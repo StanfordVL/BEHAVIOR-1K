@@ -7,7 +7,8 @@ Description:
     pink ik server for r1
 """
 
-import multiprocessing
+
+
 import sys
 import meshcat_shapes
 import numpy as np
@@ -16,7 +17,7 @@ import qpsolvers
 
 import pink
 from pink import solve_ik
-from pink.tasks import FrameTask, JointCouplingTask, PostureTask, LowAccelerationTask
+from pink.tasks import FrameTask, PostureTask,LowAccelerationTask
 
 from network_ipc_v2 import NetworkIPC
 
@@ -29,43 +30,6 @@ except ModuleNotFoundError as exc:
 
 
 from pinocchio.visualize import MeshcatVisualizer
-
-
-def writer_process(config, host):
-    # acts like your original "client" process
-    # time.sleep(1.0)  # small delay so server binds first
-    ipc = NetworkIPC("test", config, is_server=False)
-
-    # --- Config ---
-    input_file = "/home/j/BEHAVIOR-1K/t.log"  # path to your file
-
-    # --- Regex pattern to capture left/right tensors ---
-    teleop_pattern = re.compile(r"TeleopAction\(left=tensor\((.*?)\),\s*right=tensor\((.*?)\)", re.S)
-
-    # --- Read and parse ---
-    teleop_actions = []
-    with open(input_file, "r") as f:
-        content = f.read()
-
-    for left_str, right_str in teleop_pattern.findall(content):
-        # Convert each tensor string to list of floats
-        left = np.fromstring(left_str.replace("\n", " ").replace("[", "").replace("]", ""), sep=",")
-        right = np.fromstring(right_str.replace("\n", " ").replace("[", "").replace("]", ""), sep=",")
-        combined = np.concatenate([left, right])
-        teleop_actions.append(combined)
-
-    # --- Stack all into one array ---
-    teleop_actions = np.stack(teleop_actions)
-
-    for i in range(len(teleop_actions)):
-        # send cam_high to server for next round
-        ipc.set("teleop_actions", np.array([teleop_actions[i]]))
-
-        ipc.talk()  # fetch server snapshot (contains 'state')
-
-    # ipc.commit()
-    ipc.close()
-    print("client close")
 
 
 if __name__ == "__main__":
@@ -211,11 +175,6 @@ if __name__ == "__main__":
 
     ipc = NetworkIPC("test", config, is_server=True)
 
-    # writer = multiprocessing.Process(target=writer_process, args=(config,0))
-
-    # start server then client (order matters for bind/connect)
-
-    # writer.start()
 
     while True:
         # --- 更新目标 ---
@@ -297,6 +256,7 @@ if __name__ == "__main__":
         viz.display(configuration.q)
         rate.sleep()
         t += dt
-        i += 1
-
-    writer.join()
+        i+=1
+    
+   
+   
