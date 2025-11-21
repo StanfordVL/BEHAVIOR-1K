@@ -30,7 +30,7 @@ setuptools.setup(
         "pybullet",
         "pygame",
         "pyglm",
-        "PyQt6",
+        "PyQt6==6.9.1",
         "pyquaternion",
         "pure-python-adb",
         "quaternion",
