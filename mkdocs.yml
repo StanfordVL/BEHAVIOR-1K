@@ -45,6 +45,9 @@ extra_css:
 
 extra_javascript:
   - assets/fold_api_reference.js
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  - javascripts/tablesort.js
+
 
 markdown_extensions:
   - pymdownx.emoji:
