@@ -1633,7 +1633,7 @@ class ManipulationRobot(BaseRobot):
                         self._ag_grasp_counter[arm] += 1
 
                         # Check if window is complete
-                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_sim_step_dt()
+                        time_in_grasp = self._ag_grasp_counter[arm] * og.sim.get_physics_dt()
                         if time_in_grasp >= m.GRASP_WINDOW:
                             # Establish grasp with the LATEST ag_data
                             self._establish_grasp(arm=arm, ag_data=current_ag_data)
