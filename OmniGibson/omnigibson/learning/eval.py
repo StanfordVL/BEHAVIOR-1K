@@ -54,7 +54,7 @@ gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
 
-# Set grasp windwo to larger value to account for hard grasps
+# Set grasp window to larger value to account for hard grasps
 with macros.unlocked():
     macros.robots.manipulation_robot.GRASP_WINDOW = 0.75
 
