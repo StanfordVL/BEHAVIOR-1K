@@ -56,7 +56,7 @@ m.MAX_AG_DEFAULT_GRASP_POINT_PROP = 0.95
 m.AG_DEFAULT_GRASP_POINT_Z_PROP = 0.4
 
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
-m.GRASP_WINDOW = 3.0  # grasp window in seconds
+m.GRASP_WINDOW = 1 / 30.0  # grasp window in seconds
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
 AG_MODES = {
