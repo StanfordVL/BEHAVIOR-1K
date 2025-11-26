@@ -35,7 +35,7 @@ from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
     write_video,
 )
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
@@ -49,11 +49,15 @@ m.NUM_EVAL_EPISODES = 1
 m.NUM_TRAIN_INSTANCES = 200
 m.NUM_EVAL_INSTANCES = 10
 
-
 # set global variables to boost performance
 gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
+
+# Set grasp window to larger value to account for hard grasps
+with macros.unlocked():
+    macros.robots.manipulation_robot.GRASP_WINDOW = 0.75
+
 
 # create module logger
 logger = logging.getLogger("evaluator")

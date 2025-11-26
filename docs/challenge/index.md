@@ -6,6 +6,26 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 11/17/2025 — Submissions Closed"
+
+    Submissions for the 2025 BEHAVIOR Challenge have officially closed! We are thrilled to announce that we have received submissions from 18 teams across academia, industry, and individuals; participating from 4 countries (US, China, Canada, South Korea) and including some multinational teams. Stay tuned as we verify results for the final leaderboard!
+
+
+!!! info "🗓️ 11/13/2025 — Deadline Extension"
+
+    To allow any final evaluations to complete, we're extending the submission deadline by 24 hours.
+    The new deadline will now be November 16th 11:59PM AoE. Please plan accordingly as we will not be able to accept any late submissions!
+
+
+!!! info "🗓️ 11/07/2025 — Rule Clarifications"
+    Key updates this week:
+    
+    - Documentation updates
+    - Bug fixes & Hidden test logic addition. 
+
+    [Read full details →](./updates.md#11072025)
+
+
 !!! info "🗓️ 10/30/2025 — Rule Clarifications & Features Update"
     Key updates this week:
     
@@ -133,7 +153,7 @@ Whether you're a robotics veteran or just entering the field, we're here to supp
 ### Important Dates
 
 - **Challenge Launch**: September 2, 2025
-- **Submission Deadline**: November 15, 2025
+- **Submission Deadline**: November 16th 11:59PM AoE, 2025
 - **Winners Announcement**: December 6-7, 2025 @ NeurIPS conference in San Diego
 
 ## :material-book-edit: **BibTeX**

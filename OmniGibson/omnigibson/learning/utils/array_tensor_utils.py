@@ -45,10 +45,16 @@ def any_concat(xs: List, *, dim: int = 0):
 
 @make_recursive_func
 def torch_to_numpy(tensor_struct):
-    """
-    Converts all tensors in a nested structure to numpy arrays.
-    """
-    return tree.map_structure(lambda x: x.detach().cpu().numpy(), tensor_struct)
+    def safe_convert(x):
+        if isinstance(x, th.Tensor):
+            return x.detach().cpu().numpy()
+        elif isinstance(x, (int, float, bool)):
+            return np.array(x)
+        else:
+            # leave strings, np array or other objects untouched
+            return x
+
+    return tree.map_structure(safe_convert, tensor_struct)
 
 
 @make_recursive_func
