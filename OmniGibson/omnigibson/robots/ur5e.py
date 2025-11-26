@@ -124,6 +124,7 @@ class UR5e(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            grasping_direction="upper",
             finger_static_friction=finger_static_friction,
             finger_dynamic_friction=finger_dynamic_friction,
             **kwargs,
@@ -157,7 +158,6 @@ class UR5e(ManipulationRobot):
                 -math.pi / 2,
                 -math.pi / 2,
                 0,  # arm
-                # ,0.0, -math.pi / 2, math.pi / 2, -math.pi / 2, -math.pi / 2, -math.pi / 2, # arm
                 0,
                 0,
                 0,
@@ -173,13 +173,13 @@ class UR5e(ManipulationRobot):
     def arm_link_names(self):
         return {
             self.default_arm: [
-                "world",
-                "shoulder_pan_joint_jointbody",
-                "shoulder_lift_joint_jointbody",
-                "elbow_joint_jointbody",
-                "wrist_1_joint_jointbody",
-                "wrist_2_joint_jointbody",
-                "wrist_3_joint_jointbody",
+                "base",
+                "shoulder_link",
+                "upper_arm_link",
+                "forearm_link",
+                "wrist_1_link",
+                "wrist_2_link",
+                "wrist_3_link",
             ]
         }
 
@@ -204,14 +204,14 @@ class UR5e(ManipulationRobot):
     def finger_link_names(self):
         return {
             self.default_arm: [
-                "left_silicone_pad",
-                "right_silicone_pad",
+                "left_inner_finger",
+                "right_inner_finger",
             ]
         }
 
     @cached_property
     def finger_joint_names(self):
-        return {self.default_arm: ["left_driver_joint", "right_driver_joint"]}
+        return {self.default_arm: ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]}
 
     @property
     def teleop_rotation_offset(self):
@@ -221,8 +221,8 @@ class UR5e(ManipulationRobot):
     def _assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.032])),
-                GraspingPoint(link_name="left_silicone_pad", position=th.tensor([0.0, -0.008, 0.008])),
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
             ]
         }
 
@@ -230,8 +230,8 @@ class UR5e(ManipulationRobot):
     def _assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="right_silicone_pad", position=th.tensor([0.0, -0.008, 0.032])),
-                GraspingPoint(link_name="right_silicone_pad", position=th.tensor([0.0, -0.008, 0.008])),
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
             ]
         }
 
@@ -239,17 +239,14 @@ class UR5e(ManipulationRobot):
     def disabled_collision_pairs(self):
         # disable all robotiq gripper internal collisions
         links = [
-            "left_driver",
-            "left_follower",
-            "left_pad",
-            "left_silicone_pad",
-            "left_coupler",
-            "right_driver",
-            "right_follower",
-            "right_pad",
-            "right_silicone_pad",
-            "right_coupler",
-            "base_gripper",
+            "left_outer_knuckle",
+            "left_outer_finger",
+            "left_inner_finger",
+            "left_inner_knuckle",
+            "right_outer_knuckle",
+            "right_outer_finger",
+            "right_inner_finger",
+            "right_inner_knuckle",
         ]
         disabled_pairs = []
         for i, link1 in enumerate(links):
