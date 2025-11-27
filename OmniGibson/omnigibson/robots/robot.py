@@ -375,7 +375,7 @@ class Robot(USDObject, BaseObject, GymObservable):
     def _init_capabilities(self):
         if self.is_holonomic_base:
             self.is_locomotion = True
-        if self.is_mobile_manipulation:
+        if self.is_mobile_manipulation or self.is_articulated_trunk:
             self.is_manipulation = True
     
     def load(self, scene):
@@ -998,6 +998,10 @@ class Robot(USDObject, BaseObject, GymObservable):
             fcns["canonical_pos"] = lambda: fcns["_canonical_pos_quat"][0]
             fcns["canonical_quat"] = lambda: fcns["_canonical_pos_quat"][1]
 
+        if self.is_articulated_trunk:
+            self._add_task_frame_control_dict(
+                fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
+            )
 
         return fcns
 
@@ -1602,6 +1606,12 @@ class Robot(USDObject, BaseObject, GymObservable):
                 dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
                 dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
                 dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
+        if self.is_articulated_trunk:
+            joint_positions = dic["joint_qpos"]
+            joint_velocities = dic["joint_qvel"]
+            dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
+            dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
+
         return dic
 
     def _load_observation_space(self):
@@ -2190,6 +2200,8 @@ class Robot(USDObject, BaseObject, GymObservable):
             return obs_keys
         if self.is_locomotion:
             obs_keys += ["base_qpos_sin", "base_qpos_cos", "robot_lin_vel", "robot_ang_vel"]
+        if self.is_articulated_trunk:
+            obs_keys += ["trunk_qpos", "trunk_qvel"]
         return obs_keys
 
     @property
@@ -2464,6 +2476,13 @@ class Robot(USDObject, BaseObject, GymObservable):
                 ]: self._default_holonomic_base_joint_controller_config,
                 self._default_base_null_joint_controller_config["name"]: self._default_base_null_joint_controller_config,
             }
+        if self.is_articulated_trunk:
+            cfg["trunk"] = {
+                self._default_trunk_joint_controller_config["name"]: self._default_trunk_joint_controller_config,
+                self._default_trunk_null_joint_controller_config["name"]: self._default_trunk_null_joint_controller_config,
+                self._default_trunk_ik_controller_config["name"]: self._default_trunk_ik_controller_config,
+                self._default_trunk_osc_controller_config["name"]: self._default_trunk_osc_controller_config,
+            }
         return cfg
 
     def _get_assisted_grasp_joint_type(self, ag_obj, ag_link):
@@ -2598,6 +2617,8 @@ class Robot(USDObject, BaseObject, GymObservable):
             controllers["base"] = "JointController"
         if self.is_holonomic_base:
             controllers["base"] = "HolonomicBaseJointController"
+        if self.is_articulated_trunk:
+            controllers["trunk"] = "JointController"
         return controllers
     
     @property
@@ -3841,5 +3862,116 @@ class Robot(USDObject, BaseObject, GymObservable):
         """
         assert self.is_mobile_manipulation
         self.set_joint_positions(self.untucked_default_joint_pos)
+
+    @cached_property
+    def trunk_links(self):
+        assert self.is_articulated_trunk
+        return [self.links[name] for name in self.trunk_link_names]
+
+    @cached_property
+    def trunk_link_names(self):
+        assert self.is_articulated_trunk
+        raise NotImplementedError
+
+    @cached_property
+    def trunk_joint_names(self):
+        assert self.is_articulated_trunk
+        raise NotImplementedError("trunk_joint_names must be implemented in subclass")
+
+    @cached_property
+    def trunk_control_idx(self):
+        """
+        Returns:
+            n-array: Indices in low-level control vector corresponding to trunk joints.
+        """
+        assert self.is_articulated_trunk
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.trunk_joint_names])
+
+    @property
+    def trunk_action_idx(self):
+        assert self.is_articulated_trunk
+        controller_idx = self.controller_order.index("trunk")
+        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+        return th.arange(action_start_idx, action_start_idx + self.controllers["trunk"].command_dim)
+
+    @property
+    def _default_trunk_ik_controller_config(self):
+        """
+        Returns:
+            dict: Default controller config for an Inverse kinematics controller to control this robot's trunk
+        """
+        assert self.is_articulated_trunk
+        return {
+            "name": "InverseKinematicsController",
+            "task_name": "trunk",
+            "control_freq": self._control_freq,
+            "reset_joint_pos": self.reset_joint_pos,
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": (
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+            ),
+            "mode": "pose_delta_ori",
+            "smoothing_filter_size": 2,
+            "workspace_pose_limiter": None,
+        }
+
+    @property
+    def _default_trunk_osc_controller_config(self):
+        """
+        Returns:
+            dict: Default controller config for an Operational Space controller to control this robot's trunk
+        """
+        assert self.is_articulated_trunk
+        return {
+            "name": "OperationalSpaceController",
+            "task_name": "trunk",
+            "control_freq": self._control_freq,
+            "reset_joint_pos": self.reset_joint_pos,
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": (
+                th.tensor([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                th.tensor([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+            ),
+            "mode": "pose_delta_ori",
+            "workspace_pose_limiter": None,
+        }
+
+    @property
+    def _default_trunk_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default base joint controller config to control this robot's base. Uses position
+                control by default.
+        """
+        assert self.is_articulated_trunk
+        return {
+            "name": "JointController",
+            "control_freq": self._control_freq,
+            "motor_type": "position",
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "command_output_limits": None,
+            "use_delta_commands": True,
+        }
+
+    @property
+    def _default_trunk_null_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default null joint controller config to control this robot's base i.e. dummy controller
+        """
+        assert self.is_articulated_trunk
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "position",
+            "control_limits": self.control_limits,
+            "dof_idx": self.trunk_control_idx,
+            "default_goal": self.reset_joint_pos[self.trunk_control_idx],
+            "use_impedances": False,
+        }
 
   
