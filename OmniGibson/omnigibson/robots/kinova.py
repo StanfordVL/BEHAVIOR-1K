@@ -9,7 +9,7 @@ from omnigibson.utils.transform_utils import euler2quat
 
 class Kinova(ManipulationRobot):
     """
-    The Kinova Gen 3 7DOF arm equipped with a Robotiq-2f85 gripper
+    The Kinova Gen 3 7DOF arm equipped with a Robotiq-2F85 gripper
     """
 
     def __init__(
