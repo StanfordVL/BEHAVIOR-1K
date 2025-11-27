@@ -66,6 +66,11 @@ REGISTERED_ROBOTS = dict()
 # Add proprio sensor modality to ALL_SENSOR_MODALITIES
 ALL_SENSOR_MODALITIES.add("proprio")
 
+RESET_JOINT_OPTIONS = {
+    "tuck",
+    "untuck",
+}
+
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
@@ -142,6 +147,8 @@ class Robot(USDObject, BaseObject, GymObservable):
         disable_grasp_handling=False,
         finger_static_friction=None,
         finger_dynamic_friction=None,
+        # Unique to MobileManipulationRobot
+        default_reset_mode="untuck",
         **kwargs,
     ):
         """
@@ -217,6 +224,8 @@ class Robot(USDObject, BaseObject, GymObservable):
             finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
                 Note: If specified, this will override any ways that are found within @link_physics_materials for any
                 robot finger gripper links
+            default_reset_mode (str): Default reset mode for the robot. Should be one of: {"tuck", "untuck"}
+                If reset_joint_pos is not None, this will be ignored (since _default_joint_pos won't be used during initialization).
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -322,6 +331,11 @@ class Robot(USDObject, BaseObject, GymObservable):
                 assert (
                     controller_config["base"]["name"] == "HolonomicBaseJointController"
                 ), "Base controller must be a HolonomicBaseJointController!"
+        
+        if self.is_mobile_manipulation:
+            assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
+            self.default_reset_mode = default_reset_mode
+
 
         # Run super init
         super().__init__(
@@ -361,6 +375,8 @@ class Robot(USDObject, BaseObject, GymObservable):
     def _init_capabilities(self):
         if self.is_holonomic_base:
             self.is_locomotion = True
+        if self.is_mobile_manipulation:
+            self.is_manipulation = True
     
     def load(self, scene):
         # Run super first
@@ -2384,7 +2400,8 @@ class Robot(USDObject, BaseObject, GymObservable):
         Returns:
             n-array: Default joint positions for this robot
         """
-        raise NotImplementedError
+        if self.is_mobile_manipulation:
+            return self.tucked_default_joint_pos if self.default_reset_mode == "tuck" else self.untucked_default_joint_pos
 
     @property
     @abstractmethod
@@ -3792,7 +3809,7 @@ class Robot(USDObject, BaseObject, GymObservable):
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:
         assert self.is_holonomic_base
-        action = ManipulationRobot.teleop_data_to_action(self, teleop_action)
+        action = self.teleop_data_to_action(teleop_action)
         action[self.base_action_idx] = th.tensor(teleop_action.base).float()
         return action
 
@@ -3800,5 +3817,29 @@ class Robot(USDObject, BaseObject, GymObservable):
     def base_footprint_link_name(self):
         assert self.is_holonomic_base
         raise NotImplementedError("base_footprint_link_name is not implemented for HolonomicBaseRobot")
+
+    @property
+    def tucked_default_joint_pos(self):
+        assert self.is_mobile_manipulation
+        raise NotImplementedError("tucked_default_joint_pos must be implemented in subclasses")
+
+    @property
+    def untucked_default_joint_pos(self):
+        assert self.is_mobile_manipulation
+        raise NotImplementedError("untucked_default_joint_pos must be implemented in subclasses")
+
+    def tuck(self):
+        """
+        Immediately set this robot's configuration to be in tucked mode
+        """
+        assert self.is_mobile_manipulation
+        self.set_joint_positions(self.tucked_default_joint_pos)
+
+    def untuck(self):
+        """
+        Immediately set this robot's configuration to be in untucked mode
+        """
+        assert self.is_mobile_manipulation
+        self.set_joint_positions(self.untucked_default_joint_pos)
 
   
