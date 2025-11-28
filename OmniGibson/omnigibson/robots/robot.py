@@ -39,7 +39,9 @@ from omnigibson.controllers import (
     MultiFingerGripperController,
     OperationalSpaceController,
     LocomotionController,
-    JointController, HolonomicBaseJointController,
+    JointController, 
+    HolonomicBaseJointController,
+    DifferentialDriveController
 )
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.objects.object_base import BaseObject
@@ -149,6 +151,8 @@ class Robot(USDObject, BaseObject, GymObservable):
         finger_dynamic_friction=None,
         # Unique to MobileManipulationRobot
         default_reset_mode="untuck",
+        # Unique to UntuckedArmPoseRobot
+        default_arm_pose="vertical",
         **kwargs,
     ):
         """
@@ -335,6 +339,11 @@ class Robot(USDObject, BaseObject, GymObservable):
         if self.is_mobile_manipulation:
             assert_valid_key(key=default_reset_mode, valid_keys=RESET_JOINT_OPTIONS, name="default_reset_mode")
             self.default_reset_mode = default_reset_mode
+        
+        if self.is_untucked_arm_pose:
+            assert_valid_key(key=default_arm_pose, valid_keys=self.default_arm_poses, name="default_arm_pose")
+            self.default_arm_pose = default_arm_pose
+
 
 
         # Run super init
@@ -373,10 +382,14 @@ class Robot(USDObject, BaseObject, GymObservable):
                             self._link_physics_materials[finger_link_name]["dynamic_friction"] = finger_dynamic_friction
 
     def _init_capabilities(self):
-        if self.is_holonomic_base:
-            self.is_locomotion = True
+        if self.is_untucked_arm_pose:
+            self.is_mobile_manipulation = True
         if self.is_mobile_manipulation or self.is_articulated_trunk:
             self.is_manipulation = True
+        if self.is_holonomic_base:
+            self.is_locomotion = True
+        if self.is_two_wheel:
+            self.is_locomotion = True
     
     def load(self, scene):
         # Run super first
@@ -1494,6 +1507,8 @@ class Robot(USDObject, BaseObject, GymObservable):
                 assert isinstance(
                     self._controllers["base"], LocomotionController
                 ), "Base controller must be a LocomotionController!"
+        if self.is_two_wheel:
+            assert len(self.base_control_idx) == 2, "Differential drive can only be used with robot with two base joints!"
 
 
     def get_obs(self):
@@ -1611,6 +1626,27 @@ class Robot(USDObject, BaseObject, GymObservable):
             joint_velocities = dic["joint_qvel"]
             dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
             dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
+        if self.is_two_wheel:
+            # Grab wheel joint velocity info
+            l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
+                self.base_control_idx
+            ]
+
+            # Compute linear and angular velocities
+            lin_vel = (l_vel + r_vel) / 2.0 * self.wheel_radius
+            ang_vel = (r_vel - l_vel) / self.wheel_axle_length
+
+            # Add info
+            dic["dd_base_lin_vel"] = th.tensor([lin_vel])
+            dic["dd_base_ang_vel"] = th.tensor([ang_vel])
+        if self.is_active_camera:
+            joint_positions = dic["joint_qpos"]
+            joint_velocities = dic["joint_qvel"]
+            dic["camera_qpos"] = joint_positions[self.camera_control_idx]
+            dic["camera_qpos_sin"] = th.sin(joint_positions[self.camera_control_idx])
+            dic["camera_qpos_cos"] = th.cos(joint_positions[self.camera_control_idx])
+            dic["camera_qvel"] = joint_velocities[self.camera_control_idx]
+
 
         return dic
 
@@ -2073,8 +2109,8 @@ class Robot(USDObject, BaseObject, GymObservable):
         Returns:
             th.tensor: array of action data filled with update value
         """
+        action=th.zeros(self.action_dim)
         if self.is_manipulation:
-            action = super().teleop_data_to_action(teleop_action)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
                 arm_name = self.arm_names[i]
@@ -2090,8 +2126,14 @@ class Robot(USDObject, BaseObject, GymObservable):
                     self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
                 ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
                 action[self.gripper_action_idx[arm_name]] = arm_action[6]
-            return action
-        return th.zeros(self.action_dim)
+        if self.is_holonomic_base:
+            action[self.base_action_idx] = th.tensor(teleop_action.base).float()
+        if self.is_two_wheel:
+            assert isinstance(
+                self._controllers["base"], DifferentialDriveController
+            ), "Only DifferentialDriveController is supported!"
+            action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
+        return action
 
     @property
     def sensors(self):
@@ -2202,6 +2244,10 @@ class Robot(USDObject, BaseObject, GymObservable):
             obs_keys += ["base_qpos_sin", "base_qpos_cos", "robot_lin_vel", "robot_ang_vel"]
         if self.is_articulated_trunk:
             obs_keys += ["trunk_qpos", "trunk_qvel"]
+        if self.is_two_wheel:
+            obs_keys += ["dd_base_lin_vel", "dd_base_ang_vel"]
+        if self.is_active_camera:
+            obs_keys += ["camera_qpos_sin", "camera_qpos_cos"]
         return obs_keys
 
     @property
@@ -2483,6 +2529,18 @@ class Robot(USDObject, BaseObject, GymObservable):
                 self._default_trunk_ik_controller_config["name"]: self._default_trunk_ik_controller_config,
                 self._default_trunk_osc_controller_config["name"]: self._default_trunk_osc_controller_config,
             }
+        if self.is_two_wheel:
+            cfg["base"][self._default_base_differential_drive_controller_config["name"]] = (
+                self._default_base_differential_drive_controller_config
+            )
+        if self.is_active_camera:
+            cfg["camera"] = {
+                self._default_camera_joint_controller_config["name"]: self._default_camera_joint_controller_config,
+                self._default_camera_null_joint_controller_config[
+                    "name"
+                ]: self._default_camera_null_joint_controller_config,
+            }
+
         return cfg
 
     def _get_assisted_grasp_joint_type(self, ag_obj, ag_link):
@@ -2619,6 +2677,10 @@ class Robot(USDObject, BaseObject, GymObservable):
             controllers["base"] = "HolonomicBaseJointController"
         if self.is_articulated_trunk:
             controllers["trunk"] = "JointController"
+        if self.is_two_wheel:
+            controllers["base"] = "DifferentialDriveController"
+        if self.is_active_camera:
+            controllers["camera"] = "JointController"
         return controllers
     
     @property
@@ -3828,12 +3890,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
         return action
 
-    def teleop_data_to_action(self, teleop_action) -> th.Tensor:
-        assert self.is_holonomic_base
-        action = self.teleop_data_to_action(teleop_action)
-        action[self.base_action_idx] = th.tensor(teleop_action.base).float()
-        return action
-
     @cached_property
     def base_footprint_link_name(self):
         assert self.is_holonomic_base
@@ -3973,5 +4029,150 @@ class Robot(USDObject, BaseObject, GymObservable):
             "default_goal": self.reset_joint_pos[self.trunk_control_idx],
             "use_impedances": False,
         }
+    
+    @property
+    def untucked_default_joint_pos(self):
+        assert self.is_untucked_arm_pose
+        pos = th.zeros(self.n_joints)
+        for arm in self.arm_names:
+            pos[self.arm_control_idx[arm]] = self.default_arm_poses[self.default_arm_pose]
+        return pos
+
+    @property
+    def default_arm_poses(self):
+        assert self.is_untucked_arm_pose
+        raise NotImplementedError("default_arm_poses must be implemented in subclasses")
+
+    def _create_discrete_action_space(self):
+        assert self.is_two_wheel
+        # Set action list based on controller (joint or DD) used
+
+        # We set straight velocity to be 50% of max velocity for the wheels
+        max_wheel_joint_vels = self.control_limits["velocity"][1][self.base_control_idx]
+        assert len(max_wheel_joint_vels) == 2, "TwoWheelRobot must only have two base (wheel) joints!"
+        assert max_wheel_joint_vels[0] == max_wheel_joint_vels[1], "Both wheels must have the same max speed!"
+        wheel_straight_vel = 0.5 * max_wheel_joint_vels[0]
+        wheel_rotate_vel = 0.5
+        if self._controller_config["base"]["name"] == "JointController":
+            action_list = [
+                [wheel_straight_vel, wheel_straight_vel],
+                [-wheel_straight_vel, -wheel_straight_vel],
+                [wheel_rotate_vel, -wheel_rotate_vel],
+                [-wheel_rotate_vel, wheel_rotate_vel],
+                [0, 0],
+            ]
+        else:
+            # DifferentialDriveController
+            lin_vel = wheel_straight_vel * self.wheel_radius
+            ang_vel = wheel_rotate_vel * self.wheel_radius * 2.0 / self.wheel_axle_length
+            action_list = [
+                [lin_vel, 0],
+                [-lin_vel, 0],
+                [0, ang_vel],
+                [0, -ang_vel],
+                [0, 0],
+            ]
+
+        self.action_list = action_list
+
+        # Return this action space
+        return gym.spaces.Discrete(n=len(self.action_list))
+
+    @property
+    def _default_base_differential_drive_controller_config(self):
+        """
+        Returns:
+            dict: Default differential drive controller config to
+                control this robot's base.
+        """
+        assert self.is_two_wheel
+        return {
+            "name": "DifferentialDriveController",
+            "control_freq": self._control_freq,
+            "wheel_radius": self.wheel_radius,
+            "wheel_axle_length": self.wheel_axle_length,
+            "control_limits": self.control_limits,
+            "dof_idx": self.base_control_idx,
+        }
+
+    @property
+    def wheel_radius(self):
+        """
+        Returns:
+            float: radius of each wheel at the base, in metric units
+        """
+        assert self.is_two_wheel
+        raise NotImplementedError
+
+    @property
+    def wheel_axle_length(self):
+        """
+        Returns:
+            float: perpendicular distance between the robot's two wheels, in metric units
+        """
+        assert self.is_two_wheel
+        raise NotImplementedError
+    
+    @property
+    def _raw_controller_order(self):
+        assert self.is_active_camera
+        # By default, only camera is supported
+        return ["camera"]
+    
+    @property
+    def _default_camera_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default camera joint controller config to control this robot's camera
+        """
+        assert self.is_active_camera
+        return {
+            "name": "JointController",
+            "control_freq": self._control_freq,
+            "control_limits": self.control_limits,
+            "dof_idx": self.camera_control_idx,
+            "command_output_limits": None,
+            "motor_type": "position",
+            "use_delta_commands": True,
+            "use_impedances": False,
+        }
+
+    @property
+    def _default_camera_null_joint_controller_config(self):
+        """
+        Returns:
+            dict: Default null joint controller config to control this robot's camera i.e. dummy controller
+        """
+        assert self.is_active_camera
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "position",
+            "control_limits": self.control_limits,
+            "dof_idx": self.camera_control_idx,
+            "default_goal": self.reset_joint_pos[self.camera_control_idx],
+            "use_impedances": False,
+        }
+
+    @cached_property
+    def camera_joint_names(self):
+        """
+        Returns:
+            list: Array of joint names corresponding to this robot's camera joints.
+
+                Note: the ordering within the list is assumed to be intentional, and is
+                directly used to define the set of corresponding control idxs.
+        """
+        assert self.is_active_camera
+        raise NotImplementedError
+
+    @cached_property
+    def camera_control_idx(self):
+        """
+        Returns:
+            n-array: Indices in low-level control vector corresponding to camera joints.
+        """
+        assert self.is_active_camera
+        return th.tensor([list(self.joints.keys()).index(name) for name in self.camera_joint_names])
 
   
