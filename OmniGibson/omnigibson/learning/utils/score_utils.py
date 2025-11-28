@@ -6,6 +6,41 @@ from omnigibson.macros import gm
 from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 
 
+def sanity_check_filename(input_dir: str) -> None:
+    """
+    Sanity check whether the input directory name follows the expected format:
+    input_dir/
+        <track>.<testset>.<team_name>.<affiliation_name>.<date>/
+            json/
+                <task_name>_<instance_id>_<rollout_id>.json
+    In particular, append 0 to rollout_id if missing from json file.
+    Args:
+        input_dir (str): Path to the directory containing evaluation result json files.
+    """
+    input_dir = os.path.expanduser(input_dir)
+    base_name = os.path.basename(os.path.normpath(input_dir))
+    track, testset, team, affiliation, date = base_name.split(".")
+    assert track in ["standard", "privileged"], f"Track {track} not recognized"
+    assert testset in ["public", "hidden"], f"Testset {testset} not recognized"
+    assert team != "", "Team name cannot be empty"
+    assert affiliation != "", "Affiliation name cannot be empty"
+    assert date != "", "Date cannot be empty"
+    # Now, check all json files in the json folder
+    assert os.path.exists(f"{input_dir}/json"), f"Input path {input_dir}/json does not exist"
+    for file in os.listdir(f"{input_dir}/json"):
+        if file.endswith(".json") is False:
+            print(f"Skipping non-json file {file} in input directory")
+            continue
+        file_name = os.path.splitext(file)[0]
+        if not file_name.split("_")[-2].isdigit():
+            new_file_name = f"{file_name}_0.json"
+            os.rename(
+                os.path.join(f"{input_dir}/json", file),
+                os.path.join(f"{input_dir}/json", new_file_name),
+            )
+            print(f"Renamed {file} to {new_file_name}")
+
+
 def compute_final_q_score(
     input_dir: str, output_dir: str, final_score_only: bool = True, verbose: bool = False
 ) -> None:
@@ -13,28 +48,29 @@ def compute_final_q_score(
     Compute the final Q score from the evaluation result json files stored in the given path.
     Args:
         input_dir (str): Path to the directory containing evaluation result json files.
-            Should be of the form <track>.<team>.<affiliation>.<date>/ containing a json folder for all results.
+            Should be of the form <track>.<testset>.<team>.<affiliation>.<date>/ containing a json folder for all results.
         output_dir (str): Path to save the computed final scores json file.
         final_score_only (bool): Whether to only save the final scores, or also per-rollout scores.
         verbose (bool): Whether to print verbose output.
     """
     input_dir = os.path.expanduser(input_dir)
     output_dir = os.path.expanduser(output_dir)
-    # assert path exists
-    assert os.path.exists(f"{input_dir}/json"), f"Input path {input_dir}/json does not exist"
     # get the root of the input dir to extract team, affiliation, date
     base_name = os.path.basename(os.path.normpath(input_dir))
-    track, team, affiliation, date = base_name.split(".")
-    # load test instance files
-    task_instance_csv_path = os.path.join(
-        gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
-    )
-    with open(task_instance_csv_path, "r") as f:
-        lines = list(csv.reader(f))[1:]
+    track, testset, team, affiliation, date = base_name.split(".")
+    if testset == "public":
+        # load test instance files
+        task_instance_csv_path = os.path.join(
+            gm.DATA_PATH, "2025-challenge-task-instances", "metadata", "test_instances.csv"
+        )
+        with open(task_instance_csv_path, "r") as f:
+            lines = list(csv.reader(f))[1:]
     # get all possible filenames:
     possible_filenames = set()
     for task_name, task_idx in TASK_NAMES_TO_INDICES.items():
-        test_instances = [int(x) for x in lines[task_idx][2].strip().split(",")][:10]
+        test_instances = (
+            [int(x) for x in lines[task_idx][2].strip().split(",")][:10] if testset == "public" else range(10)
+        )
         for instance_id in test_instances:
             for rollout_id in range(1):  # 1 rollout per instance
                 filename = f"{task_name}_{instance_id}_{rollout_id}.json"
@@ -95,6 +131,7 @@ def compute_final_q_score(
         "affiliation": affiliation.replace("_", " "),
         "date": date,
         "track": track,
+        "testset": testset,
         "overall_scores": {
             "q_score": overall_q_score,
             "task_sr": overall_task_sr,
@@ -120,7 +157,7 @@ def compute_final_q_score(
             "left_distance_score": left_distance_score,
             "right_distance_score": right_distance_score,
         }
-    with open(f"{output_dir}/{track}.{team}.{affiliation}.{date}.json", "w") as f:
+    with open(f"{output_dir}/{track}.{testset}.{team}.{affiliation}.{date}.json", "w") as f:
         json.dump(output_json, f, indent=4)
 
     print("Total rollouts:", n_rollouts)
@@ -135,11 +172,6 @@ def compute_final_q_score(
 
 
 if __name__ == "__main__":
-    # The file expects the submission folder to be of structure:
-    # input_dir/
-    #   <track>.<team_name>.<affiliation_name>.<date>/
-    #     json/
-    #       rollout_id.json
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input_dir",
@@ -165,6 +197,7 @@ if __name__ == "__main__":
     for submission in os.listdir(args.input_dir):
         submission_path = os.path.join(args.input_dir, submission)
         print(f"Processing submission folder: {submission_path}")
+        sanity_check_filename(submission_path)
         compute_final_q_score(
             submission_path, args.output_dir, final_score_only=args.final_score_only, verbose=args.verbose
         )
