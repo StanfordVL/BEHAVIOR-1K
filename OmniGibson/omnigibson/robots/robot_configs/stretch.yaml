@@ -1,17 +1,15 @@
-name: Stretch
-module_path: omnigibson.robots.robot_configs.stretch
-description: |
-  Strech Robot from Hello Robotics
-  Reference: https://hello-robot.com/stretch-3-product
-capabilities: [manipulation, two_wheel, active_camera]
+capabilities: 
+ - is_manipulation
+ - is_two_wheel
+ - is_active_camera
 property:
-  _raw_controller_order: ["base", "camera", "arm_0", "gripper_0"]
-  _default_controllers:
+  raw_controller_order: ["base", "camera", "arm_0", "gripper_0"]
+  default_controllers:
     base: DifferentialDriveController
     camera: JointController
     arm_0: JointController
     gripper_0: MultiFingerGripperController
-  _default_joint_pos: [0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, "pi/8", "pi/8"]
+  default_joint_pos: [0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, "pi/8", "pi/8"]
   wheel_radius: 0.050
   wheel_axle_length: 0.330
   disabled_collision_pairs:
@@ -26,15 +24,7 @@ property:
   base_joint_names: ["joint_left_wheel", "joint_right_wheel"]
   camera_joint_names: ["joint_head_pan", "joint_head_tilt"]
   arm_link_names:
-    "0":
-      - link_lift
-      - link_arm_l3
-      - link_arm_l2
-      - link_arm_l1
-      - link_arm_l0
-      - link_wrist_yaw
-      - link_wrist_pitch
-      - link_wrist_roll
+    "0": ["link_lift", "link_arm_l3", "link_arm_l2", "link_arm_l1", "link_arm_l0", "link_wrist_yaw", "link_wrist_pitch", "link_wrist_roll"]
   arm_joint_names:
     "0": ["joint_lift", "joint_arm_l3", "joint_arm_l2", "joint_arm_l1", "joint_arm_l0", "joint_wrist_yaw", "joint_wrist_pitch", "joint_wrist_roll"]
   eef_link_names:

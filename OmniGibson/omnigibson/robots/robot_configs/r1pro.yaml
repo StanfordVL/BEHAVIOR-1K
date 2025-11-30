@@ -1,17 +1,14 @@
-name: R1Pro
-module_path: omnigibson.robots.robot_configs.r1pro
-description: R1 Pro Robot
-capabilities: []
-extends: omnigibson.robots.robot_configs.r1:R1
+capabilities: 
+  - is_holonomic_base
+  - is_articulated_trunk
+  - is_mobile_manipulation
 property:
   tucked_default_joint_pos:
-    init: 0 # initiate as pos = th.zeros(self.n_dof)
     base_idx: current # Keep the current joint positions for the base joints
     gripper_control_idx:
       left: [0.05, 0.05]
       right: [0.05, 0.05]
   untucked_default_joint_pos:
-    init: 0 # initiate as pos = th.zeros(self.n_dof)
     base_idx: current # Keep the current joint positions for the base joints
     gripper_control_idx:
       left: [0.05, 0.05]
@@ -54,3 +51,20 @@ property:
     - ["base_link", "wheel_motor_link2"]
     - ["base_link", "wheel_motor_link3"]
     - ["torso_link2", "torso_link4"]
+  force_sphere_wheel_approximation: True
+  base_footprint_link_name: "base_link"
+  raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"] 
+  default_controllers:
+    base: HolonomicBaseJointController
+    trunk: JointController
+    arm_left: InverseKinematicsController
+    arm_right: InverseKinematicsController
+    gripper_left: MultiFingerGripperController
+    gripper_right: MultiFingerGripperController
+  trunk_link_names: ["torso_link1", "torso_link2", "torso_link3", "torso_link4"]
+  trunk_joint_names: ["torso_joint1", "torso_joint2", "torso_joint3", "torso_joint4"]
+  eef_link_names:
+    left: left_eef_link
+    right: right_eef_link
+  n_arms: 2
+  arm_names: ["left", "right"]

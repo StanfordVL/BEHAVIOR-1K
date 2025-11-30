@@ -1,21 +1,15 @@
-name: Tiago
-module_path: omnigibson.robots.robot_configs.tiago
-description: |
-  Tiago Robot
-  Reference: https://pal-robotics.com/robots/tiago/
-capabilities: [holonomic_base, articulated_trunk, untucked_arm_pose, active_camera]
-init:
-  # Override parent class default for default_arm_pose
-  default_arm_pose: "diagonal15"
-  # Add custom parameter unique to Tiago
-  variant: "default"
-classproperty:
+# Tiago Robot, Reference: https://pal-robotics.com/robots/tiago/
+capabilities: 
+  - is_holonomic_base
+  - is_articulated_trunk
+  - is_untucked_arm_pose
+  - is_active_camera
+property:
+  support_variant: True
   n_arms: 2
   arm_names: ["left", "right"]
-property:
   base_footprint_link_name: "base_footprint"
   tucked_default_joint_pos:
-    init: 0
     base_idx: current
     trunk_control_idx: 0
     camera_control_idx: [0.0, 0.0]
@@ -43,11 +37,7 @@ property:
     - "wheel_front_right_link"
     - "wheel_rear_left_link"
     - "wheel_rear_right_link"
-  _raw_controller_order: ["base", "trunk", "camera", "arm_left", "gripper_left", "arm_right", "gripper_right"]
-  _default_controllers:
-    base: HolonomicBaseJointController
-    trunk: JointController
-    camera: JointController
+  default_controllers:
     arm_left: InverseKinematicsController
     arm_right: InverseKinematicsController
     gripper_left: MultiFingerGripperController
@@ -183,3 +173,6 @@ property:
   arm_workspace_range:
     left: [15, 75]
     right: [-75, -15]
+  visual_only_eef_links: True
+  raw_controller_order: ["base", "trunk", "camera", "arm_left", "gripper_left", "arm_right", "gripper_right"]
+  add_combined_arm_control_idx: True

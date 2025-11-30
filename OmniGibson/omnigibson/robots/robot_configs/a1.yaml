@@ -1,35 +1,8 @@
-name: A1
-module_path: omnigibson.robots.robot_configs.a1
-description: The A1 robot with inspire hand
-capabilities: [manipulation]
-init:
-  name: null
-  relative_prim_path: null
-  scale: null
-  visible: true
-  visual_only: false
-  self_collisions: true
-  link_physics_materials: null
-  load_config: null
-  fixed_base: true
-  abilities: null
-  control_freq: null
-  controller_config: null
-  action_type: "continuous"
-  action_normalize: true
-  reset_joint_pos: null
-  obs_modalities: ["rgb", "proprio"]
-  include_sensor_names: null
-  exclude_sensor_names: null
-  proprio_obs: "default"
-  sensor_config: null
-  grasping_mode: "physical"
-  finger_static_friction: null
-  finger_dynamic_friction: null
-  end_effector: "gripper"
+capabilities: 
+ - is_manipulation
 property:
-  _raw_controller_order: ["arm_0", "gripper_0"]
-  _default_controllers:
+  raw_controller_order: ["arm_0", "gripper_0"]
+  default_controllers:
     "arm_0": "InverseKinematicsController"
     "gripper_0": "MultiFingerGripperController"
   arm_link_names:
@@ -37,43 +10,36 @@ property:
   arm_joint_names:
     "0": ['arm_joint1', 'arm_joint2', 'arm_joint3', 'arm_joint4', 'arm_joint5', 'arm_joint6']
     
-
+  supported_end_effector: [gripper, inspire]
+  
   gripper:
-    _eef_link_names: "eef_link"
     eef_link_names:
       "0": "eef_link"
-    _finger_link_names: ["gripper1", "gripper2"]
     finger_link_names:
       "0": ["gripper1", "gripper2"]
-    _finger_joint_names: ["gripper_joint1", "gripper_joint2"]
     finger_joint_names:
       "0": ["gripper_joint1", "gripper_joint2"]
-    _default_robot_model_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, 0.0, 0.0, 0.0]
-    _default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, 0.0, 0.0, 0.0]
-    _teleop_rotation_offset: [0, 0, 0.707, 0.707]
+    default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, 0.0, 0.0, 0.0]
     teleop_rotation_offset:
       "0": [0, 0, 0.707, 0.707]
     disabled_collision_pairs: [["gripper1", "gripper2"]]
-    _ag_start_points: [["gripper1", [0.065, -0.014, 0.0115]], ["gripper1", [0.015, -0.014, 0.0115]]]
-    _ag_end_points: [["gripper2", [0.065, -0.014, 0.0115]], ["gripper2", [0.015, -0.014, 0.0115]]]
+    ag_start_points: [["gripper1", [0.065, -0.014, 0.0115]], ["gripper1", [0.015, -0.014, 0.0115]]]
+    ag_end_points: [["gripper2", [0.065, -0.014, 0.0115]], ["gripper2", [0.015, -0.014, 0.0115]]]
+  
   inspire:
-    _eef_link_names: "palm_lower"
     eef_link_names:
       "0": "palm_lower"
     # thumb.proximal, ..., thumb.tip, ..., ring.tip
-    _finger_link_names: ['link11', 'link12', 'link13', 'link14', 'link21', 'link22', 'link31', 'link32', 'link41', 'link42', 'link51', 'link52']
     finger_link_names:
       "0": ['link11', 'link12', 'link13', 'link14', 'link21', 'link22', 'link31', 'link32', 'link41', 'link42', 'link51', 'link52']
-    _finger_joint_names: ['joint11', 'joint12', 'joint13', 'joint14', 'joint21', 'joint22', 'joint31', 'joint32', 'joint41', 'joint42', 'joint51', 'joint52']
     finger_joint_names:
       "0": ['joint11', 'joint12', 'joint13', 'joint14', 'joint21', 'joint22', 'joint31', 'joint32', 'joint41', 'joint42', 'joint51', 'joint52']
     # the robot hand at [0.45, 0, 0.3] offset from base with palm open and facing downwards.
-    _default_robot_model_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    _default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    _teleop_rotation_offset: [0, 0, 0.707, 0.707]
+    default_joint_pos: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     teleop_rotation_offset:
       "0": [0, 0, 0.707, 0.707]
     usd_path: "models/a1/usd/a1_inspire.usda"
     disabled_collision_pairs: [["base_link", "connector"], ["base_link", "link12"]]
-    _ag_start_points: [["base_link", [-0.025, -0.07, 0.012]], ["base_link", [-0.015, -0.11, 0.012]], ["link14", [-0.01, 0.015, 0.004]]]
-    _ag_end_points: [["link22", [0.006, 0.04, 0.003]], ["link32", [0.006, 0.045, 0.003]], ["link42", [0.006, 0.04, 0.003]], ["link52", [0.006, 0.04, 0.003]]]
+    ag_start_points: [["base_link", [-0.025, -0.07, 0.012]], ["base_link", [-0.015, -0.11, 0.012]], ["link14", [-0.01, 0.015, 0.004]]]
+    ag_end_points: [["link22", [0.006, 0.04, 0.003]], ["link32", [0.006, 0.045, 0.003]], ["link42", [0.006, 0.04, 0.003]], ["link52", [0.006, 0.04, 0.003]]]
+    not_support_urdf: True

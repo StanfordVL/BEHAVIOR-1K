@@ -1,11 +1,7 @@
-name: Locobot
-module_path: omnigibson.robots.robot_configs.locobot
-description: |
-  Locobot robot
-  Reference: https://www.trossenrobotics.com/locobot-pyrobot-ros-rover.aspx
-capabilities: [two_wheel]
+capabilities: 
+  - is_two_wheel
 property:
   wheel_radius: 0.038
   wheel_axle_length: 0.230
   base_joint_names: ["wheel_left_joint", "wheel_right_joint"]  
-  _default_joint_pos: 0
+  default_joint_pos: [0,0]

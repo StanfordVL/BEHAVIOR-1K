@@ -1,42 +1,15 @@
-name: R1
-module_path: omnigibson.robots.robot_configs.r1
-description: R1 Robot
-capabilities: [holonomic_base, articulated_trunk, mobile_manipulation]
-init:
-  name: null
-  relative_prim_path: null
-  scale: null
-  visible: true
-  visual_only: false
-  self_collisions: true
-  link_physics_materials: null
-  load_config: null
-  abilities: null
-  control_freq: null
-  controller_config: null
-  action_type: "continuous"
-  action_normalize: true
-  reset_joint_pos: null
-  obs_modalities: ["rgb", "proprio"]
-  include_sensor_names: null
-  exclude_sensor_names: null
-  proprio_obs: "default"
-  sensor_config: null
-  grasping_mode: "physical"
-  disable_grasp_handling: false
-  finger_static_friction: null
-  finger_dynamic_friction: null
-  default_reset_mode: "untuck"
+capabilities: 
+  - is_holonomic_base
+  - is_articulated_trunk
+  - is_mobile_manipulation
 property:
   base_footprint_link_name: "base_link"
   tucked_default_joint_pos:
-    init: 0 # initiate as pos = th.zeros(self.n_dof)
     base_idx: current # Keep the current joint positions for the base joints
     gripper_control_idx:
       left: [0.05, 0.05]
       right: [0.05, 0.05]
   untucked_default_joint_pos:
-    init: 0 # initiate as pos = th.zeros(self.n_dof)
     base_idx: current # Keep the current joint positions for the base joints
     gripper_control_idx:
       left: [0.05, 0.05]
@@ -44,8 +17,8 @@ property:
     arm_control_idx:
       left: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571]
       right: [0.0, 1.906, -0.991, 1.571, 0.915, -1.571]
-  _raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"] 
-  _default_controllers:
+  raw_controller_order: ["base", "trunk", "arm_left", "gripper_left", "arm_right", "gripper_right"] 
+  default_controllers:
     base: HolonomicBaseJointController
     trunk: JointController
     arm_left: InverseKinematicsController
@@ -80,8 +53,6 @@ property:
     - ["base_link", "wheel_link2"]
     - ["base_link", "wheel_link3"]
     - ["torso_link2", "torso_link4"]
-
-classproperty:
   n_arms: 2
   arm_names: ["left", "right"]
-
+  force_sphere_wheel_approximation: True
