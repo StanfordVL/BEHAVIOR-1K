@@ -6,6 +6,11 @@
 
 ## 📣 **Announcements**
 
+!!! info "🗓️ 12/01/2025 — Leaderboard Open"
+
+    [Leaderboard](./leaderboard.md) for the 2025 BEHAVIOR Challenge is now officially online! Congradulations to the winners, and huge thanks to the participants for all the impressive submissions!
+
+
 !!! info "🗓️ 11/17/2025 — Submissions Closed"
 
     Submissions for the 2025 BEHAVIOR Challenge have officially closed! We are thrilled to announce that we have received submissions from 18 teams across academia, industry, and individuals; participating from 4 countries (US, China, Canada, South Korea) and including some multinational teams. Stay tuned as we verify results for the final leaderboard!

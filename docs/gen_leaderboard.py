@@ -60,7 +60,12 @@ def generate_combined_leaderboard():
     
     with mkdocs_gen_files.open("challenge/leaderboard.md", "w") as fd:
         
-        fd.write("# Challenge Leaderboards\n\n")
+        fd.write("# Challenge Leaderboard\n\n")
+        fd.write(
+            '!!! warning "Provisional 2025 Challenge Leaderboard"\n'
+            "    The entries below are submissions to the 2025 BEHAVIOR challenge. "
+            "We will migrate the leaderboard to HuggingFace in the future with more details, including task-specific statistics.\n\n"
+        )
         fd.write(
             '!!! info "About Q-score"\n'
             "    We rank policies by Q-score. Q-score measures how much of a task's goal "
