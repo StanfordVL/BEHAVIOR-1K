@@ -39,12 +39,17 @@ def load_submissions():
             
         except Exception as e:
             print(f"Error loading {json_file}: {e}")
-    # Now, sort submissions by hidden_q_score descending, if no hidden q_score, use public_q_score
-    # Also, those with a hidden score should rank higher than those without
+    # Now, sort submissions by max(hidden_q_score, public_q_score) descending, set to 0 if missing
+    # If tie, use average of distance score as tiebreaker
+    # If still tie, use public time score as next tiebreaker
     submissions = OrderedDict(
         sorted(
             submissions.items(),
-            key=lambda item: (item[1].get("hidden_q_score", -1), item[1].get("public_q_score", -1)),
+            key=lambda item: (
+                max(item[1].get("hidden_q_score", 0), item[1].get("public_q_score", 0)), 
+                (item[1].get("public_base_distance_score", 0) + item[1].get("public_left_distance_score", 0) + item[1].get("public_right_distance_score", 0)) / 3,
+                item[1].get("public_time_score", 0),
+            ),
             reverse=True,
         )
     )
