@@ -79,8 +79,8 @@ def generate_combined_leaderboard():
             '!!! banner "Submission tracks & test sets"\n'
             "    This page lists submissions to the 2025 BEHAVIOR challenge across all tracks and test sets.\n"
             "    Standard-track submissions remain eligible for privileged-track consideration where applicable.\n\n"
-            "    'Validation (Public)' entries are self-reported on the public validation set.\n"
-            "    'Held-out Test (Hidden)' entries are from the hidden test set and are verified by the BEHAVIOR team.\n\n"
+            "    'Public Validation' entries are self-reported on the public validation set.\n"
+            "    'Held-out Test' entries are from the hidden test set and are verified by the BEHAVIOR team.\n\n"
         )
         
         submissions = load_submissions()
@@ -101,10 +101,10 @@ def generate_combined_leaderboard():
                 "      <th colspan=\"2\">★ <strong>Q Score</strong></th>\n"
                 "    </tr>\n"
                 "    <tr>\n"
-                "      <th>Validation (Public)</th>\n"
-                "      <th>Held-out Test (Hidden)</th>\n"
-                "      <th>Validation (Public)</th>\n"
-                "      <th>Held-out Test (Hidden)</th>\n"
+                "      <th>Public Validation</th>\n"
+                "      <th>Held-out Test</th>\n"
+                "      <th>Public Validation</th>\n"
+                "      <th>Held-out Test</th>\n"
                 "    </tr>\n"
                 "  </thead>\n"
                 "  <tbody>\n"
