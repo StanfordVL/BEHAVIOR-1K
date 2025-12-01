@@ -582,7 +582,7 @@ def rgbd_vid_to_pcd(
         -0.2,
         1.5,
     ),  # x_min, x_max, y_min, y_max, z_min, z_max
-    pcd_num_points: int = 4096,
+    pcd_num_points: Optional[int] = 4096,
     batch_size: int = 500,
     use_fps: bool = False,
 ):
@@ -596,7 +596,7 @@ def rgbd_vid_to_pcd(
         robot_camera_names (dict): Dict of camera names to process.
         downsample_ratio (int): Downsample ratio for the camera resolution.
         pcd_range (tuple): Range of the point cloud.
-        pcd_num_points (int): Number of points to sample from the point cloud.
+        pcd_num_points (Optional[int]): Number of points to sample from the point cloud. If None, no downsampling is performed.
         batch_size (int): Number of frames to process in each batch.
         use_fps (bool): Whether to use farthest point sampling for point cloud downsampling.
     """
@@ -604,22 +604,18 @@ def rgbd_vid_to_pcd(
     output_dir = os.path.join(data_folder, "pcd_vid", f"task-{task_id:04d}")
     makedirs_with_mode(output_dir)
 
+    total_n_points_before_downsample = 0
     # create a new hdf5 file to store the point cloud data
     with h5py.File(f"{output_dir}/episode_{demo_id:08d}.hdf5", "w") as out_f:
         in_f = pd.read_parquet(
             f"{data_folder}/2025-challenge-demos/data/task-{task_id:04d}/episode_{demo_id:08d}.parquet"
         )
-        cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
-        data_size = cam_rel_poses.shape[0]
-        fused_pcd_dset = out_f.create_dataset(
-            f"data/demo_{episode_id}/robot_r1::fused_pcd",
-            shape=(data_size, pcd_num_points, 6),
-            compression="lzf",
-        )
         # get observation loaders
         obs_loaders = {}
         for camera_id, robot_camera_name in robot_camera_names.items():
             resolution = HEAD_RESOLUTION if camera_id == "head" else WRIST_RESOLUTION
+            output_size = (resolution[0] // downsample_ratio, resolution[1] // downsample_ratio)
+            total_n_points_before_downsample += output_size[0] * output_size[1]
             keys = ["rgb", "depth_linear"]
             for key in keys:
                 kwargs = {}
@@ -634,13 +630,20 @@ def rgbd_vid_to_pcd(
                         task_id=task_id,
                         demo_id=f"{demo_id:08d}",
                         camera_id=camera_id,
-                        output_size=(resolution[0] // downsample_ratio, resolution[1] // downsample_ratio),
+                        output_size=output_size,
                         batch_size=batch_size,
                         stride=batch_size,
                         **kwargs,
                     )
                 )
-
+        # construct out dset
+        cam_rel_poses = th.from_numpy(np.array(in_f["observation.cam_rel_poses"].tolist(), dtype=np.float32))
+        data_size = cam_rel_poses.shape[0]
+        fused_pcd_dset = out_f.create_dataset(
+            f"data/demo_{episode_id}/robot_r1::fused_pcd",
+            shape=(data_size, pcd_num_points if pcd_num_points is not None else total_n_points_before_downsample, 6),
+            compression="lzf",
+        )
         # We batch process every batch_size frames
         for i in range(0, data_size, batch_size):
             logger.info(f"Processing batch {i} of {data_size}...")
