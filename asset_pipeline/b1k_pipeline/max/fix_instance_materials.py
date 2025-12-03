@@ -49,7 +49,9 @@ def fix_instance_materials():
             obj1, obj2 = objs
             mtl1 = obj1.material
             mtl2 = obj2.material
-            if (rt.classOf(mtl1) == rt.Multimaterial) == (rt.classOf(mtl2) == rt.Multimaterial):
+            if (rt.classOf(mtl1) == rt.Multimaterial) == (
+                rt.classOf(mtl2) == rt.Multimaterial
+            ):
                 # Either both are multi-material or neither.
                 print(
                     f"Cannot decide which material is right between 2 objects: {obj_names}. Do it manually."

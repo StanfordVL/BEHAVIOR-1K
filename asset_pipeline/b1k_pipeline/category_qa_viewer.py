@@ -8,8 +8,8 @@ import csv
 import pybullet as p
 import shutil
 
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+nltk.download("wordnet")
+nltk.download("omw-1.4")
 from nltk.corpus import wordnet as wn
 
 import igibson
@@ -40,7 +40,6 @@ with open(PIPELINE_ROOT / "metadata/category_mapping.csv", "r") as f:
     r = csv.DictReader(f)
     for row in r:
         CATEGORY_TO_SYNSET[row["category"].strip()] = row["synset"].strip()
-        
 
 
 def main(dataset_path, record_path):
@@ -74,7 +73,7 @@ def main(dataset_path, record_path):
     print(f"{len(remaining_cats)} cats remaining out of {len(all_cats)}.")
 
     for i, obj_category in enumerate(sorted(remaining_cats)):
-        print(f"Cat {i+1}/{len(remaining_cats)}: {obj_category}.")
+        print(f"Cat {i + 1}/{len(remaining_cats)}: {obj_category}.")
         try:
             sim = Simulator(mode="headless", use_pb_gui=True)
             sim.import_scene(EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1]))
@@ -83,7 +82,9 @@ def main(dataset_path, record_path):
                 model_path = get_ig_model_path(obj_category, obj_model)
                 filename = os.path.join(model_path, "urdf", obj_model + ".urdf")
 
-                print("Visualizing category {}, model {}".format(obj_category, obj_model))
+                print(
+                    "Visualizing category {}, model {}".format(obj_category, obj_model)
+                )
                 bbox = URDFObject(
                     filename,
                     name=obj_name,
@@ -100,25 +101,29 @@ def main(dataset_path, record_path):
                     category=obj_category,
                     model_path=model_path,
                     fixed_base=True,
-                    scale=np.array([scale, scale, scale])
+                    scale=np.array([scale, scale, scale]),
                 )
 
                 sim.import_object(simulator_obj)
-                simulator_obj.set_bbox_center_position_orientation(np.array([i + 0.5, 0.5, 0.5]), np.array([0, 0, 0, 1]))
+                simulator_obj.set_bbox_center_position_orientation(
+                    np.array([i + 0.5, 0.5, 0.5]), np.array([0, 0, 0, 1])
+                )
 
             print("Synset info:", get_synset(obj_category))
             user_input = input("Hit enter to continue, 's' to skip")
-            if user_input == 's':
+            if user_input == "s":
                 save_to_skip_file(obj_category, skip_file_path)
-            
+
             with open(record_path, "w") as f:
                 processed_cats.add(obj_category)
                 json.dump(sorted(processed_cats), f)
-            
+
         finally:
             sim.disconnect()
-            shutil.rmtree(PIPELINE_ROOT / "artifacts/aggregate/scene_instances", ignore_errors=True)
-    
+            shutil.rmtree(
+                PIPELINE_ROOT / "artifacts/aggregate/scene_instances",
+                ignore_errors=True,
+            )
 
 
 def save_to_skip_file(category, skip_file_path):
@@ -142,20 +147,25 @@ def get_synset(category):
 
     # Read the custom synsets from the CSV file
     custom_synsets = []
-    with open(PIPELINE_ROOT / 'metadata/synsets.csv', 'r') as csvfile:
+    with open(PIPELINE_ROOT / "metadata/synsets.csv", "r") as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             if synset_name == row[0].strip():
-                return row[1] + " (custom synset)", row[2] + "(hypernyms): " + (wn.synset(row[2])).definition()
+                return row[1] + " (custom synset)", row[2] + "(hypernyms): " + (
+                    wn.synset(row[2])
+                ).definition()
     try:
         synset = wn.synset(synset_name)
     except:
         return synset_name, "No definition found"
     return synset.name(), synset.definition()
 
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     if len(sys.argv) != 3:
-        print("Usage: python -m b1k_pipeline.category_qa_viewer dataset_path record_file_path.json")
+        print(
+            "Usage: python -m b1k_pipeline.category_qa_viewer dataset_path record_file_path.json"
+        )
         sys.exit(1)
     main(sys.argv[1], sys.argv[2])

@@ -2,12 +2,12 @@ CROWD_PROP_NAMES = [
     "breakable",
     "fillable",
     "flammable",
-    "openable", 
+    "openable",
     "toggleable",
 ]
 
 GPT_PROP_NAMES = [
-    "cookable", 
+    "cookable",
     "heatSource",
     "coldSource",
     # "fireSource",       # deprecated

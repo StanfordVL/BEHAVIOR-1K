@@ -65,7 +65,7 @@ def build_mesh_tree(
     # Get the mesh list and bboxes
     mesh_list = object_list["meshes"]
     object_bounding_boxes = object_list["bounding_boxes"]
-    
+
     # Invert the bbox rotations and update their scales
     # TODO: Remove .inv() after fixing the object_list wrong rotation.
     for model_id, instances in object_bounding_boxes.items():
@@ -161,7 +161,10 @@ def build_mesh_tree(
                         # TODO: Remove this after it's fixed in export_meshes
                         # Fix inverted meta link orientations
                         meta_link["orientation"] = (
-                            R.from_quat(meta_link["orientation"]).inv().as_quat().tolist()
+                            R.from_quat(meta_link["orientation"])
+                            .inv()
+                            .as_quat()
+                            .tolist()
                         )
 
                         if "length" in meta_link:
@@ -207,7 +210,9 @@ def build_mesh_tree(
                 if load_meshes:
                     upper_points = load_points(mesh_dir, mesh_fn)
                     G.nodes[node_key]["upper_points"] = (
-                        trimesh.transformations.transform_points(upper_points, SCALE_MATRIX)
+                        trimesh.transformations.transform_points(
+                            upper_points, SCALE_MATRIX
+                        )
                     )
             else:
                 G.nodes[node_key]["metadata"] = metadata
@@ -218,35 +223,45 @@ def build_mesh_tree(
                     assert (
                         "lower_mesh" not in G.nodes[node_key]
                     ), f"Found two lower meshes for {node_key}"
-                    lower_mesh = load_mesh(mesh_dir, mesh_fn, process=False, force="mesh")
+                    lower_mesh = load_mesh(
+                        mesh_dir, mesh_fn, process=False, force="mesh"
+                    )
                     lower_mesh.apply_transform(SCALE_MATRIX)
                     G.nodes[node_key]["lower_mesh"] = lower_mesh
 
                     lower_points = load_points(mesh_dir, mesh_fn)
                     G.nodes[node_key]["lower_points"] = (
-                        trimesh.transformations.transform_points(lower_points, SCALE_MATRIX)
+                        trimesh.transformations.transform_points(
+                            lower_points, SCALE_MATRIX
+                        )
                     )
 
                     # Load the texture map paths and convert them to absolute paths
                     G.nodes[node_key]["material_maps"] = {}
                     bakery_fs = pipeline_fs.target(target).opendir("bakery")
-                    for channel, path_rel_to_bakery in metadata["material_maps"].items():
+                    for channel, path_rel_to_bakery in metadata[
+                        "material_maps"
+                    ].items():
                         # TODO: Remove this once it is corrected.
                         if channel == "Transparency Color Map":
                             channel = "Transparency Map"
-                        G.nodes[node_key]["material_maps"][channel] = bakery_fs.getsyspath(path_rel_to_bakery)
+                        G.nodes[node_key]["material_maps"][channel] = (
+                            bakery_fs.getsyspath(path_rel_to_bakery)
+                        )
 
                     # Load convexmesh meta links
                     for cm_type in CONVEX_MESH_TYPES:
                         # Check if a collision mesh exist in the same directory
-                        pattern_str = r"^.*-M" + cm_type + r"(?:_[A-Za-z0-9]+)?-(\d+).obj$"
+                        pattern_str = (
+                            r"^.*-M" + cm_type + r"(?:_[A-Za-z0-9]+)?-(\d+).obj$"
+                        )
                         selection_matching_pattern = re.compile(pattern_str)
                         cm_filenames = [
                             x
                             for x in mesh_dir.listdir("/")
                             if selection_matching_pattern.fullmatch(x)
                         ]
-                        
+
                         if cm_filenames:
                             # Match the files
                             selection_matches = [
@@ -254,7 +269,9 @@ def build_mesh_tree(
                                 for x in cm_filenames
                             ]
                             indexed_matches = {
-                                int(match.group(1)): fn for match, fn in selection_matches if match
+                                int(match.group(1)): fn
+                                for match, fn in selection_matches
+                                if match
                             }
                             expected_keys = set(range(len(indexed_matches)))
                             found_keys = set(indexed_matches.keys())
@@ -298,7 +315,10 @@ def build_mesh_tree(
             joint_type = d["joint_type"]
             needs_upper = load_upper and not data["is_broken"] and joint_type != "F"
         assert (
-            not should_load_data or not load_meshes or not needs_upper or "upper_points" in data
+            not should_load_data
+            or not load_meshes
+            or not needs_upper
+            or "upper_points" in data
         ), f"{node} does not have upper mesh."
         assert (
             not should_load_data or not load_meshes or "lower_mesh" in data
@@ -306,7 +326,9 @@ def build_mesh_tree(
         assert (
             not should_load_data or not load_meshes or "lower_points" in data
         ), f"{node} does not have lower mesh."
-        assert not should_load_data or "metadata" in data, f"{node} does not have metadata."
+        assert (
+            not should_load_data or "metadata" in data
+        ), f"{node} does not have metadata."
 
         if "upper_points" in data:
             lower_vertices = len(data["lower_points"])
@@ -326,14 +348,22 @@ def build_mesh_tree(
 
     # Find roots to look them up in bounding boxes.
     roots = [node for node, in_degree in G.in_degree() if in_degree == 0]
-    
+
     # Assert that the roots keys are a subset of the bounding boxes keys.
     roots_to_model_and_instance = sorted([(node[1], node[2]) for node in roots])
     roots_to_model_and_instance_set = set(roots_to_model_and_instance)
-    assert len(roots_to_model_and_instance) == len(roots_to_model_and_instance_set), f"Duplicate root nodes found in {roots_to_model_and_instance}"
-    bbox_keys = set([(model_id, instance_id) for model_id, instances in object_bounding_boxes.items() for instance_id in instances])
-    assert (
-        roots_to_model_and_instance_set.issubset(bbox_keys)
+    assert len(roots_to_model_and_instance) == len(
+        roots_to_model_and_instance_set
+    ), f"Duplicate root nodes found in {roots_to_model_and_instance}"
+    bbox_keys = set(
+        [
+            (model_id, instance_id)
+            for model_id, instances in object_bounding_boxes.items()
+            for instance_id in instances
+        ]
+    )
+    assert roots_to_model_and_instance_set.issubset(
+        bbox_keys
     ), f"Root nodes do not match the bounding boxes. Roots: {roots_to_model_and_instance}, BBoxes: {bbox_keys}"
 
     for root in roots:
@@ -347,7 +377,9 @@ def build_mesh_tree(
             canonical_orientation = G.nodes[root]["canonical_orientation"]
             canonical_orientation = R.from_quat(canonical_orientation)
             delta_orientation = bbox_orientation.inv() * canonical_orientation
-            assert delta_orientation.magnitude() < 1e-5, f"Root node {root} has a bounding box with orientation {bbox_orientation.as_quat()} that does not match the canonical orientation {canonical_orientation.as_quat()}."
+            assert (
+                delta_orientation.magnitude() < 1e-5
+            ), f"Root node {root} has a bounding box with orientation {bbox_orientation.as_quat()} that does not match the canonical orientation {canonical_orientation.as_quat()}."
 
         # Create combined mesh for each root node and add some data.
         if load_meshes:

@@ -3,8 +3,13 @@ import json
 import os
 import sys
 
+
 def combine_list(ancestor, ours, theirs):
-    assert isinstance(ancestor, list) and isinstance(ours, list) and isinstance(theirs, list)
+    assert (
+        isinstance(ancestor, list)
+        and isinstance(ours, list)
+        and isinstance(theirs, list)
+    )
 
     # Check that all the elements in ancestor are in ours and theirs
     for x in ancestor:
@@ -19,7 +24,11 @@ def combine_list(ancestor, ours, theirs):
 
 
 def combine_obj(ancestor, ours, theirs):
-    assert isinstance(ancestor, dict) and isinstance(ours, dict) and isinstance(theirs, dict)
+    assert (
+        isinstance(ancestor, dict)
+        and isinstance(ours, dict)
+        and isinstance(theirs, dict)
+    )
 
     # Check that all the keys in ancestor are in ours and theirs
     for k in ancestor.keys():
@@ -39,7 +48,9 @@ def combine_obj(ancestor, ours, theirs):
 
 def main():
     if len(sys.argv) != 5:
-        print("Usage: python json_merge.py <list|obj> <ancestor_json> <our_json> <their_json>")
+        print(
+            "Usage: python json_merge.py <list|obj> <ancestor_json> <our_json> <their_json>"
+        )
         return
 
     mode, ancestor_fn, ours_fn, theirs_fn = sys.argv[1:]
@@ -54,10 +65,15 @@ def main():
     with open(theirs_fn, "r") as f:
         theirs = json.load(f)
 
-    combined = combine_list(ancestor, ours, theirs) if mode == "list" else combine_obj(ancestor, ours, theirs)
+    combined = (
+        combine_list(ancestor, ours, theirs)
+        if mode == "list"
+        else combine_obj(ancestor, ours, theirs)
+    )
 
     with open(ours_fn, "w") as f:
         json.dump(combined, f, indent=4)
+
 
 if __name__ == "__main__":
     main()

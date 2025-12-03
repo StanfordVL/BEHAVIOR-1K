@@ -23,12 +23,12 @@ with open(r"objlinks.csv", "r") as f:
 
 print(f"Read {len(data)} URLs.")
 
-with open('link_to_obj.csv', 'w', newline='') as csvfile:
-    fieldnames = ['link', 'objs']
+with open("link_to_obj.csv", "w", newline="") as csvfile:
+    fieldnames = ["link", "objs"]
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_ALL)
     writer.writeheader()
 
     for link, objs in data.items():
-        writer.writerow({'link': link, 'objs': ",".join(objs)})
+        writer.writerow({"link": link, "objs": ",".join(objs)})
 
 print("Saved mapping.")

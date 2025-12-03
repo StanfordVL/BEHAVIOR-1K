@@ -8,8 +8,10 @@ import b1k_pipeline.utils
 
 
 def main():
-    with b1k_pipeline.utils.PipelineFS() as pipeline_fs, \
-         b1k_pipeline.utils.ParallelZipFS("metadata.zip", write=True) as archive_fs:
+    with (
+        b1k_pipeline.utils.PipelineFS() as pipeline_fs,
+        b1k_pipeline.utils.ParallelZipFS("metadata.zip", write=True) as archive_fs,
+    ):
         pipeline_output_dir = pipeline_fs.pipeline_output()
         metadata_in_dir = pipeline_fs.opendir("metadata")
         metadata_out_dir = archive_fs.makedirs("metadata")
@@ -41,11 +43,19 @@ def main():
                     category = row["category"].strip()
                     categories_by_id[cat_id] = category
 
-                    assert category in collision_average_volumes, f"Category {category} not in collision_average_volumes"
+                    assert (
+                        category in collision_average_volumes
+                    ), f"Category {category} not in collision_average_volumes"
 
                     volume = collision_average_volumes[category]
-                    mass = float(row["mass (auto)"]) if row["mass (auto)"] and row["mass (auto)"] != "#DIV/0!" else None
-                    assert mass is not None and mass > 0, f"Invalid mass for category {category}"
+                    mass = (
+                        float(row["mass (auto)"])
+                        if row["mass (auto)"] and row["mass (auto)"] != "#DIV/0!"
+                        else None
+                    )
+                    assert (
+                        mass is not None and mass > 0
+                    ), f"Invalid mass for category {category}"
                     density = mass / volume if mass and volume else None
 
                     # The density needs to be temporarily capped at 10000 kg/m^3 - values above that

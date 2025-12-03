@@ -13,10 +13,10 @@ import pybullet_data
 def main():
     # Load the scene into iGibson 2
     p.connect(p.GUI)
-    p.setGravity(0,0,-10)
-    p.setAdditionalSearchPath(pybullet_data.getDataPath()) #used by loadURDF
+    p.setGravity(0, 0, -10)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())  # used by loadURDF
     p.loadURDF("plane.urdf")
-    
+
     dataset_path = r"C:\Users\cgokmen\Downloads\urdf-test-2-3"
     cat = "ice_tray"
     obj = "gewlsk"
@@ -27,6 +27,7 @@ def main():
     # Step the simulation by 5 seconds.
     while True:
         p.stepSimulation()
+
 
 if __name__ == "__main__":
     main()

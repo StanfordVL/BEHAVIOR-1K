@@ -386,7 +386,7 @@ class Evaluator:
 if __name__ == "__main__":
     register_omegaconf_resolvers()
     # open yaml from task path
-    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
+    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
     OmegaConf.resolve(config)
     # set headless mode

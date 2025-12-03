@@ -402,7 +402,9 @@ def max_path_to_cat(target):
 
 
 def bin_files():
-    max_files = glob.glob(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\legacy_*\processed.max")
+    max_files = glob.glob(
+        r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\legacy_*\processed.max"
+    )
 
     # Check if any of the files are empty
     # for f in tqdm.tqdm(max_files):
@@ -414,7 +416,9 @@ def bin_files():
         rt.resetMaxFile(rt.name("noPrompt"))
 
         # Create the directory
-        file_root = os.path.join(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\legacy_batch-%02d" % i)
+        file_root = os.path.join(
+            r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\legacy_batch-%02d" % i
+        )
         max_path = os.path.join(file_root, "processed.max")
         if os.path.exists(max_path):
             continue
@@ -482,6 +486,7 @@ def bin_files():
         rt.saveMaxFile(max_path, quiet=True)
 
     print("Done!")
+
 
 if __name__ == "__main__":
     bin_files()

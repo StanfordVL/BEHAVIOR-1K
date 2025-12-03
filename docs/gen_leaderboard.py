@@ -5,14 +5,15 @@ from collections import OrderedDict
 from pathlib import Path
 import mkdocs_gen_files
 
+
 def load_submissions():
     """Load all submissions from a track directory."""
     submissions = dict()
     track_path = Path("docs/challenge_submissions")
-    
+
     if not track_path.exists():
         return []
-    
+
     for json_file in track_path.glob("*.json"):
         try:
             with open(json_file) as f:
@@ -28,15 +29,21 @@ def load_submissions():
                 f"{testset}_q_score": data["overall_scores"].get("q_score", 0),
                 f"{testset}_task_sr": data["overall_scores"].get("task_sr", 0),
                 f"{testset}_time_score": data["overall_scores"].get("time_score", 0),
-                f"{testset}_base_distance_score": data["overall_scores"].get("base_distance_score", 0),
-                f"{testset}_left_distance_score": data["overall_scores"].get("left_distance_score", 0),
-                f"{testset}_right_distance_score": data["overall_scores"].get("right_distance_score", 0),
+                f"{testset}_base_distance_score": data["overall_scores"].get(
+                    "base_distance_score", 0
+                ),
+                f"{testset}_left_distance_score": data["overall_scores"].get(
+                    "left_distance_score", 0
+                ),
+                f"{testset}_right_distance_score": data["overall_scores"].get(
+                    "right_distance_score", 0
+                ),
             }
             if team not in submissions:
                 submissions[team] = submission
             else:
                 submissions[team].update(submission)
-            
+
         except Exception as e:
             print(f"Error loading {json_file}: {e}")
     # Now, sort submissions by max(hidden_q_score, public_q_score) descending, set to 0 if missing
@@ -46,8 +53,13 @@ def load_submissions():
         sorted(
             submissions.items(),
             key=lambda item: (
-                max(item[1].get("hidden_q_score", 0), item[1].get("public_q_score", 0)), 
-                (item[1].get("public_base_distance_score", 0) + item[1].get("public_left_distance_score", 0) + item[1].get("public_right_distance_score", 0)) / 3,
+                max(item[1].get("hidden_q_score", 0), item[1].get("public_q_score", 0)),
+                (
+                    item[1].get("public_base_distance_score", 0)
+                    + item[1].get("public_left_distance_score", 0)
+                    + item[1].get("public_right_distance_score", 0)
+                )
+                / 3,
                 item[1].get("public_time_score", 0),
             ),
             reverse=True,
@@ -55,11 +67,11 @@ def load_submissions():
     )
     return submissions
 
+
 def generate_combined_leaderboard():
     """Generate a single leaderboard page."""
-    
+
     with mkdocs_gen_files.open("challenge/leaderboard.md", "w") as fd:
-        
         fd.write("# Challenge Leaderboard\n\n")
         fd.write(
             '!!! warning "Provisional 2025 Challenge Leaderboard"\n'
@@ -82,7 +94,7 @@ def generate_combined_leaderboard():
             "    'Public Validation' entries are self-reported on the public validation set.\n"
             "    'Held-out Test' entries are from the hidden test set and are verified by the BEHAVIOR team.\n\n"
         )
-        
+
         submissions = load_submissions()
         if not submissions:
             fd.write("No submissions yet. Be the first to submit!\n\n")
@@ -92,13 +104,13 @@ def generate_combined_leaderboard():
                 "<table>\n"
                 "  <thead>\n"
                 "    <tr>\n"
-                "      <th rowspan=\"2\">Rank</th>\n"
-                "      <th rowspan=\"2\">Team</th>\n"
-                "      <th rowspan=\"2\">Affiliation</th>\n"
-                "      <th rowspan=\"2\">Date</th>\n"
-                "      <th rowspan=\"2\">Track</th>\n"
-                "      <th colspan=\"2\">Full Task Success Rate</th>\n"
-                "      <th colspan=\"2\">★ <strong>Q Score</strong></th>\n"
+                '      <th rowspan="2">Rank</th>\n'
+                '      <th rowspan="2">Team</th>\n'
+                '      <th rowspan="2">Affiliation</th>\n'
+                '      <th rowspan="2">Date</th>\n'
+                '      <th rowspan="2">Track</th>\n'
+                '      <th colspan="2">Full Task Success Rate</th>\n'
+                '      <th colspan="2">★ <strong>Q Score</strong></th>\n'
                 "    </tr>\n"
                 "    <tr>\n"
                 "      <th>Public Validation</th>\n"
@@ -112,9 +124,13 @@ def generate_combined_leaderboard():
 
             for i, (team, sub) in enumerate(submissions.items(), 1):
                 public_q_score = f"{sub.get('public_q_score', 0):.4f}"
-                hidden_q_score = f"{sub['hidden_q_score']:.4f}" if "hidden_q_score" in sub else ""
+                hidden_q_score = (
+                    f"{sub['hidden_q_score']:.4f}" if "hidden_q_score" in sub else ""
+                )
                 public_task_sr = f"{sub.get('public_task_sr', 0):.4f}"
-                hidden_task_sr = f"{sub['hidden_task_sr']:.4f}" if "hidden_task_sr" in sub else ""
+                hidden_task_sr = (
+                    f"{sub['hidden_task_sr']:.4f}" if "hidden_task_sr" in sub else ""
+                )
                 fd.write(
                     "    <tr>"
                     f"<td>{i}</td>"

@@ -6,6 +6,7 @@ import json
 from fs.zipfs import ZipFS
 
 import pymxs
+
 rt = pymxs.runtime
 
 import sys
@@ -31,7 +32,7 @@ def import_collision_mesh(obj, collision_selections, collision_mesh_fs):
     link_name = parsed_name.group("link_name")
     link_name = link_name if link_name else "base_link"
     node_key = (category, model_id, instance_id, link_name)
-   
+
     # Does it already have a collision mesh? If so, move on.
     for child in obj.children:
         parsed_child_name = parse_name(child.name)
@@ -39,26 +40,28 @@ def import_collision_mesh(obj, collision_selections, collision_mesh_fs):
             continue
 
         # Skip parts etc.
-        if parsed_child_name.group("mesh_basename") != parsed_name.group("mesh_basename"):
+        if parsed_child_name.group("mesh_basename") != parsed_name.group(
+            "mesh_basename"
+        ):
             continue
 
         if parsed_child_name.group("meta_type") == "collision":
             print("Collision mesh already exists for", obj.name, ", skipping.")
             return
-        
+
     # Try to load a collision mesh selection
     collision_key = (model_id, link_name)
     if collision_key not in collision_selections:
         print("No collision selection found for", obj.name)
         return
-    
+
     collision_selection = collision_selections[collision_key]
     print("Collision selection for", obj.name, "is", collision_selection)
 
     if not collision_mesh_fs.exists(obj.name):
         print("No collision mesh found for", obj.name)
         return
-    
+
     collision_fs = collision_mesh_fs.opendir(obj.name)
     collision_filenames = collision_fs.listdir("/")
     selection_matching_pattern = re.compile(collision_selection + r"-(\d+).obj$")
@@ -68,18 +71,34 @@ def import_collision_mesh(obj, collision_selections, collision_mesh_fs):
         print("No collision meshes found for", obj.name)
         return
 
-    selection_matches = [(selection_matching_pattern.fullmatch(x), x) for x in collision_filenames]
-    indexed_matches = {int(match.group(1)): fn for match, fn in selection_matches if match}
+    selection_matches = [
+        (selection_matching_pattern.fullmatch(x), x) for x in collision_filenames
+    ]
+    indexed_matches = {
+        int(match.group(1)): fn for match, fn in selection_matches if match
+    }
     expected_keys = set(range(len(indexed_matches)))
     found_keys = set(indexed_matches.keys())
-    assert expected_keys == found_keys, f"Missing collision meshes for {node_key}: {expected_keys - found_keys}"
-    ordered_collision_filenames = [indexed_matches[i] for i in range(len(indexed_matches))]
+    assert (
+        expected_keys == found_keys
+    ), f"Missing collision meshes for {node_key}: {expected_keys - found_keys}"
+    ordered_collision_filenames = [
+        indexed_matches[i] for i in range(len(indexed_matches))
+    ]
 
     collision_meshes = []
     for collision_filename in ordered_collision_filenames:
-        collision_mesh = load_mesh(collision_fs, collision_filename, force="mesh", skip_materials=True)
+        collision_mesh = load_mesh(
+            collision_fs, collision_filename, force="mesh", skip_materials=True
+        )
         if not collision_mesh.is_volume:
-            collision_mesh = load_mesh(collision_fs, collision_filename, force="mesh", process=False, skip_materials=True)
+            collision_mesh = load_mesh(
+                collision_fs,
+                collision_filename,
+                force="mesh",
+                process=False,
+                skip_materials=True,
+            )
         collision_meshes.append(collision_mesh)
 
     # Get a flattened list of vertices and faces
@@ -117,10 +136,17 @@ def import_collision_mesh(obj, collision_selections, collision_mesh_fs):
     collision_obj.parent = obj
 
     # Check that the new element count is the same as the split count
-    elems = {tuple(rt.polyop.GetElementsUsingFace(collision_obj, i + 1)) for i in range(rt.polyop.GetNumFaces(collision_obj))}
-    assert len(elems) == len(collision_meshes), f"{obj.name} has different number of faces in collision mesh than in splits"
+    elems = {
+        tuple(rt.polyop.GetElementsUsingFace(collision_obj, i + 1))
+        for i in range(rt.polyop.GetNumFaces(collision_obj))
+    }
+    assert len(elems) == len(
+        collision_meshes
+    ), f"{obj.name} has different number of faces in collision mesh than in splits"
     elems = np.array(list(elems))
-    assert not np.any(np.sum(elems, axis=0) > 1), f"{obj.name} has same face appear in multiple elements"
+    assert not np.any(
+        np.sum(elems, axis=0) > 1
+    ), f"{obj.name} has same face appear in multiple elements"
 
     # Hide the mesh
     collision_obj.isHidden = True
@@ -140,11 +166,23 @@ def process_target(pipeline_fs, target):
         # Load the collision selections
         with target_output_fs.open("collision_selection.json", "r") as f:
             mesh_to_collision = json.load(f)
-            match_to_collision = {parse_name(k): v for k, v in mesh_to_collision.items()}
-            collision_selections = {(k.group("model_id"), k.group("link_name") if k.group("link_name") else "base_link"): v for k, v in match_to_collision.items() if k is not None}
+            match_to_collision = {
+                parse_name(k): v for k, v in mesh_to_collision.items()
+            }
+            collision_selections = {
+                (
+                    k.group("model_id"),
+                    k.group("link_name") if k.group("link_name") else "base_link",
+                ): v
+                for k, v in match_to_collision.items()
+                if k is not None
+            }
 
         # Open the collision meshes ZIP
-        with target_output_fs.open("collision_meshes.zip", "rb") as f, ZipFS(f) as collision_mesh_fs:
+        with (
+            target_output_fs.open("collision_meshes.zip", "rb") as f,
+            ZipFS(f) as collision_mesh_fs,
+        ):
             # Iterate over the objects in the scene
             for obj in rt.objects:
                 import_collision_mesh(obj, collision_selections, collision_mesh_fs)
@@ -163,6 +201,7 @@ def main():
 
         for target in get_targets("combined"):
             process_target(pipeline_fs, target)
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 import re
 import sys
 import bisect
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import json
@@ -14,9 +15,11 @@ rt = pymxs.runtime
 
 type_re = re.compile(r"([A-Z\-]+):")
 ignore_messages = ["SYNSET", "CATEGORY", "ABILITIES", "SUBSTANCE", "STRUCTURE-UNCLOSED"]
+
+
 def file_eligible(objdir):
     complaint_path = objdir / "complaints.json"
-    
+
     if not complaint_path.exists():
         return False
 
@@ -25,7 +28,7 @@ def file_eligible(objdir):
         for complaint in x:
             if complaint["processed"]:
                 continue
-                
+
             complaint_type = "PREVIOUS PASS"
             m = type_re.match(complaint["message"])
             if m:
@@ -53,9 +56,14 @@ def next_failed():
         print("There are symlinks! Run the following commands:")
         for start in range(0, len(symlinks), 50):
             batch = symlinks[start : start + 50]
-            print("dvc unprotect", " ".join(str(x.relative_to(b1k_pipeline.utils.PIPELINE_ROOT)) for x in batch))
+            print(
+                "dvc unprotect",
+                " ".join(
+                    str(x.relative_to(b1k_pipeline.utils.PIPELINE_ROOT)) for x in batch
+                ),
+            )
         return
-    
+
     print(len(eligible_max), "files remaining.")
     print("\n".join(str(x) for x in eligible_max))
     if eligible_max:

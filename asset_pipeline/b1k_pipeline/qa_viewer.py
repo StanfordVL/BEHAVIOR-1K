@@ -8,8 +8,8 @@ import csv
 import pybullet as p
 import shutil
 
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+nltk.download("wordnet")
+nltk.download("omw-1.4")
 from nltk.corpus import wordnet as wn
 
 import igibson
@@ -40,7 +40,6 @@ with open(PIPELINE_ROOT / "metadata/category_mapping.csv", "r") as f:
     r = csv.DictReader(f)
     for row in r:
         CATEGORY_TO_SYNSET[row["category"].strip()] = row["synset"].strip()
-        
 
 
 def main(dataset_path, record_path):
@@ -62,7 +61,8 @@ def main(dataset_path, record_path):
 
     # Get all the objects in the dataset
     all_objs = {
-        (cat, model) for cat in get_all_object_categories()
+        (cat, model)
+        for cat in get_all_object_categories()
         for model in get_object_models_of_category(cat)
     }
 
@@ -79,8 +79,10 @@ def main(dataset_path, record_path):
         model_path = get_ig_model_path(obj_category, obj_model)
         filename = os.path.join(model_path, "urdf", f"{obj_model}.urdf")
 
-        print("\n\n-----------------------------------------------------------------------------")
-        print(f"Object {i+1}/{len(remaining_objs)}: ")
+        print(
+            "\n\n-----------------------------------------------------------------------------"
+        )
+        print(f"Object {i + 1}/{len(remaining_objs)}: ")
         print(f"{obj_category}-{obj_model}")
 
         try:
@@ -89,15 +91,22 @@ def main(dataset_path, record_path):
                 name=obj_name,
                 category=obj_category,
                 model_path=model_path,
-                fixed_base=True
+                fixed_base=True,
             )
 
             sim.import_object(simulator_obj)
-            z_pos = simulator_obj.bounding_box[2] / 2 + simulator_obj.scaled_bbxc_in_blf[2]
+            z_pos = (
+                simulator_obj.bounding_box[2] / 2 + simulator_obj.scaled_bbxc_in_blf[2]
+            )
             simulator_obj.set_position([0.0, 0.0, z_pos])
 
             dist = 3 * np.max(simulator_obj.bounding_box)
-            p.resetDebugVisualizerCamera(cameraDistance=dist, cameraYaw=30, cameraPitch=-30, cameraTargetPosition=[0,0,0])
+            p.resetDebugVisualizerCamera(
+                cameraDistance=dist,
+                cameraYaw=30,
+                cameraPitch=-30,
+                cameraTargetPosition=[0, 0, 0],
+            )
 
             user_complained_synset(simulator_obj)
             user_complained_appearance(simulator_obj)
@@ -106,18 +115,24 @@ def main(dataset_path, record_path):
             # user_complained_properties(simulator_obj)
             user_complained_metas(simulator_obj)
             user_complained_articulation(simulator_obj)
-            
+
             with open(record_path, "w") as f:
                 processed_objs.add((obj_category, obj_model))
                 json.dump(sorted(processed_objs), f, indent=4)
         finally:
             sim.disconnect()
-            shutil.rmtree(PIPELINE_ROOT / "artifacts/aggregate/scene_instances", ignore_errors=True)
+            shutil.rmtree(
+                PIPELINE_ROOT / "artifacts/aggregate/scene_instances",
+                ignore_errors=True,
+            )
+
 
 def process_complaint(message, simulator_obj):
     print("-----------------------")
     print(message)
-    response = input("Do you think anything is wrong? Enter a complaint (hit enter if all's good): ")
+    response = input(
+        "Do you think anything is wrong? Enter a complaint (hit enter if all's good): "
+    )
     if response:
         model = os.path.basename(simulator_obj.model_path)
         object_key = simulator_obj.category + "-" + model
@@ -125,7 +140,7 @@ def process_complaint(message, simulator_obj):
             "object": object_key,
             "message": message,
             "complaint": response,
-            "processed": False
+            "processed": False,
         }
         target_name = INVENTORY_DICT[object_key]
 
@@ -147,11 +162,13 @@ def get_synset(category):
 
     # Read the custom synsets from the CSV file
     custom_synsets = []
-    with open(PIPELINE_ROOT / 'metadata/synsets.csv', 'r') as csvfile:
+    with open(PIPELINE_ROOT / "metadata/synsets.csv", "r") as csvfile:
         reader = csv.reader(csvfile)
         for row in reader:
             if synset_name == row[1]:
-                return row[1] + " (custom synset)", row[2] + "(hypernyms): " + (wn.synset(row[2])).definition()
+                return row[1] + " (custom synset)", row[2] + "(hypernyms): " + (
+                    wn.synset(row[2])
+                ).definition()
     try:
         synset = wn.synset(synset_name)
     except:
@@ -208,7 +225,10 @@ def user_complained_properties(simulator_obj):
         abilities = []
         print("synset not in taxonomy")
 
-    all_abilities = sorted({a for s in taxonomy.taxonomy.nodes for a in taxonomy.get_abilities(s).keys()} - BAD_PROPERTIES)
+    all_abilities = sorted(
+        {a for s in taxonomy.taxonomy.nodes for a in taxonomy.get_abilities(s).keys()}
+        - BAD_PROPERTIES
+    )
     message = "Confirm object properties:\n"
     for ability in abilities:
         if ability not in BAD_PROPERTIES:
@@ -219,10 +239,13 @@ def user_complained_properties(simulator_obj):
 
 
 def user_complained_metas(simulator_obj):
-    meta_links = sorted({
-        meta_name
-        for link_metas in simulator_obj.metadata["meta_links"].values()
-        for meta_name in link_metas})
+    meta_links = sorted(
+        {
+            meta_name
+            for link_metas in simulator_obj.metadata["meta_links"].values()
+            for meta_name in link_metas
+        }
+    )
     message = f"Confirm object meta links listed below:\n"
     if meta_links:
         for meta_link in meta_links:
@@ -259,7 +282,11 @@ def user_complained_bbox(simulator_obj):
 def user_complained_articulation(simulator_obj):
     message = f"Confirm articulation:\n"
     message += "This object has the below movable links annotated:\n"
-    joint_ids = [(bid, joint) for bid in simulator_obj.get_body_ids() for joint in pb_utils.get_movable_joints(bid)]
+    joint_ids = [
+        (bid, joint)
+        for bid in simulator_obj.get_body_ids()
+        for joint in pb_utils.get_movable_joints(bid)
+    ]
     if joint_ids:
         for bid, joint in joint_ids:
             name = pb_utils.get_link_name(bid, joint)
@@ -269,14 +296,18 @@ def user_complained_articulation(simulator_obj):
     else:
         message += f"- N/A\n"
     message += "\nThey have now all been set to their upper (maximum) limits.\n"
-    message += "Verify that these are all the moving parts you expect from this object\n"
+    message += (
+        "Verify that these are all the moving parts you expect from this object\n"
+    )
     message += "and that the joint limits look reasonable."
     process_complaint(message, simulator_obj)
-  
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     if len(sys.argv) != 3:
-        print("Usage: python -m b1k_pipeline.qa_viewer dataset_path record_file_path.json")
+        print(
+            "Usage: python -m b1k_pipeline.qa_viewer dataset_path record_file_path.json"
+        )
         sys.exit(1)
     main(sys.argv[1], sys.argv[2])
