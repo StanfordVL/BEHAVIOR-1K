@@ -317,7 +317,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         load_config = {} if load_config is None else load_config
         load_config["xform_props_pre_loaded"] = True
 
-        
         # Store control-related inputs
         self._control_freq = control_freq
         self._controller_config = controller_config
@@ -357,8 +356,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         else:
             # If prim path is not specified, set it to the default path, but prepend controllable.
             relative_prim_path = f"/controllable__{class_name}__{name}"
-       
-        
 
         # Run super init
         super().__init__(
@@ -397,19 +394,19 @@ class Robot(USDObject, BaseObject, GymObservable):
 
     def _init_capabilities(self, capabilities):
         # init
-        self.is_manipulation=False
-        self.is_holonomic_base=False
-        self.is_articulated_trunk=False
-        self.is_active_camera=False
-        self.is_mobile_manipulation=False
-        self.is_untucked_arm_pose=False
-        self.is_locomotion=False
-        self.is_two_wheel=False
+        self.is_manipulation = False
+        self.is_holonomic_base = False
+        self.is_articulated_trunk = False
+        self.is_active_camera = False
+        self.is_mobile_manipulation = False
+        self.is_untucked_arm_pose = False
+        self.is_locomotion = False
+        self.is_two_wheel = False
 
         for capability in capabilities:
             assert hasattr(self, capability)
             setattr(self, capability, True)
-    
+
         # Set derived capabilities
         if self.is_untucked_arm_pose:
             self.is_mobile_manipulation = True
@@ -419,12 +416,12 @@ class Robot(USDObject, BaseObject, GymObservable):
             self.is_locomotion = True
         if self.is_two_wheel:
             self.is_locomotion = True
-        
-    
+
     def _init_ag_points(self):
         prop = self._robot_cfg[self.end_effector]
         if "ag_start_points" not in prop.keys():
             return
+
         def _convert_to_grasping_points(li):
             result = []
             for item in li:
@@ -478,7 +475,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         self._load_sensors()
 
         if self.is_holonomic_base:
-            
             self._world_base_fixed_joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
                 f"{self.prim_path}/rootJoint"
             )
@@ -1184,7 +1180,6 @@ class Robot(USDObject, BaseObject, GymObservable):
                     self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
                         lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                     )
-        
 
         if self.is_manipulation:
             breakpoint()
@@ -1207,8 +1202,6 @@ class Robot(USDObject, BaseObject, GymObservable):
                     # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-
-        
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
@@ -3029,7 +3022,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         if self.is_manipulation and hasattr(self, "_ag_start_points"):
             return {self.default_arm: self._ag_start_points}
         return None
-    
+
     @property
     def assisted_grasp_start_points(self):
         """
@@ -3068,7 +3061,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         if self.is_manipulation and hasattr(self, "_ag_end_points"):
             return {self.default_arm: self._ag_end_points}
         return None
-    
+
     @property
     def assisted_grasp_end_points(self):
         """
@@ -3401,7 +3394,7 @@ class Robot(USDObject, BaseObject, GymObservable):
                 )
             else:
                 assert False, f"Robot not supported for curobo."
-        
+
         # Import here to avoid circular imports
         from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection
 
@@ -3719,7 +3712,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         }
         self._ag_obj_in_hand[arm] = ag_obj
         self._ag_freeze_gripper[arm] = True
-    
+
     def _convert_to_math_pi(self, ele):
         """
         Convert string expressions involving pi (e.g., "pi/8", "0.5*pi", "-pi/2")
@@ -3757,7 +3750,9 @@ class Robot(USDObject, BaseObject, GymObservable):
                 # Euler angles, convert to quaternion
                 dic[key] = T.euler2quat(tensor_val)
             else:
-                raise ValueError(f"teleop_rotation_offset must have 3 (euler) or 4 (quaternion) values, got {len(tensor_val)}")
+                raise ValueError(
+                    f"teleop_rotation_offset must have 3 (euler) or 4 (quaternion) values, got {len(tensor_val)}"
+                )
         return dic
 
     @property
@@ -3921,8 +3916,9 @@ class Robot(USDObject, BaseObject, GymObservable):
                 directly used to define the set of corresponding control idxs.
         """
         assert self.is_locomotion
-        return self._robot_cfg.get("base_joint_names", [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")])
-
+        return self._robot_cfg.get(
+            "base_joint_names", [f"base_footprint_{component}_joint" for component in ("x", "y", "rz")]
+        )
 
     @cached_property
     def base_control_idx(self):
@@ -4089,7 +4085,6 @@ class Robot(USDObject, BaseObject, GymObservable):
             pos[self.arm_control_idx[arm]] = self.default_arm_poses[self.default_arm_pose]
         return pos
 
-        
     def tuck(self):
         """
         Immediately set this robot's configuration to be in tucked mode
@@ -4214,8 +4209,7 @@ class Robot(USDObject, BaseObject, GymObservable):
             "default_goal": self.reset_joint_pos[self.trunk_control_idx],
             "use_impedances": False,
         }
-    
-       
+
     @property
     def default_arm_poses(self):
         assert self.is_untucked_arm_pose
