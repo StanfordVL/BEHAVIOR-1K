@@ -90,8 +90,8 @@ def run_vhacd(input_mesh, hull_count):
 
 HULL_COUNTS = [16]
 USE_METHODS = {
-       "coacd": run_coacd,
-       # "vhacd": run_vhacd,
+    "coacd": run_coacd,
+    # "vhacd": run_vhacd,
 }
 
 
@@ -128,7 +128,9 @@ def _create_collision_obj_from_verts_faces(vertices, faces, parent, tag):
     return collision_obj
 
 
-def generate_convex_decompositions(obj, preferred_method=None, preferred_hull_count=None):
+def generate_convex_decompositions(
+    obj, preferred_method=None, preferred_hull_count=None
+):
     if rt.classOf(obj) != rt.Editable_Poly:
         return
 
@@ -139,14 +141,7 @@ def generate_convex_decompositions(obj, preferred_method=None, preferred_hull_co
     face_selection = rt.polyop.GetFaceSelection(obj)
     if face_selection.isEmpty:
         face_selection = rt.execute("#{1..%d}" % rt.polyop.GetNumFaces(obj))
-    faces = (
-        np.array(
-            rt.polyop.getFacesVerts(
-                obj, face_selection
-            )
-        )
-        - 1
-    )
+    faces = np.array(rt.polyop.getFacesVerts(obj, face_selection)) - 1
     assert all(
         len(f) == 3 for f in faces
     ), f"{obj.name} has non-triangular faces. Apply the Triangulate script."
@@ -203,8 +198,8 @@ def generate_convex_decompositions(obj, preferred_method=None, preferred_hull_co
                 tuple(rt.polyop.GetElementsUsingFace(collision_obj, i + 1))
                 for i in range(rt.polyop.GetNumFaces(collision_obj))
             }
-            assert len(elems) == len(
-                reduced_meshes
+            assert (
+                len(elems) == len(reduced_meshes)
             ), f"{obj.name} has different number of faces in collision mesh than in splits"
             elems = np.array(list(elems))
             assert not np.any(

@@ -26,18 +26,24 @@ with open(r"objlinks.csv", "r") as f:
 links = links[START:END]
 print(f"Read {len(links)} lines.")
 
-driver = webdriver.Chrome(executable_path=r"C:\Users\capri28\Downloads\chromedriver_win32\chromedriver")
+driver = webdriver.Chrome(
+    executable_path=r"C:\Users\capri28\Downloads\chromedriver_win32\chromedriver"
+)
 driver.get("https://www.turbosquid.com/MemberInfo/")
 driver.implicitly_wait(10)
 
 print("Waiting for user to log in and go to Account Info.")
-WebDriverWait(driver, 300).until(EC.title_contains("Member Info"))  # Check for login to happen and user to go to
+WebDriverWait(driver, 300).until(
+    EC.title_contains("Member Info")
+)  # Check for login to happen and user to go to
 
 bought_links = {x: 0 for x in links[:START]}
 for i, link in enumerate(links):
     # Load the page
     driver.get(link)
-    WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.CLASS_NAME, 'addToCartBtn')))
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.CLASS_NAME, "addToCartBtn"))
+    )
 
     # Try to get the price.
     try:
@@ -64,10 +70,12 @@ for i, link in enumerate(links):
     if price > 0:
         button = driver.find_element_by_class_name("addToCartBtn")
         button.click()
-        WebDriverWait(driver, 10).until(EC.visibility_of_element_located((By.ID, "quickPurchaseModalLabel")))
-        print(f"Added {link}, {i+1}/{len(links)}")
+        WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located((By.ID, "quickPurchaseModalLabel"))
+        )
+        print(f"Added {link}, {i + 1}/{len(links)}")
     else:
-        print(f"Skipping free {link}, {i+1}/{len(links)}")
+        print(f"Skipping free {link}, {i + 1}/{len(links)}")
 
     time.sleep(3)
 
@@ -78,9 +86,9 @@ x = np.array(list(bought_links.values()))
 print(f"Saved prices. Total: {np.sum(x)}")
 
 q25, q75 = np.percentile(x, [25, 75])
-bin_width = 2 * (q75 - q25) * len(x) ** (-1/3)
+bin_width = 2 * (q75 - q25) * len(x) ** (-1 / 3)
 bins = round((x.max() - x.min()) / bin_width)
-plt.hist(x, bins=bins);
+plt.hist(x, bins=bins)
 plt.show()
 
 driver.close()

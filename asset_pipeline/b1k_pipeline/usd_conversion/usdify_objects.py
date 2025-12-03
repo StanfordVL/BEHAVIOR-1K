@@ -19,38 +19,81 @@ WORKER_COUNT = 6
 BATCH_SIZE = 64
 MAX_TIME_PER_PROCESS = 5 * 60  # 5 minutes
 
+
 def run_on_batch(dataset_path, batch):
-    python_cmd = ["python", "-m", "b1k_pipeline.usd_conversion.usdify_objects_process", dataset_path] + batch
-    cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
+    python_cmd = [
+        "python",
+        "-m",
+        "b1k_pipeline.usd_conversion.usdify_objects_process",
+        dataset_path,
+    ] + batch
+    cmd = [
+        "micromamba",
+        "run",
+        "-n",
+        "omnigibson",
+        "/bin/bash",
+        "-c",
+        "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && "
+        + " ".join(python_cmd),
+    ]
     obj = batch[0][:-1].split("/")[-1]
-    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr:
+    with (
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f,
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr,
+    ):
         try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
+            p = subprocess.Popen(
+                cmd,
+                stdout=f,
+                stderr=ferr,
+                cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+                start_new_session=True,
+            )
             return p.wait(timeout=MAX_TIME_PER_PROCESS)
         except subprocess.TimeoutExpired:
-            print(f'Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing', file=sys.stderr)
+            print(
+                f"Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing",
+                file=sys.stderr,
+            )
             os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             return p.wait()
 
 
 def main():
     failed_objects = set()
-    with PipelineFS() as pipeline_fs, \
-         ParallelZipFS("objects.zip") as objects_fs, \
-         TempFS(temp_dir=str(TMP_DIR)) as dataset_fs:
+    with (
+        PipelineFS() as pipeline_fs,
+        ParallelZipFS("objects.zip") as objects_fs,
+        TempFS(temp_dir=str(TMP_DIR)) as dataset_fs,
+    ):
         with ParallelZipFS("objects_usd.zip", write=True) as out_fs:
             # Copy everything over to the dataset FS
             print("Copying input to dataset fs...")
             objdir_glob = list(objects_fs.glob("objects/*/*/"))
             for item in tqdm.tqdm(objdir_glob):
-                if objects_fs.opendir(item.path).opendir("urdf").glob("*.urdf").count().files == 0:
+                if (
+                    objects_fs.opendir(item.path)
+                    .opendir("urdf")
+                    .glob("*.urdf")
+                    .count()
+                    .files
+                    == 0
+                ):
                     continue
-                fs.copy.copy_fs(objects_fs.opendir(item.path), dataset_fs.makedirs(item.path, recreate=True))
+                fs.copy.copy_fs(
+                    objects_fs.opendir(item.path),
+                    dataset_fs.makedirs(item.path, recreate=True),
+                )
 
             print("Launching cluster...")
             dask_client = Client(n_workers=0, host="", scheduler_port=8786)
             # subprocess.run('ssh sc.stanford.edu "cd /cvgl2/u/cgokmen/ig_pipeline/b1k_pipeline/docker; sbatch --parsable run_worker_slurm.sh capri32.stanford.edu:8786"', shell=True, check=True)
-            subprocess.run(f'cd /scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker; ./run_worker_local.sh {WORKER_COUNT} cgokmen-lambda.stanford.edu:8786', shell=True, check=True)
+            subprocess.run(
+                f"cd /scr/BEHAVIOR-1K/asset_pipeline/b1k_pipeline/docker; ./run_worker_local.sh {WORKER_COUNT} cgokmen-lambda.stanford.edu:8786",
+                shell=True,
+                check=True,
+            )
             print("Waiting for workers")
             dask_client.wait_for_workers(WORKER_COUNT)
 
@@ -67,17 +110,17 @@ def main():
                 end = start + batch_size
                 batch = object_glob[start:end]
                 worker_future = dask_client.submit(
-                    run_on_batch,
-                    dataset_fs.getsyspath("/"),
-                    batch,
-                    pure=False)
+                    run_on_batch, dataset_fs.getsyspath("/"), batch, pure=False
+                )
                 futures[worker_future] = batch
 
             # Wait for all the workers to finish
             print("Queued all batches. Waiting for them to finish...")
             logs = []
             while True:
-                for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
+                for future in tqdm.tqdm(
+                    as_completed(futures.keys()), total=len(futures)
+                ):
                     # Check the batch results.
                     batch = futures[future]
                     return_code = future.result()  # we dont use the return code since we check the output files directly
@@ -112,7 +155,8 @@ def main():
                                 run_on_batch,
                                 dataset_fs.getsyspath("/"),
                                 subbatch,
-                                pure=False)
+                                pure=False,
+                            )
                             futures[worker_future] = subbatch
                         del futures[future]
 
@@ -124,7 +168,9 @@ def main():
 
             # Move the USDs to the output FS
             print("Copying USDs to output FS...")
-            usd_glob = [x.path for x in dataset_fs.glob("objects/*/*/usd/*.encrypted.usd")]
+            usd_glob = [
+                x.path for x in dataset_fs.glob("objects/*/*/usd/*.encrypted.usd")
+            ]
             for item in tqdm.tqdm(usd_glob):
                 itemdir = fs.path.dirname(item)
                 fs.copy.copy_fs(dataset_fs.opendir(itemdir), out_fs.makedirs(itemdir))
@@ -133,11 +179,15 @@ def main():
 
         # Save the logs
         with pipeline_fs.pipeline_output().open("usdify_objects.json", "w") as f:
-            json.dump({
-                "success": len(failed_objects) == 0,
-                "failed_objects": sorted(failed_objects),
-                "logs": logs,
-            }, f)
+            json.dump(
+                {
+                    "success": len(failed_objects) == 0,
+                    "failed_objects": sorted(failed_objects),
+                    "logs": logs,
+                },
+                f,
+            )
+
 
 if __name__ == "__main__":
     main()

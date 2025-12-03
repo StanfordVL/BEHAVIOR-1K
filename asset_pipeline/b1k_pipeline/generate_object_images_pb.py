@@ -16,8 +16,8 @@ from fs.tempfs import TempFS
 from fs.zipfs import ZipFS
 import tqdm
 
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+nltk.download("wordnet")
+nltk.download("omw-1.4")
 from nltk.corpus import wordnet as wn
 
 import igibson
@@ -38,12 +38,17 @@ from b1k_pipeline.utils import PipelineFS, TMP_DIR
 
 USE_IG_RENDERER = False
 
-def main():
-        #  TempFS(temp_dir=str(TMP_DIR)) as dataset_fs, \
 
-    with PipelineFS() as pipeline_fs, \
-         OSFS(r"D:\dataset-5-3") as dataset_fs, \
-         ZipFS(pipeline_fs.pipeline_output().open("object_images.zip", "wb"), write=True) as out_fs:
+def main():
+    #  TempFS(temp_dir=str(TMP_DIR)) as dataset_fs, \
+
+    with (
+        PipelineFS() as pipeline_fs,
+        OSFS(r"D:\dataset-5-3") as dataset_fs,
+        ZipFS(
+            pipeline_fs.pipeline_output().open("object_images.zip", "wb"), write=True
+        ) as out_fs,
+    ):
         # First copy over all the objects
         # with ZipFS(pipeline_fs.open("artifacts/og_dataset.zip", "rb")) as dataset_zip_fs:
         #     print("Copying objects over")
@@ -54,7 +59,8 @@ def main():
 
         # Get all the objects in the dataset
         all_objs = [
-            (cat, model) for cat in get_all_object_categories()
+            (cat, model)
+            for cat in get_all_object_categories()
             for model in get_object_models_of_category(cat)
         ]
         all_objs.sort()
@@ -66,8 +72,17 @@ def main():
 
             height, width = 768, 1024
             if USE_IG_RENDERER:
-                settings = MeshRendererSettings(env_texture_filename=None, enable_shadow=True, msaa=True)
-                sim = Simulator(mode="headless", use_pb_gui=False, image_width=width, image_height=height, vertical_fov=70, rendering_settings=settings)
+                settings = MeshRendererSettings(
+                    env_texture_filename=None, enable_shadow=True, msaa=True
+                )
+                sim = Simulator(
+                    mode="headless",
+                    use_pb_gui=False,
+                    image_width=width,
+                    image_height=height,
+                    vertical_fov=70,
+                    rendering_settings=settings,
+                )
             else:
                 sim = Simulator(mode="headless", use_pb_gui=True)
             sim.import_scene(EmptyScene(render_floor_plane=False))
@@ -92,24 +107,41 @@ def main():
                     category=obj_category,
                     model_path=model_path,
                     fixed_base=True,
-                    scale=np.array([scale, scale, scale])
+                    scale=np.array([scale, scale, scale]),
                 )
 
                 sim.import_object(simulator_obj)
-                simulator_obj.set_bbox_center_position_orientation(np.array([0, 0, 0.5]), np.array([0, 0, 0, 1]))
+                simulator_obj.set_bbox_center_position_orientation(
+                    np.array([0, 0, 0.5]), np.array([0, 0, 0, 1])
+                )
 
                 dist = 1
                 if USE_IG_RENDERER:
                     target = [0, 0, simulator_obj.bounding_box[2] / 2]
-                    cam = [dist * np.cos(np.deg2rad(30)), dist * np.sin(np.deg2rad(30)), dist * np.sin(np.deg2rad(30))]
+                    cam = [
+                        dist * np.cos(np.deg2rad(30)),
+                        dist * np.sin(np.deg2rad(30)),
+                        dist * np.sin(np.deg2rad(30)),
+                    ]
                     sim.renderer.set_camera(cam, target, [0, 0, 1])
                     img = sim.renderer.render(modes=("rgb",))[0]
                     img = np.reshape(img, (height, width, 4))
                     img = img[:, :, :3] * 255
                 else:
-                    p.resetDebugVisualizerCamera(cameraDistance=dist, cameraYaw=30, cameraPitch=-30, cameraTargetPosition=[0,0,simulator_obj.bounding_box[2] / 2])
+                    p.resetDebugVisualizerCamera(
+                        cameraDistance=dist,
+                        cameraYaw=30,
+                        cameraPitch=-30,
+                        cameraTargetPosition=[0, 0, simulator_obj.bounding_box[2] / 2],
+                    )
                     w, h, V, P = p.getDebugVisualizerCamera()[:4]
-                    img = p.getCameraImage(w, h, viewMatrix=V, projectionMatrix=P, renderer=p.ER_BULLET_HARDWARE_OPENGL)[2]
+                    img = p.getCameraImage(
+                        w,
+                        h,
+                        viewMatrix=V,
+                        projectionMatrix=P,
+                        renderer=p.ER_BULLET_HARDWARE_OPENGL,
+                    )[2]
                     img = np.reshape(img, (h, w, 4))
                     img = img[:, :, :3]
 
@@ -127,7 +159,7 @@ def main():
                 print(obj_name, "failed - continuing.")
             finally:
                 sim.disconnect()
-  
+
 
 if __name__ == "__main__":
     main()

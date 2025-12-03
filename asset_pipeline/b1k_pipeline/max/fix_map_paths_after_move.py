@@ -47,18 +47,27 @@ def get_maps(root_mat):
 def fix_maps():
     providers = {
         k.split("-")[-1]: v
-        for k, v in 
-        json.loads(pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\artifacts\pipeline\object_inventory.json").read_text())["providers"].items()
+        for k, v in json.loads(
+            pathlib.Path(
+                r"D:\BEHAVIOR-1K\asset_pipeline\artifacts\pipeline\object_inventory.json"
+            ).read_text()
+        )["providers"].items()
     }
     current_target = "/".join(pathlib.Path(rt.maxFilePath).parts[-2:])
-    current_target_bakery = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "bakery"
-    current_target_textures = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "textures"
+    current_target_bakery = (
+        pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "bakery"
+    )
+    current_target_textures = (
+        pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / "textures"
+    )
     for obj in rt.objects:
         all_texmaps = get_maps(obj.material)
 
         for texmap in all_texmaps:
             if not hasattr(texmap, "filename") or not texmap.filename:
-                print(f"Map {texmap} of type {rt.classOf(texmap)} has no filename. Skipping.")
+                print(
+                    f"Map {texmap} of type {rt.classOf(texmap)} has no filename. Skipping."
+                )
                 continue
 
             # assert (
@@ -67,7 +76,10 @@ def fix_maps():
 
             # Check if the map is already under this target.
             texmap_filename = pathlib.Path(texmap.filename)
-            if current_target_bakery in texmap_filename.parents or current_target_textures in texmap_filename.parents:
+            if (
+                current_target_bakery in texmap_filename.parents
+                or current_target_textures in texmap_filename.parents
+            ):
                 print(
                     f"Map {texmap_filename} is already under the target {current_target}. Skipping.",
                 )
@@ -78,7 +90,11 @@ def fix_maps():
             if texmap_filename.exists():
                 # If it's available at the provided path, use that.
                 orig_map_path = texmap_filename
-            elif hasattr(texmap, "bitmap") and texmap.bitmap is not None and pathlib.Path(texmap.bitmap.filename).exists():
+            elif (
+                hasattr(texmap, "bitmap")
+                and texmap.bitmap is not None
+                and pathlib.Path(texmap.bitmap.filename).exists()
+            ):
                 # Otherwise, if the path was resolved somehow by 3ds Max, use that.
                 orig_map_path = pathlib.Path(texmap.bitmap.filename)
             else:
@@ -86,19 +102,30 @@ def fix_maps():
                 # Get the original provider for the object
                 parsed_name = parse_name(obj.name)
                 if not parsed_name:
-                    print(f"Could not parse name for object {obj.name}. Skipping map {texmap_filename}.")
+                    print(
+                        f"Could not parse name for object {obj.name}. Skipping map {texmap_filename}."
+                    )
                     continue
 
                 model_id = parsed_name.group("model_id")
                 original_provider = providers.get(model_id, None)
                 if not original_provider:
-                    print(f"Could not find original provider for model ID {model_id}. Skipping map {texmap_filename}.")
+                    print(
+                        f"Could not find original provider for model ID {model_id}. Skipping map {texmap_filename}."
+                    )
                     continue
 
                 # Use os.path.abspath which normalizes + absolutifies the paths but does not resolve symlinks unlike pathlib (problem with dvc)
                 map_filename = texmap_filename.name
-                map_directory = "bakery" if "bakery" in texmap_filename.parts else "textures"
-                orig_map_path = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / original_provider / map_directory / map_filename
+                map_directory = (
+                    "bakery" if "bakery" in texmap_filename.parts else "textures"
+                )
+                orig_map_path = (
+                    pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad")
+                    / original_provider
+                    / map_directory
+                    / map_filename
+                )
             if not orig_map_path.exists():
                 print(
                     f"Map {texmap_filename} does not exist at {orig_map_path}. Skipping.",
@@ -110,9 +137,20 @@ def fix_maps():
                 map_hash = hashlib.md5(f.read()).hexdigest()
 
             # Generate a brand new path for the map file. Prefix the filename with the hash if it's not in the bakery directory.
-            new_map_directory = "bakery" if "bakery" in orig_map_path.parts else "textures"
-            new_map_filename = f"{map_hash}_{orig_map_path.name}" if new_map_directory == "textures" else orig_map_path.name
-            new_map_path = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / current_target / new_map_directory / new_map_filename
+            new_map_directory = (
+                "bakery" if "bakery" in orig_map_path.parts else "textures"
+            )
+            new_map_filename = (
+                f"{map_hash}_{orig_map_path.name}"
+                if new_map_directory == "textures"
+                else orig_map_path.name
+            )
+            new_map_path = (
+                pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad")
+                / current_target
+                / new_map_directory
+                / new_map_filename
+            )
 
             if not new_map_path.exists():
                 print("Copying map from", orig_map_path, "to", new_map_path)
@@ -120,6 +158,7 @@ def fix_maps():
 
             # Then update the path in the bitmap texture
             texmap.filename = str(new_map_path)
+
 
 if __name__ == "__main__":
     fix_maps()

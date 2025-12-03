@@ -258,7 +258,7 @@ class FrankaPanda(ManipulationRobot):
 
     @cached_property
     def arm_joint_names(self):
-        return {self.default_arm: [f"panda_joint{i+1}" for i in range(7)]}
+        return {self.default_arm: [f"panda_joint{i + 1}" for i in range(7)]}
 
     @cached_property
     def eef_link_names(self):

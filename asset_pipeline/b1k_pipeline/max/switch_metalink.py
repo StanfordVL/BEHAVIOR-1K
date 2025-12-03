@@ -1,10 +1,12 @@
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.utils import parse_name
 
 
 import pymxs
+
 rt = pymxs.runtime
 
 
@@ -18,7 +20,7 @@ def switch_metalink():
         current_metatype = n.group("meta_type")
 
         if current_metatype == "togglebutton":
-           new_metatype = "slicer"
+            new_metatype = "slicer"
         elif current_metatype == "slicer":
             new_metatype = "fillable"
         elif current_metatype == "fillable":
@@ -28,19 +30,15 @@ def switch_metalink():
         elif current_metatype == "fluidsource":
             new_metatype = "heatsource"
         elif current_metatype == "heatsource":
-           new_metatype = "particleapplier"
+            new_metatype = "particleapplier"
         elif current_metatype == "particleapplier":
-           new_metatype = "togglebutton"
-        
+            new_metatype = "togglebutton"
 
-        before = obj.name[:n.start("meta_type")]
-        after = obj.name[n.end("meta_type"):] 
+        before = obj.name[: n.start("meta_type")]
+        after = obj.name[n.end("meta_type") :]
         new_name = before + new_metatype + after
         assert parse_name(obj.name), f"Almost generated invalid name {new_name}"
         obj.name = new_name
-
-
-
 
 
 def switch_metalink_button():

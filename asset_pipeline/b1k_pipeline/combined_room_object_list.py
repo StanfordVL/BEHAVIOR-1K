@@ -111,7 +111,9 @@ def main():
                 room_type_keys = defaultdict(set)
                 for rm_name in scene_info.keys():
                     if "_" not in rm_name:
-                        print("Found invalid room name", rm_name, "in scene", scene_name)
+                        print(
+                            "Found invalid room name", rm_name, "in scene", scene_name
+                        )
                         continue
                     room_type, room_id = rm_name.rsplit("_", 1)
                     room_type_keys[room_type].add(int(room_id))
@@ -120,7 +122,9 @@ def main():
                     if room_ids != set(range(len(room_ids))):
                         non_contiguous_rooms[scene_name][room_type] = sorted(room_ids)
             except:
-                raise ValueError("Error parsing room name", rm_name, "in scene", scene_name)
+                raise ValueError(
+                    "Error parsing room name", rm_name, "in scene", scene_name
+                )
 
         success = (
             len(skipped_files) == 0

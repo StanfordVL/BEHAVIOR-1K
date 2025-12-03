@@ -15,15 +15,15 @@ with mkdocs_gen_files.open("challenge/task_data.json", "w") as fd:
 
 # Room display names
 room_names = {
-    'kitchen': 'Kitchen',
-    'living_room': 'Living Room',
-    'bedroom': 'Bedroom',
-    'bathroom': 'Bathroom',
-    'garage': 'Garage',
-    'garden': 'Garden',
-    'childs_room': "Child's Room",
-    'corridor': 'Corridor',
-    'utility_room': 'Utility Room'
+    "kitchen": "Kitchen",
+    "living_room": "Living Room",
+    "bedroom": "Bedroom",
+    "bathroom": "Bathroom",
+    "garage": "Garage",
+    "garden": "Garden",
+    "childs_room": "Child's Room",
+    "corridor": "Corridor",
+    "utility_room": "Utility Room",
 }
 
 # Create the demo gallery as index page with all tasks embedded
@@ -32,10 +32,12 @@ with mkdocs_gen_files.open("challenge/tasks/index.md", "w") as fd:
     # fd.write("icon: material/grid\n")
     # fd.write("---\n\n")
     fd.write("# Demo Gallery\n\n")
-    fd.write("Browse through all 50 household tasks in our 2025 challenge. Click on any task to view an example of RGB video demonstration.\n\n")
-    
+    fd.write(
+        "Browse through all 50 household tasks in our 2025 challenge. Click on any task to view an example of RGB video demonstration.\n\n"
+    )
+
     # Add controls
-    fd.write('''<div class="controls">
+    fd.write("""<div class="controls">
   <div class="filter-control">
     <label for="room-filter">Filter by room:</label>
     <select id="room-filter">
@@ -66,17 +68,17 @@ with mkdocs_gen_files.open("challenge/tasks/index.md", "w") as fd:
 <div class="grid cards compact" id="task-grid">
   <div class="loading">Loading tasks...</div>
 </div>
-''')
+""")
 
     # Add JavaScript with embedded data
-    fd.write('\n<script>\n')
-    fd.write('(function() {\n')
-    fd.write('  // Embedded task data\n')
-    fd.write('  const tasks = ')
-    fd.write(json.dumps(data['tasks'], indent=2))
-    fd.write(';\n\n')
-    
-    fd.write('''  // Room display names
+    fd.write("\n<script>\n")
+    fd.write("(function() {\n")
+    fd.write("  // Embedded task data\n")
+    fd.write("  const tasks = ")
+    fd.write(json.dumps(data["tasks"], indent=2))
+    fd.write(";\n\n")
+
+    fd.write("""  // Room display names
   const roomNames = {
     'kitchen': 'Kitchen',
     'living_room': 'Living Room',
@@ -205,10 +207,10 @@ with mkdocs_gen_files.open("challenge/tasks/index.md", "w") as fd:
   }
 })();
 </script>
-''')
-    
+""")
+
     # Add styles
-    fd.write('''
+    fd.write("""
 <style>
 .controls {
   display: flex;
@@ -371,35 +373,37 @@ with mkdocs_gen_files.open("challenge/tasks/index.md", "w") as fd:
   }
 }
 </style>
-''')
+""")
 
 # Generate individual task pages (without annotations, with proper video sizing)
-for task in data['tasks']:
-    task_id = task['id']
-    task_name = task['name']
-    
+for task in data["tasks"]:
+    task_id = task["id"]
+    task_name = task["name"]
+
     # Get task index for numbering
-    task_index = data['tasks'].index(task)
-    
+    task_index = data["tasks"].index(task)
+
     # Create file path with zero-padded task number prefix for proper sorting
     doc_path = Path("challenge", "tasks", f"{task_index:02d}_{task_id}.md")
     full_doc_path = Path(doc_path)
-    
+
     # Generate page content
     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
         # Page header
         fd.write("---\n")
         fd.write("icon: material/video-outline\n")
         fd.write("---\n\n")
-        
+
         # Title
-        task_index = data['tasks'].index(task)
+        task_index = data["tasks"].index(task)
         fd.write(f"# Task {task_index}: {task_name}\n\n")
-        
+
         # Metadata
-        rooms_display = ', '.join([room_names.get(r, r.title()) for r in task.get('rooms', [])])
-        duration = task.get('duration', 'N/A')
-        
+        rooms_display = ", ".join(
+            [room_names.get(r, r.title()) for r in task.get("rooms", [])]
+        )
+        duration = task.get("duration", "N/A")
+
         # Format duration as "x minutes y seconds"
         if isinstance(duration, int):
             minutes = duration // 60
@@ -412,24 +416,26 @@ for task in data['tasks']:
                 duration_display = f"{minutes} minutes {seconds} seconds"
         else:
             duration_display = str(duration)
-        
+
         fd.write(f"**Rooms:** {rooms_display}  \n")
         fd.write(f"**Duration:** {duration_display} avg  \n")
-        
+
         # Add task instruction if available
-        if task.get('instruction'):
+        if task.get("instruction"):
             fd.write(f"**Language Instruction:** {task['instruction']}  \n")
-        
+
         # Link to BEHAVIOR knowledge base (if available)
         kb_url = f"https://behavior.stanford.edu/knowledgebase/tasks/{task_id}-0.html"
-        fd.write(f"**Full Task Definition:** [View on BEHAVIOR Knowledge Base]({kb_url})\n\n")
-        
+        fd.write(
+            f"**Full Task Definition:** [View on BEHAVIOR Knowledge Base]({kb_url})\n\n"
+        )
+
         # Video section - only RGB with proper sizing and minimal controls
-        if task.get('video'):
-            video_url = task['video']
+        if task.get("video"):
+            video_url = task["video"]
             # Extract video ID from URL if it's a Vimeo URL
-            if 'vimeo.com' in video_url:
-                # Add minimal Vimeo parameters: 
+            if "vimeo.com" in video_url:
+                # Add minimal Vimeo parameters:
                 # controls=1 (show controls)
                 # title=0, byline=0, portrait=0 (hide title, author, portrait)
                 # dnt=1 (do not track)
@@ -438,20 +444,24 @@ for task in data['tasks']:
                 # sidedock=0 (hide the sidebar with sharing, like, etc.)
                 # logo=0 (hide Vimeo logo - requires Plus account or higher)
                 fd.write('<div class="video-wrapper">\n')
-                fd.write(f'  <iframe src="{video_url}?controls=1&title=0&byline=0&portrait=0&dnt=1&transparent=0&sidedock=0&logo=0" ')
-                fd.write('width="720" height="720" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>\n')
-                fd.write('</div>\n\n')
+                fd.write(
+                    f'  <iframe src="{video_url}?controls=1&title=0&byline=0&portrait=0&dnt=1&transparent=0&sidedock=0&logo=0" '
+                )
+                fd.write(
+                    'width="720" height="720" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>\n'
+                )
+                fd.write("</div>\n\n")
         else:
             # Placeholder when video is not available
             fd.write('<div class="video-placeholder">\n')
             fd.write('  <div class="placeholder-content">\n')
             fd.write('    <i class="material-icons">videocam_off</i>\n')
-            fd.write('    <p>Video demonstration coming soon</p>\n')
-            fd.write('  </div>\n')
-            fd.write('</div>\n\n')
-        
+            fd.write("    <p>Video demonstration coming soon</p>\n")
+            fd.write("  </div>\n")
+            fd.write("</div>\n\n")
+
         # Add styles for video
-        fd.write('''<style>
+        fd.write("""<style>
 /* Video wrapper for proper sizing */
 .video-wrapper {
   max-width: 720px;
@@ -495,7 +505,9 @@ for task in data['tasks']:
   }
 }
 </style>
-''')
-    
+""")
+
     # Set edit path for the generated file
-    mkdocs_gen_files.set_edit_path(full_doc_path, Path("../../docs/challenge/task_data.json"))
+    mkdocs_gen_files.set_edit_path(
+        full_doc_path, Path("../../docs/challenge/task_data.json")
+    )

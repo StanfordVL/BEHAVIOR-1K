@@ -64,7 +64,9 @@ CHANNEL_DATA_FORMAT_OVERRIDES = {
 # }
 
 RENDER_PRESET_FILENAME = str(
-    (b1k_pipeline.utils.PIPELINE_ROOT / "render_presets" / "no_sampler_no_gi.rps").absolute()
+    (
+        b1k_pipeline.utils.PIPELINE_ROOT / "render_presets" / "no_sampler_no_gi.rps"
+    ).absolute()
 )
 
 allow_list = []
@@ -160,7 +162,7 @@ class TextureBaker:
 
     def get_process_objs(self):
         objs = []
-        for obj in (rt.objects if not rt.selection else rt.selection):
+        for obj in rt.objects if not rt.selection else rt.selection:
             if rt.classOf(obj) != rt.Editable_Poly:
                 continue
             if allow_list and all(
@@ -231,15 +233,21 @@ class TextureBaker:
         print("uv_unwrapping", obj.name)
 
         rt.polyop.setMapSupport(obj, 99, False)
-        assert not rt.polyop.getMapSupport(obj, 99), f"Failed to clear UV channel 99 for {obj.name} prior to unwrapping"
+        assert not rt.polyop.getMapSupport(
+            obj, 99
+        ), f"Failed to clear UV channel 99 for {obj.name} prior to unwrapping"
         if USE_UNWRELLA:
             self.uv_unwrapping_unwrella(obj)
             if not rt.polyop.getMapSupport(obj, 99):
-                print(f"Unwrella failed for {obj.name}, falling back to native unwrapping.")
+                print(
+                    f"Unwrella failed for {obj.name}, falling back to native unwrapping."
+                )
                 self.uv_unwrapping_native(obj)
         else:
             self.uv_unwrapping_native(obj)
-        assert rt.polyop.getMapSupport(obj, 99), f"Could not unwrap UVs for object {obj.name}"
+        assert rt.polyop.getMapSupport(
+            obj, 99
+        ), f"Could not unwrap UVs for object {obj.name}"
 
         # Flatten the modifier stack
         rt.maxOps.collapseNodeTo(obj, 1, True)
@@ -278,8 +286,7 @@ class TextureBaker:
         siblings = []
         for candidate in rt.objects:
             if (
-                candidate.baseObject
-                == obj.baseObject
+                candidate.baseObject == obj.baseObject
                 # and candidate.material == obj.material  # TODO: Is this too aggressive?
             ):
                 siblings.append(candidate)
@@ -295,9 +302,7 @@ class TextureBaker:
 
             # Only the first channel requires creating the new PhysicalMaterial
             if i == 0:
-                btt.setOutputTo(
-                    obj, "CreateNewMaterial", material=rt.VrayMtl()
-                )
+                btt.setOutputTo(obj, "CreateNewMaterial", material=rt.VrayMtl())
                 # btt.setOutputTo(obj, "CreateNewMaterial", material=rt.PBRMetalRough())
 
             # Make sure the new UV channel is selected
@@ -314,7 +319,10 @@ class TextureBaker:
             texture_map.fileType = CHANNEL_DATA_FORMAT_OVERRIDES.get(map_name, "png")
 
             # Set the apply color mapping option
-            if texture_map.getOptionsCount() > 0 and texture_map.getOptionName(1) == "Apply color mapping":
+            if (
+                texture_map.getOptionsCount() > 0
+                and texture_map.getOptionName(1) == "Apply color mapping"
+            ):
                 texture_map.setOptionValue(1, False)
 
             # Mapping from the original channel (of VRay, Corona, etc) to the new channel of PhysicalMaterial
