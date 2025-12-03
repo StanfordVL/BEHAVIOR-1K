@@ -207,6 +207,7 @@ class Evaluator:
         self.robot_action = self.policy.forward(obs=self.obs)
 
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+
         # process obs
         self.obs = self._preprocess_obs(obs)
 
@@ -326,6 +327,8 @@ class Evaluator:
         """
         Write the current robot observations to video.
         """
+        if ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb" not in self.obs:
+            return
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
@@ -362,7 +365,6 @@ class Evaluator:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        # print stats
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Total success trials: {self.n_success_trials}")
