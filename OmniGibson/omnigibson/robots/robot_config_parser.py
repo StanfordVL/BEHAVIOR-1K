@@ -332,7 +332,7 @@ def _set_default_controllers(config, robot_cls):
         return
 
     updates_dict = updates.copy()
-
+    
     def _make_property(update_dict):
         @property
         def prop_func(self):
@@ -572,7 +572,7 @@ def _validate_config(cfg: Dict[str, Any]) -> None:
 
 def _import_class(import_path: str):
     """
-    Used when a robot config uses the extends key to inherit
+    Used when a robot config uses the extends key to inherit 
     from another robot class specified as a string path.
     """
     # Parse the import path
@@ -605,8 +605,8 @@ def _import_class(import_path: str):
 
     # Otherwise, try to import it from the module (for non-YAML classes)
     try:
-        module = importlib.import_module(module_path)
-        return getattr(module, cls_name)
+    module = importlib.import_module(module_path)
+    return getattr(module, cls_name)
     except (ImportError, AttributeError) as e:
         raise ValueError(
             f"Could not import class {cls_name} from {import_path}. "
@@ -695,4 +695,5 @@ __all__: List[str] = []
 _registered = autodiscover_and_register(ROBOT_CONFIG_DIR)
 for _name, _cls in _registered:
     globals()[_name] = _cls
-    __all__.append(_name)
+    __all__.append(_name) 
+ 

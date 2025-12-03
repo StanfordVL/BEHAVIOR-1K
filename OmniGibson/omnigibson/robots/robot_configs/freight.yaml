@@ -1,4 +1,5 @@
-capabilities: [two_wheel]
+capabilities: 
+  - is_two_wheel
 property:
   wheel_radius: 0.0613
   wheel_axle_length: 0.372

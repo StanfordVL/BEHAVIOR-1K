@@ -186,7 +186,7 @@ class HolonomicBaseRobot(LocomotionRobot):
 
     def _post_load(self):
         super()._post_load()
-
+       
         self._world_base_fixed_joint_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
             f"{self.prim_path}/rootJoint"
         )
