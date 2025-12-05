@@ -2,7 +2,7 @@ from omnigibson.envs import EnvironmentWrapper, Environment
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.learning.utils.eval_utils import ROBOT_CAMERA_NAMES, HEAD_RESOLUTION, WRIST_RESOLUTION
 from omnigibson.sensors.vision_sensor import VisionSensor
-from omnigibson.learning.utils.eval_utils import flatten_obs_dict, TASK_NAMES_TO_INDICES
+from omnigibson.learning.utils.eval_utils import flatten_obs_dict
 import numpy as np
 import torch as th
 import omnigibson.utils.transform_utils as T
