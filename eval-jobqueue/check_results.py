@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Optional
 from slugify import slugify
 
 
-log = logging.getLogger("generate_jobs")
+log = logging.getLogger("check_results")
 
 
 def parse_args() -> argparse.Namespace:
