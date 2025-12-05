@@ -13,7 +13,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple, Optional
+from typing import Dict, List, Sequence
 from slugify import slugify
 
 
