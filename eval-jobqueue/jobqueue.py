@@ -356,7 +356,7 @@ def log_stats():
             "Resource pools: %d" % len(resource_pools),
             "Resource counts: %s" % str(resource_counts),
             "Resource utilization by resource type: %s" % str(utilization),
-            "Pending jobs per resource: %s" % str(in_progress_resource_counts),
+            "In-progress jobs per resource type: %s" % str(in_progress_resource_counts),
         ]
         log.info(" | ".join(message))
         time.sleep(60)
