@@ -11,7 +11,6 @@ This script does not generate jobs or resources files.
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Dict, List, Sequence
 from slugify import slugify
