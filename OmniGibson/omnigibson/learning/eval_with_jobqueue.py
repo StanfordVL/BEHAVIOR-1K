@@ -155,6 +155,8 @@ def main():
         f"env_wrapper._target_=omnigibson.learning.wrappers.challenge_submissions.submission_{team_slug}.WRAPPER_CLASS",
         f"task.name={task_name}",
         f"log_path={log_path}",
+        f"model.host=None",
+        f"model.port=None",
         "test_hidden=true",
     ]
     register_omegaconf_resolvers()

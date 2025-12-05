@@ -53,7 +53,9 @@ class WebsocketPolicy:
     ) -> None:
         logging.info(f"Creating websocket client policy with host: {host}, port: {port}")
         self.last_action = None
-        self.policy = None  # WebsocketClientPolicy(host=host, port=port)
+        self.policy = None
+        if host is not None or port is not None:
+            self.policy = WebsocketClientPolicy(host=host, port=port)
 
     def update_host(self, host: str, port: int) -> None:
         self.policy = WebsocketClientPolicy(host=host, port=port)
