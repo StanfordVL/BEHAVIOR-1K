@@ -13,7 +13,6 @@ based on task compatibility constraints, and generates resources.json.
 import argparse
 import json
 import logging
-import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple, Optional
