@@ -1,6 +1,6 @@
 from omnigibson.envs import EnvironmentWrapper, Environment
 from omnigibson.utils.ui_utils import create_module_logger
-from omnigibson.learning.utils.eval_utils import ROBOT_CAMERA_NAMES, TASK_NAMES_TO_INDICES
+from omnigibson.learning.utils.eval_utils import TASK_NAMES_TO_INDICES
 import omnigibson.utils.transform_utils as T
 import torch as th
 from typing import List, Optional
