@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 """
-Utility for producing a jobs.json file that `eval_jobqueue.py` can load.
+Utility for checking evaluation results against challenge submissions.
 
-For every challenge submission, this script inspects the per-task q_score
-and schedules jobs for every (team, task, test instance) triple where the
-team achieved non-zero q_score for that task.
+For every challenge submission, this script loads per-team and per-task results,
+summarizes evaluation scores, and prints a summary of results for each team and task.
 
-This script also reads resources-raw.json to create pseudo-resource-groups
-based on task compatibility constraints, and generates resources.json.
+This script does not generate jobs or resources files.
 """
 
 import argparse
