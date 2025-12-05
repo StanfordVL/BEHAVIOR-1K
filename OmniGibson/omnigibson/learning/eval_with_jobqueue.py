@@ -107,7 +107,7 @@ def mark_job_as_completed(job_id: str, worker_id: str) -> None:
 
 
 def heartbeat_thread_func(worker_id: str, stop_event: threading.Event) -> None:
-    """Background thread that sends heartbeats every 10 seconds."""
+    """Background thread that sends heartbeats every 30 seconds."""
     while not stop_event.is_set():
         send_heartbeat_all_jobs_and_resources(worker_id)
         # Wait for 10 seconds or until stop event is set
