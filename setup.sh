@@ -201,7 +201,7 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     source "$(conda info --base)/etc/profile.d/conda.sh"
-    
+
     # Check if environment already exists and exit with instructions
     if conda env list | grep -q "^behavior "; then
         echo ""
@@ -211,13 +211,13 @@ if [ "$NEW_ENV" = true ]; then
         echo ""
         exit 1
     fi
-    
+
     # Create environment with only Python 3.10
     conda create -n behavior python=3.10 -c conda-forge -y
     conda activate behavior
-    
+
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
-    
+
     # Install numpy and setuptools via pip
     echo "Installing numpy and setuptools..."
     pip install "numpy<2" "setuptools<=79"
