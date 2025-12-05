@@ -72,7 +72,7 @@ class WebsocketClientPolicy:
                 if response.ok:
                     logger.info("Health check passed, attempting websocket connection...")
                     break
-            except:
+            except Exception:
                 pass
             logger.info(f"Health check failed, waiting for server at {health_url}...")
             time.sleep(5)
