@@ -16,7 +16,7 @@ import logging
 import re
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Sequence, Tuple, Optional
+from typing import Dict, List, Sequence, Tuple, Optional
 from slugify import slugify
 
 
