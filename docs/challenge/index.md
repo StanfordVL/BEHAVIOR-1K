@@ -4,7 +4,7 @@
 
 - Event: Foundation Models Meet Embodied Agents Challenge @ NeurIPS 2025
 - Time: Dec. 7th, 11:00 AM – 1:45 PM PST
-- Location: Mezzanine Room 15AB, Convention Center, or [over zoom](https://stanford.zoom.us/j/4015770317?pwd=dkJSM3cybUxaUm83MUNRQnBpS2x3UT09)
+- Location: Mezzanine Room 15AB, Convention Center, or [over zoom](https://us06web.zoom.us/j/84419017872?pwd=EeE71l6XbsjdU6kqy8jHJF45MSR9vM.1)
 
 
 ---
