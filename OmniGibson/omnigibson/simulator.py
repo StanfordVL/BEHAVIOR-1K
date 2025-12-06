@@ -206,8 +206,8 @@ def _launch_app():
     icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
     try:
-        shutil.copy(kit_file, kit_file_target)
-        shutil.copy(icon_file, icon_file_target)
+        shutil.copyfile(kit_file, kit_file_target)
+        shutil.copyfile(icon_file, icon_file_target)
     except Exception as e:
         raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
