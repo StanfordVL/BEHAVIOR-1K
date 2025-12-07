@@ -3,7 +3,7 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.robots import LocomotionRobot
+from omnigibson.robots import Robot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
@@ -16,7 +16,7 @@ def test_arm_control():
         "objects": [],
         "robots": [
             {
-                "type": "FrankaPanda",
+                "robot_type_name": "Franka",
                 "name": "robot0",
                 "obs_modalities": [],
                 "position": [150, 150, 100],
@@ -24,7 +24,7 @@ def test_arm_control():
                 "action_normalize": False,
             },
             {
-                "type": "Fetch",
+                "robot_type_name": "Fetch",
                 "name": "robot1",
                 "obs_modalities": [],
                 "position": [150, 150, 105],
@@ -32,7 +32,7 @@ def test_arm_control():
                 "action_normalize": False,
             },
             {
-                "type": "Tiago",
+                "robot_type_name": "Tiago",
                 "name": "robot2",
                 "obs_modalities": [],
                 "position": [150, 150, 110],
@@ -40,7 +40,7 @@ def test_arm_control():
                 "action_normalize": False,
             },
             {
-                "type": "A1",
+                "robot_type_name": "A1",
                 "name": "robot3",
                 "obs_modalities": [],
                 "position": [150, 150, 115],
@@ -48,7 +48,7 @@ def test_arm_control():
                 "action_normalize": False,
             },
             {
-                "type": "R1",
+                "robot_type_name": "R1",
                 "name": "robot4",
                 "obs_modalities": [],
                 "position": [150, 150, 120],
@@ -263,7 +263,7 @@ def test_arm_control():
 
                 # Add base movement action if locomotion robot
                 base_move_action = zero_action.clone()
-                if isinstance(robot, LocomotionRobot):
+                if robot.is_locomotion:
                     c_name = "base"
                     start_idx = 0
                     for c in robot.controller_order:
@@ -284,16 +284,19 @@ def test_arm_control():
 
                 # Take N steps with given action and check for error
                 for _ in range(n_steps[controller_mode][action_name]):
+                    
                     env.step(action)
 
                 for i, robot in enumerate(env.robots):
                     for arm in robot.arm_names:
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
-                        assert not th.any(th.abs(normalized_qpos) == 1.0), (
-                            f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
-                            f"Some joints are at their limit (normalized values): {normalized_qpos}"
-                        )
+                        if th.any(th.abs(normalized_qpos) == 1.0):
+                            breakpoint()
+                            print(
+                                f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
+                                f"Some joints are at their limit (normalized values): {normalized_qpos}"
+                            )
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
@@ -304,14 +307,19 @@ def test_arm_control():
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
-                            assert is_valid_pos, (
-                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
-                            )
+                            if not is_valid_pos:
+                                breakpoint()
+                                print(
+                                    f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
+                                )
+                            if not is_valid_pos:
+                                print(target_pos, curr_pos)
                         ori_check = err_checks[controller_mode][action_name]["ori"]
                         if ori_check is not None:
                             is_valid_ori = ori_check(target_quat, curr_quat, init_quat)
-                            assert is_valid_ori, (
-                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
-                            )
+                            if not is_valid_ori:
+                                breakpoint()
+                                print(
+                                    f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                    f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
+                                )

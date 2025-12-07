@@ -1,7 +1,7 @@
 import torch as th
 
 import omnigibson as og
-from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.robots import REGISTERED_ROBOTS, Robot
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -22,13 +22,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.stop()
 
     # Iterate over all robots and demo their motion
-    for robot_name, robot_cls in REGISTERED_ROBOTS.items():
-        if robot_name in ["BehaviorRobot"]:
-            continue
-
+    for robot_name in REGISTERED_ROBOTS:
+      
         # Create and import robot
-        robot = robot_cls(
+        robot = Robot(
             name=robot_name,
+            robot_type_name=robot_name,
             obs_modalities=[],  # We're just moving robots around so don't load any observation modalities
         )
         env.scene.add_object(robot)

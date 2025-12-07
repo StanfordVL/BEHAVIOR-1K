@@ -8,9 +8,7 @@ import torch as th
 import omnigibson as og
 from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm
-from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
-from omnigibson.robots.locomotion_robot import LocomotionRobot
-
+from omnigibson.robots.robot import Robot
 
 def test_curobo():
     # Make sure object states are enabled
@@ -255,7 +253,7 @@ def test_curobo():
 
         floor_touching_base_link_prim_paths = (
             [os.path.join(robot.prim_path, link_name) for link_name in robot.floor_touching_base_link_names]
-            if isinstance(robot, LocomotionRobot)
+            if robot.is_locomotion
             else []
         )
 
@@ -293,7 +291,7 @@ def test_curobo():
         th.manual_seed(1)
         lo, hi = robot.joint_lower_limits.clone().view(1, -1), robot.joint_upper_limits.clone().view(1, -1)
 
-        if isinstance(robot, HolonomicBaseRobot):
+        if robot.is_holonomic_base:
             lo[0, :2] = -0.1
             lo[0, 2:5] = 0.0
             lo[0, 5] = -math.pi

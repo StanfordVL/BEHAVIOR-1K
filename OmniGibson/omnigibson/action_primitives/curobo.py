@@ -9,7 +9,7 @@ import omnigibson.lazy as lazy
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
+from omnigibson.robots.robot import Robot
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import multi_dim_linspace
 
@@ -160,7 +160,7 @@ class CuRoboMotionGenerator:
 
             robot_cfg_obj = lazy.curobo.types.robot.RobotConfig.from_dict(robot_cfg_dict, self._tensor_args)
 
-            if isinstance(robot, HolonomicBaseRobot):
+            if isinstance(robot, Robot) and robot.is_holonomic_base:
                 self.update_joint_limits(robot_cfg_obj, emb_sel)
 
             motion_kwargs = dict(

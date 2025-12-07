@@ -77,7 +77,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     robot_name = "Fetch"
     if not quickstart:
         robot_name = choose_from_options(
-            options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
+            options=list(sorted(REGISTERED_ROBOTS)), name="robot", random_selection=random_selection
         )
 
     scene_cfg = dict()
@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     # Add the robot we want to load
     robot0_cfg = dict()
-    robot0_cfg["type"] = robot_name
+    robot0_cfg["robot_type_name"] = robot_name
     robot0_cfg["obs_modalities"] = ["rgb"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
@@ -168,6 +168,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
             action = random_action
         else:
             action = action_generator.get_teleop_action()
+        
         env.step(action=action)
         step += 1
 

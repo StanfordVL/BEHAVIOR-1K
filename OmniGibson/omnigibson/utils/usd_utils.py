@@ -507,13 +507,13 @@ RigidContactAPI = RigidContactAPIImpl()
 class GripperRigidContactAPIImpl(RigidContactAPIImpl):
     @classmethod
     def get_column_filters(cls):
-        from omnigibson.robots.manipulation_robot import ManipulationRobot
+        from omnigibson.robots.robot import Robot
 
         filters = dict()
         for scene_idx, scene in enumerate(og.sim.scenes):
             filters[scene_idx] = []
             for robot in scene.robots:
-                if isinstance(robot, ManipulationRobot):
+                if isinstance(robot, Robot) and robot.is_manipulation:
                     filters[scene_idx].extend(link.prim_path for links in robot.finger_links.values() for link in links)
 
         return filters
@@ -838,10 +838,10 @@ class BatchControlViewAPIImpl:
 
     def initialize_view(self):
         # First, get all of the controllable objects in the scene (avoiding circular import)
-        from omnigibson.objects.controllable_object import ControllableObject
+        from omnigibson.robots import Robot
 
         controllable_objects = [
-            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)
         ]
 
         # Get their corresponding prim paths
@@ -1224,10 +1224,10 @@ class ControllableObjectViewAPI:
         cls._VIEWS_BY_PATTERN = {}
 
         # First, get all of the controllable objects in the scene (avoiding circular import)
-        from omnigibson.objects.controllable_object import ControllableObject
+        from omnigibson.robots import Robot
 
         controllable_objects = [
-            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, ControllableObject)
+            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)
         ]
 
         # Get their corresponding prim paths

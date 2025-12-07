@@ -78,7 +78,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
     @classmethod
     def global_update(cls):
         # Avoid circular imports
-        from omnigibson.robots.manipulation_robot import ManipulationRobot
+        from omnigibson.robots.robot import Robot
 
         # Clear finger contact objects since it will be refreshed now
         cls._finger_contact_objs = set()
@@ -88,7 +88,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
             {
                 link.prim_path
                 for robot in scene.robots
-                if isinstance(robot, ManipulationRobot)
+                if isinstance(robot, Robot) and robot.is_manipulation
                 for finger_links in robot.finger_links.values()
                 for link in finger_links
             }

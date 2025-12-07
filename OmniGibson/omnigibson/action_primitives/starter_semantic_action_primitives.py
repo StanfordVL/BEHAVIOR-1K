@@ -34,20 +34,7 @@ from omnigibson.controllers import (
 from omnigibson.macros import create_module_macros
 from omnigibson.macros import macros
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.robots import (
-    R1,
-    R1Pro,
-    BaseRobot,
-    Fetch,
-    Freight,
-    Husky,
-    Locobot,
-    Stretch,
-    Tiago,
-    Turtlebot,
-)
-from omnigibson.robots.manipulation_robot import ManipulationRobot
-from omnigibson.robots.holonomic_base_robot import HolonomicBaseRobot
+from omnigibson.robots import Robot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.geometry_utils import wrap_angle
@@ -60,26 +47,26 @@ from omnigibson.utils.ui_utils import create_module_logger
 m = create_module_macros(module_path=__file__)
 
 m.KP_LIN_VEL = {
-    Tiago: 0.3,
-    Fetch: 0.2,
-    Stretch: 0.5,
-    Turtlebot: 0.3,
-    Husky: 0.05,
-    Freight: 0.2,
-    Locobot: 1.5,
-    R1: 0.3,
-    R1Pro: 0.3,
+    "tiago": 0.3,
+    "fetch": 0.2,
+    "stretch": 0.5,
+    "turtlebot": 0.3,
+    "husky": 0.05,
+    "freight": 0.2,
+    "locobot": 1.5,
+    "r1": 0.3,
+    "r1pro": 0.3,
 }
 m.KP_ANGLE_VEL = {
-    Tiago: 0.2,
-    Fetch: 0.1,
-    Stretch: 0.7,
-    Turtlebot: 0.2,
-    Husky: 0.05,
-    Freight: 0.1,
-    Locobot: 1.0,
-    R1: 0.2,
-    R1Pro: 0.2,
+    "tiago": 0.2,
+    "fetch": 0.1,
+    "stretch": 0.7,
+    "turtlebot": 0.2,
+    "husky": 0.05,
+    "freight": 0.1,
+    "locobot": 1.0,
+    "r1": 0.2,
+    "r1pro": 0.2,
 }
 
 m.DEFAULT_COLLISION_ACTIVATION_DISTANCE = 0.02
@@ -211,7 +198,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         control_dict = self.robot.get_control_dict()
         self._arm_targets = {}
         self._reset_eef_pose = {}
-        if isinstance(self.robot, ManipulationRobot):
+        if self.robot.is_manipulation:
             for arm_name in self.robot.arm_names:
                 eef = f"eef_{arm_name}"
                 arm = f"arm_{arm_name}"
@@ -236,7 +223,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @property
     def arm(self):
-        assert isinstance(self.robot, ManipulationRobot), "Cannot use arm for non-manipulation robot"
+        assert self.robot.is_manipulation, "Cannot use arm for non-manipulation robot"
         return self.robot.default_arm
 
     def _postprocess_action(self, action):
@@ -256,7 +243,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 
         # Filter out the robots.
-        self.addressable_objects = [obj for obj in self.addressable_objects if not isinstance(obj, BaseRobot)]
+        self.addressable_objects = [obj for obj in self.addressable_objects if not isinstance(obj, Robot)]
 
         self.num_objects = len(self.addressable_objects)
         return gym.spaces.Tuple(
@@ -1396,7 +1383,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 target_obj_pose = self._tracking_object.get_position_orientation()
 
-        assert isinstance(self.robot, Tiago), "Tracking object with camera is currently only supported for Tiago"
+        assert self.robot.robot_type_name == "tiago", "Tracking object with camera is currently only supported for Tiago"
 
         head_q = self._get_head_goal_q(target_obj_pose)
         head_idx = self.robot.controller_action_idx["camera"]
@@ -1686,12 +1673,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         self.robot.controllers["base"].motor_type == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
                     direction_vec = (
-                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[type(self.robot)]
+                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[self.robot.robot_type_name]
                     )
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
-                    base_action = th.tensor([m.KP_LIN_VEL[type(self.robot)], 0.0], dtype=th.float32)
+                    base_action = th.tensor([m.KP_LIN_VEL[self.robot.robot_type_name], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
@@ -1727,7 +1714,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = m.KP_ANGLE_VEL[type(self.robot)] * direction
+            ang_vel = m.KP_ANGLE_VEL[self.robot.robot_type_name] * direction
 
             base_action = action[self.robot.controller_action_idx["base"]]
 
@@ -2016,7 +2003,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             th.tensor: (x,y,z) Position in the world frame
             th.tensor: (x,y,z,w) Quaternion orientation in the world frame
         """
-        if isinstance(self.robot, HolonomicBaseRobot):
+        if self.robot.is_holonomic_base:
             base_joints = self.robot.get_joint_positions()[self.robot.base_idx]
             pos = th.tensor([pose_2d[0], pose_2d[1], base_joints[2]], dtype=th.float32)
             euler_intrinsic_xyz = th.tensor([base_joints[3], base_joints[4], pose_2d[2]], dtype=th.float32)

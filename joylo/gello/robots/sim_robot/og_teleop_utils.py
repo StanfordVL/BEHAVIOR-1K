@@ -15,8 +15,7 @@ from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
 from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.robots.r1 import R1
-from omnigibson.robots.r1pro import R1Pro
+from omnigibson.robots.robot import R1obot
 from bddl.activity import Conditions
 
 from gello.robots.sim_robot.og_teleop_cfg import *
@@ -276,7 +275,7 @@ def setup_cameras(robot, external_sensors, resolution):
     og.sim.viewer_camera.image_width = resolution[1]
 
     # Adjust wrist cameras for R1
-    if isinstance(robot, R1) and not isinstance(robot, R1Pro):
+    if robot.robot_type_name.startswith("r1"):
         left_wrist_camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(
             prim_path=f"{robot.links[WRIST_CAMERA_LINK_NAME[robot.__class__.__name__]['left']].prim_path}/Camera"
         )
@@ -299,7 +298,7 @@ def setup_cameras(robot, external_sensors, resolution):
         ) # expects (w, x, y, z)
     
     # Adjust head camera for R1Pro (TODO: fix this in assets)
-    if isinstance(robot, R1Pro):
+    if robot.robot_type_name=="r1pro":
         head_camera_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(prim_path=f"{robot.links[HEAD_CAMERA_LINK_NAME[robot.__class__.__name__]].prim_path}/Camera")
         head_camera_prim.GetAttribute("xformOp:translate").Set(
             lazy.pxr.Gf.Vec3d(*R1PRO_HEAD_CAMERA_LOCAL_POS.tolist())
@@ -1023,9 +1022,9 @@ def optimize_sim_settings(vr_mode=False):
     settings.set("/app/vsync", True)
 
 def setup_ghost_robot_info(ghost, robot):
-    if isinstance(robot, R1Pro):
+    if robot.roobot_type_name=="r1pro":
         robot_arm_dof = 7
-    elif isinstance(robot, R1):
+    elif robot.roobot_type_name=="r1":
         robot_arm_dof = 6
     else:
         raise ValueError(f"Unknown robot type: {type(robot)}")

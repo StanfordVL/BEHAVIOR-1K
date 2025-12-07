@@ -8,7 +8,6 @@ from typing import Literal
 from abc import abstractmethod
 from collections import namedtuple
 import networkx as nx
-
 import gymnasium as gym
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros, gm
@@ -80,7 +79,7 @@ m = create_module_macros(module_path=__file__)
 # Name of the category to assign to all robots
 m.ROBOT_CATEGORY = "agent"
 
-# ---ManipulationRobot---
+# ---Manipulation---
 # Assisted grasping parameters
 m.ASSIST_FRACTION = 1.0
 m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
@@ -710,6 +709,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         Args:
             action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
+        breakpoint()
         if self.is_holonomic_base:
             rz_joint_dof_indices = rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
             j_pos = self.get_joint_positions()[rz_joint_dof_indices]
@@ -743,7 +743,6 @@ class Robot(USDObject, BaseObject, GymObservable):
 
         # First, loop over all controllers, and update the desired command
         idx = 0
-        # breakpoint()
         for name, controller in self._controllers.items():
             # Set command, then take a controller step
             controller.update_goal(
@@ -848,6 +847,7 @@ class Robot(USDObject, BaseObject, GymObservable):
             control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
                  This should be n-DOF length for all joints being set.
         """
+        breakpoint()
         if self.is_manipulation:
             # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
             for arm in self.arm_names:
@@ -1042,9 +1042,6 @@ class Robot(USDObject, BaseObject, GymObservable):
             self.articulation_root_path
         )
 
-        if self.is_manipulation:
-            for arm in self.arm_names:
-                self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=self.eef_link_names[arm])
         if self.is_holonomic_base:
             # Add canonical position and orientation
             fcns["_canonical_pos_quat"] = lambda: ControllableObjectViewAPI.get_root_position_orientation(
@@ -1057,7 +1054,19 @@ class Robot(USDObject, BaseObject, GymObservable):
             self._add_task_frame_control_dict(
                 fcns=fcns, task_name="trunk", link_name=self.joints[self.trunk_joint_names[-1]].body1.split("/")[-1]
             )
-
+        
+        if self.is_manipulation:
+            for arm in self.arm_names:
+                eef_link_name = self.eef_link_names[arm] if self.eef_link_names else None
+                if eef_link_name is None:
+                    raise ValueError(f"eef_link_names is None for arm {arm}. Check robot config YAML.")
+                # Verify the link actually exists
+                if eef_link_name not in self._links:
+                    raise ValueError(f"EEF link '{eef_link_name}' for arm '{arm}' not found in robot links. Available links: {list(self._links.keys())}")
+        
+                self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=eef_link_name)
+            # breakpoint()
+        
         return fcns
 
     def _add_task_frame_control_dict(self, fcns, task_name, link_name):
@@ -1133,17 +1142,27 @@ class Robot(USDObject, BaseObject, GymObservable):
     ):
         """
         Sets robot's pose with respect to the specified frame
-
-        Args:
-            position (None or 3-array): if specified, (x,y,z) position in the specified frame.
-                Default is None, which means left unchanged.
-            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the specified frame.
-                Default is None, which means left unchanged.
-            frame (Literal): frame to set the pose with respect to, defaults to "world".
-                - "world": set position relative to the world frame
-                - "parent": set position relative to the object parent
-                - "scene": set position relative to the scene
+        ...
         """
+        # Log when this is called to debug PhysX errors
+        import traceback
+        is_playing = og.sim.is_playing() if hasattr(og, 'sim') and og.sim is not None else False
+        currently_stepping = getattr(og.sim, 'currently_stepping', False) if hasattr(og, 'sim') and og.sim is not None else False
+        stack = ''.join(traceback.format_stack()[-5:-1])  # Get last 4 stack frames (excluding current)
+        log.warning(
+            f"[set_position_orientation] Robot '{self.name}' called set_position_orientation. "
+            f"is_playing={is_playing}, currently_stepping={currently_stepping}, "
+            f"frame={frame}, position={position}, orientation={orientation}\n"
+            f"Call stack:\n{stack}"
+        )
+        
+        # Store original EEF poses for manipulation robots (must happen BEFORE any position changes)
+        
+        if self.is_manipulation:
+            original_poses = {}
+            for arm in self.arm_names:
+                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
+
         # Handle holonomic_base special case (similar to HolonomicBaseRobot.set_position_orientation)
         if self.is_holonomic_base:
             assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
@@ -1167,7 +1186,7 @@ class Robot(USDObject, BaseObject, GymObservable):
             if og.sim.is_playing() and self.initialized:
                 # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
                 # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
-                # Note: set_joint_positions will call clear_object internally
+                # Note: set_joint_positions will call clear_object and reset controllers internally
                 joint_pos, joint_orn = self.root_link.get_position_orientation()
                 inv_joint_pos, inv_joint_orn = T.invert_pose_transform(joint_pos, joint_orn)
                 relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
@@ -1175,6 +1194,7 @@ class Robot(USDObject, BaseObject, GymObservable):
                 joint_positions = th.concatenate((relative_pos, intrinsic_eulers))
                 self.set_joint_positions(positions=joint_positions, indices=self.base_idx, drive=False)
             else:
+                # Call the super() method to move the robot frame first
                 super().set_position_orientation(position, orientation, frame)
                 ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
 
@@ -1184,15 +1204,11 @@ class Robot(USDObject, BaseObject, GymObservable):
                     self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
                         lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                     )
-        
 
-        if self.is_manipulation:
-            breakpoint()
-            # Store the original EEF poses.
-            original_poses = {}
-            for arm in self.arm_names:
-                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
-
+        # Handle manipulation special case (similar to ManipulationRobot.set_position_orientation)
+        # Note: This runs AFTER holonomic_base logic, matching the pattern where ManipulationRobot
+        # calls super() which would go through HolonomicBaseRobot in the original inheritance
+        elif self.is_manipulation:
             super().set_position_orientation(position, orientation, frame)
             ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
 
@@ -1208,7 +1224,10 @@ class Robot(USDObject, BaseObject, GymObservable):
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
-        
+        # For robots that are neither holonomic_base nor manipulation, call super
+        else:
+            super().set_position_orientation(position, orientation, frame)
+            ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
@@ -2885,6 +2904,9 @@ class Robot(USDObject, BaseObject, GymObservable):
             return self._robot_cfg["eef_link_names"]
         elif self.end_effector in self._robot_cfg.keys():
             return self._robot_cfg[self.end_effector]["eef_link_names"]
+        else:
+            raise ValueError(f"eef_link_names not found in robot config for robot_type_name={self.robot_type_name}, end_effector={self.end_effector}")
+    
 
     @cached_property
     def gripper_link_names(self):
