@@ -58,9 +58,9 @@ def test_teleop():
         env.step(action)
     cur_base_pose = robot.get_position_orientation()
     assert cur_base_pose[0][0] - start_base_pose[0][0] > 0.02, "robot base not moving forward"
-    assert (
-        quat2euler(cur_base_pose[1])[2] - quat2euler(start_base_pose[1])[2] > 0.02
-    ), "robot base not rotating counter-clockwise"
+    assert quat2euler(cur_base_pose[1])[2] - quat2euler(start_base_pose[1])[2] > 0.02, (
+        "robot base not rotating counter-clockwise"
+    )
 
     # Clear the sim
     og.clear()

@@ -131,9 +131,9 @@ def sample_kinematics(
             use_trav_map = False
     if max_trials is None:
         max_trials = m.DEFAULT_LOW_LEVEL_SAMPLING_ATTEMPTS
-    assert (
-        z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
-    ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02, (
+        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    )
 
     # Wake objects accordingly and make sure both are kept still
     objA.wake()
@@ -317,9 +317,9 @@ def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy
     Returns:
         bool: True if successfully sampled, else False
     """
-    assert (
-        z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02
-    ), f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02, (
+        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+    )
 
     if not (obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
         raise ValueError("sample_cloth_on_rigid requires obj1 is cloth and obj2 is rigid.")

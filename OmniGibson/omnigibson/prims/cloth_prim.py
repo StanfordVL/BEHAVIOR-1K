@@ -525,9 +525,9 @@ class ClothPrim(GeomPrim):
             configuration (Literal["default", "settled", "folded", "crumpled"]): Configuration to reset the cloth to
         """
         # Get the points arguments stored on the USD prim
-        assert (
-            configuration in self.get_available_configurations()
-        ), f"Invalid or unavailable cloth configuration {configuration}!"
+        assert configuration in self.get_available_configurations(), (
+            f"Invalid or unavailable cloth configuration {configuration}!"
+        )
         attr_name = f"points_{configuration}"
         points = self.get_attribute(attr=attr_name)
         self.set_attribute(attr="points", val=points)
@@ -613,9 +613,9 @@ class ClothPrim(GeomPrim):
             idxs (n-array or None): If set, will only set the requested indexed particle state
         """
         n_expected = self._n_particles if idxs is None else len(idxs)
-        assert (
-            len(positions) == n_expected
-        ), f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
+        assert len(positions) == n_expected, (
+            f"Got mismatch in particle setting size: {len(positions)}, vs. number of expected particles {n_expected}!"
+        )
 
         translation, rotation = self.get_position_orientation()
         rotation = T.quat2mat(rotation)
@@ -712,9 +712,9 @@ class ClothPrim(GeomPrim):
             th.tensor: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame
         """
-        assert (
-            vel.shape[0] == self._n_particles
-        ), f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
+        assert vel.shape[0] == self._n_particles, (
+            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
+        )
 
         # the velocities attribute is w.r.t the world frame already
         self.set_attribute(attr="velocities", val=lazy.pxr.Vt.Vec3fArray(vel.tolist()))

@@ -626,9 +626,9 @@ class BaseTransitionRule(Registerable):
         if cls.__name__ not in cls._do_not_register_classes:
             global RULES_REGISTRY
             RULES_REGISTRY.add(obj=cls)
-            assert (
-                len(cls.candidate_filters) > 0
-            ), "At least one of individual_filters or group_filters must be specified!"
+            assert len(cls.candidate_filters) > 0, (
+                "At least one of individual_filters or group_filters must be specified!"
+            )
 
     def __init__(self, scene):
         self.scene = scene
@@ -986,9 +986,9 @@ class SlicingRule(BaseTransitionRule):
                     # Determine the relative scale to apply to the object part from the original object
                     # Note that proper (rotated) scaling can only be applied when the relative orientation of
                     # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                    assert T.check_quat_right_angle(
-                        part_bb_orn
-                    ), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                    assert T.check_quat_right_angle(part_bb_orn), (
+                        "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                    )
                     scale = th.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
                 # Calculate global part bounding box pose.
@@ -1172,9 +1172,9 @@ class RecipeRule(BaseTransitionRule):
                 assert nx.is_tree(input_object_tree), f"Input object tree must be a tree! Now: {input_object_tree}."
                 root_nodes = [node for node in input_object_tree.nodes() if input_object_tree.in_degree(node) == 0]
                 assert len(root_nodes) == 1, f"Input object tree must have exactly one root node! Now: {root_nodes}."
-                assert (
-                    input_objects[root_nodes[0]] == 1
-                ), f"Input object tree root node must have exactly one instance! Now: {cls._recipes[name]['input_objects'][root_nodes[0]]}."
+                assert input_objects[root_nodes[0]] == 1, (
+                    f"Input object tree root node must have exactly one instance! Now: {cls._recipes[name]['input_objects'][root_nodes[0]]}."
+                )
 
         # Store information for this recipe
         cls._recipes[name] = {
@@ -1355,9 +1355,9 @@ class RecipeRule(BaseTransitionRule):
 
             all_subtree_objs = set()
             for child_cat in children_categories:
-                assert (
-                    len(input_states[child_cat]["binary_object"]) == 1
-                ), "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
+                assert len(input_states[child_cat]["binary_object"]) == 1, (
+                    "Each child node should have exactly one binary object state, i.e. one parent in the input_object_tree"
+                )
                 state_class, _, state_value = input_states[child_cat]["binary_object"][0]
                 num_valid_children = 0
                 children_objs = [self._objects[i] for i in category_to_valid_indices[child_cat]]
@@ -1963,16 +1963,16 @@ class CookingPhysicalParticleRule(RecipeRule):
         assert len(input_objects) == 0, f"No input objects can be specified for {cls.__name__}, recipe: {name}!"
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
 
-        assert (
-            len(input_systems) == 1 or len(input_systems) == 2
-        ), f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
+        assert len(input_systems) == 1 or len(input_systems) == 2, (
+            f"Only one or two input systems can be specified for {cls.__name__}, recipe: {name}!"
+        )
         if len(input_systems) == 2:
-            assert (
-                input_systems[1] == "cooked__water"
-            ), f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
-        assert (
-            len(output_systems) == 1
-        ), f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+            assert input_systems[1] == "cooked__water", (
+                f"Second input system must be cooked__water for {cls.__name__}, recipe: {name}!"
+            )
+        assert len(output_systems) == 1, (
+            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+        )
 
         super().add_recipe(
             name=name,
@@ -2083,12 +2083,12 @@ class ToggleableMachineRule(RecipeRule):
                 for this recipe. If None, any fillable is allowed
         """
         if len(output_objects) > 0:
-            assert (
-                len(output_objects) == 1
-            ), f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
-            assert (
-                output_objects[list(output_objects.keys())[0]] == 1
-            ), f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
+            assert len(output_objects) == 1, (
+                f"Only one category of output object can be specified for {cls.__name__}, recipe: {name}!"
+            )
+            assert output_objects[list(output_objects.keys())[0]] == 1, (
+                f"Only one instance of output object can be specified for {cls.__name__}, recipe: {name}!"
+            )
 
         super().add_recipe(
             name=name,
@@ -2181,9 +2181,9 @@ class MixingToolRule(RecipeRule):
         """
         assert len(output_objects) == 0, f"No output objects can be specified for {cls.__name__}, recipe: {name}!"
         assert len(input_systems) > 0, f"Some input systems need to be specified for {cls.__name__}, recipe: {name}!"
-        assert (
-            len(output_systems) == 1
-        ), f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+        assert len(output_systems) == 1, (
+            f"Exactly one output system needs to be specified for {cls.__name__}, recipe: {name}!"
+        )
 
         super().add_recipe(
             name=name,

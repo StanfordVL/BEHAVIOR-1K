@@ -378,12 +378,12 @@ def test_curobo():
         print(
             f"Collision checking false positive: {false_positive / n_samples}, false negative: {false_negative / n_samples}."
         )
-        assert (
-            false_positive / n_samples <= max_false_positive_rate
-        ), f"Collision checking false positive rate: {false_positive / n_samples} > {max_false_positive_rate}"
-        assert (
-            false_negative / n_samples <= max_false_negative_rate
-        ), f"Collision checking false negative rate: {false_negative / n_samples} > {max_false_negative_rate}"
+        assert false_positive / n_samples <= max_false_positive_rate, (
+            f"Collision checking false positive rate: {false_positive / n_samples} > {max_false_positive_rate}"
+        )
+        assert false_negative / n_samples <= max_false_negative_rate, (
+            f"Collision checking false negative rate: {false_negative / n_samples} > {max_false_negative_rate}"
+        )
 
         env.scene.reset()
 
@@ -456,9 +456,9 @@ def test_curobo():
                             if th.tensor(list(contact.impulse)).norm() == 0:
                                 continue
                             print(f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}")
-                            assert (
-                                False
-                            ), f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            assert False, (
+                                f"Unexpected contact pair during traj rollout: {contact.body0}, {contact.body1}"
+                            )
                     else:
                         # Convert target joint positions to action
                         action = robot.q_to_action(q)

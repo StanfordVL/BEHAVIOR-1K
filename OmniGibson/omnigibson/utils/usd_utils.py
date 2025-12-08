@@ -127,9 +127,9 @@ def create_joint(
     assert JointType.is_valid(joint_type=joint_type), f"Invalid joint specified for creation: {joint_type}"
 
     # Make sure at least body0 or body1 is specified
-    assert (
-        body0 is not None or body1 is not None
-    ), "At least either body0 or body1 must be specified when creating a joint!"
+    assert body0 is not None or body1 is not None, (
+        "At least either body0 or body1 must be specified when creating a joint!"
+    )
 
     # Create the joint
     joint = getattr(lazy.pxr.UsdPhysics, joint_type).Define(og.sim.stage, prim_path)
@@ -378,9 +378,9 @@ class RigidContactAPIImpl:
 
         # Get the interesting-columns from the impulse matrix
         interesting_impulse_columns = impulses[:, interesting_columns]
-        assert (
-            interesting_impulse_columns.ndim == 2
-        ), f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
+        assert interesting_impulse_columns.ndim == 2, (
+            f"Impulse matrix should be 2D, found shape {interesting_impulse_columns.shape}"
+        )
         interesting_row_idxes = th.nonzero(th.any(interesting_impulse_columns > 0, dim=1)).flatten()
         interesting_row_paths = [self.get_row_idx_prim_path(scene_idx, i) for i in interesting_row_idxes]
 
@@ -547,9 +547,9 @@ class CollisionAPI:
         assert og.sim is None or og.sim.is_stopped(), "Cannot create a collision group unless og.sim is stopped!"
 
         # Make sure the group doesn't already exist
-        assert (
-            col_group not in cls.ACTIVE_COLLISION_GROUPS
-        ), f"Cannot create collision group {col_group} because it already exists!"
+        assert col_group not in cls.ACTIVE_COLLISION_GROUPS, (
+            f"Cannot create collision group {col_group} because it already exists!"
+        )
 
         # Create the group
         col_group_prim_path = f"/World/collision_groups/{col_group}"
@@ -569,9 +569,9 @@ class CollisionAPI:
             prim_path (str): Prim (and all nested prims) to assign to this @col_group
         """
         # Make sure collision group exists
-        assert (
-            col_group in cls.ACTIVE_COLLISION_GROUPS
-        ), f"Cannot add to collision group {col_group} because it does not exist!"
+        assert col_group in cls.ACTIVE_COLLISION_GROUPS, (
+            f"Cannot add to collision group {col_group} because it does not exist!"
+        )
 
         # Add this prim to the collision group
         cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
@@ -665,9 +665,9 @@ class PoseAPI:
                 - torch.Tensor: (x,y,z,w) quaternion orientation in the world frame
         """
         # Check that no reads from PoseAPI are happening during a physics step.
-        assert (
-            not og.sim.currently_stepping
-        ), "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+        assert not og.sim.currently_stepping, (
+            "Do not read poses from PoseAPI during a physics step, this is quite slow!"
+        )
 
         # Add to stored prims if not already existing
         if prim_path not in cls.PRIMS:
@@ -709,9 +709,9 @@ class PoseAPI:
 
         # Check that the local transform consists only of a position, scale and rotation
         product = local_transform[:3, :3] @ local_transform[:3, :3].T
-        assert th.allclose(
-            product, th.diag(th.diag(product)), atol=1e-3
-        ), f"{prim.GetPath()} local transform is not orthogonal."
+        assert th.allclose(product, th.diag(th.diag(product)), atol=1e-3), (
+            f"{prim.GetPath()} local transform is not orthogonal."
+        )
 
         # Return the local pose
         return T.mat2pose(local_transform)
@@ -861,9 +861,9 @@ class BatchControlViewAPIImpl:
         # articulation root path for every object (base_link for non-fixed, parent for fixed objects)
         self._view = og.sim.physics_sim_view.create_articulation_view(self._pattern)
         view_prim_paths = self._view.prim_paths
-        assert (
-            set(view_prim_paths) == expected_prim_paths
-        ), f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+        assert set(view_prim_paths) == expected_prim_paths, (
+            f"ControllableObjectViewAPI expected prim paths {expected_prim_paths} but got {view_prim_paths}"
+        )
 
         # Create the mapping from prim path to index
         self._idx = {prim_path: i for i, prim_path in enumerate(view_prim_paths)}
@@ -1269,12 +1269,12 @@ class ControllableObjectViewAPI:
         scene_id, robot_name = prim_path.split("/")[2:4]
         assert scene_id.startswith("scene_"), f"Prim path 2nd component {prim_path} does not start with scene_"
         components = robot_name.split("__")
-        assert (
-            len(components) == 3
-        ), f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
-        assert (
-            components[0] == "controllable"
-        ), f"Prim path {prim_path} 3rd component does not start with prefix {cls._prefix}__"
+        assert len(components) == 3, (
+            f"Robot prim path's 3rd component {robot_name} does not match expected format of prefix__robottype__robotname."
+        )
+        assert components[0] == "controllable", (
+            f"Prim path {prim_path} 3rd component does not start with prefix {cls._prefix}__"
+        )
         robot_name_pattern = prim_path.replace(f"/{scene_id}/", "/scene_*/").replace(
             f"/{robot_name}", f"/{components[0]}__{components[1]}__*"
         )
@@ -1812,9 +1812,9 @@ def absolute_prim_path_to_scene_relative(scene, absolute_prim_path):
     # When the scene is set to None, this prim is not in a scene but is global e.g. like the
     # viewer camera or one of the scene prims.
     if scene is None:
-        assert not absolute_prim_path.startswith(
-            "/World/scene_"
-        ), f"Expected global prim path, got {absolute_prim_path}"
+        assert not absolute_prim_path.startswith("/World/scene_"), (
+            f"Expected global prim path, got {absolute_prim_path}"
+        )
         return absolute_prim_path[len("/World") :]
 
     return absolute_prim_path[len(scene.prim_path) :]

@@ -55,9 +55,9 @@ class EnvMetric:
             info (dict): info, i.e. dictionary with any useful information
         """
         step_metrics = self._compute_step_metrics(env, action, obs, reward, terminated, truncated, info)
-        assert (
-            env.scene in self.state
-        ), f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
+        assert env.scene in self.state, (
+            f"Environment {env} is not being tracked, please call 'self.reset(env)' to track!"
+        )
         state = self.state[env.scene]
         for k, v in step_metrics.items():
             if k not in state:
@@ -154,9 +154,9 @@ class MetricsWrapper(EnvironmentWrapper):
             metric (EnvMetric): Metric to add
         """
         # Validate the metric is compatible, then add
-        assert metric.is_compatible(
-            self
-        ), f"Metric {metric.__class__.__name__} is not compatible with this environment!"
+        assert metric.is_compatible(self), (
+            f"Metric {metric.__class__.__name__} is not compatible with this environment!"
+        )
         self.metrics[name] = metric
 
     def remove_metric(self, name):

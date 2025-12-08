@@ -27,9 +27,9 @@ class LocomotionRobot(BaseRobot):
     def _validate_configuration(self):
         # If we have a base controller, make sure it is a locomotion controller
         if "base" in self._controllers:
-            assert isinstance(
-                self._controllers["base"], LocomotionController
-            ), "Base controller must be a LocomotionController!"
+            assert isinstance(self._controllers["base"], LocomotionController), (
+                "Base controller must be a LocomotionController!"
+            )
 
         # run super
         super()._validate_configuration()

@@ -335,9 +335,9 @@ def create_rigid_prim(stage, link_prim_path):
     """
     # Make sure link prim does NOT already exist (this should be a new link)
     link_prim_exists = stage.GetPrimAtPath(link_prim_path).IsValid()
-    assert (
-        not link_prim_exists
-    ), f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"
+    assert not link_prim_exists, (
+        f"Cannot create new link because there already exists a link at prim path {link_prim_path}!"
+    )
 
     # Manually create a new prim (specified offset)
     link_prim = lazy.pxr.UsdGeom.Xform.Define(stage, link_prim_path).GetPrim()
@@ -384,16 +384,18 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
         parent_link_prim = None
     else:
         parent_path = f"{root_prim_path}/{parent_link_name}"
-        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(
-            parent_path
-        ), f"Could not find parent link within robot with name {parent_link_name}!"
+        assert lazy.isaacsim.core.utils.prims.is_prim_path_valid(parent_path), (
+            f"Could not find parent link within robot with name {parent_link_name}!"
+        )
         parent_link_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(parent_path)
 
     # If parent link is defined, link prim should NOT exist (this should be a new link)
     link_prim_path = f"{root_prim_path}/{link_name}"
     link_prim_exists = lazy.isaacsim.core.utils.prims.is_prim_path_valid(link_prim_path)
     if parent_link_prim is not None:
-        assert not link_prim_exists, f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        assert not link_prim_exists, (
+            f"Since parent link is defined, link_name {link_name} must be a link that is NOT pre-existing within the robot's set of links!"
+        )
         # Manually create a new prim (specified offset)
         create_rigid_prim(
             stage=stage,
@@ -424,7 +426,9 @@ def add_sensor(stage, root_prim, sensor_type, link_name, parent_link_name=None, 
 
     else:
         # Otherwise, link prim MUST exist
-        assert link_prim_exists, f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
+        assert link_prim_exists, (
+            f"Since no parent link is defined, link_name {link_name} must be a link that IS pre-existing within the robot's set of links!"
+        )
 
     # Define functions to generate the desired sensor prim
     if sensor_type == "Camera":

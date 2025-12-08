@@ -161,9 +161,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 kinematic_only = True
 
         # Validate that we didn't make a kinematic-only decision that does not match
-        assert (
-            self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"]
-        ), f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
+        assert self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"], (
+            f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
+        )
 
         # Actually apply the kinematic-only decision
         self._load_config["kinematic_only"] = kinematic_only

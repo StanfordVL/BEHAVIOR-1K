@@ -278,15 +278,15 @@ def _populate_input_output_objects_systems(og_recipe, input_synsets, output_syns
                 og_recipe[system_key].append(get_system_name_by_synset(synset))
             else:
                 obj_categories = OBJECT_TAXONOMY.get_categories(synset)
-                assert (
-                    len(obj_categories) == 1
-                ), f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                assert len(obj_categories) == 1, (
+                    f"Object synset {synset} must map to exactly one object category! Now: {obj_categories}."
+                )
                 og_recipe[obj_key][obj_categories[0]] = count
 
     # Assert only one of output_objects or output_systems is not None
-    assert (
-        len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0
-    ), "Recipe can only generate output objects or output systems, but not both!"
+    assert len(og_recipe["output_objects"]) == 0 or len(og_recipe["output_systems"]) == 0, (
+        "Recipe can only generate output objects or output systems, but not both!"
+    )
 
 
 def _populate_input_output_states(og_recipe, input_states, output_states):
@@ -304,51 +304,51 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                 first_synset, second_synset = synset_split
 
             # Assert the first synset is an object because the systems don't have any states.
-            assert OBJECT_TAXONOMY.is_leaf(
-                first_synset
-            ), f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
-            assert not is_substance_synset(
-                first_synset
-            ), f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+            assert OBJECT_TAXONOMY.is_leaf(first_synset), (
+                f"Input/output state synset {first_synset} must be a leaf node in the taxonomy!"
+            )
+            assert not is_substance_synset(first_synset), (
+                f"Input/output state synset {first_synset} must be applied to an object, not a substance!"
+            )
             obj_categories = OBJECT_TAXONOMY.get_categories(first_synset)
-            assert (
-                len(obj_categories) == 1
-            ), f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+            assert len(obj_categories) == 1, (
+                f"Input/output state synset {first_synset} must map to exactly one object category! Now: {obj_categories}."
+            )
             first_obj_category = obj_categories[0]
 
             if second_synset is None:
                 # Unary states for the first synset
                 for state_type, state_value in states:
                     state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                    assert issubclass(
-                        state_class, AbsoluteObjectState
-                    ), f"Input/output state type {state_type} must be a unary state!"
+                    assert issubclass(state_class, AbsoluteObjectState), (
+                        f"Input/output state type {state_type} must be a unary state!"
+                    )
                     # Example: (Cooked, True)
                     og_recipe[states_key][first_obj_category]["unary"].append((state_class, state_value))
             else:
-                assert OBJECT_TAXONOMY.is_leaf(
-                    second_synset
-                ), f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                assert OBJECT_TAXONOMY.is_leaf(second_synset), (
+                    f"Input/output state synset {second_synset} must be a leaf node in the taxonomy!"
+                )
                 obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
                 if is_substance_synset(second_synset):
                     second_obj_category = get_system_name_by_synset(second_synset)
                     is_substance = True
                 else:
                     obj_categories = OBJECT_TAXONOMY.get_categories(second_synset)
-                    assert (
-                        len(obj_categories) == 1
-                    ), f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                    assert len(obj_categories) == 1, (
+                        f"Input/output state synset {second_synset} must map to exactly one object category! Now: {obj_categories}."
+                    )
                     second_obj_category = obj_categories[0]
                     is_substance = False
 
                 for state_type, state_value in states:
                     state_class = SUPPORTED_PREDICATES[state_type].STATE_CLASS
-                    assert issubclass(
-                        state_class, RelativeObjectState
-                    ), f"Input/output state type {state_type} must be a binary state!"
-                    assert is_substance == (
-                        state_class in get_system_states()
-                    ), f"Input/output state type {state_type} system state inconsistency found!"
+                    assert issubclass(state_class, RelativeObjectState), (
+                        f"Input/output state type {state_type} must be a binary state!"
+                    )
+                    assert is_substance == (state_class in get_system_states()), (
+                        f"Input/output state type {state_type} system state inconsistency found!"
+                    )
                     if is_substance:
                         # Non-kinematic binary states, e.g. Covered, Saturated, Filled, Contains.
                         # Example: (Covered, "sesame_seed", True)
@@ -358,9 +358,9 @@ def _populate_input_output_states(og_recipe, input_states, output_states):
                     else:
                         # Kinematic binary states w.r.t. the second object.
                         # Example: (OnTop, "raw_egg", True)
-                        assert (
-                            states_key != "output_states"
-                        ), f"Output state type {state_type} can only be used in input states!"
+                        assert states_key != "output_states", (
+                            f"Output state type {state_type} can only be used in input states!"
+                        )
                         og_recipe[states_key][first_obj_category]["binary_object"].append(
                             (state_class, second_obj_category, state_value)
                         )
@@ -499,9 +499,9 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
         if "*" in line:
             # Make sure we're not in the goal conditions -- we ONLY expect the wildcard to be
             # specified in either the object scope or init conditions
-            assert (
-                not in_goal
-            ), "Found wildcard in BDDL goal conditions, but only expected in object_scope and init conditions!"
+            assert not in_goal, (
+                "Found wildcard in BDDL goal conditions, but only expected in object_scope and init conditions!"
+            )
 
             # Infer whether this line is part of the object scope or goal conditions
             if "-" in line:
@@ -512,18 +512,18 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
 
                 # Synset should be a scene object instance
                 abilities = OBJECT_TAXONOMY.get_abilities(synset)
-                assert (
-                    "sceneObject" in abilities
-                ), f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
+                assert "sceneObject" in abilities, (
+                    f"Wildcard can only be used on sceneObject synsets, but got synset: {synset}"
+                )
 
                 # Get all valid categories that are mapped to this synset
                 og_categories = OBJECT_TAXONOMY.get_subtree_categories(synset)
 
                 # Wildcard should be specified in the final instance
                 wildcard_instance = instances[-1]
-                assert (
-                    "*" in wildcard_instance
-                ), f"Expected wildcard to be specified in final instance in raw BDDL object scope line:\n{line}"
+                assert "*" in wildcard_instance, (
+                    f"Expected wildcard to be specified in final instance in raw BDDL object scope line:\n{line}"
+                )
 
                 # Make sure this hasn't been specified yet
                 assert wildcard_instance not in swap_info, f"Already found wildcard previously for synset {synset}!"
@@ -542,13 +542,13 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 # For now, we ONLY support inroom condition, so assert that this is the case
                 tokens = line.strip(" ()\n\t").split(" ")
                 assert len(tokens) == 3, f"Expected 3 total parsed tokens for wildcard init condition line:\n{line}"
-                assert (
-                    tokens[0] == "inroom"
-                ), f"Only inroom is supported for wildcard init condition, but found: {tokens[0]}"
+                assert tokens[0] == "inroom", (
+                    f"Only inroom is supported for wildcard init condition, but found: {tokens[0]}"
+                )
                 _, wildcard_instance, room = tokens
-                assert (
-                    wildcard_instance in swap_info
-                ), f"Expected wildcard instance {wildcard_instance} to already be specified in object_scope, but found none!"
+                assert wildcard_instance in swap_info, (
+                    f"Expected wildcard instance {wildcard_instance} to already be specified in object_scope, but found none!"
+                )
                 swap_info[wildcard_instance]["room"] = room
                 swap_info[wildcard_instance]["init_cond_idx"] = idx
 
@@ -585,9 +585,9 @@ def get_processed_bddl(behavior_activity, activity_definition, scene):
                 if in_room_objs is not None:
                     n_valid_objects = max(n_valid_objects, len(valid_objs.intersection(in_room_objs)))
 
-            assert (
-                n_valid_objects >= n_min_instances
-            ), f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in rooms of type {info['room']}!"
+            assert n_valid_objects >= n_min_instances, (
+                f"BDDL requires at least {n_min_instances} instances of synset {synset}, but only found {n_valid_objects} in rooms of type {info['room']}!"
+            )
 
             # Hot swap this information into the BDDL
             extra_instances = [f"{synset}_{i + 1}" for i in range(n_min_instances, n_valid_objects)]
@@ -710,9 +710,9 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
         """
-        assert (
-            self.exists and self.initialized
-        ), f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist or is not initialized!"
+        assert self.exists and self.initialized, (
+            f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist or is not initialized!"
+        )
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
 
@@ -1234,9 +1234,9 @@ class BDDLSampler:
                             log.warning(log_msg)
 
                             # Record the result for the child object
-                            assert (
-                                parent_obj_name not in problematic_objs[child_scope_name]
-                            ), f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            assert parent_obj_name not in problematic_objs[child_scope_name], (
+                                f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            )
                             problematic_objs[child_scope_name][parent_obj_name] = success
                             # If any condition fails for this candidate object, skip
                             if not success:

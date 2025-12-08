@@ -19,7 +19,7 @@ class ContactBodies(AbsoluteObjectState):
         bodies -= set(self.obj.link_prim_paths)
         rigid_prims = prim_paths_to_rigid_prims(bodies, self.obj.scene)
         # Ignore_objs should either be None or tuple (CANNOT be list because we need to hash these inputs)
-        assert ignore_objs is None or isinstance(
-            ignore_objs, tuple
-        ), "ignore_objs must either be None or a tuple of objects to ignore!"
+        assert ignore_objs is None or isinstance(ignore_objs, tuple), (
+            "ignore_objs must either be None or a tuple of objects to ignore!"
+        )
         return {p for o, p in rigid_prims if ignore_objs is None or o not in ignore_objs}

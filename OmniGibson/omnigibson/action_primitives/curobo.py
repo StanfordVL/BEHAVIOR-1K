@@ -267,9 +267,9 @@ class CuRoboMotionGenerator:
                 continue
             for link in obj.links.values():
                 for collision_mesh in link.collision_meshes.values():
-                    assert (
-                        collision_mesh.geom_type == "Mesh"
-                    ), f"collision_mesh {collision_mesh.prim_path} is not a mesh, but a {collision_mesh.geom_type}"
+                    assert collision_mesh.geom_type == "Mesh", (
+                        f"collision_mesh {collision_mesh.prim_path} is not a mesh, but a {collision_mesh.geom_type}"
+                    )
                     obj_pose = T.pose2mat(collision_mesh.get_position_orientation())
                     pose = robot_transform @ obj_pose
                     pos, orn = T.mat2pose(pose)

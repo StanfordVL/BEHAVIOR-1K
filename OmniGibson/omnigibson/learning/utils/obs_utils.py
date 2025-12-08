@@ -117,9 +117,9 @@ def create_video_writer(
         av.Container: PyAV container object that can be used to write video frames
         av.Stream: PyAV stream object that can be used to write video frames
     """
-    assert fpath.endswith(".mp4") or fpath.endswith(
-        ".mkv"
-    ), f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
+    assert fpath.endswith(".mp4") or fpath.endswith(".mkv"), (
+        f"Video writer fpath must end with .mp4 or .mkv! Got: {fpath}"
+    )
     container = av.open(fpath, mode="w")
     stream = container.add_stream(codec_name, rate=rate)
     stream.height = resolution[0]
@@ -472,9 +472,9 @@ def downsample_pcd(color_pcd, num_points, use_fps=True) -> Tuple[th.Tensor, th.T
             # Create batch indices for all points
             batch_indices = th.arange(B, device=device).repeat_interleave(N)  # (B*N,)
             # Single FPS call for all batches
-            assert (
-                fps is not None
-            ), "torch_cluster.fps is not available! Please make sure you have omnigibson setup with eval dependencies."
+            assert fps is not None, (
+                "torch_cluster.fps is not available! Please make sure you have omnigibson setup with eval dependencies."
+            )
             idx_flat = fps(xyz_flat, batch_indices, ratio=float(num_points) / N, random_start=True)
             # Vectorized post-processing
             batch_idx = idx_flat // N  # Which batch each index belongs to

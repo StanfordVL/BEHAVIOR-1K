@@ -333,9 +333,9 @@ class EntityPrim(XFormPrim):
             if uniform_scale:
                 scale_along_axis = self.scale[0]
             else:
-                assert (
-                    not self.initialized
-                ), "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                assert not self.initialized, (
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                )
                 for link in self.links.values():
                     if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame. Note that we
@@ -585,9 +585,9 @@ class EntityPrim(XFormPrim):
         # Assert all nodes have in-degree of 1 except root
         in_degrees = {node: G.in_degree(node) for node in G.nodes}
         assert in_degrees[self.root_link_name] == 0, "Root link should have in-degree of 0!"
-        assert all(
-            [in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]
-        ), "All non-root links should have in-degree of 1!"
+        assert all([in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]), (
+            "All non-root links should have in-degree of 1!"
+        )
 
         self._articulation_tree = G
 
@@ -1084,9 +1084,9 @@ class EntityPrim(XFormPrim):
             position, orientation = self.scene.convert_scene_relative_pose_to_world(position, orientation)
 
         # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        )
 
         # Actually set the pose.
         self._articulation_view.set_world_poses(
@@ -1126,9 +1126,9 @@ class EntityPrim(XFormPrim):
         orientation = orientations[0][[1, 2, 3, 0]]
 
         # Assert that the orientation is a unit quaternion
-        assert math.isclose(
-            th.norm(orientations).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientations} is not a unit quaternion."
+        assert math.isclose(th.norm(orientations).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} orientation {orientations} is not a unit quaternion."
+        )
 
         # If requested, compute the scene-local transform
         if frame == "scene":

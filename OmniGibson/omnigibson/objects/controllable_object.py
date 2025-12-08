@@ -142,19 +142,19 @@ class ControllableObject(BaseObject):
     def _initialize(self):
         # Assert that the prim path matches ControllableObjectViewAPI's expected format
         scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
-        assert scene_id.startswith(
-            "scene_"
-        ), "Second component of articulation root path (scene ID) must start with 'scene_'"
+        assert scene_id.startswith("scene_"), (
+            "Second component of articulation root path (scene ID) must start with 'scene_'"
+        )
         robot_name_components = robot_name.split("__")
-        assert (
-            len(robot_name_components) == 3
-        ), "Third component of articulation root path (robot name) must have 3 components separated by '__'"
-        assert (
-            robot_name_components[0] == "controllable"
-        ), "Third component of articulation root path (robot name) must start with 'controllable'"
-        assert (
-            robot_name_components[1] == self.__class__.__name__.lower()
-        ), "Third component of articulation root path (robot name) must contain the class name as the second part"
+        assert len(robot_name_components) == 3, (
+            "Third component of articulation root path (robot name) must have 3 components separated by '__'"
+        )
+        assert robot_name_components[0] == "controllable", (
+            "Third component of articulation root path (robot name) must start with 'controllable'"
+        )
+        assert robot_name_components[1] == self.__class__.__name__.lower(), (
+            "Third component of articulation root path (robot name) must contain the class name as the second part"
+        )
 
         # Run super first
         super()._initialize()
@@ -196,9 +196,9 @@ class ControllableObject(BaseObject):
             )
             self._control_freq = expected_control_freq
         else:
-            assert math.isclose(
-                expected_control_freq, self._control_freq
-            ), "Stored control frequency does not match environment's render timestep."
+            assert math.isclose(expected_control_freq, self._control_freq), (
+                "Stored control frequency does not match environment's render timestep."
+            )
 
         return prim
 
@@ -252,18 +252,18 @@ class ControllableObject(BaseObject):
             # If this controller subsumes other controllers, it cannot be subsumed by another controller
             # (i.e.: we don't allow nested / cyclical subsuming)
             if len(subsume_controllers) > 0:
-                assert (
-                    name not in subsume_names
-                ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                assert name not in subsume_names, (
+                    f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                )
                 controller_subsumes[name] = subsume_controllers
                 for subsume_name in subsume_controllers:
                     # Make sure it doesn't already exist -- a controller should only be subsumed by up to one other
-                    assert (
-                        subsume_name not in subsume_names
-                    ), f"Controller {subsume_name} cannot be subsumed by more than one other controller!"
-                    assert (
-                        subsume_name not in controller_subsumes
-                    ), f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                    assert subsume_name not in subsume_names, (
+                        f"Controller {subsume_name} cannot be subsumed by more than one other controller!"
+                    )
+                    assert subsume_name not in controller_subsumes, (
+                        f"Controller {name} subsumes other controllers, and therefore cannot be subsumed by another controller!"
+                    )
                     subsume_names.add(subsume_name)
 
         # Loop over all controllers, in the order corresponding to @action dim
@@ -286,9 +286,9 @@ class ControllableObject(BaseObject):
             controller = create_controller(**cb.from_torch_recursive(cfg))
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
-                assert self._joints[
-                    self.dof_names_ordered[idx]
-                ].driven, "Controllers should only control driveable joints!"
+                assert self._joints[self.dof_names_ordered[idx]].driven, (
+                    "Controllers should only control driveable joints!"
+                )
             self._controllers[name] = controller
         self.update_controller_mode()
 
@@ -706,15 +706,15 @@ class ControllableObject(BaseObject):
         """
         action = []
         for name, controller in self.controllers.items():
-            assert (
-                isinstance(controller, JointController) and not controller.use_delta_commands
-            ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
+            assert isinstance(controller, JointController) and not controller.use_delta_commands, (
+                f"Controller [{name}] should be a JointController with use_delta_commands=False!"
+            )
             command = q[controller.dof_idx]
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
-        assert (
-            action.shape[0] == self.action_dim
-        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        assert action.shape[0] == self.action_dim, (
+            f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        )
         return action
 
     def dump_action(self):

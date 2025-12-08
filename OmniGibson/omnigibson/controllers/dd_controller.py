@@ -63,16 +63,16 @@ class DifferentialDriveController(LocomotionController):
         # If we're using default command output limits, map this to maximum linear / angular velocities
         if type(command_output_limits) is str and command_output_limits == "default":
             min_vels = control_limits["velocity"][0][dof_idx]
-            assert (
-                min_vels[0] == min_vels[1]
-            ), "Differential drive requires both wheel joints to have same min velocities!"
+            assert min_vels[0] == min_vels[1], (
+                "Differential drive requires both wheel joints to have same min velocities!"
+            )
             max_vels = control_limits["velocity"][1][dof_idx]
-            assert (
-                max_vels[0] == max_vels[1]
-            ), "Differential drive requires both wheel joints to have same max velocities!"
-            assert abs(min_vels[0]) == abs(
-                max_vels[0]
-            ), "Differential drive requires both wheel joints to have same min and max absolute velocities!"
+            assert max_vels[0] == max_vels[1], (
+                "Differential drive requires both wheel joints to have same max velocities!"
+            )
+            assert abs(min_vels[0]) == abs(max_vels[0]), (
+                "Differential drive requires both wheel joints to have same min and max absolute velocities!"
+            )
             max_lin_vel = max_vels[0] * wheel_radius
             max_ang_vel = max_lin_vel * 2.0 / wheel_axle_length
             command_output_limits = ((-max_lin_vel, -max_ang_vel), (max_lin_vel, max_ang_vel))

@@ -142,21 +142,21 @@ def test_multi_scene_set_local_position():
     expected_local_pos = new_global_pos - scene_pos
 
     # Assert that the global position has been updated correctly
-    assert th.allclose(
-        updated_global_pos, new_global_pos, atol=1e-3
-    ), f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
+    assert th.allclose(updated_global_pos, new_global_pos, atol=1e-3), (
+        f"Updated global position {updated_global_pos} does not match expected {new_global_pos}"
+    )
 
     # Assert that the local position has been updated correctly
-    assert th.allclose(
-        updated_local_pos, expected_local_pos, atol=1e-3
-    ), f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
+    assert th.allclose(updated_local_pos, expected_local_pos, atol=1e-3), (
+        f"Updated local position {updated_local_pos} does not match expected {expected_local_pos}"
+    )
 
     # Assert that the change in global position is correct
     global_pos_change = updated_global_pos - initial_global_pos
     expected_change = th.tensor([1.0, 0.5, 0.0], dtype=th.float32)
-    assert th.allclose(
-        global_pos_change, expected_change, atol=1e-3
-    ), f"Global position change {global_pos_change} does not match expected change {expected_change}"
+    assert th.allclose(global_pos_change, expected_change, atol=1e-3), (
+        f"Global position change {global_pos_change} does not match expected change {expected_change}"
+    )
 
     og.clear()
 
@@ -229,14 +229,14 @@ def test_multi_scene_position_orientation_relative_to_scene():
     updated_relative_pos, updated_relative_ori = robot.get_position_orientation(frame="scene")
 
     # Assert that the relative position has been updated correctly
-    assert th.allclose(
-        updated_relative_pos, new_relative_pos, atol=1e-3
-    ), f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
+    assert th.allclose(updated_relative_pos, new_relative_pos, atol=1e-3), (
+        f"Updated relative position {updated_relative_pos} does not match expected {new_relative_pos}"
+    )
 
     # Assert that the relative orientation has been updated correctly
-    assert th.allclose(
-        updated_relative_ori, new_relative_ori, atol=1e-3
-    ), f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
+    assert th.allclose(updated_relative_ori, new_relative_ori, atol=1e-3), (
+        f"Updated relative orientation {updated_relative_ori} does not match expected {new_relative_ori}"
+    )
 
     # Get the scene's global position and orientation
     scene_pos, scene_ori = vec_env.envs[1].scene.get_position_orientation()
@@ -248,17 +248,17 @@ def test_multi_scene_position_orientation_relative_to_scene():
     expected_global_pos = scene_pos + updated_relative_pos
 
     # Assert that the global position is correct
-    assert th.allclose(
-        global_pos, expected_global_pos, atol=1e-3
-    ), f"Global position {global_pos} does not match expected {expected_global_pos}"
+    assert th.allclose(global_pos, expected_global_pos, atol=1e-3), (
+        f"Global position {global_pos} does not match expected {expected_global_pos}"
+    )
 
     # Calculate expected global orientation
     expected_global_ori = quat_multiply(scene_ori, new_relative_ori)
 
     # Assert that the global orientation is correct
-    assert th.allclose(
-        global_ori, expected_global_ori, atol=1e-3
-    ), f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+    assert th.allclose(global_ori, expected_global_ori, atol=1e-3), (
+        f"Global orientation {global_ori} does not match expected {expected_global_ori}"
+    )
 
     og.clear()
 

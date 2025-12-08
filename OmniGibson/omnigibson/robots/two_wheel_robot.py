@@ -162,8 +162,8 @@ class TwoWheelRobot(LocomotionRobot):
             th.tensor: array of action data
         """
         action = super().teleop_data_to_action(teleop_action)
-        assert isinstance(
-            self._controllers["base"], DifferentialDriveController
-        ), "Only DifferentialDriveController is supported!"
+        assert isinstance(self._controllers["base"], DifferentialDriveController), (
+            "Only DifferentialDriveController is supported!"
+        )
         action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
         return action

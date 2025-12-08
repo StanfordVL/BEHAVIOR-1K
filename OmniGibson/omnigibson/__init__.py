@@ -125,9 +125,9 @@ def clear(
     launch(**init_kwargs)
 
     # Check that the device remains the same
-    assert (
-        sim.device == init_kwargs["device"]
-    ), f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
+    assert sim.device == init_kwargs["device"], (
+        f"Device changed from {init_kwargs['device']} to {sim.device} after clear."
+    )
 
 
 def cleanup(*args, **kwargs):

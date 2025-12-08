@@ -177,18 +177,18 @@ class BaseController(Serializable, Registerable, Recreatable):
             isaac_kd = m.DEFAULT_ISAAC_KD if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.VELOCITY:
             # No kp should be specified, but kd should be
-            assert (
-                isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            assert isaac_kp is None, (
+                f"Control type for controller {self.__class__.__name__} is VELOCITY, so no isaac_kp should be set!"
+            )
             isaac_kd = m.DEFAULT_ISAAC_KP if isaac_kd is None else isaac_kd
         elif self.control_type == ControlType.EFFORT:
             # Neither kp nor kd should be specified
-            assert (
-                isaac_kp is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
-            assert (
-                isaac_kd is None
-            ), f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            assert isaac_kp is None, (
+                f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kp should be set!"
+            )
+            assert isaac_kd is None, (
+                f"Control type for controller {self.__class__.__name__} is EFFORT, so no isaac_kd should be set!"
+            )
         else:
             raise ValueError(
                 f"Expected control type to be one of: [POSITION, VELOCITY, EFFORT], but got: {self.control_type}"
@@ -299,9 +299,9 @@ class BaseController(Serializable, Registerable, Recreatable):
             control_dict (dict): Current state
         """
         # Sanity check the command
-        assert (
-            len(command) == self.command_dim
-        ), f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
+        assert len(command) == self.command_dim, (
+            f"Commands must be dimension {self.command_dim}, got dim {len(command)} instead."
+        )
 
         # Preprocess and run internal command
         self._goal = self._update_goal(command=self._preprocess_command(command), control_dict=control_dict)
@@ -375,9 +375,9 @@ class BaseController(Serializable, Registerable, Recreatable):
 
         # Compute control, then clip and return
         control = self.compute_control(goal_dict=self._goal, control_dict=control_dict)
-        assert (
-            len(control) == self.control_dim
-        ), f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
+        assert len(control) == self.control_dim, (
+            f"Control signal must be of length {self.control_dim}, got {len(control)} instead."
+        )
         self._control = self.clip_control(control=control)
         return self._control
 

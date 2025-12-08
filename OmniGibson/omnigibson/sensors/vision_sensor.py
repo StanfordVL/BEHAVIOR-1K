@@ -168,9 +168,9 @@ class VisionSensor(BaseSensor):
             pointcloud="pointcloud",
         )
 
-        assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(
-            self.all_modalities
-        ), "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
+        assert {key for key in self._RAW_SENSOR_TYPES.keys() if key != "camera_params"} == set(self.all_modalities), (
+            "VisionSensor._RAW_SENSOR_TYPES must have the same keys as VisionSensor.all_modalities!"
+        )
 
         if modalities == "all":
             modalities = self.all_modalities
@@ -380,14 +380,14 @@ class VisionSensor(BaseSensor):
                 # If there are multiple class names, grab the one that is a registered system
                 # This happens with MacroVisual particles, e.g. {"11": {"class": "breakfast_table,stain"}}
                 categories = [cat for cat in replicator_mapping[key].split(",") if cat in get_all_system_names()]
-                assert (
-                    len(categories) == 1
-                ), "There should be exactly one category that belongs to scene.system_registry"
+                assert len(categories) == 1, (
+                    "There should be exactly one category that belongs to scene.system_registry"
+                )
                 replicator_mapping[key] = categories[0]
 
-            assert (
-                replicator_mapping[key] in semantic_class_id_to_name().values()
-            ), f"Class {val['class']} does not exist in the semantic class name to id mapping!"
+            assert replicator_mapping[key] in semantic_class_id_to_name().values(), (
+                f"Class {val['class']} does not exist in the semantic class name to id mapping!"
+            )
         return replicator_mapping
 
     def _remap_semantic_segmentation(self, img, id_to_labels):

@@ -159,9 +159,9 @@ def create_physx_particleset_pointinstancer(
 
     # Create point instancer
     instancer_prim_path = f"{prim_path}/instancer"
-    assert not stage.GetPrimAtPath(
-        instancer_prim_path
-    ), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
+    assert not stage.GetPrimAtPath(instancer_prim_path), (
+        f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
+    )
     instancer = lazy.pxr.UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
 
     is_isosurface = (
@@ -202,9 +202,9 @@ def create_physx_particleset_pointinstancer(
     velocities = th.zeros((n_particles, 3)) if velocities is None else velocities
     angular_velocities = th.zeros((n_particles, 3)) if angular_velocities is None else angular_velocities
     scales = th.ones((n_particles, 3)) if scales is None else scales
-    assert (
-        particle_mass is not None or particle_density is not None
-    ), "Either particle mass or particle density must be specified when creating particle instancer!"
+    assert particle_mass is not None or particle_density is not None, (
+        "Either particle mass or particle density must be specified when creating particle instancer!"
+    )
     particle_mass = 0.0 if particle_mass is None else particle_mass
     particle_density = 0.0 if particle_density is None else particle_density
 

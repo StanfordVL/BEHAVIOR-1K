@@ -237,15 +237,15 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             # If we have an arm controller, make sure it is a manipulation controller
             if f"arm_{arm}" in self._controllers:
-                assert isinstance(
-                    self._controllers["arm_{}".format(arm)], ManipulationController
-                ), "Arm {} controller must be a ManipulationController!".format(arm)
+                assert isinstance(self._controllers["arm_{}".format(arm)], ManipulationController), (
+                    "Arm {} controller must be a ManipulationController!".format(arm)
+                )
 
             # If we have a gripper controller, make sure it is a manipulation controller
             if f"gripper_{arm}" in self._controllers:
-                assert isinstance(
-                    self._controllers["gripper_{}".format(arm)], GripperController
-                ), "Gripper {} controller must be a GripperController!".format(arm)
+                assert isinstance(self._controllers["gripper_{}".format(arm)], GripperController), (
+                    "Gripper {} controller must be a GripperController!".format(arm)
+                )
 
         # run super
         super()._validate_configuration()
@@ -286,9 +286,9 @@ class ManipulationRobot(BaseRobot):
             # Infer parent link for this finger
             finger_parent_link, finger_parent_max_z = None, None
             is_parallel_jaw = len(finger_links) == 2
-            assert (
-                is_parallel_jaw
-            ), "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            assert is_parallel_jaw, (
+                "Inferring finger link information can only be done for parallel jaw gripper robots!"
+            )
             finger_pts_in_eef_frame = []
             for i, finger_link in enumerate(finger_links):
                 # Find parent, and make sure one exists
@@ -297,9 +297,9 @@ class ManipulationRobot(BaseRobot):
                     if finger_link.prim_path == joint.body1:
                         parent_prim_path = joint.body0
                         break
-                assert (
-                    parent_prim_path is not None
-                ), f"Expected articulated parent joint for finger link {finger_link.name} but found none!"
+                assert parent_prim_path is not None, (
+                    f"Expected articulated parent joint for finger link {finger_link.name} but found none!"
+                )
                 for link in self.links.values():
                     if parent_prim_path == link.prim_path:
                         parent_link = link
@@ -309,23 +309,23 @@ class ManipulationRobot(BaseRobot):
                 if finger_parent_link is None:
                     finger_parent_link = parent_link
                     finger_parent_pts = finger_parent_link.collision_boundary_points_world
-                    assert (
-                        finger_parent_pts is not None
-                    ), f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
+                    assert finger_parent_pts is not None, (
+                        f"Expected finger parent points to be defined for parent link {finger_parent_link.name}, but got None!"
+                    )
                     # Convert from world frame -> eef frame
                     finger_parent_pts = th.concatenate([finger_parent_pts, th.ones(len(finger_parent_pts), 1)], dim=-1)
                     finger_parent_pts = (finger_parent_pts @ eef_to_world_tf.T)[:, :3]
                     finger_parent_max_z = finger_parent_pts[:, 2].max().item()
                 else:
-                    assert (
-                        finger_parent_link == parent_link
-                    ), f"Expected all fingers to have same parent link, but found multiple parents at {finger_parent_link.prim_path} and {parent_link.prim_path}"
+                    assert finger_parent_link == parent_link, (
+                        f"Expected all fingers to have same parent link, but found multiple parents at {finger_parent_link.prim_path} and {parent_link.prim_path}"
+                    )
 
                 # Calculate this finger's collision boundary points in the world frame
                 finger_pts = finger_link.collision_boundary_points_world
-                assert (
-                    finger_pts is not None
-                ), f"Expected finger points to be defined for link {finger_link.name}, but got None!"
+                assert finger_pts is not None, (
+                    f"Expected finger points to be defined for link {finger_link.name}, but got None!"
+                )
                 # Convert from world frame -> eef frame
                 finger_pts = th.concatenate([finger_pts, th.ones(len(finger_pts), 1)], dim=-1)
                 finger_pts = (finger_pts @ eef_to_world_tf.T)[:, :3]
@@ -343,9 +343,9 @@ class ManipulationRobot(BaseRobot):
                 # Since we know the EEF frame always points with z outwards towards the fingers, the outer-most point /
                 # fingertip is the maximum z value
                 finger_max_z = finger_pts[:, 2].max().item()
-                assert (
-                    finger_max_z > 0
-                ), f"Expected positive fingertip to eef frame offset for link {finger_link.name}, but got: {finger_max_z}. Does the EEF frame z-axis point in the direction of the fingers?"
+                assert finger_max_z > 0, (
+                    f"Expected positive fingertip to eef frame offset for link {finger_link.name}, but got: {finger_max_z}. Does the EEF frame z-axis point in the direction of the fingers?"
+                )
                 self._eef_to_fingertip_lengths[arm][finger_link.name] = finger_max_z
 
                 # Now, only keep points that are above the parent max z by 20% for inferring y values
@@ -388,9 +388,9 @@ class ManipulationRobot(BaseRobot):
                 )
                 # We want to ensure the z value is symmetric about the EEF z frame, so make sure z_lower is negative
                 # and z_upper is positive, and use +/- the absolute minimum value between the two
-                assert (
-                    z_lower < 0 and z_upper > 0
-                ), f"Expected computed z_lower / z_upper bounds for finger grasping points to be negative / positive, but instead got: {z_lower}, {z_upper}"
+                assert z_lower < 0 and z_upper > 0, (
+                    f"Expected computed z_lower / z_upper bounds for finger grasping points to be negative / positive, but instead got: {z_lower}, {z_upper}"
+                )
                 z_offset = min(abs(z_lower), abs(z_upper))
 
                 grasp_pts = th.tensor(
@@ -1195,12 +1195,12 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         # First, make sure start and end grasp points exist (i.e.: aren't None)
-        assert (
-            self.assisted_grasp_start_points[arm] is not None
-        ), "In order to use assisted grasping, assisted_grasp_start_points must not be None!"
-        assert (
-            self.assisted_grasp_end_points[arm] is not None
-        ), "In order to use assisted grasping, assisted_grasp_end_points must not be None!"
+        assert self.assisted_grasp_start_points[arm] is not None, (
+            "In order to use assisted grasping, assisted_grasp_start_points must not be None!"
+        )
+        assert self.assisted_grasp_end_points[arm] is not None, (
+            "In order to use assisted grasping, assisted_grasp_end_points must not be None!"
+        )
 
         # Iterate over all start and end grasp points and calculate their x,y,z positions in the world frame
         # (per arm appendage)
@@ -1916,8 +1916,8 @@ class ManipulationRobot(BaseRobot):
             target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
             action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
             # gripper action
-            assert isinstance(
-                self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
-            ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+            assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), (
+                f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+            )
             action[self.gripper_action_idx[arm_name]] = arm_action[6]
         return action

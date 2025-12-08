@@ -85,19 +85,19 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If the sim is launched, check that the parameters match
         if og.sim is not None:
-            assert (
-                og.sim.initial_physics_dt == physics_dt
-            ), f"Physics frequency mismatch! Expected {physics_dt}, got {og.sim.initial_physics_dt}"
-            assert (
-                og.sim.initial_rendering_dt == rendering_dt
-            ), f"Rendering frequency mismatch! Expected {rendering_dt}, got {og.sim.initial_rendering_dt}"
+            assert og.sim.initial_physics_dt == physics_dt, (
+                f"Physics frequency mismatch! Expected {physics_dt}, got {og.sim.initial_physics_dt}"
+            )
+            assert og.sim.initial_rendering_dt == rendering_dt, (
+                f"Rendering frequency mismatch! Expected {rendering_dt}, got {og.sim.initial_rendering_dt}"
+            )
             assert og.sim.device == self.device, f"Device mismatch! Expected {self.device}, got {og.sim.device}"
-            assert (
-                og.sim.viewer_width == viewer_width
-            ), f"Viewer width mismatch! Expected {viewer_width}, got {og.sim.viewer_width}"
-            assert (
-                og.sim.viewer_height == viewer_height
-            ), f"Viewer height mismatch! Expected {viewer_height}, got {og.sim.viewer_height}"
+            assert og.sim.viewer_width == viewer_width, (
+                f"Viewer width mismatch! Expected {viewer_width}, got {og.sim.viewer_width}"
+            )
+            assert og.sim.viewer_height == viewer_height, (
+                f"Viewer height mismatch! Expected {viewer_height}, got {og.sim.viewer_height}"
+            )
         # Otherwise, launch a simulator instance
         else:
             og.launch(
@@ -203,9 +203,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
         # less than the offset we set (dist = 0.5 * gravity * (t^2))
         drop_distance = 0.5 * 9.8 * (og.sim.get_sim_step_dt() ** 2)
-        assert (
-            drop_distance < self._initial_pos_z_offset
-        ), f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
+        assert drop_distance < self._initial_pos_z_offset, (
+            f"initial_pos_z_offset is too small for collision checking, must be greater than {drop_distance}"
+        )
 
     def _load_task(self, task_config=None):
         """
@@ -400,12 +400,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
             lows = []
             highs = []
             for space in action_space.values():
-                assert isinstance(
-                    space, gym.spaces.Box
-                ), "Can only flatten action space where all individual spaces are gym.space.Box instances!"
-                assert (
-                    len(space.shape) == 1
-                ), "Can only flatten action space where all individual spaces are 1D instances!"
+                assert isinstance(space, gym.spaces.Box), (
+                    "Can only flatten action space where all individual spaces are gym.space.Box instances!"
+                )
+                assert len(space.shape) == 1, (
+                    "Can only flatten action space where all individual spaces are 1D instances!"
+                )
                 lows.append(space.low)
                 highs.append(space.high)
             action_space = gym.spaces.Box(

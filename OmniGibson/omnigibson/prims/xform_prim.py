@@ -212,9 +212,9 @@ class XFormPrim(BasePrim):
             position, orientation = PoseAPI.convert_world_pose_to_local(self._prim, position, orientation)
 
         # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        )
 
         # Actually set the local pose now.
         properties = self.prim.GetPropertyNames()

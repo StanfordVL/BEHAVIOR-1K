@@ -117,9 +117,9 @@ def get_batch_size(x, strict: bool = False) -> int:
 
     if strict:
         batch_sizes = [_get_batch_size(x) for x in xs]
-        assert all(
-            b == batch_sizes[0] for b in batch_sizes
-        ), f"batch sizes must all be the same in nested structure: {batch_sizes}"
+        assert all(b == batch_sizes[0] for b in batch_sizes), (
+            f"batch sizes must all be the same in nested structure: {batch_sizes}"
+        )
         return batch_sizes[0]
     else:
         return _get_batch_size(xs[0])

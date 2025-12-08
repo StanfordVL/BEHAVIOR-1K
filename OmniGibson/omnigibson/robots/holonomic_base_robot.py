@@ -117,9 +117,9 @@ class HolonomicBaseRobot(LocomotionRobot):
 
         # Sanity check that the base controller is a HolonomicBaseJointController
         if controller_config is not None and "base" in controller_config:
-            assert (
-                controller_config["base"]["name"] == "HolonomicBaseJointController"
-            ), "Base controller must be a HolonomicBaseJointController!"
+            assert controller_config["base"]["name"] == "HolonomicBaseJointController", (
+                "Base controller must be a HolonomicBaseJointController!"
+            )
 
         # Call super() method
         super().__init__(
@@ -378,9 +378,9 @@ class HolonomicBaseRobot(LocomotionRobot):
         """
         action = []
         for name, controller in self.controllers.items():
-            assert (
-                isinstance(controller, JointController) and not controller.use_delta_commands
-            ), f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
+            assert isinstance(controller, JointController) and not controller.use_delta_commands, (
+                f"Controller [{name}] should be a JointController/HolonomicBaseJointController with use_delta_commands=False!"
+            )
             command = q[controller.dof_idx]
             if isinstance(controller, HolonomicBaseJointController):
                 # For a holonomic base joint controller, the command should be in the robot local frame
@@ -395,9 +395,9 @@ class HolonomicBaseRobot(LocomotionRobot):
                 command = th.tensor([local_pos[0], local_pos[1], delta_q])
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
-        assert (
-            action.shape[0] == self.action_dim
-        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        assert action.shape[0] == self.action_dim, (
+            f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        )
         return action
 
     def teleop_data_to_action(self, teleop_action) -> th.Tensor:

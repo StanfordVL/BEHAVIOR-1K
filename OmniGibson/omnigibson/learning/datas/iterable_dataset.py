@@ -114,9 +114,9 @@ class BehaviorIterableDataset(IterableDataset):
         self._ctx_len = ctx_len
         self._use_action_chunks = use_action_chunks
         self._action_prediction_horizon = action_prediction_horizon
-        assert (
-            self._action_prediction_horizon is not None if self._use_action_chunks else True
-        ), "action_prediction_horizon must be provided if use_action_chunks is True!"
+        assert self._action_prediction_horizon is not None if self._use_action_chunks else True, (
+            "action_prediction_horizon must be provided if use_action_chunks is True!"
+        )
         self._downsample_factor = downsample_factor
         assert self._downsample_factor >= 1, "downsample_factor must be >= 1!"
         self._use_task_info = use_task_info
@@ -127,9 +127,9 @@ class BehaviorIterableDataset(IterableDataset):
         self._shuffle = shuffle
         self._epoch = 0
 
-        assert set(visual_obs_types).issubset(
-            {"rgb", "depth_linear", "seg_instance_id", "pcd"}
-        ), "visual_obs_types must be a subset of {'rgb', 'depth_linear', 'seg_instance_id', 'pcd'}!"
+        assert set(visual_obs_types).issubset({"rgb", "depth_linear", "seg_instance_id", "pcd"}), (
+            "visual_obs_types must be a subset of {'rgb', 'depth_linear', 'seg_instance_id', 'pcd'}!"
+        )
         self._visual_obs_types = set(visual_obs_types)
 
         self._multi_view_cameras = multi_view_cameras

@@ -91,9 +91,9 @@ class RigidKinematicPrim(RigidPrim):
             position, orientation = XFormPrim.get_position_orientation(self, clone=clone)
 
             # Assert that the orientation is a unit quaternion
-            assert math.isclose(
-                th.norm(orientation).item(), 1, abs_tol=1e-3
-            ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
+            assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+                f"{self.prim_path} orientation {orientation} is not a unit quaternion."
+            )
 
             # Cache world pose
             self._kinematic_pose_cache["world"] = (position, orientation)

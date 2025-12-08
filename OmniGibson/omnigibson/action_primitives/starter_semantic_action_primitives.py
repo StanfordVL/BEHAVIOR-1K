@@ -251,9 +251,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def get_action_space(self):
         # TODO: Figure out how to implement what happens when the set of objects in scene changes.
         if self._task_relevant_objects_only:
-            assert isinstance(
-                self.env.task, BehaviorTask
-            ), "Activity relevant objects can only be used for BEHAVIOR tasks"
+            assert isinstance(self.env.task, BehaviorTask), (
+                "Activity relevant objects can only be used for BEHAVIOR tasks"
+            )
             self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
         else:
             self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
@@ -1151,9 +1151,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
-        assert (
-            controller_config["name"] == "InverseKinematicsController"
-        ), "Controller must be InverseKinematicsController"
+        assert controller_config["name"] == "InverseKinematicsController", (
+            "Controller must be InverseKinematicsController"
+        )
         assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_absolute_ori mode"
         if in_world_frame:
             target_pose = self._world_pose_to_robot_pose(target_pose)
@@ -1685,9 +1685,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action = self._empty_action()
                 if isinstance(self.robot.controllers["base"], HolonomicBaseJointController):
-                    assert (
-                        self.robot.controllers["base"].motor_type == "velocity"
-                    ), "Holonomic base controller must be in velocity mode"
+                    assert self.robot.controllers["base"].motor_type == "velocity", (
+                        "Holonomic base controller must be in velocity mode"
+                    )
                     direction_vec = (
                         body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[type(self.robot)]
                     )
@@ -1735,9 +1735,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = action[self.robot.controller_action_idx["base"]]
 
             if isinstance(self.robot.controllers["base"], HolonomicBaseJointController):
-                assert (
-                    self.robot.controllers["base"].motor_type == "velocity"
-                ), "Holonomic base controller must be in velocity mode"
+                assert self.robot.controllers["base"].motor_type == "velocity", (
+                    "Holonomic base controller must be in velocity mode"
+                )
                 base_action[0] = 0.0
                 base_action[1] = 0.0
                 base_action[2] = ang_vel

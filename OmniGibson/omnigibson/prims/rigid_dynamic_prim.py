@@ -64,13 +64,13 @@ class RigidDynamicPrim(RigidPrim):
         """
         # Validate that the view is valid if physics is running
         if og.sim.is_playing() and self.initialized:
-            assert (
-                self._rigid_prim_view.is_physics_handle_valid() and self._rigid_prim_view._physics_view.check()
-            ), "Rigid prim view must be valid if physics is running!"
+            assert self._rigid_prim_view.is_physics_handle_valid() and self._rigid_prim_view._physics_view.check(), (
+                "Rigid prim view must be valid if physics is running!"
+            )
 
-        assert not (
-            og.sim.is_playing() and not self._rigid_prim_view.is_valid
-        ), "Rigid prim view must be valid if physics is running!"
+        assert not (og.sim.is_playing() and not self._rigid_prim_view.is_valid), (
+            "Rigid prim view must be valid if physics is running!"
+        )
 
         self._rigid_prim_view.initialize(og.sim.physics_sim_view)
 
@@ -135,9 +135,9 @@ class RigidDynamicPrim(RigidPrim):
         orientation = th.as_tensor(orientation, dtype=th.float32)
 
         # Assert validity of the orientation
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
+        )
 
         # Convert to from scene-relative to world if necessary
         if frame == "scene":
@@ -169,9 +169,9 @@ class RigidDynamicPrim(RigidPrim):
         orientation = orientations[0][[1, 2, 3, 0]]  # Convert from (w,x,y,z) to (x,y,z,w)
 
         # Assert that the orientation is a unit quaternion
-        assert math.isclose(
-            th.norm(orientation).item(), 1, abs_tol=1e-3
-        ), f"{self.prim_path} orientation {orientation} is not a unit quaternion."
+        assert math.isclose(th.norm(orientation).item(), 1, abs_tol=1e-3), (
+            f"{self.prim_path} orientation {orientation} is not a unit quaternion."
+        )
 
         # If requested, compute the scene-local transform
         if frame == "scene":

@@ -399,9 +399,9 @@ def generate_low_dim_data(
             replayed_f["data"][f"demo_{episode_id}"]["obs"]["robot_r1::cam_rel_poses"][:], dtype=np.float32
         )
         # check if the data is valid
-        assert (
-            actions.shape[0] == proprio.shape[0] == task_info.shape[0]
-        ), "Action, proprio, and task-info must have the same length"
+        assert actions.shape[0] == proprio.shape[0] == task_info.shape[0], (
+            "Action, proprio, and task-info must have the same length"
+        )
         T = len(actions)
 
         data = {

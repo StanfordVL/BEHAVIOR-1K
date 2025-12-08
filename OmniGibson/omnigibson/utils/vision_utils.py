@@ -97,9 +97,9 @@ class Remapper:
             dict: The remapped labels dictionary, e.g. {5: 'desk', 7: 'chair', 100: 'unlabelled'}.
         """
         # Make sure that max int32 doesn't match any value in the new mapping
-        assert th.all(
-            th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max
-        ), "New mapping contains default unmapped value!"
+        assert th.all(th.tensor(list(new_mapping.keys())) != th.iinfo(th.int32).max), (
+            "New mapping contains default unmapped value!"
+        )
         image_max_key = max(th.max(image).item(), max(old_mapping.keys()))
 
         if self.key_array is None:

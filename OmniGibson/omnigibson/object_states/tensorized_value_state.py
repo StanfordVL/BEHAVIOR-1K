@@ -84,9 +84,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
         Args:
             obj (StatefulObject): Object to add
         """
-        assert (
-            obj not in cls.OBJ_IDXS
-        ), f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
+        assert obj not in cls.OBJ_IDXS, (
+            f"Tried to add object {obj.name} to the global tensorized value array but the object already exists!"
+        )
 
         # Add this object to the tracked global state
         cls.OBJ_IDXS[obj] = len(cls.VALUES)
@@ -103,9 +103,9 @@ class TensorizedValueState(AbsoluteObjectState, GlobalUpdateStateMixin):
             obj (StatefulObject): Object to remove
         """
         # Removes this tracked object from the global value array
-        assert (
-            obj in cls.OBJ_IDXS
-        ), f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
+        assert obj in cls.OBJ_IDXS, (
+            f"Tried to remove object {obj.name} from the global tensorized value array but the object does not exist!"
+        )
         deleted_idx = cls.OBJ_IDXS.pop(obj)
 
         # Re-standardize the indices

@@ -115,9 +115,9 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             pos_damping_ratio = m.DEFAULT_JOINT_POS_DAMPING_RATIO if pos_damping_ratio is None else pos_damping_ratio
         elif self._motor_type == "velocity":
             vel_kp = m.DEFAULT_JOINT_VEL_KP if vel_kp is None else vel_kp
-            assert (
-                pos_damping_ratio is None
-            ), "Cannot set pos_damping_ratio for JointController with motor_type=velocity!"
+            assert pos_damping_ratio is None, (
+                "Cannot set pos_damping_ratio for JointController with motor_type=velocity!"
+            )
         else:  # effort
             assert pos_kp is None, "Cannot set pos_kp for JointController with motor_type=effort!"
             assert pos_damping_ratio is None, "Cannot set pos_damping_ratio for JointController with motor_type=effort!"

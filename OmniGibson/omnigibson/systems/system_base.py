@@ -520,9 +520,9 @@ class VisualParticleSystem(BaseSystem):
         group = VisualParticleSystem.get_group_name(obj=obj)
         # This should only happen once for a single attachment group, so we explicitly check to make sure the object
         # doesn't already exist
-        assert (
-            group not in self.groups
-        ), f"Cannot create new attachment group because group with name {group} already exists!"
+        assert group not in self.groups, (
+            f"Cannot create new attachment group because group with name {group} already exists!"
+        )
 
         # Create the group
         self._group_particles[group] = dict()
@@ -759,9 +759,9 @@ class PhysicalParticleSystem(BaseSystem):
         super().initialize(scene)
 
         # Make sure min and max scale are identical
-        assert th.all(
-            self.min_scale == self.max_scale
-        ), "Min and max scale should be identical for PhysicalParticleSystem!"
+        assert th.all(self.min_scale == self.max_scale), (
+            "Min and max scale should be identical for PhysicalParticleSystem!"
+        )
 
     @property
     def particle_density(self):
@@ -862,9 +862,9 @@ class PhysicalParticleSystem(BaseSystem):
         sampling_distance = self.particle_particle_rest_distance if sampling_distance is None else sampling_distance
 
         # This guarantees that h - self.particle_radius > l + self.particle_radius
-        assert th.all(
-            extent >= 2 * self.particle_radius
-        ), f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
+        assert th.all(extent >= 2 * self.particle_radius), (
+            f"link {link.name} is too small to sample any particle of radius {self.particle_radius}."
+        )
 
         arrs = [
             th.arange(l + self.particle_radius, h - self.particle_radius, sampling_distance) for l, h in zip(low, high)

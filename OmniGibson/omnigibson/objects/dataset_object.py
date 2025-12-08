@@ -378,9 +378,9 @@ class DatasetObject(USDObject):
         Returns:
             3-array: (x,y,z) bounding box
         """
-        assert (
-            "ig:nativeBB" in self.property_names
-        ), f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        assert "ig:nativeBB" in self.property_names, (
+            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        )
         return th.tensor(self.get_attribute(attr="ig:nativeBB"))
 
     @property

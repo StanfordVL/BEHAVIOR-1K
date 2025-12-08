@@ -295,9 +295,9 @@ class FrankaPanda(ManipulationRobot):
     @property
     def curobo_path(self):
         # Only supported for normal franka now
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        assert self._model_name == "franka_panda", (
+            f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        )
         return os.path.join(
             get_dataset_path("omnigibson-robot-assets"),
             "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml",
@@ -305,9 +305,9 @@ class FrankaPanda(ManipulationRobot):
 
     @cached_property
     def curobo_attached_object_link_names(self):
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        assert self._model_name == "franka_panda", (
+            f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        )
         return super().curobo_attached_object_link_names
 
     @property

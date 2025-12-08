@@ -154,9 +154,9 @@ def validate_scene_can_be_sampled(scene):
 
     # Assert user is None or is USER, else False
     scene_user = scene_user_mapping[scene]
-    assert (
-        scene_user is None or scene_user == USER
-    ), f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
+    assert scene_user is None or scene_user == USER, (
+        f"Cannot sample scene {scene} with user {USER}! Scene already has user: {scene_user}."
+    )
 
     # Fill in this value to reserve it
     idx = scenes_sorted.index(scene)

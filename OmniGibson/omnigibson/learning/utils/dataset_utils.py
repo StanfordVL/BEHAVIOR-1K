@@ -224,16 +224,16 @@ def download_and_extract_data(
     with tarfile.open(file_name, "r:*") as tar_ref:
         tar_ref.extractall(f"{data_dir}/2025-challenge-rawdata")
     # rename and move to "raw" folder
-    assert os.path.exists(
-        f"{data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"
-    ), f"File not found: {data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"
+    assert os.path.exists(f"{data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"), (
+        f"File not found: {data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5"
+    )
     # check running_args.json
     with open(f"{data_dir}/2025-challenge-rawdata/{base_name}/running_args.json", "r") as f:
         running_args = json.load(f)
         assert running_args["task_name"] == task_name, f"Task name mismatch: {running_args['task_name']} != {task_name}"
-        assert (
-            running_args["instance_id"] == instance_id
-        ), f"Instance ID mismatch: {running_args['instance_id']} in running_args.json != {instance_id} from LW API"
+        assert running_args["instance_id"] == instance_id, (
+            f"Instance ID mismatch: {running_args['instance_id']} in running_args.json != {instance_id} from LW API"
+        )
     os.rename(
         f"{data_dir}/2025-challenge-rawdata/{base_name}/{task_name}.hdf5",
         f"{data_dir}/2025-challenge-rawdata/task-{TASK_NAMES_TO_INDICES[task_name]:04d}/episode_{TASK_NAMES_TO_INDICES[task_name]:04d}{instance_id:03d}{traj_id:01d}.hdf5",
@@ -394,9 +394,9 @@ def extract_annotations(
             task_index = TASK_NAMES_TO_INDICES[filename]
             os.rename(f"{data_dir}/annotations/{filename}", f"{data_dir}/annotations/task-{task_index:04d}")
             # now, assert there are 200 files in the task folder
-            assert (
-                len(os.listdir(f"{data_dir}/annotations/task-{task_index:04d}")) == 200
-            ), f"Task {task_index} does not have 200 files."
+            assert len(os.listdir(f"{data_dir}/annotations/task-{task_index:04d}")) == 200, (
+                f"Task {task_index} does not have 200 files."
+            )
             # now, fetch all timestamp - task indices correspondance from worksheet
             worksheet = spreadsheet.worksheet(f"{task_index} - {filename}")
             rows = worksheet.get_all_values()[1:]  # skip header
@@ -551,9 +551,9 @@ def assign_test_instances(task_ws, ws_misc, misc_values) -> None:
 
     # First row is header
     target_row = misc_values[task_id + 1]
-    assert (
-        int(target_row[0]) == task_id and target_row[1].strip() == task_name
-    ), f"Row mismatch for task {task_id} - {task_name}: found {target_row[0]} - {target_row[1]}"
+    assert int(target_row[0]) == task_id and target_row[1].strip() == task_name, (
+        f"Row mismatch for task {task_id} - {task_name}: found {target_row[0]} - {target_row[1]}"
+    )
 
     # --- Step 5: update in one batch ---
     ws_misc.update(range_name=f"C{task_id + 2}:C{task_id + 2}", values=[[", ".join(map(str, sample_missing))]])

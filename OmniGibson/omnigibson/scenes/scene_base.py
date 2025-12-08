@@ -655,9 +655,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         cxt = contextlib.nullcontext() if _batched_call else og.sim.adding_objects(objs=[obj])
         with cxt:
             # Make sure all objects in this scene are uniquely named
-            assert (
-                obj.name not in self.object_registry.object_names
-            ), f"Object with name {obj.name} already exists in scene!"
+            assert obj.name not in self.object_registry.object_names, (
+                f"Object with name {obj.name} already exists in scene!"
+            )
 
             # Load the object.
             obj.load(self)
@@ -1109,9 +1109,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 with open(scene_file, "r") as f:
                     scene_file = json.load(f)
             else:
-                assert isinstance(
-                    scene_file, dict
-                ), f"Expected scene_file to be a dictionary, but got: {type(scene_file)}"
+                assert isinstance(scene_file, dict), (
+                    f"Expected scene_file to be a dictionary, but got: {type(scene_file)}"
+                )
 
         scene_file["state"] = recursively_convert_to_torch(scene_file["state"])
         self._initial_file = scene_file

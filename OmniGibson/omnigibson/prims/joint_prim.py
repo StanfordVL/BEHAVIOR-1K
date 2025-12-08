@@ -116,9 +116,9 @@ class JointPrim(BasePrim):
             # We MUST already have the joint state API defined beforehand in the USD
             # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
             # happens because joint prims are usually created externally during an EntityPrim's initialization phase
-            assert self._prim.HasAPI(
-                lazy.pxr.PhysxSchema.JointStateAPI
-            ), "Revolute or Prismatic joints must already have JointStateAPI added!"
+            assert self._prim.HasAPI(lazy.pxr.PhysxSchema.JointStateAPI), (
+                "Revolute or Prismatic joints must already have JointStateAPI added!"
+            )
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
@@ -777,9 +777,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set position for articulated joints!"
         if drive:
             assert self.driven, "Can only use set_pos with drive=True if this joint is driven!"
-            assert (
-                self._control_type == ControlType.POSITION
-            ), "Trying to set joint position target, but control type is not position!"
+            assert self._control_type == ControlType.POSITION, (
+                "Trying to set joint position target, but control type is not position!"
+            )
 
         # Standardize input
         pos = (
@@ -828,9 +828,9 @@ class JointPrim(BasePrim):
         assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
             assert self.driven, "Can only use set_vel with drive=True if this joint is driven!"
-            assert (
-                self._control_type == ControlType.VELOCITY
-            ), f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
+            assert self._control_type == ControlType.VELOCITY, (
+                f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
+            )
 
         # Standardize input
         vel = (

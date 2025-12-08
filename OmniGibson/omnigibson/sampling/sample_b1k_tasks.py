@@ -186,9 +186,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     # 2. environment level variables
     if args.scene_model is None:
         # This MUST be specified
-        assert os.environ.get(
-            "SAMPLING_SCENE_MODEL"
-        ), "scene model MUST be specified, either as a command-line arg or as an environment variable!"
+        assert os.environ.get("SAMPLING_SCENE_MODEL"), (
+            "scene model MUST be specified, either as a command-line arg or as an environment variable!"
+        )
         args.scene_model = os.environ["SAMPLING_SCENE_MODEL"]
     if args.activities is None and os.environ.get("SAMPLING_ACTIVITIES"):
         args.activities = os.environ["SAMPLING_ACTIVITIES"]
