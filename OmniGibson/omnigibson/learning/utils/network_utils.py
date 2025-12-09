@@ -11,15 +11,10 @@ import numpy as np
 import time
 import torch as th
 import traceback
+import websockets.asyncio.server as _server
 import websockets.sync.client
 import websockets
 import requests
-
-try:
-    import websockets.asyncio.server as _server
-except ImportError:
-    # Fallback for websockets < 13.0
-    import websockets.server as _server
 from copy import deepcopy
 from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
