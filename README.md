@@ -10,7 +10,7 @@
 
 BEHAVIOR-1K provides an installation script that handles all dependencies and components. The script supports modular installation, allowing you to install only the components you need.
 
-Please checkout out [Installation Guide](https://behavior.stanford.edu/getting_started/installation.html) for more details!
+Please check out [Installation Guide](https://behavior.stanford.edu/getting_started/installation.html) for more details!
 
 ## 📄 Citation
 

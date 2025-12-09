@@ -227,7 +227,7 @@ python -m omnigibson.examples.scenes.scene_selector # (1)!
 
     5. Install primitive support: `./setup.sh --bddl --omnigibson --primitives`
 
-    Note that with this method you do need to set the environment variables (step 4) the first time curobo perform JIT compiling. 
+    Note that with this method you need to set the environment variables (step 4) the first time curobo performs JIT compilation. 
 
 ??? question "OmniGibson is stuck at `HydraEngine rtx failed creating scene renderer.`"
 

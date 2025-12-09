@@ -359,11 +359,11 @@ if [ "$OMNIGIBSON" = true ]; then
             echo "Fixing websockets conflict..."
             find "$ISAAC_PATH/extscache" -type d -name "websockets" -path "*/pip_prebundle/*" -exec rm -rf {} + 2>/dev/null || true
         fi
-
-        # force reinstall cffi 1.17.1 to avoid conflicts
-        pip install --force-reinstall cffi==1.17.1
     fi
     
+    # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
+    pip install --force-reinstall cffi==1.17.1
+
     echo "OmniGibson installation completed successfully!"
 fi
 
