@@ -417,16 +417,26 @@ if ($extrasList.Count -gt 0) {
             Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
         }
         
-        # Fix cryptography conflict
-        if ($env:ISAAC_PATH) {
-            $cryptographyPath = Join-Path $env:ISAAC_PATH "exts\omni.pip.cloud\pip_prebundle\cryptography"
-            if (Test-Path $cryptographyPath) {
-                Write-Host "Fixing cryptography conflict..."
-                Remove-Item -Path $cryptographyPath -Recurse -Force
+        # Extract ISAAC_PATH from isaacsim module
+        $IsaacPath = python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>$null
+        
+        if ($IsaacPath) {
+            # Fix websockets conflict - remove any extscache/**/pip_prebundle/websockets
+            $extscacheRoot = Join-Path $IsaacPath "extscache"
+            if (Test-Path $extscacheRoot) {
+                Get-ChildItem -Path $extscacheRoot -Directory -Recurse -Force -ErrorAction SilentlyContinue |
+                    Where-Object { $_.FullName -like "*\pip_prebundle\websockets" } |
+                    ForEach-Object {
+                        Write-Host "Removing websockets prebundle at $($_.FullName)..."
+                        Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                    }
             }
         }
     }
     
+    # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
+    pip install --force-reinstall cffi==1.17.1
+
     Write-Host "OmniGibson installation completed successfully!"
 }
 

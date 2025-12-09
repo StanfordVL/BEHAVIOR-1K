@@ -50,8 +50,9 @@ setup(
         "matplotlib>=3.0.0",
         "lxml>=5.2.2",
         "numba>=0.59.1",
-        "cffi~=1.17.1",
+        "cffi==1.17.1",
         "pillow~=11.0.0",
+        "websockets>=15.0.1",
     ],
     extras_require={
         "dev": [
@@ -79,7 +80,6 @@ setup(
         "eval": [
             "dm_tree>=0.1.9",
             "hydra-core>=1.3.2",
-            "websockets>=15.0.1",
             "msgpack>=1.1.0",
             "lerobot @ git+https://github.com/huggingface/lerobot@577cd10974b84bea1f06b6472eb9e5e74e07f77a",
             "gspread>=6.2.1",
