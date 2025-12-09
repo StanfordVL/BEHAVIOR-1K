@@ -32,38 +32,21 @@ Choose your installation method:
         **Use this method if you want to modify the code or need the latest development features.**
 
         1. Clone the BEHAVIOR-1K repository:
-
-            === "Linux"
-
-                ```shell
-                # Clone the latest stable release (recommended)
-                git clone -b v3.7.2 https://github.com/StanfordVL/BEHAVIOR-1K.git
-                cd BEHAVIOR-1K
-                ```
-
-            === "Windows"
-
-                ```powershell
-                # Clone the latest stable release (recommended)
-                git clone -b v3.7.2 https://github.com/StanfordVL/BEHAVIOR-1K.git
-                cd BEHAVIOR-1K
-                ```
             
-            !!! note "Development Branch"
-                If you want the latest development features and updates (potentially less stable), clone the main branch instead:
-                
-                === "Linux"
-                    ```shell
-                    git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
-                    cd BEHAVIOR-1K
-                    ```
-                
-                === "Windows"
-                    ```powershell
-                    git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
-                    cd BEHAVIOR-1K
-                    ```
+            Clone the latest stable release (recommended):
 
+            ```shell
+            git clone -b v3.7.2 https://github.com/StanfordVL/BEHAVIOR-1K.git
+            cd BEHAVIOR-1K
+            ```
+            
+            If you want the latest development features and updates (potentially less stable), directly clone the main branch instead:
+            
+            ```shell
+            git clone https://github.com/StanfordVL/BEHAVIOR-1K.git
+            cd BEHAVIOR-1K
+            ```
+                
         2. Run the unified setup script:
 
             === "Linux"
@@ -102,17 +85,10 @@ Choose your installation method:
 
         3. Activate the environment:
 
-            === "Linux"
+            ```shell
+            conda activate behavior
+            ```
 
-                ```shell
-                conda activate behavior
-                ```
-
-            === "Windows"
-
-                ```powershell
-                conda activate behavior
-                ```
 
         !!! info "What does the setup script do?"
             
@@ -230,6 +206,28 @@ python -m omnigibson.examples.scenes.scene_selector # (1)!
 
 
 ## :material-fire-extinguisher: **Troubleshooting**
+
+??? question "CuRobo installation failed"
+
+    This is likely due to incorrect configurations of cuda toolkit. If you don't plan to use system-installed cuda toolkit, here is an alternate way to get it work all in conda:
+
+    1. Install behavior without primitives support first: `./setup.sh --new-env --bddl --omnigibson [OTHER FLAGS]`
+    2. Activate conda environment: `conda activate behavior`
+    3. Install cuda (we use 12.4 here as an example): `conda install "cuda-compiler=12.4" "cuda-toolkit=12.4" -c conda-forge`
+    4. Set environment variables:
+        ```
+        export CUDA_HOME="$CONDA_PREFIX"
+        export CUDACXX="$CONDA_PREFIX/bin/nvcc"
+        export CUDA_PATH="$CUDA_HOME"
+
+        export CPATH="$CONDA_PREFIX/targets/x86_64-linux/include:$CPATH"
+        export LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LIBRARY_PATH"
+        export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+        ```
+
+    5. Install primitive support: `./setup.sh --bddl --omnigibson --primitives`
+
+    Note that with this method you do need to set the environment variables (step 4) the first time curobo perform JIT compiling. 
 
 ??? question "OmniGibson is stuck at `HydraEngine rtx failed creating scene renderer.`"
 
