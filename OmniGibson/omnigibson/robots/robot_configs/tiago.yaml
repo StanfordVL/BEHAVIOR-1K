@@ -19,13 +19,6 @@ property:
     arm_control_idx:
       left: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
       right: [-1.10, 1.47, 2.71, 1.71, -1.57, 1.39, 0]
-  untucked_default_joint_pos:
-    base_idx: current
-    trunk_control_idx: 0.17
-    camera_control_idx: [0.0, -0.45]
-    gripper_control_idx:
-      left: [0.045, 0.045]
-      right: [0.045, 0.045]
   default_arm_poses:
     vertical: [0.85846, -0.14852, 1.81008, 1.63368, 0.13764, -1.32488, -0.68415]
     diagonal15: [0.90522, -0.42811, 2.23505, 1.64627, 0.76867, -0.79464, -1.08908]

@@ -37,10 +37,3 @@ property:
     diagonal30: [-1.06595, -0.22184, 1.53448, 1.46076, -0.84995, 1.36904, 1.90996]
     diagonal45: [-1.11479, -0.0685, 1.5696, 1.37304, -0.74273, 1.3983, 1.79618]
     horizontal: [-1.43016, 0.20965, 1.86816, 1.77576, -0.27289, 1.31715, 2.01226]
-  untucked_default_joint_pos:
-    base_control_idx: 0
-    trunk_control_idx: 0.385
-    camera_control_idx: [0.0, 0.45]
-    gripper_control_idx: 
-      "0": [0.05, 0.05]
-
