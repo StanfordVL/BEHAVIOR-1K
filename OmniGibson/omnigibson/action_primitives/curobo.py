@@ -62,6 +62,43 @@ def create_world_mesh_collision(tensor_args, obb_cache_size=10, mesh_cache_size=
     return lazy.curobo.geom.sdf.utils.create_collision_checker(world_cfg)
 
 
+def holonomic_base_command_in_world_frame(robot, joint_pos):
+    """
+    Converts a CuRobo joint configuration whose holonomic base entries are expressed in the robot root frame
+    (i.e., base_footprint joints) into a world-frame configuration that HolonomicBaseJointController expects.
+    """
+    if not isinstance(robot, HolonomicBaseRobot):
+        raise ValueError("holonomic_base_command_in_world_frame only supports HolonomicBaseRobot instances.")
+
+    command_joint_pos = joint_pos.clone()
+    base_local = joint_pos[robot.base_idx]
+    local_pos = base_local[:3]
+    local_euler = base_local[3:]
+    local_quat = T.mat2quat(T.euler_intrinsic2mat(local_euler))
+
+    root_pos, root_quat = robot.root_link.get_position_orientation()
+    world_pos, world_quat = T.pose_transform(root_pos, root_quat, local_pos, local_quat)
+    world_euler = T.mat2euler_intrinsic(T.quat2mat(world_quat))
+    command_joint_pos[robot.base_idx[:3]] = world_pos
+    command_joint_pos[robot.base_idx[3:]] = world_euler
+    return command_joint_pos
+
+
+def holonomic_base_pose_in_root_frame(robot):
+    """
+    Returns the current holonomic base pose expressed in the robot root frame (i.e., the 6DoF base joint).
+    """
+    if not isinstance(robot, HolonomicBaseRobot):
+        raise ValueError("holonomic_base_pose_in_root_frame only supports HolonomicBaseRobot instances.")
+
+    base_pos, base_quat = robot.links[robot.base_footprint_link_name].get_position_orientation()
+    root_pos, root_quat = robot.root_link.get_position_orientation()
+    relative_pos, relative_quat = T.relative_pose_transform(base_pos, base_quat, root_pos, root_quat)
+    base_euler = T.mat2euler_intrinsic(T.quat2mat(relative_quat))
+    base_pose = th.cat((relative_pos, base_euler))
+    return base_pose
+
+
 class CuRoboMotionGenerator:
     """
     Class for motion generator using CuRobo backend

@@ -25,7 +25,12 @@ from omnigibson.action_primitives.action_primitive_set_base import (
     ActionPrimitiveErrorGroup,
     BaseActionPrimitiveSet,
 )
-from omnigibson.action_primitives.curobo import CuRoboEmbodimentSelection, CuRoboMotionGenerator
+from omnigibson.action_primitives.curobo import (
+    CuRoboEmbodimentSelection,
+    CuRoboMotionGenerator,
+    holonomic_base_command_in_world_frame,
+    holonomic_base_pose_in_root_frame,
+)
 from omnigibson.controllers import (
     InverseKinematicsController,
     HolonomicBaseJointController,
@@ -1027,10 +1032,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                     # We need to call @q_to_action for every step because as the robot base moves, the same base joint_pos will be
                     # converted to different actions, since HolonomicBaseJointController accepts an action in the robot local frame.
-                    action = self.robot.q_to_action(joint_pos)
+                    action = self.robot.q_to_action(holonomic_base_command_in_world_frame(self.robot, joint_pos))
                     yield self._postprocess_action(action)
 
                     current_joint_pos = self.robot.get_joint_positions()
+                    current_joint_pos[self.robot.base_idx] = holonomic_base_pose_in_root_frame(self.robot)
                     joint_pos_diff = joint_pos - current_joint_pos
                     base_joint_diff = joint_pos_diff[self.robot.base_control_idx]
                     articulation_joint_diff = joint_pos_diff[articulation_control_idx]  # Gets all non-base joints
