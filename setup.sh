@@ -32,12 +32,12 @@ while [[ $# -gt 0 ]]; do
         --eval) EVAL=true; shift ;;
         --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
-        --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
+        --cuda-version) CUDA_VERSION="$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
         --confirm-no-conda) CONFIRM_NO_CONDA=true; shift ;;
-        *) echo "Unknown option: \$1"; exit 1 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
