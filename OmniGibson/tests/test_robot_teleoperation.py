@@ -15,6 +15,7 @@ def test_teleop():
         "robots": [
             {
                 "type": "Fetch",
+                "robot_type_name": "Fetch",
                 "action_normalize": False,
                 "controller_config": {
                     "arm_0": {

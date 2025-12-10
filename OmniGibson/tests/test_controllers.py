@@ -284,16 +284,13 @@ def test_arm_control():
 
                 # Take N steps with given action and check for error
                 for _ in range(n_steps[controller_mode][action_name]):
-                    
                     env.step(action)
 
                 for i, robot in enumerate(env.robots):
                     for arm in robot.arm_names:
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
-                        if th.any(th.abs(normalized_qpos) == 1.0):
-                            breakpoint()
-                            print(
+                        assert not th.any(th.abs(normalized_qpos) == 1.0), (
                                 f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
                                 f"Some joints are at their limit (normalized values): {normalized_qpos}"
                             )
@@ -307,19 +304,14 @@ def test_arm_control():
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
-                            if not is_valid_pos:
-                                breakpoint()
-                                print(
+                            assert is_valid_pos,(
+                                    f"{robot.model_name} 11Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
                                     f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
                                 )
-                            if not is_valid_pos:
-                                print(target_pos, curr_pos)
                         ori_check = err_checks[controller_mode][action_name]["ori"]
                         if ori_check is not None:
                             is_valid_ori = ori_check(target_quat, curr_quat, init_quat)
-                            if not is_valid_ori:
-                                breakpoint()
-                                print(
-                                    f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                            assert is_valid_ori,(
+                                    f"{robot.model_name} Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
                                     f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
                                 )

@@ -2,7 +2,7 @@
 capabilities: 
  - is_manipulation
 property:
-  
+  fixed_base: true
   raw_controller_order: [arm_0, gripper_0]
   default_controllers:
     arm_0: InverseKinematicsController

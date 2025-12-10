@@ -206,7 +206,7 @@ class OGRobotServer:
                     if obj.category in VISUAL_ONLY_CATEGORIES:
                         obj.visual_only = True
                 else:
-                    if isinstance(obj, Robot) and obj.robot_type_name.startswith("r1"):
+                    if isinstance(obj, Robot) and obj.model_name.startswith("r1"):
                         obj.base_footprint_link.mass = 250.0
 
             # Update ghost robot's masses to be uniform to avoid orthonormal errors
@@ -393,7 +393,7 @@ class OGRobotServer:
         """
         # If R1, process manually
         state = joint_state.clone()
-        if self.robot.robot_type_name=="r1" and self.robot.robot_type_name!="r1pro":
+        if self.robot.model_name=="r1" and self.robot.model_name!="r1pro":
             # [ 6DOF left arm, 6DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -404,7 +404,7 @@ class OGRobotServer:
                     break
                 self._joint_cmd[component] = state[start_idx: start_idx + dim]
                 start_idx += dim
-        elif self.robot.robot_type_name=="r1pro":
+        elif self.robot.model_name=="r1pro":
             # [ 7DOF left arm, 7DOF right arm, 3DOF base, 2DOF trunk (z, ry), 2DOF gripper, -, +, X, Y, B, A, home, left arrow, right arrow buttons]
             start_idx = 0
             for component, dim in zip(
@@ -736,7 +736,7 @@ class OGRobotServer:
         action = th.zeros(self.robot.action_dim)
 
         # Apply arm action + extra dimension from base
-        if self.robot.robot_type_name=="r1":
+        if self.robot.model_name=="r1":
             # Apply arm action
             left_act = self._joint_cmd["left_arm"].clone().clip(self._arm_joint_limits["left"]["lower"], self._arm_joint_limits["left"]["upper"])
             right_act = self._joint_cmd["right_arm"].clone().clip(self._arm_joint_limits["right"]["lower"], self._arm_joint_limits["right"]["upper"])
@@ -846,7 +846,7 @@ class OGRobotServer:
         self._grasp_action = {arm: 1 for arm in self.robot.arm_names}
         for detector in self._gripper_action_signal_detectors.values():
             detector.reset()
-        if self.robot.robot_type_name.startswith("r1"):
+        if self.robot.model_name.startswith("r1"):
             for arm in self.robot.arm_names:
                 self._joint_cmd[f"{arm}_gripper"] = th.ones(len(self.robot.gripper_action_idx[arm]))
                 self._joint_cmd["base"] = self._joint_state[self.robot.base_control_idx]

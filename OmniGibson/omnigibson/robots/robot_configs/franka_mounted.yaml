@@ -19,7 +19,8 @@ property:
     "0": ['panda_link0', 'panda_link1', 'panda_link2', 'panda_link3', 'panda_link4', 'panda_link5', 'panda_link6', 'panda_link7']
   arm_joint_names:
     "0": ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
-
+  fixed_base: true
+  
   gripper:
     model_name: "franka_panda"
     eef_link_names:

@@ -1383,7 +1383,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 target_obj_pose = self._tracking_object.get_position_orientation()
 
-        assert self.robot.robot_type_name == "tiago", "Tracking object with camera is currently only supported for Tiago"
+        assert self.robot.model_name == "tiago", "Tracking object with camera is currently only supported for Tiago"
 
         head_q = self._get_head_goal_q(target_obj_pose)
         head_idx = self.robot.controller_action_idx["camera"]
@@ -1673,12 +1673,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         self.robot.controllers["base"].motor_type == "velocity"
                     ), "Holonomic base controller must be in velocity mode"
                     direction_vec = (
-                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[self.robot.robot_type_name]
+                        body_target_pose[0][:2] / th.norm(body_target_pose[0][:2]) * m.KP_LIN_VEL[self.robot.model_name]
                     )
                     base_action = th.tensor([direction_vec[0], direction_vec[1], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 elif isinstance(self.robot.controllers["base"], DifferentialDriveController):
-                    base_action = th.tensor([m.KP_LIN_VEL[self.robot.robot_type_name], 0.0], dtype=th.float32)
+                    base_action = th.tensor([m.KP_LIN_VEL[self.robot.model_name], 0.0], dtype=th.float32)
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
                     raise ValueError(f"Unsupported base controller: {type(self.robot.controllers['base'])}")
@@ -1714,7 +1714,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
-            ang_vel = m.KP_ANGLE_VEL[self.robot.robot_type_name] * direction
+            ang_vel = m.KP_ANGLE_VEL[self.robot.model_name] * direction
 
             base_action = action[self.robot.controller_action_idx["base"]]
 

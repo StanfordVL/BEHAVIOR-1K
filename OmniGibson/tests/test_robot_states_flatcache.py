@@ -7,7 +7,7 @@ import omnigibson.lazy as lazy
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.macros import gm
 from omnigibson.macros import macros as m
-from omnigibson.robots import REGISTERED_ROBOTS, Fetch, LocomotionRobot, ManipulationRobot, Stretch
+from omnigibson.robots import REGISTERED_ROBOTS, Robot
 from omnigibson.sensors import VisionSensor
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.transform_utils import mat2pose, pose2mat, quaternions_close, relative_pose_transform
@@ -37,6 +37,7 @@ def setup_environment(flatcache):
         "robots": [
             {
                 "type": "Fetch",
+                "robot_type_name": "Fetch",
                 "obs_modalities": ["rgb", "seg_semantic", "seg_instance"],
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
@@ -149,7 +150,7 @@ def test_robot_load_drive():
     og.sim.stop()
 
     # Iterate over all robots and test their motion
-    for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+    for robot_name in REGISTERED_ROBOTS.items():
         if robot_name in ["FrankaMounted", "Stretch"]:
             # TODO: skipping FrankaMounted and Stretch for now because CI doesn't have the required assets
             continue
@@ -159,8 +160,9 @@ def test_robot_load_drive():
             # BehaviorRobot does not work with the primitive actions at the moment
             continue
 
-        robot = robot_cls(
+        robot = Robot(
             name=robot_name,
+            robot_type_name=robot_name,
             obs_modalities=[],
         )
         env.scene.add_object(robot)
@@ -181,7 +183,7 @@ def test_robot_load_drive():
         )
 
         # If this is a manipulation robot, we want to test moving the arm
-        if isinstance(robot, ManipulationRobot):
+        if robot.is_manipulation:
             # load IK controller
             controller_config = {
                 f"arm_{robot.default_arm}": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}
@@ -193,7 +195,7 @@ def test_robot_load_drive():
 
             eef_pos = env.robots[0].get_eef_position()
             eef_orn = env.robots[0].get_eef_orientation()
-            if isinstance(robot, Stretch):  # Stretch arm faces the y-axis
+            if robot.model_name=="stretch":  # Stretch arm faces the y-axis
                 target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
             else:
                 target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
@@ -203,7 +205,7 @@ def test_robot_load_drive():
             assert th.norm(robot.get_eef_position() - target_eef_pos) < 0.05
 
         # If this is a locomotion robot, we want to test driving
-        if isinstance(robot, LocomotionRobot):
+        if robot.is_locomotion:
             action_primitives = StarterSemanticActionPrimitives(env, robot, skip_curobo_initilization=True)
             goal_location = th.tensor([0, 1, 0], dtype=th.float32)
             for action in action_primitives._navigate_to_pose_direct(goal_location):
@@ -274,8 +276,9 @@ def test_grasping_mode():
             raise ValueError(f"Unknown grasping mode: {grasping_mode}")
 
     for grasping_mode in grasping_modes:
-        robot = Fetch(
+        robot = Robot(
             name="Fetch",
+            robot_type_name = "Fetch",
             obs_modalities=[],
             controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,

@@ -62,9 +62,6 @@ from omnigibson.utils.usd_utils import (
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
-# Global dicts that will contain mappings
-REGISTERED_ROBOTS = dict()
-
 # Add proprio sensor modality to ALL_SENSOR_MODALITIES
 ALL_SENSOR_MODALITIES.add("proprio")
 
@@ -109,7 +106,7 @@ AG_MODES = {
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
-class Robot(USDObject, BaseObject, GymObservable):
+class Robot(USDObject, GymObservable):
     def __init__(
         self,
         # Shared kwargs in hierarchy
@@ -118,7 +115,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         relative_prim_path=None,
         scale=None,
         visible=True,
-        fixed_base=False,
+        fixed_base=None,
         visual_only=False,
         self_collisions=True,
         link_physics_materials=None,
@@ -239,6 +236,8 @@ class Robot(USDObject, BaseObject, GymObservable):
             cfg = yaml.safe_load(f) or {}
             self._robot_cfg = cfg["property"]
             self._init_capabilities(cfg["capabilities"])
+        
+        
 
         # Unique to Tiago
         if "support_variant" in self._robot_cfg.keys():
@@ -356,6 +355,8 @@ class Robot(USDObject, BaseObject, GymObservable):
             # If prim path is not specified, set it to the default path, but prepend controllable.
             relative_prim_path = f"/controllable__{class_name}__{name}"
 
+        if fixed_base is None:
+            fixed_base = self._robot_cfg.get("fixed_base", False)
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,
@@ -705,7 +706,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         Args:
             action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
-        breakpoint()
         if self.is_holonomic_base:
             rz_joint_dof_indices = rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
             j_pos = self.get_joint_positions()[rz_joint_dof_indices]
@@ -843,7 +843,6 @@ class Robot(USDObject, BaseObject, GymObservable):
             control_type (n-array): control types for each DOF. Each entry should be one of ControlType.
                  This should be n-DOF length for all joints being set.
         """
-        breakpoint()
         if self.is_manipulation:
             # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
             for arm in self.arm_names:
@@ -1061,7 +1060,7 @@ class Robot(USDObject, BaseObject, GymObservable):
                     raise ValueError(f"EEF link '{eef_link_name}' for arm '{arm}' not found in robot links. Available links: {list(self._links.keys())}")
         
                 self._add_task_frame_control_dict(fcns=fcns, task_name=f"eef_{arm}", link_name=eef_link_name)
-            # breakpoint()
+         
         
         return fcns
 
@@ -1132,7 +1131,14 @@ class Robot(USDObject, BaseObject, GymObservable):
         Dump the last action applied to this object. For use in demo collection.
         """
         return self._last_action
+    
+    def _base_set_position_orientation(self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"):
+        # Run super first
+        super().set_position_orientation(position, orientation, frame)
 
+        # Clear the controllable view's backend since state has changed
+        ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+    
     def set_position_orientation(
         self, position=None, orientation=None, frame: Literal["world", "parent", "scene"] = "world"
     ):
@@ -1140,26 +1146,6 @@ class Robot(USDObject, BaseObject, GymObservable):
         Sets robot's pose with respect to the specified frame
         ...
         """
-        # Log when this is called to debug PhysX errors
-        import traceback
-        is_playing = og.sim.is_playing() if hasattr(og, 'sim') and og.sim is not None else False
-        currently_stepping = getattr(og.sim, 'currently_stepping', False) if hasattr(og, 'sim') and og.sim is not None else False
-        stack = ''.join(traceback.format_stack()[-5:-1])  # Get last 4 stack frames (excluding current)
-        log.warning(
-            f"[set_position_orientation] Robot '{self.name}' called set_position_orientation. "
-            f"is_playing={is_playing}, currently_stepping={currently_stepping}, "
-            f"frame={frame}, position={position}, orientation={orientation}\n"
-            f"Call stack:\n{stack}"
-        )
-        
-        # Store original EEF poses for manipulation robots (must happen BEFORE any position changes)
-        
-        if self.is_manipulation:
-            original_poses = {}
-            for arm in self.arm_names:
-                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
-
-        # Handle holonomic_base special case (similar to HolonomicBaseRobot.set_position_orientation)
         if self.is_holonomic_base:
             assert frame in ["world", "scene"], f"Invalid frame '{frame}'. Must be 'world' or 'scene'."
 
@@ -1182,31 +1168,32 @@ class Robot(USDObject, BaseObject, GymObservable):
             if og.sim.is_playing() and self.initialized:
                 # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
                 # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
-                # Note: set_joint_positions will call clear_object and reset controllers internally
+                # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
                 joint_pos, joint_orn = self.root_link.get_position_orientation()
                 inv_joint_pos, inv_joint_orn = T.invert_pose_transform(joint_pos, joint_orn)
                 relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
                 intrinsic_eulers = T.mat2euler_intrinsic(T.quat2mat(relative_orn))
                 joint_positions = th.concatenate((relative_pos, intrinsic_eulers))
                 self.set_joint_positions(positions=joint_positions, indices=self.base_idx, drive=False)
+
+            # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
             else:
                 # Call the super() method to move the robot frame first
-                super().set_position_orientation(position, orientation, frame)
-                ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
-
+                self._base_set_position_orientation(position, orientation,frame)
                 # Move the joint frame for the world_base_joint
                 if self._world_base_fixed_joint_prim is not None:
                     self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
                     self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(
                         lazy.pxr.Gf.Quatf(*orientation[[3, 0, 1, 2]].tolist())
                     )
+            return
+        if self.is_manipulation:
+            # Store the original EEF poses.
+            original_poses = {}
+            for arm in self.arm_names:
+                original_poses[arm] = (self.get_eef_position(arm), self.get_eef_orientation(arm))
 
-        # Handle manipulation special case (similar to ManipulationRobot.set_position_orientation)
-        # Note: This runs AFTER holonomic_base logic, matching the pattern where ManipulationRobot
-        # calls super() which would go through HolonomicBaseRobot in the original inheritance
-        elif self.is_manipulation:
-            super().set_position_orientation(position, orientation, frame)
-            ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+            self._base_set_position_orientation(position, orientation,frame)
 
             # Now for each hand, if it was holding an AG object, teleport it.
             for arm in self.arm_names:
@@ -1219,11 +1206,8 @@ class Robot(USDObject, BaseObject, GymObservable):
                     # original --> "De"transform the original EEF pose --> "Re"transform the new EEF pose
                     new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                     self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
-
-        # For robots that are neither holonomic_base nor manipulation, call super
-        else:
-            super().set_position_orientation(position, orientation, frame)
-            ControllableObjectViewAPI.clear_object(prim_path=self.articulation_root_path)
+            return
+        self._base_set_position_orientation(position, orientation,frame)
 
     def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         # Call super first
@@ -1361,8 +1345,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         return state_dict, idx
 
     def _initialize(self):
-        # Run super
-        super()._initialize()
+        
 
         # Assert that the prim path matches ControllableObjectViewAPI's expected format
         scene_id, robot_name = self.articulation_root_path.split("/")[2:4]
@@ -1379,7 +1362,8 @@ class Robot(USDObject, BaseObject, GymObservable):
         assert (
             robot_name_components[1] == self.robot_type_name.lower()
         ), "Third component of articulation root path (robot name) must contain the class name as the second part"
-
+        # Run super
+        super()._initialize()
         # Fill in the DOF to joint mapping
         self._dof_to_joints = dict()
         idx = 0
@@ -1430,6 +1414,7 @@ class Robot(USDObject, BaseObject, GymObservable):
                 self._infer_finger_properties()
             except AssertionError as e:
                 log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
+        
         if self.is_holonomic_base:
             for i, component in enumerate(["x", "y", "z", "rx", "ry", "rz"]):
                 joint_name = f"base_footprint_{component}_joint"
@@ -1616,15 +1601,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         """
         proprio_dict = self._get_proprioception_dict()
         dic = th.cat([proprio_dict[obs] for obs in self._proprio_obs]), {}
-        if self.is_locomotion:
-            joint_positions = dic["joint_qpos"]
-            joint_velocities = dic["joint_qvel"]
-
-            # Add base info
-            dic["base_qpos"] = joint_positions[self.base_control_idx]
-            dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
-            dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
-            dic["base_qvel"] = joint_velocities[self.base_control_idx]
+        
         return dic
 
     def _get_proprioception_dict(self):
@@ -1694,6 +1671,15 @@ class Robot(USDObject, BaseObject, GymObservable):
             joint_velocities = dic["joint_qvel"]
             dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
             dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
+        if self.is_locomotion:
+            joint_positions = dic["joint_qpos"]
+            joint_velocities = dic["joint_qvel"]
+
+            # Add base info
+            dic["base_qpos"] = joint_positions[self.base_control_idx]
+            dic["base_qpos_sin"] = th.sin(joint_positions[self.base_control_idx])
+            dic["base_qpos_cos"] = th.cos(joint_positions[self.base_control_idx])
+            dic["base_qvel"] = joint_velocities[self.base_control_idx]
         if self.is_two_wheel:
             # Grab wheel joint velocity info
             l_vel, r_vel = ControllableObjectViewAPI.get_joint_velocities(self.articulation_root_path)[
@@ -2174,8 +2160,16 @@ class Robot(USDObject, BaseObject, GymObservable):
         Returns:
             th.tensor: array of action data filled with update value
         """
-        action = th.zeros(self.action_dim)
-        if self.is_manipulation:
+        if self.is_two_wheel:
+            action = th.zeros(self.action_dim)
+            assert isinstance(
+                self._controllers["base"], DifferentialDriveController
+            ), "Only DifferentialDriveController is supported!"
+            action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
+            return action
+        
+        if self.is_holonomic_base:
+            action = th.zeros(self.action_dim)
             hands = ["left", "right"] if self.n_arms == 2 else ["right"]
             for i, hand in enumerate(hands):
                 arm_name = self.arm_names[i]
@@ -2191,14 +2185,29 @@ class Robot(USDObject, BaseObject, GymObservable):
                     self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
                 ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
                 action[self.gripper_action_idx[arm_name]] = arm_action[6]
-        if self.is_holonomic_base:
             action[self.base_action_idx] = th.tensor(teleop_action.base).float()
-        if self.is_two_wheel:
-            assert isinstance(
-                self._controllers["base"], DifferentialDriveController
-            ), "Only DifferentialDriveController is supported!"
-            action[self.base_action_idx] = th.tensor([teleop_action.base[0], teleop_action.base[2]]).float() * 0.3
-        return action
+            return action
+        
+        if self.is_manipulation:
+            action = th.zeros(self.action_dim)
+            hands = ["left", "right"] if self.n_arms == 2 else ["right"]
+            for i, hand in enumerate(hands):
+                arm_name = self.arm_names[i]
+                arm_action = th.tensor(teleop_action[hand]).float()
+                # arm action
+                assert isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or isinstance(
+                    self._controllers[f"arm_{arm_name}"], OperationalSpaceController
+                ), f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                target_pos, target_orn = arm_action[:3], T.quat2axisangle(T.euler2quat(arm_action[3:6]))
+                action[self.arm_action_idx[arm_name]] = th.cat((target_pos, target_orn))
+                # gripper action
+                assert isinstance(
+                    self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController
+                ), f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+                action[self.gripper_action_idx[arm_name]] = arm_action[6]
+                return action
+        
+        
 
     @property
     def sensors(self):
@@ -4076,7 +4085,7 @@ class Robot(USDObject, BaseObject, GymObservable):
         ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
         return action
 
-    def _get_tucked_untucked_default_joint_pos(self, prop):
+    def _get_tucked_default_joint_pos(self, prop):
         if isinstance(prop, list):
             return self._convert_yaml_list_to_tensor(prop)
         pos = th.zeros(self.n_dof)
@@ -4096,18 +4105,45 @@ class Robot(USDObject, BaseObject, GymObservable):
     @property
     def tucked_default_joint_pos(self):
         assert self.is_mobile_manipulation
-        return self._get_tucked_untucked_default_joint_pos(self._robot_cfg["tucked_default_joint_pos"])
+        return self._get_tucked_default_joint_pos(self._robot_cfg["tucked_default_joint_pos"])
 
     @property
     def untucked_default_joint_pos(self):
-        assert self.is_mobile_manipulation
-        if "untucked_default_joint_pos" in self._robot_cfg.keys():
-            return self._get_tucked_untucked_default_joint_pos(self._robot_cfg["untucked_default_joint_pos"])
-
-        assert self.is_untucked_arm_pose
+        if self.model_name=="r1":
+            pos = th.zeros(self.n_dof)
+            # Keep the current joint positions for the base joints
+            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+            for arm in self.arm_names:
+                pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
+                pos[self.arm_control_idx[arm]] = th.tensor([0.0, 1.906, -0.991, 1.571, 0.915, -1.571])
+            return pos
+        if self.model_name=="r1pro":
+            pos = th.zeros(self.n_dof)
+            # Keep the current joint positions for the base joints
+            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+            for arm in self.arm_names:
+                pos[self.gripper_control_idx[arm]] = th.tensor([0.05, 0.05])  # open gripper
+            pos[self.arm_control_idx["left"]] = th.tensor([0.0, 1.57, 0.0, -1.57, 1.57, 0.0, 0.0])
+            pos[self.arm_control_idx["right"]] = th.tensor([0.0, -1.57, 0.0, -1.57, -1.57, 0.0, 0.0])
+            return pos
+        
         pos = th.zeros(self.n_joints)
         for arm in self.arm_names:
             pos[self.arm_control_idx[arm]] = self.default_arm_poses[self.default_arm_pose]
+        if self.model_name=="fetch":
+            pos[self.base_control_idx] = 0.0
+            pos[self.trunk_control_idx] = 0.385
+            pos[self.camera_control_idx] = th.tensor([0.0, 0.45])
+            pos[self.gripper_control_idx[self.default_arm]] = th.tensor([0.05, 0.05])  # open gripper
+            return pos
+        if self.model_name=="tiago":
+            # Keep the current joint positions for the base joints
+            pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
+            pos[self.trunk_control_idx] = 0.17
+            pos[self.camera_control_idx] = th.tensor([0.0, -0.45])
+            for arm in self.arm_names:
+                pos[self.gripper_control_idx[arm]] = th.tensor([0.045, 0.045])  # open gripper
+            return pos
         return pos
 
     def tuck(self):

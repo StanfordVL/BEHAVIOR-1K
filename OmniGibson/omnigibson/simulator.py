@@ -22,7 +22,7 @@ from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubsc
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.update_state_mixin import GlobalUpdateStateMixin, UpdateStateMixin
-from omnigibson.objects.controllable_object import ControllableObject
+from omnigibson.robots.robot import Robot
 from omnigibson.objects.light_object import LightObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -1243,7 +1243,7 @@ def _launch_simulator(*args, **kwargs):
                 # Run the controller step on every controllable object
                 for scene in self.scenes:
                     for obj in scene.objects:
-                        if isinstance(obj, ControllableObject):
+                        if isinstance(obj, Robot):
                             obj.step()
 
                 # Flush the controls from the ControllableObjectViewAPI
