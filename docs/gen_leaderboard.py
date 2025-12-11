@@ -5,6 +5,21 @@ from collections import OrderedDict
 from pathlib import Path
 import mkdocs_gen_files
 
+# Map team names to labeled public links (keys become button text).
+OPEN_SOURCE_RESOURCES = {
+    "Robot Learning Collective": {
+        "code": "https://github.com/IliaLarchenko/behavior-1k-solution",
+        "report": "https://arxiv.org/abs/2512.06951",
+    },
+    "Comet": {
+        "code": "https://github.com/mli0603/openpi-comet",
+        "report": "https://github.com/mli0603/openpi-comet/blob/main/docs/report.pdf",
+    },
+    "Merlin Labs": {
+        "report": "https://merlyn-labs.com/behavior-report",
+    },
+}
+
 
 def load_submissions():
     """Load all submissions from a track directory."""
@@ -107,11 +122,12 @@ def generate_combined_leaderboard():
                 '      <th rowspan="2">Rank</th>\n'
                 '      <th rowspan="2">Team</th>\n'
                 '      <th rowspan="2">Affiliation</th>\n'
-                '      <th rowspan="2">Date</th>\n'
                 '      <th rowspan="2">Track</th>\n'
+                '      <th rowspan="2">Release</th>\n'
                 '      <th colspan="2">Full Task Success Rate</th>\n'
                 '      <th colspan="2">★ <strong>Q Score</strong></th>\n'
-                "    </tr>\n"
+                '      <th rowspan="2">Date</th>\n'
+            "    </tr>\n"
                 "    <tr>\n"
                 "      <th>Public Validation</th>\n"
                 "      <th>Held-out Test</th>\n"
@@ -131,17 +147,25 @@ def generate_combined_leaderboard():
                 hidden_task_sr = (
                     f"{sub['hidden_task_sr']:.4f}" if "hidden_task_sr" in sub else ""
                 )
+                resources = OPEN_SOURCE_RESOURCES.get(team, {})
+                resource_links = [
+                    f'<a href="{url}">{label}</a>'
+                    for label, url in resources.items()
+                    if url
+                ]
+                resources_html = "<br>".join(resource_links)
                 fd.write(
                     "    <tr>"
                     f"<td>{i}</td>"
                     f"<td>{team}</td>"
                     f"<td>{sub.get('affiliation', '')}</td>"
-                    f"<td>{sub.get('date', '')}</td>"
                     f"<td>{sub.get('track', '').capitalize()}</td>"
+                    f"<td>{resources_html}</td>"
                     f"<td>{public_task_sr}</td>"
                     f"<td>{hidden_task_sr}</td>"
                     f"<td>{public_q_score}</td>"
                     f"<td><strong>{hidden_q_score}</strong></td>"
+                    f"<td>{sub.get('date', '')}</td>"
                     "</tr>\n"
                 )
 
