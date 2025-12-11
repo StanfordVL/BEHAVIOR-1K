@@ -11,7 +11,6 @@ property:
     "0": ['arm_joint1', 'arm_joint2', 'arm_joint3', 'arm_joint4', 'arm_joint5', 'arm_joint6']
     
   supported_end_effector: [gripper, inspire]
-  fixed_base: true
   gripper:
     eef_link_names:
       "0": "eef_link"

@@ -22,6 +22,7 @@ def test_arm_control():
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
+                "fixed_base": True
             },
             {
                 "robot_type_name": "Fetch",
@@ -30,6 +31,7 @@ def test_arm_control():
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
+                "fixed_base": True
             },
             {
                 "robot_type_name": "Tiago",
@@ -46,6 +48,7 @@ def test_arm_control():
                 "position": [150, 150, 115],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
+                "fixed_base": True
             },
             {
                 "robot_type_name": "R1",

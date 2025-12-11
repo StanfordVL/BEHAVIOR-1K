@@ -115,7 +115,7 @@ class Robot(USDObject, GymObservable):
         relative_prim_path=None,
         scale=None,
         visible=True,
-        fixed_base=None,
+        fixed_base=False,
         visual_only=False,
         self_collisions=True,
         link_physics_materials=None,
@@ -152,7 +152,7 @@ class Robot(USDObject, GymObservable):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            robot_type_name (str): Type of Robot. Supported type: TODO
+            robot_type_name (str): Type of Robot. 
             relative_prim_path (str): Scene-local prim path of the Prim to encapsulate or create.
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
@@ -355,8 +355,6 @@ class Robot(USDObject, GymObservable):
             # If prim path is not specified, set it to the default path, but prepend controllable.
             relative_prim_path = f"/controllable__{class_name}__{name}"
 
-        if fixed_base is None:
-            fixed_base = self._robot_cfg.get("fixed_base", False)
         # Run super init
         super().__init__(
             relative_prim_path=relative_prim_path,

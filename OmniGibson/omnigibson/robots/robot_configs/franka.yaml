@@ -12,7 +12,7 @@ property:
   
   supported_end_effector: ['gripper', 'allegro', 'leap_right', 'leap_left', 'inspire']
   eef_support_curobo_attached_object_link_names: [gripper]
-  fixed_base: true
+
   gripper:
     model_name: "franka_panda"
     eef_link_names:
