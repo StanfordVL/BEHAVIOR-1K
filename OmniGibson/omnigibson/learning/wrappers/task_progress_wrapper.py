@@ -1,8 +1,9 @@
+import gymnasium as gym
 from omnigibson.envs import EnvironmentWrapper
 from omnigibson.learning.utils.task_progress_utils import CHALLENGE_TASKS_PROGRESS_APPROXIMATION
 
 
-class TaskProgressWrapper(EnvironmentWrapper):
+class TaskProgressWrapper(EnvironmentWrapper, gym.Wrapper):
     """
     Args:
         env (og.Environment): The environment to wrap.
