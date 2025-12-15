@@ -13,10 +13,14 @@ OPEN_SOURCE_RESOURCES = {
     },
     "Comet": {
         "code": "https://github.com/mli0603/openpi-comet",
-        "report": "https://github.com/mli0603/openpi-comet/blob/main/docs/report.pdf",
+        "report": "https://arxiv.org/abs/2512.10071",
     },
     "Merlin Labs": {
         "report": "https://merlyn-labs.com/behavior-report",
+    },
+    "StarVLA": {
+        "code": "https://github.com/starVLA/starVLA",
+        "report": "https://github.com/starVLA/starVLA/examples/BEHAVIOR/technical_report.pdf",
     },
 }
 
