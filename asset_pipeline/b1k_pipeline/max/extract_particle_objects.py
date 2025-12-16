@@ -161,12 +161,12 @@ MERGES_BY_TARGET = {
     #     "uwdwzw",
     #     "clvjuy",
     # ],
-    'objects/batch-09': ['acjxoq'],
-    'objects/legacy_batch-05': ['acooui'],
-    'objects/legacy_batch-04': ['mfkwzi'],
-    'objects/batch-11': ['rxefdu'],
-    'objects/batch-12': ['avvshq'],
-    'objects/legacy_batch-11': ['bhirar'],
+    "objects/batch-09": ["acjxoq"],
+    "objects/legacy_batch-05": ["acooui"],
+    "objects/legacy_batch-04": ["mfkwzi"],
+    "objects/batch-11": ["rxefdu"],
+    "objects/batch-12": ["avvshq"],
+    "objects/legacy_batch-11": ["bhirar"],
 }
 
 
@@ -175,7 +175,11 @@ def merge_files():
 
     # Merge in each file
     for target, ids in tqdm.tqdm(MERGES_BY_TARGET.items()):
-        p = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad") / target / "processed.max"
+        p = (
+            pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad")
+            / target
+            / "processed.max"
+        )
         filename = str(p)
 
         # Get the right object names from the file
@@ -227,10 +231,9 @@ def merge_files():
         )
         assert success, f"Failed to import"
         imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-        assert set(objects_to_import) == set(
-            imported_objs_by_name.keys()
-        ), "Not all objects were imported. Missing: " + str(
-            set(objects_to_import) - set(imported_objs_by_name.keys())
+        assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
+            "Not all objects were imported. Missing: "
+            + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
         )
 
         # Unhide everything
@@ -240,7 +243,7 @@ def merge_files():
         # Move the root-level objects to the right place
         for x in imported_meshes:
             if x.parent is not None:
-                continue 
+                continue
 
             bbox_min, bbox_max = rt.NodeGetBoundingBox(x, rt.Matrix3(1))
             bbox_min = np.array(bbox_min)

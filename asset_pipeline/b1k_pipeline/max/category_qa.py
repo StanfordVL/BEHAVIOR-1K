@@ -3,14 +3,17 @@ import json
 import os
 import sys
 import textwrap
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pymxs
+
 rt = pymxs.runtime
 
 import nltk
-nltk.download('wordnet')
-nltk.download('omw-1.4')
+
+nltk.download("wordnet")
+nltk.download("omw-1.4")
 from nltk.corpus import wordnet as wn
 
 from b1k_pipeline.utils import parse_name, PIPELINE_ROOT
@@ -19,6 +22,7 @@ IGNORE_CATEGORIES = {"walls", "floors", "ceilings"}
 
 PASS_NAME = "benjamin-scene-looseness-category"
 RECORD_PATH = PIPELINE_ROOT / "qa-logs" / f"{PASS_NAME}.json"
+
 
 def main():
     # Read completed groups record
@@ -32,7 +36,10 @@ def main():
     available_groups = {
         x.group("category")
         for x in parsed_names
-        if x is not None and int(x.group("instance_id")) == 0 and x.group("category") not in IGNORE_CATEGORIES}
+        if x is not None
+        and int(x.group("instance_id")) == 0
+        and x.group("category") not in IGNORE_CATEGORIES
+    }
     remaining_groups = sorted(available_groups - completed_groups)
     if not remaining_groups:
         rt.messageBox("Scene complete.")
@@ -65,7 +72,9 @@ def main():
     rt.select(next_group_objects)
     rt.IsolateSelection.EnterIsolateSelectionMode()
     rt.execute("max tool zoomextents")
-    print(f"{len(available_groups) - len(remaining_groups) + 1} / {len(available_groups)}: {next_group}")
+    print(
+        f"{len(available_groups) - len(remaining_groups) + 1} / {len(available_groups)}: {next_group}"
+    )
 
     if has_loose and not has_fixed and not has_clutter:
         print("Used as loose")
@@ -74,7 +83,11 @@ def main():
     elif has_clutter and not has_loose and not has_fixed:
         print("Used as clutter")
     else:
-        print(textwrap.fill(f"Used as loose: {has_loose}. Used as fixed: {has_fixed}. Used as clutter: {has_clutter}"))
+        print(
+            textwrap.fill(
+                f"Used as loose: {has_loose}. Used as fixed: {has_fixed}. Used as clutter: {has_clutter}"
+            )
+        )
 
     # Show a popup with the synset info
     # category_name = next_group.split("-")[0]
@@ -84,6 +97,7 @@ def main():
     # Record that object as completed
     with open(RECORD_PATH, "w") as f:
         json.dump(list(completed_groups | {next_group}), f)
+
 
 if __name__ == "__main__":
     main()

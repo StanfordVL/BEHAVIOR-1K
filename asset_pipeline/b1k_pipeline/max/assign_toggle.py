@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import pymxs
@@ -24,7 +25,9 @@ def assign_toggle():
     button.name = target.name + "-Mtogglebutton"
 
     # Validate that the object name is valid
-    assert parse_name(button.name) is not None, f"Done, but please fix invalid name {button.name} for collision object"
+    assert (
+        parse_name(button.name) is not None
+    ), f"Done, but please fix invalid name {button.name} for collision object"
 
 
 def assign_toggle_button():

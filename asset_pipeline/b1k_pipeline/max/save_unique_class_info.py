@@ -1,4 +1,5 @@
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.utils import parse_name
@@ -21,11 +22,13 @@ def get_object_key(obj):
     """
     return parse_name(obj.name).group("model_id")
 
+
 def get_object_category(obj):
     """
     Get a unique key for an object.
     """
     return parse_name(obj.name).group("category")
+
 
 def save_unique_class_infos():
     class_infos = {}
@@ -45,14 +48,19 @@ def save_unique_class_infos():
             "material_name": material_name,
             "eigvals": eigvals.tolist(),
         }
-    
+
     json.dump(class_infos, open("unique_class_info.json", "w"))
+
 
 def get_unique_class_info(src_obj):
     """
     Uniquely identify a class by its material name and the eigenvalues of its covariance matrix.
     """
-    X = np.array(rt.polyop.getVerts(src_obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(src_obj))))
+    X = np.array(
+        rt.polyop.getVerts(
+            src_obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(src_obj))
+        )
+    )
     n, m = X.shape
     u = np.mean(X, axis=0)
     # rt.messageBox("u: {}".format(u))
@@ -79,7 +87,6 @@ def get_unique_class_info(src_obj):
     #     },
     #     open("unique_class_info.json", "a"),
     # )
-
 
 
 def save_unique_class_info_button():

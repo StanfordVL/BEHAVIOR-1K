@@ -6,12 +6,14 @@ from pymxs import runtime as rt
 from tqdm import tqdm
 
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from b1k_pipeline.max.prebake_textures import hash_object
 
 OUTPUT_FILENAME = "file_manifest.json"
 OUTPUT_FILENAME_DEEP = "file_manifest_deep.json"
+
 
 class MaxscriptEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -26,14 +28,17 @@ class MaxscriptEncoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return super().default(obj)
 
+
 def hash_single_thing(thing):
     # try:
     # This tries to check if the thing can be JSON dumped. If it can, then we can do a proper hash
     # by sha256'ing its bytes.
-    json_string = json.dumps(thing, sort_keys=True, separators=(',', ':'), cls=MaxscriptEncoder)
+    json_string = json.dumps(
+        thing, sort_keys=True, separators=(",", ":"), cls=MaxscriptEncoder
+    )
 
     # Encode the string to bytes, as hashlib works on bytes
-    json_bytes = json_string.encode('utf-8')
+    json_bytes = json_string.encode("utf-8")
 
     # Use a standard hash algorithm like SHA-256
     # Use hexdigest() for a string representation of the hash
@@ -43,18 +48,26 @@ def hash_single_thing(thing):
     #     # non-maxscript objects. But - no alternatives here!
     #     return hash(thing)
 
+
 def should_skip_attr(k, v):
     # We skip None because its hash changes every time we run the script.
     # It's fine to do this because if the value changes to not none, it will stop being
     # skipped and we'll get a different hash.
     if v is None:
         return True
-    if k in ["setmxsprop", "getmxsprop", "bitmap", "excludeList", "brdf_newGTRAnisotropy"]:
+    if k in [
+        "setmxsprop",
+        "getmxsprop",
+        "bitmap",
+        "excludeList",
+        "brdf_newGTRAnisotropy",
+    ]:
         return True
     # These get hashed as part of the submtl / subtexmap searches.
     if rt.superClassOf(v) == rt.textureMap or rt.superClassOf(v) == rt.Material:
         return True
     return False
+
 
 def hash_attrs(obj):
     hash_dict = {}
@@ -73,6 +86,7 @@ def hash_attrs(obj):
     # debugging.
     return hash_dict  # {"unified_hash": hash_single_thing(hash_dict)}
 
+
 def hash_material(root_mat):
     """
     Get the hash of a material by recursively hashing its sub-materials.
@@ -81,6 +95,7 @@ def hash_material(root_mat):
     """
 
     hash_dict = {}
+
     def _recursively_hash_materials_and_textures(mtl, partial_hash_dict):
         # Do the actual hashing
         partial_hash_dict.update(hash_attrs(mtl))
@@ -93,7 +108,9 @@ def hash_material(root_mat):
                 sub_mtl_slot_name = rt.getSubMtlSlotName(mtl, i + 1)
                 partial_hash_dict["submtls"][sub_mtl_slot_name] = {}
                 if sub_mtl is not None:
-                    _recursively_hash_materials_and_textures(sub_mtl, partial_hash_dict["submtls"][sub_mtl_slot_name])
+                    _recursively_hash_materials_and_textures(
+                        sub_mtl, partial_hash_dict["submtls"][sub_mtl_slot_name]
+                    )
 
         # We can check for subtexmaps for texture maps and materials
         if rt.superClassOf(mtl) == rt.textureMap or rt.superClassOf(mtl) == rt.Material:
@@ -103,10 +120,14 @@ def hash_material(root_mat):
                 sub_texmap_slot_name = rt.getSubTexmapSlotName(mtl, i + 1)
                 partial_hash_dict["subtexmaps"][sub_texmap_slot_name] = {}
                 if sub_texmap is not None:
-                    _recursively_hash_materials_and_textures(sub_texmap, partial_hash_dict["subtexmaps"][sub_texmap_slot_name])
+                    _recursively_hash_materials_and_textures(
+                        sub_texmap,
+                        partial_hash_dict["subtexmaps"][sub_texmap_slot_name],
+                    )
 
     _recursively_hash_materials_and_textures(root_mat, hash_dict)
     return hash_dict
+
 
 def main():
     # Go through all the objects and store their information.
@@ -125,28 +146,34 @@ def main():
         obj_mtl_hash = hash_material(obj.material) if obj.material else None
         obj_transform = str(obj.transform)
         obj_objecttransform = str(obj.objectTransform)
-        file_manifest_deep.append({
-            "id": obj_id,
-            "name": obj_name,
-            "parent": obj_parent,
-            "layer": obj_layer,
-            "class": obj_class,
-            "hash": obj_hash,
-            "mtl_hash": obj_mtl_hash,
-            "transform": obj_transform,
-            "objecttransform": obj_objecttransform,
-        })
-        file_manifest.append({
-            "id": obj_id,
-            "name": obj_name,
-            "parent": obj_parent,
-            "layer": obj_layer,
-            "class": obj_class,
-            "hash": obj_hash if isinstance(obj_hash, str) else hash_single_thing(obj_hash),
-            "mtl_hash": hash_single_thing(obj_mtl_hash),
-            "transform": obj_transform,
-            "objecttransform": obj_objecttransform,
-        })
+        file_manifest_deep.append(
+            {
+                "id": obj_id,
+                "name": obj_name,
+                "parent": obj_parent,
+                "layer": obj_layer,
+                "class": obj_class,
+                "hash": obj_hash,
+                "mtl_hash": obj_mtl_hash,
+                "transform": obj_transform,
+                "objecttransform": obj_objecttransform,
+            }
+        )
+        file_manifest.append(
+            {
+                "id": obj_id,
+                "name": obj_name,
+                "parent": obj_parent,
+                "layer": obj_layer,
+                "class": obj_class,
+                "hash": obj_hash
+                if isinstance(obj_hash, str)
+                else hash_single_thing(obj_hash),
+                "mtl_hash": hash_single_thing(obj_mtl_hash),
+                "transform": obj_transform,
+                "objecttransform": obj_objecttransform,
+            }
+        )
 
     # Sort the list by id
     file_manifest_deep.sort(key=lambda x: x["name"])
@@ -163,6 +190,7 @@ def main():
     filename_deep = output_dir / OUTPUT_FILENAME_DEEP
     with open(filename_deep, "w") as f:
         json.dump(file_manifest_deep, f, indent=4)
+
 
 if __name__ == "__main__":
     main()

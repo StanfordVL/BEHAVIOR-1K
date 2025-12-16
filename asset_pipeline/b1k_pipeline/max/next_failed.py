@@ -20,6 +20,7 @@ file_name = "sanitycheck.json"
 # file_name = "object_list.json"
 # file_name = "export_meshes.json"
 
+
 def file_eligible(objdir):
     sanitycheck = objdir / "artifacts" / file_name
 
@@ -52,7 +53,14 @@ def next_failed():
         current_max_dir = pathlib.Path(rt.maxFilePath).resolve()
         next_idx = 0
         try:
-            next_idx = (next(i for i, max in enumerate(eligible_max) if max.parent.resolve() == current_max_dir) + 1) % len(eligible_max)
+            next_idx = (
+                next(
+                    i
+                    for i, max in enumerate(eligible_max)
+                    if max.parent.resolve() == current_max_dir
+                )
+                + 1
+            ) % len(eligible_max)
         except:
             pass
 

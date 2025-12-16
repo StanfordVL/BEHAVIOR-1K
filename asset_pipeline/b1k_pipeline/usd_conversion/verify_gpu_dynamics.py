@@ -15,18 +15,44 @@ WORKER_COUNT = 4
 
 
 def run_on_batch(dataset_path, path):
-    python_cmd = ["python", "-m", "b1k_pipeline.usd_conversion.verify_gpu_dynamics_process", dataset_path, path]
-    cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
+    python_cmd = [
+        "python",
+        "-m",
+        "b1k_pipeline.usd_conversion.verify_gpu_dynamics_process",
+        dataset_path,
+        path,
+    ]
+    cmd = [
+        "micromamba",
+        "run",
+        "-n",
+        "omnigibson",
+        "/bin/bash",
+        "-c",
+        "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && "
+        + " ".join(python_cmd),
+    ]
     obj = path[:-1].split("/")[-1]
-    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr:
-        return subprocess.run(cmd, stdout=f, stderr=ferr, check=True, cwd="/scr/BEHAVIOR-1K/asset_pipeline")
+    with (
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f,
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr,
+    ):
+        return subprocess.run(
+            cmd,
+            stdout=f,
+            stderr=ferr,
+            check=True,
+            cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+        )
 
 
 def main():
-    with ParallelZipFS("objects_usd.zip") as objects_fs, \
-         ParallelZipFS("metadata.zip") as metadata_fs, \
-         ParallelZipFS("systems.zip") as systems_fs, \
-         TempFS(temp_dir=str(TMP_DIR)) as dataset_fs:
+    with (
+        ParallelZipFS("objects_usd.zip") as objects_fs,
+        ParallelZipFS("metadata.zip") as metadata_fs,
+        ParallelZipFS("systems.zip") as systems_fs,
+        TempFS(temp_dir=str(TMP_DIR)) as dataset_fs,
+    ):
         # Copy everything over to the dataset FS
         print("Copying input to dataset fs...")
         fs.copy.copy_fs(metadata_fs, dataset_fs)
@@ -45,10 +71,8 @@ def main():
         futures = {}
         for path in object_glob:
             worker_future = dask_client.submit(
-                run_on_batch,
-                dataset_fs.getsyspath("/"),
-                path,
-                pure=False)
+                run_on_batch, dataset_fs.getsyspath("/"), path, pure=False
+            )
             futures[worker_future] = path
 
         # Wait for all the workers to finish
@@ -59,11 +83,16 @@ def main():
             obj = path[:-1].split("/")[-1]
             if future.exception():
                 print(f"Exception in {futures[future]}: {future.exception()}")
-                with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.exception", "w") as f:
+                with open(
+                    f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.exception", "w"
+                ) as f:
                     f.write(str(future.exception()))
             else:
-                with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.success", "w") as f:
+                with open(
+                    f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.success", "w"
+                ) as f:
                     pass
+
 
 if __name__ == "__main__":
     main()

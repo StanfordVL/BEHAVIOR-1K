@@ -17,14 +17,19 @@ gm.ENABLE_FLATCACHE = True
 
 MAX_BBOX = 0.3
 
+
 def draw_mesh(mesh, parent_pos):
     draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     edge_vert_idxes = mesh.edges_unique
     N = len(edge_vert_idxes)
-    colors = [(1., 0., 0., 1.) for _ in range(N)]
-    sizes = [1. for _ in range(N)]
-    points1 = [tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 0]] + parent_pos).tolist()]
-    points2 = [tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 1]] + parent_pos).tolist()]
+    colors = [(1.0, 0.0, 0.0, 1.0) for _ in range(N)]
+    sizes = [1.0 for _ in range(N)]
+    points1 = [
+        tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 0]] + parent_pos).tolist()
+    ]
+    points2 = [
+        tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 1]] + parent_pos).tolist()
+    ]
     draw.draw_lines(points1, points2, colors, sizes)
 
 
@@ -46,27 +51,43 @@ def sample_raytest_start_end_full_grid_topdown(
     bbox_center = obj.aabb_center
     bbox_orn = th.tensor([0, 0, 0, 1.0])
     bbox_bf_extent = obj.aabb_extent
-    aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
+    aabb_offset = (
+        aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
+    )
     # bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True, fallback_to_aabb=True)
 
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
-    x = th.linspace(-half_extent_with_offset[0], half_extent_with_offset[0], int(half_extent_with_offset[0] * 2 / ray_spacing) + 1)
-    y = th.linspace(-half_extent_with_offset[1], half_extent_with_offset[1], int(half_extent_with_offset[1] * 2 / ray_spacing) + 1)
+    x = th.linspace(
+        -half_extent_with_offset[0],
+        half_extent_with_offset[0],
+        int(half_extent_with_offset[0] * 2 / ray_spacing) + 1,
+    )
+    y = th.linspace(
+        -half_extent_with_offset[1],
+        half_extent_with_offset[1],
+        int(half_extent_with_offset[1] * 2 / ray_spacing) + 1,
+    )
     n_rays = len(x) * len(y)
 
-    start_points = th.stack([
-        x.repeat(len(y)),
-        y.repeat_interleave(len(x)),
-        th.ones(n_rays) * half_extent_with_offset[2],
-    ]).T
+    start_points = th.stack(
+        [
+            x.repeat(len(y)),
+            y.repeat_interleave(len(x)),
+            th.ones(n_rays) * half_extent_with_offset[2],
+        ]
+    ).T
 
     end_points = start_points.clone()
     end_points[:, 2] = -half_extent_with_offset[2]
 
     # Convert the points into the world frame
     to_wf_transform = T.pose2mat((bbox_center, bbox_orn))
-    start_points = th.tensor(trimesh.transformations.transform_points(start_points, to_wf_transform))
-    end_points = th.tensor(trimesh.transformations.transform_points(end_points, to_wf_transform))
+    start_points = th.tensor(
+        trimesh.transformations.transform_points(start_points, to_wf_transform)
+    )
+    end_points = th.tensor(
+        trimesh.transformations.transform_points(end_points, to_wf_transform)
+    )
 
     start_points = start_points.unsqueeze(1)
     end_points = end_points.unsqueeze(1)
@@ -77,19 +98,24 @@ def sample_raytest_start_end_full_grid_topdown(
 def sample_fillable_point_from_top(obj, n_rays, prop_successful):
     aabb_low, aabb_high = obj.aabb
     # Sample uniformly from the top of the AABB, and take the lowest z and randomly sample again
-    start_rays, end_rays = sample_raytest_start_end_full_grid_topdown(obj,
-                                                                      th.mean((aabb_high[:2] - aabb_low[:2]) / 10.0))
+    start_rays, end_rays = sample_raytest_start_end_full_grid_topdown(
+        obj, th.mean((aabb_high[:2] - aabb_low[:2]) / 10.0)
+    )
     down_results = raytest_batch(start_rays.reshape(-1, 3), end_rays.reshape(-1, 3))
-    down_hit_results = th.stack([th.tensor(result["position"]) for result in down_results if result["hit"]])
+    down_hit_results = th.stack(
+        [th.tensor(result["position"]) for result in down_results if result["hit"]]
+    )
 
     z = down_hit_results[:, 2].min() + 0.01
     point = down_hit_results[th.argmin(down_hit_results[:, 2])]
     point[2] += 0.01
     results = sample_radial_rays(point, n=n_rays)
 
-    if th.mean(th.tensor([result["hit"] for result in results], dtype=th.float32)) >= prop_successful and th.all(
-        th.tensor([result["distance"] > 0 for result in results if result["hit"]])):
-
+    if th.mean(
+        th.tensor([result["hit"] for result in results], dtype=th.float32)
+    ) >= prop_successful and th.all(
+        th.tensor([result["distance"] > 0 for result in results if result["hit"]])
+    ):
         xs = th.tensor([result["position"][0] for result in results if result["hit"]])
         ys = th.tensor([result["position"][1] for result in results if result["hit"]])
         center = th.tensor([xs.mean(), ys.mean(), z])
@@ -130,7 +156,7 @@ def process_object(cat, mdl, out_path):
                 "kinematic_only": False,
                 "fixed_base": True,
             },
-        ]
+        ],
     }
 
     env = og.Environment(configs=cfg)
@@ -156,7 +182,11 @@ def process_object(cat, mdl, out_path):
 
     for i in range(200):
         results = sample_radial_rays(point, n=n_rays)
-        if th.mean(th.tensor([result["hit"] for result in results], dtype=th.float32)) >= prop_successful and th.all(th.tensor([result["distance"] > 0 for result in results if result["hit"]])):
+        if th.mean(
+            th.tensor([result["hit"] for result in results], dtype=th.float32)
+        ) >= prop_successful and th.all(
+            th.tensor([result["distance"] > 0 for result in results if result["hit"]])
+        ):
             success = True
             break
         point = th.rand(3) * (aabb_high - aabb_low) + aabb_low
@@ -164,7 +194,9 @@ def process_object(cat, mdl, out_path):
 
     if not success:
         # Try sampling from the top
-        success, point = sample_fillable_point_from_top(fillable, n_rays, prop_successful)
+        success, point = sample_fillable_point_from_top(
+            fillable, n_rays, prop_successful
+        )
 
     if success:
         # 2c. Move point to center of circle
@@ -175,7 +207,9 @@ def process_object(cat, mdl, out_path):
         # 3. Shoot ray up and down to hit boundaries
         down_ray = {"hit": False}
 
-        while (not down_ray["hit"] or down_ray["distance"] == 0.0) and center[2] <= (aabb_high[2] + 0.01):
+        while (not down_ray["hit"] or down_ray["distance"] == 0.0) and center[2] <= (
+            aabb_high[2] + 0.01
+        ):
             center = center + th.tensor([0, 0, 0.01])
             down_ray = raytest(
                 start_point=center,
@@ -186,10 +220,18 @@ def process_object(cat, mdl, out_path):
 
     if success:
         results = sample_radial_rays(center, n=n_rays)
-        if not (th.mean(th.tensor([result["hit"] for result in results], dtype=th.float32)) >= prop_successful and th.all(
-            th.tensor([result["distance"] > 0 for result in results if result["hit"]]))):
-
-            success, center = sample_fillable_point_from_top(fillable, n_rays, prop_successful)
+        if not (
+            th.mean(th.tensor([result["hit"] for result in results], dtype=th.float32))
+            >= prop_successful
+            and th.all(
+                th.tensor(
+                    [result["distance"] > 0 for result in results if result["hit"]]
+                )
+            )
+        ):
+            success, center = sample_fillable_point_from_top(
+                fillable, n_rays, prop_successful
+            )
             assert success
 
         down_ray = raytest(
@@ -217,22 +259,36 @@ def process_object(cat, mdl, out_path):
         while z <= z_high:
             layer_center = th.tensor([center[0], center[1], z])
             layer_results = sample_radial_rays(point=layer_center, n=n_rays)
-            layer_hit_positions = th.stack([th.tensor(result["position"]) for result in layer_results if result["hit"]])
+            layer_hit_positions = th.stack(
+                [
+                    th.tensor(result["position"])
+                    for result in layer_results
+                    if result["hit"]
+                ]
+            )
             if not len(layer_hit_positions) / len(layer_results) >= prop_successful:
                 if i <= 1:
                     # We failed to sample, probably a degenerate mesh, fail
                     success = False
                 break
-            if len(mesh_points) > 0 and th.any((layer_hit_positions.max(dim=0)[0][:2] - layer_hit_positions.min(dim=0)[0][:2]) < min_diameter):
+            if len(mesh_points) > 0 and th.any(
+                (
+                    layer_hit_positions.max(dim=0)[0][:2]
+                    - layer_hit_positions.min(dim=0)[0][:2]
+                )
+                < min_diameter
+            ):
                 break
-            layer_rays = (layer_hit_positions - layer_center.unsqueeze(0))
-            layer_points = layer_hit_positions - layer_rays * offset / th.norm(layer_rays, dim=1, keepdim=True)
+            layer_rays = layer_hit_positions - layer_center.unsqueeze(0)
+            layer_points = layer_hit_positions - layer_rays * offset / th.norm(
+                layer_rays, dim=1, keepdim=True
+            )
             mesh_points = th.cat([mesh_points, layer_points], dim=0)
             z += z_dist
             i += 1
 
         # Prune previous layer
-        mesh_points = mesh_points[:-len(layer_points)]
+        mesh_points = mesh_points[: -len(layer_points)]
 
     if not success:
         print("Failed to find sufficient cavity to generate fillable, skipping.")
@@ -263,7 +319,9 @@ def process_object(cat, mdl, out_path):
     # Check which rays are within the polygon
     # Each inequality is of the form Ax + By + C <= 0
     # We need to check if the point satisfies all inequalities
-    is_within = th.all((ray_grid_flattened @ equations[:, :-1].T) + equations[:, -1] <= 0, dim=1)
+    is_within = th.all(
+        (ray_grid_flattened @ equations[:, :-1].T) + equations[:, -1] <= 0, dim=1
+    )
     xy_ray_positions = ray_grid_flattened[is_within]
 
     # Shoot these rays downwards and record their poses -- add them to the point set
@@ -309,7 +367,13 @@ def process_object(cat, mdl, out_path):
     hull.unmerge_vertices()
 
     # Save it somewhere
-    hull.export(out_path, file_type="obj", include_normals=False, include_color=False, include_texture=False)
+    hull.export(
+        out_path,
+        file_type="obj",
+        include_normals=False,
+        include_color=False,
+        include_texture=False,
+    )
 
 
 def main():

@@ -1,9 +1,11 @@
 import collections
 import os
 import pymxs
+
 rt = pymxs.runtime
 
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 import b1k_pipeline.utils
@@ -14,6 +16,7 @@ import random
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import tqdm
+
 
 def generate_texture(label, path):
     # create an image
@@ -27,9 +30,17 @@ def generate_texture(label, path):
     FONT_SIZE = 172
     fnt = ImageFont.truetype("impact.ttf", FONT_SIZE, encoding="unic")
     d = ImageDraw.Draw(out)
-    d.multiline_text((WIDTH // 2, HEIGHT // 2), text, font=fnt, anchor="mm", align="center", fill=(30, 30, 30))
+    d.multiline_text(
+        (WIDTH // 2, HEIGHT // 2),
+        text,
+        font=fnt,
+        anchor="mm",
+        align="center",
+        fill=(30, 30, 30),
+    )
 
     out.save(path)
+
 
 def generate_container(cat, label, base_model, last_seen_id):
     # Find the stuff belonging to the base
@@ -55,9 +66,13 @@ def generate_container(cat, label, base_model, last_seen_id):
             newNodes=pymxs.byref(None),
         )
         assert success, f"Could not clone {base_obj.name}"
-        base_copy, = base_copy
+        (base_copy,) = base_copy
         base_copy.name = base_obj.name.replace(base_name, new_name)
-        expected_parent_name = base_obj.parent.name.replace(base_name, new_name) if base_obj.parent is not None else None
+        expected_parent_name = (
+            base_obj.parent.name.replace(base_name, new_name)
+            if base_obj.parent is not None
+            else None
+        )
         base_copies.append((base_obj, base_copy, expected_parent_name))
 
     children_copies = []  # (old, new, expectedparentname)
@@ -68,7 +83,7 @@ def generate_container(cat, label, base_model, last_seen_id):
             newNodes=pymxs.byref(None),
         )
         assert success, f"Could not clone {child.name}"
-        child_copy, = child_copy
+        (child_copy,) = child_copy
 
         # Compute the new model ID for the child
         child_model = b1k_pipeline.utils.parse_name(child.name).group("model_id")
@@ -78,7 +93,11 @@ def generate_container(cat, label, base_model, last_seen_id):
 
         # Update the name
         child_copy.name = child.name.replace(f"-{child_old_iid}-", f"-{child_new_iid}-")
-        expected_parent_name = child.parent.name.replace(base_name, new_name) if child.parent is not None else None
+        expected_parent_name = (
+            child.parent.name.replace(base_name, new_name)
+            if child.parent is not None
+            else None
+        )
         children_copies.append((child, child_copy, expected_parent_name))
 
     # Check that everything that shows up in the parent is appropriately parented
@@ -87,7 +106,7 @@ def generate_container(cat, label, base_model, last_seen_id):
             continue
         parent_candidates = [x for _, x, _ in base_copies if x.name == parent_name]
         assert parent_candidates, f"Could not find parent {parent_name} for {item.name}"
-        parent, = parent_candidates
+        (parent,) = parent_candidates
         item.parent = parent
 
     # Replace any uppers with an instance of the lower
@@ -97,9 +116,11 @@ def generate_container(cat, label, base_model, last_seen_id):
         if b1k_pipeline.utils.parse_name(item.name).group("joint_side") != "upper":
             continue
         lower_name = item.name.replace("upper", "lower")
-        lower_candidates = [x for _, x, _ in base_copies + children_copies if x.name == lower_name]
+        lower_candidates = [
+            x for _, x, _ in base_copies + children_copies if x.name == lower_name
+        ]
         assert lower_candidates, f"Could not find lower {lower_name} for {item.name}"
-        lower, = lower_candidates
+        (lower,) = lower_candidates
 
         success, lower_copy = rt.maxOps.cloneNodes(
             lower,
@@ -107,7 +128,7 @@ def generate_container(cat, label, base_model, last_seen_id):
             newNodes=pymxs.byref(None),
         )
         assert success, f"Could not clone {lower.name}"
-        lower_copy, = lower_copy
+        (lower_copy,) = lower_copy
         lower_copy.transform = item.transform
         lower_copy.name = item.name
         rt.delete(item)
@@ -121,11 +142,11 @@ def generate_container(cat, label, base_model, last_seen_id):
             break
     else:
         raise AssertionError("Could not find label object")
-    
+
     # Generate the texture
     texture_path = os.path.join(rt.maxFilePath, "textures", f"{cat}.png")
     generate_texture(label, texture_path)
-    
+
     # Create a material
     mat = rt.VRayMtl()
     label_obj.material = mat
@@ -137,7 +158,8 @@ def generate_container(cat, label, base_model, last_seen_id):
 
     print("Created", cat)
     return [obj for _, obj, _ in base_copies + children_copies]
-        
+
+
 def main():
     with open(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\container_generation.csv") as f:
         containers = []
@@ -145,7 +167,17 @@ def main():
         for row in tqdm.tqdm(list(csv.DictReader(f))):
             if row["Action"] != "GENERATE":
                 continue
-            containers.append((row["Actual Object"], generate_container(row["Category"], row["Label"], row["Actual Object"], last_seen_id)))
+            containers.append(
+                (
+                    row["Actual Object"],
+                    generate_container(
+                        row["Category"],
+                        row["Label"],
+                        row["Actual Object"],
+                        last_seen_id,
+                    ),
+                )
+            )
 
         position_ctr = collections.Counter()
         for kind, container_set in containers:
@@ -153,6 +185,7 @@ def main():
             for container in container_set:
                 if container.parent is None:
                     container.position += rt.Point3(0, position_ctr[kind] * 400, 0)
-        
+
+
 if __name__ == "__main__":
     main()

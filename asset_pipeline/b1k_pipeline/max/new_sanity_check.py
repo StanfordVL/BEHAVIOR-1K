@@ -39,13 +39,7 @@ WARN_VERTICES = 20000
 OUTPUT_FILENAME = "sanitycheck.json"
 
 
-ALLOWED_TAGS = {
-    "soft",
-    "glass",
-    "openable",
-    "openablebothsides",
-    "locked"
-}
+ALLOWED_TAGS = {"soft", "glass", "openable", "openablebothsides", "locked"}
 
 ALLOWED_PART_TAGS = {
     "subpart",
@@ -103,7 +97,7 @@ def get_required_meta_links(category):
     synset = OBJECT_TAXONOMY.get_synset_from_category(category)
     if synset is not None:
         return OBJECT_TAXONOMY.get_required_meta_links_for_synset(synset)
-    
+
     substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(category)
     if substance_synset is not None:
         return set()
@@ -177,7 +171,10 @@ class SanityCheck:
 
         self.providers = get_providers()
         if self.providers is None:
-            self.expect(False, "Could not load providers because inventory file is missing. The provider-related errors you see may or may not be accurate. When run as part of the pipeline, this error will resolve, but other new errors may show up.")
+            self.expect(
+                False,
+                "Could not load providers because inventory file is missing. The provider-related errors you see may or may not be accurate. When run as part of the pipeline, this error will resolve, but other new errors may show up.",
+            )
             self.providers = {}
 
     def expect(self, condition, message, level="ERROR"):
@@ -201,13 +198,16 @@ class SanityCheck:
             return (
                 np.array(
                     rt.polyop.getFacesVerts(
-                        obj.baseObject, rt.execute("#{1..%d}" % rt.polyop.GetNumFaces(obj))
+                        obj.baseObject,
+                        rt.execute("#{1..%d}" % rt.polyop.GetNumFaces(obj)),
                     )
                 )
                 - 1
             )
         except:
-            raise ValueError(f"Error getting faces for {obj.name}. Did you triangulate?")
+            raise ValueError(
+                f"Error getting faces for {obj.name}. Did you triangulate?"
+            )
 
     def maybe_rename_category(self, cat, model):
         if (cat, model) in RENAMES:
@@ -345,7 +345,10 @@ class SanityCheck:
                 f"{row.object_name} is not rendering the baked material in the viewport. Select the baked material for viewport.",
             )
 
-            self.expect(rt.polyop.getMapSupport(obj, 99), f"{row.object_name} does not have a UVW map in channel 99. Reunwrap the object.")
+            self.expect(
+                rt.polyop.getMapSupport(obj, 99),
+                f"{row.object_name} does not have a UVW map in channel 99. Reunwrap the object.",
+            )
 
             current_hash = hash_object(
                 obj,
@@ -359,19 +362,23 @@ class SanityCheck:
             )
 
             # Run cloth object checks
-            renamed_category = self.maybe_rename_category(row.name_category, row.name_model_id)
+            renamed_category = self.maybe_rename_category(
+                row.name_category, row.name_model_id
+            )
             synset = OBJECT_TAXONOMY.get_synset_from_category(renamed_category)
-            substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(renamed_category)
+            substance_synset = OBJECT_TAXONOMY.get_synset_from_substance(
+                renamed_category
+            )
             self.expect(
                 synset is not None or substance_synset is not None,
                 f"Cannot perform cloth/particle checks: category {renamed_category} not found in taxonomy.",
             )
-            
+
             if synset is not None:
                 obj_is_cloth = "cloth" in OBJECT_TAXONOMY.get_abilities(synset)
                 if obj_is_cloth:
                     self.validate_cloth(row)
-            
+
             if substance_synset is not None:
                 # Check that this file is one of the substances files
                 self.expect(
@@ -393,18 +400,24 @@ class SanityCheck:
             # Validate materials
             if obj.material is not None:
                 recursive_materials = set()
+
                 def _recursively_get_materials(mtl):
                     recursive_materials.add(mtl)
                     for i in range(rt.getNumSubMtls(mtl)):
                         sub_mtl = rt.getSubMtl(mtl, i + 1)
                         if sub_mtl is not None:
                             _recursively_get_materials(sub_mtl)
+
                 _recursively_get_materials(obj.material)
 
                 # We should NOT find more than 1 multimaterial in the entire hierarchy. If we do,
                 # it means that a bad merge was done and thus the face material IDs overwritten.
                 # Sadly this means data loss and I'm not sure how we're going to get back from it.
-                multimaterials = [mat for mat in recursive_materials if rt.classOf(mat) == rt.MultiMaterial]
+                multimaterials = [
+                    mat
+                    for mat in recursive_materials
+                    if rt.classOf(mat) == rt.MultiMaterial
+                ]
                 self.expect(
                     len(multimaterials) <= 1,
                     f"{row.object_name} has more than one MultiMaterial in its material hierarchy. This is a bad attachment and has resulted in face material assignment loss.",
@@ -416,13 +429,27 @@ class SanityCheck:
                     mat_type = rt.classOf(mat)
                     if mat == obj.material:
                         # The top level material can be vray, shell, or multi
-                        self.expect(mat_type in (rt.MultiMaterial, rt.Shell_Material) or "vray" in str(mat).lower(), f"Top level material {mat} of {row.object_name} is not a MultiMaterial, Shell_Material, or VrayMtl.")
-                    elif rt.classOf(obj.material) == rt.Shell_Material and mat == obj.material.bakedMaterial:
+                        self.expect(
+                            mat_type in (rt.MultiMaterial, rt.Shell_Material)
+                            or "vray" in str(mat).lower(),
+                            f"Top level material {mat} of {row.object_name} is not a MultiMaterial, Shell_Material, or VrayMtl.",
+                        )
+                    elif (
+                        rt.classOf(obj.material) == rt.Shell_Material
+                        and mat == obj.material.bakedMaterial
+                    ):
                         # If the top level material is a Shell_Material, then the baked material should be VrayMtl
-                        self.expect(mat_type == rt.VrayMtl, f"Baked material {mat} of {row.object_name} is not a VrayMtl.")
+                        self.expect(
+                            mat_type == rt.VrayMtl,
+                            f"Baked material {mat} of {row.object_name} is not a VrayMtl.",
+                        )
                     else:
                         # Everything that's not the top level material nor the baked material should be a vraymtl or multimaterial
-                        self.expect(mat_type == rt.MultiMaterial or "vray" in str(mat).lower(), f"Non-top level material {mat} of {row.object_name} is not a MultiMaterial or some kind of VRay material: {rt.classOf(mat)}", level="WARNING")
+                        self.expect(
+                            mat_type == rt.MultiMaterial or "vray" in str(mat).lower(),
+                            f"Non-top level material {mat} of {row.object_name} is not a MultiMaterial or some kind of VRay material: {rt.classOf(mat)}",
+                            level="WARNING",
+                        )
 
         else:
             # Bad object tasks
@@ -699,14 +726,22 @@ class SanityCheck:
             elems = []
             while not np.all(faces_not_yet_found):
                 next_not_found_face = int(np.where(~faces_not_yet_found)[0][0])
-                elem = np.array(rt.polyop.GetElementsUsingFace(obj, [next_not_found_face + 1]))
+                elem = np.array(
+                    rt.polyop.GetElementsUsingFace(obj, [next_not_found_face + 1])
+                )
                 assert elem[next_not_found_face], "Searched face not found in element."
                 elems.append(elem)
                 faces_not_yet_found[elem] = True
             elems = np.array(elems)
-            self.expect(not np.any(np.sum(elems.astype(int), axis=0) > 1), f"{obj.name} has same face appear in multiple elements")
+            self.expect(
+                not np.any(np.sum(elems.astype(int), axis=0) > 1),
+                f"{obj.name} has same face appear in multiple elements",
+            )
             if max_elements is not None:
-                self.expect(len(elems) <= max_elements, f"{obj.name} should not have more than {max_elements} elements. Has {len(elems)} elements.")
+                self.expect(
+                    len(elems) <= max_elements,
+                    f"{obj.name} should not have more than {max_elements} elements. Has {len(elems)} elements.",
+                )
 
             # Iterate through the elements
             for i, elem in enumerate(elems):
@@ -715,10 +750,16 @@ class SanityCheck:
                 m = trimesh.Trimesh(vertices=verts, faces=relevant_faces, process=False)
                 m.remove_unreferenced_vertices()
                 if max_vertices_per_element is not None:
-                    self.expect(len(m.vertices) <= max_vertices_per_element, f"{obj.name} element {i} has too many vertices ({len(m.vertices)} > {max_vertices_per_element})")
+                    self.expect(
+                        len(m.vertices) <= max_vertices_per_element,
+                        f"{obj.name} element {i} has too many vertices ({len(m.vertices)} > {max_vertices_per_element})",
+                    )
                 self.expect(m.is_volume, f"{obj.name} element {i} is not a volume")
                 # self.expect(m.is_convex, f"{obj.name} element {i} may be non-convex. The checker says so, but it's not 100% accurate, so please verify that all elements are indeed convex.", level="WARNING")
-                self.expect(len(m.split()) == 1, f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected")
+                self.expect(
+                    len(m.split()) == 1,
+                    f"{obj.name} element {i} has elements trimesh still finds splittable e.g. are not watertight / connected",
+                )
 
         except Exception as e:
             self.expect(False, str(e))
@@ -852,15 +893,27 @@ class SanityCheck:
                 found_convex_mesh_metas[meta_link_type].append(child)
                 self.validate_convex_mesh(child)
 
-            if meta_link_type == "collision" and row.name_category not in ("floors", "driveway", "lawn", "ceilings", "rail_fence", "roof", "walls"):
+            if meta_link_type == "collision" and row.name_category not in (
+                "floors",
+                "driveway",
+                "lawn",
+                "ceilings",
+                "rail_fence",
+                "roof",
+                "walls",
+            ):
                 # For collision meshes, get the AABB of the mesh and its collision mesh and check that
                 # their bounds are not more than 5cm different in any direction.
-                child_bbox_min, child_bbox_max = rt.NodeGetBoundingBox(child._obj, rt.Matrix3(1))
+                child_bbox_min, child_bbox_max = rt.NodeGetBoundingBox(
+                    child._obj, rt.Matrix3(1)
+                )
                 child_bbox_min = np.array(child_bbox_min)
                 child_bbox_max = np.array(child_bbox_max)
                 child_bbox_volume = np.prod(child_bbox_max - child_bbox_min)
 
-                parent_bbox_min, parent_bbox_max = rt.NodeGetBoundingBox(row.object._obj, rt.Matrix3(1))
+                parent_bbox_min, parent_bbox_max = rt.NodeGetBoundingBox(
+                    row.object._obj, rt.Matrix3(1)
+                )
                 parent_bbox_min = np.array(parent_bbox_min)
                 parent_bbox_max = np.array(parent_bbox_max)
                 parent_bbox_volume = np.prod(parent_bbox_max - parent_bbox_min)
@@ -876,7 +929,7 @@ class SanityCheck:
                     f"Collision mesh {child.name} has bounding box max {child_bbox_max} that is more than 5cm different from parent {row.object_name} max {parent_bbox_max}.",
                     level="WARNING",
                 )
-                
+
                 # TODO: Reconsider this IOU logic. The problem with this is that it is really sensitive
                 # to the size of the bounding box. If the bounding box is very small along any dimension,
                 # just a few cm's difference in the bounding box will cause the IOU to be very small.
@@ -893,7 +946,6 @@ class SanityCheck:
                 #     f"Collision mesh {child.name} has low IOU with parent {row.object_name}: {iou:.2f}.",
                 #     level="WARNING",
                 # )
-
 
             if meta_link_type == "attachment":
                 attachment_type = match.group("meta_id")
@@ -999,7 +1051,10 @@ class SanityCheck:
             # Get the recorded vertex and face count for the model ID
             recorded_counts = self.get_recorded_vertex_and_face_count(model_id)
             if recorded_counts is None:
-                self.expect("False", f"{model_id} has no recorded face and vertex counts. Make sure you run object list first.")
+                self.expect(
+                    "False",
+                    f"{model_id} has no recorded face and vertex counts. Make sure you run object list first.",
+                )
             else:
                 recorded_vertex_count, recorded_face_count = recorded_counts
                 # Check that the total vertex and face count matches the recorded vertex and face count
@@ -1105,8 +1160,9 @@ class SanityCheck:
         def record_links(group):
             instance_id = group["name_instance_id"].iloc[0]
             # Check that there is a base link row
-            assert "base_link" in group["name_link_name"].unique(), \
-                f"Model ID {model_id} instance {instance_id} is missing base link."
+            assert (
+                "base_link" in group["name_link_name"].unique()
+            ), f"Model ID {model_id} instance {instance_id} is missing base link."
             base_link_row = group[group["name_link_name"] == "base_link"].iloc[0]
             base_link_transform = base_link_row.object.objecttransform
             inverse_base_link_transform = rt.inverse(base_link_transform)
@@ -1178,11 +1234,15 @@ class SanityCheck:
                         f"{model_id} link {link_name} has different scale in instance {instance_id} compared to instance 0. Scale difference: {scale_difference}.",
                     )
                     self.expect(
-                        np.allclose(position_difference, 0, atol=5),  # Up to 5mm is fine
+                        np.allclose(
+                            position_difference, 0, atol=5
+                        ),  # Up to 5mm is fine
                         f"{model_id} link {link_name} has different position in instance {instance_id} compared to instance 0. Position difference: {position_difference}.",
                     )
                     self.expect(
-                        np.isclose(rotation_difference.magnitude(), 0, atol=np.deg2rad(2)),
+                        np.isclose(
+                            rotation_difference.magnitude(), 0, atol=np.deg2rad(2)
+                        ),
                         f"{model_id} link {link_name} has different rotation in instance {instance_id} compared to instance 0. Rotation difference: {rotation_difference.magnitude()}.",
                     )
 

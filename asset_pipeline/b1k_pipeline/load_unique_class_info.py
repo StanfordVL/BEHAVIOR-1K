@@ -13,17 +13,20 @@ local_coordsys = pymxs.runtime.Name("local")
 
 EIGVAL_TOL = 1e-3
 
+
 def get_object_key(obj):
     """
     Get a unique key for an object.
     """
     return parse_name(obj.name).group("model_id")
 
+
 def get_object_category(obj):
     """
     Get a unique key for an object.
     """
     return parse_name(obj.name).group("category")
+
 
 def change_object_category(obj, new_category):
     """
@@ -35,6 +38,7 @@ def change_object_category(obj, new_category):
     # Change the category
     obj.name = obj.name.replace(old_category, new_category)
 
+
 def change_object_key(obj, new_key):
     """
     Change the key of an object.
@@ -44,6 +48,7 @@ def change_object_key(obj, new_key):
 
     # Change the key
     obj.name = obj.name.replace(old_key, new_key)
+
 
 def load_unique_class_infos():
     saved_infos = json.load(open("unique_class_info.json", "r"))
@@ -62,23 +67,31 @@ def load_unique_class_infos():
         # i = 0
         for saved_model_id, saved_info in saved_infos.items():
             # i+=1
-            if (
-                saved_info["material_name"] == material_name
-                and np.allclose(saved_info["eigvals"], eigvals, atol=EIGVAL_TOL)
+            if saved_info["material_name"] == material_name and np.allclose(
+                saved_info["eigvals"], eigvals, atol=EIGVAL_TOL
             ):
                 # Change the category
-                rt.messageBox("Changing key of {} to {}".format(obj.name, saved_model_id))
+                rt.messageBox(
+                    "Changing key of {} to {}".format(obj.name, saved_model_id)
+                )
                 change_object_key(obj, saved_model_id)
-                rt.messageBox("Changed key of {} to {}".format(obj.name, saved_model_id))
+                rt.messageBox(
+                    "Changed key of {} to {}".format(obj.name, saved_model_id)
+                )
                 # if i>1:
-                    # assert False
+                # assert False
                 break
+
 
 def get_unique_class_info(src_obj):
     """
     Uniquely identify a class by its material name and the eigenvalues of its covariance matrix.
     """
-    X = np.array(rt.polyop.getVerts(src_obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(src_obj))))
+    X = np.array(
+        rt.polyop.getVerts(
+            src_obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(src_obj))
+        )
+    )
     n, m = X.shape
     u = np.mean(X, axis=0)
     # rt.messageBox("u: {}".format(u))
@@ -105,7 +118,6 @@ def get_unique_class_info(src_obj):
     #     },
     #     open("unique_class_info.json", "a"),
     # )
-
 
 
 def load_unique_class_info_button():

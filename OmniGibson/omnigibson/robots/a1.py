@@ -3,7 +3,6 @@ from functools import cached_property
 
 import torch as th
 
-from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.asset_utils import get_dataset_path
 
@@ -76,7 +75,7 @@ class A1(ManipulationRobot):
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the robot with a different rese joint position.
+                Set this value instead if you want to initialize the robot with a different reset joint position.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
@@ -203,11 +202,11 @@ class A1(ManipulationRobot):
 
     @cached_property
     def arm_link_names(self):
-        return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
+        return {self.default_arm: [f"arm_seg{i + 1}" for i in range(5)]}
 
     @cached_property
     def arm_joint_names(self):
-        return {self.default_arm: [f"arm_joint{i+1}" for i in range(6)]}
+        return {self.default_arm: [f"arm_joint{i + 1}" for i in range(6)]}
 
     @cached_property
     def eef_link_names(self):

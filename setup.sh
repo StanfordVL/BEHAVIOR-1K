@@ -212,7 +212,7 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     source "$(conda info --base)/etc/profile.d/conda.sh"
-    
+
     # Check if environment already exists and exit with instructions
     if conda env list | grep -q "^$NEW_ENV_NAME "; then
         echo ""
@@ -397,11 +397,13 @@ if [ "$OMNIGIBSON" = true ]; then
         
         install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         
-        # Fix cryptography conflict - remove conflicting version
-        if [ -d "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
-            echo "Fixing cryptography conflict..."
-            rm -rf "$CONDA_PREFIX/lib/python3.11/site-packages/isaacsim/exts/omni.pip.cloud/pip_prebundle/cryptography"
-        fi
+        # Extract ISAAC_PATH from isaacsim module
+        ISAAC_PATH=$(python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>/dev/null)
+        
+        # Fix websockets conflict - remove any pip_prebundle/websockets under extscache
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache" ]; then
+            echo "Fixing websockets conflict..."
+            find "$ISAAC_PATH/extscache" -type d -name "websockets" -path "*/pip_prebundle/*" -exec rm -rf {} + 2>/dev/null || true
 
         # Fix packaging conflict - remove conflicting version
         # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
@@ -411,6 +413,9 @@ if [ "$OMNIGIBSON" = true ]; then
         fi
     fi
     
+    # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
+    pip install --force-reinstall cffi==1.17.1
+
     echo "OmniGibson installation completed successfully!"
 fi
 

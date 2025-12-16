@@ -102,7 +102,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the robot with a different rese joint position.
+                Set this value instead if you want to initialize the robot with a different reset joint position.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will

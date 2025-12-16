@@ -56,7 +56,9 @@ def flat_floor_to_cmesh(collision_objs, target):
     rt.maxOps.collapseNodeTo(baseObj, 1, True)
 
     # Select all the faces
-    rt.polyop.setFaceSelection(baseObj, list(range(1, rt.polyop.getNumFaces(baseObj) + 1)))
+    rt.polyop.setFaceSelection(
+        baseObj, list(range(1, rt.polyop.getNumFaces(baseObj) + 1))
+    )
 
     # Apply the Face Extrusion modifier
     fe = rt.Face_Extrude()
