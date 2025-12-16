@@ -52,7 +52,7 @@ def quantize_depth(
     Returns:
         np.ndarray: Quantized depth tensor.
     """
-    qmax = (1 << 14) - 1
+    qmax = (1 << 16) - 1
     log_min = np.log(min_depth + shift)
     log_max = np.log(max_depth + shift)
 
@@ -77,7 +77,7 @@ def dequantize_depth(
     Returns:
         np.ndarray: Dequantized depth tensor.
     """
-    qmax = (1 << 14) - 1
+    qmax = (1 << 16) - 1
     log_min = np.log(min_depth + shift)
     log_max = np.log(max_depth + shift)
 
@@ -202,6 +202,8 @@ class VideoLoader:
         start_idx_is_keyframe: bool = False,
         fps: int = 30,
         downsample_factor: int = 1,
+        query_timestamps: Optional[List[float]] = None,
+        tolerance_s: float = 1e-4,
         **kwargs,
     ):
         """
@@ -220,6 +222,10 @@ class VideoLoader:
                 Set this to True if you know the start index is a keyframe, which will allow for faster seeking to the start index.
             fps (int): Frames per second of the video. Default is 30.
             downsample_factor (int): Factor to downsample the video frames by. Default is 1 (no downsampling).
+            query_timestamps (Optional[List[float]]): List of timestamps (in seconds) to query from the video.
+                If provided, the loader will return frames at these specific timestamps instead of sequential iteration.
+            tolerance_s (float): Tolerance in seconds for matching query timestamps to actual frame timestamps.
+                Default is 1e-4.
         Returns:
             th.Tensor: (T, H, W, 3) RGB video tensor
         """
@@ -238,6 +244,8 @@ class VideoLoader:
         self._time_base = self.stream.time_base
         self._fps = fps
         self._downsample_factor = downsample_factor
+        self._query_timestamps = query_timestamps
+        self._tolerance_s = tolerance_s
         # Note that unless start idx is keyframe, we also set start_pts to be a few frames preceding the start_frame if it's not 0,
         # so we can return the correct iterator in reset()
         start_frame = self._start_frame if self._start_idx_is_keyframe else max(0, self._start_frame - 5)
@@ -253,6 +261,12 @@ class VideoLoader:
     def __next__(self):
         if self._done:
             raise StopIteration
+
+        # If query_timestamps are provided, use timestamp-based querying
+        if self._query_timestamps is not None:
+            return self._query_frames_by_timestamps()
+
+        # Otherwise, use sequential iteration (original behavior)
         try:
             while True:
                 # use downsample factor to skip frames
@@ -283,8 +297,90 @@ class VideoLoader:
     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
         raise NotImplementedError("Subclasses must implement this method")
 
+    def _query_frames_by_timestamps(self) -> th.Tensor:
+        """
+        Query frames at specific timestamps from the video.
+        This method loads frames around the query timestamps and returns the closest matches.
+
+        Returns:
+            th.Tensor: Tensor of shape (len(query_timestamps), C, H, W) containing the queried frames
+        """
+        if self._done:
+            raise StopIteration
+
+        # Mark as done since we return all queried frames at once
+        self._done = True
+
+        # Convert query timestamps relative to start frame
+        start_time = self._start_frame / self._fps
+        query_ts = [start_time + ts for ts in self._query_timestamps]
+
+        # Set the first and last requested timestamps
+        # Go a bit backward to account for timestamp mismatch
+        first_ts = min(query_ts) - 5 / self._fps
+        last_ts = max(query_ts)
+
+        # Seek to the first timestamp
+        first_pts = int(first_ts / self._time_base)
+        self.container.seek(first_pts, stream=self.stream, backward=True, any_frame=False)
+        frame_iter = self.container.decode(self.stream)
+
+        # Load all frames until last requested frame
+        loaded_frames = []
+        loaded_ts = []
+        for frame in frame_iter:
+            if frame.pts is None:
+                continue
+            current_ts = frame.pts * self._time_base
+            loaded_frames.append(self._process_single_frame(frame))
+            loaded_ts.append(current_ts)
+            if current_ts >= last_ts:
+                break
+
+        if len(loaded_frames) == 0:
+            raise StopIteration
+
+        # Convert to tensors for distance computation
+        query_ts_tensor = th.tensor(query_ts, dtype=th.float32)
+        loaded_ts_tensor = th.tensor(loaded_ts, dtype=th.float32)
+
+        # Compute distances between each query timestamp and timestamps of all loaded frames
+        dist = th.cdist(query_ts_tensor[:, None], loaded_ts_tensor[:, None], p=1)
+        min_dist, argmin_idx = dist.min(1)
+
+        # Check tolerance
+        is_within_tol = min_dist < self._tolerance_s
+        if not is_within_tol.all():
+            violated_indices = th.where(~is_within_tol)[0]
+            raise ValueError(
+                f"One or several query timestamps unexpectedly violate the tolerance "
+                f"({min_dist[violated_indices].tolist()} > {self._tolerance_s}).\n"
+                f"Violated query timestamps: {[query_ts[i] for i in violated_indices]}\n"
+                f"Available loaded timestamps: {loaded_ts}\n"
+                f"This might be due to synchronization issues during data collection."
+            )
+
+        # Get closest frames to the query timestamps
+        # Use cat instead of stack to preserve the (N, C, H, W) format
+        # since each loaded_frame has shape (1, C, H, W)
+        closest_frames = th.cat([loaded_frames[idx] for idx in argmin_idx], dim=0)
+
+        return closest_frames
+
+    def update_query_timestamps(self, query_timestamps: List[float]) -> None:
+        """
+        Update the query timestamps for the next iteration.
+        This allows reusing the same VideoLoader instance with different query timestamps.
+
+        Args:
+            query_timestamps (List[float]): List of timestamps (in seconds) to query from the video.
+        """
+        self._query_timestamps = query_timestamps
+        self._done = False
+
     def reset(self):
         self._current_frame = self._start_frame
+        self._done = False
         self.container.seek(self._start_pts, stream=self.stream, backward=True, any_frame=False)
         self._frame_iter = self.container.decode(self.stream)
         if self._start_frame > 0 and not self._start_idx_is_keyframe:

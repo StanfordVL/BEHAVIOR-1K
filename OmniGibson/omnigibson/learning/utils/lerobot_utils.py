@@ -7,24 +7,36 @@ import os
 import pandas as pd
 import torch as th
 import torchvision
+from torch.utils.data import Dataset, get_worker_info
+import torch.nn.functional as F
+from packaging.version import Version
+import glob
+import PIL
 from lerobot.datasets.compute_stats import _assert_type_and_shape
+from lerobot.datasets.lerobot_dataset import LeRobotDataset, CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION
 from omnigibson.learning.utils.dataset_utils import get_credentials
 from omnigibson.learning.utils.eval_utils import (
     TASK_NAMES_TO_INDICES,
     PROPRIOCEPTION_INDICES,
 )
-from omnigibson.learning.utils.obs_utils import (
-    dequantize_depth,
-    MIN_DEPTH,
-    MAX_DEPTH,
-    DEPTH_SHIFT,
-)
+import omnigibson.learning.utils.obs_utils as OU
+from omnigibson.utils.ui_utils import create_module_logger
 from pathlib import Path
 from PIL import Image as PILImage
 from torchvision import transforms
 from torchvision.io import VideoReader
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Callable, List
 from tqdm import tqdm
+import tempfile
+import shutil
+
+from lerobot.datasets.utils import DEFAULT_IMAGE_PATH, validate_episode_buffer, write_info
+from lerobot.datasets.compute_stats import compute_episode_stats
+from lerobot.datasets.video_utils import decode_video_frames as native_decode_video_frames
+import datasets
+import concurrent.futures
+
+logger = create_module_logger("OmniGibsonLeRobotDataset")
 
 
 def hf_transform_to_torch(items_dict: dict[th.Tensor | None]):
@@ -52,15 +64,172 @@ def hf_transform_to_torch(items_dict: dict[th.Tensor | None]):
     return items_dict
 
 
+def _encode_video_worker(video_key: str, episode_index: int, root: Path, fps: int) -> Path:
+    temp_path = Path(tempfile.mkdtemp(dir=root)) / f"{video_key}_{episode_index:03d}.mp4"
+    fpath = DEFAULT_IMAGE_PATH.format(image_key=video_key, episode_index=episode_index, frame_index=0)
+    img_dir = (root / fpath).parent
+    # Use our custom video encoder
+    mode = "depth" if "depth" in video_key else "rgb"
+    encode_video_frames(img_dir, temp_path, fps, overwrite=True, mode=mode)
+
+    shutil.rmtree(img_dir)
+    return temp_path
+
+
+def encode_video_frames(
+    imgs_dir: Path | str,
+    video_path: Path | str,
+    fps: int,
+    vcodec: str = "libsvtav1",
+    pix_fmt: str = "yuv420p",
+    g: int | None = 2,
+    crf: int | None = 30,
+    fast_decode: int = 0,
+    log_level: int | None = av.logging.ERROR,
+    overwrite: bool = False,
+    preset: int | None = None,
+    mode: str = "rgb",
+    stream_options: dict | None = None,
+) -> None:
+    """More info on ffmpeg arguments tuning on `benchmark/video/README.md`"""
+    # Check encoder availability
+    if vcodec not in ["h264", "hevc", "libsvtav1", "libx264", "libx265"]:
+        raise ValueError(f"Unsupported video codec: {vcodec}. Supported codecs are: h264, hevc, libsvtav1.")
+
+    video_path = Path(video_path)
+    imgs_dir = Path(imgs_dir)
+
+    if video_path.exists() and not overwrite:
+        logging.warning(f"Video file already exists: {video_path}. Skipping encoding.")
+        return
+
+    video_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Encoders/pixel formats incompatibility check
+    if (vcodec == "libsvtav1" or vcodec == "hevc") and pix_fmt == "yuv444p":
+        logging.warning(
+            f"Incompatible pixel format 'yuv444p' for codec {vcodec}, auto-selecting format 'yuv420p'"
+        )
+        pix_fmt = "yuv420p"
+
+    # Encoders/pixel formats incompatibility check
+    if mode == "depth":
+        if vcodec != "libx265":
+            logging.warning(
+                f"Incompatible codec {vcodec} with mode == 'depth', auto-selecting codec 'libx265'"
+            )
+            vcodec = "libx265"
+        if pix_fmt != "yuv444p12le":
+            logging.warning(
+                f"Incompatible pix_fmt {pix_fmt} with mode == 'depth', auto-selecting pix_fmt 'yuv444p12le'"
+            )
+            pix_fmt = "yuv444p12le"
+        if stream_options is None:
+            stream_options = dict()
+        stream_options["x265-params"] = "lossless=1:log-level=none"
+        crf = 0
+
+    # Determine info based on lerobot version
+    if LEROBOT_CODEBASE_VERSION == "v2.1":
+        delimiter = "_"
+    else:
+        # v3.0
+        delimiter = "-"
+
+    # Get input frames
+    template = f"frame{delimiter}" + ("[0-9]" * 6) + ".png"
+    input_list = sorted(
+        glob.glob(str(imgs_dir / template)), key=lambda x: int(x.split(delimiter)[-1].split(".")[0])
+    )
+
+    # Define video output frame size (assuming all input frames are the same size)
+    if len(input_list) == 0:
+        raise FileNotFoundError(f"No images found in {imgs_dir}.")
+    with PIL.Image.open(input_list[0]) as dummy_image:
+        width, height = dummy_image.size
+
+    # Define video codec options
+    video_options = {}
+
+    if g is not None:
+        video_options["g"] = str(g)
+
+    if crf is not None:
+        video_options["crf"] = str(crf)
+
+    if fast_decode:
+        key = "svtav1-params" if vcodec == "libsvtav1" else "tune"
+        value = f"fast-decode={fast_decode}" if vcodec == "libsvtav1" else "fastdecode"
+        video_options[key] = value
+
+    if vcodec == "libsvtav1":
+        video_options["preset"] = str(preset) if preset is not None else "12"
+
+    # Set logging level
+    if log_level is not None:
+        # "While less efficient, it is generally preferable to modify logging with Python's logging"
+        logging.getLogger("libav").setLevel(log_level)
+
+    # Create and open output file (overwrite by default)
+    with av.open(str(video_path), "w") as output:
+        output_stream = output.add_stream(vcodec, fps, options=video_options)
+        output_stream.pix_fmt = pix_fmt
+        output_stream.width = width
+        output_stream.height = height
+        # output_stream.codec_context.gop_size = int(fps * 2)
+        if stream_options is not None:
+            output_stream.options = stream_options
+
+        # Loop through input frames and encode them
+        for input_data in input_list:
+            with PIL.Image.open(input_data) as input_image:
+                if mode == "rgb":
+                    input_image = input_image.convert("RGB")
+                    input_frame = av.VideoFrame.from_image(input_image)
+                elif mode == "depth":
+                    input_frame = av.VideoFrame.from_ndarray(np.array(input_image), format="gray16le")
+                packet = output_stream.encode(input_frame)
+                if packet:
+                    output.mux(packet)
+
+        # Flush the encoder
+        packet = output_stream.encode()
+        if packet:
+            output.mux(packet)
+
+    # Reset logging level
+    if log_level is not None:
+        av.logging.restore_default_callback()
+
+    if not video_path.exists():
+        raise OSError(f"Video encoding did not work. File not found: {video_path}.")
+
+
 def decode_video_frames(
     video_path: Path | str,
     timestamps: list[float],
     tolerance_s: float,
     backend: str | None = None,
+    min_depth: float | None = None,
+    max_depth: float | None = None,
+    depth_shift: float | None = None,
 ) -> th.Tensor:
-    return decode_video_frames_torchvision(
-        video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
-    )
+    # Use our custom decoder for depth
+    if "depth" in str(video_path):
+        backend = "pyav"
+        return decode_video_frames_torchvision(
+            video_path=video_path,
+            timestamps=timestamps,
+            tolerance_s=tolerance_s,
+            backend=backend,
+            min_depth=min_depth,
+            max_depth=max_depth,
+            depth_shift=depth_shift,
+        )
+    else:
+        return native_decode_video_frames(
+            video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
+        )
 
 
 def decode_video_frames_torchvision(
@@ -69,6 +238,9 @@ def decode_video_frames_torchvision(
     tolerance_s: float,
     log_loaded_timestamps: bool = False,
     backend: str | None = None,
+    min_depth: float | None = None,
+    max_depth: float | None = None,
+    depth_shift: float | None = None,
 ) -> th.Tensor:
     """
     Adapted from decode_video_frames_vision to handle depth decoding
@@ -86,7 +258,7 @@ def decode_video_frames_torchvision(
     # set a video stream reader
     # TODO(rcadene): also load audio stream at the same time
     if "depth" in video_path:
-        reader = DepthVideoReader(video_path, "video")
+        reader = DepthVideoReader(video_path, "video", min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
     else:
         reader = VideoReader(video_path, "video")
 
@@ -155,6 +327,20 @@ class DepthVideoReader(VideoReader):
     """
     Adapted from torchvision.io.VideoReader to support gray16le decoding for depth
     """
+    def __init__(
+        self,
+        src: str,
+        stream: str = "video",
+        num_threads: int = 0,
+        min_depth: float | None = None,
+        max_depth: float | None = None,
+        depth_shift: float | None = None,
+    ) -> None:
+        self.min_depth = min_depth
+        self.max_depth = max_depth
+        self.depth_shift = depth_shift
+
+        super().__init__(src=src, stream=stream, num_threads=num_threads)
 
     def __next__(self) -> Dict[str, Any]:
         """Decodes and returns the next frame of the current stream.
@@ -173,13 +359,13 @@ class DepthVideoReader(VideoReader):
             pts = float(frame.pts * frame.time_base)
             if "video" in self.pyav_stream:
                 frame = th.as_tensor(
-                    dequantize_depth(
+                    OU.dequantize_depth(
                         frame.reformat(format="gray16le").to_ndarray(),
-                        min_depth=MIN_DEPTH,
-                        max_depth=MAX_DEPTH,
-                        shift=DEPTH_SHIFT,
+                        min_depth=self.min_depth,
+                        max_depth=self.max_depth,
+                        shift=self.depth_shift,
                     )
-                )
+                ).unsqueeze(dim=-3)         # Add back 1 channel
             elif "audio" in self.pyav_stream:
                 frame = th.as_tensor(frame.to_ndarray()).permute(1, 0)
             else:
@@ -527,6 +713,623 @@ def generate_info_json(
         json.dump(info, f, indent=4)
 
     print(f"Generated info JSON for {len(info)} entries.")
+#
+#
+# class RGBVideoLoader(OU.VideoLoader):
+#     # def __init__(self, data_path: str, task_id: int, camera_id: str, demo_id: str, *args, **kwargs):
+#     #     super().__init__(path=data_path,
+#     #         *args,
+#     #         **kwargs,
+#     #     )
+#
+#     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+#         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
+#         if self.output_size is None:
+#             return th.from_numpy(rgb).movedim(-1, -3).unsqueeze(0)
+#         rgb = F.interpolate(
+#             th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), size=self.output_size, mode="nearest-exact"
+#         )
+#         return rgb  # (1, 3, H, W)
+#
+#
+# class DepthVideoLoader(OU.VideoLoader):
+#     def __init__(self, path: str, *args, **kwargs):
+#         self.min_depth = kwargs.get("min_depth", OU.MIN_DEPTH)
+#         self.max_depth = kwargs.get("max_depth", OU.MAX_DEPTH)
+#         self.shift = kwargs.get("shift", OU.DEPTH_SHIFT)
+#         super().__init__(
+#             path=path,
+#             *args,
+#             **kwargs,
+#         )
+#
+#     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
+#         # Decode Y (luma) channel only; YUV420 → grayscale image
+#         frame_gray16 = frame.reformat(format="gray16le").to_ndarray()  # (H, W)
+#         depth = OU.dequantize_depth(frame_gray16, min_depth=self.min_depth, max_depth=self.max_depth, shift=self.shift)
+#         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
+#         if self.output_size is not None:
+#             depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
+#         return depth.squeeze(0)  # (1, H, W)
+#
+
+class OmniGibsonLeRobotDataset(LeRobotDataset):
+
+    MIN_DEPTH = None
+    MAX_DEPTH = None
+    DEPTH_SHIFT = None
+
+    @classmethod
+    def create(
+        cls,
+        repo_id: str,
+        fps: int,
+        features: dict,
+        root: str | Path | None = None,
+        robot_type: str | None = None,
+        use_videos: bool = True,
+        tolerance_s: float = 1e-4,
+        image_writer_processes: int = 0,
+        image_writer_threads: int = 0,
+        video_backend: str | None = None,
+        batch_encoding_size: int = 1,
+        min_depth=OU.MIN_DEPTH,
+        max_depth=OU.MAX_DEPTH,
+        depth_shift=OU.DEPTH_SHIFT,
+    ) -> "OmniGibsonLeRobotDataset":
+
+        # Set depth ranges
+        cls.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+
+        # Call super first
+        obj = super().create(
+            repo_id=repo_id,
+            fps=fps,
+            features=features,
+            root=root,
+            robot_type=robot_type,
+            use_videos=use_videos,
+            tolerance_s=tolerance_s,
+            image_writer_processes=image_writer_processes,
+            image_writer_threads=image_writer_threads,
+            video_backend=video_backend,
+            batch_encoding_size=batch_encoding_size,
+        )
+
+        # Add og metadata dict
+        obj.meta.info["omnigibson"] = dict()
+
+        return obj
+
+    def __init__(
+            self,
+            repo_id: str,
+            root: str | Path | None = None,
+            episodes: list[int] | None = None,
+            image_transforms: Callable | None = None,
+            delta_timestamps: dict[str, list[float]] | None = None,
+            tolerance_s: float = 1e-4,
+            revision: str | None = None,
+            force_cache_sync: bool = False,
+            download_videos: bool = True,
+            video_backend: str | None = None,
+            batch_encoding_size: int = 1,
+            # chunk_streaming_using_keyframe: bool = True,
+            # shuffle: bool = True,
+            # seed: int = 0,
+            min_depth=None,
+            max_depth=None,
+            depth_shift=None,
+    ):
+        # Call super
+        super().__init__(
+            repo_id=repo_id,
+            root=root,
+            episodes=episodes,
+            image_transforms=image_transforms,
+            delta_timestamps=delta_timestamps,
+            tolerance_s=tolerance_s,
+            revision=revision,
+            force_cache_sync=force_cache_sync,
+            download_videos=download_videos,
+            video_backend=video_backend,
+            batch_encoding_size=batch_encoding_size,
+        )
+
+        # # Handle chunking
+        # self.seed = seed
+        # self.current_streaming_chunk_idx = None
+        # self.current_streaming_frame_idx = None
+        # self.obs_loaders = None
+        # self._should_obs_loaders_reload = None
+        # self.chunks = None
+        # self._chunk_streaming_using_keyframe = chunk_streaming_using_keyframe
+        # if self._chunk_streaming_using_keyframe:
+        #     if not shuffle:
+        #         logger.warning(
+        #             "chunk_streaming_using_keyframe mode is enabled but shuffle is set to False. This may lead to less randomness in chunk selection."
+        #         )
+        #     self.chunks = self._get_keyframe_chunk_indices() #chunk_size=60)
+        #     # Now, we randomly permute the episodes if shuffle is True
+        #     if shuffle:
+        #         self.current_streaming_chunk_idx = None
+        #         self.current_streaming_frame_idx = None
+        #     else:
+        #         self.current_streaming_chunk_idx = 0
+        #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
+        #     self.obs_loaders = dict()
+        #     self._should_obs_loaders_reload = True
+
+        # If depth values not set, load from dataset's meta info and set them internally
+        min_depth = self.meta.info["omnigibson"]["min_depth"] if min_depth is None else min_depth
+        max_depth = self.meta.info["omnigibson"]["max_depth"] if max_depth is None else max_depth
+        depth_shift = self.meta.info["omnigibson"]["depth_shift"] if depth_shift is None else depth_shift
+
+        # Update depth values
+        self.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+
+    # def _get_keyframe_chunk_indices(self, chunk_size=250) -> List[Tuple[int, int, int]]:
+    #     """
+    #     Divide each episode into chunks of data based on GOP of the data (here for B1K, GOP size is 250 frames).
+    #     Args:
+    #         chunk_size (int): size of each chunk in number of frames. Default is 250 for B1K. Should be the GOP size of the video data.
+    #     Returns:
+    #         List of tuples, where each tuple contains (start_index, end_index, local_start_index) for each chunk.
+    #     """
+    #     episode_lengths = {ep_idx: ep_dict["length"] for ep_idx, ep_dict in self.meta.episodes.items()}
+    #     # episode_lengths = [episode_lengths[ep_idx] for ep_idx in self.episodes]
+    #     chunks = []
+    #     offset = 0
+    #     for L in episode_lengths.values():
+    #         local_starts = list(range(0, L, chunk_size))
+    #         local_ends = local_starts[1:] + [L]
+    #         for ls, le in zip(local_starts, local_ends):
+    #             chunks.append((offset + ls, offset + le, ls))
+    #         offset += L
+    #     return chunks
+
+    # def __getitem__(self, idx) -> dict:
+    #     if not self._chunk_streaming_using_keyframe:
+    #         return super().__getitem__(idx)
+    #
+    #     # Streaming mode: we will load the episode at the current streaming index, and then increment the index for next call
+    #     # Randomize chunk index on first call
+    #     if self.current_streaming_chunk_idx is None:
+    #         worker_info = get_worker_info()
+    #         worker_id = 0 if worker_info is None else worker_info.id
+    #         rng = np.random.default_rng(self.seed + worker_id)
+    #         rng.shuffle(self.chunks)
+    #         self.current_streaming_chunk_idx = rng.integers(0, len(self.chunks)).item()
+    #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
+    #     # Current chunk iterated, move to next chunk
+    #     if self.current_streaming_frame_idx >= self.chunks[self.current_streaming_chunk_idx][1]:
+    #         self.current_streaming_chunk_idx += 1
+    #         # All data iterated, restart from beginning
+    #         if self.current_streaming_chunk_idx >= len(self.chunks):
+    #             self.current_streaming_chunk_idx = 0
+    #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
+    #         self._should_obs_loaders_reload = True
+    #     item = self.hf_dataset[self.current_streaming_frame_idx]
+    #     ep_idx = item["episode_index"].item()
+    #
+    #     query_indices = None
+    #     if self.delta_indices is not None:
+    #         query_indices, padding = self._get_query_indices(self.current_streaming_frame_idx, ep_idx)
+    #         query_result = self._query_hf_dataset(query_indices)
+    #         item = {**item, **padding}
+    #         for key, val in query_result.items():
+    #             item[key] = val
+    #
+    #     current_ts = item["timestamp"].item()
+    #     query_timestamps = self._get_query_timestamps(current_ts, query_indices)
+    #
+    #     # TODO: Remove
+    #     query_timestamps = {k: v for k, v in query_timestamps.items() if "external_sensor0" in k}
+    #
+    #     if self._should_obs_loaders_reload:
+    #         for loader in self.obs_loaders.values():
+    #             loader.close()
+    #         self.obs_loaders = dict()
+    #         # reload video loaders for new episode
+    #         self.current_streaming_episode_idx = ep_idx
+    #         for vid_key in query_timestamps.keys():
+    #             kwargs = {}
+    #             # task_id = item["task_index"].item()
+    #             if "seg_instance_id" in vid_key:
+    #                 raise NotImplementedError
+    #                 # # load id list
+    #                 # with open(
+    #                 #     self.root / "meta/episodes" / f"task-{task_id:04d}" / f"episode_{ep_idx:08d}.json",
+    #                 #     "r",
+    #                 # ) as f:
+    #                 #     kwargs["id_list"] = th.tensor(
+    #                 #         json.load(f)[f"{ROBOT_CAMERA_NAMES['R1Pro'][vid_key.split('.')[-1]]}::unique_ins_ids"]
+    #                 #     )
+    #             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
+    #             if "rgb" in vid_key:
+    #                 obs_loader_cls = RGBVideoLoader
+    #             elif "depth" in vid_key:
+    #                 obs_loader_cls = DepthVideoLoader
+    #                 kwargs["min_depth"] = self.MIN_DEPTH
+    #                 kwargs["max_depth"] = self.MAX_DEPTH
+    #                 kwargs["depth_shift"] = self.DEPTH_SHIFT
+    #             else:
+    #                 raise NotImplementedError
+    #             self.obs_loaders[vid_key] = iter(
+    #                 obs_loader_cls(
+    #                     path=str(video_path),
+    #                     start_idx=self.chunks[self.current_streaming_chunk_idx][2],
+    #                     start_idx_is_keyframe=False,  # TODO (Wensi): Change this to True after figuring out the correct keyframe indices
+    #                     batch_size=1, #len(query_timestamps), # TODO: Fix this -- currently just sanity checking shapes 1,
+    #                     stride=1,
+    #                     fps=self.fps,
+    #                     query_timestamps=query_timestamps[vid_key],  # Pass query timestamps
+    #                     tolerance_s=self.tolerance_s,
+    #                     **kwargs,
+    #                 )
+    #             )
+    #         self._should_obs_loaders_reload = False
+    #
+    #     else:
+    #         for vid_key in query_timestamps.keys(): #self.meta.video_keys:
+    #             # Update existing loader with new timestamps
+    #             self.obs_loaders[vid_key].update_query_timestamps(query_timestamps[vid_key])
+    #
+    #     # load visual observations
+    #     # TODO: Undo
+    #     for key in query_timestamps.keys(): #self.meta.video_keys:
+    #         item[key] = next(self.obs_loaders[key]) #[0]
+    #
+    #     if self.image_transforms is not None:
+    #         image_keys = self.meta.camera_keys
+    #         for cam in image_keys:
+    #             item[cam] = self.image_transforms(item[cam])
+    #
+    #     # Add task as a string
+    #     task_idx = item["task_index"].item()
+    #     item["task"] = self.meta.tasks[task_idx]
+    #     self.current_streaming_frame_idx += 1
+    #
+    #     return item
+
+    @classmethod
+    def set_depth_range(cls, min_depth, max_depth, depth_shift):
+        cls.MIN_DEPTH = min_depth
+        cls.MAX_DEPTH = max_depth
+        cls.DEPTH_SHIFT = depth_shift
+
+        # Also make sure to set the root class's values since that is what is used when overwriting the lerobot function
+        if cls != OmniGibsonLeRobotDataset:
+            OmniGibsonLeRobotDataset.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+
+    def set_omnigibson_metadata(self, key, value):
+        """
+        Adds omnigibson-relevant metadata to this dataset's metadata info dict
+
+        Args:
+            key (str): Entry to add / modify
+            value (Any): Value to store
+        """
+        if "omnigibson" not in self.meta.info:
+            self.meta.info["omnigibson"] = dict()
+
+        self.meta.info["omnigibson"][key] = value
+
+    def get_omnigibson_metadata(self, key):
+        """
+        Grabs omnigibson-relevant metadata from this dataset's metadata info dict. Returns None if not found
+
+        Args:
+            key (str): Entry to grab
+
+        Returns:
+            Any: Corresponding metadata value
+        """
+        assert "omnigibson" in self.meta.info, "Found no omnigibson metadata in this dataset!"
+        return self.meta.info["omnigibson"].get(key, None)
+
+    @classmethod
+    def image_array_to_pil_image(cls, image_array: np.ndarray, range_check: bool = True) -> PIL.Image.Image:
+        # Overwrites the native LeRobot implementation to include depth processing
+        # TODO(aliberts): handle 1 channel and 4 for depth images
+        if image_array.ndim != 3:
+            raise ValueError(f"The array has {image_array.ndim} dimensions, but 3 is expected for an image.")
+
+        if image_array.shape[0] in {1, 3}:  # Handle RGB or Depth
+            # Transpose from pytorch convention (C, H, W) to (H, W, C)
+            image_array = image_array.transpose(1, 2, 0)
+
+        elif image_array.shape[-1] not in {1, 3}:
+            raise NotImplementedError(
+                f"The image has {image_array.shape[-1]} channels, but 1 or 3 is required for now."
+            )
+
+        if image_array.dtype != np.uint8:
+            if image_array.shape[-1] == 3:
+                if range_check:
+                    # RGB, handle edge cases
+                    max_ = image_array.max().item()
+                    min_ = image_array.min().item()
+                    if max_ > 1.0 or min_ < 0.0:
+                        raise ValueError(
+                            "The image data type is float, which requires values in the range [0.0, 1.0]. "
+                            f"However, the provided range is [{min_}, {max_}]. Please adjust the range or "
+                            "provide a uint8 image with values in the range [0, 255]."
+                        )
+                image_array = (image_array * 255).astype(np.uint8)
+            else:
+                # This is depth, so normalize before storing as image
+                image_array = OU.quantize_depth(
+                    depth=image_array,
+                    min_depth=cls.MIN_DEPTH,
+                    max_depth=cls.MAX_DEPTH,
+                    shift=cls.DEPTH_SHIFT,
+                )[:, :, 0]  # Prune final dimension so shape is (H, W)
+
+        return PIL.Image.fromarray(image_array)
+
+
+# Define separate classes for V2 vs V3 versions of the dataset
+class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
+
+    def __init__(
+            self,
+            repo_id: str,
+            root: str | Path | None = None,
+            episodes: list[int] | None = None,
+            image_transforms: Callable | None = None,
+            delta_timestamps: dict[list[float]] | None = None,
+            tolerance_s: float = 1e-4,
+            revision: str | None = None,
+            force_cache_sync: bool = False,
+            download_videos: bool = True,
+            video_backend: str | None = None,
+            batch_encoding_size: int = 1,
+            # chunk_streaming_using_keyframe: bool = True,
+            # shuffle: bool = True,
+            # seed: int = 0,
+            min_depth=None,
+            max_depth=None,
+            depth_shift=None,
+    ):
+        # Sanity check datasets version -- must use <= v0.36
+        installed_version = Version(datasets.__version__)
+        assert installed_version <= Version("3.6.0"), \
+            f"To use LeRobotV2 dataset, installed datasets package version must be <= 3.6.0, but found version: {installed_version}\n" + \
+            "To install compatible version, run `pip install 'datasets<=3.6'`"
+
+        # Call super
+        super().__init__(
+            repo_id=repo_id,
+            root=root,
+            episodes=episodes,
+            image_transforms=image_transforms,
+            delta_timestamps=delta_timestamps,
+            tolerance_s=tolerance_s,
+            revision=revision,
+            force_cache_sync=force_cache_sync,
+            download_videos=download_videos,
+            video_backend=video_backend,
+            batch_encoding_size=batch_encoding_size,
+            # chunk_streaming_using_keyframe=chunk_streaming_using_keyframe,
+            # shuffle=shuffle,
+            # seed=seed,
+            min_depth=min_depth,
+            max_depth=max_depth,
+            depth_shift=depth_shift,
+        )
+
+    def _query_hf_dataset(self, query_indices: dict[str, list[int]]) -> dict:
+        # See: https://github.com/huggingface/lerobot/issues/93#issuecomment-3182826868
+        posted_data = {}
+        for key, indices in query_indices.items():
+            if key not in self.meta.video_keys:
+                posted_data[key] = th.stack(
+                    [self.hf_dataset[idx][key] for idx in indices]
+                )
+        return posted_data
+
+    def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
+        """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
+        in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
+        Segmentation Fault. This probably happens because a memory reference to the video loader is created in
+        the main process and a subprocess fails to access it.
+        """
+        item = {}
+        for vid_key, query_ts in query_timestamps.items():
+            video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
+            # Use our custom decode_video_frames function
+            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend, self.MIN_DEPTH, self.MAX_DEPTH, self.DEPTH_SHIFT)
+            item[vid_key] = frames.squeeze(0)
+
+        return item
+
+    def encode_episode_videos(self, episode_index: int) -> None:
+        """
+        Use ffmpeg to convert frames stored as png into mp4 videos.
+        Note: `encode_video_frames` is a blocking call. Making it asynchronous shouldn't speedup encoding,
+        since video encoding with ffmpeg is already using multithreading.
+
+        This method handles video encoding steps:
+        - Video encoding via ffmpeg
+        - Video info updating in metadata
+        - Raw image cleanup
+
+        Args:
+            episode_index (int): Index of the episode to encode.
+        """
+        for key in self.meta.video_keys:
+            video_path = self.root / self.meta.get_video_file_path(episode_index, key)
+            if video_path.is_file():
+                # Skip if video is already encoded. Could be the case when resuming data recording.
+                continue
+            img_dir = self._get_image_file_path(
+                episode_index=episode_index, image_key=key, frame_index=0
+            ).parent
+            # Use our own custom video encoder function
+            mode = "depth" if "depth" in key else "rgb"
+            encode_video_frames(img_dir, video_path, self.fps, overwrite=True, mode=mode)
+            shutil.rmtree(img_dir)
+
+        # Update video info (only needed when first episode is encoded since it reads from episode 0)
+        if len(self.meta.video_keys) > 0 and episode_index == 0:
+            self.meta.update_video_info()
+            write_info(self.meta.info, self.meta.root)  # ensure video info always written properly
+
+    def save_episode(self, episode_data: dict | None = None) -> None:
+        # Run super
+        super().save_episode(episode_data=episode_data)
+
+        # Update depth values
+        self.meta.info["omnigibson"]["min_depth"] = self.MIN_DEPTH
+        self.meta.info["omnigibson"]["max_depth"] = self.MAX_DEPTH
+        self.meta.info["omnigibson"]["depth_shift"] = self.DEPTH_SHIFT
+
+
+class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
+
+    def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
+        """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
+        in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
+        Segmentation Fault. This probably happens because a memory reference to the video loader is created in
+        the main process and a subprocess fails to access it.
+        """
+        ep = self.meta.episodes[ep_idx]
+        item = {}
+        for vid_key, query_ts in query_timestamps.items():
+            # Episodes are stored sequentially on a single mp4 to reduce the number of files.
+            # Thus we load the start timestamp of the episode on this mp4 and,
+            # shift the query timestamp accordingly.
+            from_timestamp = ep[f"videos/{vid_key}/from_timestamp"]
+            shifted_query_ts = [from_timestamp + ts for ts in query_ts]
+
+            video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
+            # Use our custom decode_video_frames function
+            frames = decode_video_frames(video_path, shifted_query_ts, self.tolerance_s, self.video_backend, self.MIN_DEPTH, self.MAX_DEPTH, self.DEPTH_SHIFT)
+            item[vid_key] = frames.squeeze(0)
+
+        return item
+
+    def _encode_temporary_episode_video(self, video_key: str, episode_index: int) -> Path:
+        # Use our custom video worker
+        return _encode_video_worker(video_key, episode_index, self.root, self.fps)
+
+    def save_episode(
+            self,
+            episode_data: dict | None = None,
+            parallel_encoding: bool = True,
+    ) -> None:
+        """
+        This will save to disk the current episode in self.episode_buffer.
+
+        Video encoding is handled automatically based on batch_encoding_size:
+        - If batch_encoding_size == 1: Videos are encoded immediately after each episode
+        - If batch_encoding_size > 1: Videos are encoded in batches.
+
+        Args:
+            episode_data (dict | None, optional): Dict containing the episode data to save. If None, this will
+                save the current episode in self.episode_buffer, which is filled with 'add_frame'. Defaults to
+                None.
+            parallel_encoding (bool, optional): If True, encode videos in parallel using ProcessPoolExecutor.
+                Defaults to True on Linux, False on macOS as it tends to use all the CPU available already.
+        """
+        episode_buffer = episode_data if episode_data is not None else self.episode_buffer
+
+        validate_episode_buffer(episode_buffer, self.meta.total_episodes, self.features)
+
+        # size and task are special cases that won't be added to hf_dataset
+        episode_length = episode_buffer.pop("size")
+        tasks = episode_buffer.pop("task")
+        episode_tasks = list(set(tasks))
+        episode_index = episode_buffer["episode_index"]
+
+        episode_buffer["index"] = np.arange(self.meta.total_frames, self.meta.total_frames + episode_length)
+        episode_buffer["episode_index"] = np.full((episode_length,), episode_index)
+
+        # Update tasks and task indices with new tasks if any
+        self.meta.save_episode_tasks(episode_tasks)
+
+        # Given tasks in natural language, find their corresponding task indices
+        episode_buffer["task_index"] = np.array([self.meta.get_task_index(task) for task in tasks])
+
+        for key, ft in self.features.items():
+            # index, episode_index, task_index are already processed above, and image and video
+            # are processed separately by storing image path and frame info as meta data
+            if key in ["index", "episode_index", "task_index"] or ft["dtype"] in ["image", "video"]:
+                continue
+            episode_buffer[key] = np.stack(episode_buffer[key])
+
+        # Wait for image writer to end, so that episode stats over images can be computed
+        self._wait_image_writer()
+
+        # TODO: Handle depth
+        ep_stats = compute_episode_stats(episode_buffer, self.features)
+
+        ep_metadata = self._save_episode_data(episode_buffer)
+        has_video_keys = len(self.meta.video_keys) > 0
+        use_batched_encoding = self.batch_encoding_size > 1
+
+        if has_video_keys and not use_batched_encoding:
+            num_cameras = len(self.meta.video_keys)
+            if parallel_encoding and num_cameras > 1:
+                # TODO(Steven): Ideally we would like to control the number of threads per encoding such that:
+                # num_cameras * num_threads = (total_cpu -1)
+                with concurrent.futures.ProcessPoolExecutor(max_workers=num_cameras) as executor:
+                    future_to_key = {
+                        executor.submit(
+                            _encode_video_worker,
+                            video_key,
+                            episode_index,
+                            self.root,
+                            self.fps,
+                        ): video_key
+                        for video_key in self.meta.video_keys
+                    }
+
+                    results = {}
+                    for future in concurrent.futures.as_completed(future_to_key):
+                        video_key = future_to_key[future]
+                        try:
+                            temp_path = future.result()
+                            results[video_key] = temp_path
+                        except Exception as exc:
+                            logging.error(f"Video encoding failed for {video_key}: {exc}")
+                            raise exc
+
+                for video_key in self.meta.video_keys:
+                    temp_path = results[video_key]
+                    ep_metadata.update(
+                        self._save_episode_video(video_key, episode_index, temp_path=temp_path)
+                    )
+            else:
+                for video_key in self.meta.video_keys:
+                    ep_metadata.update(self._save_episode_video(video_key, episode_index))
+
+        # `meta.save_episode` need to be executed after encoding the videos
+        self.meta.save_episode(episode_index, episode_length, episode_tasks, ep_stats, ep_metadata)
+
+        if has_video_keys and use_batched_encoding:
+            # Check if we should trigger batch encoding
+            self.episodes_since_last_encoding += 1
+            if self.episodes_since_last_encoding == self.batch_encoding_size:
+                start_ep = self.num_episodes - self.batch_encoding_size
+                end_ep = self.num_episodes
+                self._batch_save_episode_video(start_ep, end_ep)
+                self.episodes_since_last_encoding = 0
+
+        if not episode_data:
+            # Reset episode buffer and clean up temporary images (if not already deleted during video encoding)
+            self.clear_episode_buffer(delete_images=len(self.meta.image_keys) > 0)
+
+        # Update depth values
+        self.meta.info["omnigibson"]["min_depth"] = self.MIN_DEPTH
+        self.meta.info["omnigibson"]["max_depth"] = self.MAX_DEPTH
+        self.meta.info["omnigibson"]["depth_shift"] = self.DEPTH_SHIFT
+
+
+# Save internal methods to force handling depth during image saving
+import lerobot.datasets.image_writer as liw
+liw.image_array_to_pil_image = OmniGibsonLeRobotDataset.image_array_to_pil_image
 
 
 if __name__ == "__main__":
