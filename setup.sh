@@ -32,12 +32,12 @@ while [[ $# -gt 0 ]]; do
         --eval) EVAL=true; shift ;;
         --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
-        --cuda-version) CUDA_VERSION="\$2"; shift 2 ;;
+        --cuda-version) CUDA_VERSION="$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
         --confirm-no-conda) CONFIRM_NO_CONDA=true; shift ;;
-        *) echo "Unknown option: \$1"; exit 1 ;;
+        *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
 
@@ -201,7 +201,7 @@ if [ "$NEW_ENV" = true ]; then
     fi
     
     source "$(conda info --base)/etc/profile.d/conda.sh"
-    
+
     # Check if environment already exists and exit with instructions
     if conda env list | grep -q "^behavior "; then
         echo ""
@@ -211,13 +211,13 @@ if [ "$NEW_ENV" = true ]; then
         echo ""
         exit 1
     fi
-    
+
     # Create environment with only Python 3.10
     conda create -n behavior python=3.10 -c conda-forge -y
     conda activate behavior
-    
+
     [[ "$CONDA_DEFAULT_ENV" != "behavior" ]] && { echo "ERROR: Failed to activate environment"; exit 1; }
-    
+
     # Install numpy and setuptools via pip
     echo "Installing numpy and setuptools..."
     pip install "numpy<2" "setuptools<=79"
@@ -351,13 +351,19 @@ if [ "$OMNIGIBSON" = true ]; then
         
         install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
         
-        # Fix cryptography conflict - remove conflicting version
-        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography" ]; then
-            echo "Fixing cryptography conflict..."
-            rm -rf "$ISAAC_PATH/exts/omni.pip.cloud/pip_prebundle/cryptography"
+        # Extract ISAAC_PATH from isaacsim module
+        ISAAC_PATH=$(python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>/dev/null)
+        
+        # Fix websockets conflict - remove any pip_prebundle/websockets under extscache
+        if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache" ]; then
+            echo "Fixing websockets conflict..."
+            find "$ISAAC_PATH/extscache" -type d -name "websockets" -path "*/pip_prebundle/*" -exec rm -rf {} + 2>/dev/null || true
         fi
     fi
     
+    # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
+    pip install --force-reinstall cffi==1.17.1
+
     echo "OmniGibson installation completed successfully!"
 fi
 

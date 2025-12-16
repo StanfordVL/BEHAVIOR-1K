@@ -2,7 +2,7 @@ import os
 from bddl.bddl_verification import *
 
 
-def verify_tms(): 
+def verify_tms():
     with open(SYNS_TO_PROPS_JSON, "r") as f:
         syns_to_props = json.load(f)
     *__, domain_predicates = parse_domain("omnigibson")
@@ -20,7 +20,7 @@ def verify_tms():
             no_substances_with_multiple_instances_tm(rule, submap, syns_to_props)
 
     no_duplicate_rule_names()
-    
+
 
 if __name__ == "__main__":
     verify_tms()

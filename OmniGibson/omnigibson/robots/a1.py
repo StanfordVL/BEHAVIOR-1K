@@ -202,11 +202,11 @@ class A1(ManipulationRobot):
 
     @cached_property
     def arm_link_names(self):
-        return {self.default_arm: [f"arm_seg{i+1}" for i in range(5)]}
+        return {self.default_arm: [f"arm_seg{i + 1}" for i in range(5)]}
 
     @cached_property
     def arm_joint_names(self):
-        return {self.default_arm: [f"arm_joint{i+1}" for i in range(6)]}
+        return {self.default_arm: [f"arm_joint{i + 1}" for i in range(6)]}
 
     @cached_property
     def eef_link_names(self):

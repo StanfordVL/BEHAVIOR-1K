@@ -222,16 +222,19 @@ class ObjectExporter:
 
         # Export information about the material
         mtl = obj.material
-        assert rt.classOf(obj.material) == rt.Shell_Material, f"Material {obj.material} is not a shell material."
+        assert (
+            rt.classOf(obj.material) == rt.Shell_Material
+        ), f"Material {obj.material} is not a shell material."
         baked_mtl = mtl.bakedMaterial
         metadata["material_maps"] = {}
         for map_idx in range(rt.getNumSubTexmaps(baked_mtl)):
             sub_texmap = rt.getSubTexmap(baked_mtl, map_idx + 1)
             if sub_texmap is not None:
                 sub_texmap_slot_name = rt.getSubTexmapSlotName(baked_mtl, map_idx + 1)
-                assert rt.classOf(sub_texmap) == rt.Bitmaptexture, \
-                    f"Object {obj.name} baked material map {sub_texmap_slot_name} has unexpected type {rt.classOf(sub_texmap)}"
-                
+                assert (
+                    rt.classOf(sub_texmap) == rt.Bitmaptexture
+                ), f"Object {obj.name} baked material map {sub_texmap_slot_name} has unexpected type {rt.classOf(sub_texmap)}"
+
                 # Use os.path.abspath which normalizes + absolutifies the paths but does not resolve symlinks unlike pathlib (problem with dvc)
                 map_path_str = os.path.abspath(sub_texmap.filename)
                 # Fix legacy-format paths
@@ -241,11 +244,15 @@ class ObjectExporter:
                     )
                 map_path = pathlib.Path(map_path_str)
                 assert map_path.exists(), f"Object {obj.name} baked material map {sub_texmap_slot_name} does not exist at {map_path}"
-                bakery_path = pathlib.Path(os.path.abspath(os.path.join(rt.maxFilePath, "bakery")))
+                bakery_path = pathlib.Path(
+                    os.path.abspath(os.path.join(rt.maxFilePath, "bakery"))
+                )
 
                 # Then switch to Pathlib which asserts that the path is a subpath before normalizing
-                metadata["material_maps"][sub_texmap_slot_name] = map_path.relative_to(bakery_path).as_posix()
-                
+                metadata["material_maps"][sub_texmap_slot_name] = map_path.relative_to(
+                    bakery_path
+                ).as_posix()
+
         assert len(metadata["material_maps"]) > 0, f"Object {obj.name} has no maps."
 
         metadata["meta_links"] = defaultdict(
@@ -342,9 +349,9 @@ class ObjectExporter:
 
             if rt.classOf(child) == rt.Sphere:
                 size = np.array([child.radius, child.radius, child.radius]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid][
-                    "type"
-                ] = "sphere"
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = (
+                    "sphere"
+                )
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -356,9 +363,9 @@ class ObjectExporter:
                 )
             elif rt.classOf(child) == rt.Cylinder:
                 size = np.array([child.radius, child.radius, child.height]) * scale
-                metadata["meta_links"][meta_type][meta_id][meta_subid][
-                    "type"
-                ] = "cylinder"
+                metadata["meta_links"][meta_type][meta_id][meta_subid]["type"] = (
+                    "cylinder"
+                )
                 metadata["meta_links"][meta_type][meta_id][meta_subid]["size"] = list(
                     size
                 )
@@ -397,7 +404,7 @@ class ObjectExporter:
         failures = {}
         for i, obj in enumerate(objs):
             try:
-                print(f"{i+1} / {len(objs)} total")
+                print(f"{i + 1} / {len(objs)} total")
 
                 obj.isHidden = False
                 for child in obj.children:
@@ -417,9 +424,12 @@ def main():
     success = True
     error_msg = ""
     try:
-        with TempFS(temp_dir=r"D:\tmp") as obj_out_fs, ZipFS(
-            os.path.join(out_dir, "meshes.zip"), write=True, temp_fs=obj_out_fs
-        ) as zip_fs:
+        with (
+            TempFS(temp_dir=r"D:\tmp") as obj_out_fs,
+            ZipFS(
+                os.path.join(out_dir, "meshes.zip"), write=True, temp_fs=obj_out_fs
+            ) as zip_fs,
+        ):
             exp = ObjectExporter(obj_out_fs.getsyspath("/"))
             exp.run()
 

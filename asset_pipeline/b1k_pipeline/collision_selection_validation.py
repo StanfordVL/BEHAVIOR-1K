@@ -25,7 +25,9 @@ def compare_aabbs(lower_mesh, collision_meshes):
     lower_max = np.max(lower_aabb, axis=0)
 
     # Get the AABB of the collision meshes
-    collision_aabbs = np.concatenate([get_aabb_corners(mesh) for mesh in collision_meshes], axis=0)
+    collision_aabbs = np.concatenate(
+        [get_aabb_corners(mesh) for mesh in collision_meshes], axis=0
+    )
     collision_min = np.min(collision_aabbs, axis=0)
     collision_max = np.max(collision_aabbs, axis=0)
 
@@ -45,7 +47,9 @@ def process_target(target):
         with PipelineFS() as pipeline_fs:
             errors = collections.defaultdict(list)
 
-            with pipeline_fs.target_output(target).open("collision_selection.json", "r") as f:
+            with pipeline_fs.target_output(target).open(
+                "collision_selection.json", "r"
+            ) as f:
                 collision_selection = json.load(f)
 
             selected = {}
@@ -56,11 +60,17 @@ def process_target(target):
                 if not link:
                     link = "base_link"
                 if (model, link) in selected:
-                    errors[obj].append("Duplicate collision selection. Seen before as " + selected[(model, link)] + ".")
+                    errors[obj].append(
+                        "Duplicate collision selection. Seen before as "
+                        + selected[(model, link)]
+                        + "."
+                    )
                 selected[(model, link)] = obj
 
             # Get the mesh tree
-            G = mesh_tree.build_mesh_tree(target, load_upper=False, load_bad=False, load_nonzero=False)
+            G = mesh_tree.build_mesh_tree(
+                target, load_upper=False, load_bad=False, load_nonzero=False
+            )
 
             # Check that each object matches at least one of the options
             for node in G.nodes:
@@ -69,18 +79,38 @@ def process_target(target):
                     # Validate the mesh
                     splits = G.nodes[node]["collision_mesh"]
                     if len(splits) == 0:
-                        errors[node].append("Collision mesh was found but contains no meshes.")
+                        errors[node].append(
+                            "Collision mesh was found but contains no meshes."
+                        )
                     elif len(splits) > 32:
-                        errors[node].append("Collision mesh was found but contains too many meshes: {len(splits)}.")
+                        errors[node].append(
+                            "Collision mesh was found but contains too many meshes: {len(splits)}."
+                        )
                     elif any(not split.is_watertight for split in splits):
-                        errors[node].append("Collision mesh was found but contains non-watertight meshes.")
-                    elif any(not split.is_volume or split.volume <= 0 for split in splits):
-                        errors[node].append("Collision mesh was found but contains zero volume meshes.")
-                    elif any(np.any(split.bounding_box.extents == 0) for split in splits):
-                        errors[node].append("Collision mesh was found but contains zero bbox dimension meshes.")
+                        errors[node].append(
+                            "Collision mesh was found but contains non-watertight meshes."
+                        )
+                    elif any(
+                        not split.is_volume or split.volume <= 0 for split in splits
+                    ):
+                        errors[node].append(
+                            "Collision mesh was found but contains zero volume meshes."
+                        )
+                    elif any(
+                        np.any(split.bounding_box.extents == 0) for split in splits
+                    ):
+                        errors[node].append(
+                            "Collision mesh was found but contains zero bbox dimension meshes."
+                        )
                     else:
-                        aabb_error = compare_aabbs(G.nodes[node]["lower_mesh"], G.nodes[node]["collision_mesh"])
-                        if aabb_error and node[0] not in ["floors", "ceilings", "walls"]:
+                        aabb_error = compare_aabbs(
+                            G.nodes[node]["lower_mesh"], G.nodes[node]["collision_mesh"]
+                        )
+                        if aabb_error and node[0] not in [
+                            "floors",
+                            "ceilings",
+                            "walls",
+                        ]:
                             errors[node].append(aabb_error)
 
                     # Identify manual collision mesh in error
@@ -89,20 +119,31 @@ def process_target(target):
                     # If we reach here, no errors!
                 elif "manual_collision_filename" in G.nodes[node]:
                     # The object has a manual collision mesh but it was not loaded
-                    errors[node].append("Manual collision mesh was found but could not be loaded.")
+                    errors[node].append(
+                        "Manual collision mesh was found but could not be loaded."
+                    )
                 elif "collision_selection" not in G.nodes[node]:
                     # No collision selection was made
                     errors[node].append("No collision selection was made.")
-                elif "collision_options" not in G.nodes[node] or not G.nodes[node]["collision_options"]:
+                elif (
+                    "collision_options" not in G.nodes[node]
+                    or not G.nodes[node]["collision_options"]
+                ):
                     errors[node].append("No collision options were available.")
-                elif G.nodes[node]["collision_selection"] not in G.nodes[node]["collision_options"]:
-                    errors[node].append("Collision selection was not in the available options.")
+                elif (
+                    G.nodes[node]["collision_selection"]
+                    not in G.nodes[node]["collision_options"]
+                ):
+                    errors[node].append(
+                        "Collision selection was not in the available options."
+                    )
                 else:
                     errors[node].append("Something unexpected happened.")
 
             return errors
     except Exception as e:
         return {"Exception": str(e) + "\n" + traceback.format_exc()}
+
 
 def main():
     errors = {}
@@ -112,7 +153,7 @@ def main():
     with futures.ProcessPoolExecutor(max_workers=16) as executor:
         for target in tqdm.tqdm(targets):
             target_futures[executor.submit(process_target, target)] = target
-                
+
         with tqdm.tqdm(total=len(target_futures)) as pbar:
             for future in futures.as_completed(target_futures.keys()):
                 target = target_futures[future]
@@ -133,7 +174,9 @@ def main():
         if NUKE_SELECTIONS:
             for target in errors:
                 # Load the collision selections
-                with pipeline_fs.target_output(target).open("collision_selection.json", "r") as f:
+                with pipeline_fs.target_output(target).open(
+                    "collision_selection.json", "r"
+                ) as f:
                     target_selections = json.load(f)
 
                 # Get model-link pairs that have errors
@@ -161,11 +204,17 @@ def main():
                         print("Removing", key)
 
                 # Save the collision selection
-                with pipeline_fs.target_output(target).open("collision_selection.json", "w") as f:
+                with pipeline_fs.target_output(target).open(
+                    "collision_selection.json", "w"
+                ) as f:
                     json.dump(new_selections, f, indent=4)
 
-        with pipeline_fs.pipeline_output().open("collision_selection_validation.json", "w") as f:
-            printable_errors = {k: {str(k2): v2 for k2, v2 in v.items()} for k, v in errors.items()}
+        with pipeline_fs.pipeline_output().open(
+            "collision_selection_validation.json", "w"
+        ) as f:
+            printable_errors = {
+                k: {str(k2): v2 for k2, v2 in v.items()} for k, v in errors.items()
+            }
             json.dump({"success": not errors, "errors": printable_errors}, f, indent=4)
 
 

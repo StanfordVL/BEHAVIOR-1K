@@ -2,9 +2,19 @@
 
 **Join us and solve 50 full-length household tasks in the realistic BEHAVIOR-1K environment, with 10,000 teleoperated expert demonstrations (1200+ hours) available!** 🤖
 
+- Event: Foundation Models Meet Embodied Agents Challenge @ NeurIPS 2025
+- Time: Dec. 7th, 11:00 AM – 1:45 PM PST
+- Location: Mezzanine Room 15AB, Convention Center, or [over zoom](https://us06web.zoom.us/j/84419017872?pwd=EeE71l6XbsjdU6kqy8jHJF45MSR9vM.1)
+
+
 ---
 
 ## 📣 **Announcements**
+
+!!! info "🗓️ 12/01/2025 — Leaderboard Open"
+
+    [Leaderboard](./leaderboard.md) for the 2025 BEHAVIOR Challenge is now officially online! Congradulations to the winners, and huge thanks to the participants for all the impressive submissions!
+
 
 !!! info "🗓️ 11/17/2025 — Submissions Closed"
 

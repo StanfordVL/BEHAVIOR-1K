@@ -174,8 +174,8 @@ def import_fillable_volumes(model_id, object_links):
                 tuple(rt.polyop.GetElementsUsingFace(fillable_obj, i + 1))
                 for i in range(rt.polyop.GetNumFaces(fillable_obj))
             }
-            assert len(elems) == len(
-                fillable_meshes
+            assert (
+                len(elems) == len(fillable_meshes)
             ), f"{fillable_obj.name} has different number of faces in fillable mesh than in splits"
             elems = np.array(list(elems))
             assert not np.any(

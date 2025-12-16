@@ -207,6 +207,7 @@ class Evaluator:
         self.robot_action = self.policy.forward(obs=self.obs)
 
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+
         # process obs
         self.obs = self._preprocess_obs(obs)
 
@@ -326,6 +327,8 @@ class Evaluator:
         """
         Write the current robot observations to video.
         """
+        if ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb" not in self.obs:
+            return
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
@@ -362,7 +365,6 @@ class Evaluator:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        # print stats
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Total success trials: {self.n_success_trials}")
@@ -386,7 +388,7 @@ class Evaluator:
 if __name__ == "__main__":
     register_omegaconf_resolvers()
     # open yaml from task path
-    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
+    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
     OmegaConf.resolve(config)
     # set headless mode

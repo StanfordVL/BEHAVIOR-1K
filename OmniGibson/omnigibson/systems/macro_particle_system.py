@@ -945,7 +945,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         for name in common_groups:
             info = name_to_info_mapping[name]
             if self.num_group_particles(group=name) != info["n_particles"]:
-                log.debug(f"Got mismatch in particle group {name} when syncing, " f"deleting and recreating group now.")
+                log.debug(f"Got mismatch in particle group {name} when syncing, deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
                 groups_to_delete.append(name)
                 groups_to_create.append(name)

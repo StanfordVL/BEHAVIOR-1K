@@ -8,7 +8,11 @@ from b1k_pipeline.utils import ParallelZipFS, PipelineFS
 
 
 def main():
-    with PipelineFS() as pipeline_fs, ParallelZipFS("objects_usd.zip") as objects_usd_fs, ParallelZipFS("objects.zip") as objects_urdf_fs:
+    with (
+        PipelineFS() as pipeline_fs,
+        ParallelZipFS("objects_usd.zip") as objects_usd_fs,
+        ParallelZipFS("objects.zip") as objects_urdf_fs,
+    ):
         objects_fs = MultiFS()
         objects_fs.add_fs("objects_usd", objects_usd_fs, priority=0)
         objects_fs.add_fs("objects_urdf", objects_urdf_fs, priority=1)

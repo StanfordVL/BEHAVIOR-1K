@@ -49,8 +49,12 @@ def main():
                     providers[provided].append(target)
 
                     model_id = provided.split("-")[1]
-                    bounding_box_size = object_list["bounding_boxes"][model_id]["0"]["extent"]
-                    bounding_box_sizes[model_id] = [x / 1000. for x in bounding_box_size]
+                    bounding_box_size = object_list["bounding_boxes"][model_id]["0"][
+                        "extent"
+                    ]
+                    bounding_box_sizes[model_id] = [
+                        x / 1000.0 for x in bounding_box_size
+                    ]
                 for obj, links in object_list["meta_links"].items():
                     meta_links[obj].update(links)
                 for obj, attachment_dict in object_list["attachment_pairs"].items():

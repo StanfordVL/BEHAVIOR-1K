@@ -1,16 +1,17 @@
 import json
-import os 
+import os
 import sys
 import bddl.bddl_verification as ver
 import bddl.parsing as parse
 
 
-# MAIN 
+# MAIN
+
 
 def verify_definition(activity, syns_to_props, domain_predicates, csv=False):
     defn_fn = os.path.join(ver.PROBLEM_FILE_DIR, activity, "problem0.bddl")
     with open(defn_fn, "r") as f:
-        defn = f.read() 
+        defn = f.read()
     __, objects, init, goal = ver._get_defn_elements_from_file(activity)
     ver.object_list_correctly_formatted(defn)
     ver.all_objects_appropriate(objects, init, goal)
@@ -30,23 +31,25 @@ def verify_definition(activity, syns_to_props, domain_predicates, csv=False):
 
 
 # Master planning sheet
-def batch_verify(): 
+def batch_verify():
     with open(ver.SYNS_TO_PROPS_JSON, "r") as f:
-        syns_to_props = json.load(f) 
+        syns_to_props = json.load(f)
     *__, domain_predicates = parse.parse_domain("omnigibson")
     for activity in sorted(os.listdir(ver.PROBLEM_FILE_DIR)):
-        if "-" in activity: continue
-        if not os.path.isdir(os.path.join(ver.PROBLEM_FILE_DIR, activity)): continue
+        if "-" in activity:
+            continue
+        if not os.path.isdir(os.path.join(ver.PROBLEM_FILE_DIR, activity)):
+            continue
         print()
         print(activity)
         verify_definition(activity, syns_to_props, domain_predicates, csv=False)
 
 
 def main():
-    if sys.argv[1] == "verify": 
+    if sys.argv[1] == "verify":
         verify_definition(sys.argv[2])
-    
-    elif sys.argv[1] == "batch_verify": 
+
+    elif sys.argv[1] == "batch_verify":
         batch_verify()
 
 

@@ -19,7 +19,13 @@ INSTANCE_EXPR = re.compile(r"problem(\d+).bddl")
 
 
 class Conditions(object):
-    def __init__(self, behavior_activity, activity_definition, simulator_name, predefined_problem=None):
+    def __init__(
+        self,
+        behavior_activity,
+        activity_definition,
+        simulator_name,
+        predefined_problem=None,
+    ):
         """Object to store behavior activity content and compile conditions for checking and
             simulator use
 
@@ -32,8 +38,16 @@ class Conditions(object):
         self.behavior_activity = behavior_activity
         self.activity_definition = activity_definition
         domain_name, *__ = parse_domain(simulator_name)
-        __, self.parsed_objects, self.parsed_initial_conditions, self.parsed_goal_conditions = parse_problem(
-            self.behavior_activity, self.activity_definition, domain_name, predefined_problem=predefined_problem
+        (
+            __,
+            self.parsed_objects,
+            self.parsed_initial_conditions,
+            self.parsed_goal_conditions,
+        ) = parse_problem(
+            self.behavior_activity,
+            self.activity_definition,
+            domain_name,
+            predefined_problem=predefined_problem,
         )
 
 
@@ -67,11 +81,15 @@ def get_initial_conditions(conds, backend, scope, generate_ground_options=True):
     """
     if bool(conds.parsed_initial_conditions[0]):
         initial_conditions = compile_state(
-            [cond for cond in conds.parsed_initial_conditions if cond[0] not in ["inroom"]],
+            [
+                cond
+                for cond in conds.parsed_initial_conditions
+                if cond[0] not in ["inroom"]
+            ],
             backend,
             scope=scope,
             object_map=conds.parsed_objects,
-            generate_ground_options=generate_ground_options
+            generate_ground_options=generate_ground_options,
         )
         return initial_conditions
 
@@ -91,11 +109,11 @@ def get_goal_conditions(conds, backend, scope, generate_ground_options=True):
     """
     if bool(conds.parsed_goal_conditions[0]):
         goal_conditions = compile_state(
-            conds.parsed_goal_conditions, 
-            backend, 
-            scope=scope, 
+            conds.parsed_goal_conditions,
+            backend,
+            scope=scope,
             object_map=conds.parsed_objects,
-            generate_ground_options=generate_ground_options
+            generate_ground_options=generate_ground_options,
         )
         return goal_conditions
 
@@ -163,36 +181,48 @@ def get_natural_goal_conditions(conds):
 
 def get_all_activities():
     """Return a list of all activities included in this version of BDDL.
-        
+
     Returns:
         list<str>: list containing the name of each included activity
     """
-    return [x for x in os.listdir(ACTIVITY_CONFIGS_PATH) if os.path.isdir(os.path.join(ACTIVITY_CONFIGS_PATH, x))]
+    return [
+        x
+        for x in os.listdir(ACTIVITY_CONFIGS_PATH)
+        if os.path.isdir(os.path.join(ACTIVITY_CONFIGS_PATH, x))
+    ]
 
 
 def get_instance_count(act):
     """Return the number of instances of a given activity that are included in this version of BDDL.
-    
+
     Args:
         act (str): name of the activity to check
-        
+
     Returns:
         int: number of instances of the given activity
     """
-    problem_files = [INSTANCE_EXPR.fullmatch(x) for x in os.listdir(os.path.join(ACTIVITY_CONFIGS_PATH, act))]
+    problem_files = [
+        INSTANCE_EXPR.fullmatch(x)
+        for x in os.listdir(os.path.join(ACTIVITY_CONFIGS_PATH, act))
+    ]
     ids = set(int(x.group(1)) for x in problem_files if x is not None)
-    assert ids == set(range(len(ids))), f"Non-contiguous instance IDs found for problem {act}"
+    assert ids == set(
+        range(len(ids))
+    ), f"Non-contiguous instance IDs found for problem {act}"
     return len(ids)
 
 
-def get_reward(ground_goal_state_options): 
+def get_reward(ground_goal_state_options):
     """Return reward given ground goal state options.
        Reward formulated as max(<percent literals that are satisfied in the option> for option in ground_goal_state_options)
 
-    Args: 
+    Args:
         ground_goal_state_options (list<list<HEAD>>): list of compiled ground goal state options
 
-    Returns: 
+    Returns:
         float: reward
     """
-    return max(len(evaluate_state(option)[-1]["satisfied"]) / float(len(option)) for option in ground_goal_state_options)
+    return max(
+        len(evaluate_state(option)[-1]["satisfied"]) / float(len(option))
+        for option in ground_goal_state_options
+    )

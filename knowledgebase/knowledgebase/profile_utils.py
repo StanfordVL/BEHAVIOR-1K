@@ -70,7 +70,9 @@ def plot_profile(plot_name, last_n_points, ignore_series=None):
         raise ValueError(f"Plot {plot_name} not found.")
 
     series = plots[plot_name]
-    series_names = [x for x in series.keys() if ignore_series is None or x not in ignore_series]
+    series_names = [
+        x for x in series.keys() if ignore_series is None or x not in ignore_series
+    ]
 
     # Plot the series.
     plt.figure(figsize=(10, 4), dpi=300)
@@ -81,8 +83,8 @@ def plot_profile(plot_name, last_n_points, ignore_series=None):
     plt.xticks(ticks=np.arange(len(tick_labels)), labels=tick_labels, rotation=90)
     plt.ylabel(plot_units[plot_name])
     plt.title(plot_name)
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.axhline(1., linestyle='--', c="gray", alpha=0.5)
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.axhline(1.0, linestyle="--", c="gray", alpha=0.5)
     plt.tight_layout()
 
     stream = io.BytesIO()
@@ -94,21 +96,27 @@ def plot_profile(plot_name, last_n_points, ignore_series=None):
 def make_realtime_badge(series_name):
     plots, commits, plot_units = get_profile_data()
 
-    realtime_coeff = [x for x in plots["Realtime Performance"][series_name] if x is not None][-1]
+    realtime_coeff = [
+        x for x in plots["Realtime Performance"][series_name] if x is not None
+    ][-1]
     if realtime_coeff > 1:
         color = "green"
     elif realtime_coeff > 0.5:
         color = "yellow"
     else:
         color = "red"
-    return badge(left_text=f'{series_name} realtime performance', right_text=f"{realtime_coeff:.2f}x", right_color=color)
+    return badge(
+        left_text=f"{series_name} realtime performance",
+        right_text=f"{realtime_coeff:.2f}x",
+        right_color=color,
+    )
 
 
 def get_profile_badge_svg():
     """Generate profile badge SVG for static site generation."""
     try:
         badge_text = make_realtime_badge("Rs_int")
-        return badge_text.encode('utf-8')
+        return badge_text.encode("utf-8")
     except Exception:
         return None
 
@@ -116,7 +124,9 @@ def get_profile_badge_svg():
 def get_profile_plot_png():
     """Generate profile plot PNG for static site generation."""
     try:
-        plot_img = plot_profile("Realtime Performance", 10, ignore_series=["Empty scene"])
+        plot_img = plot_profile(
+            "Realtime Performance", 10, ignore_series=["Empty scene"]
+        )
         stream = io.BytesIO()
         plot_img.save(stream, format="PNG")
         return stream.getvalue()

@@ -212,10 +212,9 @@ def import_bad_model_originals(model_id):
     )
     assert success, f"Failed to import {model_id}."
     imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-    assert set(objects_to_import) == set(
-        imported_objs_by_name.keys()
-    ), "Not all objects were imported. Missing: " + str(
-        set(objects_to_import) - set(imported_objs_by_name.keys())
+    assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
+        "Not all objects were imported. Missing: "
+        + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
     )
 
     zero_layer = rt.LayerManager.getLayer(0)
@@ -421,11 +420,17 @@ def replace_object_instances(obj, respect_aspect_ratio=False):
         base_copy_world_bb = bounding_box_from_verts(
             apply_transform(base_copy_points, combined_transform)
         )
-        base_copy_world_bb_bottom_center = (base_copy_world_bb[0] + base_copy_world_bb[1]) / 2
+        base_copy_world_bb_bottom_center = (
+            base_copy_world_bb[0] + base_copy_world_bb[1]
+        ) / 2
         base_copy_world_bb_bottom_center[2] = base_copy_world_bb[0][2]
-        instance_world_bb_bottom_center = (instance_world_bb[0] + instance_world_bb[1]) / 2
+        instance_world_bb_bottom_center = (
+            instance_world_bb[0] + instance_world_bb[1]
+        ) / 2
         instance_world_bb_bottom_center[2] = instance_world_bb[0][2]
-        move_center_by = instance_world_bb_bottom_center - base_copy_world_bb_bottom_center
+        move_center_by = (
+            instance_world_bb_bottom_center - base_copy_world_bb_bottom_center
+        )
         combined_transform[:3, 3] = move_center_by
 
         # Convert and apply the transform to the 3ds Max object

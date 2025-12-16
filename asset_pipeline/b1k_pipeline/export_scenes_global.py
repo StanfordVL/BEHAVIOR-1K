@@ -20,6 +20,7 @@ ALLOWED_PART_TAGS = {
     "connectedpart",
 }
 
+
 def process_target(target, scenes_dir):
     scene_name = os.path.split(target)[-1]
     pipeline_fs = b1k_pipeline.utils.PipelineFS()
@@ -101,7 +102,9 @@ def process_target(target, scenes_dir):
             # Get the relevant bbox info.
             bbox_size = G.nodes[root_node]["object_bounding_box"]["extent"]
             bbox_world_center = G.nodes[root_node]["object_bounding_box"]["position"]
-            bbox_world_rot = R.from_quat(G.nodes[root_node]["object_bounding_box"]["rotation"]) 
+            bbox_world_rot = R.from_quat(
+                G.nodes[root_node]["object_bounding_box"]["rotation"]
+            )
 
             # Apply the relevant transformation
             bbox_transform = np.eye(4)
@@ -152,12 +155,12 @@ def process_target(target, scenes_dir):
     # Write, reparse, and write with header, using the XML library,
     urdf_dir = OSFS(scenes_dir).makedir(scene_name).makedir("urdf")
     for suffix, scene_tree_root in scene_tree_roots.items():
-        xmlstr = minidom.parseString(ET.tostring(scene_tree_root)).toprettyxml(indent="   ")
+        xmlstr = minidom.parseString(ET.tostring(scene_tree_root)).toprettyxml(
+            indent="   "
+        )
         xmlio = io.StringIO(xmlstr)
         tree = ET.parse(xmlio)
-        with urdf_dir.open(
-            f"{scene_name}_{suffix}.urdf", "wb"
-        ) as f:
+        with urdf_dir.open(f"{scene_name}_{suffix}.urdf", "wb") as f:
             tree.write(f, xml_declaration=True)
 
 
