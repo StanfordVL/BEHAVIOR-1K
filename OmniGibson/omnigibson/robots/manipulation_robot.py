@@ -66,6 +66,11 @@ AG_MODES = {
 }
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
+# Supported assisted-grasp joint types for serialization / deserialization
+AG_JOINT_TYPES = ("FixedJoint", "SphericalJoint")
+AG_JOINT_TYPE_TO_ID = {joint_type: idx for idx, joint_type in enumerate(AG_JOINT_TYPES)}
+AG_JOINT_ID_TO_TYPE = {idx: joint_type for joint_type, idx in AG_JOINT_TYPE_TO_ID.items()}
+
 
 class ManipulationRobot(BaseRobot):
     """
@@ -1857,6 +1862,163 @@ class ManipulationRobot(BaseRobot):
                 )
                 self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=contact_pos_global)
 
+    @staticmethod
+    def _ag_link_index_from_path(obj, link_prim_path):
+        if obj is None or link_prim_path is None:
+            return -1
+        link_name = link_prim_path.split("/")[-1]
+        link_order = tuple(sorted(obj.links.keys()))
+        try:
+            return link_order.index(link_name)
+        except ValueError:
+            return -1
+
+    @staticmethod
+    def _ag_link_path_from_index(obj, link_index):
+        if obj is None or link_index < 0:
+            return ""
+        link_order = tuple(sorted(obj.links.keys()))
+        if link_index >= len(link_order):
+            return ""
+        link_name = link_order[link_index]
+        return obj.links[link_name].prim_path
+
+    def _ag_serialized_state_size(self, arm):
+        # 1 (flag) + 4 (metadata) + |gripper| + 1 (force) + 3 (contact) + 1 (cloth flag) + 3 (offset)
+        return len(self.gripper_control_idx[arm]) + 13
+
+    def _serialize_ag_state_for_arm(self, arm, arm_params, dtype, device):
+        size = self._ag_serialized_state_size(arm)
+        buf = th.zeros(size, dtype=dtype, device=device)
+        if len(arm_params) == 0:
+            return buf
+
+        assert self.scene is not None, "Cannot serialize AG state without a scene"
+        obj = self.scene.object_registry("prim_path", arm_params.get("ag_obj_prim_path"))
+        if obj is None:
+            log.warning("Unable to find AG object at %s while serializing state.", arm_params.get("ag_obj_prim_path"))
+            return buf
+
+        def copy_into(destination, value):
+            if value is None:
+                return
+            src = th.as_tensor(value, dtype=dtype, device=device).flatten()
+            length = min(destination.numel(), src.numel())
+            if length > 0:
+                destination[:length] = src[:length]
+
+        link_idx = float(self._ag_link_index_from_path(obj, arm_params.get("ag_link_prim_path")))
+        joint_parent_type = 0.0
+        joint_path = arm_params.get("ag_joint_prim_path", "")
+        if not joint_path.startswith(self.eef_links[arm].prim_path):
+            joint_parent_type = 1.0
+        joint_type_idx = float(AG_JOINT_TYPE_TO_ID.get(arm_params.get("joint_type", AG_JOINT_TYPES[0]), 0))
+
+        idx = 0
+        buf[idx] = 1.0
+        idx += 1
+        buf[idx : idx + 4] = th.tensor(
+            [float(obj.uuid), link_idx, joint_parent_type, joint_type_idx], dtype=dtype, device=device
+        )
+        idx += 4
+
+        gripper_dof = len(self.gripper_control_idx[arm])
+        gripper_values = th.zeros(gripper_dof, dtype=dtype, device=device)
+        copy_into(gripper_values, arm_params.get("gripper_pos"))
+        buf[idx : idx + gripper_dof] = gripper_values
+        idx += gripper_dof
+
+        buf[idx] = float(arm_params.get("max_force", 0.0))
+        idx += 1
+
+        contact = th.zeros(3, dtype=dtype, device=device)
+        copy_into(contact, arm_params.get("contact_pos"))
+        buf[idx : idx + 3] = contact
+        idx += 3
+
+        has_attachment = float("attachment_point_pos_local" in arm_params)
+        buf[idx] = has_attachment
+        idx += 1
+
+        if has_attachment:
+            attachment = th.zeros(3, dtype=dtype, device=device)
+            copy_into(attachment, arm_params.get("attachment_point_pos_local"))
+            buf[idx : idx + 3] = attachment
+        idx += 3
+
+        return buf
+
+    def _deserialize_ag_state_for_arm(self, arm, arm_state):
+        idx = 0
+        has_constraint = bool(arm_state[idx].item())
+        idx += 1
+        if not has_constraint:
+            return {}
+
+        obj_uuid = int(round(arm_state[idx].item()))
+        idx += 1
+        link_idx = int(round(arm_state[idx].item()))
+        idx += 1
+        joint_parent_type = int(round(arm_state[idx].item()))
+        idx += 1
+        joint_type_idx = int(round(arm_state[idx].item()))
+        idx += 1
+
+        gripper_dof = len(self.gripper_control_idx[arm])
+        gripper_pos = arm_state[idx : idx + gripper_dof].to(dtype=th.float32)
+        idx += gripper_dof
+
+        max_force = float(arm_state[idx].item())
+        idx += 1
+
+        contact_pos = arm_state[idx : idx + 3].to(dtype=th.float32)
+        idx += 3
+
+        has_attachment = bool(arm_state[idx].item())
+        idx += 1
+        attachment_point = arm_state[idx : idx + 3].to(dtype=th.float32)
+        idx += 3
+
+        assert idx == arm_state.shape[0], "Invalid assisted grasp serialized state size"
+
+        assert self.scene is not None, "Cannot deserialize AG state without a scene"
+        ag_obj = self.scene.object_registry("uuid", obj_uuid)
+        if ag_obj is None:
+            log.warning(
+                "Unable to find AG object with uuid %s when deserializing state. Dropping the constraint.", obj_uuid
+            )
+            return {}
+
+        ag_link_prim_path = self._ag_link_path_from_index(ag_obj, link_idx)
+        if not ag_link_prim_path:
+            log.warning(
+                "Unable to resolve AG link (index %s) for object %s when deserializing state. Dropping the constraint.",
+                link_idx,
+                ag_obj.name,
+            )
+            return {}
+
+        ag_joint_prim_path = (
+            f"{self.eef_links[arm].prim_path}/ag_constraint"
+            if joint_parent_type <= 0
+            else f"{ag_link_prim_path}/ag_constraint"
+        )
+
+        arm_state_dict = {
+            "ag_obj_prim_path": ag_obj.prim_path,
+            "ag_link_prim_path": ag_link_prim_path,
+            "ag_joint_prim_path": ag_joint_prim_path,
+            "joint_type": AG_JOINT_ID_TO_TYPE.get(joint_type_idx, AG_JOINT_TYPES[0]),
+            "gripper_pos": gripper_pos,
+            "max_force": max_force,
+            "contact_pos": contact_pos,
+        }
+
+        if has_attachment:
+            arm_state_dict["attachment_point_pos_local"] = attachment_point
+
+        return arm_state_dict
+
     def serialize(self, state):
         # Call super first
         state_flat = super().serialize(state=state)
@@ -1865,8 +2027,18 @@ class ManipulationRobot(BaseRobot):
         if self.grasping_mode == "physical":
             return state_flat
 
-        # TODO AG
-        return state_flat
+        dtype = state_flat.dtype if state_flat.numel() > 0 else th.float32
+        device = state_flat.device
+
+        ag_params = state.get("ag_obj_constraint_params", {arm: {} for arm in self.arm_names})
+        ag_state_parts = []
+        for arm in self.arm_names:
+            arm_params = ag_params.get(arm, {})
+            ag_state_parts.append(self._serialize_ag_state_for_arm(arm, arm_params, dtype=dtype, device=device))
+
+        ag_state_flat = th.cat(ag_state_parts) if len(ag_state_parts) > 0 else th.empty(0, dtype=dtype, device=device)
+
+        return th.cat([state_flat, ag_state_flat]) if ag_state_flat.numel() > 0 else state_flat
 
     def deserialize(self, state):
         # Call super first
@@ -1876,7 +2048,25 @@ class ManipulationRobot(BaseRobot):
         if self.grasping_mode == "physical":
             return state_dict, idx
 
-        # TODO AG
+        ag_params = dict()
+        total_len = state.shape[0]
+        dtype = state.dtype
+        device = state.device
+        for arm in self.arm_names:
+            arm_state_size = self._ag_serialized_state_size(arm)
+            remaining = total_len - idx
+            if remaining >= arm_state_size:
+                arm_state = state[idx : idx + arm_state_size]
+                idx += arm_state_size
+            else:
+                arm_state = th.zeros(arm_state_size, dtype=dtype, device=device)
+                if remaining > 0:
+                    arm_state[:remaining] = state[idx:]
+                    idx += remaining
+            ag_params[arm] = self._deserialize_ag_state_for_arm(arm, arm_state)
+
+        state_dict["ag_obj_constraint_params"] = ag_params
+
         return state_dict, idx
 
     @classproperty
