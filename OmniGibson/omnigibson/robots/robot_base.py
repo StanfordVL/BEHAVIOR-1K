@@ -498,6 +498,15 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         super().remove()
 
     @property
+    def proprio_obs(self):
+        """
+        Returns:
+            list of str: Active proprioception observation keys. Note that this determines the order of obs construction
+                during @get_proprioception() call
+        """
+        return self._proprio_obs
+
+    @property
     def reset_joint_pos_aabb_extent(self):
         """
         This is the aabb extent of the robot in the robot frame after resetting the joints.
