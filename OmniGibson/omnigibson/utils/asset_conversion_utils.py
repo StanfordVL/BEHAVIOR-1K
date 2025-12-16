@@ -1013,6 +1013,96 @@ def _create_urdf_import_config(
     return import_config
 
 
+def _migrate_materials_to_looks(stage):
+    """
+    Migrates material prims from the /meshes hierarchy to /Looks hierarchy and updates all material bindings.
+
+    This is necessary for IsaacSim 5.1+ where materials are placed under the /meshes hierarchy,
+    which gets deleted during post-processing. By moving materials to /Looks, we preserve them
+    and follow USD best practices.
+
+    Args:
+        stage (pxr.Usd.Stage): The USD stage containing the materials to migrate
+
+    Returns:
+        dict: Mapping from old material paths to new material paths
+    """
+    # Get the meshes prim - this is where materials are currently located
+    meshes_prim = stage.GetPrimAtPath("/meshes")
+    if not meshes_prim.IsValid():
+        log.debug("No /meshes prim found, skipping material migration")
+        return {}
+
+    # Find all Material prims under /meshes
+    material_prims = []
+    for prim in lazy.pxr.Usd.PrimRange(meshes_prim):
+        if prim.GetTypeName() == "Material":
+            material_prims.append(prim)
+
+    if not material_prims:
+        log.debug("No materials found in /meshes hierarchy")
+        return {}
+
+    log.debug(f"Found {len(material_prims)} material prims to migrate")
+
+    # Get the /Looks scope
+    looks_prim = stage.GetDefaultPrim().GetChild("Looks")
+    looks_path = looks_prim.GetPath()
+
+    # Map from old paths to new paths
+    material_path_mapping = {}
+
+    # Move each material to /Looks
+    for material_prim in material_prims:
+        old_path = material_prim.GetPath()
+        material_name = material_prim.GetName()
+
+        # Create a unique name in /Looks if there's a conflict
+        new_path = looks_path.AppendChild(material_name)
+        counter = 0
+        while stage.GetPrimAtPath(new_path).IsValid():
+            new_path = looks_path.AppendChild(f"{material_name}_{counter}")
+            counter += 1
+
+        # Copy the material prim to the new location
+        success = lazy.pxr.Sdf.CopySpec(
+            stage.GetRootLayer(),
+            old_path,
+            stage.GetRootLayer(),
+            new_path
+        )
+
+        if success:
+            material_path_mapping[str(old_path)] = str(new_path)
+            log.debug(f"Moved material from {old_path} to {new_path}")
+        else:
+            log.warning(f"Failed to copy material from {old_path} to {new_path}")
+
+    # Update all material bindings to point to new paths
+    for prim in stage.Traverse():
+        # Check if this prim has material bindings
+        if lazy.pxr.UsdShade.MaterialBindingAPI.CanApply(prim):
+            binding_api = lazy.pxr.UsdShade.MaterialBindingAPI(prim)
+
+            # Get direct binding
+            direct_binding = binding_api.GetDirectBinding()
+            if direct_binding:
+                material_path = direct_binding.GetMaterialPath()
+                material_path_str = str(material_path)
+
+                # If this material was moved, update the binding
+                if material_path_str in material_path_mapping:
+                    new_material_path = material_path_mapping[material_path_str]
+                    new_material_prim = stage.GetPrimAtPath(new_material_path)
+
+                    if new_material_prim.IsValid():
+                        new_material = lazy.pxr.UsdShade.Material(new_material_prim)
+                        binding_api.Bind(new_material)
+                        log.debug(f"Updated material binding on {prim.GetPath()} from {material_path_str} to {new_material_path}")
+
+    return material_path_mapping
+
+
 def convert_urdf_to_usd(
     urdf_path,
     obj_category,
@@ -1085,7 +1175,7 @@ def convert_urdf_to_usd(
     current_materials = configuration_dir / "materials" / "textures"
     new_materials = model_root_path / "material"
     if current_materials.exists():
-        new_materials.mkdir()
+        new_materials.mkdir(parents=True, exist_ok=True)
         for texture in current_materials.iterdir():
             texture.rename(new_materials / texture.name)
 
@@ -1152,6 +1242,7 @@ def convert_urdf_to_usd(
     colliders_prim = side_stage.GetPrimAtPath("/colliders")
     links = list(visuals_prim.GetChildren()) + list(colliders_prim.GetChildren())
     wrappers = [wrapper for link in links for wrapper in link.GetChildren()]
+
     for parent_prim in wrappers:
         parent_path = parent_prim.GetPath()
         grandparent_path = parent_path.GetParentPath()
@@ -1163,7 +1254,7 @@ def convert_urdf_to_usd(
         referenced_wrapper_prim = side_stage.GetPrimAtPath(referenced_wrapper_path_str)
         assert referenced_wrapper_prim.IsValid()
 
-        child_prim = referenced_wrapper_prim.GetChild("mesh")
+        child_prim = referenced_wrapper_prim.GetChild("World").GetChild("mesh")
         assert child_prim.IsValid()
         child_path = child_prim.GetPath()
 
@@ -1189,6 +1280,10 @@ def convert_urdf_to_usd(
 
         # Delete the child's original path
         del side_stage.GetRootLayer().GetPrimAtPath(child_path.GetParentPath()).nameChildren[child_path.name]
+
+    # Migrate materials from /meshes to /Looks before deleting the meshes hierarchy
+    # This is necessary for IsaacSim 5.1+ where materials are now placed under /meshes
+    _migrate_materials_to_looks(side_stage)
 
     # Remove the meshes hierarchy altogether
     del side_stage.GetRootLayer().rootPrims["meshes"]

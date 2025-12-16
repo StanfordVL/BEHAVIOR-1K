@@ -120,7 +120,7 @@ class VisionSensor(BaseSensor):
         self,
         relative_prim_path,
         name,
-        modalities=["rgb"],
+        modalities=("rgb",),
         enabled=True,
         noise=None,
         load_config=None,
@@ -667,8 +667,8 @@ class VisionSensor(BaseSensor):
         # Add the camera params modality if it doesn't already exist
         if "camera_params" not in self._annotators:
             self.initialize_sensors(names="camera_params")
-            # Requires 3 render updates for camera params annotator to become active
-            for _ in range(3):
+            # Requires 4 render updates for camera params annotator to become active
+            for _ in range(4):
                 render()
         # Grab and return the parameters
         return self._annotators["camera_params"].get_data()
@@ -893,6 +893,12 @@ class VisionSensor(BaseSensor):
         cx = (1.0 - P[0, 2]) * width / 2.0
         cy = (1.0 - P[1, 2]) * height / 2.0
         K = th.tensor([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
+
+        # Explicitly sanity check for null values here
+        degen_mat = th.zeros(3, 3)
+        degen_mat[2, 2] = 1.0
+        assert not th.all(K == degen_mat).item(), f"intrinsic matrix for sensor: {self.name} is degenerate!"
+
         return K
 
     @property

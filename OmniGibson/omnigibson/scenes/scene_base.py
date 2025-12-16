@@ -15,7 +15,8 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.robots.robot_base import REGISTERED_ROBOTS, m as robot_macros
+from omnigibson.robots.robot_base import REGISTERED_ROBOTS, BaseRobot, m as robot_macros
+from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.systems import Cloth
 from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.systems.macro_particle_system import MacroParticleSystem
@@ -500,6 +501,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Remove all of the scene's objects.
         og.sim.batch_remove_objects(list(self.objects))
 
+        # Remove any vision sensors attached to this scene
+        # This needs to happen BEFORE the scene prim is removed or else the path to the sensor will become stale
+        for sensor in tuple(VisionSensor.SENSORS.values()):
+            if self.prim_path in sensor.prim_path:
+                sensor.remove()
+
         # Remove the scene prim.
         self._scene_prim.remove()
 
@@ -701,6 +708,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Sometimes we don't register objects to the object registry during add_object (e.g. particle templates)
             if self.object_registry.object_is_registered(obj):
                 self.object_registry.remove(obj)
+
+            # Delete any (extra) vision sensors that were externally added to this object
+            # This needs to happen BEFORE the object is removed or else the path to the sensor will become stale
+            sensor_prim_paths = set(VisionSensor.SENSORS.keys())
+            if isinstance(obj, BaseRobot):
+                # However, for robots, we don't want to pre-emptively remove its own sensors since those are handled
+                # internally
+                sensor_prim_paths -= set([sensor.prim_path for sensor in obj.sensors.values()])
+            # Only delete sensors attached to the object (nested prim path)
+            sensor_prim_paths = {spp for spp in sensor_prim_paths if obj.prim_path in spp}
+            for prim_path in sensor_prim_paths:
+                VisionSensor.SENSORS[prim_path].remove()
 
             # Remove from omni stage
             obj.remove()
