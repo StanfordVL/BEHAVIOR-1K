@@ -6,6 +6,7 @@ import random
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict, namedtuple
 from copy import copy
+from pathlib import Path
 
 import bddl
 import networkx as nx
@@ -2604,7 +2605,7 @@ class CookingSystemRule(CookingRule):
 def import_recipes():
     for json_file, rule_names in _JSON_FILES_TO_RULES.items():
         recipe_fpath = os.path.join(
-            os.path.dirname(bddl.__file__), "generated_data", "transition_map", "tm_jsons", json_file
+            Path(__file__).parent.parent.parent, "bddl", "bddl", "generated_data", "transition_map", "tm_jsons", json_file
         )
         if not os.path.exists(recipe_fpath):
             log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")

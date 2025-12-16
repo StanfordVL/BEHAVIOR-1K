@@ -3,6 +3,7 @@ import random
 import re
 from collections import defaultdict
 from copy import deepcopy
+from pathlib import Path
 
 import bddl
 import networkx as nx
@@ -264,7 +265,7 @@ KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATI
 
 # BEHAVIOR-related
 OBJECT_TAXONOMY = ObjectTaxonomy()
-BEHAVIOR_ACTIVITIES = sorted(os.listdir(os.path.join(os.path.dirname(bddl.__file__), "activity_definitions")))
+BEHAVIOR_ACTIVITIES = sorted(os.listdir(Path(__file__).parent.parent.parent.parent / "bddl" / "bddl" / "activity_definitions"))
 
 
 def _populate_input_output_objects_systems(og_recipe, input_synsets, output_synsets):
