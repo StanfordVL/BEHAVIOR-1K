@@ -3,14 +3,13 @@ from functools import cached_property
 
 import torch as th
 
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.transform_utils import euler2quat
 
 
-class VX300S(ManipulationRobot):
+class UR5e(ManipulationRobot):
     """
-    The VX300-6DOF arm from Trossen Robotics
-    (https://www.trossenrobotics.com/docs/interbotix_xsarms/specifications/vx300s.html)
+    The UR5e-6DOF arm equipped with a Robotiq-2F85 gripper
     """
 
     def __init__(
@@ -125,6 +124,7 @@ class VX300S(ManipulationRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            grasping_direction="upper",
             finger_static_friction=finger_static_friction,
             finger_dynamic_friction=finger_dynamic_friction,
             **kwargs,
@@ -135,7 +135,7 @@ class VX300S(ManipulationRobot):
         raise NotImplementedError()
 
     def _create_discrete_action_space(self):
-        raise ValueError("VX300S does not support discrete actions!")
+        raise ValueError("UR5e does not support discrete actions!")
 
     @property
     def _raw_controller_order(self):
@@ -150,19 +150,36 @@ class VX300S(ManipulationRobot):
 
     @property
     def _default_joint_pos(self):
-        return th.tensor([0.0, -0.849879, 0.258767, 0.0, 1.2831712, 0.0, 0.057, 0.057])
+        return th.tensor(
+            [
+                math.pi / 2,
+                -math.pi / 2,
+                math.pi / 2,
+                -math.pi / 2,
+                -math.pi / 2,
+                0,  # arm
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,  # gripper
+            ]
+        )
 
     @cached_property
     def arm_link_names(self):
         return {
             self.default_arm: [
-                "base_link",
+                "base",
                 "shoulder_link",
                 "upper_arm_link",
-                "upper_forearm_link",
-                "lower_forearm_link",
-                "wrist_link",
-                "gripper_link",
+                "forearm_link",
+                "wrist_1_link",
+                "wrist_2_link",
+                "wrist_3_link",
             ]
         }
 
@@ -170,12 +187,12 @@ class VX300S(ManipulationRobot):
     def arm_joint_names(self):
         return {
             self.default_arm: [
-                "waist",
-                "shoulder",
-                "elbow",
-                "forearm_roll",
-                "wrist_angle",
-                "wrist_rotate",
+                "shoulder_pan_joint",
+                "shoulder_lift_joint",
+                "elbow_joint",
+                "wrist_1_joint",
+                "wrist_2_joint",
+                "wrist_3_joint",
             ]
         }
 
@@ -185,12 +202,54 @@ class VX300S(ManipulationRobot):
 
     @cached_property
     def finger_link_names(self):
-        return {self.default_arm: ["left_finger_link", "right_finger_link"]}
+        return {
+            self.default_arm: [
+                "left_inner_finger",
+                "right_inner_finger",
+            ]
+        }
 
     @cached_property
     def finger_joint_names(self):
-        return {self.default_arm: ["left_finger", "right_finger"]}
+        return {self.default_arm: ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]}
 
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-math.pi, 0, 0])}
+
+    @property
+    def _assisted_grasp_start_points(self):
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
+            ]
+        }
+
+    @property
+    def _assisted_grasp_end_points(self):
+        return {
+            self.default_arm: [
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
+            ]
+        }
+
+    @property
+    def disabled_collision_pairs(self):
+        # disable all robotiq gripper internal collisions
+        links = [
+            "left_outer_knuckle",
+            "left_outer_finger",
+            "left_inner_finger",
+            "left_inner_knuckle",
+            "right_outer_knuckle",
+            "right_outer_finger",
+            "right_inner_finger",
+            "right_inner_knuckle",
+        ]
+        disabled_pairs = []
+        for i, link1 in enumerate(links):
+            for link2 in links[i + 1 :]:
+                disabled_pairs.append([link1, link2])
+        return disabled_pairs
