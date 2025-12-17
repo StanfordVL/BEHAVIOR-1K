@@ -1,5 +1,5 @@
-"""Utilities for URDF parsing.
-"""
+"""Utilities for URDF parsing."""
+
 import os
 
 from lxml import etree as ET
@@ -32,11 +32,14 @@ def rpy_to_matrix(coords):
     c3, c2, c1 = np.cos(coords)
     s3, s2, s1 = np.sin(coords)
 
-    return np.array([
-        [c1 * c2, (c1 * s2 * s3) - (c3 * s1), (s1 * s3) + (c1 * c3 * s2)],
-        [c2 * s1, (c1 * c3) + (s1 * s2 * s3), (c3 * s1 * s2) - (c1 * s3)],
-        [-s2, c2 * s3, c2 * c3]
-    ], dtype=np.float64)
+    return np.array(
+        [
+            [c1 * c2, (c1 * s2 * s3) - (c3 * s1), (s1 * s3) + (c1 * c3 * s2)],
+            [c2 * s1, (c1 * c3) + (s1 * s2 * s3), (c3 * s1 * s2) - (c1 * s3)],
+            [-s2, c2 * s3, c2 * c3],
+        ],
+        dtype=np.float64,
+    )
 
 
 def matrix_to_rpy(R, solution=1):
@@ -71,21 +74,21 @@ def matrix_to_rpy(R, solution=1):
     p = 0.0
     y = 0.0
 
-    if np.abs(R[2,0]) >= 1.0 - 1e-12:
+    if np.abs(R[2, 0]) >= 1.0 - 1e-12:
         y = 0.0
-        if R[2,0] < 0:
+        if R[2, 0] < 0:
             p = np.pi / 2
-            r = np.arctan2(R[0,1], R[0,2])
+            r = np.arctan2(R[0, 1], R[0, 2])
         else:
             p = -np.pi / 2
-            r = np.arctan2(-R[0,1], -R[0,2])
+            r = np.arctan2(-R[0, 1], -R[0, 2])
     else:
         if solution == 1:
-            p = -np.arcsin(R[2,0])
+            p = -np.arcsin(R[2, 0])
         else:
-            p = np.pi + np.arcsin(R[2,0])
-        r = np.arctan2(R[2,1] / np.cos(p), R[2,2] / np.cos(p))
-        y = np.arctan2(R[1,0] / np.cos(p), R[0,0] / np.cos(p))
+            p = np.pi + np.arcsin(R[2, 0])
+        r = np.arctan2(R[2, 1] / np.cos(p), R[2, 2] / np.cos(p))
+        y = np.arctan2(R[1, 0] / np.cos(p), R[0, 0] / np.cos(p))
 
     return np.array([r, p, y], dtype=np.float64)
 
@@ -103,8 +106,8 @@ def matrix_to_xyz_rpy(matrix):
     xyz_rpy : (6,) float
         The xyz_rpy vector.
     """
-    xyz = matrix[:3,3]
-    rpy = matrix_to_rpy(matrix[:3,:3])
+    xyz = matrix[:3, 3]
+    rpy = matrix_to_rpy(matrix[:3, :3])
     return np.hstack((xyz, rpy))
 
 
@@ -122,8 +125,8 @@ def xyz_rpy_to_matrix(xyz_rpy):
         The homogenous transform matrix.
     """
     matrix = np.eye(4, dtype=np.float64)
-    matrix[:3,3] = xyz_rpy[:3]
-    matrix[:3,:3] = rpy_to_matrix(xyz_rpy[3:])
+    matrix[:3, 3] = xyz_rpy[:3]
+    matrix[:3, :3] = rpy_to_matrix(xyz_rpy[3:])
     return matrix
 
 
@@ -145,13 +148,13 @@ def parse_origin(node):
         child was found.
     """
     matrix = np.eye(4, dtype=np.float64)
-    origin_node = node.find('origin')
+    origin_node = node.find("origin")
     if origin_node is not None:
-        if 'xyz' in origin_node.attrib:
-            matrix[:3,3] = np.fromstring(origin_node.attrib['xyz'], sep=' ')
-        if 'rpy' in origin_node.attrib:
-            rpy = np.fromstring(origin_node.attrib['rpy'], sep=' ')
-            matrix[:3,:3] = rpy_to_matrix(rpy)
+        if "xyz" in origin_node.attrib:
+            matrix[:3, 3] = np.fromstring(origin_node.attrib["xyz"], sep=" ")
+        if "rpy" in origin_node.attrib:
+            rpy = np.fromstring(origin_node.attrib["rpy"], sep=" ")
+            matrix[:3, :3] = rpy_to_matrix(rpy)
     return matrix
 
 
@@ -174,9 +177,9 @@ def unparse_origin(matrix):
         - ``rpy`` - A string with three space-delimited floats representing
           the rotation of the origin.
     """
-    node = ET.Element('origin')
-    node.attrib['xyz'] = '{} {} {}'.format(*matrix[:3,3])
-    node.attrib['rpy'] = '{} {} {}'.format(*matrix_to_rpy(matrix[:3,:3]))
+    node = ET.Element("origin")
+    node.attrib["xyz"] = "{} {} {}".format(*matrix[:3, 3])
+    node.attrib["rpy"] = "{} {} {}".format(*matrix_to_rpy(matrix[:3, :3]))
     return node
 
 
@@ -232,14 +235,14 @@ def load_meshes(filename):
     if isinstance(meshes, (list, tuple, set)):
         meshes = list(meshes)
         if len(meshes) == 0:
-            raise ValueError('At least one mesh must be pmeshesent in file')
+            raise ValueError("At least one mesh must be pmeshesent in file")
         for r in meshes:
             if not isinstance(r, trimesh.Trimesh):
-                raise TypeError('Could not load meshes from file')
+                raise TypeError("Could not load meshes from file")
     elif isinstance(meshes, trimesh.Trimesh):
         meshes = [meshes]
     else:
-        raise ValueError('Unable to load mesh from file')
+        raise ValueError("Unable to load mesh from file")
 
     return meshes
 
@@ -264,9 +267,10 @@ def configure_origin(value):
         value = np.asanyarray(value, dtype=np.float64)
         if value.shape == (6,):
             value = xyz_rpy_to_matrix(value)
-        elif value.shape != (4,4):
-            raise ValueError('Origin must be specified as a 4x4 '
-                             'homogenous transformation matrix')
+        elif value.shape != (4, 4):
+            raise ValueError(
+                "Origin must be specified as a 4x4 homogenous transformation matrix"
+            )
     else:
-        raise TypeError('Invalid type for origin, expect 4x4 matrix')
+        raise TypeError("Invalid type for origin, expect 4x4 matrix")
     return value

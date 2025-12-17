@@ -1,9 +1,6 @@
 import os
-from functools import cached_property
-
 import torch as th
-
-from omnigibson.macros import gm
+from functools import cached_property
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.utils.asset_utils import get_dataset_path
 
@@ -76,7 +73,7 @@ class FrankaPanda(ManipulationRobot):
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the robot with a different rese joint position.
+                Set this value instead if you want to initialize the robot with a different reset joint position.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
@@ -101,7 +98,7 @@ class FrankaPanda(ManipulationRobot):
             finger_dynamic_friction (None or float): If specified, specific dynamic friction to use for robot's fingers.
                 Note: If specified, this will override any ways that are found within @link_physics_materials for any
                 robot finger gripper links
-            end_effector (str): type of end effector to use. One of {"gripper", "allegro", "leap_right", "leap_left", "inspire"}
+            end_effector (str): type of end effector to use. One of {"gripper", "robotiq", "allegro", "leap_right", "leap_left", "inspire"}
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -120,6 +117,24 @@ class FrankaPanda(ManipulationRobot):
             ]
             self._ag_end_points = [
                 GraspingPoint(link_name="panda_leftfinger", position=th.tensor([0.0, 0.001, 0.045])),
+            ]
+        elif end_effector == "robotiq":
+            self._model_name = "franka_robotiq"
+            self._gripper_control_idx = th.arange(7, 9)
+            self._eef_link_names = "eef_link"
+            self._finger_link_names = ["left_inner_finger", "right_inner_finger"]
+            self._finger_joint_names = ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]
+            self._default_robot_model_joint_pos = th.tensor(
+                [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+            )
+            self._teleop_rotation_offset = th.tensor([-1, 0, 0, 0])
+            self._ag_start_points = [
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="left_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
+            ]
+            self._ag_end_points = [
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.010, 0.0])),
+                GraspingPoint(link_name="right_inner_finger", position=th.tensor([0.008, 0.040, 0.0])),
             ]
         elif end_effector == "allegro":
             self._model_name = "franka_allegro"
@@ -258,7 +273,7 @@ class FrankaPanda(ManipulationRobot):
 
     @cached_property
     def arm_joint_names(self):
-        return {self.default_arm: [f"panda_joint{i+1}" for i in range(7)]}
+        return {self.default_arm: [f"panda_joint{i + 1}" for i in range(7)]}
 
     @cached_property
     def eef_link_names(self):
@@ -276,9 +291,10 @@ class FrankaPanda(ManipulationRobot):
     def usd_path(self):
         return (
             os.path.join(
-                get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_panda/usd/franka_panda.usda"
+                get_dataset_path("omnigibson-robot-assets"),
+                f"models/franka/{self.model_name}/usd/{self.model_name}.usda",
             )
-            if self.model_name == "franka_panda"
+            if self.model_name in {"franka_panda", "franka_robotiq"}
             else os.path.join(
                 get_dataset_path("omnigibson-robot-assets"), f"models/franka/franka_dexhand/{self.model_name}.usd"
             )
@@ -287,27 +303,33 @@ class FrankaPanda(ManipulationRobot):
     @property
     def urdf_path(self):
         # Only supported for normal franka now
-        assert self._model_name == "franka_panda", f"Only franka_panda has urdf currently. Got: {self._model_name}"
+        assert self._model_name in {
+            "franka_panda",
+            "franka_robotiq",
+        }, f"Only franka_panda and franka_robotiq have urdf currently. Got: {self._model_name}"
         return os.path.join(
-            get_dataset_path("omnigibson-robot-assets"), "models/franka/franka_panda/urdf/franka_panda.urdf"
+            get_dataset_path("omnigibson-robot-assets"),
+            f"models/franka/{self._model_name}/urdf/{self._model_name}.urdf",
         )
 
     @property
     def curobo_path(self):
         # Only supported for normal franka now
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        assert self._model_name in {
+            "franka_panda",
+            "franka_robotiq",
+        }, f"Only franka_panda and franka_robotiq are currently supported for curobo. Got: {self._model_name}"
         return os.path.join(
             get_dataset_path("omnigibson-robot-assets"),
-            "models/franka/franka_panda/curobo/franka_panda_description_curobo_default.yaml",
+            f"models/franka/{self._model_name}/curobo/{self._model_name}_description_curobo_default.yaml",
         )
 
     @cached_property
     def curobo_attached_object_link_names(self):
-        assert (
-            self._model_name == "franka_panda"
-        ), f"Only franka_panda is currently supported for curobo. Got: {self._model_name}"
+        assert self._model_name in {
+            "franka_panda",
+            "franka_robotiq",
+        }, f"Only franka_panda and franka_robotiq are currently supported for curobo. Got: {self._model_name}"
         return super().curobo_attached_object_link_names
 
     @property
@@ -334,5 +356,20 @@ class FrankaPanda(ManipulationRobot):
             collision_pairs.append(["link_12_0", "part_studio_link"])
         elif self.end_effector == "inspire":
             collision_pairs.append(["base_link", "link12"])
+        elif self.end_effector == "robotiq":
+            # disable all robotiq gripper internal collisions
+            links = [
+                "left_outer_knuckle",
+                "left_outer_finger",
+                "left_inner_finger",
+                "left_inner_knuckle",
+                "right_outer_knuckle",
+                "right_outer_finger",
+                "right_inner_finger",
+                "right_inner_knuckle",
+            ]
+            for i, link1 in enumerate(links):
+                for link2 in links[i + 1 :]:
+                    collision_pairs.append([link1, link2])
 
         return collision_pairs

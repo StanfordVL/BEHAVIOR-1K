@@ -42,47 +42,64 @@ def get_assignments():
 
     with open(ASSIGNMENT_FILE, "r") as f:
         return json.load(f)
-    
+
+
 def add_assignment(mdl, assignment):
     assignments = get_assignments()
     assignments[mdl] = assignment
     with open(ASSIGNMENT_FILE, "w") as f:
         json.dump(assignments, f)
 
+
 def _draw_meshes():
     draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     draw.clear_lines()
     for item in DRAWING_MESHES:
         if item is None:
-            continue 
+            continue
         mesh, parent_pos, color, size, visible = item
         if not visible:
             continue
         edge_vert_idxes = mesh.edges_unique
         N = len(edge_vert_idxes)
         colors = [color for _ in range(N)]
-        sizes = [1. for _ in range(N)]
-        points1 = [tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 0]] + parent_pos.numpy().copy()).tolist()]
-        points2 = [tuple(x) for x in (mesh.vertices[edge_vert_idxes[:, 1]] + parent_pos.numpy().copy()).tolist()]
+        sizes = [1.0 for _ in range(N)]
+        points1 = [
+            tuple(x)
+            for x in (
+                mesh.vertices[edge_vert_idxes[:, 0]] + parent_pos.numpy().copy()
+            ).tolist()
+        ]
+        points2 = [
+            tuple(x)
+            for x in (
+                mesh.vertices[edge_vert_idxes[:, 1]] + parent_pos.numpy().copy()
+            ).tolist()
+        ]
         draw.draw_lines(points1, points2, colors, sizes)
 
-def draw_mesh(mesh, parent_pos, color=(1., 0., 0., 1.), size=1.):
+
+def draw_mesh(mesh, parent_pos, color=(1.0, 0.0, 0.0, 1.0), size=1.0):
     DRAWING_MESHES.append((mesh, parent_pos, color, size, True))
     _draw_meshes()
     return len(DRAWING_MESHES) - 1
+
 
 def toggle_draw_visibility(idx):
     mesh, parent_pos, color, size, visible = DRAWING_MESHES[idx]
     DRAWING_MESHES[idx] = (mesh, parent_pos, color, size, not visible)
     _draw_meshes()
 
+
 def erase_mesh(idx):
     DRAWING_MESHES[idx] = None
     _draw_meshes()
 
+
 def clear_meshes():
     DRAWING_MESHES.clear()
     _draw_meshes()
+
 
 def anorm(x, axis=None, keepdims=False):
     """Compute L2 norms alogn specified axes."""
@@ -112,7 +129,11 @@ def vecs2quat(vec0, vec1, normalized=False):
 
     # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
     cos_theta = np.sum(vec0 * vec1, axis=-1, keepdims=True)
-    quat_unnormalized = np.where(cos_theta == -1, np.array([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1))
+    quat_unnormalized = np.where(
+        cos_theta == -1,
+        np.array([1.0, 0, 0, 0]),
+        np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1),
+    )
     return quat_unnormalized / np.linalg.norm(quat_unnormalized, axis=-1, keepdims=True)
 
 
@@ -196,7 +217,14 @@ def shoot_ray(tm, point, direction):
     return hit
 
 
-def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold=0.75, n_rays=100, scale=(1.0, 1.0, 1.0)):
+def sample_fillable_volume(
+    tm,
+    start_point,
+    direction=(0, 0, 1.0),
+    hit_threshold=0.75,
+    n_rays=100,
+    scale=(1.0, 1.0, 1.0),
+):
     """
     Samples fillable volume within a given mesh @tm's cavity using raycasting
 
@@ -221,10 +249,14 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
 
     # Shoot rays at the initial start point
     direction = np.array(direction)
-    prop_hit, hits = sample_radial_rays(tm=tm, point=start_point, normal=direction, n=n_rays)
+    prop_hit, hits = sample_radial_rays(
+        tm=tm, point=start_point, normal=direction, n=n_rays
+    )
     all_points = np.array([hit for hit in hits.values()])
     if not prop_hit >= hit_threshold:
-        print(f"Expected at least {hit_threshold} raycast hits, got {prop_hit} instead.")
+        print(
+            f"Expected at least {hit_threshold} raycast hits, got {prop_hit} instead."
+        )
         # Plot the pruned results
         sources = np.stack([start_point] * len(hits), axis=0)
         rays = np.stack([sources, all_points], axis=1)
@@ -236,14 +268,18 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
 
     # Shoot ray in downwards direction, make sure we hit some surface
     bottom_hit = shoot_ray(tm=tm, point=center, direction=-direction)
-    assert bottom_hit is not None, "Got no valid hit when trying to shoot ray towards opposite direction!"
+    assert (
+        bottom_hit is not None
+    ), "Got no valid hit when trying to shoot ray towards opposite direction!"
 
     # Find top hit by shooting ray in positive @direction
     top_hit = shoot_ray(tm=tm, point=center, direction=direction)
     if top_hit is None:
         # Only when shooting up, we are OK hitting the convex hull. try that
         top_hit = shoot_ray(tm=tm.convex_hull, point=center, direction=direction)
-    assert top_hit is not None, "Got no valid hit within convex hull when trying to shoot ray towards positive direction!"
+    assert (
+        top_hit is not None
+    ), "Got no valid hit within convex hull when trying to shoot ray towards positive direction!"
 
     # Transform mesh to such that z points in @direction, and compute average diameter in this direction
     tf = np.eye(4)
@@ -254,7 +290,9 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
     bbox_extent_rot = bbox_max_rot - bbox_min_rot
     avg_diameter = np.mean(bbox_extent_rot[:2])
     min_diameter = avg_diameter / 5.0
-    offset = min(0.005, avg_diameter / 20.) # Offset to prevent direct collisions. Defaults to 5mm
+    offset = min(
+        0.005, avg_diameter / 20.0
+    )  # Offset to prevent direct collisions. Defaults to 5mm
 
     # Make sure to rotate trimesh mesh back
     tf_inv = np.eye(4)
@@ -264,16 +302,20 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
     # Starting at the bottom, sample points radially and iteratively move in @direction
     mesh_points = np.array([]).reshape(0, 3)
 
-    total_distance = np.linalg.norm(top_hit - bottom_hit) - (offset / 2.)
+    total_distance = np.linalg.norm(top_hit - bottom_hit) - (offset / 2.0)
     delta = 0.005
-    delta = np.clip(delta, total_distance / 20, total_distance / 3)  # between 3 and 20 entries
+    delta = np.clip(
+        delta, total_distance / 20, total_distance / 3
+    )  # between 3 and 20 entries
     i = 0
 
-    cur_distance = (offset / 2.0)
+    cur_distance = offset / 2.0
 
     while cur_distance <= total_distance:
         point = bottom_hit + cur_distance * direction
-        prop_hit, hits = sample_radial_rays(tm=tm, point=point, normal=direction, n=n_rays)
+        prop_hit, hits = sample_radial_rays(
+            tm=tm, point=point, normal=direction, n=n_rays
+        )
         if prop_hit < hit_threshold:
             if i == 0:
                 # Failed to sample at all, probably a degenerate mesh, so raise an error
@@ -285,7 +327,10 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
         positions = np.array([hit for hit in hits.values()])
         positions_rot = positions @ rot.T
         # If the distance between points is less than a threshold, also break
-        if len(mesh_points) > 0 and np.any((positions_rot.max(axis=0)[:2] - positions_rot.min(axis=0)[:2]) < min_diameter):
+        if len(mesh_points) > 0 and np.any(
+            (positions_rot.max(axis=0)[:2] - positions_rot.min(axis=0)[:2])
+            < min_diameter
+        ):
             break
 
         # Compute points -- slightly offset them by @offset so they don't directly collide with edge
@@ -296,10 +341,12 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
         i += 1
 
     # Prune previous layer
-    mesh_points = mesh_points[:-len(layer_points)]
+    mesh_points = mesh_points[: -len(layer_points)]
 
     # Make sure we have nonzero set of points
-    assert len(mesh_points) > 0, "Got no valid mesh points for generating fillable mesh!"
+    assert (
+        len(mesh_points) > 0
+    ), "Got no valid mesh points for generating fillable mesh!"
 
     # 5. Create fillable trimesh
     tm_fillable_tmp = trimesh.Trimesh(vertices=np.array(mesh_points))
@@ -327,7 +374,9 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
     # Check which rays are within the polygon
     # Each inequality is of the form Ax + By + C <= 0
     # We need to check if the point satisfies all inequalities
-    is_within = np.all((ray_grid_flattened @ equations[:, :-1].T) + equations[:, -1] <= 0, axis=1)
+    is_within = np.all(
+        (ray_grid_flattened @ equations[:, :-1].T) + equations[:, -1] <= 0, axis=1
+    )
     xy_ray_positions = ray_grid_flattened[is_within]
 
     # Shoot these rays downwards and record their poses -- add them to the point set
@@ -353,7 +402,9 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
         if hit is not None:
             additional_points_rot.append(hit)
 
-    assert len(additional_points_rot) > 0, "Failed to generate any additional points for the fillable mesh!"
+    assert (
+        len(additional_points_rot) > 0
+    ), "Failed to generate any additional points for the fillable mesh!"
 
     # Rotate the points back into the original frame
     # Note: forward transform is points @ rot.T so inverse is points @ rot
@@ -372,18 +423,25 @@ def sample_fillable_volume(tm, start_point, direction=(0, 0, 1.0), hit_threshold
     # Return the convex hull of this mesh
     return tm_fillable.convex_hull
 
-def generate_fillable_mesh_for_object(obj, selected_link_name, start_point, up_dir, allow_convex_hull_hit):
-    # Walk through the link hierarchy to select the stuff below this one
-    links_to_include = set(nx.descendants(obj.articulation_tree, selected_link_name)) | {selected_link_name}
 
-    tm = trimesh.util.concatenate([
-        mesh_prim_to_trimesh_mesh(cm.prim, world_frame=True)
-        for link_name in links_to_include
-        for cm in obj.links[link_name].collision_meshes.values()
-    ])
+def generate_fillable_mesh_for_object(
+    obj, selected_link_name, start_point, up_dir, allow_convex_hull_hit
+):
+    # Walk through the link hierarchy to select the stuff below this one
+    links_to_include = set(
+        nx.descendants(obj.articulation_tree, selected_link_name)
+    ) | {selected_link_name}
+
+    tm = trimesh.util.concatenate(
+        [
+            mesh_prim_to_trimesh_mesh(cm.prim, world_frame=True)
+            for link_name in links_to_include
+            for cm in obj.links[link_name].collision_meshes.values()
+        ]
+    )
     if allow_convex_hull_hit:
         tm = trimesh.util.concatenate([tm, tm.convex_hull])
-    
+
     try:
         fillable_hull = sample_fillable_volume(
             tm=tm,
@@ -407,6 +465,7 @@ def generate_fillable_mesh_for_object(obj, selected_link_name, start_point, up_d
     fillable_hull.apply_transform(np.linalg.inv(obj_transform))
 
     return fillable_hull
+
 
 def view_object(cat, mdl):
     if og.sim:
@@ -436,7 +495,7 @@ def view_object(cat, mdl):
                 "kinematic_only": False,
                 "fixed_base": True,
             },
-        ]
+        ],
     }
 
     env = og.Environment(configs=cfg)
@@ -453,9 +512,11 @@ def view_object(cat, mdl):
 
     # Create the stopper function
     keep_rendering = True
+
     def stop_rendering():
         nonlocal keep_rendering
         keep_rendering = False
+
     def save_assignment_and_stop(assignment, meshes=None):
         # meshes should look like {link_name: [(mesh, enclosed)]}
         print(f"Chose option {assignment} for {cat}/{mdl}")
@@ -464,9 +525,11 @@ def view_object(cat, mdl):
             for link_name, meshlist in meshes.items():
                 for i, (mesh, enclosed) in enumerate(meshlist):
                     enclosed = "enclosed" if enclosed else "open"
-                    mesh.export(f"{gm.DATASET_PATH}/objects/{cat}/{mdl}/fillable---{link_name}---{i}---{enclosed}.obj")
+                    mesh.export(
+                        f"{gm.DATASET_PATH}/objects/{cat}/{mdl}/fillable---{link_name}---{i}---{enclosed}.obj"
+                    )
         stop_rendering()
-    
+
     # Skip without any assignment
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.J,
@@ -479,9 +542,13 @@ def view_object(cat, mdl):
         key=lazy.carb.input.KeyboardInput.U,
         callback_fn=lambda: save_assignment_and_stop("notfillable"),
     )
-    print("Press U to indicate we should remove the fillable annotation from the object.")
+    print(
+        "Press U to indicate we should remove the fillable annotation from the object."
+    )
 
-    dip_path = pathlib.Path(gm.DATASET_PATH) / "objects" / cat / mdl / "fillable_dip.obj"
+    dip_path = (
+        pathlib.Path(gm.DATASET_PATH) / "objects" / cat / mdl / "fillable_dip.obj"
+    )
     if dip_path.exists():
         # Find the scale the mesh was generated at
         scale = np.minimum(1, MAX_BBOX / np.max(np.asarray(fillable.native_bbox)))
@@ -492,12 +559,16 @@ def view_object(cat, mdl):
         dip_mesh.apply_transform(transform)
 
         # Draw the mesh
-        dip_viz_idx = draw_mesh(dip_mesh, fillable.get_position_orientation()[0], color=(1., 0., 0., 1.))
+        dip_viz_idx = draw_mesh(
+            dip_mesh, fillable.get_position_orientation()[0], color=(1.0, 0.0, 0.0, 1.0)
+        )
 
         # Add the dip option chooser
         KeyboardEventHandler.add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.X,
-            callback_fn=lambda: save_assignment_and_stop("dip", meshes={fillable.root_link_name: [(dip_mesh, True)]}),
+            callback_fn=lambda: save_assignment_and_stop(
+                "dip", meshes={fillable.root_link_name: [(dip_mesh, True)]}
+            ),
         )
         print("Press X to choose the dip (red) option.")
 
@@ -508,17 +579,23 @@ def view_object(cat, mdl):
         )
         print("Press B to toggle visibility of the dip (red) mesh.")
 
-    ray_path = pathlib.Path(gm.DATASET_PATH) / "objects" / cat / mdl / "fillable_ray.obj"
+    ray_path = (
+        pathlib.Path(gm.DATASET_PATH) / "objects" / cat / mdl / "fillable_ray.obj"
+    )
     if ray_path.exists():
         ray_mesh = trimesh.load(ray_path, force="mesh")
 
         # Draw the mesh
-        ray_viz_idx = draw_mesh(ray_mesh, fillable.get_position_orientation()[0], color=(0., 0., 1., 1.))
+        ray_viz_idx = draw_mesh(
+            ray_mesh, fillable.get_position_orientation()[0], color=(0.0, 0.0, 1.0, 1.0)
+        )
 
         # Add the ray option chooser
         KeyboardEventHandler.add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.S,
-            callback_fn=lambda: save_assignment_and_stop("ray", meshes={fillable.root_link_name: [(ray_mesh, True)]}),
+            callback_fn=lambda: save_assignment_and_stop(
+                "ray", meshes={fillable.root_link_name: [(ray_mesh, True)]}
+            ),
         )
         print("Press S to choose the ray (blue) option.")
 
@@ -532,15 +609,27 @@ def view_object(cat, mdl):
     # Now the combined version
     if dip_path.exists() and ray_path.exists():
         # Check if either mesh contains the entire other mesh
-        combined_mesh = trimesh.convex.convex_hull(np.concatenate([dip_mesh.vertices, ray_mesh.vertices], axis=0))
-        if not np.allclose(combined_mesh.volume, dip_mesh.volume, rtol=1e-3) and not np.allclose(combined_mesh.volume, ray_mesh.volume, rtol=1e-3):
+        combined_mesh = trimesh.convex.convex_hull(
+            np.concatenate([dip_mesh.vertices, ray_mesh.vertices], axis=0)
+        )
+        if not np.allclose(
+            combined_mesh.volume, dip_mesh.volume, rtol=1e-3
+        ) and not np.allclose(combined_mesh.volume, ray_mesh.volume, rtol=1e-3):
             # Draw the mesh
-            combined_viz_idx = draw_mesh(combined_mesh, fillable.get_position_orientation()[0], color=(1., 0., 1., 1.), size=0.5)
+            combined_viz_idx = draw_mesh(
+                combined_mesh,
+                fillable.get_position_orientation()[0],
+                color=(1.0, 0.0, 1.0, 1.0),
+                size=0.5,
+            )
 
             # Add the combined option chooser
             KeyboardEventHandler.add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.W,
-                callback_fn=lambda: save_assignment_and_stop("combined", meshes={fillable.root_link_name: [(combined_mesh, True)]}),
+                callback_fn=lambda: save_assignment_and_stop(
+                    "combined",
+                    meshes={fillable.root_link_name: [(combined_mesh, True)]},
+                ),
             )
             print("Press W to choose the combined (purple) option.")
 
@@ -557,15 +646,22 @@ def view_object(cat, mdl):
     # Add a seed prim
     seed_prim = XFormPrim(name="seed", relative_prim_path="/seed")
     seed_prim.load(env.scene)
+
     def _move_seed():
-        descendants = nx.descendants(fillable.articulation_tree, selected_link) | {selected_link}
-        aabbs = th.cat([th.stack(list(fillable.links[link].aabb), dim=0) for link in descendants], dim=0)
+        descendants = nx.descendants(fillable.articulation_tree, selected_link) | {
+            selected_link
+        }
+        aabbs = th.cat(
+            [th.stack(list(fillable.links[link].aabb), dim=0) for link in descendants],
+            dim=0,
+        )
         aabb_low = th.min(aabbs, dim=0).values
         aabb_high = th.max(aabbs, dim=0).values
         aabb_extent = aabb_high - aabb_low
         aabb_center = (aabb_high + aabb_low) / 2
         start_point = aabb_center + th.as_tensor([0, 0, aabb_extent[2] * 0.125])
         seed_prim.set_position_orientation(start_point, th.as_tensor([0, 0, 0, 1]))
+
     _move_seed()
 
     # Store the original hiddenness of prims
@@ -579,12 +675,22 @@ def view_object(cat, mdl):
 
     def _update_visibility():
         # Hide links that are not descendants of the selected link
-        descendants = nx.descendants(fillable.articulation_tree, selected_link) | {selected_link}
+        descendants = nx.descendants(fillable.articulation_tree, selected_link) | {
+            selected_link
+        }
         for link_name, link in fillable.links.items():
             for geom in link.visual_meshes.values():
-                geom.purpose = "guide" if hide_visuals or link_name not in descendants else original_hiddenness[geom]
+                geom.purpose = (
+                    "guide"
+                    if hide_visuals or link_name not in descendants
+                    else original_hiddenness[geom]
+                )
             for geom in link.collision_meshes.values():
-                geom.purpose = "guide" if hide_collision or link_name not in descendants else "default"
+                geom.purpose = (
+                    "guide"
+                    if hide_collision or link_name not in descendants
+                    else "default"
+                )
 
     _update_visibility()
 
@@ -592,6 +698,7 @@ def view_object(cat, mdl):
         nonlocal hide_visuals
         hide_visuals = not hide_visuals
         _update_visibility()
+
     # Add the ability to hide or show visuals
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.V,
@@ -603,6 +710,7 @@ def view_object(cat, mdl):
         nonlocal hide_collision
         hide_collision = not hide_collision
         _update_visibility()
+
     # Add the ability to hide or show collision meshes
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.C,
@@ -612,7 +720,9 @@ def view_object(cat, mdl):
 
     def _increment_selection(inc):
         nonlocal selected_link
-        available_links = [k for k, v in fillable.links.items() if v.collision_meshes]  # only pick links with meshes
+        available_links = [
+            k for k, v in fillable.links.items() if v.collision_meshes
+        ]  # only pick links with meshes
         selected_idx = available_links.index(selected_link)
         new_selected_idx = (selected_idx + inc) % len(available_links)
         selected_link = available_links[new_selected_idx]
@@ -620,6 +730,7 @@ def view_object(cat, mdl):
         _update_visibility()
         _move_seed()
         print(f"Selected link: {selected_link}")
+
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.A,
         callback_fn=lambda: _increment_selection(1),
@@ -637,19 +748,38 @@ def view_object(cat, mdl):
         # First check that no parent or child already has a generated mesh
         ancestors = nx.ancestors(fillable.articulation_tree, selected_link)
         descendants = nx.descendants(fillable.articulation_tree, selected_link)
-        if any(ancestors & set(generated_meshes)) or any(descendants & set(generated_meshes)):
-            print(f"Cannot generate mesh for {selected_link} because a parent or child already has a generated mesh.")
+        if any(ancestors & set(generated_meshes)) or any(
+            descendants & set(generated_meshes)
+        ):
+            print(
+                f"Cannot generate mesh for {selected_link} because a parent or child already has a generated mesh."
+            )
             return
 
         seed_pos, seed_orn = seed_prim.get_position_orientation()
         seed_mat = T.quat2mat(seed_orn).numpy()
         up_dir = seed_mat @ np.array([0, 0, 1.0])
-        generated_mesh = generate_fillable_mesh_for_object(fillable, selected_link, seed_pos.numpy().copy(), up_dir, allow_convex_hull_hit)
+        generated_mesh = generate_fillable_mesh_for_object(
+            fillable,
+            selected_link,
+            seed_pos.numpy().copy(),
+            up_dir,
+            allow_convex_hull_hit,
+        )
         if generated_mesh is None:
             return
-        draw_idx = draw_mesh(generated_mesh, fillable.get_position_orientation()[0], color=(0., 1., 0., 1.))
-        generated_meshes[selected_link].append((generated_mesh, draw_idx, allow_convex_hull_hit))
-        print(f"Generated mesh {len(generated_meshes[selected_link])} for selected link {selected_link}")
+        draw_idx = draw_mesh(
+            generated_mesh,
+            fillable.get_position_orientation()[0],
+            color=(0.0, 1.0, 0.0, 1.0),
+        )
+        generated_meshes[selected_link].append(
+            (generated_mesh, draw_idx, allow_convex_hull_hit)
+        )
+        print(
+            f"Generated mesh {len(generated_meshes[selected_link])} for selected link {selected_link}"
+        )
+
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.K,
         callback_fn=lambda: _generate_mesh(allow_convex_hull_hit=False),
@@ -659,16 +789,23 @@ def view_object(cat, mdl):
         key=lazy.carb.input.KeyboardInput.L,
         callback_fn=lambda: _generate_mesh(allow_convex_hull_hit=True),
     )
-    print("Press L to generate an OPEN fillable mesh from the current seed point, allowing convex hull hits.")
-    print("    Note that this marks the fillable volume as unenclosed, meaning it provides fewer guarantees with sampling.")
+    print(
+        "Press L to generate an OPEN fillable mesh from the current seed point, allowing convex hull hits."
+    )
+    print(
+        "    Note that this marks the fillable volume as unenclosed, meaning it provides fewer guarantees with sampling."
+    )
     print("    Use this option if the volume is not fully enclosed, e.g. a shelf.")
 
     def _remove_last_generated():
         if len(generated_meshes[selected_link]) == 0:
             return
-        generated_mesh, draw_idx, allow_convex_hull_hit = generated_meshes[selected_link].pop()
+        generated_mesh, draw_idx, allow_convex_hull_hit = generated_meshes[
+            selected_link
+        ].pop()
         erase_mesh(draw_idx)
         print(f"Removed last generated mesh")
+
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.O,
         callback_fn=_remove_last_generated,
@@ -681,6 +818,7 @@ def view_object(cat, mdl):
                 mesh, idx, allow_convex_hull_hit = meshes.pop()
                 erase_mesh(idx)
         print(f"Cleared all generated meshes.")
+
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.P,
         callback_fn=_clear_generated_meshes,
@@ -694,11 +832,15 @@ def view_object(cat, mdl):
             return
         generated_concat = {
             # enclosed = not allow_convex_hull_hit
-            link: [(mesh, not allow_convex_hull_hit) for mesh, idx, allow_convex_hull_hit in meshes]
+            link: [
+                (mesh, not allow_convex_hull_hit)
+                for mesh, idx, allow_convex_hull_hit in meshes
+            ]
             for link, meshes in generated_meshes.items()
             if len(meshes) > 0
         }
         save_assignment_and_stop("generated", meshes=generated_concat)
+
     KeyboardEventHandler.add_keyboard_callback(
         key=lazy.carb.input.KeyboardInput.Z,
         callback_fn=_pick_generated,
@@ -721,8 +863,15 @@ def main():
 
     # Get all the models that are fillable-annotated
     from bddl.knowledge_base import Object
-    fillables = sorted(o.name.split("-") for o in Object.all_objects() if any(p.name == "fillable" for p in o.category.synset.properties))
-    assert len(fillables) == 1031, f"Expected 1031 fillable objects, got {len(fillables)}. Uninstall BDDL and reinstall the develop branch."
+
+    fillables = sorted(
+        o.name.split("-")
+        for o in Object.all_objects()
+        if any(p.name == "fillable" for p in o.category.synset.properties)
+    )
+    assert (
+        len(fillables) == 1031
+    ), f"Expected 1031 fillable objects, got {len(fillables)}. Uninstall BDDL and reinstall the develop branch."
 
     # Get the ones that don't have a fillable assignment
     assignments = get_assignments()
@@ -736,7 +885,9 @@ def main():
     ]
 
     for cat, mdl in tqdm.tqdm(fillables):
-        if not os.path.exists(DatasetObject.get_usd_path(cat, mdl).replace(".usd", ".encrypted.usd")):
+        if not os.path.exists(
+            DatasetObject.get_usd_path(cat, mdl).replace(".usd", ".encrypted.usd")
+        ):
             print(f"Skipping {cat}/{mdl} because it does not exist")
             continue
         view_object(cat, mdl)

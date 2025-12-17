@@ -7,6 +7,7 @@ gm.USE_ENCRYPTED_ASSETS = True
 gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_FLATCACHE = False
 
+
 def process_object(cat, mdl):
     cfg = {
         "scene": {
@@ -21,7 +22,7 @@ def process_object(cat, mdl):
                 "kinematic_only": False,
                 "fixed_base": True,
             },
-        ]
+        ],
     }
 
     env = og.Environment(configs=cfg)

@@ -24,7 +24,9 @@ CONFIRM_EACH = False
 INTERACTIVE_MODE = True
 IN_DATASET_ROOT = r"C:\Users\Cem\research\iGibson-dev\igibson\data\ig_dataset"
 OUTPUT_ROOT = r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects"
-RECORD_PATH = os.path.join(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\patched_rotations.json")
+RECORD_PATH = os.path.join(
+    r"D:\BEHAVIOR-1K\asset_pipeline\metadata\patched_rotations.json"
+)
 TRANSLATION_PATH = os.path.join(IN_DATASET_ROOT, "metadata", "model_rename.yaml")
 with open(TRANSLATION_PATH, "r") as f:
     TRANSLATION_DICT = yaml.load(f, Loader=yaml.SafeLoader)
@@ -35,7 +37,9 @@ class AutomationError(ValueError):
 
 
 def process_urdf(old_category_name, old_model_name):
-    model_dir = os.path.join(IN_DATASET_ROOT, "objects", old_category_name, old_model_name)
+    model_dir = os.path.join(
+        IN_DATASET_ROOT, "objects", old_category_name, old_model_name
+    )
     intervention_request_msgs = []
 
     # Convert to new model name.
@@ -93,9 +97,15 @@ def process_urdf(old_category_name, old_model_name):
         parent_name = re.sub(r"[^a-z0-9_]", "", j.parent.lower())
         if parent_name == robot.base_link.name:
             parent_name = "base_link"
-        obj_name = f"{new_category_name}-{new_model_name}-0-{link_name}-{parent_name}-R-upper"
+        obj_name = (
+            f"{new_category_name}-{new_model_name}-0-{link_name}-{parent_name}-R-upper"
+        )
 
-        (obj,) = [x for x in rt.objects if b1k_pipeline.utils.parse_name(x.name).group("mesh_basename") == obj_name]
+        (obj,) = [
+            x
+            for x in rt.objects
+            if b1k_pipeline.utils.parse_name(x.name).group("mesh_basename") == obj_name
+        ]
         obj.transform = mat
 
     # Then, for each joint, add the upper limit.
@@ -109,7 +119,9 @@ def process_urdf(old_category_name, old_model_name):
         if joint_range <= 179:
             continue
         elif joint_range > 200:
-            intervention_request_msgs.append(f"Large joint range of {joint_range}. Take a look.")
+            intervention_request_msgs.append(
+                f"Large joint range of {joint_range}. Take a look."
+            )
 
         # Get some joint info.
         joint_name = joint.name
@@ -275,7 +287,7 @@ def fix_legacy_obj_rots():
         print(f"Failures: {len(failures)} / {len(remaining_objs)}")
         sorted_failure_fns = sorted(failures.keys())
         for i, failure_fn in enumerate(sorted_failure_fns):
-            print(f"{i+1} / {len(failures)} - {failure_fn}: {failures[failure_fn]}")
+            print(f"{i + 1} / {len(failures)} - {failure_fn}: {failures[failure_fn]}")
 
 
 if __name__ == "__main__":

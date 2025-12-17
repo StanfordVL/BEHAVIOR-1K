@@ -1,0 +1,13 @@
+[
+  {
+    "id": "job-1",
+    "payload": {
+      "description": "Example job payload",
+      "dataset": "example"
+    },
+    "resource_type": "model1-hosts",
+    "status": "pending",
+    "attempts": 0
+  }
+]
+

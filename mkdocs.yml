@@ -45,6 +45,9 @@ extra_css:
 
 extra_javascript:
   - assets/fold_api_reference.js
+  - https://unpkg.com/tablesort@5.3.0/dist/tablesort.min.js
+  - javascripts/tablesort.js
+
 
 markdown_extensions:
   - pymdownx.emoji:
@@ -102,7 +105,7 @@ nav:
     - challenge/index.md
     - Call for Participation: challenge/call_for_participation.md
     - Announcements / Updates: challenge/updates.md
-    # - Leaderboard: challenge/leaderboard.md
+    - Leaderboard: challenge/leaderboard.md
     - Dataset: challenge/dataset.md
     - Baselines: challenge/baselines.md
     - Evaluation and Rules: challenge/evaluation.md

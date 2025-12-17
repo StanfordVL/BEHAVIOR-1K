@@ -2,6 +2,7 @@ import json
 
 import b1k_pipeline.utils
 
+
 def main():
     targets = b1k_pipeline.utils.get_targets("combined")
     with b1k_pipeline.utils.PipelineFS() as pipeline_fs:
@@ -14,9 +15,11 @@ def main():
                     combined_file_manifest[target] = json.load(f)
 
         # Write the combined list
-        with pipeline_fs.open("artifacts/pipeline/combined_file_manifest.json", "w", newline="\n") as f:
+        with pipeline_fs.open(
+            "artifacts/pipeline/combined_file_manifest.json", "w", newline="\n"
+        ) as f:
             json.dump(combined_file_manifest, f, indent=2)
+
 
 if __name__ == "__main__":
     main()
-    

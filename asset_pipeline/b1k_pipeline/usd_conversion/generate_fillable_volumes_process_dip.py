@@ -21,40 +21,54 @@ gm.ENABLE_FLATCACHE = False
 
 MAX_BBOX = 0.3
 
+
 def find_largest_connected_component(points, d):
     # Create a KDTree for efficient nearest neighbor search
     points_np = points.numpy().copy()
     tree = KDTree(points_np)
-    
+
     # Find pairs of points within distance d
-    pairs = tree.query_pairs(r=d, output_type='ndarray')
-    
+    pairs = tree.query_pairs(r=d, output_type="ndarray")
+
     # Create an adjacency matrix for the graph
     n_points = points.shape[0]
-    adjacency_matrix = csr_matrix((np.ones(pairs.shape[0]), (pairs[:, 0], pairs[:, 1])), shape=(n_points, n_points))
-    
+    adjacency_matrix = csr_matrix(
+        (np.ones(pairs.shape[0]), (pairs[:, 0], pairs[:, 1])),
+        shape=(n_points, n_points),
+    )
+
     # Make the matrix symmetric since the graph is undirected
     adjacency_matrix = adjacency_matrix + adjacency_matrix.T
-    
+
     # Find connected components
-    _, labels = connected_components(csgraph=adjacency_matrix, directed=False, return_labels=True)
-    
+    _, labels = connected_components(
+        csgraph=adjacency_matrix, directed=False, return_labels=True
+    )
+
     # Find the largest connected component
     largest_component_label = th.argmax(th.bincount(th.tensor(labels)))
-    largest_component_indices = th.where(th.tensor(labels) == largest_component_label)[0]
-    
+    largest_component_indices = th.where(th.tensor(labels) == largest_component_label)[
+        0
+    ]
+
     # Return the points belonging to the largest connected component
     return points[largest_component_indices]
+
 
 def generate_box(box_half_extent):
     # The floor plane already exists
     # We just need to generate the side planes
-    plane_centers = th.tensor([
-        [1, 0, 1],
-        [0, 1, 1],
-        [-1, 0, 1],
-        [0, -1, 1],
-    ]) * box_half_extent
+    plane_centers = (
+        th.tensor(
+            [
+                [1, 0, 1],
+                [0, 1, 1],
+                [-1, 0, 1],
+                [0, -1, 1],
+            ]
+        )
+        * box_half_extent
+    )
     for i, pc in enumerate(plane_centers):
         plane = lazy.omni.isaac.core.objects.ground_plane.GroundPlane(
             prim_path=f"/World/plane_{i}",
@@ -63,7 +77,6 @@ def generate_box(box_half_extent):
             size=box_half_extent[2].item(),
             color=None,
             visible=False,
-
             # TODO: update with new PhysicsMaterial API
             # static_friction=static_friction,
             # dynamic_friction=dynamic_friction,
@@ -75,7 +88,7 @@ def generate_box(box_half_extent):
             name=plane.name,
         )
         plane_as_prim.load(None)
-        
+
         # Build the plane orientation from the plane normal
         horiz_dir = pc - th.tensor([0, 0, box_half_extent[2]])
         plane_z = -1 * horiz_dir / th.norm(horiz_dir)
@@ -84,6 +97,7 @@ def generate_box(box_half_extent):
         plane_mat = th.stack([plane_x, plane_y, plane_z], dim=1)
         plane_quat = T.mat2quat(plane_mat)
         plane_as_prim.set_position_orientation(pc, plane_quat)
+
 
 def generate_particles_in_box(water, box_half_extent):
     particle_radius = water.particle_radius
@@ -96,27 +110,39 @@ def generate_particles_in_box(water, box_half_extent):
     # We sample the range of each extent minus
     sampling_distance = 2 * particle_radius
     n_particles_per_axis = (extent / sampling_distance).long()
-    assert th.all(n_particles_per_axis > 0), f"box is too small to sample any particle of radius {particle_radius}."
+    assert th.all(
+        n_particles_per_axis > 0
+    ), f"box is too small to sample any particle of radius {particle_radius}."
 
     # 1e-10 is added because the extent might be an exact multiple of particle radius
-    arrs = [th.arange(l + particle_radius, h - particle_radius + 1e-10, particle_radius * 2)
-            for l, h, n in zip(low, high, n_particles_per_axis)]
+    arrs = [
+        th.arange(l + particle_radius, h - particle_radius + 1e-10, particle_radius * 2)
+        for l, h, n in zip(low, high, n_particles_per_axis)
+    ]
     # Generate 3D-rectangular grid of points
-    particle_positions = th.stack(th.meshgrid(*arrs, indexing='ij')).view(3, -1).t()
+    particle_positions = th.stack(th.meshgrid(*arrs, indexing="ij")).view(3, -1).t()
 
     water.generate_particles(
         positions=particle_positions,
     )
 
+
 def draw_mesh(mesh, parent_pos):
     draw = lazy.omni.isaac.debug_draw._debug_draw.acquire_debug_draw_interface()
     edge_vert_idxes = mesh.edges_unique
     N = len(edge_vert_idxes)
-    colors = [(1., 0., 0., 1.) for _ in range(N)]
-    sizes = [1. for _ in range(N)]
-    points1 = [tuple(x) for x in (th.tensor(mesh.vertices[edge_vert_idxes[:, 0]]) + parent_pos).tolist()]
-    points2 = [tuple(x) for x in (th.tensor(mesh.vertices[edge_vert_idxes[:, 1]]) + parent_pos).tolist()]
+    colors = [(1.0, 0.0, 0.0, 1.0) for _ in range(N)]
+    sizes = [1.0 for _ in range(N)]
+    points1 = [
+        tuple(x)
+        for x in (th.tensor(mesh.vertices[edge_vert_idxes[:, 0]]) + parent_pos).tolist()
+    ]
+    points2 = [
+        tuple(x)
+        for x in (th.tensor(mesh.vertices[edge_vert_idxes[:, 1]]) + parent_pos).tolist()
+    ]
     draw.draw_lines(points1, points2, colors, sizes)
+
 
 def check_in_contact(system, positions):
     """
@@ -130,8 +156,11 @@ def check_in_contact(system, positions):
     """
     in_contact = th.zeros(len(positions), dtype=bool)
     for idx, pos in enumerate(positions):
-        in_contact[idx] = og.sim.psqi.overlap_sphere_any(system.particle_contact_radius * 0.8, pos.numpy().copy())
+        in_contact[idx] = og.sim.psqi.overlap_sphere_any(
+            system.particle_contact_radius * 0.8, pos.numpy().copy()
+        )
     return in_contact
+
 
 def process_object(cat, mdl, out_path):
     if og.sim:
@@ -155,7 +184,9 @@ def process_object(cat, mdl, out_path):
     scale = MAX_BBOX / th.max(bounding_box)
 
     if scale > 1:
-        print("The object won't be scaled because it's smaller than the requested bounding box.")
+        print(
+            "The object won't be scaled because it's smaller than the requested bounding box."
+        )
         scale = 1
 
     cfg = {
@@ -172,7 +203,7 @@ def process_object(cat, mdl, out_path):
                 "fixed_base": True,
                 "scale": [scale, scale, scale],
             },
-        ]
+        ],
     }
 
     env = og.Environment(configs=cfg)
@@ -204,7 +235,9 @@ def process_object(cat, mdl, out_path):
     # Now generate the box and the particles
     water = env.scene.get_system("water")
     box_half_extent = aabb_extent * 0.55
-    box_half_extent = th.maximum(box_half_extent, aabb_extent / 2 + 2.1 * water.particle_radius)
+    box_half_extent = th.maximum(
+        box_half_extent, aabb_extent / 2 + 2.1 * water.particle_radius
+    )
     generate_box(box_half_extent)
     og.sim.step()
     generate_particles_in_box(water, box_half_extent)
@@ -293,10 +326,17 @@ def process_object(cat, mdl, out_path):
     aabb_min, aabb_max = fillable.aabb
     particles = th.tensor(water.get_particles_position_orientation()[0])
     particles = particles[th.where(check_in_contact(water, particles) == 0)[0]]
-    particle_point_offsets = th.stack([e * side * water.particle_radius for e in th.eye(3) for side in [-1, 1]] + [th.zeros(3)])
-    points = particles.unsqueeze(1).repeat(1, len(particle_point_offsets), 1) + particle_point_offsets.unsqueeze(0)
+    particle_point_offsets = th.stack(
+        [e * side * water.particle_radius for e in th.eye(3) for side in [-1, 1]]
+        + [th.zeros(3)]
+    )
+    points = particles.unsqueeze(1).repeat(
+        1, len(particle_point_offsets), 1
+    ) + particle_point_offsets.unsqueeze(0)
     points = points.reshape(-1, 3)
-    points = points[th.all(points <= (aabb_max + th.tensor([0, 0, water.particle_radius])), dim=1)]
+    points = points[
+        th.all(points <= (aabb_max + th.tensor([0, 0, water.particle_radius])), dim=1)
+    ]
     points = points[th.all(points >= aabb_min, dim=1)]
     assert len(points) > 0, "No points found in the AABB of the object."
 
@@ -310,7 +350,13 @@ def process_object(cat, mdl, out_path):
     hull = trimesh.convex.convex_hull(points.numpy().copy())
 
     # Save it somewhere
-    hull.export(out_path, file_type="obj", include_normals=False, include_color=False, include_texture=False)
+    hull.export(
+        out_path,
+        file_type="obj",
+        include_normals=False,
+        include_color=False,
+        include_texture=False,
+    )
 
     # draw_mesh(hull, fillable.get_position_orientation()[0])
     # while True:

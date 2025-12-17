@@ -171,10 +171,7 @@ def main():
             continue
 
         # Check if this is the 0th instance and the lower mesh and not a meta link and not bad
-        if (
-            match.group("joint_side") == "upper"
-            or match.group("meta_type")
-        ):
+        if match.group("joint_side") == "upper" or match.group("meta_type"):
             continue
 
         # Otherwise store the vertex and face info for the model ID
@@ -210,7 +207,7 @@ def main():
     bounding_boxes = defaultdict(dict)
     for (model_id, instance_id), parts in pivots_and_mesh_parts.items():
         # Find the pivot and get a copy that's position and rotation only.
-        possibly_scaled_pivot, = [x[0] for x in parts if x[0] is not None]
+        (possibly_scaled_pivot,) = [x[0] for x in parts if x[0] is not None]
         pivot = rt.Matrix3(1)
         pivot.rotation = possibly_scaled_pivot.rotation
         pivot.position = possibly_scaled_pivot.position
@@ -227,7 +224,9 @@ def main():
         bbox_extent = bbox_max - bbox_min
         bbox_center_in_pivot = rt.Point3(*((bbox_max + bbox_min) / 2.0).tolist())
 
-        bbox_position_in_world = np.array(pivot.position) + np.array(bbox_center_in_pivot * pivot.rotation)
+        bbox_position_in_world = np.array(pivot.position) + np.array(
+            bbox_center_in_pivot * pivot.rotation
+        )
         bbox_rotation_in_world = quat2arr(pivot.rotation)
 
         bounding_boxes[model_id][instance_id] = {
@@ -425,7 +424,9 @@ def main():
                     if match.group("category") in MUST_HAVE_ROOM_ASSIGNMENT_CATEGORIES:
                         missing_room_assignment.add(obj.name)
                     continue
-                object_instances_by_room[room_str][model].add(int(match.group("instance_id")))
+                object_instances_by_room[room_str][model].add(
+                    int(match.group("instance_id"))
+                )
 
         objects_by_room = {
             room: {mid: len(instances) for mid, instances in models.items()}

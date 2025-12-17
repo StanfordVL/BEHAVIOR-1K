@@ -6,6 +6,7 @@ VERTEX_COUNT = 20000
 
 STOP_AFTER_EVERY_OBJECT = True
 
+
 def prereduce():
     done_bases = set()
     for obj in rt.objects:
@@ -18,7 +19,12 @@ def prereduce():
             continue
 
         # Only do objects that don't already have multires on them.
-        if any([rt.classOf(x) == rt.multiRes or rt.classOf(x) == rt.ProOptimizer for x in obj.modifiers]):
+        if any(
+            [
+                rt.classOf(x) == rt.multiRes or rt.classOf(x) == rt.ProOptimizer
+                for x in obj.modifiers
+            ]
+        ):
             continue
 
         print(f"Processing object {obj.name}.")
@@ -60,7 +66,10 @@ def prereduce():
     print("Prereduce done.")
     rt.IsolateSelection.ExitIsolateSelectionMode()
     if not STOP_AFTER_EVERY_OBJECT:
-      rt.messageBox(f"{len(done_bases)} objects processed. Please confirm visually reasonable vertex count (and reduce as necessary).")
+        rt.messageBox(
+            f"{len(done_bases)} objects processed. Please confirm visually reasonable vertex count (and reduce as necessary)."
+        )
+
 
 if __name__ == "__main__":
     prereduce()

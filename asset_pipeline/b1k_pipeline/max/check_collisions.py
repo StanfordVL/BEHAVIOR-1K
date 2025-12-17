@@ -40,7 +40,14 @@ def get_collision_meshes_relative_to_base(obj, base_transform):
             for i in range(rt.polyop.GetNumVerts(obj))
         ]
     )
-    faces = np.array(rt.polyop.getFacesVerts(obj, rt.execute("#{1..%d}" % rt.polyop.GetNumFaces(obj)))) - 1
+    faces = (
+        np.array(
+            rt.polyop.getFacesVerts(
+                obj, rt.execute("#{1..%d}" % rt.polyop.GetNumFaces(obj))
+            )
+        )
+        - 1
+    )
     assert faces.shape[1] == 3, f"{obj.name} has non-triangular faces"
 
     # Split the faces into elements
@@ -108,8 +115,8 @@ def import_bad_model_originals(model_id):
         else:
             visual_objects[link_name] = obj
 
-    assert set(visual_objects.keys()) == set(
-        collision_objects.keys()
+    assert (
+        set(visual_objects.keys()) == set(collision_objects.keys())
     ), f"Visual and collision objects should match in source for {model_id}. Currently: {visual_objects.keys()} vs {collision_objects.keys()}"
 
     objects_to_import = sorted(
@@ -129,10 +136,9 @@ def import_bad_model_originals(model_id):
     )
     assert success, f"Failed to import {model_id}."
     imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-    assert set(objects_to_import) == set(
-        imported_objs_by_name.keys()
-    ), "Not all objects were imported. Missing: " + str(
-        set(objects_to_import) - set(imported_objs_by_name.keys())
+    assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
+        "Not all objects were imported. Missing: "
+        + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
     )
 
     # Make sure the objects all have the right parents
@@ -177,9 +183,10 @@ def prepare_scene(use_clutter=False):
             categories_by_model_id[parsed_name.group("model_id")] = parsed_name.group(
                 "category"
             )
-        assert parsed_name.group("category") == categories_by_model_id[
-            parsed_name.group("model_id")
-        ], f"{parsed_name.group('model_id')} has different categories: {parsed_name.group('category')} vs {categories_by_model_id[parsed_name.group('model_id')]}."
+        assert (
+            parsed_name.group("category")
+            == categories_by_model_id[parsed_name.group("model_id")]
+        ), f"{parsed_name.group('model_id')} has different categories: {parsed_name.group('category')} vs {categories_by_model_id[parsed_name.group('model_id')]}."
 
         if int(parsed_name.group("instance_id")) != 0:
             continue
@@ -316,12 +323,21 @@ def check_collisions(scene):
 
     pairs_collision = {}
     for collision in tqdm.tqdm(collision_data, desc="Filtering collisions"):
-        left, right = sorted(tuple(collision.names))  # Sorting here gives deterministic category ordering
-        left_category, left_model, left_instance, left_link, left_body, left_loose = left.split("-")
-        left_loose = left_loose == "true"
-        right_category, right_model, right_instance, right_link, right_body, right_loose = right.split(
-            "-"
+        left, right = sorted(
+            tuple(collision.names)
+        )  # Sorting here gives deterministic category ordering
+        left_category, left_model, left_instance, left_link, left_body, left_loose = (
+            left.split("-")
         )
+        left_loose = left_loose == "true"
+        (
+            right_category,
+            right_model,
+            right_instance,
+            right_link,
+            right_body,
+            right_loose,
+        ) = right.split("-")
         right_loose = right_loose == "true"
 
         # Exclude self-collisions
@@ -353,7 +369,12 @@ def check_collisions(scene):
             continue
 
         pair = tuple(
-            sorted([(left_category, left_model, left_instance), (right_category, right_model, right_instance)])
+            sorted(
+                [
+                    (left_category, left_model, left_instance),
+                    (right_category, right_model, right_instance),
+                ]
+            )
         )
         if pair not in pairs_collision:
             pairs_collision[pair] = depth
@@ -384,7 +405,11 @@ def main():
     output_dir = pathlib.Path(rt.maxFilePath) / "artifacts"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    filename = output_dir / ("check_collisions.json" if not use_clutter else "check_collisions_with_clutter.json")
+    filename = output_dir / (
+        "check_collisions.json"
+        if not use_clutter
+        else "check_collisions_with_clutter.json"
+    )
     results = {
         "success": not error and len(collisions) == 0,
         "collisions": collisions,

@@ -1,0 +1,8 @@
+*.code-workspace
+__pycache__
+*.log
+challenge_submissions
+test_instances
+resources-raw.json
+resources.json
+jobs.json

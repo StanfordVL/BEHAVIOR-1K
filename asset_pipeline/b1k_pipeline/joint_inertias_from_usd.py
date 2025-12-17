@@ -57,8 +57,11 @@ def get_joint_inertias_from_usd(input_usd, tempdir):
         for child in root_prim.GetChildren():
             if prim_type in child.GetTypeName():
                 found_prims.append(child)
-            found_prims += find_all_prim_children_with_type(prim_type=prim_type, root_prim=child)
+            found_prims += find_all_prim_children_with_type(
+                prim_type=prim_type, root_prim=child
+            )
         return found_prims
+
     prismatics = find_all_prim_children_with_type("PhysicsPrismaticJoint", prim)
     revolutes = find_all_prim_children_with_type("PhysicsRevoluteJoint", prim)
     fixeds = find_all_prim_children_with_type("PhysicsFixedJoint", prim)
@@ -75,11 +78,14 @@ def get_joint_inertias_from_usd(input_usd, tempdir):
 
     movable_joints = prismatics + revolutes
     joint_inertias = {
-        str(joint.GetPath()): sum(link_masses[link] for link in _get_subtree(G, joint_children[joint]))
+        str(joint.GetPath()): sum(
+            link_masses[link] for link in _get_subtree(G, joint_children[joint])
+        )
         for joint in movable_joints
     }
 
     return joint_inertias
+
 
 def main():
     input_usds = list(DATASET_PATH.glob("objects/*/*/usd/*.usd"))
@@ -89,19 +95,24 @@ def main():
     # Scale up
     futures = {}
     with tempfile.TemporaryDirectory() as tempdir:
-      with ProcessPoolExecutor() as executor:
-          for input_usd in tqdm(input_usds, desc="Queueing up jobs"):
-              future = executor.submit(get_joint_inertias_from_usd, input_usd, tempdir)
-              futures[future] = input_usd
+        with ProcessPoolExecutor() as executor:
+            for input_usd in tqdm(input_usds, desc="Queueing up jobs"):
+                future = executor.submit(
+                    get_joint_inertias_from_usd, input_usd, tempdir
+                )
+                futures[future] = input_usd
 
-          # Gather the results (with a tqdm progress bar)
-          results = {}
-          for future in tqdm(as_completed(futures), total=len(futures), desc="Processing results"):
-              input_usd = futures[future]
-              results[input_usd.parts[-3]] = future.result()
+            # Gather the results (with a tqdm progress bar)
+            results = {}
+            for future in tqdm(
+                as_completed(futures), total=len(futures), desc="Processing results"
+            ):
+                input_usd = futures[future]
+                results[input_usd.parts[-3]] = future.result()
 
     with open(DATASET_PATH / "joint_inertias.json", "w") as f:
         json.dump(results, f)
+
 
 if __name__ == "__main__":
     main()
