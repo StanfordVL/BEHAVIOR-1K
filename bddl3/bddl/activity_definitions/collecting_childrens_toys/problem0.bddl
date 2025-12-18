@@ -46,6 +46,10 @@
                         (?board_game.n.01 - board_game.n.01)
                         (inside ?board_game.n.01 ?bookcase.n.01)
                     )
+                    (forall
+                        (?train_set.n.01 - train_set.n.01)
+                        (inside ?train_set.n.01 ?bookcase.n.01)
+                    )
                 )
             )
         )
