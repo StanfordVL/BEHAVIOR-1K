@@ -13,3 +13,7 @@ datasets/*
 
 # No DVC caches
 asset_pipeline/.dvc
+asset_pipeline/tmp
+asset_pipeline/logs
+asset_pipeline/artifacts
+asset_pipeline/cad

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#SBATCH --job-name=omnigibson-vscode
+#SBATCH --job-name=behavior-vscode
 #SBATCH --account=cvgl
 #SBATCH --partition=svl --qos=normal
 #SBATCH --nodes=1
@@ -45,12 +45,11 @@ if [ ! -d "$DATA_DIR" ]; then
     mkdir "$DATA_DIR" || { echo "Error creating $DATA_DIR"; exit 1; }
 fi
 
-# Step 4: Clone OmniGibson if necessary
-if [ ! -d "$BASE_DIR/OmniGibson" ]; then
-    git clone https://github.com/StanfordVL/OmniGibson.git $BASE_DIR/OmniGibson
-    cd $BASE_DIR/OmniGibson
+# Step 4: Clone BEHAVIOR-1K if necessary
+if [ ! -d "$BASE_DIR/BEHAVIOR-1K" ]; then
+    git clone https://github.com/StanfordVL/BEHAVIOR-1K.git $BASE_DIR/BEHAVIOR-1K
+    cd $BASE_DIR/BEHAVIOR-1K
     git pull
-    git checkout vscode-docker  # TODO: Change this to og-develop before vscode-docker is merged
     cd $BASE_DIR
 fi
 
@@ -71,13 +70,13 @@ done
 
 # Print HTTP link to access webrtc and vscode
 FQDN_HOSTNAME=$(hostname -i)  # $(curl "https://checkip.amazonaws.com")
-echo "[OMNIGIBSON-VSCODE] Launching remote OmniGibson environment..."
-echo "[OMNIGIBSON-VSCODE] To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
-echo "[OMNIGIBSON-VSCODE] To access webrtc, go to http://${FQDN_HOSTNAME}:${HTTP_PORT}/streaming/webrtc-client"
+echo "[BEHAVIOR-VSCODE] Launching remote BEHAVIOR environment..."
+echo "[BEHAVIOR-VSCODE] To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
+echo "[BEHAVIOR-VSCODE] To access webrtc, go to http://${FQDN_HOSTNAME}:${HTTP_PORT}/streaming/webrtc-client"
 echo ""
 
 # Step 6: Create the container
-IMAGE_PATH="/cvgl/group/Gibson/og-docker/omnigibson-vscode.sqsh"
+IMAGE_PATH="/cvgl/group/Gibson/og-docker/behavior-vscode.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
 
@@ -109,7 +108,7 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/config]=/root/.nvidia-omniverse/config
     [${ISAAC_CACHE_PATH}/isaac-sim/data]=/root/.local/share/ov/data
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
-    [${BASE_DIR}/OmniGibson]=/omnigibson-src
+    [${BASE_DIR}/BEHAVIOR-1K]=/behavior-src
     [${VSCODE_CONFIG_DIR}]=/vscode-config
 )
 
@@ -124,7 +123,7 @@ for mount in "${!MOUNTS[@]}"; do
 done
 
 # Create the image, even if it exists.
-CONTAINER_NAME=omnigibson_${GPU_ID}
+CONTAINER_NAME=behavior_vscode_${GPU_ID}
 enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
 
 # Remove leading space in string

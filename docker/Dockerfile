@@ -1,5 +1,5 @@
 # --- START ISAAC SIM DOCKERFILE COPY ---
-FROM nvcr.io/nvidia/base/ubuntu:noble-20250619
+FROM nvcr.io/nvidia/base/ubuntu:jammy-20251013
 
 ENV NVIDIA_VISIBLE_DEVICES=all NVIDIA_DRIVER_CAPABILITIES=all
 # ENV OMNI_SERVER=https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1
@@ -81,6 +81,7 @@ WORKDIR /behavior-src
 # Here we also compile this such that it is compatible with GPU architectures
 # Turing, Ampere, and Ada; which correspond to 20, 30, and 40 series GPUs.
 # We also suppress the output of the installation to avoid the log limit.
+# TODO: Add support for aarch64.
 RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb && \ 
   dpkg -i /cuda-keyring.deb && rm /cuda-keyring.deb && apt-get update && \
   DEBIAN_FRONTEND=noninteractive apt-get install -y cuda-toolkit-12-4 && \
@@ -97,8 +98,7 @@ SHELL ["conda", "run", "-n", "behavior", "/bin/bash", "--login", "-c"]
 ARG DEV_MODE
 ENV DEV_MODE=${DEV_MODE}
 ARG WORKDIR_PATH=/behavior-src
-RUN if [ "$DEV_MODE" != "1" ]; then \
-    else \
+RUN if [ "$DEV_MODE" == "1" ]; then \
       WORKDIR_PATH=/; \
       cd / && rm -rf /behavior-src; \
     fi

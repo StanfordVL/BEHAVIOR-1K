@@ -3,7 +3,7 @@ set -e -o pipefail
 
 # Get the user's currently running vscode job count
 USERNAME=$(whoami)
-CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode || true)
+CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep behavior-vscode || true)
 
 if [ -z "$CURRENTLY_RUNNING_JOBS" ]; then
     # Queue a new job for the user
@@ -11,14 +11,14 @@ if [ -z "$CURRENTLY_RUNNING_JOBS" ]; then
     sbatch /cvgl/group/Gibson/og-docker/launch_vscode.sh
 
     # Wait for the file to show up
-    while ! (squeue -u $USERNAME -o "%j:%i" | grep -q omnigibson-vscode); do
+    while ! (squeue -u $USERNAME -o "%j:%i" | grep -q behavior-vscode); do
         echo "Waiting for the job to launch."
         sleep 3
     done
 fi
 
 # Get the job id
-LAUNCHED_JOB_ID=$(squeue -u $USERNAME -o "%j:%i" | grep -m 1 omnigibson-vscode | sed "s/.*://g" | tr -d '\n')
+LAUNCHED_JOB_ID=$(squeue -u $USERNAME -o "%j:%i" | grep -m 1 behavior-vscode | sed "s/.*://g" | tr -d '\n')
 echo "Job ID: $LAUNCHED_JOB_ID"
 
 # Check that the output file exists
@@ -28,8 +28,8 @@ while [ ! -f "$OUTPUT_FILE" ]; do
     sleep 3
 done
 
-# Wait for the output file to contain the string OMNIGIBSON-VSCODE exactly 3 times
-while [ "$(grep -c "OMNIGIBSON-VSCODE" "$OUTPUT_FILE" || true)" -lt 3 ]; do
+# Wait for the output file to contain the string BEHAVIOR-VSCODE exactly 3 times
+while [ "$(grep -c "BEHAVIOR-VSCODE" "$OUTPUT_FILE" || true)" -lt 3 ]; do
     echo "Waiting for the job to allocate ports."
     sleep 3
 done
@@ -43,5 +43,5 @@ done
 # echo "HTTP server started successfully."
 # echo ""
 
-# Echo the OMNIGIBSON-VSCODE lines
-grep "OMNIGIBSON-VSCODE" "$OUTPUT_FILE"
+# Echo the BEHAVIOR-VSCODE lines
+grep "BEHAVIOR-VSCODE" "$OUTPUT_FILE"

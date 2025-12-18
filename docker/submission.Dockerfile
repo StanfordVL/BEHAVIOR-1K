@@ -29,7 +29,7 @@ SHELL ["conda", "run", "-n", "behavior", "/bin/bash", "-c"]
 RUN pip install "numpy<2" "setuptools<=79"
 RUN pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu124
 
-# Copy over omnigibson source
+# Copy over BEHAVIOR-1K source
 ADD . /b1k-src
 WORKDIR /b1k-src
 

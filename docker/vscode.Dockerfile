@@ -1,4 +1,4 @@
-FROM stanfordvl/omnigibson:latest
+FROM stanfordvl/behavior-dev:latest
 
 # environment settings
 ARG DEBIAN_FRONTEND="noninteractive"
@@ -34,9 +34,6 @@ RUN \
     /var/lib/apt/lists/* \
     /var/tmp/*
 
-# Remove the omnigibson source code
-RUN rm -rf /omnigibson-src
-
 # run command
 CMD sed -i "s/49100/${OMNIGIBSON_WEBRTC_PORT}/g" /isaac-sim/extscache/omni.services.streamclient.webrtc-1.3.8/web/js/kit-player.js && \
   /app/code-server/bin/code-server \
@@ -45,4 +42,4 @@ CMD sed -i "s/49100/${OMNIGIBSON_WEBRTC_PORT}/g" /isaac-sim/extscache/omni.servi
   --extensions-dir /vscode-config/extensions \
   --disable-telemetry \
   --auth password \
-  /omnigibson-src
+  /behavior-src
