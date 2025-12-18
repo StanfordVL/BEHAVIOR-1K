@@ -49,16 +49,18 @@ class WebsocketPolicy:
         *args,
         host: Optional[str] = None,
         port: Optional[int] = None,
+        allow_reconnect: bool = False,
         **kwargs,
     ) -> None:
         logging.info(f"Creating websocket client policy with host: {host}, port: {port}")
         self.last_action = None
         self.policy = None
+        self._allow_reconnect = allow_reconnect
         if host is not None or port is not None:
-            self.policy = WebsocketClientPolicy(host=host, port=port)
+            self.policy = WebsocketClientPolicy(host=host, port=port, allow_reconnect=allow_reconnect)
 
     def update_host(self, host: str, port: int) -> None:
-        self.policy = WebsocketClientPolicy(host=host, port=port)
+        self.policy = WebsocketClientPolicy(host=host, port=port, allow_reconnect=self._allow_reconnect)
 
     def forward(self, obs: dict, *args, **kwargs) -> th.Tensor:
         if "need_new_action" in obs and not obs["need_new_action"] and self.last_action is not None:
