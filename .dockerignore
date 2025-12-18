@@ -10,3 +10,6 @@ outputs/
 # Dataset
 datasets/*
 !datasets/README
+
+# No DVC caches
+asset_pipeline/.dvc
