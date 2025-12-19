@@ -17,3 +17,4 @@ asset_pipeline/tmp
 asset_pipeline/logs
 asset_pipeline/artifacts
 asset_pipeline/cad
+.git

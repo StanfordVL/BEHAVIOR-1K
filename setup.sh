@@ -277,7 +277,7 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "Setting up pre-commit..."
         conda install -c conda-forge pre-commit -y
         cd "$WORKDIR/OmniGibson"
-        pre-commit install
+        pre-commit install || true  # Ignore errors here in case the directory is not a git repo
         cd "$WORKDIR"
     fi
     
