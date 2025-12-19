@@ -10,7 +10,7 @@ on:
 
 jobs:
   docker:
-    runs-on: docker-builder
+    runs-on: docker-builder  # This is a larger runner with more disk space.
     steps:
       - 
         name: Check disk space
