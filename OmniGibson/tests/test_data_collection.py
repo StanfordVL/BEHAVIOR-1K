@@ -169,10 +169,9 @@ def test_data_collect_and_playback():
     }
 
     if should_playback:
-
         for playback_cls, playback_kwargs in zip(
-                (LeRobotPlaybackWrapper, HDF5PlaybackWrapper),
-                (lerobot_playback_kwargs, hdf5_playback_kwargs),
+            (LeRobotPlaybackWrapper, HDF5PlaybackWrapper),
+            (lerobot_playback_kwargs, hdf5_playback_kwargs),
         ):
             # Clear the sim
             og.clear(
@@ -236,7 +235,7 @@ def test_data_collect_and_playback():
         repo_id=lerobot_playback_kwargs["output_path"],
         root=f"{lerobot_playback_kwargs['root_dir']}/{lerobot_playback_kwargs['output_path']}",
         delta_timestamps={
-            'observation.rgb.external_sensor0':  [-i / 30 for i in reversed(range(5))],
+            "observation.rgb.external_sensor0": [-i / 30 for i in reversed(range(5))],
         },
     )
 
@@ -247,7 +246,7 @@ def test_data_collect_and_playback():
     rgb_shape = (3, img_h, img_w)
     depth_shape = (1, img_h, img_w)
     for key, shape in (
-        ("action", (12,)),    # (2DOF base + 1DOF trunk + 2DOF head + 6DOF EEF + 1DOF gripper)
+        ("action", (12,)),  # (2DOF base + 1DOF trunk + 2DOF head + 6DOF EEF + 1DOF gripper)
         ("observation.rgb.external_sensor0", rgb_shape),
         ("observation.rgb.eef_link_camera_0", rgb_shape),
         ("observation.rgb.eyes_camera_0", rgb_shape),
@@ -256,7 +255,10 @@ def test_data_collect_and_playback():
     ):
         assert key in batch
         expected_shape = (batch_size, *shape)
-        assert batch[key].shape == expected_shape, f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
+        assert (
+            batch[key].shape == expected_shape
+        ), f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
+
 
 test_data_collect_and_playback()
 og.shutdown()
