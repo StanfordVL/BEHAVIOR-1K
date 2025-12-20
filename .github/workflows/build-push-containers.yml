@@ -112,6 +112,7 @@ jobs:
         id: build-prod
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
@@ -124,6 +125,7 @@ jobs:
         id: build-dev
         uses: docker/build-push-action@v5
         with:
+          context: .
           build-args: "DEV_MODE=1"
           push: true
           tags: ${{ steps.meta-dev.outputs.tags }}
@@ -140,6 +142,7 @@ jobs:
         id: build-vscode
         uses: docker/build-push-action@v5
         with:
+          context: .
           push: true
           tags: ${{ steps.meta-vscode.outputs.tags }}
           labels: ${{ steps.meta-vscode.outputs.labels }}
