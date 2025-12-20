@@ -134,7 +134,7 @@ jobs:
 
       - name: Update vscode image Dockerfile with prod image tag
         run: |
-          sed -i "s/behavior:latest/behavior@${{ steps.build-prod.outputs.digest }}/g" docker/vscode.Dockerfile && cat docker/vscode.Dockerfile
+          sed -i "s/behavior-dev:latest/behavior-dev@${{ steps.build-prod.outputs.digest }}/g" docker/vscode.Dockerfile && cat docker/vscode.Dockerfile
       -
         name: Build and push vscode image
         id: build-vscode
