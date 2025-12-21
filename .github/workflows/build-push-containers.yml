@@ -128,6 +128,7 @@ jobs:
           context: .
           build-args: "DEV_MODE=1"
           push: true
+          provenance: false
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/Dockerfile
