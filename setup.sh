@@ -44,6 +44,7 @@ while [[ $# -gt 0 ]]; do
         --asset-pipeline) ASSET_PIPELINE=true; shift ;;
         --dev) DEV=true; shift ;;
         --cuda-version) CUDA_VERSION="$2"; shift 2 ;;
+        --torch-version) TORCH_VERSION="$2"; shift 2 ;;
         --accept-conda-tos) ACCEPT_CONDA_TOS=true; shift ;;
         --accept-nvidia-eula) ACCEPT_NVIDIA_EULA=true; shift ;;
         --accept-dataset-tos) ACCEPT_DATASET_TOS=true; shift ;;
@@ -249,7 +250,7 @@ pip install "numpy<2"
 if [ "$BDDL" = true ]; then
     echo "Installing BDDL..."
     [ ! -d "BDDL" ] && { echo "ERROR: BDDL directory not found"; exit 1; }
-    pip install -e "$WORKDIR/BDDL"
+    pip install -e "$WORKDIR/bddl3"
 fi
 
 # Install OmniGibson with Isaac Sim

@@ -1584,6 +1584,97 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             include_contacts=include_contacts,
         )
 
+    @classmethod
+    def get_lerobot_obs_mapping(cls, env):
+        obs_mapping, obs_features = dict(), dict()
+        for key, gym_shape in env.observation_space.items():
+            modality = key.split("::")[-1]
+            info = dict()
+            # Parse the relevant name to assign
+            obs_name_strs = key.split("::")[-2].split(":")
+            if "robot" in obs_name_strs[0]:
+                # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
+                obs_name_strs = obs_name_strs[1:]
+            # Join with "_" and make lowercase to make final name
+            obs_name = "_".join(obs_name_strs).lower()
+            if obs_name == "":
+                # e.g.: for proprio
+                obs_name = "robot"
+            if "rgb" in modality:
+                info["dtype"] = "video"
+                info["shape"] = gym_shape.shape[:-1] + (3,)
+                info["names"] = ["height", "width", "channel"]
+            elif "depth" in modality:
+                info["dtype"] = "video"
+                info["shape"] = gym_shape.shape + (1,)
+                info["names"] = ["height", "width"]
+
+                # We also add relative camera transforms (wrt robot egocentric frame) in case we
+                # want to convert depth to point clouds
+                # So we add an extra entry here
+                tf_name = f"observation.robot2cam_pose.{obs_name}"
+                if tf_name not in obs_features:
+                    obs_features[tf_name] = {
+                        "dtype": "float32",
+                        "shape": (7,),
+                        "names": None,
+                    }
+
+            elif "proprio" in modality or "low_dim" in modality:
+                info["dtype"] = "float32"
+                info["shape"] = gym_shape.shape
+                info["names"] = None,
+            else:
+                raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
+
+            # Add this key to features, and store the obs name mapping
+            lerobot_obs_name = f"observation.{modality}.{obs_name}"
+            obs_features[lerobot_obs_name] = info
+            obs_mapping[key] = lerobot_obs_name
+
+        return obs_mapping, obs_features
+
+    @classmethod
+    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping):
+        # Add tfs to flattened obs
+        # TODO: Currently overfit to a single robot
+        robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
+        for sensor_group in (env.external_sensors, env.robots[0].sensors):
+            if sensor_group is None:
+                continue
+            for name, sensor in sensor_group.items():
+                obs_flat[f"{name}::rel_pose"] = th.cat(T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation())))
+
+        # Compose lerobot format obs
+        frame = dict()
+        for name in env.observation_space.keys():
+            obs = obs_flat[name]
+            # Prune alpha channel if keeping RGB
+            if "rgb" in name:
+                obs = obs[..., :-1]
+            elif "depth" in name:
+                # Add channel dim at the end
+                obs = obs.unsqueeze(-1)
+                # If we haven't already added the sensor pose obs, do so now
+                obs_name_strs = name.split("::")[-2].split(":")
+                if "robot" in obs_name_strs[0]:
+                    # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
+                    obs_name_strs = obs_name_strs[1:]
+                # Join with "_" and make lowercase to make final name
+                obs_name = "_".join(obs_name_strs).lower()
+                tf_name = f"observation.robot2cam_pose.{obs_name}"
+                if tf_name not in frame:
+                    sensor_name = name.split("::")[-2]
+                    frame[tf_name] = obs_flat[f"{sensor_name}::rel_pose"]
+            elif "proprio" in name:
+                # Map float64 -> float32
+                obs = obs.float()
+            # Add the observation to the current frame
+            frame[obs_mapping[name]] = obs
+
+        return frame
+
+
     def create_dataset(self, output_path, env, overwrite=True):
         # Sanity checks
         assert output_path == self.lerobot_dataset_kwargs['repo_id'], \
@@ -1605,7 +1696,6 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
         # Extract relevant info from original source env config
         config = json.loads(self.input_hdf5["data"].attrs["config"])
-        obs_mapping = dict()
 
         # Create LeRobot dataset, define features to store
         # Define standard features (RL-related entries, language instructions)
@@ -1650,50 +1740,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             },
         }
 
-        for key, gym_shape in env.observation_space.items():
-            modality = key.split("::")[-1]
-            info = dict()
-            # Parse the relevant name to assign
-            obs_name_strs = key.split("::")[-2].split(":")
-            if "robot" in obs_name_strs[0]:
-                # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
-                obs_name_strs = obs_name_strs[1:]
-            # Join with "_" and make lowercase to make final name
-            obs_name = "_".join(obs_name_strs).lower()
-            if obs_name == "":
-                # e.g.: for proprio
-                obs_name = "robot"
-            if "rgb" in modality:
-                info["dtype"] = "video"
-                info["shape"] = gym_shape.shape[:-1] + (3,)
-                info["names"] = ["height", "width", "channel"]
-            elif "depth" in modality:
-                info["dtype"] = "video"
-                info["shape"] = gym_shape.shape + (1,)
-                info["names"] = ["height", "width"]
-
-                # We also add relative camera transforms (wrt robot egocentric frame) in case we
-                # want to convert depth to point clouds
-                # So we add an extra entry here
-                tf_name = f"observation.robot2cam_pose.{obs_name}"
-                if tf_name not in features:
-                    features[tf_name] = {
-                        "dtype": "float32",
-                        "shape": (7,),
-                        "names": None,
-                    }
-
-            elif "proprio" in modality or "low_dim" in modality:
-                info["dtype"] = "float32"
-                info["shape"] = gym_shape.shape
-                info["names"] = None,
-            else:
-                raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
-
-            # Add this key to features, and store the obs name mapping
-            lerobot_obs_name = f"observation.{modality}.{obs_name}"
-            features[lerobot_obs_name] = info
-            obs_mapping[key] = lerobot_obs_name
+        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env)
+        features.update(obs_features)
 
         if self.lerobot_version == "v2.1":
             dataset_cls = OmniGibsonLeRobotV2Dataset
@@ -1806,11 +1854,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
     def _process_obs(self, obs, info):
         # Include camera poses wrt robot frame
         obs = super()._process_obs(obs, info)
-        robot_tf_inv = T.pose_inv(T.pose2mat(self.env.robots[0].get_position_orientation()))
-        for sensor_group in (self.env.external_sensors, self.env.robots[0].sensors):
-            for name, sensor in sensor_group.items():
-                obs[f"{name}::rel_pose"] = th.cat(T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation())))
 
+        # Convert to lerobot format
+        obs = self.og_to_lerobot_obs(env=self.env, obs_flat=obs, obs_mapping=self.obs_mapping)
         return obs
 
     def postprocess_current_traj(self):

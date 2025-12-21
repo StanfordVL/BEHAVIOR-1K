@@ -9,11 +9,14 @@ import torch as th
 import torchvision
 from torch.utils.data import Dataset, get_worker_info
 import torch.nn.functional as F
+import packaging
 from packaging.version import Version
 import glob
 import PIL
+from lerobot.constants import HF_LEROBOT_HOME
+from lerobot.datasets.video_utils import get_audio_info, get_safe_default_codec
 from lerobot.datasets.compute_stats import _assert_type_and_shape
-from lerobot.datasets.lerobot_dataset import LeRobotDataset, CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION
+from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION
 from omnigibson.learning.utils.dataset_utils import get_credentials
 from omnigibson.learning.utils.eval_utils import (
     TASK_NAMES_TO_INDICES,
@@ -25,12 +28,21 @@ from pathlib import Path
 from PIL import Image as PILImage
 from torchvision import transforms
 from torchvision.io import VideoReader
-from typing import Any, Dict, Tuple, Callable, List
+from typing import Any, Dict, Tuple, Callable, List, Sequence
 from tqdm import tqdm
 import tempfile
 import shutil
 
-from lerobot.datasets.utils import DEFAULT_IMAGE_PATH, validate_episode_buffer, write_info
+from lerobot.datasets.utils import (
+    DEFAULT_IMAGE_PATH,
+    check_delta_timestamps,
+    check_timestamps_sync,
+    get_delta_indices,
+    get_episode_data_index,
+    get_safe_version,
+    validate_episode_buffer,
+    write_info,
+)
 from lerobot.datasets.compute_stats import compute_episode_stats
 from lerobot.datasets.video_utils import decode_video_frames as native_decode_video_frames
 import datasets
@@ -62,6 +74,53 @@ def hf_transform_to_torch(items_dict: dict[th.Tensor | None]):
             else:
                 items_dict[key] = [x if isinstance(x, str) else th.tensor(x) for x in items_dict[key]]
     return items_dict
+
+
+def get_video_pixel_channels(pix_fmt: str) -> int:
+    if "gray" in pix_fmt or "depth" in pix_fmt or "monochrome" in pix_fmt:
+        return 1
+    elif "rgba" in pix_fmt or "yuva" in pix_fmt:
+        return 4
+    elif "rgb" in pix_fmt or "yuv" in pix_fmt or "gbrp" in pix_fmt:
+        return 3
+    else:
+        raise ValueError("Unknown format")
+
+
+def get_video_info(video_path: Path | str) -> dict:
+    # Set logging level
+    logging.getLogger("libav").setLevel(av.logging.ERROR)
+
+    # Getting video stream information
+    video_info = {}
+    with av.open(str(video_path), "r") as video_file:
+        try:
+            video_stream = video_file.streams.video[0]
+        except IndexError:
+            # Reset logging level
+            av.logging.restore_default_callback()
+            return {}
+
+        video_info["video.height"] = video_stream.height
+        video_info["video.width"] = video_stream.width
+        video_info["video.codec"] = video_stream.codec.canonical_name
+        video_info["video.pix_fmt"] = video_stream.pix_fmt
+        video_info["video.is_depth_map"] = False
+
+        # Calculate fps from r_frame_rate
+        video_info["video.fps"] = int(video_stream.base_rate)
+
+        pixel_channels = get_video_pixel_channels(video_stream.pix_fmt)
+        video_info["video.channels"] = pixel_channels
+
+    # Reset logging level
+    av.logging.restore_default_callback()
+
+    # Adding audio stream information
+    video_info.update(**get_audio_info(video_path))
+
+    return video_info
+
 
 
 def _encode_video_worker(video_key: str, episode_index: int, root: Path, fps: int) -> Path:
@@ -114,20 +173,26 @@ def encode_video_frames(
 
     # Encoders/pixel formats incompatibility check
     if mode == "depth":
-        if vcodec != "libx265":
-            logging.warning(
-                f"Incompatible codec {vcodec} with mode == 'depth', auto-selecting codec 'libx265'"
-            )
-            vcodec = "libx265"
-        if pix_fmt != "yuv444p12le":
-            logging.warning(
-                f"Incompatible pix_fmt {pix_fmt} with mode == 'depth', auto-selecting pix_fmt 'yuv444p12le'"
-            )
-            pix_fmt = "yuv444p12le"
         if stream_options is None:
             stream_options = dict()
-        stream_options["x265-params"] = "lossless=1:log-level=none"
-        crf = 0
+        if OU.USE_DEPTH_RGB_ENCODING:
+            _depth_codec = "hevc_nvenc"
+            _depth_pix_fmt = "gbrp"
+            stream_options["tune"] = "lossless"
+        else:
+            _depth_codec = "libx265"
+            _depth_pix_fmt = "yuv444p12le"
+            stream_options["x265-params"] = "lossless=1:log-level=none"
+        if vcodec != _depth_codec:
+            logging.warning(
+                f"Incompatible codec {vcodec} with mode == 'depth', auto-selecting codec '{_depth_codec}'"
+            )
+            vcodec = _depth_codec
+        if pix_fmt != _depth_pix_fmt:
+            logging.warning(
+                f"Incompatible pix_fmt {pix_fmt} with mode == 'depth', auto-selecting pix_fmt '{_depth_pix_fmt}'"
+            )
+            pix_fmt = _depth_pix_fmt
 
     # Determine info based on lerobot version
     if LEROBOT_CODEBASE_VERSION == "v2.1":
@@ -183,7 +248,9 @@ def encode_video_frames(
         # Loop through input frames and encode them
         for input_data in input_list:
             with PIL.Image.open(input_data) as input_image:
-                if mode == "rgb":
+                input_image = input_image.convert("RGB")
+                input_frame = av.VideoFrame.from_image(input_image)
+                if OU.USE_DEPTH_RGB_ENCODING or mode == "rgb":
                     input_image = input_image.convert("RGB")
                     input_frame = av.VideoFrame.from_image(input_image)
                 elif mode == "depth":
@@ -214,22 +281,32 @@ def decode_video_frames(
     max_depth: float | None = None,
     depth_shift: float | None = None,
 ) -> th.Tensor:
-    # Use our custom decoder for depth
-    if "depth" in str(video_path):
-        backend = "pyav"
-        return decode_video_frames_torchvision(
-            video_path=video_path,
-            timestamps=timestamps,
-            tolerance_s=tolerance_s,
-            backend=backend,
-            min_depth=min_depth,
-            max_depth=max_depth,
-            depth_shift=depth_shift,
-        )
+    if OU.USE_DEPTH_RGB_ENCODING:
+        frames = native_decode_video_frames(video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend)
+
+        # Convert RGB -> depth
+        if "depth" in str(video_path):
+            frames = th.from_numpy(OU.rgb2depth((frames.permute(0, 2, 3, 1).numpy() * 255).astype(np.uint8), min_depth=min_depth, max_depth=max_depth, disparity=False)).unsqueeze(-3)
+
+        return frames
+
     else:
-        return native_decode_video_frames(
-            video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
-        )
+        # Use our custom decoder for depth
+        if "depth" in str(video_path):
+            backend = "pyav"
+            return decode_video_frames_torchvision(
+                video_path=video_path,
+                timestamps=timestamps,
+                tolerance_s=tolerance_s,
+                backend=backend,
+                min_depth=min_depth,
+                max_depth=max_depth,
+                depth_shift=depth_shift,
+            )
+        else:
+            return native_decode_video_frames(
+                video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
+            )
 
 
 def decode_video_frames_torchvision(
@@ -753,11 +830,92 @@ def generate_info_json(
 #         return depth.squeeze(0)  # (1, H, W)
 #
 
+
+class OmniGibsonLeRobotDatasetMetadata(LeRobotDatasetMetadata):
+    #
+    # @classmethod
+    # def create(
+    #     cls,
+    #     repo_id: str,
+    #     fps: int,
+    #     features: dict,
+    #     robot_type: str | None = None,
+    #     root: str | Path | None = None,
+    #     use_videos: bool = True,
+    # ) -> "LeRobotDatasetMetadata":
+    # @classmethod
+    # def create(
+    #     cls,
+    #     repo_id: str,
+    #     fps: int,
+    #     features: dict,
+    #     robot_type: str | None = None,
+    #     root: str | Path | None = None,
+    #     use_videos: bool = True,
+    # ) -> "LeRobotDatasetMetadata":
+    #     """Creates metadata for a LeRobotDataset."""
+    #     obj = cls.__new__(cls)
+    #     obj._features_to_include = None
+    #     obj.repo_id = repo_id
+    #     obj.root = Path(root) if root is not None else HF_LEROBOT_HOME / repo_id
+    #
+    #     obj.root.mkdir(parents=True, exist_ok=False)
+    #
+    #     # TODO(aliberts, rcadene): implement sanity check for features
+    #     features = {**features, **DEFAULT_FEATURES}
+    #     _validate_feature_names(features)
+    #
+    #     obj.tasks, obj.task_to_task_index = {}, {}
+    #     obj.episodes_stats, obj.stats, obj.episodes = {}, {}, {}
+    #     obj.info = create_empty_dataset_info(CODEBASE_VERSION, fps, features, use_videos, robot_type)
+    #     if len(obj.video_keys) > 0 and not use_videos:
+    #         raise ValueError()
+    #     write_json(obj.info, obj.root / INFO_PATH)
+    #     obj.revision = None
+    #     return obj
+
+    def __init__(
+        self,
+        repo_id: str,
+        root: str | Path | None = None,
+        revision: str | None = None,
+        force_cache_sync: bool = False,
+        features: Sequence[str] | None = None,
+    ):
+        self._features_to_include = None if features is None else set(features)
+        # Call super
+        super().__init__(
+            repo_id=repo_id,
+            root=root,
+            revision=revision,
+            force_cache_sync=force_cache_sync,
+        )
+
+    @property
+    def features(self) -> dict[str, dict]:
+        """All features contained in the dataset."""
+        if not hasattr(self, "_features_to_include") or self._features_to_include is None:
+            return self.info["features"]
+        else:
+            return {k: v for k, v in self.info["features"].items() if k in self._features_to_include}
+
+    def update_video_info(self) -> None:
+        """
+        Warning: this function writes info from first episode videos, implicitly assuming that all videos have
+        been encoded the same way. Also, this means it assumes the first episode exists.
+        """
+        for key in self.video_keys:
+            if not self.features[key].get("info", None):
+                video_path = self.root / self.get_video_file_path(ep_index=0, vid_key=key)
+                # We modify this call to consider special pixel formats
+                self.info["features"][key]["info"] = get_video_info(video_path)
+
+
 class OmniGibsonLeRobotDataset(LeRobotDataset):
 
-    MIN_DEPTH = None
-    MAX_DEPTH = None
-    DEPTH_SHIFT = None
+    _MIN_DEPTH = None
+    _MAX_DEPTH = None
+    _DEPTH_SHIFT = None
 
     @classmethod
     def create(
@@ -779,24 +937,66 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
     ) -> "OmniGibsonLeRobotDataset":
 
         # Set depth ranges
-        cls.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+        cls.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
-        # Call super first
-        obj = super().create(
+        # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
+        assert LEROBOT_CODEBASE_VERSION == "v2.1", \
+            f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+
+        ##############
+        """Create a LeRobot Dataset from scratch in order to record data."""
+        obj = cls.__new__(cls)
+        obj.meta = OmniGibsonLeRobotDatasetMetadata.create(
             repo_id=repo_id,
             fps=fps,
+            robot_type=robot_type,
             features=features,
             root=root,
-            robot_type=robot_type,
             use_videos=use_videos,
-            tolerance_s=tolerance_s,
-            image_writer_processes=image_writer_processes,
-            image_writer_threads=image_writer_threads,
-            video_backend=video_backend,
-            batch_encoding_size=batch_encoding_size,
         )
+        obj.repo_id = obj.meta.repo_id
+        obj.root = obj.meta.root
+        obj.revision = None
+        obj.tolerance_s = tolerance_s
+        obj.image_writer = None
+        obj.batch_encoding_size = batch_encoding_size
+        obj.episodes_since_last_encoding = 0
+
+        if image_writer_processes or image_writer_threads:
+            obj.start_image_writer(image_writer_processes, image_writer_threads)
+
+        # TODO(aliberts, rcadene, alexander-soare): Merge this with OnlineBuffer/DataBuffer
+        obj.episode_buffer = obj.create_episode_buffer()
+
+        obj.episodes = None
+        obj.hf_dataset = obj.create_hf_dataset()
+        obj.image_transforms = None
+        obj.delta_timestamps = None
+        obj.delta_indices = None
+        obj.episode_data_index = None
+        obj.video_backend = video_backend if video_backend is not None else get_safe_default_codec()
+
+        ##############
+
+        # # Call super first
+        # obj = super().create(
+        #     repo_id=repo_id,
+        #     fps=fps,
+        #     features=features,
+        #     root=root,
+        #     robot_type=robot_type,
+        #     use_videos=use_videos,
+        #     tolerance_s=tolerance_s,
+        #     image_writer_processes=image_writer_processes,
+        #     image_writer_threads=image_writer_threads,
+        #     video_backend=video_backend,
+        #     batch_encoding_size=batch_encoding_size,
+        # )
 
         # Add og metadata dict
+        obj.min_depth = min_depth
+        obj.max_depth = max_depth
+        obj.depth_shift = depth_shift
         obj.meta.info["omnigibson"] = dict()
 
         return obj
@@ -817,24 +1017,83 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
             # chunk_streaming_using_keyframe: bool = True,
             # shuffle: bool = True,
             # seed: int = 0,
+            features: Sequence[str] | None = None,
             min_depth=None,
             max_depth=None,
             depth_shift=None,
     ):
-        # Call super
-        super().__init__(
-            repo_id=repo_id,
-            root=root,
-            episodes=episodes,
-            image_transforms=image_transforms,
-            delta_timestamps=delta_timestamps,
-            tolerance_s=tolerance_s,
-            revision=revision,
-            force_cache_sync=force_cache_sync,
-            download_videos=download_videos,
-            video_backend=video_backend,
-            batch_encoding_size=batch_encoding_size,
+        # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
+        assert LEROBOT_CODEBASE_VERSION == "v2.1", \
+            f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+
+        ###################
+        Dataset.__init__(self)
+        self.repo_id = repo_id
+        self.root = Path(root) if root else HF_LEROBOT_HOME / repo_id
+        self.image_transforms = image_transforms
+        self.delta_timestamps = delta_timestamps
+        self.episodes = episodes
+        self.tolerance_s = tolerance_s
+        self.revision = revision if revision else LEROBOT_CODEBASE_VERSION
+        self.video_backend = video_backend if video_backend else get_safe_default_codec()
+        self.delta_indices = None
+        self.batch_encoding_size = batch_encoding_size
+        self.episodes_since_last_encoding = 0
+
+        # Unused attributes
+        self.image_writer = None
+        self.episode_buffer = None
+
+        self.root.mkdir(exist_ok=True, parents=True)
+
+        # Load metadata
+        self.meta = OmniGibsonLeRobotDatasetMetadata(
+            self.repo_id, self.root, self.revision, force_cache_sync=force_cache_sync, features=features,
         )
+        if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
+            episodes_stats = [self.meta.episodes_stats[ep_idx] for ep_idx in self.episodes]
+            self.stats = aggregate_stats(episodes_stats)
+
+        # Load actual data
+        try:
+            if force_cache_sync:
+                raise FileNotFoundError
+            assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
+            self.hf_dataset = self.load_hf_dataset()
+        except (AssertionError, FileNotFoundError, NotADirectoryError):
+            self.revision = get_safe_version(self.repo_id, self.revision)
+            self.download_episodes(download_videos)
+            self.hf_dataset = self.load_hf_dataset()
+
+        self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
+
+        # # Check timestamps
+        # timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
+        # episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
+        # ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
+        # check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
+
+        # Setup delta_indices
+        if self.delta_timestamps is not None:
+            check_delta_timestamps(self.delta_timestamps, self.fps, self.tolerance_s)
+            self.delta_indices = get_delta_indices(self.delta_timestamps, self.fps)
+
+        ###################
+
+        # # Call super
+        # super().__init__(
+        #     repo_id=repo_id,
+        #     root=root,
+        #     episodes=episodes,
+        #     image_transforms=image_transforms,
+        #     delta_timestamps=delta_timestamps,
+        #     tolerance_s=tolerance_s,
+        #     revision=revision,
+        #     force_cache_sync=force_cache_sync,
+        #     download_videos=download_videos,
+        #     video_backend=video_backend,
+        #     batch_encoding_size=batch_encoding_size,
+        # )
 
         # # Handle chunking
         # self.seed = seed
@@ -861,12 +1120,13 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         #     self._should_obs_loaders_reload = True
 
         # If depth values not set, load from dataset's meta info and set them internally
-        min_depth = self.meta.info["omnigibson"]["min_depth"] if min_depth is None else min_depth
-        max_depth = self.meta.info["omnigibson"]["max_depth"] if max_depth is None else max_depth
-        depth_shift = self.meta.info["omnigibson"]["depth_shift"] if depth_shift is None else depth_shift
+        og_info = self.meta.info.get("omnigibson", {})
+        self.min_depth = og_info.get("min_depth", OU.MIN_DEPTH) if min_depth is None else min_depth
+        self.max_depth = og_info.get("max_depth", OU.MAX_DEPTH) if max_depth is None else max_depth
+        self.depth_shift = og_info.get("depth_shift", OU.DEPTH_SHIFT) if depth_shift is None else depth_shift
 
         # Update depth values
-        self.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+        self.set_depth_range(min_depth=self.min_depth, max_depth=self.max_depth, depth_shift=self.depth_shift)
 
     # def _get_keyframe_chunk_indices(self, chunk_size=250) -> List[Tuple[int, int, int]]:
     #     """
@@ -993,14 +1253,20 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
     #     return item
 
     @classmethod
-    def set_depth_range(cls, min_depth, max_depth, depth_shift):
-        cls.MIN_DEPTH = min_depth
-        cls.MAX_DEPTH = max_depth
-        cls.DEPTH_SHIFT = depth_shift
+    def set_cls_depth_range(cls, min_depth, max_depth, depth_shift):
+        cls._MIN_DEPTH = min_depth
+        cls._MAX_DEPTH = max_depth
+        cls._DEPTH_SHIFT = depth_shift
 
         # Also make sure to set the root class's values since that is what is used when overwriting the lerobot function
         if cls != OmniGibsonLeRobotDataset:
-            OmniGibsonLeRobotDataset.set_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+            OmniGibsonLeRobotDataset.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+
+    def set_depth_range(self, min_depth, max_depth, depth_shift):
+        self.min_depth = min_depth
+        self.max_depth = max_depth
+        self.depth_shift = depth_shift
+        self.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
     def set_omnigibson_metadata(self, key, value):
         """
@@ -1059,12 +1325,20 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
                 image_array = (image_array * 255).astype(np.uint8)
             else:
                 # This is depth, so normalize before storing as image
-                image_array = OU.quantize_depth(
-                    depth=image_array,
-                    min_depth=cls.MIN_DEPTH,
-                    max_depth=cls.MAX_DEPTH,
-                    shift=cls.DEPTH_SHIFT,
-                )[:, :, 0]  # Prune final dimension so shape is (H, W)
+                if OU.USE_DEPTH_RGB_ENCODING:
+                    image_array = OU.depth2rgb(
+                        depth=image_array[:, :, 0],  # Prune final dimension so shape is (H, W)
+                        min_depth=cls._MIN_DEPTH,
+                        max_depth=cls._MAX_DEPTH,
+                        disparity=False,
+                    )
+                else:
+                    image_array = OU.quantize_depth(
+                        depth=image_array,
+                        min_depth=cls._MIN_DEPTH,
+                        max_depth=cls._MAX_DEPTH,
+                        shift=cls._DEPTH_SHIFT,
+                    )[:, :, 0]  # Prune final dimension so shape is (H, W)
 
         return PIL.Image.fromarray(image_array)
 
@@ -1088,15 +1362,16 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
             # chunk_streaming_using_keyframe: bool = True,
             # shuffle: bool = True,
             # seed: int = 0,
+            features: Sequence[str] | None = None,
             min_depth=None,
             max_depth=None,
             depth_shift=None,
     ):
-        # Sanity check datasets version -- must use <= v0.36
-        installed_version = Version(datasets.__version__)
-        assert installed_version <= Version("3.6.0"), \
-            f"To use LeRobotV2 dataset, installed datasets package version must be <= 3.6.0, but found version: {installed_version}\n" + \
-            "To install compatible version, run `pip install 'datasets<=3.6'`"
+        # # Sanity check datasets version -- must use <= v0.36
+        # installed_version = Version(datasets.__version__)
+        # assert installed_version <= Version("3.6.0"), \
+        #     f"To use LeRobotV2 dataset, installed datasets package version must be <= 3.6.0, but found version: {installed_version}\n" + \
+        #     "To install compatible version, run `pip install 'datasets<=3.6'`"
 
         # Call super
         super().__init__(
@@ -1114,6 +1389,7 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
             # chunk_streaming_using_keyframe=chunk_streaming_using_keyframe,
             # shuffle=shuffle,
             # seed=seed,
+            features=features,
             min_depth=min_depth,
             max_depth=max_depth,
             depth_shift=depth_shift,
@@ -1129,6 +1405,42 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
                 )
         return posted_data
 
+    # def _query_hf_dataset(self, query_indices: dict[str, list[int]]) -> dict:
+    #     # See https://github.com/huggingface/lerobot/issues/93#issuecomment-3179916907
+    #     # Step 1: Combine all unique indices
+    #     all_indices = sorted({idx for indices in query_indices.values() for idx in indices})
+    #
+    #     # Step 2: Select all required data at once
+    #     selected_dataset = self.hf_dataset.select(all_indices).to_dict()
+    #     selected_dataset = {key: th.tensor(values) for key, values in selected_dataset.items()}
+    #
+    #     # Step 3: Map original indices to their positions in the selected dataset
+    #     index_map = {original_idx: i for i, original_idx in enumerate(all_indices)}
+    #
+    #     # Step 4: Build the result for each key
+    #     results = {}
+    #     for key, q_indices in query_indices.items():
+    #         if key not in self.meta.video_keys:
+    #             mapped_indices = [index_map[idx] for idx in q_indices]
+    #             results[key] = th.stack([selected_dataset[key][i] for i in mapped_indices])
+    #
+    #     return results
+
+    def _get_query_timestamps(
+        self,
+        current_ts: float,
+        query_indices: dict[str, list[int]] | None = None,
+    ) -> dict[str, list[float]]:
+        query_timestamps = {}
+        for key in self.meta.video_keys:
+            if query_indices is not None and key in query_indices:
+                timestamps = self.hf_dataset[query_indices[key]]["timestamp"]
+                query_timestamps[key] = th.stack(timestamps).tolist()
+            else:
+                query_timestamps[key] = [current_ts]
+
+        return query_timestamps
+
     def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
         """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
         in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
@@ -1139,7 +1451,7 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         for vid_key, query_ts in query_timestamps.items():
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             # Use our custom decode_video_frames function
-            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend, self.MIN_DEPTH, self.MAX_DEPTH, self.DEPTH_SHIFT)
+            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend, self.min_depth, self.max_depth, self.depth_shift)
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -1181,9 +1493,9 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         super().save_episode(episode_data=episode_data)
 
         # Update depth values
-        self.meta.info["omnigibson"]["min_depth"] = self.MIN_DEPTH
-        self.meta.info["omnigibson"]["max_depth"] = self.MAX_DEPTH
-        self.meta.info["omnigibson"]["depth_shift"] = self.DEPTH_SHIFT
+        self.meta.info["omnigibson"]["min_depth"] = self.min_depth
+        self.meta.info["omnigibson"]["max_depth"] = self.max_depth
+        self.meta.info["omnigibson"]["depth_shift"] = self.depth_shift
 
 
 class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
@@ -1205,7 +1517,7 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
 
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             # Use our custom decode_video_frames function
-            frames = decode_video_frames(video_path, shifted_query_ts, self.tolerance_s, self.video_backend, self.MIN_DEPTH, self.MAX_DEPTH, self.DEPTH_SHIFT)
+            frames = decode_video_frames(video_path, shifted_query_ts, self.tolerance_s, self.video_backend, self.min_depth, self.max_depth, self.depth_shift)
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -1322,9 +1634,9 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
             self.clear_episode_buffer(delete_images=len(self.meta.image_keys) > 0)
 
         # Update depth values
-        self.meta.info["omnigibson"]["min_depth"] = self.MIN_DEPTH
-        self.meta.info["omnigibson"]["max_depth"] = self.MAX_DEPTH
-        self.meta.info["omnigibson"]["depth_shift"] = self.DEPTH_SHIFT
+        self.meta.info["omnigibson"]["min_depth"] = self.min_depth
+        self.meta.info["omnigibson"]["max_depth"] = self.max_depth
+        self.meta.info["omnigibson"]["depth_shift"] = self.depth_shift
 
 
 # Save internal methods to force handling depth during image saving

@@ -52,6 +52,7 @@ setup(
         "numba>=0.59.1",
         "cffi~=1.17.1",
         "pillow~=11.0.0",
+        "google-auth>=2.45.0"
     ],
     extras_require={
         "dev": [
