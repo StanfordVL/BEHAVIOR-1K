@@ -16,7 +16,11 @@ import PIL
 from lerobot.constants import HF_LEROBOT_HOME
 from lerobot.datasets.video_utils import get_audio_info, get_safe_default_codec
 from lerobot.datasets.compute_stats import _assert_type_and_shape
-from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata, CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION
+from lerobot.datasets.lerobot_dataset import (
+    LeRobotDataset,
+    LeRobotDatasetMetadata,
+    CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
+)
 from omnigibson.learning.utils.dataset_utils import get_credentials
 from omnigibson.learning.utils.eval_utils import (
     TASK_NAMES_TO_INDICES,
@@ -122,7 +126,6 @@ def get_video_info(video_path: Path | str) -> dict:
     return video_info
 
 
-
 def _encode_video_worker(video_key: str, episode_index: int, root: Path, fps: int) -> Path:
     temp_path = Path(tempfile.mkdtemp(dir=root)) / f"{video_key}_{episode_index:03d}.mp4"
     fpath = DEFAULT_IMAGE_PATH.format(image_key=video_key, episode_index=episode_index, frame_index=0)
@@ -182,9 +185,7 @@ def encode_video_frames(
             _depth_pix_fmt = "yuv444p12le"
             stream_options["x265-params"] = "lossless=1:log-level=none"
         if vcodec != _depth_codec:
-            logging.warning(
-                f"Incompatible codec {vcodec} with mode == 'depth', auto-selecting codec '{_depth_codec}'"
-            )
+            logging.warning(f"Incompatible codec {vcodec} with mode == 'depth', auto-selecting codec '{_depth_codec}'")
             vcodec = _depth_codec
         if pix_fmt != _depth_pix_fmt:
             logging.warning(
@@ -278,11 +279,20 @@ def decode_video_frames(
     depth_shift: float | None = None,
 ) -> th.Tensor:
     if OU.USE_DEPTH_RGB_ENCODING:
-        frames = native_decode_video_frames(video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend)
+        frames = native_decode_video_frames(
+            video_path=video_path, timestamps=timestamps, tolerance_s=tolerance_s, backend=backend
+        )
 
         # Convert RGB -> depth
         if "depth" in str(video_path):
-            frames = th.from_numpy(OU.rgb2depth((frames.permute(0, 2, 3, 1).numpy() * 255).astype(np.uint8), min_depth=min_depth, max_depth=max_depth, disparity=False)).unsqueeze(-3)
+            frames = th.from_numpy(
+                OU.rgb2depth(
+                    (frames.permute(0, 2, 3, 1).numpy() * 255).astype(np.uint8),
+                    min_depth=min_depth,
+                    max_depth=max_depth,
+                    disparity=False,
+                )
+            ).unsqueeze(-3)
 
         return frames
 
@@ -913,7 +923,6 @@ class OmniGibsonLeRobotDatasetMetadata(LeRobotDatasetMetadata):
 
 
 class OmniGibsonLeRobotDataset(LeRobotDataset):
-
     _MIN_DEPTH = None
     _MAX_DEPTH = None
     _DEPTH_SHIFT = None
@@ -940,8 +949,9 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         cls.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
         # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        assert LEROBOT_CODEBASE_VERSION == "v2.1", \
-            f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+        assert (
+            LEROBOT_CODEBASE_VERSION == "v2.1"
+        ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
 
         ##############
         """Create a LeRobot Dataset from scratch in order to record data."""
@@ -1002,29 +1012,30 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         return obj
 
     def __init__(
-            self,
-            repo_id: str,
-            root: str | Path | None = None,
-            episodes: list[int] | None = None,
-            image_transforms: Callable | None = None,
-            delta_timestamps: dict[str, list[float]] | None = None,
-            tolerance_s: float = 1e-4,
-            revision: str | None = None,
-            force_cache_sync: bool = False,
-            download_videos: bool = True,
-            video_backend: str | None = None,
-            batch_encoding_size: int = 1,
-            # chunk_streaming_using_keyframe: bool = True,
-            # shuffle: bool = True,
-            # seed: int = 0,
-            features: Sequence[str] | None = None,
-            min_depth=None,
-            max_depth=None,
-            depth_shift=None,
+        self,
+        repo_id: str,
+        root: str | Path | None = None,
+        episodes: list[int] | None = None,
+        image_transforms: Callable | None = None,
+        delta_timestamps: dict[str, list[float]] | None = None,
+        tolerance_s: float = 1e-4,
+        revision: str | None = None,
+        force_cache_sync: bool = False,
+        download_videos: bool = True,
+        video_backend: str | None = None,
+        batch_encoding_size: int = 1,
+        # chunk_streaming_using_keyframe: bool = True,
+        # shuffle: bool = True,
+        # seed: int = 0,
+        features: Sequence[str] | None = None,
+        min_depth=None,
+        max_depth=None,
+        depth_shift=None,
     ):
         # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        assert LEROBOT_CODEBASE_VERSION == "v2.1", \
-            f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+        assert (
+            LEROBOT_CODEBASE_VERSION == "v2.1"
+        ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
 
         ###################
         Dataset.__init__(self)
@@ -1048,7 +1059,11 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
         # Load metadata
         self.meta = OmniGibsonLeRobotDatasetMetadata(
-            self.repo_id, self.root, self.revision, force_cache_sync=force_cache_sync, features=features,
+            self.repo_id,
+            self.root,
+            self.revision,
+            force_cache_sync=force_cache_sync,
+            features=features,
         )
         if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
             episodes_stats = [self.meta.episodes_stats[ep_idx] for ep_idx in self.episodes]
@@ -1260,7 +1275,9 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
         # Also make sure to set the root class's values since that is what is used when overwriting the lerobot function
         if cls != OmniGibsonLeRobotDataset:
-            OmniGibsonLeRobotDataset.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+            OmniGibsonLeRobotDataset.set_cls_depth_range(
+                min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift
+            )
 
     def set_depth_range(self, min_depth, max_depth, depth_shift):
         self.min_depth = min_depth
@@ -1346,25 +1363,25 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 # Define separate classes for V2 vs V3 versions of the dataset
 class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
     def __init__(
-            self,
-            repo_id: str,
-            root: str | Path | None = None,
-            episodes: list[int] | None = None,
-            image_transforms: Callable | None = None,
-            delta_timestamps: dict[list[float]] | None = None,
-            tolerance_s: float = 1e-4,
-            revision: str | None = None,
-            force_cache_sync: bool = False,
-            download_videos: bool = True,
-            video_backend: str | None = None,
-            batch_encoding_size: int = 1,
-            # chunk_streaming_using_keyframe: bool = True,
-            # shuffle: bool = True,
-            # seed: int = 0,
-            features: Sequence[str] | None = None,
-            min_depth=None,
-            max_depth=None,
-            depth_shift=None,
+        self,
+        repo_id: str,
+        root: str | Path | None = None,
+        episodes: list[int] | None = None,
+        image_transforms: Callable | None = None,
+        delta_timestamps: dict[list[float]] | None = None,
+        tolerance_s: float = 1e-4,
+        revision: str | None = None,
+        force_cache_sync: bool = False,
+        download_videos: bool = True,
+        video_backend: str | None = None,
+        batch_encoding_size: int = 1,
+        # chunk_streaming_using_keyframe: bool = True,
+        # shuffle: bool = True,
+        # seed: int = 0,
+        features: Sequence[str] | None = None,
+        min_depth=None,
+        max_depth=None,
+        depth_shift=None,
     ):
         # # Sanity check datasets version -- must use <= v0.36
         # installed_version = Version(datasets.__version__)
@@ -1448,7 +1465,15 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         for vid_key, query_ts in query_timestamps.items():
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             # Use our custom decode_video_frames function
-            frames = decode_video_frames(video_path, query_ts, self.tolerance_s, self.video_backend, self.min_depth, self.max_depth, self.depth_shift)
+            frames = decode_video_frames(
+                video_path,
+                query_ts,
+                self.tolerance_s,
+                self.video_backend,
+                self.min_depth,
+                self.max_depth,
+                self.depth_shift,
+            )
             item[vid_key] = frames.squeeze(0)
 
         return item
@@ -1511,7 +1536,15 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
 
             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
             # Use our custom decode_video_frames function
-            frames = decode_video_frames(video_path, shifted_query_ts, self.tolerance_s, self.video_backend, self.min_depth, self.max_depth, self.depth_shift)
+            frames = decode_video_frames(
+                video_path,
+                shifted_query_ts,
+                self.tolerance_s,
+                self.video_backend,
+                self.min_depth,
+                self.max_depth,
+                self.depth_shift,
+            )
             item[vid_key] = frames.squeeze(0)
 
         return item

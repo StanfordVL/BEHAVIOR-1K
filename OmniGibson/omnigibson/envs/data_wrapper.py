@@ -1636,7 +1636,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             elif "proprio" in modality or "low_dim" in modality:
                 info["dtype"] = "float32"
                 info["shape"] = gym_shape.shape
-                info["names"] = None,
+                info["names"] = (None,)
             else:
                 raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
 
@@ -1656,7 +1656,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             if sensor_group is None:
                 continue
             for name, sensor in sensor_group.items():
-                obs_flat[f"{name}::rel_pose"] = th.cat(T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation())))
+                obs_flat[f"{name}::rel_pose"] = th.cat(
+                    T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation()))
+                )
 
         # Compose lerobot format obs
         frame = dict()
@@ -1686,7 +1688,6 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             frame[obs_mapping[name]] = obs
 
         return frame
-
 
     def create_dataset(self, output_path, env, overwrite=True):
         # Sanity checks
