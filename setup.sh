@@ -404,6 +404,7 @@ if [ "$OMNIGIBSON" = true ]; then
         if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache" ]; then
             echo "Fixing websockets conflict..."
             find "$ISAAC_PATH/extscache" -type d -name "websockets" -path "*/pip_prebundle/*" -exec rm -rf {} + 2>/dev/null || true
+        fi
 
         # Fix packaging conflict - remove conflicting version
         # There is a conflict where isaacsim enforces 23.0 but omni kit ships with 25.0
