@@ -166,9 +166,7 @@ def encode_video_frames(
 
     # Encoders/pixel formats incompatibility check
     if (vcodec == "libsvtav1" or vcodec == "hevc") and pix_fmt == "yuv444p":
-        logging.warning(
-            f"Incompatible pixel format 'yuv444p' for codec {vcodec}, auto-selecting format 'yuv420p'"
-        )
+        logging.warning(f"Incompatible pixel format 'yuv444p' for codec {vcodec}, auto-selecting format 'yuv420p'")
         pix_fmt = "yuv420p"
 
     # Encoders/pixel formats incompatibility check
@@ -203,9 +201,7 @@ def encode_video_frames(
 
     # Get input frames
     template = f"frame{delimiter}" + ("[0-9]" * 6) + ".png"
-    input_list = sorted(
-        glob.glob(str(imgs_dir / template)), key=lambda x: int(x.split(delimiter)[-1].split(".")[0])
-    )
+    input_list = sorted(glob.glob(str(imgs_dir / template)), key=lambda x: int(x.split(delimiter)[-1].split(".")[0]))
 
     # Define video output frame size (assuming all input frames are the same size)
     if len(input_list) == 0:
@@ -335,7 +331,9 @@ def decode_video_frames_torchvision(
     # set a video stream reader
     # TODO(rcadene): also load audio stream at the same time
     if "depth" in video_path:
-        reader = DepthVideoReader(video_path, "video", min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
+        reader = DepthVideoReader(
+            video_path, "video", min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift
+        )
     else:
         reader = VideoReader(video_path, "video")
 
@@ -404,6 +402,7 @@ class DepthVideoReader(VideoReader):
     """
     Adapted from torchvision.io.VideoReader to support gray16le decoding for depth
     """
+
     def __init__(
         self,
         src: str,
@@ -442,7 +441,7 @@ class DepthVideoReader(VideoReader):
                         max_depth=self.max_depth,
                         shift=self.depth_shift,
                     )
-                ).unsqueeze(dim=-3)         # Add back 1 channel
+                ).unsqueeze(dim=-3)  # Add back 1 channel
             elif "audio" in self.pyav_stream:
                 frame = th.as_tensor(frame.to_ndarray()).permute(1, 0)
             else:
@@ -790,6 +789,8 @@ def generate_info_json(
         json.dump(info, f, indent=4)
 
     print(f"Generated info JSON for {len(info)} entries.")
+
+
 #
 #
 # class RGBVideoLoader(OU.VideoLoader):
@@ -935,7 +936,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         max_depth=OU.MAX_DEPTH,
         depth_shift=OU.DEPTH_SHIFT,
     ) -> "OmniGibsonLeRobotDataset":
-
         # Set depth ranges
         cls.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
@@ -1345,7 +1345,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
 # Define separate classes for V2 vs V3 versions of the dataset
 class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
-
     def __init__(
             self,
             repo_id: str,
@@ -1400,9 +1399,7 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         posted_data = {}
         for key, indices in query_indices.items():
             if key not in self.meta.video_keys:
-                posted_data[key] = th.stack(
-                    [self.hf_dataset[idx][key] for idx in indices]
-                )
+                posted_data[key] = th.stack([self.hf_dataset[idx][key] for idx in indices])
         return posted_data
 
     # def _query_hf_dataset(self, query_indices: dict[str, list[int]]) -> dict:
@@ -1475,9 +1472,7 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
             if video_path.is_file():
                 # Skip if video is already encoded. Could be the case when resuming data recording.
                 continue
-            img_dir = self._get_image_file_path(
-                episode_index=episode_index, image_key=key, frame_index=0
-            ).parent
+            img_dir = self._get_image_file_path(episode_index=episode_index, image_key=key, frame_index=0).parent
             # Use our own custom video encoder function
             mode = "depth" if "depth" in key else "rgb"
             encode_video_frames(img_dir, video_path, self.fps, overwrite=True, mode=mode)
@@ -1499,7 +1494,6 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
 
 
 class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
-
     def _query_videos(self, query_timestamps: dict[str, list[float]], ep_idx: int) -> dict[str, th.Tensor]:
         """Note: When using data workers (e.g. DataLoader with num_workers>0), do not call this function
         in the main process (e.g. by using a second Dataloader with num_workers=0). It will result in a
@@ -1527,9 +1521,9 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
         return _encode_video_worker(video_key, episode_index, self.root, self.fps)
 
     def save_episode(
-            self,
-            episode_data: dict | None = None,
-            parallel_encoding: bool = True,
+        self,
+        episode_data: dict | None = None,
+        parallel_encoding: bool = True,
     ) -> None:
         """
         This will save to disk the current episode in self.episode_buffer.
@@ -1610,9 +1604,7 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
 
                 for video_key in self.meta.video_keys:
                     temp_path = results[video_key]
-                    ep_metadata.update(
-                        self._save_episode_video(video_key, episode_index, temp_path=temp_path)
-                    )
+                    ep_metadata.update(self._save_episode_video(video_key, episode_index, temp_path=temp_path))
             else:
                 for video_key in self.meta.video_keys:
                     ep_metadata.update(self._save_episode_video(video_key, episode_index))
@@ -1641,6 +1633,7 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
 
 # Save internal methods to force handling depth during image saving
 import lerobot.datasets.image_writer as liw
+
 liw.image_array_to_pil_image = OmniGibsonLeRobotDataset.image_array_to_pil_image
 
 

@@ -13,17 +13,25 @@ import b1k_pipeline.utils
 
 rt = pymxs.runtime
 
-ignore_messages = ["Confirm reasonable bounding box size:", "Confirm object synset assignment."]
+ignore_messages = [
+    "Confirm reasonable bounding box size:",
+    "Confirm object synset assignment.",
+]
+
 
 def file_eligible(objdir):
     complaint_path = objdir / "complaints.json"
-    
+
     if not complaint_path.exists():
         return False
 
     with open(complaint_path, "r") as f:
         x = json.load(f)
-        if any(not y["processed"] for y in x if not any(y["message"].startswith(ign) for ign in ignore_messages)):
+        if any(
+            not y["processed"]
+            for y in x
+            if not any(y["message"].startswith(ign) for ign in ignore_messages)
+        ):
             return True
 
     return False
@@ -34,7 +42,10 @@ def next_failed():
         reader = csv.reader(f)
         task_required_objects = {row[0].split("-")[-1] for row in reader}
 
-    with open(b1k_pipeline.utils.PIPELINE_ROOT / "artifacts/pipeline/object_inventory.json", "r") as f:
+    with open(
+        b1k_pipeline.utils.PIPELINE_ROOT / "artifacts/pipeline/object_inventory.json",
+        "r",
+    ) as f:
         providers = json.load(f)["providers"]
     provided = defaultdict(set)
     for object, provider in providers.items():
@@ -57,7 +68,12 @@ def next_failed():
         print("There are symlinks! Run the following commands:")
         for start in range(0, len(symlinks), 50):
             batch = symlinks[start : start + 50]
-            print("dvc unprotect", " ".join(str(x.relative_to(b1k_pipeline.utils.PIPELINE_ROOT)) for x in batch))
+            print(
+                "dvc unprotect",
+                " ".join(
+                    str(x.relative_to(b1k_pipeline.utils.PIPELINE_ROOT)) for x in batch
+                ),
+            )
         return
 
     print(len(eligible_max), "files remaining.")

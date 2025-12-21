@@ -17,12 +17,30 @@ import b1k_pipeline.utils
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-OUTPUT_FILENAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "pipeline", "pack_dataset.json")
-SUCCESS_FILENAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "pipeline", "pack_dataset.success")
-IN_FILENAME_AGGREGATE = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "aggregate")
-PARALLELS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "parallels")
-OUT_FILENAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset.zip")
-DEMO_OUT_FILENAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset_demo.zip")
+OUTPUT_FILENAME = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    "artifacts",
+    "pipeline",
+    "pack_dataset.json",
+)
+SUCCESS_FILENAME = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)),
+    "artifacts",
+    "pipeline",
+    "pack_dataset.success",
+)
+IN_FILENAME_AGGREGATE = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "artifacts", "aggregate"
+)
+PARALLELS_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "artifacts", "parallels"
+)
+OUT_FILENAME = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset.zip"
+)
+DEMO_OUT_FILENAME = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "artifacts", "og_dataset_demo.zip"
+)
 VERSION_FILENAME = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
 PARALLELS = [
     "objects.zip",
@@ -31,6 +49,7 @@ PARALLELS = [
     "scenes_json.zip",
     "systems.zip",
 ]
+
 
 def main():
     success = True
@@ -42,7 +61,9 @@ def main():
         for parallel_zip_name in PARALLELS:
             parallel_zip = os.path.join(PARALLELS_DIR, parallel_zip_name)
             print("Adding", parallel_zip)
-            multi_fs.add_fs(os.path.basename(parallel_zip), fs.zipfs.ZipFS(parallel_zip), priority=1)
+            multi_fs.add_fs(
+                os.path.basename(parallel_zip), fs.zipfs.ZipFS(parallel_zip), priority=1
+            )
 
         # Copy all the files to the output zip filesystem.
         print("Copying files")
@@ -56,7 +77,9 @@ def main():
             if out_fs.exists("scenes"):
                 scenes_dir = out_fs.opendir("scenes")
                 for scene_dir in list(scenes_dir.listdir("/")):
-                    if "scenes/" + scene_dir in b1k_pipeline.utils.get_targets("verified_scenes"):
+                    if "scenes/" + scene_dir in b1k_pipeline.utils.get_targets(
+                        "verified_scenes"
+                    ):
                         continue
 
                     # First rename the main dir
@@ -80,7 +103,9 @@ def main():
 
             # Delete the URDF and shape directories since they contain unencrypted objects
             print("Removing URDF directories")
-            urdf_dirs = {x.path for x in out_fs.glob("*/*/*/urdf/")} | {x.path for x in out_fs.glob("*/*/*/shape/")}
+            urdf_dirs = {x.path for x in out_fs.glob("*/*/*/urdf/")} | {
+                x.path for x in out_fs.glob("*/*/*/shape/")
+            }
             for urdf_dir in urdf_dirs:
                 out_fs.removetree(urdf_dir)
 
@@ -120,6 +145,7 @@ def main():
     if success:
         with open(SUCCESS_FILENAME, "w") as f:
             pass
+
 
 if __name__ == "__main__":
     main()

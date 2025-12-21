@@ -113,7 +113,9 @@ def match_links_between_instances(obj):
             if link_name == "base_link":
                 continue
             link_obj = links_to_objs.get(link_name, None)
-            corresponding_link_on_base_instance = links_by_instance_id[base_instance_id][link_name]
+            corresponding_link_on_base_instance = links_by_instance_id[
+                base_instance_id
+            ][link_name]
             if link_obj is None:
                 print(f"Copying link {link_name} for instance {inst_id}")
                 copy_name = corresponding_link_on_base_instance.name.replace(
@@ -131,13 +133,82 @@ def match_links_between_instances(obj):
                 relative_transforms[link_name] * instance_base_link_transform
             )
             scale_ratio = instance_base_link_offset_scale / base_link_offset_scale
-            link_obj.objectoffsetscale = corresponding_link_on_base_instance.objectoffsetscale * scale_ratio
-            link_obj.objectoffsetpos = corresponding_link_on_base_instance.objectoffsetpos * scale_ratio
+            link_obj.objectoffsetscale = (
+                corresponding_link_on_base_instance.objectoffsetscale * scale_ratio
+            )
+            link_obj.objectoffsetpos = (
+                corresponding_link_on_base_instance.objectoffsetpos * scale_ratio
+            )
 
 
 def process_all_objects():
     # Get all non-bad, zeroth-instance, base-link editable polies and process them
-    MODEL_WHITELIST = {"bamfsz", "bkdxqa", "bmsclc", "ceddpg", "dladgw", "dmwxyl", "dnyzym", "dqnbsj", "ehwmol", "emeeke", "eobsmt", "fexqbj", "fqhdne", "fqvgny", "fwstpx", "gemgfz", "gfrgkk", "ggcyib", "gjrero", "gpkbiw", "ijnwlp", "immwzb", "inmymj", "ithrgo", "jhymlr", "jongdb", "jrhgeu", "kctcuj", "kfmkbm", "ktydvs", "kubcdk", "kwbnhy", "lcrefl", "lsyzkh", "lvgliq", "lwjdmj", "mfocvp", "nfrbch", "nnvyol", "ntlgsx", "nwlbit", "ohagsq", "pluwfl", "pwoerr", "pxhbim", "qohxjq", "rgmujm", "rsypfh", "rvunhj", "rxvopf", "slgzfc", "spojpj", "taqzxq", "ufhpbn", "ulnafj", "uztisk", "vudhlc", "wwhydr", "xbfgjc", "xiajyb", "xxipyh", "xyejdx", "yfycfx", "ykfcaz"}
+    MODEL_WHITELIST = {
+        "bamfsz",
+        "bkdxqa",
+        "bmsclc",
+        "ceddpg",
+        "dladgw",
+        "dmwxyl",
+        "dnyzym",
+        "dqnbsj",
+        "ehwmol",
+        "emeeke",
+        "eobsmt",
+        "fexqbj",
+        "fqhdne",
+        "fqvgny",
+        "fwstpx",
+        "gemgfz",
+        "gfrgkk",
+        "ggcyib",
+        "gjrero",
+        "gpkbiw",
+        "ijnwlp",
+        "immwzb",
+        "inmymj",
+        "ithrgo",
+        "jhymlr",
+        "jongdb",
+        "jrhgeu",
+        "kctcuj",
+        "kfmkbm",
+        "ktydvs",
+        "kubcdk",
+        "kwbnhy",
+        "lcrefl",
+        "lsyzkh",
+        "lvgliq",
+        "lwjdmj",
+        "mfocvp",
+        "nfrbch",
+        "nnvyol",
+        "ntlgsx",
+        "nwlbit",
+        "ohagsq",
+        "pluwfl",
+        "pwoerr",
+        "pxhbim",
+        "qohxjq",
+        "rgmujm",
+        "rsypfh",
+        "rvunhj",
+        "rxvopf",
+        "slgzfc",
+        "spojpj",
+        "taqzxq",
+        "ufhpbn",
+        "ulnafj",
+        "uztisk",
+        "vudhlc",
+        "wwhydr",
+        "xbfgjc",
+        "xiajyb",
+        "xxipyh",
+        "xyejdx",
+        "yfycfx",
+        "ykfcaz",
+    }
     for obj in rt.objects:
         if rt.classOf(obj) != rt.Editable_Poly:
             continue
@@ -148,7 +219,10 @@ def process_all_objects():
             continue
         if parsed_name.group("instance_id") != "0":
             continue
-        if parsed_name.group("link_name") and parsed_name.group("link_name") != "base_link":
+        if (
+            parsed_name.group("link_name")
+            and parsed_name.group("link_name") != "base_link"
+        ):
             continue
         if parsed_name.group("bad"):
             continue

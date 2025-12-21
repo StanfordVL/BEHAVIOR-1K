@@ -15,8 +15,7 @@ class RGBLowResWrapper(EnvironmentWrapper):
 
     def __init__(self, env: Environment):
         super().__init__(env=env)
-        # Note that from eval.py we already set the robot to include rgb + depth + seg_instance_id modalities
-        # Here, we modify the robot observation to include only rgb modalities, and use 224 * 224 resolution
+        # Here, we modify the robot observation to use 224 * 224 resolution
         # For a complete list of available modalities, see VisionSensor.ALL_MODALITIES
         robot = env.robots[0]
         for camera_id, camera_name in ROBOT_CAMERA_NAMES["R1Pro"].items():

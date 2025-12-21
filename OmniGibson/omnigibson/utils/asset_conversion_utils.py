@@ -1065,12 +1065,7 @@ def _migrate_materials_to_looks(stage):
             counter += 1
 
         # Copy the material prim to the new location
-        success = lazy.pxr.Sdf.CopySpec(
-            stage.GetRootLayer(),
-            old_path,
-            stage.GetRootLayer(),
-            new_path
-        )
+        success = lazy.pxr.Sdf.CopySpec(stage.GetRootLayer(), old_path, stage.GetRootLayer(), new_path)
 
         if success:
             material_path_mapping[str(old_path)] = str(new_path)
@@ -1098,7 +1093,9 @@ def _migrate_materials_to_looks(stage):
                     if new_material_prim.IsValid():
                         new_material = lazy.pxr.UsdShade.Material(new_material_prim)
                         binding_api.Bind(new_material)
-                        log.debug(f"Updated material binding on {prim.GetPath()} from {material_path_str} to {new_material_path}")
+                        log.debug(
+                            f"Updated material binding on {prim.GetPath()} from {material_path_str} to {new_material_path}"
+                        )
 
     return material_path_mapping
 

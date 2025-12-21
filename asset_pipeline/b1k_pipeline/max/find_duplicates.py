@@ -9,7 +9,11 @@ def find_duplicates():
     keys = [x for x in rt.objects if rt.classOf(x) == rt.Editable_Poly]
     positions = [
         np.mean(
-            np.array(rt.polyop.getVerts(obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(obj)))),
+            np.array(
+                rt.polyop.getVerts(
+                    obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(obj))
+                )
+            ),
             axis=0,
         )
         for obj in keys

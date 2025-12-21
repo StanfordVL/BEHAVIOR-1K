@@ -16,45 +16,87 @@ import tqdm
 
 
 BATCH_SIZE = 8
-assert(BATCH_SIZE % 2 == 0)
+assert BATCH_SIZE % 2 == 0
 WORKER_COUNT = 6
 MAX_TIME_PER_PROCESS = 5 * 60  # 5 minutes
 
+
 def run_on_batch(dataset_path, out_path, batch):
-    python_cmd = ["python", "-m", "b1k_pipeline.generate_object_images_og", dataset_path, out_path] + batch
-    cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
+    python_cmd = [
+        "python",
+        "-m",
+        "b1k_pipeline.generate_object_images_og",
+        dataset_path,
+        out_path,
+    ] + batch
+    cmd = [
+        "micromamba",
+        "run",
+        "-n",
+        "omnigibson",
+        "/bin/bash",
+        "-c",
+        "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && "
+        + " ".join(python_cmd),
+    ]
     obj = batch[0].split("/")[-1]
-    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr:
+    with (
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.log", "w") as f,
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{obj}.err", "w") as ferr,
+    ):
         try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
+            p = subprocess.Popen(
+                cmd,
+                stdout=f,
+                stderr=ferr,
+                cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+                start_new_session=True,
+            )
             return p.wait(timeout=MAX_TIME_PER_PROCESS)
         except subprocess.TimeoutExpired:
-            print(f'Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing', file=sys.stderr)
+            print(
+                f"Timeout for {batch} ({MAX_TIME_PER_PROCESS}s) expired. Killing",
+                file=sys.stderr,
+            )
             os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             return p.wait()
 
+
 def main():
     with PipelineFS() as pipeline_fs:
-        with ZipFS(pipeline_fs.open("artifacts/og_dataset.zip", "rb")) as dataset_zip_fs, \
-            TempFS(temp_dir=str(TMP_DIR)) as dataset_fs, \
-            OSFS(pipeline_fs.makedirs("artifacts/pipeline/object_images", recreate=True).getsyspath("/")) as out_temp_fs:
+        with (
+            ZipFS(pipeline_fs.open("artifacts/og_dataset.zip", "rb")) as dataset_zip_fs,
+            TempFS(temp_dir=str(TMP_DIR)) as dataset_fs,
+            OSFS(
+                pipeline_fs.makedirs(
+                    "artifacts/pipeline/object_images", recreate=True
+                ).getsyspath("/")
+            ) as out_temp_fs,
+        ):
             # Copy everything over to the dataset FS
             print("Copy everything over to the dataset FS...")
             objdir_glob = list(dataset_zip_fs.glob("objects/*/*/"))
             for item in tqdm.tqdm(objdir_glob):
-                if dataset_zip_fs.opendir(item.path).glob("usd/*.usd").count().files == 0:
+                if (
+                    dataset_zip_fs.opendir(item.path).glob("usd/*.usd").count().files
+                    == 0
+                ):
                     continue
                 objdir_normalized = fs.path.normpath(item.path)
                 obj_id = fs.path.basename(objdir_normalized)
                 if out_temp_fs.exists(f"{obj_id}.success"):
                     continue
-                copy_fs(dataset_zip_fs.opendir(item.path), dataset_fs.makedirs(item.path))
+                copy_fs(
+                    dataset_zip_fs.opendir(item.path), dataset_fs.makedirs(item.path)
+                )
 
             # Launch the cluster
             dask_client = launch_cluster(WORKER_COUNT)
 
             # Start the batched run
-            object_glob = [fs.path.normpath(x.path) for x in dataset_fs.glob("objects/*/*/")]
+            object_glob = [
+                fs.path.normpath(x.path) for x in dataset_fs.glob("objects/*/*/")
+            ]
 
             print("Queueing batches.")
             print("Total count: ", len(object_glob))
@@ -69,13 +111,16 @@ def main():
                         dataset_fs.getsyspath("/"),
                         out_temp_fs.getsyspath("/"),
                         batch,
-                        pure=False)
+                        pure=False,
+                    )
                     futures[worker_future] = batch
 
             # Wait for all the workers to finish
             print("Queued all batches. Waiting for them to finish...")
             while True:
-                for future in tqdm.tqdm(as_completed(futures.keys()), total=len(futures)):
+                for future in tqdm.tqdm(
+                    as_completed(futures.keys()), total=len(futures)
+                ):
                     # Check the batch results.
                     batch = futures[future]
                     return_code = future.result()  # we dont use the return code since we check the output files directly
@@ -107,7 +152,8 @@ def main():
                                 run_on_batch,
                                 dataset_fs.getsyspath("/"),
                                 subbatch,
-                                pure=False)
+                                pure=False,
+                            )
                             futures[worker_future] = subbatch
                         del futures[future]
 

@@ -20,9 +20,12 @@ from b1k_pipeline.max.new_sanity_check import SanityCheck
 PRECHECK_COLLISION = False
 PRECHECK_EMPTY = False
 
+
 def bin_files():
     max_files = glob.glob(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\*\processed.max")
-    max_files = sorted([pathlib.Path(x) for x in max_files if "legacy_" not in x and "batch-" not in x])
+    max_files = sorted(
+        [pathlib.Path(x) for x in max_files if "legacy_" not in x and "batch-" not in x]
+    )
 
     # Deterministic shuffle
     random.seed(1337)
@@ -31,7 +34,10 @@ def bin_files():
     print(len(max_files), "files found")
 
     batch_size = 50
-    bins = [set(max_files[start:start+batch_size]) for start in range(0, len(max_files), batch_size)]
+    bins = [
+        set(max_files[start : start + batch_size])
+        for start in range(0, len(max_files), batch_size)
+    ]
 
     # Apply displacements to avoid texture collisions
     displacements = {
@@ -41,13 +47,17 @@ def bin_files():
         "hockey_stick-ja": 6,
         "jewelry_cleaner-bh": 5,
         "tequilla-jo": 4,
-        'baby_bottle-hv': 13,
-        'coconut_milk-oq': 11,
-        'log-da': 12,
+        "baby_bottle-hv": 13,
+        "coconut_milk-oq": 11,
+        "log-da": 12,
     }
     for d, tgt in displacements.items():
         # Convert d to its path form
-        p = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects") / d / "processed.max"
+        p = (
+            pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects")
+            / d
+            / "processed.max"
+        )
 
         # Remove d from the bin it shows up in
         for bin in bins:
@@ -62,9 +72,9 @@ def bin_files():
 
     # Identify any texture collisions
     if PRECHECK_COLLISION:
-        any_collision = False   
+        any_collision = False
         texture_hashes = {}
-        hash_to_file = {}     
+        hash_to_file = {}
         for i, files in enumerate(tqdm.tqdm(bins)):
             texture_hashes[i] = defaultdict(set)
             hash_to_file[i] = defaultdict(set)
@@ -72,7 +82,7 @@ def bin_files():
                 texture_dir = f.parent / "textures"
                 if texture_dir.exists():
                     textures = list(texture_dir.rglob("*"))
-                    
+
                     # First check for collision within the same file
                     c = Counter([t.name.lower() for t in textures])
                     for k, v in c.items():
@@ -93,10 +103,21 @@ def bin_files():
             needs_removal = set()
             for basename, hashes in texture_hashes[i].items():
                 if len(hashes) > 1:
-                    providers = [x for h in hashes for x in hash_to_file[i][(basename, h)]]
-                    print("Texture collision for", basename, "between", providers, "in bin", i)
+                    providers = [
+                        x for h in hashes for x in hash_to_file[i][(basename, h)]
+                    ]
+                    print(
+                        "Texture collision for",
+                        basename,
+                        "between",
+                        providers,
+                        "in bin",
+                        i,
+                    )
                     for provider in providers[1:]:
-                        relpath = provider.relative_to(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects")
+                        relpath = provider.relative_to(
+                            r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects"
+                        )
                         needs_removal.add(relpath.parts[0])
                     any_collision = True
 
@@ -105,7 +126,7 @@ def bin_files():
 
         if any_collision:
             return
-      
+
     # Check if any of the files are empty
     if PRECHECK_EMPTY:
         any_empty = False
@@ -122,7 +143,9 @@ def bin_files():
         rt.resetMaxFile(rt.name("noPrompt"))
 
         # Create the directory
-        file_root = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\batch-%02d" % i)
+        file_root = pathlib.Path(
+            r"D:\BEHAVIOR-1K\asset_pipeline\cad\objects\batch-%02d" % i
+        )
         max_path = file_root / "processed.max"
         if max_path.exists():
             continue
@@ -183,12 +206,19 @@ def bin_files():
                     target_path = textures_dir / t.name
                     if target_path.exists():
                         # Check if the file contents are equal
-                        with open(t, "rb") as t_file, open(target_path, "rb") as target_path_file:
+                        with (
+                            open(t, "rb") as t_file,
+                            open(target_path, "rb") as target_path_file,
+                        ):
                             t_hash = hashlib.md5(t_file.read()).hexdigest()
-                            target_path_hash = hashlib.md5(target_path_file.read()).hexdigest()
-                        assert t_hash == target_path_hash, f"Two different texture files including {t} want to be copied to {target_path}"
+                            target_path_hash = hashlib.md5(
+                                target_path_file.read()
+                            ).hexdigest()
+                        assert (
+                            t_hash == target_path_hash
+                        ), f"Two different texture files including {t} want to be copied to {target_path}"
                         continue
-                            
+
                     shutil.copy(t, target_path)
 
         # After loading everything, run a sanity check
@@ -200,6 +230,7 @@ def bin_files():
         rt.saveMaxFile(str(max_path), quiet=True)
 
     print("Done!")
+
 
 if __name__ == "__main__":
     bin_files()

@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sys
+
 sys.path.append(r"D:\BEHAVIOR-1K\asset_pipeline")
 
 from collections import Counter, defaultdict
@@ -22,17 +23,22 @@ SIDES = {
     # Top down
     # "top": R.from_euler("Z", -np.pi / 2),
     # Diagonal
-    "diagonal1": R.from_euler("xy", [-np.pi / 2, np.pi / 2]) * R.from_euler("XYZ", [0, -np.pi / 6, np.pi / 6]),
-    "diagonal2": (R.from_euler("xy", [-np.pi / 2, np.pi / 2]) * R.from_euler("XYZ", [0, -np.pi / 6, np.pi / 6])).inv(),
+    "diagonal1": R.from_euler("xy", [-np.pi / 2, np.pi / 2])
+    * R.from_euler("XYZ", [0, -np.pi / 6, np.pi / 6]),
+    "diagonal2": (
+        R.from_euler("xy", [-np.pi / 2, np.pi / 2])
+        * R.from_euler("XYZ", [0, -np.pi / 6, np.pi / 6])
+    ).inv(),
     # "top", "left", "right", "front", "back"
 }
 JSON_FILENAME = "generate_max_object_images.json"
+
 
 # The camera somehow has different axes.
 def main():
     output_dir = os.path.join(rt.maxFilePath, "artifacts")
     os.makedirs(output_dir, exist_ok=True)
-    
+
     with ZipFS(os.path.join(output_dir, "max_object_images.zip"), write=True) as zipfs:
         # Set the render preset
         preset_path = r"C:\Users\Cem\Documents\3ds Max 2022\renderpresets\imgrender.rps"
@@ -57,7 +63,11 @@ def main():
             if match is None:
                 continue
 
-            if int(match.group("instance_id")) != 0 or match.group("bad") or match.group("meta_type"):
+            if (
+                int(match.group("instance_id")) != 0
+                or match.group("bad")
+                or match.group("meta_type")
+            ):
                 continue
 
             groups[
@@ -108,7 +118,9 @@ def main():
 
                     # Rotate the camera to match the object.
                     camera_rot = side_rot * obj_rot.inv()
-                    rt.viewport.rotate(rt.Quat(*[float(x) for x in camera_rot.as_quat()]))
+                    rt.viewport.rotate(
+                        rt.Quat(*[float(x) for x in camera_rot.as_quat()])
+                    )
 
                     # Set the zoom extent
                     rt.select([])

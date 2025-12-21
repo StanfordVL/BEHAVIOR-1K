@@ -64,8 +64,9 @@ def convert_to_trimesh(obj, checks=True):
         m.remove_unreferenced_vertices()
         assert not checks or m.is_volume, f"{obj.name} element {i} is not a volume"
         # assert not checks or m.is_convex, f"{obj.name} element {i} is not convex"
-        assert not checks or len(m.split()) == 1, \
-            f"{obj.name} element {i} has elements trimesh still finds splittable"
+        assert (
+            not checks or len(m.split()) == 1
+        ), f"{obj.name} element {i} has elements trimesh still finds splittable"
         meshes.append(m)
 
     return meshes
@@ -90,7 +91,9 @@ def process_convex_obj(obj, force=False):
     # if the vertex count is too high, and replace the shape with its convex hull helping with the volumeness
     # issues.
     reduced_trimeshes = [reduce_mesh(m) for m in convex_meshes]
-    assert all(m.is_volume for m in reduced_trimeshes), f"{obj.name} reduced part is not a volume. Not quite sure how that can be."
+    assert all(
+        m.is_volume for m in reduced_trimeshes
+    ), f"{obj.name} reduced part is not a volume. Not quite sure how that can be."
 
     # Get a flattened list of vertices and faces
     all_vertices = []

@@ -1,6 +1,7 @@
 """
 Script to import scene and objects
 """
+
 import pathlib
 import sys
 import time

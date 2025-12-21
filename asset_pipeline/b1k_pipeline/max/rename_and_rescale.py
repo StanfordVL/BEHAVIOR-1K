@@ -22,9 +22,16 @@ rt = pymxs.runtime
 
 RECORD_RELPATH = "rename_and_rescale.success"
 
+
 def compute_bounding_box(objs):
     objs = [x for x in objs if rt.classOf(x) == rt.Editable_Poly]
-    base, = [x for x in objs if b1k_pipeline.utils.parse_name(x.name).group("link_name") in (None, "", "base_link") and not b1k_pipeline.utils.parse_name(x.name).group("meta_type")]
+    (base,) = [
+        x
+        for x in objs
+        if b1k_pipeline.utils.parse_name(x.name).group("link_name")
+        in (None, "", "base_link")
+        and not b1k_pipeline.utils.parse_name(x.name).group("meta_type")
+    ]
     transform = np.eye(4)
     transform[:3] = b1k_pipeline.utils.mat2arr(base.transform).T
     invt = np.linalg.inv(transform)
@@ -36,7 +43,9 @@ def compute_bounding_box(objs):
             continue
 
         # Get all the vertices
-        X = np.array(rt.polyop.getVerts(obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(obj))))
+        X = np.array(
+            rt.polyop.getVerts(obj, rt.execute("#{1..%d}" % rt.polyop.getNumVerts(obj)))
+        )
 
         # Convert them into the base frame
         pts = transform_points(X, invt)
@@ -51,6 +60,7 @@ def compute_bounding_box(objs):
     bb_max = all_pts.max(axis=0)
     return np.abs(bb_max - bb_min)
 
+
 def processFile(pipeline_fs, target, renames, deletions, avg_dims):
     # Load file, fixing the units
     max_path = pipeline_fs.target(target).getsyspath("processed.max")
@@ -59,7 +69,7 @@ def processFile(pipeline_fs, target, renames, deletions, avg_dims):
     assert rt.units.systemType == rt.Name("millimeters"), "System scale not set to 1mm."
 
     # Take care of resizing.
-    if False: # "objects/legacy_" in target:
+    if False:  # "objects/legacy_" in target:
         # First, group things by object ID
         objs_by_model = defaultdict(list)
         for obj in rt.objects:
@@ -73,7 +83,9 @@ def processFile(pipeline_fs, target, renames, deletions, avg_dims):
 
         # Identify the base object.
         # This is the object that has the same ID as the file name.
-        base_key = next(k for k in objs_by_model.keys() if k[1] == target.split("-")[-1])
+        base_key = next(
+            k for k in objs_by_model.keys() if k[1] == target.split("-")[-1]
+        )
         base_objs = objs_by_model[base_key]
         bb_ext = np.sort(compute_bounding_box(base_objs))
         avg_cat_dims = np.sort(avg_dims[base_key[0]])
@@ -81,7 +93,9 @@ def processFile(pipeline_fs, target, renames, deletions, avg_dims):
 
         # Make sure that the max scale is not more than x times the min scale
         if scale_factors.max() / scale_factors.min() > 10:
-            raise ValueError(f"Object {base_key} has scales that vary by too much: {scale_factors}")
+            raise ValueError(
+                f"Object {base_key} has scales that vary by too much: {scale_factors}"
+            )
         scale_factor = float(scale_factors.min())
 
         # Apply the scale
@@ -168,31 +182,46 @@ def rename_and_rescale_all_files():
         # Open the target's object list
         # with pipeline_fs.target_output(target).open("object_list.json", "r") as f:
         #     object_list = set(json.load(f)["needed_objects"])
-        mesh_list = rt.getMAXFileObjectNames(pipeline_fs.target(target).getsyspath("processed.max"), quiet=True)
+        mesh_list = rt.getMAXFileObjectNames(
+            pipeline_fs.target(target).getsyspath("processed.max"), quiet=True
+        )
         match_list = [b1k_pipeline.utils.parse_name(mesh) for mesh in mesh_list]
-        object_list = {match.group("category") + "-" + match.group("model_id") for match in match_list if match}
+        object_list = {
+            match.group("category") + "-" + match.group("model_id")
+            for match in match_list
+            if match
+        }
         ids = {x.split("-")[1] for x in object_list}
 
         # See if the target needs any of the operations
         has_rename = ids & set(renames.keys())
         has_deletion = ids & deletions
-        has_scale = False # "objects/legacy_" in target
+        has_scale = False  # "objects/legacy_" in target
         if has_rename or has_deletion or has_scale:
             selected_targets.append(target)
 
     print("Remaining files:", len(selected_targets))
 
     # Before processing, check if any of the remaining targets are symlinks, and unprotect them
-    paths = [pathlib.Path(pipeline_fs.target(target).getsyspath("processed.max")) for target in selected_targets]
+    paths = [
+        pathlib.Path(pipeline_fs.target(target).getsyspath("processed.max"))
+        for target in selected_targets
+    ]
     symlinks = [p for p in paths if p.is_symlink()]
     if symlinks:
         print("Found symlinks. Run below commands to unprotect them in DVC.")
         for batch_start in range(0, len(symlinks), 50):
-            print("dvc unprotect", " ".join(str(p.relative_to(b1k_pipeline.utils.PIPELINE_ROOT)) for p in symlinks[batch_start:batch_start+50]))
+            print(
+                "dvc unprotect",
+                " ".join(
+                    str(p.relative_to(b1k_pipeline.utils.PIPELINE_ROOT))
+                    for p in symlinks[batch_start : batch_start + 50]
+                ),
+            )
         return
 
     for i, f in enumerate(sorted(selected_targets)):
-        print(f"Processing file {i+1}/{len(selected_targets)}: {f}")
+        print(f"Processing file {i + 1}/{len(selected_targets)}: {f}")
         try:
             processFile(pipeline_fs, f, renames, deletions, avg_dims)
         except Exception as e:

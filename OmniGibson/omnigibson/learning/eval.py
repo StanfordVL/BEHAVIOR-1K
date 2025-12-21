@@ -35,7 +35,7 @@ from omnigibson.learning.utils.obs_utils import (
     create_video_writer,
     write_video,
 )
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.metrics import MetricBase, AgentMetric, TaskMetric
 from omnigibson.robots import BaseRobot
 from omnigibson.utils.asset_utils import get_task_instance_path
@@ -49,11 +49,15 @@ m.NUM_EVAL_EPISODES = 1
 m.NUM_TRAIN_INSTANCES = 200
 m.NUM_EVAL_INSTANCES = 10
 
-
 # set global variables to boost performance
 gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_TRANSITION_RULES = True
+
+# Set grasp window to larger value to account for hard grasps
+with macros.unlocked():
+    macros.robots.manipulation_robot.GRASP_WINDOW = 0.75
+
 
 # create module logger
 logger = logging.getLogger("evaluator")
@@ -203,6 +207,7 @@ class Evaluator:
         self.robot_action = self.policy.forward(obs=self.obs)
 
         obs, _, terminated, truncated, info = self.env.step(self.robot_action, n_render_iterations=1)
+
         # process obs
         self.obs = self._preprocess_obs(obs)
 
@@ -233,12 +238,13 @@ class Evaluator:
             container.close()
         self._video_writer = video_writer
 
-    def load_task_instance(self, instance_id: int) -> None:
+    def load_task_instance(self, instance_id: int, test_hidden: bool = False) -> None:
         """
         Loads the configuration for a specific task instance.
 
         Args:
             instance_id (int): The ID of the task instance to load.
+            test_hidden (bool): [Interal use only] Whether to load the hidden test instance.
         """
         scene_model = self.env.task.scene_name
         tro_filename = self.env.task.get_cached_activity_scene_filename(
@@ -247,10 +253,18 @@ class Evaluator:
             activity_definition_id=self.env.task.activity_definition_id,
             activity_instance_id=instance_id,
         )
-        tro_file_path = os.path.join(
-            get_task_instance_path(scene_model),
-            f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
-        )
+        if test_hidden:
+            tro_file_path = os.path.join(
+                gm.DATA_PATH,
+                "2025-challenge-test-instances",
+                self.env.task.activity_name,
+                f"{tro_filename}-tro_state.json",
+            )
+        else:
+            tro_file_path = os.path.join(
+                get_task_instance_path(scene_model),
+                f"json/{scene_model}_task_{self.env.task.activity_name}_instances/{tro_filename}-tro_state.json",
+            )
         with open(tro_file_path, "r") as f:
             tro_state = recursively_convert_to_torch(json.load(f))
         for tro_key, tro_state in tro_state.items():
@@ -305,12 +319,16 @@ class Evaluator:
                 cam_pose = T.mat2pose(th.tensor(np.linalg.inv(np.reshape(direct_cam_pose, [4, 4]).T), dtype=th.float32))
                 cam_rel_poses.append(th.cat(T.relative_pose_transform(*cam_pose, *base_pose)))
         obs["robot_r1::cam_rel_poses"] = th.cat(cam_rel_poses, axis=-1)
+        # append task id to obs
+        obs["task_id"] = th.tensor([TASK_NAMES_TO_INDICES[self.cfg.task.name]], dtype=th.int64)
         return obs
 
     def _write_video(self) -> None:
         """
         Write the current robot observations to video.
         """
+        if ROBOT_CAMERA_NAMES["R1Pro"]["head"] + "::rgb" not in self.obs:
+            return
         # concatenate obs
         left_wrist_rgb = cv2.resize(
             self.obs[ROBOT_CAMERA_NAMES["R1Pro"]["left_wrist"] + "::rgb"].numpy(),
@@ -347,7 +365,6 @@ class Evaluator:
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        # print stats
         logger.info("")
         logger.info("=" * 50)
         logger.info(f"Total success trials: {self.n_success_trials}")
@@ -371,7 +388,7 @@ class Evaluator:
 if __name__ == "__main__":
     register_omegaconf_resolvers()
     # open yaml from task path
-    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda:0)).parents[0]}/configs", version_base="1.1"):
+    with hydra.initialize_config_dir(f"{Path(getsourcefile(lambda: 0)).parents[0]}/configs", version_base="1.1"):
         config = hydra.compose("base_config.yaml", overrides=sys.argv[1:])
     OmegaConf.resolve(config)
     # set headless mode
@@ -380,6 +397,11 @@ if __name__ == "__main__":
     if config.write_video:
         video_path = Path(config.log_path).expanduser() / "videos"
         video_path.mkdir(parents=True, exist_ok=True)
+    assert not (
+        config.eval_on_train_instances and config.test_hidden
+    ), "Cannot eval on train instances and test hidden instances simultaneously."
+    if config.test_hidden:
+        logger.info("You are evaluating on hidden test instances! This is for internal use only.")
     # get run instances
     if config.eval_on_train_instances:
         logger.info(
@@ -392,11 +414,18 @@ if __name__ == "__main__":
         for episode in episodes:
             if episode["episode_index"] // 1e4 == task_idx:
                 instances_to_run.append(str(int((episode["episode_index"] // 10) % 1e3)))
-                if config.eval_instance_ids:
-                    assert set(config.eval_instance_ids).issubset(
-                        set(range(m.NUM_TRAIN_INSTANCES))
-                    ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
-                    instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+        if config.eval_instance_ids:
+            assert set(config.eval_instance_ids).issubset(
+                set(range(m.NUM_TRAIN_INSTANCES))
+            ), f"eval instance ids must be in range({m.NUM_TRAIN_INSTANCES})"
+            instances_to_run = [instances_to_run[i] for i in config.eval_instance_ids]
+    elif config.test_hidden:
+        instances_to_run = (
+            config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
+        )
+        assert set(instances_to_run).issubset(
+            set(range(m.NUM_EVAL_INSTANCES))
+        ), f"eval instance ids must be in range({m.NUM_EVAL_INSTANCES})"
     else:
         instances_to_run = (
             config.eval_instance_ids if config.eval_instance_ids is not None else set(range(m.NUM_EVAL_INSTANCES))
@@ -425,7 +454,7 @@ if __name__ == "__main__":
 
         for idx in instances_to_run:
             evaluator.reset()
-            evaluator.load_task_instance(idx)
+            evaluator.load_task_instance(idx, test_hidden=config.test_hidden)
             logger.info(f"Starting task instance {idx} for evaluation...")
             for epi in range(m.NUM_EVAL_EPISODES):
                 evaluator.reset()

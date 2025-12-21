@@ -18,6 +18,7 @@ from b1k_pipeline.max.collision_vertex_reduction import reduce_mesh
 
 REQUIRE_ADDITIONAL_BASE_POINTS = False
 
+
 def anorm(x, axis=None, keepdims=False):
     """Compute L2 norms alogn specified axes."""
     return np.linalg.norm(x, axis=axis, keepdims=keepdims)
@@ -334,7 +335,9 @@ def sample_fillable_volume(
 
             # Raycast downwards and record the hit point
             start = np.array([*xy_ray_pos, z])
-            hit = shoot_ray(tm=ctm_rot_unmerged, point=start, direction=np.array([0, 0, -1.0]))
+            hit = shoot_ray(
+                tm=ctm_rot_unmerged, point=start, direction=np.array([0, 0, -1.0])
+            )
 
             # If we have a valid hit, record this point
             if hit is not None:

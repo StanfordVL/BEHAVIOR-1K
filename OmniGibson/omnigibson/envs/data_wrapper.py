@@ -23,7 +23,11 @@ from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.controllers.controller_base import ControlType
 
-from lerobot.datasets.lerobot_dataset import HF_LEROBOT_HOME, LeRobotDataset, CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION
+from lerobot.datasets.lerobot_dataset import (
+    HF_LEROBOT_HOME,
+    LeRobotDataset,
+    CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
+)
 from omnigibson.learning.utils.lerobot_utils import OmniGibsonLeRobotV2Dataset, OmniGibsonLeRobotV3Dataset
 
 import shutil
@@ -251,6 +255,7 @@ class HDF5DataWrapper(DataWrapper):
     """
     Specific data wrapper for writing data to HDF5 format
     """
+
     def __init__(
         self,
         env,
@@ -411,6 +416,7 @@ class HDF5DataWrapper(DataWrapper):
             self.hdf5_file["data"].attrs["n_episodes"] = self.traj_count
             self.hdf5_file["data"].attrs["n_steps"] = self.step_count
             self.hdf5_file.close()
+
 
 class HDF5CollectionWrapper(HDF5DataWrapper):
     """
@@ -1203,12 +1209,12 @@ class DataPlaybackWrapper(DataWrapper):
             self.flush_current_traj()
 
     def allocate_traj(
-            self,
-            step_data,
-            episode_id,
-            num_samples: int,
-            nested_keys=("obs",),
-            video_writers=None,
+        self,
+        step_data,
+        episode_id,
+        num_samples: int,
+        nested_keys=("obs",),
+        video_writers=None,
     ):
         """
         Allocate trajectory data space from @step_data given the number of samples @num_samples.
@@ -1305,19 +1311,23 @@ class DataPlaybackWrapper(DataWrapper):
                             else:
                                 self.add_to_dataset(
                                     keys=[key, mod],
-                                    idxs=list(range(
-                                        self.current_episode_step_count - data_length_to_flush + 1,
-                                        self.current_episode_step_count + 1,
-                                    )),
+                                    idxs=list(
+                                        range(
+                                            self.current_episode_step_count - data_length_to_flush + 1,
+                                            self.current_episode_step_count + 1,
+                                        )
+                                    ),
                                     data=data_to_write,
                                 )
                 else:
                     self.add_to_dataset(
                         keys=[key],
-                        idxs=list(range(
-                            self.current_episode_step_count - data_length_to_flush,
-                            self.current_episode_step_count,
-                        )),
+                        idxs=list(
+                            range(
+                                self.current_episode_step_count - data_length_to_flush,
+                                self.current_episode_step_count,
+                            )
+                        ),
                         data=th.stack([self.current_traj_history[i][key] for i in range(data_length_to_flush)], dim=0),
                     )
         # Reset the current trajectory history
@@ -1349,6 +1359,7 @@ class HDF5PlaybackWrapper(DataPlaybackWrapper, HDF5DataWrapper):
     """
     Playback wrapper for replaying data and writing to an HDF5 file
     """
+
     def __init__(
         self,
         env,
@@ -1491,6 +1502,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
     NOTE: This assumes a DataCollectionWrapper environment has been used to collect data!
     """
+
     def __init__(
         self,
         env,
@@ -1551,13 +1563,14 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             "image_writer_processes": image_writer_processes,
         }
         self.dataset = None
-        self.obs_mapping = None     # Maps OG obs name -> lerobot obs name
+        self.obs_mapping = None  # Maps OG obs name -> lerobot obs name
         assert_valid_key(lerobot_version, valid_keys={"v2.1", "v3.0"}, name="lerobot version")
-        assert lerobot_version == LEROBOT_CODEBASE_VERSION, \
-            f"Got mismatch between requested LeRobot version {lerobot_version} and actual version {LEROBOT_CODEBASE_VERSION}!\n\n" + \
-            "Make sure LeRobot repo is cloned and sourced locally.\n\n" + \
-            "For v2.1, run `git checkout v0.3.3`\n" + \
-            "For v3.0, run `git checkout `v0.4.2`\n\n"
+        assert lerobot_version == LEROBOT_CODEBASE_VERSION, (
+            f"Got mismatch between requested LeRobot version {lerobot_version} and actual version {LEROBOT_CODEBASE_VERSION}!\n\n"
+            + "Make sure LeRobot repo is cloned and sourced locally.\n\n"
+            + "For v2.1, run `git checkout v0.3.3`\n"
+            + "For v3.0, run `git checkout `v0.4.2`\n\n"
+        )
         self.lerobot_version = lerobot_version
 
         # Infer task name
@@ -1677,8 +1690,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
     def create_dataset(self, output_path, env, overwrite=True):
         # Sanity checks
-        assert output_path == self.lerobot_dataset_kwargs['repo_id'], \
-            f"Expected LeRobot repo_id path ({self.lerobot_dataset_kwargs['repo_id']}) to match output_path ({output_path})!"
+        assert (
+            output_path == self.lerobot_dataset_kwargs["repo_id"]
+        ), f"Expected LeRobot repo_id path ({self.lerobot_dataset_kwargs['repo_id']}) to match output_path ({output_path})!"
 
         abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
 
@@ -1793,8 +1807,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         last_obs = None
         for frame_idx, traj_step in enumerate(traj_data):
             if frame_idx == 0:
-                assert len(traj_step.keys()) == 1, \
-                    f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
+                assert (
+                    len(traj_step.keys()) == 1
+                ), f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
                 assert "obs" in traj_step, f"Expected 'obs' key in 0th traj step, but got: {traj_step.keys()}"
                 last_obs = traj_step["obs"]
                 continue
@@ -1875,12 +1890,12 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             self.dataset.finalize()
 
     def allocate_traj(
-            self,
-            step_data,
-            episode_id,
-            num_samples: int,
-            nested_keys=("obs",),
-            video_writers=None,
+        self,
+        step_data,
+        episode_id,
+        num_samples: int,
+        nested_keys=("obs",),
+        video_writers=None,
     ):
         # Does nothing currently
         pass

@@ -64,10 +64,12 @@ There are two ways to submit your model for evaluation:
 **YOU ARE NOT ALLOWED TO MODIFY THE OUTPUT JSON FILES AND VIDEOS IN ANY WAY**. Your final submission will be a zip file containing the following:
 
 1. All the json files, one for each rollout you performed (up to 500);
-2. All the mp4 videos, one for each rollout you performed (up to 500);
 3. Wrapper code (.py) used during evaluation;
 4. Robot (R1Pro) config file (.yaml) used during evaluation; 
 5. A readme file (.md) that specifies the details to perform evaluation with your policy:
-    - For docker image-based submission, please include the link to your docker image, as well as the hash
+    - For docker image-based submission, please include the link to your docker image, as well as the image digest hash
     - For IP address-based evaluation, please provide the corresponding IP address that you used to serve the policy.
     - Please also include any other information you deem necessary to help us evaluation your policy
+
+
+In addition, we require you to submit a link to all the mp4 videos, one for each rollout you performed (up to 500). See our submission [Google Form](https://forms.gle/54tVqi5zs3ANGutn7) for more details. 
