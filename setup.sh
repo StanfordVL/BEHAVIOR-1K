@@ -88,6 +88,7 @@ fi
 [ "$NEW_ENV" = true ] && [ "$CONFIRM_NO_CONDA" = true ] && { echo "ERROR: --new-env and --confirm-no-conda are mutually exclusive"; exit 1; }
 
 WORKDIR=$(pwd)
+ARCH=$(uname -m)
 
 # Check conda environment condition early (unless creating new environment)
 if [ "$NEW_ENV" = false ]; then
@@ -277,9 +278,9 @@ if [ "$OMNIGIBSON" = true ]; then
             export CUDA_HOME="$CONDA_PREFIX"
             export CUDACXX="$CONDA_PREFIX/bin/nvcc"
             export CUDA_PATH="$CUDA_HOME"
-            export CPATH="$CONDA_PREFIX/targets/x86_64-linux/include:$CPATH"
-            export LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LIBRARY_PATH"
-            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+            export CPATH="$CONDA_PREFIX/targets/${ARCH}-linux/include:$CPATH"
+            export LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LIBRARY_PATH"
+            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LD_LIBRARY_PATH"
         fi
     fi
 
@@ -363,7 +364,7 @@ if [ "$OMNIGIBSON" = true ]; then
             local wheel_files=()
             for pkg in "${packages[@]}"; do
                 local pkg_name=${pkg%-*}
-                local filename="${pkg}-cp311-none-manylinux_2_35_x86_64.whl"
+                local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
                 local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
                 local filepath="$temp_dir/$filename"
                 
