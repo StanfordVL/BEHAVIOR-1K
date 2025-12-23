@@ -196,6 +196,8 @@ def _launch_app():
         isaac_version_tuple = tuple(map(int, isaac_version_str.split(".")[:3]))
         assert isaac_version_tuple in m.KIT_FILES, f"Isaac Sim version must be one of {list(m.KIT_FILES.keys())}"
         kit_file_name = m.KIT_FILES[isaac_version_tuple]
+        if gm.ENABLE_VR:
+            kit_file_name = kit_file_name.replace(".kit", "_vr.kit")
 
     # Copy the OmniGibson kit file and icon file to the Isaac Sim apps directory. This is necessary because the Isaac Sim app
     # expects the extensions to be reachable in the parent directory of the kit file. We copy on every launch to
