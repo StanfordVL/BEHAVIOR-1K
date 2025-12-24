@@ -76,7 +76,7 @@ setup(
         ],
         "primitives": [
             "ninja~=1.13.0",
-            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@cbaf7d32436160956dad190a9465360fad6aba73",
+            "nvidia-curobo @ git+https://github.com/StanfordVL/curobo@88f6c617ea2ac73c7efb10449bbae28ed235b6dd",
         ],
         "eval": [
             "dm_tree>=0.1.9",
