@@ -42,7 +42,8 @@ setup(
         "imageio-ffmpeg>=0.4.9",
         "termcolor>=2.4.0",
         "progressbar>=2.5",
-        "pymeshlab~=2022.2",
+        "pymeshlab~=2022.2; platform_machine!='aarch64'",
+        "pymeshlab>=2022.2; platform_machine=='aarch64'",
         "click>=8.1.3",
         "aenum>=3.1.15",
         "rtree>=1.2.0",
@@ -53,6 +54,7 @@ setup(
         "cffi==1.17.1",
         "pillow~=11.0.0",
         "websockets>=15.0.1",
+        "google-auth>=2.45.0"
     ],
     extras_require={
         "dev": [

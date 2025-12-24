@@ -33,9 +33,24 @@ except ImportError:
 # Depth
 # ==============================================
 
-MIN_DEPTH = 0.0
+USE_DEPTH_RGB_ENCODING = True  # If False, will use 12bit grayscale encoding / decoding
+MIN_DEPTH = 0.01
 MAX_DEPTH = 10.0
 DEPTH_SHIFT = 3.5
+
+
+def depth2rgb(depth, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False, sanitized=True):
+    from huecodec import codec as hc
+
+    return hc.depth2rgb(
+        depth.clip(min_depth, max_depth), zrange=(min_depth, max_depth), sanitized=sanitized, inv_depth=disparity
+    )
+
+
+def rgb2depth(rgb, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False):
+    from huecodec import codec as hc
+
+    return hc.rgb2depth(rgb, zrange=(min_depth, max_depth), inv_depth=disparity)
 
 
 def quantize_depth(

@@ -88,6 +88,7 @@ fi
 [ "$NEW_ENV" = true ] && [ "$CONFIRM_NO_CONDA" = true ] && { echo "ERROR: --new-env and --confirm-no-conda are mutually exclusive"; exit 1; }
 
 WORKDIR=$(pwd)
+ARCH=$(uname -m)
 
 # Check conda environment condition early (unless creating new environment)
 if [ "$NEW_ENV" = false ]; then
@@ -277,9 +278,9 @@ if [ "$OMNIGIBSON" = true ]; then
             export CUDA_HOME="$CONDA_PREFIX"
             export CUDACXX="$CONDA_PREFIX/bin/nvcc"
             export CUDA_PATH="$CUDA_HOME"
-            export CPATH="$CONDA_PREFIX/targets/x86_64-linux/include:$CPATH"
-            export LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LIBRARY_PATH"
-            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/x86_64-linux/lib:$LD_LIBRARY_PATH"
+            export CPATH="$CONDA_PREFIX/targets/${ARCH}-linux/include:$CPATH"
+            export LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LIBRARY_PATH"
+            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LD_LIBRARY_PATH"
         fi
     fi
 
@@ -323,83 +324,88 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "Isaac Sim already installed, skipping..."
     else
         echo "Installing Isaac Sim via pip..."
-        
-        # Helper functions
-        check_glibc_old() {
-            ldd --version 2>&1 | grep -qE "2\.(31|32|33)"
-        }
-        
-        install_isaac_packages() {
-            local temp_dir=$(mktemp -d)
-            local packages=(
-                "omniverse_kit-107.3.1.206797"
-                "isaacsim_kernel-5.1.0.0"
-                "isaacsim_app-5.1.0.0"
-                "isaacsim_core-5.1.0.0"
-                "isaacsim_gui-5.1.0.0"
-                "isaacsim_utils-5.1.0.0"
-                "isaacsim_storage-5.1.0.0"
-                "isaacsim_asset-5.1.0.0"
-                "isaacsim_sensor-5.1.0.0"
-                "isaacsim_robot_motion-5.1.0.0"
-                "isaacsim_robot-5.1.0.0"
-                "isaacsim_benchmark-5.1.0.0"
-                "isaacsim_code_editor-5.1.0.0"
-                "isaacsim_ros1-5.1.0.0"
-                "isaacsim_cortex-5.1.0.0"
-                "isaacsim_example-5.1.0.0"
-                "isaacsim_replicator-5.1.0.0"
-                "isaacsim_rl-5.1.0.0"
-                "isaacsim_robot_setup-5.1.0.0"
-                "isaacsim_ros2-5.1.0.0"
-                "isaacsim_template-5.1.0.0"
-                "isaacsim_test-5.1.0.0"
-                "isaacsim-5.1.0.0"
-                "isaacsim_extscache_physics-5.1.0.0"
-                "isaacsim_extscache_kit-5.1.0.0"
-                "isaacsim_extscache_kit_sdk-5.1.0.0"
-            )
-            
-            local wheel_files=()
-            for pkg in "${packages[@]}"; do
-                local pkg_name=${pkg%-*}
-                local filename="${pkg}-cp311-none-manylinux_2_35_x86_64.whl"
-                local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
-                local filepath="$temp_dir/$filename"
-                
-                echo "Downloading $pkg..."
-                if ! curl -sL "$url" -o "$filepath"; then
-                    echo "ERROR: Failed to download $pkg"
-                    rm -rf "$temp_dir"
+
+        # For aarch, do alternative install via direct one-liner
+        if [ "$ARCH" = "aarch64" ]; then
+            pip install isaacsim[all,extscache]==5.1.0 --extra-index-url https://pypi.nvidia.com
+        else
+            # Helper functions
+            check_glibc_old() {
+                ldd --version 2>&1 | grep -qE "2\.(31|32|33)"
+            }
+
+            install_isaac_packages() {
+                local temp_dir=$(mktemp -d)
+                local packages=(
+                    "omniverse_kit-107.3.1.206797"
+                    "isaacsim_kernel-5.1.0.0"
+                    "isaacsim_app-5.1.0.0"
+                    "isaacsim_core-5.1.0.0"
+                    "isaacsim_gui-5.1.0.0"
+                    "isaacsim_utils-5.1.0.0"
+                    "isaacsim_storage-5.1.0.0"
+                    "isaacsim_asset-5.1.0.0"
+                    "isaacsim_sensor-5.1.0.0"
+                    "isaacsim_robot_motion-5.1.0.0"
+                    "isaacsim_robot-5.1.0.0"
+                    "isaacsim_benchmark-5.1.0.0"
+                    "isaacsim_code_editor-5.1.0.0"
+                    "isaacsim_ros1-5.1.0.0"
+                    "isaacsim_cortex-5.1.0.0"
+                    "isaacsim_example-5.1.0.0"
+                    "isaacsim_replicator-5.1.0.0"
+                    "isaacsim_rl-5.1.0.0"
+                    "isaacsim_robot_setup-5.1.0.0"
+                    "isaacsim_ros2-5.1.0.0"
+                    "isaacsim_template-5.1.0.0"
+                    "isaacsim_test-5.1.0.0"
+                    "isaacsim-5.1.0.0"
+                    "isaacsim_extscache_physics-5.1.0.0"
+                    "isaacsim_extscache_kit-5.1.0.0"
+                    "isaacsim_extscache_kit_sdk-5.1.0.0"
+                )
+
+                local wheel_files=()
+                for pkg in "${packages[@]}"; do
+                    local pkg_name=${pkg%-*}
+                    local filename="${pkg}-cp311-none-manylinux_2_35_${ARCH}.whl"
+                    local url="https://pypi.nvidia.com/${pkg_name//_/-}/$filename"
+                    local filepath="$temp_dir/$filename"
+
+                    echo "Downloading $pkg..."
+                    if ! curl -sL "$url" -o "$filepath"; then
+                        echo "ERROR: Failed to download $pkg"
+                        rm -rf "$temp_dir"
+                        return 1
+                    fi
+
+                    # Rename for older GLIBC
+                    if check_glibc_old; then
+                        local new_filepath="${filepath/manylinux_2_34/manylinux_2_31}"
+                        mv "$filepath" "$new_filepath"
+                        filepath="$new_filepath"
+                    fi
+
+                    wheel_files+=("$filepath")
+                done
+
+                echo "Installing Isaac Sim packages..."
+                pip install "${wheel_files[@]}"
+                rm -rf "$temp_dir"
+
+                # Verify installation
+                if ! python -c "import isaacsim" 2>/dev/null; then
+                    echo "ERROR: Isaac Sim installation verification failed"
                     return 1
                 fi
-                
-                # Rename for older GLIBC
-                if check_glibc_old; then
-                    local new_filepath="${filepath/manylinux_2_34/manylinux_2_31}"
-                    mv "$filepath" "$new_filepath"
-                    filepath="$new_filepath"
-                fi
-                
-                wheel_files+=("$filepath")
-            done
-            
-            echo "Installing Isaac Sim packages..."
-            pip install "${wheel_files[@]}"
-            rm -rf "$temp_dir"
-            
-            # Verify installation
-            if ! python -c "import isaacsim" 2>/dev/null; then
-                echo "ERROR: Isaac Sim installation verification failed"
-                return 1
-            fi
-        }
-        
-        install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
+            }
+
+            install_isaac_packages || { echo "ERROR: Isaac Sim installation failed"; exit 1; }
+        fi
         
         # Extract ISAAC_PATH from isaacsim module
         ISAAC_PATH=$(python -c "import isaacsim, os; print(os.environ.get('ISAAC_PATH', ''))" 2>/dev/null)
-        
+
         # Fix websockets conflict - remove any pip_prebundle/websockets under extscache
         if [ -n "$ISAAC_PATH" ] && [ -d "$ISAAC_PATH/extscache" ]; then
             echo "Fixing websockets conflict..."

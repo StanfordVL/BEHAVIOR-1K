@@ -251,8 +251,8 @@ class VisionSensor(BaseSensor):
         # Link the camera and viewport together
         self._viewport.viewport_api.set_active_camera(self.prim_path)
 
-        # Requires 3 render updates to propagate changes
-        for i in range(3):
+        # Requires 4 render updates to propagate changes
+        for i in range(4):
             render()
 
         # Set the viewer size (requires taking one render step afterwards)
@@ -265,8 +265,8 @@ class VisionSensor(BaseSensor):
         self.horizontal_aperture = self._load_config["horizontal_aperture"]
         self.clipping_range = self._load_config["clipping_range"]
 
-        # Requires 3 render updates to propagate changes
-        for i in range(3):
+        # Requires 4 render updates to propagate changes
+        for i in range(4):
             render()
 
     def _initialize(self):
@@ -277,7 +277,7 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
-        for _ in range(3):
+        for _ in range(4):
             render()
 
     def initialize_sensors(self, names):
@@ -724,8 +724,8 @@ class VisionSensor(BaseSensor):
         for annotator in self._annotators.values():
             annotator.attach([self._render_product])
 
-        # Requires 3 updates to propagate changes
-        for i in range(3):
+        # Requires 4 updates to propagate changes
+        for i in range(4):
             render()
 
     @property
@@ -759,8 +759,8 @@ class VisionSensor(BaseSensor):
         for annotator in self._annotators.values():
             annotator.attach([self._render_product])
 
-        # Requires 3 updates to propagate changes
-        for i in range(3):
+        # Requires 4 updates to propagate changes
+        for i in range(4):
             render()
 
     @property

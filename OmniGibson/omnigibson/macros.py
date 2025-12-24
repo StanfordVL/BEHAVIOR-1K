@@ -232,6 +232,9 @@ gm.FORCE_CATEGORY_MASS = True
 # Disable collision and gravity for the simulator, should default to False
 gm.VISUAL_ONLY = False
 
+# Whether to enable VR extension support
+gm.ENABLE_VR = os.getenv("OMNIGIBSON_VR", "False").lower() in ("true", "1", "t")
+
 
 # Create helper function for generating sub-dictionaries
 def create_module_macros(module_path):
