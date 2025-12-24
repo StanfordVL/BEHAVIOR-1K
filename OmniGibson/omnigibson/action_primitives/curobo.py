@@ -202,7 +202,6 @@ class CuRoboMotionGenerator:
                 warmup_js_trajopt=False,
                 batch=batch_size,
                 warmup_joint_delta=0.0,
-                use_eyes_targets=None,
             )
 
             # Make sure all cuda graphs have been warmed up
