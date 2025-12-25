@@ -507,7 +507,8 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
 
         # Configure the simulator to optimize for data collection
         self._enable_dump_filters = enable_dump_filters
-        self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
+        if viewport_camera_path:
+            self._optimize_sim_for_data_collection(viewport_camera_path=viewport_camera_path)
 
     def update_checkpoint(self):
         """

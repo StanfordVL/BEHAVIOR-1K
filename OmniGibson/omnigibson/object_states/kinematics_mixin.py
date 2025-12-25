@@ -34,23 +34,25 @@ class KinematicsMixin(BaseObjectState):
         return info
 
     def _cache_is_valid(self, get_value_args):
-        # Import here to avoid circular imports
-        from omnigibson.objects.stateful_object import StatefulObject
+        # TODO: uncomment after properly implementing contact caching
+        # # Import here to avoid circular imports
+        # from omnigibson.objects.stateful_object import StatefulObject
 
-        # Cache is valid if and only if all of our cached objects have not changed
-        t = self._cache[get_value_args]["t"]
-        for obj, info in self._cache[get_value_args]["info"].items():
-            # If the object is asleep, assume this object hasn't changed, so continue
-            if obj.is_asleep:
-                continue
-            if isinstance(obj, StatefulObject):
-                # If pose has changed, return False
-                if obj.states[Pose].has_changed(get_value_args=(), value=info["p"], info={}, t=t):
-                    return False
-                # If obj's joints have changed, return False
-                if obj.states[Joint].has_changed(get_value_args=(), value=info["q"], info={}, t=t):
-                    return False
-        return True
+        # # Cache is valid if and only if all of our cached objects have not changed
+        # t = self._cache[get_value_args]["t"]
+        # for obj, info in self._cache[get_value_args]["info"].items():
+        #     # If the object is asleep, assume this object hasn't changed, so continue
+        #     if obj.is_asleep:
+        #         continue
+        #     if isinstance(obj, StatefulObject):
+        #         # If pose has changed, return False
+        #         if obj.states[Pose].has_changed(get_value_args=(), value=info["p"], info={}, t=t):
+        #             return False
+        #         # If obj's joints have changed, return False
+        #         if obj.states[Joint].has_changed(get_value_args=(), value=info["q"], info={}, t=t):
+        #             return False
+        # return True
+        return False
 
     @classproperty
     def _do_not_register_classes(cls):
