@@ -892,7 +892,7 @@ def pose_inv(pose_mat: torch.Tensor) -> torch.Tensor:
 
     pose_mat = pose_mat.reshape(-1, 4, 4)
     batch_size = pose_mat.shape[0]
-    pose_inv = torch.zeros((batch_size, 4, 4))
+    pose_inv = torch.zeros((batch_size, 4, 4), device=pose_mat.device)
     pose_inv[:, :3, :3] = pose_mat[:, :3, :3].transpose(1, 2)
     pose_inv[:, :3, 3] = (-pose_inv[:, :3, :3] @ pose_mat[:, :3, 3].unsqueeze(-1)).squeeze(-1)
     pose_inv[:, 3, 3] = 1.0

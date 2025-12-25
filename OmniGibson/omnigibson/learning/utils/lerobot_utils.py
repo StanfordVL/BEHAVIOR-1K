@@ -291,6 +291,7 @@ def decode_video_frames(
                     min_depth=min_depth,
                     max_depth=max_depth,
                     disparity=False,
+                    err_depth=0.0,
                 )
             ).unsqueeze(-3)
 

@@ -47,10 +47,11 @@ def depth2rgb(depth, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False, 
     )
 
 
-def rgb2depth(rgb, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False):
+def rgb2depth(rgb, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False, err_depth=np.nan):
     from huecodec import codec as hc
 
-    return hc.rgb2depth(rgb, zrange=(min_depth, max_depth), inv_depth=disparity)
+    opts = hc.EncoderOpts(err_depth=err_depth)
+    return hc.rgb2depth(rgb, zrange=(min_depth, max_depth), inv_depth=disparity, opts=opts)
 
 
 def quantize_depth(
