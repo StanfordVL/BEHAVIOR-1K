@@ -264,9 +264,13 @@ def _launch_app():
             print(f"Now streaming on {ip} via Omniverse Streaming Client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
+            # Note: Isaac Sim 4.5.0+ uses omni.kit.livestream.webrtc, older versions use omni.services.streamclient.webrtc
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
-            lazy.isaacsim.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
+            try:
+                lazy.isaacsim.core.utils.extensions.enable_extension("omni.kit.livestream.webrtc")
+            except Exception:
+                lazy.isaacsim.core.utils.extensions.enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
         else:
             raise ValueError(
