@@ -13,14 +13,17 @@ import packaging
 from packaging.version import Version
 import glob
 import PIL
-from lerobot.constants import HF_LEROBOT_HOME
-from lerobot.datasets.video_utils import get_audio_info, get_safe_default_codec
-from lerobot.datasets.compute_stats import _assert_type_and_shape
 from lerobot.datasets.lerobot_dataset import (
     LeRobotDataset,
     LeRobotDatasetMetadata,
     CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
 )
+if LEROBOT_CODEBASE_VERSION == "v2.1":
+    from lerobot.constants import HF_LEROBOT_HOME
+else:
+    from lerobot.utils.constants import HF_LEROBOT_HOME
+from lerobot.datasets.video_utils import get_audio_info, get_safe_default_codec
+from lerobot.datasets.compute_stats import _assert_type_and_shape
 from omnigibson.learning.utils.dataset_utils import get_credentials
 from omnigibson.learning.utils.eval_utils import (
     TASK_NAMES_TO_INDICES,
@@ -40,9 +43,8 @@ import shutil
 from lerobot.datasets.utils import (
     DEFAULT_IMAGE_PATH,
     check_delta_timestamps,
-    check_timestamps_sync,
+    is_valid_version,
     get_delta_indices,
-    get_episode_data_index,
     get_safe_version,
     validate_episode_buffer,
     write_info,
@@ -180,6 +182,7 @@ def encode_video_frames(
             _depth_codec = "hevc_nvenc"
             _depth_pix_fmt = "gbrp"
             stream_options["tune"] = "lossless"
+            g = max(g, 3)           # Assumes B = 2, and G >= B + 1
         else:
             _depth_codec = "libx265"
             _depth_pix_fmt = "yuv444p12le"
@@ -911,15 +914,19 @@ class OmniGibsonLeRobotDatasetMetadata(LeRobotDatasetMetadata):
         else:
             return {k: v for k, v in self.info["features"].items() if k in self._features_to_include}
 
-    def update_video_info(self) -> None:
+    def update_video_info(self, video_key=None) -> None:
         """
         Warning: this function writes info from first episode videos, implicitly assuming that all videos have
         been encoded the same way. Also, this means it assumes the first episode exists.
         """
-        for key in self.video_keys:
+        if video_key is not None and video_key not in self.video_keys:
+            raise ValueError(f"Video key {video_key} not found in dataset")
+
+        video_keys = [video_key] if video_key is not None else self.video_keys
+        for key in video_keys:
             if not self.features[key].get("info", None):
-                video_path = self.root / self.get_video_file_path(ep_index=0, vid_key=key)
-                # We modify this call to consider special pixel formats
+                rel_path = self.get_video_file_path(ep_index=0, vid_key=key) if LEROBOT_CODEBASE_VERSION == "v2.1" else self.video_path.format(video_key=key, chunk_index=0, file_index=0)
+                video_path = self.root / rel_path
                 self.info["features"][key]["info"] = get_video_info(video_path)
 
 
@@ -949,10 +956,10 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         # Set depth ranges
         cls.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
-        # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        assert (
-            LEROBOT_CODEBASE_VERSION == "v2.1"
-        ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+        # # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
+        # assert (
+        #     LEROBOT_CODEBASE_VERSION == "v2.1"
+        # ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
 
         ##############
         """Create a LeRobot Dataset from scratch in order to record data."""
@@ -984,8 +991,19 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         obj.image_transforms = None
         obj.delta_timestamps = None
         obj.delta_indices = None
-        obj.episode_data_index = None
         obj.video_backend = video_backend if video_backend is not None else get_safe_default_codec()
+
+        if LEROBOT_CODEBASE_VERSION == "v2.1":
+            obj.episode_data_index = None
+        else:
+            obj.writer = None
+            obj.latest_episode = None
+            obj._current_file_start_frame = None
+            # Initialize tracking for incremental recording
+            obj._lazy_loading = False
+            obj._recorded_frames = 0
+            obj._writer_closed_for_reading = False
+
 
         ##############
 
@@ -1033,10 +1051,10 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         max_depth=None,
         depth_shift=None,
     ):
-        # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        assert (
-            LEROBOT_CODEBASE_VERSION == "v2.1"
-        ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
+        # # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
+        # assert (
+        #     LEROBOT_CODEBASE_VERSION == "v2.1"
+        # ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
 
         ###################
         Dataset.__init__(self)
@@ -1056,6 +1074,13 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         self.image_writer = None
         self.episode_buffer = None
 
+        if LEROBOT_CODEBASE_VERSION != "v2.1":
+            # Assume v3.0
+            assert LEROBOT_CODEBASE_VERSION == "v3.0"
+            self.writer = None
+            self.latest_episode = None
+            self._current_file_start_frame = None  # Track the starting frame index of the current parquet file
+
         self.root.mkdir(exist_ok=True, parents=True)
 
         # Load metadata
@@ -1066,22 +1091,55 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
             force_cache_sync=force_cache_sync,
             features=features,
         )
-        if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
-            episodes_stats = [self.meta.episodes_stats[ep_idx] for ep_idx in self.episodes]
-            self.stats = aggregate_stats(episodes_stats)
 
-        # Load actual data
-        try:
-            if force_cache_sync:
-                raise FileNotFoundError
-            assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
-            self.hf_dataset = self.load_hf_dataset()
-        except (AssertionError, FileNotFoundError, NotADirectoryError):
-            self.revision = get_safe_version(self.repo_id, self.revision)
-            self.download_episodes(download_videos)
-            self.hf_dataset = self.load_hf_dataset()
+        if LEROBOT_CODEBASE_VERSION == "v2.1":
+            if self.episodes is not None and self.meta._version >= packaging.version.parse("v2.1"):
+                episodes_stats = [self.meta.episodes_stats[ep_idx] for ep_idx in self.episodes]
+                self.stats = aggregate_stats(episodes_stats)
 
-        self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
+            # Load actual data
+            try:
+                if force_cache_sync:
+                    raise FileNotFoundError
+                assert all((self.root / fpath).is_file() for fpath in self.get_episodes_file_paths())
+                self.hf_dataset = self.load_hf_dataset()
+            except (AssertionError, FileNotFoundError, NotADirectoryError):
+                self.revision = get_safe_version(self.repo_id, self.revision)
+                self.download_episodes(download_videos)
+                self.hf_dataset = self.load_hf_dataset()
+
+            # Import here because it is v2.1 specific import
+            from lerobot.datasets.utils import get_episode_data_index
+            self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
+
+        else:
+            # Track dataset state for efficient incremental writing
+            self._lazy_loading = False
+            self._recorded_frames = self.meta.total_frames
+            self._writer_closed_for_reading = False
+
+            # Load actual data
+            try:
+                if force_cache_sync:
+                    raise FileNotFoundError
+                self.hf_dataset = self.load_hf_dataset()
+                # Check if cached dataset contains all requested episodes
+                if not self._check_cached_episodes_sufficient():
+                    raise FileNotFoundError("Cached dataset doesn't contain all requested episodes")
+            except (AssertionError, FileNotFoundError, NotADirectoryError):
+                if is_valid_version(self.revision):
+                    self.revision = get_safe_version(self.repo_id, self.revision)
+                self.download(download_videos)
+                self.hf_dataset = self.load_hf_dataset()
+
+            # Create mapping from absolute indices to relative indices when only a subset of the episodes are loaded
+            # Build a mapping: absolute_index -> relative_index_in_filtered_dataset
+            self._absolute_to_relative_idx = None
+            if self.episodes is not None:
+                self._absolute_to_relative_idx = {
+                    abs_idx.item() if isinstance(abs_idx, torch.Tensor) else abs_idx: rel_idx
+                    for rel_idx, abs_idx in enumerate(self.hf_dataset["index"])
+                }
 
         # # Check timestamps
         # timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
@@ -1163,6 +1221,34 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
     #             chunks.append((offset + ls, offset + le, ls))
     #         offset += L
     #     return chunks
+
+
+    def __getitem__(self, idx) -> dict:
+        item = super().__getitem__(idx)
+
+        for name, val in item.items():
+            if "depth" in name and val.ndim > 1:
+                # Decode
+                if OU.USE_DEPTH_RGB_ENCODING:
+                    shape = list(range(val.ndim - 3)) + [-2, -1, -3]
+                    val = th.from_numpy(OU.rgb2depth(
+                        rgb=(val.permute(shape).numpy() * 255).astype(np.uint8),  # Prune final dimension so shape is (H, W)
+                        min_depth=self.min_depth,
+                        max_depth=self.max_depth,
+                        err_depth=0.0,
+                    )).unsqueeze(-3)
+                else:
+                    val = OU.dequantize_depth(
+                        val,
+                        min_depth=self.min_depth,
+                        max_depth=self.max_depth,
+                        shift=self.depth_shift,
+                    )
+
+                item[name] = val
+
+        return item
+
 
     # def __getitem__(self, idx) -> dict:
     #     if not self._chunk_streaming_using_keyframe:
@@ -1608,6 +1694,13 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
         ep_metadata = self._save_episode_data(episode_buffer)
         has_video_keys = len(self.meta.video_keys) > 0
         use_batched_encoding = self.batch_encoding_size > 1
+
+        # We cannot use parallel encoding if we're using depth and writing to RGB -- this is because the GPU resource
+        # handling seems to crash upon initialization in the multi-process setting
+
+        if parallel_encoding and any("depth" in key for key in self.meta.video_keys) and OU.USE_DEPTH_RGB_ENCODING:
+            logging.warning("Cannot use parallel_encoding with depth keys and depth->RGB encoding. Setting to False.")
+            parallel_encoding = False
 
         if has_video_keys and not use_batched_encoding:
             num_cameras = len(self.meta.video_keys)

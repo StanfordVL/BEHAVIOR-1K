@@ -949,6 +949,16 @@ class DataPlaybackWrapper(DataWrapper):
         # Load env
         env = og.Environment(configs=config)
 
+        # Update robot sensor configuration
+        if robot_sensor_config is not None:
+            for robot in env.robots:
+                for sensor in robot.sensors.values():
+                    sensor_cls_name = sensor.__class__.__name__
+                    sensor_kwargs = robot_sensor_config.get(sensor_cls_name, dict()).get("sensor_kwargs", dict())
+                    for kwarg, value in sensor_kwargs.items():
+                        setattr(sensor, kwarg, value)
+            env.load_observation_space()
+
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
@@ -1524,6 +1534,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         image_writer_processes=5,
         task_name=None,
         lerobot_version="v3.0",
+        use_videos=True,
     ):
         """
         Args:
@@ -1554,6 +1565,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 will try to automatically infer if the wrapped environment is a BehaviorTask
             lerobot_version (str): Version of LeRobot to use when saving dataset. This must be aligned with the
                 installed lerobot library version
+            use_videos (bool): Whether to save high dimensional image data as video or not
         """
         # Store variables
         self.lerobot_dataset_kwargs = {
@@ -1573,6 +1585,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             + "For v3.0, run `git checkout `v0.4.2`\n\n"
         )
         self.lerobot_version = lerobot_version
+        self.use_videos = use_videos
 
         # Infer task name
         if task_name is None:
@@ -1599,7 +1612,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         )
 
     @classmethod
-    def get_lerobot_obs_mapping(cls, env):
+    def get_lerobot_obs_mapping(cls, env, use_videos=True):
         obs_mapping, obs_features = dict(), dict()
         for key, gym_shape in env.observation_space.items():
             modality = key.split("::")[-1]
@@ -1615,11 +1628,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 # e.g.: for proprio
                 obs_name = "robot"
             if "rgb" in modality:
-                info["dtype"] = "video"
+                info["dtype"] = "video" if use_videos else "image"
                 info["shape"] = gym_shape.shape[:-1] + (3,)
                 info["names"] = ["height", "width", "channel"]
             elif "depth" in modality:
-                info["dtype"] = "video"
+                info["dtype"] = "video" if use_videos else "image"
                 info["shape"] = gym_shape.shape + (1,)
                 info["names"] = ["height", "width"]
 
@@ -1648,8 +1661,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
         return obs_mapping, obs_features
 
-    @classmethod
-    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping):
+    def og_to_lerobot_obs(self, env, obs_flat, obs_mapping):
+
         # Add tfs to flattened obs
         # TODO: Currently overfit to a single robot
         robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
@@ -1756,7 +1769,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             },
         }
 
-        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env)
+        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env, use_videos=self.use_videos)
         features.update(obs_features)
 
         if self.lerobot_version == "v2.1":
@@ -1767,7 +1780,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             raise ValueError(f"Got invalid lerobot version: {self.lerobot_version}")
         self.dataset = dataset_cls.create(
             fps=config["env"]["action_frequency"],
-            use_videos=True,
+            use_videos=self.use_videos,
             features=features,
             **self.lerobot_dataset_kwargs,
         )
@@ -1806,14 +1819,13 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         # The dataset length is (N_steps + 1), since the first entry only includes the env reset observations
         # LeRobot expects (s,a) tuples to be paired with rewards from the next step, so we match the obs with
         # all other entries from the proceeding (i.e.: t+1) step
-        last_obs = None
+
         for frame_idx, traj_step in enumerate(traj_data):
             if frame_idx == 0:
                 assert (
                     len(traj_step.keys()) == 1
                 ), f"Expected only one key in 0th traj step, but got: {traj_step.keys()}"
                 assert "obs" in traj_step, f"Expected 'obs' key in 0th traj step, but got: {traj_step.keys()}"
-                last_obs = traj_step["obs"]
                 continue
 
             # Compose frame to add to dataset
@@ -1826,31 +1838,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 "annotation.language.language_instruction": th.zeros(1, dtype=th.int64),
                 "annotation.language.language_instruction_2": th.zeros(1, dtype=th.int64),
                 "annotation.language.language_instruction_3": th.zeros(1, dtype=th.int64),
+                **traj_step["obs"],
             }
-            for name in self.env.observation_space.keys():
-                obs = last_obs[name]
-                # Prune alpha channel if keeping RGB
-                if "rgb" in name:
-                    obs = obs[..., :-1]
-                elif "depth" in name:
-                    # Add channel dim at the end
-                    obs = obs.unsqueeze(-1)
-                    # If we haven't already added the sensor pose obs, do so now
-                    obs_name_strs = name.split("::")[-2].split(":")
-                    if "robot" in obs_name_strs[0]:
-                        # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
-                        obs_name_strs = obs_name_strs[1:]
-                    # Join with "_" and make lowercase to make final name
-                    obs_name = "_".join(obs_name_strs).lower()
-                    tf_name = f"observation.robot2cam_pose.{obs_name}"
-                    if tf_name not in frame:
-                        sensor_name = name.split("::")[-2]
-                        frame[tf_name] = last_obs[f"{sensor_name}::rel_pose"]
-                elif "proprio" in name:
-                    # Map float64 -> float32
-                    obs = obs.float()
-                # Add the observation to the current frame
-                frame[self.obs_mapping[name]] = obs
 
             # Modify additional differing kwargs between V2 and V3 datasets
             kwargs = {"frame": frame}
@@ -1862,9 +1851,6 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 kwargs["frame"]["task"] = self.task_name
 
             self.dataset.add_frame(**kwargs)
-
-            # Update last obs
-            last_obs = traj_step["obs"]
 
         self.dataset.save_episode()
 

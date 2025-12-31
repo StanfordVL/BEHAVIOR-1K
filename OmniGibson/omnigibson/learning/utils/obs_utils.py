@@ -3,6 +3,7 @@ import cv2
 import h5py
 import json
 import os
+import math
 import numpy as np
 import omnigibson.utils.transform_utils as T
 import pandas as pd
@@ -55,51 +56,53 @@ def rgb2depth(rgb, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False, er
 
 
 def quantize_depth(
-    depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
-) -> np.ndarray:
+    depth: np.ndarray | th.Tensor, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
+) -> np.ndarray | th.Tensor:
     """
     Quantizes depth values to a 14-bit range (0 to 16383) based on the specified min and max depth.
 
     Args:
-        depth (np.ndarray): Depth tensor.
+        depth (np.ndarray or th.tensor): Depth tensor.
         min_depth (float): Minimum depth value.
         max_depth (float): Maximum depth value.
         shift (float): Small value to shift depth to avoid log(0).
     Returns:
-        np.ndarray: Quantized depth tensor.
+        np.ndarray or th.tensor: Quantized depth tensor.
     """
+    backend = np if isinstance(depth, np.ndarray) else th
     qmax = (1 << 16) - 1
-    log_min = np.log(min_depth + shift)
-    log_max = np.log(max_depth + shift)
+    log_min = math.log(min_depth + shift)
+    log_max = math.log(max_depth + shift)
 
-    log_depth = np.log(depth + shift)
+    log_depth = backend.log(depth + shift)
     log_norm = (log_depth - log_min) / (log_max - log_min)
-    quantized_depth = np.clip((log_norm * qmax).round(), 0, qmax).astype(np.uint16)
+    quantized_depth = backend.clip((log_norm * qmax).round(), 0, qmax).astype(backend.uint16)
 
     return quantized_depth
 
 
 def dequantize_depth(
-    quantized_depth: np.ndarray, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
-) -> np.ndarray:
+    quantized_depth: np.ndarray | th.Tensor, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
+) -> np.ndarray | th.Tensor:
     """
     Dequantizes a 14-bit depth tensor back to the original depth values.
 
     Args:
-        quantized_depth (np.ndarray): Quantized depth tensor.
+        quantized_depth (np.ndarray or th.tensor): Quantized depth tensor.
         min_depth (float): Minimum depth value.
         max_depth (float): Maximum depth value.
         shift (float): Small value to shift depth to avoid log(0).
     Returns:
-        np.ndarray: Dequantized depth tensor.
+        np.ndarray or th.tensor: Dequantized depth tensor.
     """
+    backend = np if isinstance(quantized_depth, np.ndarray) else th
     qmax = (1 << 16) - 1
-    log_min = np.log(min_depth + shift)
-    log_max = np.log(max_depth + shift)
+    log_min = math.log(min_depth + shift)
+    log_max = math.log(max_depth + shift)
 
     log_norm = quantized_depth / qmax
     log_depth = log_norm * (log_max - log_min) + log_min
-    depth = np.clip(np.exp(log_depth) - shift, min_depth, max_depth)
+    depth = backend.clip(backend.exp(log_depth) - shift, min_depth, max_depth)
 
     return depth
 
