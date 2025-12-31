@@ -18,6 +18,7 @@ from lerobot.datasets.lerobot_dataset import (
     LeRobotDatasetMetadata,
     CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
 )
+
 if LEROBOT_CODEBASE_VERSION == "v2.1":
     from lerobot.constants import HF_LEROBOT_HOME
 else:
@@ -182,7 +183,7 @@ def encode_video_frames(
             _depth_codec = "hevc_nvenc"
             _depth_pix_fmt = "gbrp"
             stream_options["tune"] = "lossless"
-            g = max(g, 3)           # Assumes B = 2, and G >= B + 1
+            g = max(g, 3)  # Assumes B = 2, and G >= B + 1
         else:
             _depth_codec = "libx265"
             _depth_pix_fmt = "yuv444p12le"
@@ -925,7 +926,11 @@ class OmniGibsonLeRobotDatasetMetadata(LeRobotDatasetMetadata):
         video_keys = [video_key] if video_key is not None else self.video_keys
         for key in video_keys:
             if not self.features[key].get("info", None):
-                rel_path = self.get_video_file_path(ep_index=0, vid_key=key) if LEROBOT_CODEBASE_VERSION == "v2.1" else self.video_path.format(video_key=key, chunk_index=0, file_index=0)
+                rel_path = (
+                    self.get_video_file_path(ep_index=0, vid_key=key)
+                    if LEROBOT_CODEBASE_VERSION == "v2.1"
+                    else self.video_path.format(video_key=key, chunk_index=0, file_index=0)
+                )
                 video_path = self.root / rel_path
                 self.info["features"][key]["info"] = get_video_info(video_path)
 
@@ -1003,7 +1008,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
             obj._lazy_loading = False
             obj._recorded_frames = 0
             obj._writer_closed_for_reading = False
-
 
         ##############
 
@@ -1110,6 +1114,7 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
             # Import here because it is v2.1 specific import
             from lerobot.datasets.utils import get_episode_data_index
+
             self.episode_data_index = get_episode_data_index(self.meta.episodes, self.episodes)
 
         else:
@@ -1222,7 +1227,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
     #         offset += L
     #     return chunks
 
-
     def __getitem__(self, idx) -> dict:
         item = super().__getitem__(idx)
 
@@ -1231,12 +1235,16 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
                 # Decode
                 if OU.USE_DEPTH_RGB_ENCODING:
                     shape = list(range(val.ndim - 3)) + [-2, -1, -3]
-                    val = th.from_numpy(OU.rgb2depth(
-                        rgb=(val.permute(shape).numpy() * 255).astype(np.uint8),  # Prune final dimension so shape is (H, W)
-                        min_depth=self.min_depth,
-                        max_depth=self.max_depth,
-                        err_depth=0.0,
-                    )).unsqueeze(-3)
+                    val = th.from_numpy(
+                        OU.rgb2depth(
+                            rgb=(val.permute(shape).numpy() * 255).astype(
+                                np.uint8
+                            ),  # Prune final dimension so shape is (H, W)
+                            min_depth=self.min_depth,
+                            max_depth=self.max_depth,
+                            err_depth=0.0,
+                        )
+                    ).unsqueeze(-3)
                 else:
                     val = OU.dequantize_depth(
                         val,
@@ -1248,7 +1256,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
                 item[name] = val
 
         return item
-
 
     # def __getitem__(self, idx) -> dict:
     #     if not self._chunk_streaming_using_keyframe:

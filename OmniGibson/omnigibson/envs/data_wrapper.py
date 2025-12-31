@@ -1662,7 +1662,6 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         return obs_mapping, obs_features
 
     def og_to_lerobot_obs(self, env, obs_flat, obs_mapping):
-
         # Add tfs to flattened obs
         # TODO: Currently overfit to a single robot
         robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))

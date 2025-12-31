@@ -56,7 +56,10 @@ def rgb2depth(rgb, min_depth=MIN_DEPTH, max_depth=MAX_DEPTH, disparity=False, er
 
 
 def quantize_depth(
-    depth: np.ndarray | th.Tensor, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
+    depth: np.ndarray | th.Tensor,
+    min_depth: float = MIN_DEPTH,
+    max_depth: float = MAX_DEPTH,
+    shift: float = DEPTH_SHIFT,
 ) -> np.ndarray | th.Tensor:
     """
     Quantizes depth values to a 14-bit range (0 to 16383) based on the specified min and max depth.
@@ -82,7 +85,10 @@ def quantize_depth(
 
 
 def dequantize_depth(
-    quantized_depth: np.ndarray | th.Tensor, min_depth: float = MIN_DEPTH, max_depth: float = MAX_DEPTH, shift: float = DEPTH_SHIFT
+    quantized_depth: np.ndarray | th.Tensor,
+    min_depth: float = MIN_DEPTH,
+    max_depth: float = MAX_DEPTH,
+    shift: float = DEPTH_SHIFT,
 ) -> np.ndarray | th.Tensor:
     """
     Dequantizes a 14-bit depth tensor back to the original depth values.
