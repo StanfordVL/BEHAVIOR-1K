@@ -22,6 +22,7 @@ from omnigibson.utils.python_utils import create_object_from_init_info, h5py_gro
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.controllers.controller_base import ControlType
+from omnigibson.utils.backend_utils import _compute_backend as cb
 
 from lerobot.datasets.lerobot_dataset import (
     HF_LEROBOT_HOME,
@@ -949,7 +950,10 @@ class DataPlaybackWrapper(DataWrapper):
         # Load env
         env = og.Environment(configs=config)
 
-        # Update robot sensor configuration
+        # Update robot sensor / proprio configuration
+        if robot_proprio_keys is not None:
+            for robot in env.robots:
+                robot._proprio_obs = list(robot_proprio_keys)
         if robot_sensor_config is not None:
             for robot in env.robots:
                 for sensor in robot.sensors.values():
@@ -1535,6 +1539,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         task_name=None,
         lerobot_version="v3.0",
         use_videos=True,
+        include_multi_action_representation=False,
     ):
         """
         Args:
@@ -1566,6 +1571,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             lerobot_version (str): Version of LeRobot to use when saving dataset. This must be aligned with the
                 installed lerobot library version
             use_videos (bool): Whether to save high dimensional image data as video or not
+            include_multi_action_representation (bool): Whether to include multi action representation in the dataset. This will make the action entry a concatenation of multiple action representations, with
+                corresponding annotations written to modalities.json in the meta folder
         """
         # Store variables
         self.lerobot_dataset_kwargs = {
@@ -1586,6 +1593,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         )
         self.lerobot_version = lerobot_version
         self.use_videos = use_videos
+        self.last_actions = None
+        self.controller_action_start_idxs = None
+        self.include_multi_action_representation = include_multi_action_representation
+        if self.include_multi_action_representation:
+            assert include_robot_control, "Multi action representation requires robot control!"
 
         # Infer task name
         if task_name is None:
@@ -1655,13 +1667,14 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
 
             # Add this key to features, and store the obs name mapping
-            lerobot_obs_name = f"observation.{modality}.{obs_name}"
+            lerobot_obs_name = "observation.state" if "proprio" in modality else f"observation.{modality}.{obs_name}"
             obs_features[lerobot_obs_name] = info
             obs_mapping[key] = lerobot_obs_name
 
         return obs_mapping, obs_features
 
-    def og_to_lerobot_obs(self, env, obs_flat, obs_mapping):
+    @classmethod
+    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping):
         # Add tfs to flattened obs
         # TODO: Currently overfit to a single robot
         robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
@@ -1722,6 +1735,103 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         assert len(env.robots) == 1, "Only one robot supported for LeRobot dataset storage!"
         robot = env.robots[0]
 
+        modality_info = {
+            "annotation": {
+                "language.language_instruction": {},
+                "language.language_instruction_2": {},
+                "language.language_instruction_3": {}
+            },
+        }
+
+        # Add video modality info
+        video_modality_info = dict()
+        for i, (sensor_name, sensor) in enumerate(env.external_sensors.items()):
+            if isinstance(sensor, VisionSensor):
+                for mod in ["rgb", "depth_linear"]:
+                    if mod in sensor.modalities:
+                        mod_name = f"observation.{mod}.{sensor_name}"
+                        key = f"exterior_image_{i}_{mod}"
+                        video_modality_info[key] = {
+                            "type": mod,
+                            "original_key": mod_name,
+                        }
+        for i, (sensor_name, sensor) in enumerate(robot.sensors.items()):
+            if isinstance(sensor, VisionSensor):
+                for mod in ["rgb", "depth_linear"]:
+                    if mod in sensor.modalities:
+                        remapped_sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
+                        mod_name = f"observation.{mod}.{remapped_sensor_name}"
+                        key = f"robot_image_{i}_{mod}"
+                        video_modality_info[key] = {
+                            "type": mod,
+                            "original_key": mod_name,
+                        }
+        modality_info["video" if self.use_videos else "image"] = video_modality_info
+
+        # If we are including multi action representation, run some additional sanity checks
+        if self.include_multi_action_representation:
+            # Get start index for each controller
+            self.controller_action_start_idxs = dict()
+            cmd_start_idx = 0
+            for name, controller in robot.controllers.items():
+                self.controller_action_start_idxs[name] = cmd_start_idx
+                cmd_start_idx += controller.command_dim
+            action_modality_info = dict()
+            idx = 0
+            from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController
+            for arm in robot.arm_names:
+                arm_name = f"arm_{arm}"
+                arm_controller = robot.controllers[arm_name]
+                assert isinstance(arm_controller, InverseKinematicsController), "Only IKController supported for multi action representation!"
+                # assert arm_controller.command_input_limits is None
+                # assert arm_controller.command_output_limits is None
+                gripper_name = f"gripper_{arm}"
+                gripper_controller = robot.controllers[gripper_name]
+                assert isinstance(gripper_controller, MultiFingerGripperController), "Only MultiFingerGripperController supported for multi action representation!"
+                assert gripper_controller.command_dim == 1, "Only binary gripper commands supported for multi action representation!"
+                assert gripper_controller._mode in {"smooth", "binary"}, "Only smooth or binary gripper commands supported for multi action representation!"
+                assert gripper_controller._motor_type == "position", "Only position motor type supported for multi action representation!"
+                action_modality_info[f"{arm_name}_eef_pos"] = {
+                    "start": idx,
+                    "end": idx + 3,
+                }
+                idx += 3
+                action_modality_info[f"{arm_name}_eef_aa"] = {
+                    "start": idx,
+                    "end": idx + 3,
+                }
+                idx += 3
+                action_modality_info[f"{arm_name}_delta_eef_pos"] = {
+                    "start": idx,
+                    "end": idx + 3,
+                }
+                idx += 3
+                action_modality_info[f"{arm_name}_delta_eef_aa"] = {
+                    "start": idx,
+                    "end": idx + 3,
+                }
+                idx += 3
+                action_modality_info[f"{gripper_name}_pos"] = {
+                    "start": idx,
+                    "end": idx + 1,
+                }
+                idx += 1
+                action_modality_info[f"{arm_name}_joint_pos"] = {
+                    "start": idx,
+                    "end": idx + arm_controller.control_dim,
+                }
+                idx += arm_controller.control_dim
+                action_modality_info[f"{arm_name}_delta_joint_pos"] = {
+                    "start": idx,
+                    "end": idx + arm_controller.control_dim,
+                }
+                idx += arm_controller.control_dim
+            modality_info["action"] = action_modality_info
+            action_shape = (idx,)
+        else:
+            action_shape = env.action_space[robot.name].shape
+
+
         # Extract relevant info from original source env config
         config = json.loads(self.input_hdf5["data"].attrs["config"])
 
@@ -1730,7 +1840,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         features = {
             "action": {
                 "dtype": "float32",
-                "shape": env.action_space[robot.name].shape,  # add all actions here
+                "shape": action_shape,  # add all actions here
                 "names": ["action"],
             },
             # RL-specific fields
@@ -1793,10 +1903,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             obs_dim = len(proprio_dict[obs])
             proprio_shape_mapping[obs] = {
                 "start": idx,
-                "size": obs_dim,
+                "end": idx + obs_dim,
             }
             idx += obs_dim
-        self.dataset.set_omnigibson_metadata(key="proprio_shape_mapping", value=proprio_shape_mapping)
+        modality_info["state"] = proprio_shape_mapping
+        # self.dataset.set_omnigibson_metadata(key="proprio_shape_mapping", value=proprio_shape_mapping)
 
         # Add in camera K matrices
         cam_intrinsics = dict()
@@ -1812,6 +1923,10 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
         self.dataset.set_omnigibson_metadata(key="cam_intrinsics", value=cam_intrinsics)
+
+        # Write modality data
+        with open(os.path.join(abs_output_path, "meta", "modality.json"), "w+") as f:
+            json.dump(modality_info, f, indent=4)
 
     def process_traj_to_dataset(self, traj_data, nested_keys=("obs",)):
         # Write to LeRobot dataset
@@ -1852,6 +1967,64 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             self.dataset.add_frame(**kwargs)
 
         self.dataset.save_episode()
+    
+    def reset(self):
+        # Call super first
+        out = super().reset()
+        self.last_actions = None
+        return out
+
+    def _parse_step_data(self, action, obs, reward, terminated, truncated, info):
+        step_data = super()._parse_step_data(action, obs, reward, terminated, truncated, info)
+
+        # Handle multi action representation
+        if self.include_multi_action_representation:
+            # Our action representation is composed of [eef_pos, eef_aa, delta_eef_pos, delta_eef_aa, gripper_pos, joint_pos, delta_joint_pos] for each arm
+            robot = self.env.robots[0]
+            action = []
+            is_first_action = self.last_actions is None
+            if is_first_action:
+                self.last_actions = dict()
+            for arm in robot.arm_names:
+                arm_name = f"arm_{arm}"
+                arm_controller = robot.controllers[arm_name]
+
+                # Add eef action
+                action.append(cb.to_torch(arm_controller.goal["target_pos"]))
+                action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(arm_controller.goal["target_ori_mat"]))))
+
+                # Add delta eef action
+                if is_first_action:
+                    action += [th.zeros(3), th.zeros(3)]   # zero delta commands
+                else:
+                    action.append(cb.to_torch(arm_controller.goal["target_pos"] - self.last_actions[arm_name]["goal"]["target_pos"]))
+                    action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(self.last_actions[arm_name]["goal"]["target_ori_mat"].T @ arm_controller.goal["target_ori_mat"]))))
+                
+                # Add gripper action
+                gripper_name = f"gripper_{arm}"
+                gripper_controller = robot.controllers[gripper_name]
+                start_idx = self.controller_action_start_idxs[gripper_name]
+                end_idx = start_idx + gripper_controller.command_dim
+                action.append(step_data["action"][start_idx:end_idx])
+
+                # Add joint action
+                action.append(cb.to_torch(arm_controller.control))
+
+                # Add delta joint action
+                if is_first_action:
+                    action.append(th.zeros(arm_controller.control_dim))
+                else:
+                    action.append(cb.to_torch(arm_controller.control - self.last_actions[arm_name]["control"]))
+
+                # Update last actions
+                self.last_actions[arm_name] = {
+                    "goal": arm_controller.goal,
+                    "control": arm_controller.control,
+                }
+            
+            step_data["action"] = th.cat(action)
+
+        return step_data
 
     def _process_obs(self, obs, info):
         # Include camera poses wrt robot frame
@@ -1875,6 +2048,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         else:
             # V3, need to finalize to close all active writers
             self.dataset.finalize()
+
+        # Remove the image directory
+        abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
+        images_dir = os.path.join(abs_output_path, "images")
+        shutil.rmtree(images_dir)
 
     def allocate_traj(
         self,
