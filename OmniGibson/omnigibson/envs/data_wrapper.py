@@ -1739,7 +1739,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             "annotation": {
                 "language.language_instruction": {},
                 "language.language_instruction_2": {},
-                "language.language_instruction_3": {}
+                "language.language_instruction_3": {},
             },
         }
 
@@ -1779,18 +1779,30 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             action_modality_info = dict()
             idx = 0
             from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController
+
             for arm in robot.arm_names:
                 arm_name = f"arm_{arm}"
                 arm_controller = robot.controllers[arm_name]
-                assert isinstance(arm_controller, InverseKinematicsController), "Only IKController supported for multi action representation!"
+                assert isinstance(
+                    arm_controller, InverseKinematicsController
+                ), "Only IKController supported for multi action representation!"
                 # assert arm_controller.command_input_limits is None
                 # assert arm_controller.command_output_limits is None
                 gripper_name = f"gripper_{arm}"
                 gripper_controller = robot.controllers[gripper_name]
-                assert isinstance(gripper_controller, MultiFingerGripperController), "Only MultiFingerGripperController supported for multi action representation!"
-                assert gripper_controller.command_dim == 1, "Only binary gripper commands supported for multi action representation!"
-                assert gripper_controller._mode in {"smooth", "binary"}, "Only smooth or binary gripper commands supported for multi action representation!"
-                assert gripper_controller._motor_type == "position", "Only position motor type supported for multi action representation!"
+                assert isinstance(
+                    gripper_controller, MultiFingerGripperController
+                ), "Only MultiFingerGripperController supported for multi action representation!"
+                assert (
+                    gripper_controller.command_dim == 1
+                ), "Only binary gripper commands supported for multi action representation!"
+                assert gripper_controller._mode in {
+                    "smooth",
+                    "binary",
+                }, "Only smooth or binary gripper commands supported for multi action representation!"
+                assert (
+                    gripper_controller._motor_type == "position"
+                ), "Only position motor type supported for multi action representation!"
                 action_modality_info[f"{arm_name}_eef_pos"] = {
                     "start": idx,
                     "end": idx + 3,
@@ -1830,7 +1842,6 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             action_shape = (idx,)
         else:
             action_shape = env.action_space[robot.name].shape
-
 
         # Extract relevant info from original source env config
         config = json.loads(self.input_hdf5["data"].attrs["config"])
@@ -1967,7 +1978,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             self.dataset.add_frame(**kwargs)
 
         self.dataset.save_episode()
-    
+
     def reset(self):
         # Call super first
         out = super().reset()
@@ -1995,11 +2006,24 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
                 # Add delta eef action
                 if is_first_action:
-                    action += [th.zeros(3), th.zeros(3)]   # zero delta commands
+                    action += [th.zeros(3), th.zeros(3)]  # zero delta commands
                 else:
-                    action.append(cb.to_torch(arm_controller.goal["target_pos"] - self.last_actions[arm_name]["goal"]["target_pos"]))
-                    action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(self.last_actions[arm_name]["goal"]["target_ori_mat"].T @ arm_controller.goal["target_ori_mat"]))))
-                
+                    action.append(
+                        cb.to_torch(
+                            arm_controller.goal["target_pos"] - self.last_actions[arm_name]["goal"]["target_pos"]
+                        )
+                    )
+                    action.append(
+                        T.quat2axisangle(
+                            T.mat2quat(
+                                cb.to_torch(
+                                    self.last_actions[arm_name]["goal"]["target_ori_mat"].T
+                                    @ arm_controller.goal["target_ori_mat"]
+                                )
+                            )
+                        )
+                    )
+
                 # Add gripper action
                 gripper_name = f"gripper_{arm}"
                 gripper_controller = robot.controllers[gripper_name]
@@ -2021,7 +2045,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                     "goal": arm_controller.goal,
                     "control": arm_controller.control,
                 }
-            
+
             step_data["action"] = th.cat(action)
 
         return step_data
