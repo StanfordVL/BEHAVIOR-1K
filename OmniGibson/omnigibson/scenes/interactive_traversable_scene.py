@@ -59,6 +59,7 @@ class InteractiveTraversableScene(TraversableScene):
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
 
+        self.scene_model = scene_model
         # Infer scene directory
         self.scene_dir = get_scene_path(scene_model, dataset_name=dataset_name)
 
