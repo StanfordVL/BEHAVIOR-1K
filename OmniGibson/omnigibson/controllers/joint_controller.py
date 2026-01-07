@@ -194,7 +194,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
         # Load relevant info for this controller
         if self._goal is not None and self.control_filter is not None:
-                self.control_filter.load_state(state["control_filter"], serialized=False)
+            self.control_filter.load_state(state["control_filter"], serialized=False)
 
     def serialize(self, state):
         # Run super first
