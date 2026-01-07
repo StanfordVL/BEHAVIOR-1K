@@ -15,6 +15,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
 from omnigibson.utils.python_utils import assert_valid_key, torch_compile
+from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -51,6 +52,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         pos_kp=None,
         pos_damping_ratio=None,
         vel_kp=None,
+        smoothing_filter_size=None,
         use_impedances=False,
         use_gravity_compensation=False,
         use_cc_compensation=True,
@@ -92,6 +94,8 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 damping ratio applied to the joint controller. If None, a default value will be used.
             vel_kp (None or float): If @motor_type is "velocity" and @use_impedances=True, this is the
                 proportional gain applied to the joint controller. If None, a default value will be used.
+            smoothing_filter_size (None or int): if specified, sets the size of a moving average filter to apply
+                on all outputted joint positions.
             use_impedances (bool): If True, will use impedances via the mass matrix to modify the desired efforts
                 applied
             use_gravity_compensation (bool): If True, will add gravity compensation to the computed efforts. This is
@@ -108,6 +112,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         self._motor_type = motor_type.lower()
         self._use_delta_commands = use_delta_commands
         self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
+
+        # Possibly create control filter
+        command_dim = len(dof_idx)
+        self.control_filter = (
+            None
+            if smoothing_filter_size in {None, 0}
+            else MovingAverageFilter(obs_dim=command_dim, filter_width=smoothing_filter_size)
+        )
 
         # Store control gains
         if self._motor_type == "position":
@@ -152,6 +164,64 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             isaac_kp=isaac_kp,
             isaac_kd=isaac_kd,
         )
+
+    def reset(self):
+        # Call super first
+        super().reset()
+
+        # Reset the filter
+        if self.control_filter is not None:
+            self.control_filter.reset()
+
+    @property
+    def state_size(self):
+        # Add state size from the control filter
+        return super().state_size + (0 if self.control_filter is None else self.control_filter.state_size)
+
+    def _dump_state(self):
+        # Run super first
+        state = super()._dump_state()
+
+        # Add internal quaternion target and filter state
+        if self.control_filter is not None:
+            state["control_filter"] = self.control_filter.dump_state(serialized=False)
+
+        return state
+
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
+
+        # Load relevant info for this controller
+        if self._goal is not None and self.control_filter is not None:
+                self.control_filter.load_state(state["control_filter"], serialized=False)
+
+    def serialize(self, state):
+        # Run super first
+        state_flat = super().serialize(state=state)
+
+        # Serialize state for this controller
+        return th.cat(
+            [
+                state_flat,
+                (
+                    th.tensor([])
+                    if self.control_filter is None
+                    else self.control_filter.serialize(state=state["control_filter"])
+                ),
+            ]
+        )
+
+    def deserialize(self, state):
+        # Run super first
+        state_dict, idx = super().deserialize(state=state)
+
+        # Deserialize state for this controller
+        if self.control_filter is not None:
+            state_dict["control_filter"], deserialized_items = self.control_filter.deserialize(state=state[idx:])
+            idx += deserialized_items
+
+        return state_dict, idx
 
     def _generate_default_command_output_limits(self):
         # Use motor type instead of default control type, since, e.g, use_impedances is commanding joint positions
@@ -218,6 +288,10 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         """
         base_value = control_dict[f"joint_{self._motor_type}"][self.dof_idx]
         target = goal_dict["target"]
+
+        # Optionally pass through smoothing filter for better stability
+        if self.control_filter is not None:
+            target = self.control_filter.estimate(target)
 
         # Convert control into efforts
         if self._use_impedances:

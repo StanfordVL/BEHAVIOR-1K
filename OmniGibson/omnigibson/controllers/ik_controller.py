@@ -11,7 +11,6 @@ from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.backend_utils import add_compute_function
-from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -128,12 +127,6 @@ class InverseKinematicsController(JointController, ManipulationController):
                 Otherwise, will use the reset_joint_pos as the initial guess.
         """
         # Store arguments
-        control_dim = len(dof_idx)
-        self.control_filter = (
-            None
-            if smoothing_filter_size in {None, 0}
-            else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
-        )
         assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
 
         # If mode is absolute pose, make sure command input limits / output limits are None
@@ -187,6 +180,7 @@ class InverseKinematicsController(JointController, ManipulationController):
             pos_damping_ratio=pos_damping_ratio,
             vel_kp=vel_kp,
             motor_type="position",
+            smoothing_filter_size=smoothing_filter_size,
             use_delta_commands=False,
             use_impedances=use_impedances,
             command_input_limits=command_input_limits,
@@ -199,25 +193,8 @@ class InverseKinematicsController(JointController, ManipulationController):
         # Call super first
         super().reset()
 
-        # Reset the filter and clear internal control state
-        if self.control_filter is not None:
-            self.control_filter.reset()
+        # Clear internal control state
         self._fixed_quat_target = None
-
-    @property
-    def state_size(self):
-        # Add state size from the control filter
-        return super().state_size + (0 if self.control_filter is None else self.control_filter.state_size)
-
-    def _dump_state(self):
-        # Run super first
-        state = super()._dump_state()
-
-        # Add internal quaternion target and filter state
-        if self.control_filter is not None:
-            state["control_filter"] = self.control_filter.dump_state(serialized=False)
-
-        return state
 
     def _load_state(self, state):
         # Run super first
@@ -227,37 +204,6 @@ class InverseKinematicsController(JointController, ManipulationController):
         if self._goal is not None:
             if self.mode == "position_fixed_ori":
                 self._fixed_quat_target = self._goal["target_quat"]
-
-            # Load relevant info for this controller
-            if self.control_filter is not None:
-                self.control_filter.load_state(state["control_filter"], serialized=False)
-
-    def serialize(self, state):
-        # Run super first
-        state_flat = super().serialize(state=state)
-
-        # Serialize state for this controller
-        return th.cat(
-            [
-                state_flat,
-                (
-                    th.tensor([])
-                    if self.control_filter is None
-                    else self.control_filter.serialize(state=state["control_filter"])
-                ),
-            ]
-        )
-
-    def deserialize(self, state):
-        # Run super first
-        state_dict, idx = super().deserialize(state=state)
-
-        # Deserialize state for this controller
-        if self.control_filter is not None:
-            state_dict["control_filter"], deserialized_items = self.control_filter.deserialize(state=state[idx:])
-            idx += deserialized_items
-
-        return state_dict, idx
 
     def _update_goal(self, command, control_dict):
         # Grab important info from control dict
@@ -339,10 +285,6 @@ class InverseKinematicsController(JointController, ManipulationController):
             q_lower_limit=self._control_limits[ControlType.get_type("position")][0][self.dof_idx],
             q_upper_limit=self._control_limits[ControlType.get_type("position")][1][self.dof_idx],
         )
-
-        # Optionally pass through smoothing filter for better stability
-        if self.control_filter is not None:
-            target_joint_pos = self.control_filter.estimate(target_joint_pos)
 
         # Run super to reach desired position / velocity setpoint
         return super().compute_control(goal_dict=dict(target=target_joint_pos), control_dict=control_dict)
