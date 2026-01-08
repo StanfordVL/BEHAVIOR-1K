@@ -89,10 +89,8 @@ RUN wget --no-verbose -O /cuda-keyring.deb https://developer.download.nvidia.com
     ./setup.sh --new-env --omnigibson --bddl --joylo --primitives --eval --asset-pipeline --dev --cuda-version 12.4 --accept-conda-tos --accept-nvidia-eula && \
   apt-get remove -y cuda-toolkit-12-4 && apt-get autoremove -y && apt-get autoclean -y && rm -rf /var/lib/apt/lists/*
 
-RUN echo "conda activate behavior" >> /root/.bashrc
-
-# Set the shell
-SHELL ["conda", "run", "-n", "behavior", "/bin/bash", "--login", "-c"]
+# Replace the "conda activate" line in bashrc with "conda activate behavior"
+RUN sed -i 's/conda activate/conda activate behavior/' /root/.bashrc
 
 # Optionally remove the BEHAVIOR source code if we are in dev mode and change the workdir
 ARG DEV_MODE
@@ -106,5 +104,11 @@ RUN if [ "$DEV_MODE" == "1" ]; then \
 # Reset the WORKDIR based on whether or not we are in dev mode
 WORKDIR ${WORKDIR_PATH}
 
-ENTRYPOINT ["conda", "run", "-n", "behavior"]
+# Add before ENTRYPOINT
+RUN echo '#!/bin/bash\n\
+source /opt/conda/etc/profile.d/conda.sh\n\
+conda activate behavior\n\
+exec "$@"' > /entrypoint.sh && chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/bin/bash"]
