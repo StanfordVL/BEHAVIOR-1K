@@ -305,13 +305,13 @@ def test_arm_control():
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
                             assert is_valid_pos, (
-                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"Got pos mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}] "
                                 f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
                             )
                         ori_check = err_checks[controller_mode][action_name]["ori"]
                         if ori_check is not None:
                             is_valid_ori = ori_check(target_quat, curr_quat, init_quat)
                             assert is_valid_ori, (
-                                f"Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"Got ori mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}] "
                                 f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
                             )

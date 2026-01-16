@@ -643,6 +643,10 @@ class PoseAPI:
             # Check that no reads from PoseAPI are happening during a physics step, this is quite slow!
             assert not og.sim.currently_stepping, "Cannot refresh poses during a physics step!"
 
+            # TODO @wensi-ai: For Isaac Sim 5.1, a single render step has to happen here before changes to propagate for vision sensors.
+            # check if this is still the case for later versions
+            og.sim.render()
+
             # when flatcache is on
             if og.sim._physx_fabric_interface:
                 # no time step is taken here
