@@ -258,7 +258,3 @@ def test_data_collect_and_playback():
         assert (
             batch[key].shape == expected_shape
         ), f"Expected key [{key}] to have shape {expected_shape}, but got {batch[key].shape}"
-
-
-test_data_collect_and_playback()
-og.shutdown()
