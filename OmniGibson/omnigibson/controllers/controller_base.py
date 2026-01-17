@@ -124,8 +124,8 @@ class BaseController(Serializable, Registerable, Recreatable):
                 continue
 
             self._control_limits[ControlType.get_type(motor_type)] = [
-                control_limits[motor_type][0],
-                control_limits[motor_type][1],
+                cb.array(control_limits[motor_type][0]),
+                cb.array(control_limits[motor_type][1]),
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]

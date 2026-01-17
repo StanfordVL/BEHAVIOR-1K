@@ -1,5 +1,5 @@
 import torch as th
-
+from copy import deepcopy
 from omnigibson.controllers import ControlType, GripperController, IsGraspingState
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.backend_utils import _compute_backend as cb
@@ -77,13 +77,18 @@ class MultiFingerGripperController(GripperController):
             isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
                 isaac DOFs. Can either be a single number or a per-DOF set of numbers
                 Should only be nonzero if self.control_type is position or velocity
-            inverted (bool): whether or not the command direction (grasp is negative) and the control direction are
-                inverted, e.g. to grasp you need to move the joint in the positive direction.
+            inverted (bool or Array[bool]): whether or not the command direction (grasp is negative) and the control 
+                direction are inverted, e.g. to grasp you need to move the joint in the positive direction.
+                Can be a single bool (applied to all fingers) or a per-finger array of bools. Per-finger inversion
+                is useful when fingers have asymmetric joint ranges, e.g. one finger has range [-0.045, 0] while
+                another has [0, 0.045], and open corresponds to [-0.045, 0.045] while closed is [0, 0].
             mode (str): mode for this controller. Valid options are:
 
                 "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
                     (send max pos / vel / tor signal), otherwise send max close control signals
-                "smooth": 1D command, sends symmetric signal to all finger joints equal to the preprocessed commands
+                "smooth": 1D command, scaled proportionally to each finger's individual joint range.
+                    Lower command input limit corresponds to closed position, upper to open position. Per-finger inversion is applied
+                    to handle asymmetric joint ranges (e.g., one finger [-0.045, 0], another [0, 0.045]).
                 "independent": n-dimensional command, sends independent signals to each finger joint equal to the preprocessed command
 
             open_qpos (None or Array[float]): If specified, the joint positions representing a fully-opened gripper.
@@ -101,8 +106,15 @@ class MultiFingerGripperController(GripperController):
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
         self._motor_type = motor_type.lower()
         assert_valid_key(key=mode, valid_keys=VALID_MODES, name="mode for multi finger gripper")
-        self._inverted = inverted
         self._mode = mode
+        
+        # Handle inverted - can be a single bool or per-finger array of bools
+        if isinstance(inverted, bool):
+            self._inverted = cb.array([inverted] * len(dof_idx))
+        else:
+            self._inverted = cb.array(inverted)
+            assert len(self._inverted) == len(dof_idx), \
+                f"inverted array length ({len(self._inverted)}) must match number of DOFs ({len(dof_idx)})"
         self._limit_tolerance = limit_tolerance
         self._open_qpos = open_qpos if open_qpos is None else cb.array(open_qpos)
         self._closed_qpos = closed_qpos if closed_qpos is None else cb.array(closed_qpos)
@@ -132,15 +144,11 @@ class MultiFingerGripperController(GripperController):
         # By default (independent mode), this is simply the super call
         command_output_limits = super()._generate_default_command_output_limits()
 
-        # If we're in binary mode, output limits should just be (-1.0, 1.0)
-        if self._mode == "binary":
+        # If we're in binary or smooth mode, output limits should just be (-1.0, 1.0)
+        # For smooth mode, the 1D command is scaled to per-finger ranges in compute_control
+        if self._mode in ("binary", "smooth"):
             command_output_limits = (-1.0, 1.0)
-        # If we're in smoothing mode, output limits should be the average of the independent limits
-        elif self._mode == "smooth":
-            command_output_limits = (
-                cb.mean(command_output_limits[0]),
-                cb.mean(command_output_limits[1]),
-            )
+        # If we're in independent mode, use per-finger limits
         elif self._mode == "independent":
             pass
         else:
@@ -165,16 +173,21 @@ class MultiFingerGripperController(GripperController):
 
     def _preprocess_command(self, command):
         # We extend this method to make sure command is always n-dimensional
-        if self._mode != "independent":
+        # For binary and smooth modes, ensure 1D command
+        # For independent mode, command should already be n-dimensional
+        if self._mode in ("binary", "smooth"):
             command = (
-                cb.array([command] * self.command_dim)
+                cb.array([command])
                 if type(command) in {int, float}
-                else cb.array([command[0]] * self.command_dim)
+                else cb.array([command[0]])
             )
 
         # Flip the command if the direction is inverted.
-        if self._inverted:
-            command = self._command_input_limits[1] - (command - self._command_input_limits[0])
+        # For binary and smooth modes, per-finger inversion is handled in compute_control
+        # For independent mode, apply per-finger inversion here
+        if self._mode == "independent":
+            inverted_command = self._command_input_limits[1] - (command - self._command_input_limits[0])
+            command = cb.where(self._inverted, inverted_command, command)
 
         # Return from super method
         return super()._preprocess_command(command=command)
@@ -205,21 +218,43 @@ class MultiFingerGripperController(GripperController):
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
-            should_open = target[0] >= 0.0 if not self._inverted else target[0] > 0.0
-            if should_open:
-                u = (
-                    self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                    if self._open_qpos is None
-                    else self._open_qpos
-                )
+            # Open command: target[0] >= 0.0
+            # For non-inverted finger: open = max limit, close = min limit
+            # For inverted finger: open = min limit, close = max limit
+            should_open_cmd = target[0] >= 0.0
+            
+            if self._open_qpos is not None and self._closed_qpos is not None:
+                # Use explicitly specified open/close positions
+                u = self._open_qpos if should_open_cmd else self._closed_qpos
             else:
-                u = (
-                    self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
-                    if self._closed_qpos is None
-                    else self._closed_qpos
-                )
+                # Compute per-finger positions based on inversion
+                min_limits = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
+                max_limits = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
+                
+                if should_open_cmd:
+                    # Open: non-inverted -> max, inverted -> min
+                    u = cb.where(self._inverted, min_limits, max_limits)
+                else:
+                    # Close: non-inverted -> min, inverted -> max
+                    u = cb.where(self._inverted, max_limits, min_limits)
+        elif self._mode == "smooth":
+            # Use continuous signal - 1D target in range [-1, 1]
+            # Scale proportionally to each finger's individual joint range
+            # -1 = closed, +1 = open
+            min_limits = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
+            max_limits = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
+            
+            # Normalize target from [-1, 1] to [0, 1]
+            t = (target[0] + 1.0) / 2.0  # 0 = closed, 1 = open
+            
+            # For each finger, compute the control signal based on inversion:
+            # - Non-inverted: open = max, closed = min -> u = min + t * (max - min)
+            # - Inverted: open = min, closed = max -> u = max - t * (max - min) = max + t * (min - max)
+            u_non_inverted = min_limits + t * (max_limits - min_limits)
+            u_inverted = max_limits + t * (min_limits - max_limits)
+            u = cb.where(self._inverted, u_inverted, u_non_inverted)
         else:
-            # Use continuous signal. Make sure to go from command to control dim.
+            # Independent mode - use continuous signal directly
             u = cb.full((self.control_dim,), target[0]) if len(target) == 1 else target
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action
@@ -311,43 +346,78 @@ class MultiFingerGripperController(GripperController):
     def compute_no_op_goal(self, control_dict):
         # Take care of the special case of binary control
         if self._mode == "binary":
+            # For binary mode, no-op maintains current grasping state
+            # Per-finger inversion is handled in compute_control
             goal_sign = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
-            if self._inverted:
-                goal_sign = -1 * goal_sign
             target = cb.array([goal_sign])
 
-        else:
+        elif self._mode == "smooth":
+            # For smooth mode, compute normalized position in [-1, 1] range
+            # This requires computing the average normalized position across fingers
             if self._motor_type == "position":
-                target = control_dict["joint_position"][self.dof_idx]
+                joint_pos = control_dict["joint_position"][self.dof_idx]
+                min_limits = self._control_limits[ControlType.POSITION][0][self.dof_idx]
+                max_limits = self._control_limits[ControlType.POSITION][1][self.dof_idx]
+                
+                # Normalize each finger position to [0, 1] based on its range
+                # Account for inversion: non-inverted maps min->0, max->1; inverted maps max->0, min->1
+                t_non_inverted = (joint_pos - min_limits) / (max_limits - min_limits + 1e-8)
+                t_inverted = (max_limits - joint_pos) / (max_limits - min_limits + 1e-8)
+                t = cb.where(self._inverted, t_inverted, t_non_inverted)
+                
+                # Average across fingers and convert to [-1, 1]
+                target = cb.array([cb.mean(t) * 2.0 - 1.0])
             elif self._motor_type == "velocity":
-                target = cb.zeros(self.command_dim)
+                target = cb.zeros(1)
             else:
                 raise ValueError("Cannot compute noop action for effort motor type.")
 
-            # Convert to binary / smooth mode if necessary
-            if self._mode == "smooth":
-                target = cb.mean(target, dim=-1, keepdim=True)
+        else:
+            # For independent mode, use per-finger targets
+            if self._motor_type == "position":
+                target = control_dict["joint_position"][self.dof_idx]
+            elif self._motor_type == "velocity":
+                target = cb.zeros(self.control_dim)
+            else:
+                raise ValueError("Cannot compute noop action for effort motor type.")
 
         return dict(target=target)
 
     def _compute_no_op_command(self, control_dict):
         # Take care of the special case of binary control
         if self._mode == "binary":
+            # For binary mode, no-op maintains current grasping state
+            # Per-finger inversion is handled in compute_control
             command_val = -1 if self.is_grasping() == IsGraspingState.TRUE else 1
-            if self._inverted:
-                command_val = -1 * command_val
             return cb.array([command_val])
 
+        elif self._mode == "smooth":
+            # For smooth mode, compute normalized position in [-1, 1] range
+            if self._motor_type == "position":
+                joint_pos = control_dict["joint_position"][self.dof_idx]
+                min_limits = self._control_limits[ControlType.POSITION][0][self.dof_idx]
+                max_limits = self._control_limits[ControlType.POSITION][1][self.dof_idx]
+                
+                # Normalize each finger position to [0, 1] based on its range
+                # Account for inversion: non-inverted maps min->0, max->1; inverted maps max->0, min->1
+                t_non_inverted = (joint_pos - min_limits) / (max_limits - min_limits + 1e-8)
+                t_inverted = (max_limits - joint_pos) / (max_limits - min_limits + 1e-8)
+                t = cb.where(self._inverted, t_inverted, t_non_inverted)
+                
+                # Average across fingers and convert to [-1, 1]
+                return cb.array([cb.mean(t) * 2.0 - 1.0])
+            elif self._motor_type == "velocity":
+                return cb.zeros(1)
+            else:
+                raise ValueError("Cannot compute noop action for effort motor type.")
+
+        # For independent mode, use per-finger commands
         if self._motor_type == "position":
             command = control_dict["joint_position"][self.dof_idx]
         elif self._motor_type == "velocity":
-            command = cb.zeros(self.command_dim)
+            command = cb.zeros(self.control_dim)
         else:
             raise ValueError("Cannot compute noop action for effort motor type.")
-
-        # Convert to binary / smooth mode if necessary
-        if self._mode == "smooth":
-            command = cb.mean(command, dim=-1, keepdim=True)
 
         return command
 
@@ -398,4 +468,5 @@ class MultiFingerGripperController(GripperController):
 
     @property
     def command_dim(self):
+        # Binary and smooth modes use 1D command, independent mode uses per-finger commands
         return len(self.dof_idx) if self._mode == "independent" else 1

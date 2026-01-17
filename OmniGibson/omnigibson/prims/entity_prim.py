@@ -196,33 +196,40 @@ class EntityPrim(XFormPrim):
         """
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-        joint_children = set()
-        # Keep track of all the links we will create. We can't create that just yet because we need to find
-        # the base link first.
         links_to_create = {}
-        for prim in self._prim.GetChildren():
+        joint_children = set()
+
+        # Check for rigid links and joints
+        def check_for_rigid_links_and_joints(prim, skip_rigid_bodies=False):
             link_name = prim.GetName()
             prim_type_name = prim.GetPrimTypeInfo().GetTypeName()
-
             # Identify links based on prim type
-            if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
-                # For rigid body objects, process Xforms as potential rigid links
-                # Mark this as a link to create (we'll determine exact class later)
-                links_to_create[link_name] = (PrimType.RIGID, prim)
+            if not skip_rigid_bodies:
 
-                # Also iterate through all children to infer joints and determine the children of those joints
-                # We will use this info to infer which link is the base link!
-                for child_prim in prim.GetChildren():
-                    if "joint" in child_prim.GetPrimTypeInfo().GetTypeName().lower():
-                        # Store the child target of this joint
-                        relationships = {r.GetName(): r for r in child_prim.GetRelationships()}
-                        # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
-                        if len(relationships["physics:body0"].GetTargets()) > 0:
-                            joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
+                if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
+                    # For rigid body objects, process Xforms as potential rigid links
+                    # Mark this as a link to create (we'll determine exact class later)
+                    links_to_create[link_name] = (PrimType.RIGID, prim)
 
-            elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
-                # For cloth objects, process Meshes as cloth links
-                links_to_create[link_name] = (PrimType.CLOTH, prim)
+                elif self._prim_type == PrimType.CLOTH and prim_type_name == "Mesh":
+                    # For cloth objects, process Meshes as cloth links
+                    links_to_create[link_name] = (PrimType.CLOTH, prim)
+
+            # Also iterate through all children to infer joints and determine the children of those joints
+            # We will use this info to infer which link is the base link!
+            elif "joint" in prim_type_name.lower():
+                # Store the child target of this joint
+                relationships = {r.GetName(): r for r in prim.GetRelationships()}
+                # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
+                if len(relationships["physics:body0"].GetTargets()) > 0:
+                    joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
+
+        # Keep track of all the links we will create. We can't create that just yet because we need to find
+        # the base link first.
+        for child in self._prim.GetChildren():
+            check_for_rigid_links_and_joints(child, skip_rigid_bodies=False)
+            for gchild in child.GetChildren():
+                check_for_rigid_links_and_joints(gchild, skip_rigid_bodies=True)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints

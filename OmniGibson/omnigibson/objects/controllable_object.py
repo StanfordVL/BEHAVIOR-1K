@@ -375,6 +375,9 @@ class ControllableObject(BaseObject):
             else self._create_continuous_action_space()
         )
 
+        # Update init info
+        self._init_info["args"]["controller_config"] = self._controller_config
+
     def reset(self):
         # Call super first
         super().reset()
