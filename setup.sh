@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
         -h|--help) HELP=true; shift ;;
         --new-env)
             NEW_ENV=true
-            # support: --new-env NAME  or just --new-env (use default)
+            # support: --new-env NAME or just --new-env (use default)
             if [[ -n "$2" && ! "$2" =~ ^- ]]; then
                 NEW_ENV_NAME="$2"
                 shift 2
@@ -59,7 +59,7 @@ Usage: ./setup.sh [OPTIONS]
 
 Options:
   -h, --help              Display this help message
-  --new-env NEW_ENV_NAME   Create a new conda environment 'NEW_ENV_NAME' (default: behavior)
+  --new-env NEW_ENV_NAME  Create a new conda environment 'NEW_ENV_NAME' (default: behavior)
   --omnigibson            Install OmniGibson (core physics simulator)
   --bddl                  Install BDDL (Behavior Domain Definition Language)
   --joylo                 Install JoyLo (teleoperation interface)
@@ -74,7 +74,8 @@ Options:
   --accept-dataset-tos    Automatically accept BEHAVIOR Dataset Terms
   --confirm-no-conda      Skip confirmation prompt when not in a conda environment
 
-Example: ./setup.sh --new-env --omnigibson --bddl --joylo --dataset
+Example (core components): ./setup.sh --new-env --omnigibson --bddl --dataset
+Example (full customization): ./setup.sh --new-env my_env --omnigibson --bddl --dataset --joylo --eval --primitives --cuda-version 12.6
 Example (non-interactive): ./setup.sh --new-env --omnigibson --dataset --accept-conda-tos --accept-nvidia-eula --accept-dataset-tos
 EOF
     exit 0
@@ -201,6 +202,23 @@ EOF
 # Prompt for terms acceptance at the beginning
 prompt_for_terms
 
+# If primitives requested, ensure a matching system CUDA is available
+if [ "$PRIMITIVES" = true ]; then
+    NVCC_OK=false
+    if command -v nvcc >/dev/null 2>&1; then
+        if nvcc -V 2>&1 | grep -q "$CUDA_VERSION"; then
+            NVCC_OK=true
+        fi
+    fi
+
+    if [ "$NVCC_OK" = false ]; then
+        echo ""
+        echo "ERROR: Primitives support requires CUDA Toolkit $CUDA_VERSION and a matching 'nvcc' in PATH."
+        echo "Please install the correct CUDA toolkit system-wide (for example /usr/local/cuda-$CUDA_VERSION) or ensure your PATH provides an nvcc that reports $CUDA_VERSION, then re-run this script."
+        exit 1
+    fi
+fi
+
 # Create conda environment
 if [ "$NEW_ENV" = true ]; then
     echo "Creating conda environment '$NEW_ENV_NAME'..."
@@ -267,21 +285,6 @@ if [ "$OMNIGIBSON" = true ]; then
         echo "ERROR: Found existing Isaac Sim environment variables."
         echo "Please unset EXP_PATH, CARB_APP_PATH, and ISAAC_PATH and restart."
         exit 1
-    fi
-    
-    # if primitive specified and we don't have the corresponding system cuda toolkit, install cuda toolkit
-    if [ "$PRIMITIVES" = true ]; then
-        # Check if nvcc exists and reports the desired CUDA version; install toolkit if missing or mismatched
-        if ! command -v nvcc >/dev/null 2>&1 || ! nvcc -V 2>&1 | grep -q "$CUDA_VERSION"; then
-            echo "Installing CUDA Toolkit $CUDA_VERSION for primitives (curobo) support..."
-            conda install "cuda-compiler=$CUDA_VERSION" "cuda-toolkit=$CUDA_VERSION" -c conda-forge -y
-            export CUDA_HOME="$CONDA_PREFIX"
-            export CUDACXX="$CONDA_PREFIX/bin/nvcc"
-            export CUDA_PATH="$CUDA_HOME"
-            export CPATH="$CONDA_PREFIX/targets/${ARCH}-linux/include:$CPATH"
-            export LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LIBRARY_PATH"
-            export LD_LIBRARY_PATH="$CONDA_PREFIX/targets/${ARCH}-linux/lib:$LD_LIBRARY_PATH"
-        fi
     fi
 
     # Build extras
@@ -422,6 +425,8 @@ if [ "$OMNIGIBSON" = true ]; then
     
     # Force reinstall cffi 1.17.1 to resolve compatibility issues with Isaac Sim extensions
     pip install --force-reinstall cffi==1.17.1
+    # Force reinstall websockets >= 15.0.1 because it's been overwritten by Isaac Sim with an older version
+    pip install --force-reinstall "websockets>=15.0.1"
 
     echo "OmniGibson installation completed successfully!"
 fi
