@@ -205,7 +205,6 @@ class EntityPrim(XFormPrim):
             prim_type_name = prim.GetPrimTypeInfo().GetTypeName()
             # Identify links based on prim type
             if not skip_rigid_bodies:
-
                 if self._prim_type == PrimType.RIGID and prim_type_name == "Xform":
                     # For rigid body objects, process Xforms as potential rigid links
                     # Mark this as a link to create (we'll determine exact class later)

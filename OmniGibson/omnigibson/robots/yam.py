@@ -134,6 +134,7 @@ class Yam(ManipulationRobot):
 
         # Add callback
         import omnigibson as og
+
         og.sim.add_callback_on_play(name=f"{self.name}_set_gains", callback=self._set_gains)
 
     def _set_limits(self):
@@ -242,4 +243,3 @@ class Yam(ManipulationRobot):
                 GraspingPoint(link_name="right_link_finger", position=th.tensor([0.0, 0.0, 0.0])),
             ]
         }
-

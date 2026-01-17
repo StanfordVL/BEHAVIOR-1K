@@ -77,7 +77,7 @@ class MultiFingerGripperController(GripperController):
             isaac_kd (None or float or Array[float]): If specified, damping gains to apply to the underlying
                 isaac DOFs. Can either be a single number or a per-DOF set of numbers
                 Should only be nonzero if self.control_type is position or velocity
-            inverted (bool or Array[bool]): whether or not the command direction (grasp is negative) and the control 
+            inverted (bool or Array[bool]): whether or not the command direction (grasp is negative) and the control
                 direction are inverted, e.g. to grasp you need to move the joint in the positive direction.
                 Can be a single bool (applied to all fingers) or a per-finger array of bools. Per-finger inversion
                 is useful when fingers have asymmetric joint ranges, e.g. one finger has range [-0.045, 0] while
@@ -107,14 +107,15 @@ class MultiFingerGripperController(GripperController):
         self._motor_type = motor_type.lower()
         assert_valid_key(key=mode, valid_keys=VALID_MODES, name="mode for multi finger gripper")
         self._mode = mode
-        
+
         # Handle inverted - can be a single bool or per-finger array of bools
         if isinstance(inverted, bool):
             self._inverted = cb.array([inverted] * len(dof_idx))
         else:
             self._inverted = cb.array(inverted)
-            assert len(self._inverted) == len(dof_idx), \
-                f"inverted array length ({len(self._inverted)}) must match number of DOFs ({len(dof_idx)})"
+            assert len(self._inverted) == len(
+                dof_idx
+            ), f"inverted array length ({len(self._inverted)}) must match number of DOFs ({len(dof_idx)})"
         self._limit_tolerance = limit_tolerance
         self._open_qpos = open_qpos if open_qpos is None else cb.array(open_qpos)
         self._closed_qpos = closed_qpos if closed_qpos is None else cb.array(closed_qpos)
@@ -176,11 +177,7 @@ class MultiFingerGripperController(GripperController):
         # For binary and smooth modes, ensure 1D command
         # For independent mode, command should already be n-dimensional
         if self._mode in ("binary", "smooth"):
-            command = (
-                cb.array([command])
-                if type(command) in {int, float}
-                else cb.array([command[0]])
-            )
+            command = cb.array([command]) if type(command) in {int, float} else cb.array([command[0]])
 
         # Flip the command if the direction is inverted.
         # For binary and smooth modes, per-finger inversion is handled in compute_control
@@ -222,7 +219,7 @@ class MultiFingerGripperController(GripperController):
             # For non-inverted finger: open = max limit, close = min limit
             # For inverted finger: open = min limit, close = max limit
             should_open_cmd = target[0] >= 0.0
-            
+
             if self._open_qpos is not None and self._closed_qpos is not None:
                 # Use explicitly specified open/close positions
                 u = self._open_qpos if should_open_cmd else self._closed_qpos
@@ -230,7 +227,7 @@ class MultiFingerGripperController(GripperController):
                 # Compute per-finger positions based on inversion
                 min_limits = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
                 max_limits = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-                
+
                 if should_open_cmd:
                     # Open: non-inverted -> max, inverted -> min
                     u = cb.where(self._inverted, min_limits, max_limits)
@@ -243,10 +240,10 @@ class MultiFingerGripperController(GripperController):
             # -1 = closed, +1 = open
             min_limits = self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             max_limits = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
-            
+
             # Normalize target from [-1, 1] to [0, 1]
             t = (target[0] + 1.0) / 2.0  # 0 = closed, 1 = open
-            
+
             # For each finger, compute the control signal based on inversion:
             # - Non-inverted: open = max, closed = min -> u = min + t * (max - min)
             # - Inverted: open = min, closed = max -> u = max - t * (max - min) = max + t * (min - max)
@@ -358,13 +355,13 @@ class MultiFingerGripperController(GripperController):
                 joint_pos = control_dict["joint_position"][self.dof_idx]
                 min_limits = self._control_limits[ControlType.POSITION][0][self.dof_idx]
                 max_limits = self._control_limits[ControlType.POSITION][1][self.dof_idx]
-                
+
                 # Normalize each finger position to [0, 1] based on its range
                 # Account for inversion: non-inverted maps min->0, max->1; inverted maps max->0, min->1
                 t_non_inverted = (joint_pos - min_limits) / (max_limits - min_limits + 1e-8)
                 t_inverted = (max_limits - joint_pos) / (max_limits - min_limits + 1e-8)
                 t = cb.where(self._inverted, t_inverted, t_non_inverted)
-                
+
                 # Average across fingers and convert to [-1, 1]
                 target = cb.array([cb.mean(t) * 2.0 - 1.0])
             elif self._motor_type == "velocity":
@@ -397,13 +394,13 @@ class MultiFingerGripperController(GripperController):
                 joint_pos = control_dict["joint_position"][self.dof_idx]
                 min_limits = self._control_limits[ControlType.POSITION][0][self.dof_idx]
                 max_limits = self._control_limits[ControlType.POSITION][1][self.dof_idx]
-                
+
                 # Normalize each finger position to [0, 1] based on its range
                 # Account for inversion: non-inverted maps min->0, max->1; inverted maps max->0, min->1
                 t_non_inverted = (joint_pos - min_limits) / (max_limits - min_limits + 1e-8)
                 t_inverted = (max_limits - joint_pos) / (max_limits - min_limits + 1e-8)
                 t = cb.where(self._inverted, t_inverted, t_non_inverted)
-                
+
                 # Average across fingers and convert to [-1, 1]
                 return cb.array([cb.mean(t) * 2.0 - 1.0])
             elif self._motor_type == "velocity":
