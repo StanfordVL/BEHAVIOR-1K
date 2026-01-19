@@ -10,8 +10,8 @@ property:
   arm_joint_names:
     "0": ['panda_joint1', 'panda_joint2', 'panda_joint3', 'panda_joint4', 'panda_joint5', 'panda_joint6', 'panda_joint7']
   
-  supported_end_effector: ['gripper', 'allegro', 'leap_right', 'leap_left', 'inspire']
-  eef_support_curobo_attached_object_link_names: [gripper]
+  supported_end_effector: ['gripper', 'robotiq', 'allegro', 'leap_right', 'leap_left', 'inspire']
+  eef_support_curobo_attached_object_link_names: [gripper, robotiq]
 
   gripper:
     model_name: "franka_panda"
@@ -30,6 +30,24 @@ property:
     disabled_collision_pairs: [["panda_link5", "panda_link7"], ["panda_link5", "panda_hand"]]
     ag_start_points: [["panda_rightfinger", [0.0, 0.001, 0.045]]]
     ag_end_points: [["panda_leftfinger", [0.0, 0.001, 0.045]]]
+  robotiq:
+    model_name: "franka_robotiq"
+    gripper_control_idx:  [7, 8]
+    eef_link_names:  
+      "0": "eef_link"
+    finger_link_names:  
+      "0": ["left_inner_finger", "right_inner_finger"]
+    finger_joint_names:  
+      "0": ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]
+    default_joint_pos: [0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.00, 0.00, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    teleop_rotation_offset: 
+      "0": [-1, 0, 0, 0]
+    ag_start_points: [["left_inner_finger", [0.008, 0.010, 0.0]], ["left_inner_finger", [0.008, 0.040, 0.0]]]
+    ag_end_points: [["right_inner_finger", [0.008, 0.010, 0.0]], ["right_inner_finger", [0.008, 0.040, 0.0]]]
+    usd_path: "models/franka/franka_robotiq/usd/franka_robotiq.usda"
+    urdf_path: "models/franka/franka_robotiq/urdf/franka_robotiq.urdf"
+    curobo_path: "models/franka/franka_robotiq/curobo/franka_robotiq_description_curobo_default.yaml"
+    disabled_collision_pairs: [['left_outer_knuckle', 'left_outer_finger'], ['left_outer_knuckle', 'left_inner_finger'], ['left_outer_knuckle', 'left_inner_knuckle'], ['left_outer_knuckle', 'right_outer_knuckle'], ['left_outer_knuckle', 'right_outer_finger'], ['left_outer_knuckle', 'right_inner_finger'], ['left_outer_knuckle', 'right_inner_knuckle'], ['left_outer_finger', 'left_inner_finger'], ['left_outer_finger', 'left_inner_knuckle'], ['left_outer_finger', 'right_outer_knuckle'], ['left_outer_finger', 'right_outer_finger'], ['left_outer_finger', 'right_inner_finger'], ['left_outer_finger', 'right_inner_knuckle'], ['left_inner_finger', 'left_inner_knuckle'], ['left_inner_finger', 'right_outer_knuckle'], ['left_inner_finger', 'right_outer_finger'], ['left_inner_finger', 'right_inner_finger'], ['left_inner_finger', 'right_inner_knuckle'], ['left_inner_knuckle', 'right_outer_knuckle'], ['left_inner_knuckle', 'right_outer_finger'], ['left_inner_knuckle', 'right_inner_finger'], ['left_inner_knuckle', 'right_inner_knuckle'], ['right_outer_knuckle', 'right_outer_finger'], ['right_outer_knuckle', 'right_inner_finger'], ['right_outer_knuckle', 'right_inner_knuckle'], ['right_outer_finger', 'right_inner_finger'], ['right_outer_finger', 'right_inner_knuckle'], ['right_inner_finger', 'right_inner_knuckle']]
   allegro:
     model_name: "franka_allegro"
     eef_link_names:

@@ -180,18 +180,7 @@ class Robot(USDObject, GymObservable):
             reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
                 be set to during a reset. If None (default), self._default_joint_pos will be used instead.
                 Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the robot with a different rese joint position.
-            control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
-                we will automatically set the control frequency to be at the render frequency by default.
-            controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
-                configurations for this object. This will override any default values specified by this class.
-            action_type (str): one of {discrete, continuous} - what type of action space to use
-            action_normalize (bool): whether to normalize inputted actions. This will override any default values
-                specified by this class.
-            reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
-                be set to during a reset. If None (default), self._default_joint_pos will be used instead.
-                Note that _default_joint_pos are hardcoded & precomputed, and thus should not be modified by the user.
-                Set this value instead if you want to initialize the object with a different rese joint position.
+                Set this value instead if you want to initialize the object with a different reset joint position.
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is ["rgb", "proprio"].
                 Valid options are "all", or a list containing any subset of omnigibson.sensors.ALL_SENSOR_MODALITIES.
                 Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
@@ -415,20 +404,20 @@ class Robot(USDObject, GymObservable):
         if self.is_two_wheel:
             self.is_locomotion = True
 
+    def _convert_to_grasping_points(self, li):
+        result = []
+        for item in li:
+            link_name, position = item
+            result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
+        return result
+
     def _init_ag_points(self):
         prop = self._robot_cfg[self.end_effector]
         if "ag_start_points" not in prop.keys():
             return
 
-        def _convert_to_grasping_points(li):
-            result = []
-            for item in li:
-                link_name, position = item
-                result.append(GraspingPoint(link_name=link_name, position=th.tensor(position)))
-            return result
-
-        self._ag_start_points = _convert_to_grasping_points(prop["ag_start_points"])
-        self._ag_end_points = _convert_to_grasping_points(prop["ag_end_points"])
+        self._ag_start_points = self._convert_to_grasping_points(prop["ag_start_points"])
+        self._ag_end_points = self._convert_to_grasping_points(prop["ag_end_points"])
 
     def load(self, scene):
         # Run super first
@@ -3051,6 +3040,8 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
+        if "assisted_grasp_start_points" in self._robot_cfg.keys():
+            return self._convert_to_grasping_points(self._robot_cfg["assisted_grasp_start_points"])
         if self.is_manipulation and hasattr(self, "_ag_start_points"):
             return {self.default_arm: self._ag_start_points}
         return None
@@ -3090,6 +3081,8 @@ class Robot(USDObject, GymObservable):
                 appendage). By default, each entry returns None, and must be implemented by any robot subclass that
                 wishes to use assisted grasping.
         """
+        if "assisted_grasp_end_points" in self._robot_cfg.keys():
+            return self._convert_to_grasping_points(self._robot_cfg["assisted_grasp_end_points"])
         if self.is_manipulation and hasattr(self, "_ag_end_points"):
             return {self.default_arm: self._ag_end_points}
         return None
