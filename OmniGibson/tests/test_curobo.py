@@ -10,6 +10,7 @@ from omnigibson.action_primitives.curobo import CuRoboMotionGenerator
 from omnigibson.macros import gm
 from omnigibson.robots.robot import Robot
 
+
 def test_curobo():
     # Make sure object states are enabled
     assert gm.ENABLE_OBJECT_STATES

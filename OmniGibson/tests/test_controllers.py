@@ -22,7 +22,7 @@ def test_arm_control():
                 "position": [150, 150, 100],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
-                "fixed_base": True
+                "fixed_base": True,
             },
             {
                 "robot_type_name": "Fetch",
@@ -31,7 +31,7 @@ def test_arm_control():
                 "position": [150, 150, 105],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
-                "fixed_base": True
+                "fixed_base": True,
             },
             {
                 "robot_type_name": "Tiago",
@@ -48,7 +48,7 @@ def test_arm_control():
                 "position": [150, 150, 115],
                 "orientation": [0, 0, 0, 1],
                 "action_normalize": False,
-                "fixed_base": True
+                "fixed_base": True,
             },
             {
                 "robot_type_name": "R1",
@@ -294,9 +294,9 @@ def test_arm_control():
                         # Make sure no arm joints are at their limit
                         normalized_qpos = robot.get_joint_positions(normalized=True)[robot.arm_control_idx[arm]]
                         assert not th.any(th.abs(normalized_qpos) == 1.0), (
-                                f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
-                                f"Some joints are at their limit (normalized values): {normalized_qpos}"
-                            )
+                            f"controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], arm [{arm}], action [{action_name}]:\n"
+                            f"Some joints are at their limit (normalized values): {normalized_qpos}"
+                        )
 
                         init_pos, init_quat = initial_eef_pose[robot.name][arm]
                         curr_pos, curr_quat = robot.get_relative_eef_pose(arm=arm)
@@ -307,14 +307,14 @@ def test_arm_control():
                         pos_check = err_checks[controller_mode][action_name]["pos"]
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
-                            assert is_valid_pos,(
-                                    f"{robot.model_name} 11Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                    f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
-                                )
+                            assert is_valid_pos, (
+                                f"{robot.model_name} 11Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
+                            )
                         ori_check = err_checks[controller_mode][action_name]["ori"]
                         if ori_check is not None:
                             is_valid_ori = ori_check(target_quat, curr_quat, init_quat)
-                            assert is_valid_ori,(
-                                    f"{robot.model_name} Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
-                                    f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
-                                )
+                            assert is_valid_ori, (
+                                f"{robot.model_name} Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                f"target_quat: {target_quat}, curr_quat: {curr_quat}, init_quat: {init_quat}"
+                            )
