@@ -1,5 +1,5 @@
 """
-Iteration one: 
+Iteration one:
 Strict multi-way tree (without no count)
 We consider each unique path to a synset "different", with the obvious
 problem that each synset can have multiple hypernyms
@@ -130,7 +130,10 @@ def get_hierarchy(syn_prop_dict):
 
         # If the synset also has a category with the same name, remove it from the category list.
         # It's just a placeholder category for particles of the substance.
-        if rec["synset"] in synset_to_cat and rec["substance"] in synset_to_cat[rec["synset"]]:
+        if (
+            rec["synset"] in synset_to_cat
+            and rec["substance"] in synset_to_cat[rec["synset"]]
+        ):
             synset_to_cat[rec["synset"]].remove(rec["substance"])
 
     add_igibson_objects(hierarchy, synset_to_cat, synset_to_substance)

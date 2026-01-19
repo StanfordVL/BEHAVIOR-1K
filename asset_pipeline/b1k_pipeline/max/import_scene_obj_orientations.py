@@ -37,7 +37,12 @@ def fix():
         if match.group("link_name") and match.group("link_name") != "base_link":
             continue
 
-        if match.group("category") in ("ceilings", "floors", "walls", "electric_switch"):
+        if match.group("category") in (
+            "ceilings",
+            "floors",
+            "walls",
+            "electric_switch",
+        ):
             continue
 
         q = obj.rotation
@@ -106,7 +111,9 @@ def fix():
         count_in_urdf = len(found[x])
         count_in_file = len(candidates[x])
         if not count_in_file == count_in_urdf:
-            problems.append(f"{x} has {count_in_file} in file but {count_in_urdf} in URDF.")
+            problems.append(
+                f"{x} has {count_in_file} in file but {count_in_urdf} in URDF."
+            )
 
     assert not problems, "\n".join(problems)
 
@@ -117,8 +124,8 @@ def fix():
         [xyz for objs in found.values() for _, xyz, _ in objs]
     )
 
-    assert len(positions_from_file) == len(
-        positions_from_urdf
+    assert (
+        len(positions_from_file) == len(positions_from_urdf)
     ), f"File contains {len(positions_from_file)} things while URDF contains {len(positions_from_urdf)}"
     file_mean = np.mean(positions_from_file, axis=0)
     urdf_mean = np.mean(positions_from_urdf, axis=0)

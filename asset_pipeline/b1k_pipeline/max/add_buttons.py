@@ -62,7 +62,7 @@ def main():
     mainMenuBar = rt.menuMan.getMainMenuBar()
 
     # Create the menu if it doesnt exist
-    if rt.menuMan.registerMenuContext(0x5f77dd6d):
+    if rt.menuMan.registerMenuContext(0x5F77DD6D):
         # Create a new menu
         subMenu = rt.menuMan.createMenu("SVL")
         # Create a new menu item with the menu as its sub-menu
@@ -73,7 +73,11 @@ def main():
         mainMenuBar.addItem(subMenuItem, subMenuIndex)
     else:
         # Get the existing menu
-        subMenuItem, = [mainMenuBar.getItem(x + 1) for x in range(mainMenuBar.numItems()) if mainMenuBar.getItem(x + 1).getTitle() == "SVL"]
+        (subMenuItem,) = [
+            mainMenuBar.getItem(x + 1)
+            for x in range(mainMenuBar.numItems())
+            if mainMenuBar.getItem(x + 1).getTitle() == "SVL"
+        ]
         subMenu = subMenuItem.getSubMenu()
 
         this_dir = pathlib.Path(__file__).parent
@@ -85,22 +89,30 @@ def main():
             # Create the script
             entrypoint_fullname = str((this_dir / entrypoint).absolute())
             script = f'Python.ExecuteFile @"{entrypoint_fullname}"'
-            rt.macros.new("SVL_Tools", script_name, tooltip, script_human_readable_name, script)
+            rt.macros.new(
+                "SVL_Tools", script_name, tooltip, script_human_readable_name, script
+            )
 
             # Check if it already exists
-            existing_menu_items_with_name = [x for x in range(subMenu.numItems()) if subMenu.getItem(x + 1).getTitle() == script_human_readable_name]
+            existing_menu_items_with_name = [
+                x
+                for x in range(subMenu.numItems())
+                if subMenu.getItem(x + 1).getTitle() == script_human_readable_name
+            ]
             if existing_menu_items_with_name:
                 continue
 
             # Create a menu item that calls the sample macroScript
             actionItem = rt.menuMan.createActionItem(script_name, "SVL_Tools")
-            assert actionItem, "Failed to create action item " + script_human_readable_name
+            assert actionItem, (
+                "Failed to create action item " + script_human_readable_name
+            )
             # Add the item to the menu
             subMenu.addItem(actionItem, -1)
 
-
         # Redraw the menu bar with the new item
         rt.menuMan.updateMenuBar()
+
 
 if __name__ == "__main__":
     main()

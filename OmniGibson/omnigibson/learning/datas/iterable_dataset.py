@@ -106,7 +106,7 @@ class BehaviorIterableDataset(IterableDataset):
             seed (int): Random seed.
             shuffle (bool): Whether to shuffle the dataset.
         """
-        super().__init__(*args, **kwargs)
+        super().__init__()
         self._data_path = data_path
         self._demo_keys = demo_keys
         self._robot_type = robot_type

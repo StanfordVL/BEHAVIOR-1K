@@ -13,9 +13,9 @@ import glob
 def urdf_to_glb(in_obj_dir, out_obj_dir):
     # Get the URDF file
     urdf_files = glob.glob(in_obj_dir + "/urdf/*.urdf")
-    assert len(urdf_files) == 1, (
-        f"Expected exactly one URDF file in {in_obj_dir}, found {len(urdf_files)}"
-    )
+    assert (
+        len(urdf_files) == 1
+    ), f"Expected exactly one URDF file in {in_obj_dir}, found {len(urdf_files)}"
 
     urdf_file = urdf_files[0]
 
@@ -42,10 +42,7 @@ def main():
     ):
         # Copy everything over to the temp FS
         print("Copying input to temp fs...")
-        objdir_glob = [
-            item.path
-            for item in source_fs.glob("objects/*/*/")
-        ]
+        objdir_glob = [item.path for item in source_fs.glob("objects/*/*/")]
         for item in tqdm.tqdm(objdir_glob):
             if (
                 source_fs.opendir(item).opendir("urdf").glob("*.urdf").count().files
@@ -64,12 +61,14 @@ def main():
         for objdir in tqdm.tqdm(
             objdir_glob, desc="Processing targets to queue objects"
         ):
-            obj_futures[dask_client.submit(
-                urdf_to_glb,
-                temp_fs.opendir(objdir).getsyspath("/"),
-                out_fs.makedirs(objdir).getsyspath("/"),
-                pure=False,
-            )] = objdir
+            obj_futures[
+                dask_client.submit(
+                    urdf_to_glb,
+                    temp_fs.opendir(objdir).getsyspath("/"),
+                    out_fs.makedirs(objdir).getsyspath("/"),
+                    pure=False,
+                )
+            ] = objdir
 
         for future in tqdm.tqdm(
             as_completed(obj_futures.keys()),

@@ -16,36 +16,74 @@ from b1k_pipeline.utils import PipelineFS, TMP_DIR, launch_cluster, get_targets
 WORKER_COUNT = 1
 MAX_TIME_PER_PROCESS = 20 * 60  # 20 minutes
 
+
 def run_on_scene(dataset_path, scene, output_dir):
-    python_cmd = ["python", "-m", "b1k_pipeline.validate_scenes_process", dataset_path, scene, output_dir]
-    cmd = ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "-c", "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && " + " ".join(python_cmd)]
-    with open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log", "w") as f, open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err", "w") as ferr:
+    python_cmd = [
+        "python",
+        "-m",
+        "b1k_pipeline.validate_scenes_process",
+        dataset_path,
+        scene,
+        output_dir,
+    ]
+    cmd = [
+        "micromamba",
+        "run",
+        "-n",
+        "omnigibson",
+        "/bin/bash",
+        "-c",
+        "source /isaac-sim/setup_conda_env.sh && rm -rf /root/.cache/ov/texturecache && "
+        + " ".join(python_cmd),
+    ]
+    with (
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log", "w") as f,
+        open(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err", "w") as ferr,
+    ):
         try:
-            p = subprocess.Popen(cmd, stdout=f, stderr=ferr, cwd="/scr/BEHAVIOR-1K/asset_pipeline", start_new_session=True)
+            p = subprocess.Popen(
+                cmd,
+                stdout=f,
+                stderr=ferr,
+                cwd="/scr/BEHAVIOR-1K/asset_pipeline",
+                start_new_session=True,
+            )
             p.wait(timeout=MAX_TIME_PER_PROCESS)
         except subprocess.TimeoutExpired:
-            print(f'Timeout for {scene} ({MAX_TIME_PER_PROCESS}s) expired. Killing', file=sys.stderr)
+            print(
+                f"Timeout for {scene} ({MAX_TIME_PER_PROCESS}s) expired. Killing",
+                file=sys.stderr,
+            )
             os.killpg(os.getpgid(p.pid), signal.SIGKILL)
             p.wait()
 
     return {
-        "stdout": pathlib.Path(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log").read_text(),
-        "stderr": pathlib.Path(f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err").read_text(),
+        "stdout": pathlib.Path(
+            f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.log"
+        ).read_text(),
+        "stderr": pathlib.Path(
+            f"/scr/BEHAVIOR-1K/asset_pipeline/logs/{scene}.err"
+        ).read_text(),
     }
 
+
 def main():
-    with PipelineFS() as pipeline_fs, \
-         pipeline_fs.open("artifacts/og_dataset.zip", "rb") as og_dataset_zip, \
-         ZipFS(og_dataset_zip) as objects_fs, \
-         TempFS(temp_dir=str(TMP_DIR)) as dataset_fs, \
-         TempFS(temp_dir=str(TMP_DIR)) as out_temp_fs:
+    with (
+        PipelineFS() as pipeline_fs,
+        pipeline_fs.open("artifacts/og_dataset.zip", "rb") as og_dataset_zip,
+        ZipFS(og_dataset_zip) as objects_fs,
+        TempFS(temp_dir=str(TMP_DIR)) as dataset_fs,
+        TempFS(temp_dir=str(TMP_DIR)) as out_temp_fs,
+    ):
         # Copy everything over to the dataset FS
         print("Copying input to dataset fs...")
 
         # Copy all the files to the output zip filesystem.
         total_files = sum(1 for f in objects_fs.walk.files())
         with tqdm.tqdm(total=total_files) as pbar:
-            fs.copy.copy_fs(objects_fs, dataset_fs, on_copy=lambda *args: pbar.update(1))
+            fs.copy.copy_fs(
+                objects_fs, dataset_fs, on_copy=lambda *args: pbar.update(1)
+            )
 
         print("Launching cluster...")
         dask_client = launch_cluster(WORKER_COUNT)
@@ -61,7 +99,8 @@ def main():
                 dataset_fs.getsyspath("/"),
                 scene,
                 out_temp_fs.getsyspath("/"),
-                pure=False)
+                pure=False,
+            )
             futures[worker_future] = scene
 
         # Wait for all the workers to finish
@@ -89,6 +128,7 @@ def main():
 
         # At this point, out_temp_fs's contents will be zipped. Save the success file.
         pipeline_fs.pipeline_output().touch("usdify_scenes.success")
+
 
 if __name__ == "__main__":
     main()

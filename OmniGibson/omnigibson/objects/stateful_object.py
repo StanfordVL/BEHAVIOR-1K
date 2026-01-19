@@ -181,9 +181,9 @@ class StatefulObject(BaseObject):
             state (ObjectStateBase): Object state instance to add to this object
         """
         assert self._states is not None, "Cannot add state since states have not been initialized yet!"
-        assert state.__class__ not in self._states, (
-            f"State {state.__class__.__name__} " f"has already been added to this object!"
-        )
+        assert (
+            state.__class__ not in self._states
+        ), f"State {state.__class__.__name__} has already been added to this object!"
         self._states[state.__class__] = state
 
     @property

@@ -150,8 +150,8 @@ def sequential_sum_balanced_partitioning(nums, M, i):
     Returns:
         start_idx: starting index of the i-th partition
         start_offset: offset of the first element in the i-th partition
-        end_idx: ending index of the i-th partition (not inclusive)
-        end_offset: offset of the last element in the i-th partition
+        end_idx: ending index of the i-th partition (inclusive)
+        end_offset: offset of the last element in the i-th partition (not inclusive)
     Example:
         nums = [1, 2, 3, 4, 5, 6]
         M = 3

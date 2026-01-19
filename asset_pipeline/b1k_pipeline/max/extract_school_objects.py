@@ -163,10 +163,9 @@ def merge_files():
         )
         assert success, f"Failed to import"
         imported_objs_by_name = {obj.name: obj for obj in imported_meshes}
-        assert set(objects_to_import) == set(
-            imported_objs_by_name.keys()
-        ), "Not all objects were imported. Missing: " + str(
-            set(objects_to_import) - set(imported_objs_by_name.keys())
+        assert set(objects_to_import) == set(imported_objs_by_name.keys()), (
+            "Not all objects were imported. Missing: "
+            + str(set(objects_to_import) - set(imported_objs_by_name.keys()))
         )
 
         # Unhide everything

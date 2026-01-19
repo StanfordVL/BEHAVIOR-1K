@@ -70,7 +70,9 @@ def load_objs_from_urdf(fn, pose=None):
 
 
 def process_urdf(old_category_name, old_model_name):
-    model_dir = os.path.join(IN_DATASET_ROOT, "objects", old_category_name, old_model_name)
+    model_dir = os.path.join(
+        IN_DATASET_ROOT, "objects", old_category_name, old_model_name
+    )
     intervention_request_msgs = []
 
     # Convert to new model name.
@@ -283,13 +285,9 @@ def process_urdf(old_category_name, old_model_name):
     # First, get the lower range of everything based on the default lfk.
     found_identity_transform = False
     for link, link_pose in lfk.items():
-        obj, any_identity_transform = process_link(
-            link, link_pose, is_upper_side=False
-        )
+        obj, any_identity_transform = process_link(link, link_pose, is_upper_side=False)
         lower_objects_by_link[link] = obj
-        found_identity_transform = (
-            found_identity_transform or any_identity_transform
-        )
+        found_identity_transform = found_identity_transform or any_identity_transform
     assert found_identity_transform, "No object has identity transform."
 
     # Then, for each joint, add the upper limit.
@@ -349,7 +347,9 @@ def process_object_dir(model_dir):
 
     # Start processing.
     try:
-        intervention_request_msgs, base_obj = process_urdf(old_category_name, old_model_name)
+        intervention_request_msgs, base_obj = process_urdf(
+            old_category_name, old_model_name
+        )
 
         # Add the parts
         metadata_path = os.path.join(model_dir, "misc", "metadata.json")
@@ -391,13 +391,17 @@ def process_object_dir(model_dir):
                     # Update the name, transform and parent
                     part_idx = part_type_instance_idx[expected_part_name]
                     part_type_instance_idx[expected_part_name] += 1
-                    new_obj.name = f"B-{new_part_cat}-{new_part_model}-{part_idx}-Tsubpart"
+                    new_obj.name = (
+                        f"B-{new_part_cat}-{new_part_model}-{part_idx}-Tsubpart"
+                    )
                     new_obj.transform = new_obj.transform * pose_mat
                     new_obj.parent = base_obj
 
                 if len(new_objs) != 1:
                     part_names = ",".join([x.name for x in new_objs])
-                    intervention_request_msgs.append(f"Found new objects != 1 after importing part {part_cat}-{part_model}: {part_names}")
+                    intervention_request_msgs.append(
+                        f"Found new objects != 1 after importing part {part_cat}-{part_model}: {part_names}"
+                    )
 
         # Fix any bad materials, set the reflection color of the vray materials to be 0
         rt.select(rt.objects)
@@ -521,7 +525,7 @@ def import_legacy_objs():
         print(f"Failures: {len(failures)} / {len(remaining_objs)}")
         sorted_failure_fns = sorted(failures.keys())
         for i, failure_fn in enumerate(sorted_failure_fns):
-            print(f"{i+1} / {len(failures)} - {failure_fn}: {failures[failure_fn]}")
+            print(f"{i + 1} / {len(failures)} - {failure_fn}: {failures[failure_fn]}")
 
 
 def import_legacy_objs_button():

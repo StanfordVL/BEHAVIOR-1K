@@ -5,7 +5,9 @@ import pathlib
 import networkx as nx
 import bddl
 
-DEFAULT_HIERARCHY_FILE = pathlib.Path(__file__).parent / "generated_data/output_hierarchy_properties.json"
+DEFAULT_HIERARCHY_FILE = (
+    pathlib.Path(__file__).parent / "generated_data/output_hierarchy_properties.json"
+)
 
 
 class ObjectTaxonomy(object):
@@ -95,7 +97,7 @@ class ObjectTaxonomy(object):
         return self._get_synset_by_filter(
             lambda synset: substance in self.get_substances(synset)
         )
-    
+
     def get_synset_from_category_or_substance(self, category_or_substance):
         """
         Get synset name corresponding to object category or substance.

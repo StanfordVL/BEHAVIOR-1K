@@ -636,7 +636,7 @@ class VisualParticleSystem(BaseSystem):
     ):
         # Should not be called, since particles must be tied to a group!
         raise ValueError(
-            "Cannot call generate_particles for a VisualParticleSystem! " "Call generate_group_particles() instead."
+            "Cannot call generate_particles for a VisualParticleSystem! Call generate_group_particles() instead."
         )
 
     def generate_group_particles(
