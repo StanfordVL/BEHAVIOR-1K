@@ -27,7 +27,6 @@ property:
   arm_workspace_range:
     left: [-45, 45]
     right: [-45, 45]
-
   disabled_collision_pairs:
     - ["left_arm_link1", "torso_link4"]
     - ["left_arm_link2", "torso_link4"]

@@ -3,7 +3,6 @@ import torch as th
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
-from omnigibson.robots import Robot
 from omnigibson.utils.backend_utils import _compute_backend as cb
 
 
@@ -308,7 +307,7 @@ def test_arm_control():
                         if pos_check is not None:
                             is_valid_pos = pos_check(target_pos, curr_pos, init_pos)
                             assert is_valid_pos,(
-                                    f"{robot.model_name} 11Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
+                                    f"{robot.model_name} Got mismatch for controller [{controller}], mode [{controller_mode}], robot [{robot.model_name}], action [{action_name}]\n"
                                     f"target_pos: {target_pos}, curr_pos: {curr_pos}, init_pos: {init_pos}"
                                 )
                         ori_check = err_checks[controller_mode][action_name]["ori"]

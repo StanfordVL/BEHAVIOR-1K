@@ -9,12 +9,11 @@ import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.lazy as lazy
 from omnigibson.envs import DataCollectionWrapper
-from omnigibson.robots import REGISTERED_ROBOTS, Robot
+from omnigibson.robots import Robot
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems.system_base import BaseSystem
 from omnigibson.systems.macro_particle_system import MacroVisualParticleSystem
 from omnigibson.utils.teleop_utils import OVXRSystem
-from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states import Filled
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.usd_utils import GripperRigidContactAPI, ControllableObjectViewAPI

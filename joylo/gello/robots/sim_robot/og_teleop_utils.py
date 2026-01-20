@@ -15,7 +15,6 @@ from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils import transform_utils as T
 from omnigibson.sensors import VisionSensor
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.robots.robot import Robot
 from bddl.activity import Conditions
 
 from gello.robots.sim_robot.og_teleop_cfg import *
@@ -1022,9 +1021,9 @@ def optimize_sim_settings(vr_mode=False):
     settings.set("/app/vsync", True)
 
 def setup_ghost_robot_info(ghost, robot):
-    if robot.roobot_type_name=="r1pro":
+    if robot.robot_type_name=="r1pro":
         robot_arm_dof = 7
-    elif robot.roobot_type_name=="r1":
+    elif robot.robot_type_name=="r1":
         robot_arm_dof = 6
     else:
         raise ValueError(f"Unknown robot type: {type(robot)}")

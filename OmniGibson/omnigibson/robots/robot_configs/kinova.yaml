@@ -1,39 +1,36 @@
 capabilities: 
   - is_manipulation
-
 property:
-    raw_controller_order: ["arm_0", "gripper_0"]
-
-    default_controllers:
-        "arm_0": InverseKinematicsController"
-        "gripper_0": "MultiFingerGripperController"
-
-    default_joint_pos:
-        [0.0, "pi / 6", 0, "pi / 2", 0, "pi / 3", "-pi / 2", 0, 0, 0, 0, 0, 0, 0]
-
-    arm_link_names:
-        "0": ["gen3_base_link", "gen3_shoulder_link", "gen3_half_arm_1_link", "gen3_half_arm_2_link", "gen3_forearm_link", "gen3_spherical_wrist_1_link", "gen3_spherical_wrist_2_link"]
-
-    arm_joint_names:
-        "0": ["gen3_joint_1", "gen3_joint_2", "gen3_joint_3", "gen3_joint_4", "gen3_joint_5", "gen3_joint_6", "gen3_joint_7"]
-
-    eef_link_names:
-        "0": "eef_link"
-
-    finger_link_names:
-        "0": ["left_inner_finger", "right_inner_finger"]
-
-    finger_joint_names:
-        "0": ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]
-
-    teleop_rotation_offset:
-        "0": ["-pi", 0, 0]
-
-    assisted_grasp_start_points:
-        "0": [["left_inner_finger", [0.008, 0.010, 0.0]], ["left_inner_finger", [0.008, 0.040, 0.0]]]
-
-    assisted_grasp_end_points:
-        "0": [["right_inner_finger", [0.008, 0.010, 0.0]], ["right_inner_finger", [0.008, 0.040, 0.0]]]
-
-    disabled_collision_pairs:
-        [[left_outer_knuckle', 'left_outer_finger'], ['left_outer_knuckle', 'left_inner_finger'], ['left_outer_knuckle', 'left_inner_knuckle'], ['left_outer_knuckle', 'right_outer_knuckle'], ['left_outer_knuckle', 'right_outer_finger'], ['left_outer_knuckle', 'right_inner_finger'], ['left_outer_knuckle', 'right_inner_knuckle'], ['left_outer_finger', 'left_inner_finger'], ['left_outer_finger', 'left_inner_knuckle'], ['left_outer_finger', 'right_outer_knuckle'], ['left_outer_finger', 'right_outer_finger'], ['left_outer_finger', 'right_inner_finger'], ['left_outer_finger', 'right_inner_knuckle'], ['left_inner_finger', 'left_inner_knuckle'], ['left_inner_finger', 'right_outer_knuckle'], ['left_inner_finger', 'right_outer_finger'], ['left_inner_finger', 'right_inner_finger'], ['left_inner_finger', 'right_inner_knuckle'], ['left_inner_knuckle', 'right_outer_knuckle'], ['left_inner_knuckle', 'right_outer_finger'], ['left_inner_knuckle', 'right_inner_finger'], ['left_inner_knuckle', 'right_inner_knuckle'], ['right_outer_knuckle', 'right_outer_finger'], ['right_outer_knuckle', 'right_inner_finger'], ['right_outer_knuckle', 'right_inner_knuckle'], ['right_outer_finger', 'right_inner_finger'], ['right_outer_finger', 'right_inner_knuckle'], ['right_inner_finger', 'right_inner_knuckle']]
+  raw_controller_order: ["arm_0", "gripper_0"]
+  default_controllers:
+    "arm_0": "InverseKinematicsController"
+    "gripper_0": "MultiFingerGripperController"
+  default_joint_pos: [0.0, "pi / 6", 0, "pi / 2", 0, "pi / 3", "-pi / 2", 0, 0, 0, 0, 0, 0, 0]
+  arm_link_names:
+    "0": ["gen3_base_link", "gen3_shoulder_link", "gen3_half_arm_1_link", "gen3_half_arm_2_link", "gen3_forearm_link", "gen3_spherical_wrist_1_link", "gen3_spherical_wrist_2_link"]
+  arm_joint_names:
+    "0": ["gen3_joint_1", "gen3_joint_2", "gen3_joint_3", "gen3_joint_4", "gen3_joint_5", "gen3_joint_6", "gen3_joint_7"]
+  eef_link_names:
+    "0": "eef_link"
+  finger_link_names:
+    "0": ["left_inner_finger", "right_inner_finger"]
+  finger_joint_names:
+    "0": ["left_outer_knuckle_joint", "right_outer_knuckle_joint"]
+  teleop_rotation_offset:
+    "0": ["-pi", 0, 0]
+  assisted_grasp_start_points:
+    "0": [["left_inner_finger", [0.008, 0.010, 0.0]], ["left_inner_finger", [0.008, 0.040, 0.0]]]
+  assisted_grasp_end_points:
+    "0": [["right_inner_finger", [0.008, 0.010, 0.0]], ["right_inner_finger", [0.008, 0.040, 0.0]]]
+  disabled_collision_pairs:
+    - ["left_outer_knuckle", "left_outer_finger"]
+    - ["left_outer_knuckle", "left_inner_finger"]
+    - ["left_outer_knuckle", "left_inner_knuckle"]
+    - ["left_outer_knuckle", "right_outer_knuckle"]
+    - ["left_outer_knuckle", "right_outer_finger"]
+    - ["left_outer_knuckle", "right_inner_finger"]
+    - ["left_outer_knuckle", "right_inner_knuckle"]
+    - ["left_outer_finger", "left_inner_finger"]
+    - ["left_outer_finger", "left_inner_knuckle"]
+    - ["left_outer_finger", "right_outer_knuckle"]
+    - ["left_outer_finger", "right_outer_finger"]

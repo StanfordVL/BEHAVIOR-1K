@@ -5,7 +5,6 @@ import torch as th
 import yaml
 from functools import cached_property
 from typing import Literal
-from abc import abstractmethod
 from collections import namedtuple
 import networkx as nx
 import gymnasium as gym
@@ -21,12 +20,11 @@ from omnigibson.sensors import (
 )
 import omnigibson as og
 import omnigibson.lazy as lazy
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.asset_utils import get_dataset_path
 from omnigibson.utils.backend_utils import _compute_backend as cb
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.numpy_utils import NumpyTypes
-from omnigibson.utils.python_utils import classproperty, merge_nested_dicts, CachedFunctions, assert_valid_key
+from omnigibson.utils.python_utils import merge_nested_dicts, CachedFunctions, assert_valid_key
 from omnigibson.utils.vision_utils import segmentation_to_rgb, change_pcd_frame
 from omnigibson.utils.geometry_utils import wrap_angle
 from omnigibson.controllers import (
@@ -44,7 +42,6 @@ from omnigibson.controllers import (
     DifferentialDriveController,
 )
 from omnigibson.controllers.joint_controller import JointController
-from omnigibson.objects.object_base import BaseObject
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.object_states import ContactBodies
 from omnigibson.prims.geom_prim import VisualGeomPrim
@@ -649,17 +646,6 @@ class Robot(USDObject, GymObservable):
         if self.is_holonomic_base:
             self.set_joint_positions(base_joint_positions, indices=self.base_idx)
 
-    def _create_discrete_action_space(self):
-        """
-        Create a discrete action space for this object.
-        By default, subclass does not support this type of action space.
-        If otherwise, should be implemented by the subclass.
-
-        Returns:
-            gym.space: Object-specific discrete action space
-        """
-        raise ValueError("Does not support discrete actions!")
-
     def _create_continuous_action_space(self):
         """
         Create a continuous action space for this object. By default, this loops over all controllers and
@@ -694,7 +680,7 @@ class Robot(USDObject, GymObservable):
             action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
         if self.is_holonomic_base:
-            rz_joint_dof_indices = rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
+            rz_joint_dof_indices = self.joints["base_footprint_rz_joint"].dof_indices
             j_pos = self.get_joint_positions()[rz_joint_dof_indices]
             # In preparation for the base controller's @update_goal, we need to wrap the current joint pos
             # to be in range [-pi, pi], so that once the command (a delta joint pos in range [-pi, pi])
@@ -1094,24 +1080,6 @@ class Robot(USDObject, GymObservable):
         fcns[f"{task_name}_jacobian_relative"] = lambda: ControllableObjectViewAPI.get_relative_jacobian(
             self.articulation_root_path
         )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
-
-    def q_to_action(self, q):
-        """
-        Converts a target joint configuration to an action that can be applied to this object.
-        All controllers should be JointController with use_delta_commands=False
-        """
-        action = []
-        for name, controller in self.controllers.items():
-            assert (
-                isinstance(controller, JointController) and not controller.use_delta_commands
-            ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
-            command = q[controller.dof_idx]
-            action.append(controller._reverse_preprocess_command(command))
-        action = th.cat(action, dim=0)
-        assert (
-            action.shape[0] == self.action_dim
-        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
-        return action
 
     def dump_action(self):
         """
@@ -4051,7 +4019,20 @@ class Robot(USDObject, GymObservable):
         Converts a target joint configuration to an action that can be applied to this object.
         All controllers should be JointController with use_delta_commands=False
         """
-        assert self.is_holonomic_base
+        if not self.is_holonomic_base:
+            action = []
+            for name, controller in self.controllers.items():
+                assert (
+                    isinstance(controller, JointController) and not controller.use_delta_commands
+                ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
+                command = q[controller.dof_idx]
+                action.append(controller._reverse_preprocess_command(command))
+            action = th.cat(action, dim=0)
+            assert (
+                action.shape[0] == self.action_dim
+            ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+            return action
+
         action = []
         for name, controller in self.controllers.items():
             assert (
@@ -4273,7 +4254,6 @@ class Robot(USDObject, GymObservable):
     def _create_discrete_action_space(self):
         if not self.is_two_wheel:
             raise ValueError(f"{self.robot_type_name} does not support discrete actions!")
-            return
 
         # Set action list based on controller (joint or DD) used
 
