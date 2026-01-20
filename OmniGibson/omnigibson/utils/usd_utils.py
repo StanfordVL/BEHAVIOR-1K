@@ -840,9 +840,7 @@ class BatchControlViewAPIImpl:
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.robots import Robot
 
-        controllable_objects = [
-            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)
-        ]
+        controllable_objects = [obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)]
 
         # Get their corresponding prim paths
         expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}
@@ -1226,9 +1224,7 @@ class ControllableObjectViewAPI:
         # First, get all of the controllable objects in the scene (avoiding circular import)
         from omnigibson.robots import Robot
 
-        controllable_objects = [
-            obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)
-        ]
+        controllable_objects = [obj for scene in og.sim.scenes for obj in scene.objects if isinstance(obj, Robot)]
 
         # Get their corresponding prim paths
         expected_prim_paths = {obj.articulation_root_path for obj in controllable_objects}

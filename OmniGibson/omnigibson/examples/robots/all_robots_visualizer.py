@@ -23,7 +23,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Iterate over all robots and demo their motion
     for robot_name in REGISTERED_ROBOTS:
-      
         # Create and import robot
         robot = Robot(
             name=robot_name,

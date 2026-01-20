@@ -168,7 +168,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
             action = random_action
         else:
             action = action_generator.get_teleop_action()
-        
+
         env.step(action=action)
         step += 1
 

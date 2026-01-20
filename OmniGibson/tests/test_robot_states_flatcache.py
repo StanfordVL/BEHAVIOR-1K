@@ -195,7 +195,7 @@ def test_robot_load_drive():
 
             eef_pos = env.robots[0].get_eef_position()
             eef_orn = env.robots[0].get_eef_orientation()
-            if robot.model_name=="stretch":  # Stretch arm faces the y-axis
+            if robot.model_name == "stretch":  # Stretch arm faces the y-axis
                 target_eef_pos = th.tensor([eef_pos[0], eef_pos[1] - 0.1, eef_pos[2]], dtype=th.float32)
             else:
                 target_eef_pos = th.tensor([eef_pos[0] + 0.1, eef_pos[1], eef_pos[2]], dtype=th.float32)
@@ -278,7 +278,7 @@ def test_grasping_mode():
     for grasping_mode in grasping_modes:
         robot = Robot(
             name="Fetch",
-            robot_type_name = "Fetch",
+            robot_type_name="Fetch",
             obs_modalities=[],
             controller_config={"arm_0": {"name": "InverseKinematicsController", "mode": "pose_absolute_ori"}},
             grasping_mode=grasping_mode,
