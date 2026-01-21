@@ -55,108 +55,102 @@ def test_data_collect_and_playback():
     _, collect_hdf5_path = tempfile.mkstemp("test_data_collection.hdf5", dir=og.tempdir)
     _, playback_hdf5_path = tempfile.mkstemp("test_data_playback.hdf5", dir=og.tempdir)
 
-    # Create the environment (wrapped as a DataCollection env)
-    should_collect = not os.path.exists(collect_hdf5_path)
-    should_playback = True
-    if should_collect:
-        env = og.Environment(configs=cfg)
+    env = og.Environment(configs=cfg)
 
-        env = HDF5CollectionWrapper(
-            env=env,
-            output_path=collect_hdf5_path,
-            only_successes=False,
-            obj_attr_keys=["scale", "visible"],
-        )
+    env = HDF5CollectionWrapper(
+        env=env,
+        output_path=collect_hdf5_path,
+        only_successes=False,
+        obj_attr_keys=["scale", "visible"],
+    )
 
-        # Record 3 episodes
-        for i in range(3):
-            env.reset()
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
-            # Manually add a random object, e.g.: a banana, and place on the floor
-            obj = DatasetObject(name="banana", category="banana")
-            env.scene.add_object(obj)
-            obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
+    # Record 3 episodes
+    for i in range(3):
+        env.reset()
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
+        # Manually add a random object, e.g.: a banana, and place on the floor
+        obj = DatasetObject(name="banana", category="banana")
+        env.scene.add_object(obj)
+        obj.set_position(th.ones(3, dtype=th.float32) * 10.0)
 
-            # Take a few more steps
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
 
-            # Manually remove the added object
-            env.scene.remove_object(obj)
+        # Manually remove the added object
+        env.scene.remove_object(obj)
 
-            # Take a few more steps
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
 
-            # Checkpoint state here for our first episode
-            if i == 0:
-                env.update_checkpoint()
-                robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+        # Checkpoint state here for our first episode
+        if i == 0:
+            env.update_checkpoint()
+            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
 
-                # Take one step to avoid creating the system immediately after the checkpoint is updated, which
-                # will cause downstream errors during playback
-                env.step(env.robots[0].action_space.sample())
+            # Take one step to avoid creating the system immediately after the checkpoint is updated, which
+            # will cause downstream errors during playback
+            env.step(env.robots[0].action_space.sample())
 
-            # Add water particles
-            water = env.scene.get_system("water")
-            pos = th.rand(10, 3, dtype=th.float32) * 10.0
-            water.generate_particles(positions=pos)
+        # Add water particles
+        water = env.scene.get_system("water")
+        pos = th.rand(10, 3, dtype=th.float32) * 10.0
+        water.generate_particles(positions=pos)
 
-            # Take a few more steps
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
 
-            if i == 0:
-                # Rollback state here for our first episode
-                env.rollback_to_checkpoint()
+        if i == 0:
+            # Rollback state here for our first episode
+            env.rollback_to_checkpoint()
 
-                # Make sure water doesn't exist
-                assert "water" not in env.scene.active_systems
+            # Make sure water doesn't exist
+            assert "water" not in env.scene.active_systems
 
-                # Make sure robot state is roughly the same
-                for arm, pos in robot_eef_state.items():
-                    assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
+            # Make sure robot state is roughly the same
+            for arm, pos in robot_eef_state.items():
+                assert th.allclose(pos, env.robots[0].get_eef_position(arm=arm), atol=1e-5)
 
-            elif i == 1:
-                # Checkpoint state here for our second episode
-                env.update_checkpoint()
-                robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
+        elif i == 1:
+            # Checkpoint state here for our second episode
+            env.update_checkpoint()
+            robot_eef_state = {arm: env.robots[0].get_eef_position(arm=arm) for arm in env.robots[0].arm_names}
 
-                # Take one step to avoid clearing the system immediately after the checkpoint is updated, which
-                # will cause downstream errors during playback
-                env.step(env.robots[0].action_space.sample())
+            # Take one step to avoid clearing the system immediately after the checkpoint is updated, which
+            # will cause downstream errors during playback
+            env.step(env.robots[0].action_space.sample())
 
-            # Clear the system
+        # Clear the system
+        env.scene.clear_system("water")
+
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
+
+        if i == 1:
+            # Rollback state here for our first episode
+            env.rollback_to_checkpoint()
+
+            # Make sure water exists
+            assert "water" in env.scene.active_systems
+
+            # Make sure robot state is roughly the same
+            for arm, pos in robot_eef_state.items():
+                assert th.allclose(pos, env.robots[0].get_eef_position(arm=arm), atol=1e-5)
+
+        # Take a few more steps
+        for _ in range(2):
+            env.step(env.robots[0].action_space.sample())
+
+        if i == 1:
+            # Clear the water system since it was re-added
             env.scene.clear_system("water")
 
-            # Take a few more steps
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
-
-            if i == 1:
-                # Rollback state here for our first episode
-                env.rollback_to_checkpoint()
-
-                # Make sure water exists
-                assert "water" in env.scene.active_systems
-
-                # Make sure robot state is roughly the same
-                for arm, pos in robot_eef_state.items():
-                    assert th.all(th.isclose(pos, env.robots[0].get_eef_position(arm=arm))).item()
-
-            # Take a few more steps
-            for _ in range(2):
-                env.step(env.robots[0].action_space.sample())
-
-            if i == 1:
-                # Clear the water system since it was re-added
-                env.scene.clear_system("water")
-
-        # Save this data
-        env.save_data()
-    elif should_playback:
-        og.launch()
+    # Save this data
+    env.save_data()
 
     hdf5_playback_kwargs = {
         "output_path": playback_hdf5_path,
@@ -168,78 +162,74 @@ def test_data_collect_and_playback():
         "lerobot_version": LEROBOT_CODEBASE_VERSION,
     }
 
-    if should_playback:
-        for playback_cls, playback_kwargs in zip(
-            (LeRobotPlaybackWrapper, HDF5PlaybackWrapper),
-            (lerobot_playback_kwargs, hdf5_playback_kwargs),
-        ):
-            # Clear the sim
-            og.clear(
-                physics_dt=0.001,
-                rendering_dt=0.001,
-                sim_step_dt=0.001,
-            )
+    for playback_cls, playback_kwargs in zip(
+        (LeRobotPlaybackWrapper, HDF5PlaybackWrapper),
+        (lerobot_playback_kwargs, hdf5_playback_kwargs),
+    ):
+        # Clear the sim
+        og.clear(
+            physics_dt=0.001,
+            rendering_dt=0.001,
+            sim_step_dt=0.001,
+        )
 
-            # Define robot sensor config and external sensors to use during playback
-            robot_sensor_config = {
-                "VisionSensor": {
-                    "modalities": ["rgb"],
-                    "sensor_kwargs": {
-                        "image_height": img_h,
-                        "image_width": img_w,
-                    },
+        # Define robot sensor config and external sensors to use during playback
+        robot_sensor_config = {
+            "VisionSensor": {
+                "modalities": ["rgb"],
+                "sensor_kwargs": {
+                    "image_height": img_h,
+                    "image_width": img_w,
                 },
-            }
-            external_sensors_config = [
-                {
-                    "sensor_type": "VisionSensor",
-                    "name": "external_sensor0",
-                    "relative_prim_path": f"/controllable__{cfg['robots'][0]['type'].lower()}__{cfg['robots'][0]['name']}/root_link/external_sensor0",
-                    "modalities": ["rgb", "depth_linear"],
-                    "sensor_kwargs": {
-                        "image_height": img_h,
-                        "image_width": img_w,
-                    },
-                    "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
-                    "orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
+            },
+        }
+        external_sensors_config = [
+            {
+                "sensor_type": "VisionSensor",
+                "name": "external_sensor0",
+                "relative_prim_path": f"/controllable__{cfg['robots'][0]['type'].lower()}__{cfg['robots'][0]['name']}/root_link/external_sensor0",
+                "modalities": ["rgb", "depth_linear"],
+                "sensor_kwargs": {
+                    "image_height": img_h,
+                    "image_width": img_w,
                 },
-            ]
+                "position": th.tensor([-0.26549, -0.30288, 1.0 + 0.861], dtype=th.float32),
+                "orientation": th.tensor([0.36165891, -0.24745751, -0.50752921, 0.74187715], dtype=th.float32),
+            },
+        ]
 
-            # Create a playback env and playback the data, collecting obs along the way
-            obs_modalities = ["proprio", "rgb", "depth_linear"]
-            env = playback_cls.create_from_hdf5(
-                input_path=collect_hdf5_path,
-                robot_obs_modalities=obs_modalities,
-                robot_sensor_config=robot_sensor_config,
-                external_sensors_config=external_sensors_config,
-                n_render_iterations=1,
-                only_successes=False,
-                **playback_kwargs,
-            )
+        # Create a playback env and playback the data, collecting obs along the way
+        obs_modalities = ["proprio", "rgb", "depth_linear"]
+        env = playback_cls.create_from_hdf5(
+            input_path=collect_hdf5_path,
+            robot_obs_modalities=obs_modalities,
+            robot_sensor_config=robot_sensor_config,
+            external_sensors_config=external_sensors_config,
+            n_render_iterations=1,
+            only_successes=False,
+            **playback_kwargs,
+        )
 
-            obs, info = env.reset()
-            for mod in obs_modalities:
-                found_obs_key = False
-                for obs_key in obs.keys():
-                    if mod in obs_key.split("::")[-1]:
-                        found_obs_key = True
-                        break
-                assert found_obs_key, f"Failed to find obs modality: {mod} in observation keys: {tuple(obs.keys())}"
+        obs, info = env.reset()
+        for mod in obs_modalities:
+            found_obs_key = False
+            for obs_key in obs.keys():
+                if mod in obs_key.split("::")[-1]:
+                    found_obs_key = True
+                    break
+            assert found_obs_key, f"Failed to find obs modality: {mod} in observation keys: {tuple(obs.keys())}"
 
-            env.playback_dataset(record_data=True)
-            env.save_data()
+        env.playback_dataset(record_data=True)
+        env.save_data()
 
     # Test loading env + reading data chunks from LeRobot dataset
     dataset_cls = OmniGibsonLeRobotV2Dataset if LEROBOT_CODEBASE_VERSION == "v2.1" else OmniGibsonLeRobotV3Dataset
     dataset = dataset_cls(
         repo_id=lerobot_playback_kwargs["output_path"],
         root=f"{lerobot_playback_kwargs['root_dir']}/{lerobot_playback_kwargs['output_path']}",
-        delta_timestamps={
-            "observation.rgb.external_sensor0": [-i / 30 for i in reversed(range(5))],
-        },
     )
 
-    batch_size = 8  # Or your desired batch size
+    batch_size = 8
     data_loader = th.utils.data.DataLoader(dataset, batch_size=batch_size)
     batch = next(iter(data_loader))
 

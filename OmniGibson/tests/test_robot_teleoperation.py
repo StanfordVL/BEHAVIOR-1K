@@ -1,4 +1,3 @@
-import pytest
 import torch as th
 from telemoma.human_interface.teleop_core import TeleopAction
 
@@ -7,7 +6,6 @@ from omnigibson.macros import gm
 from omnigibson.utils.transform_utils import quat2euler
 
 
-@pytest.mark.skip(reason="test hangs on CI")
 def test_teleop():
     cfg = {
         "env": {"action_timestep": 1 / 60.0, "physics_timestep": 1 / 120.0},
@@ -43,7 +41,7 @@ def test_teleop():
     start_eef_pose = robot.links[robot.eef_link_names[robot.default_arm]].get_position_orientation()
 
     # test moving robot arm
-    teleop_action.right = th.cat(([0.01], th.zeros(6)))
+    teleop_action.right = th.cat((th.tensor([0.01]), th.zeros(6)))
     for _ in range(50):
         action = robot.teleop_data_to_action(teleop_action)
         env.step(action)
