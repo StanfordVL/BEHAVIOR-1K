@@ -702,22 +702,25 @@ class ControllableObject(BaseObject):
             self.articulation_root_path
         )[-(self.n_links - link_idx), :, start_idx : start_idx + self.n_joints]
 
-    def q_to_action(self, q):
+    def q_to_action(self, q, controller_name=None):
         """
         Converts a target joint configuration to an action that can be applied to this object.
         All controllers should be JointController with use_delta_commands=False
         """
         action = []
         for name, controller in self.controllers.items():
+            if controller_name is not None and name != controller_name:
+                continue
             assert (
                 isinstance(controller, JointController) and not controller.use_delta_commands
             ), f"Controller [{name}] should be a JointController with use_delta_commands=False!"
             command = q[controller.dof_idx]
             action.append(controller._reverse_preprocess_command(command))
         action = th.cat(action, dim=0)
-        assert (
-            action.shape[0] == self.action_dim
-        ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
+        if controller_name is None:
+            assert (
+                action.shape[0] == self.action_dim
+            ), f"Action should have dimension {self.action_dim}, got {action.shape[0]}"
         return action
 
     def dump_action(self):

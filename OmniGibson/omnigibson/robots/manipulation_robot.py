@@ -264,6 +264,38 @@ class ManipulationRobot(BaseRobot):
             self._infer_finger_properties()
         except AssertionError as e:
             log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
+        
+        # For each grasping point, if we're in DEBUG mode, visualize with spheres
+        if gm.DEBUG:
+            for ag_points in (self.assisted_grasp_start_points, self.assisted_grasp_end_points):
+                if ag_points is None:
+                    continue
+                for arm_ag_points in ag_points.values():
+                    # Skip if None exist
+                    if arm_ag_points is None:
+                        continue
+                    # For each ag point, generate a small sphere at that point
+                    for i, arm_ag_point in enumerate(arm_ag_points):
+                        link = self.links[arm_ag_point.link_name]
+                        local_pos = arm_ag_point.position
+                        vis_mesh_prim_path = f"{link.prim_path}/ag_point_{i}"
+                        create_primitive_mesh(
+                            prim_path=vis_mesh_prim_path,
+                            extents=0.005,
+                            primitive_type="Sphere",
+                        )
+                        vis_geom = VisualGeomPrim(
+                            relative_prim_path=absolute_prim_path_to_scene_relative(
+                                scene=self.scene,
+                                absolute_prim_path=vis_mesh_prim_path,
+                            ),
+                            name=f"ag_point_{i}",
+                        )
+                        vis_geom.load(self.scene)
+                        vis_geom.set_position_orientation(
+                            position=local_pos,
+                            frame="parent",
+                        )
 
     def _infer_finger_properties(self):
         """
@@ -422,36 +454,6 @@ class ManipulationRobot(BaseRobot):
                 else:
                     # End point
                     self._default_ag_end_points[arm] = grasping_points
-
-        # For each grasping point, if we're in DEBUG mode, visualize with spheres
-        if gm.DEBUG:
-            for ag_points in (self.assisted_grasp_start_points, self.assisted_grasp_end_points):
-                for arm_ag_points in ag_points.values():
-                    # Skip if None exist
-                    if arm_ag_points is None:
-                        continue
-                    # For each ag point, generate a small sphere at that point
-                    for i, arm_ag_point in enumerate(arm_ag_points):
-                        link = self.links[arm_ag_point.link_name]
-                        local_pos = arm_ag_point.position
-                        vis_mesh_prim_path = f"{link.prim_path}/ag_point_{i}"
-                        create_primitive_mesh(
-                            prim_path=vis_mesh_prim_path,
-                            extents=0.005,
-                            primitive_type="Sphere",
-                        )
-                        vis_geom = VisualGeomPrim(
-                            relative_prim_path=absolute_prim_path_to_scene_relative(
-                                scene=self.scene,
-                                absolute_prim_path=vis_mesh_prim_path,
-                            ),
-                            name=f"ag_point_{i}",
-                        )
-                        vis_geom.load(self.scene)
-                        vis_geom.set_position_orientation(
-                            position=local_pos,
-                            frame="parent",
-                        )
 
     def is_grasping(self, arm="default", candidate_obj=None):
         """
@@ -658,8 +660,13 @@ class ManipulationRobot(BaseRobot):
             )
             dic["eef_{}_pos".format(arm)], dic["eef_{}_quat".format(arm)] = cb.to_torch(eef_pos), cb.to_torch(eef_quat)
             dic["grasp_{}".format(arm)] = th.tensor([self.is_grasping(arm)])
-            dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
+            gripper_qpos = joint_positions[self.gripper_control_idx[arm]]
+            dic["gripper_{}_qpos".format(arm)] = gripper_qpos
             dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
+            # Include normalized gripper qpos state -- a single value in range[0, 1] which is the average of the absolute values of the gripper qpos and divided by their range
+            gripper_qpos_range = (self.joint_upper_limits - self.joint_lower_limits)[self.gripper_control_idx[arm]]
+            gripper_qpos_norm = th.mean(th.abs(gripper_qpos / gripper_qpos_range), dim=0, keepdim=True)
+            dic["gripper_{}_qpos_norm".format(arm)] = gripper_qpos_norm
 
         return dic
 
@@ -1600,18 +1607,45 @@ class ManipulationRobot(BaseRobot):
             control = cb.to_torch(controller.control)
             if control is None:
                 applying_grasp = False
-            elif self._grasping_direction == "lower":
-                applying_grasp = (
-                    th.any(control < self.joint_upper_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
-                    else th.any(control < 0)
-                )
             else:
-                applying_grasp = (
-                    th.any(control > self.joint_lower_limits[controlled_joints])
-                    if controller.control_type == ControlType.POSITION
-                    else th.any(control > 0)
-                )
+                # Handle per-finger inversion for asymmetric joint limits
+                # Get per-finger inversion if available (MultiFingerGripperController), else use grasping_direction
+                if isinstance(controller, MultiFingerGripperController):
+                    inverted = cb.to_torch(controller._inverted)
+                    lower_limits = self.joint_lower_limits[controlled_joints]
+                    upper_limits = self.joint_upper_limits[controlled_joints]
+
+                    if controller.control_type == ControlType.POSITION:
+                        # For each finger, check if control is moving towards closed position:
+                        # - Non-inverted: closed = lower, so applying_grasp when control < upper
+                        # - Inverted: closed = upper, so applying_grasp when control > lower
+                        grasp_non_inverted = control < upper_limits
+                        grasp_inverted = control > lower_limits
+                        per_finger_grasping = th.where(inverted, grasp_inverted, grasp_non_inverted)
+                    else:
+                        # For velocity/torque control:
+                        # - Non-inverted: closed = lower, so applying_grasp when control < 0
+                        # - Inverted: closed = upper, so applying_grasp when control > 0
+                        grasp_non_inverted = control < 0
+                        grasp_inverted = control > 0
+                        per_finger_grasping = th.where(inverted, grasp_inverted, grasp_non_inverted)
+
+                    # Grasp is being applied if any finger is moving towards closed
+                    applying_grasp = th.any(per_finger_grasping)
+                else:
+                    # Fallback to original logic using grasping_direction for non-MultiFingerGripperController
+                    if self._grasping_direction == "lower":
+                        applying_grasp = (
+                            th.any(control < self.joint_upper_limits[controlled_joints])
+                            if controller.control_type == ControlType.POSITION
+                            else th.any(control < 0)
+                        )
+                    else:
+                        applying_grasp = (
+                            th.any(control > self.joint_lower_limits[controlled_joints])
+                            if controller.control_type == ControlType.POSITION
+                            else th.any(control > 0)
+                        )
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
                 if self._ag_release_counter[arm] is not None:

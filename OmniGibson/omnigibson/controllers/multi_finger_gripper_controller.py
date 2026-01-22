@@ -116,6 +116,7 @@ class MultiFingerGripperController(GripperController):
             assert len(self._inverted) == len(
                 dof_idx
             ), f"inverted array length ({len(self._inverted)}) must match number of DOFs ({len(dof_idx)})"
+        self._inverted = cb.bool(self._inverted)
         self._limit_tolerance = limit_tolerance
         self._open_qpos = open_qpos if open_qpos is None else cb.array(open_qpos)
         self._closed_qpos = closed_qpos if closed_qpos is None else cb.array(closed_qpos)
@@ -294,10 +295,6 @@ class MultiFingerGripperController(GripperController):
         elif self._control is None:
             is_grasping = IsGraspingState.FALSE
 
-        #  Different values in the command for non-independent mode - cannot use heuristics
-        elif not cb.all(self._control == self._control[0]):
-            is_grasping = IsGraspingState.UNKNOWN
-
         # Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the gripper
         # controller's tolerance of zero-ing out velocities, which makes the heuristics invalid.
         elif not m.POS_TOLERANCE > self._limit_tolerance:
@@ -305,6 +302,8 @@ class MultiFingerGripperController(GripperController):
 
         else:
             finger_pos = control_dict["joint_position"][self.dof_idx]
+            min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]
+            max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
 
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
             if self._motor_type == "position" and cb.abs(finger_pos - self._control).mean() < m.POS_TOLERANCE:
@@ -316,19 +315,24 @@ class MultiFingerGripperController(GripperController):
 
             # Otherwise, the last control signal intends to "move" the gripper
             else:
-                min_pos = self._control_limits[ControlType.POSITION][0][self.dof_idx]
-                max_pos = self._control_limits[ControlType.POSITION][1][self.dof_idx]
-
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
                 finger_pos = finger_pos.clip(min_pos, max_pos)
 
-                # Check distance from both ends of the joint limits
-                dist_from_lower_limit = finger_pos - min_pos
-                dist_from_upper_limit = max_pos - finger_pos
+                # Compute distance from closed and open positions for each finger, accounting for inversion
+                # Non-inverted: closed = min, open = max
+                # Inverted: closed = max, open = min
+                closed_pos = cb.where(self._inverted, max_pos, min_pos)
+                open_pos = cb.where(self._inverted, min_pos, max_pos)
 
-                # If either of the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
+                # Distance from closed position (per-finger)
+                dist_from_closed = cb.abs(finger_pos - closed_pos)
+                # Distance from open position (per-finger)
+                dist_from_open = cb.abs(finger_pos - open_pos)
+
+                # The gripper is in a valid grasping position if fingers are not near their fully open
+                # or fully closed positions (i.e., stopped somewhere in between due to grasping an object)
                 valid_grasp_pos = (
-                    dist_from_lower_limit.mean() > m.POS_TOLERANCE or dist_from_upper_limit.mean() > m.POS_TOLERANCE
+                    dist_from_closed.mean() > m.POS_TOLERANCE and dist_from_open.mean() > m.POS_TOLERANCE
                 )
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)

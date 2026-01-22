@@ -176,7 +176,7 @@ class Yam(ManipulationRobot):
     @property
     def _default_joint_pos(self):
         # Default joint positions: 6 arm joints + 2 finger joints
-        return th.tensor([0.0, 1.047, 1.047, 0.0, 0.0, 0.0, 0.0, 0.0])
+        return th.tensor([0.0, 1.047, 1.047, 0.0, 0.0, 0.0, 0.045, -0.045])
 
     @cached_property
     def arm_link_names(self):
@@ -227,12 +227,25 @@ class Yam(ManipulationRobot):
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-math.pi, 0, 0])}
+    
+    @property
+    def _default_gripper_multi_finger_controller_configs(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to default controller config to control
+                this robot's multi finger gripper. Assumes robot gripper idx has exactly two elements
+        """
+        dic = super()._default_gripper_multi_finger_controller_configs
+        for arm in self.arm_names:
+            dic[arm]["inverted"] = [False, True]
+        return dic
 
     @property
     def _assisted_grasp_start_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="left_link_finger", position=th.tensor([0.0, 0.0, 0.0])),
+                GraspingPoint(link_name="left_link_finger", position=th.tensor([-0.07213, -0.0823, 0.03633])),
+                GraspingPoint(link_name="left_link_finger", position=th.tensor([-0.025, -0.0823, 0.03633])),
             ]
         }
 
@@ -240,6 +253,7 @@ class Yam(ManipulationRobot):
     def _assisted_grasp_end_points(self):
         return {
             self.default_arm: [
-                GraspingPoint(link_name="right_link_finger", position=th.tensor([0.0, 0.0, 0.0])),
+                GraspingPoint(link_name="right_link_finger", position=th.tensor([-0.07213, -0.00388, -0.03633])),
+                GraspingPoint(link_name="right_link_finger", position=th.tensor([-0.025, -0.00388, -0.03633])),
             ]
         }

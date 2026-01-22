@@ -306,6 +306,16 @@ class HDF5DataWrapper(DataWrapper):
             self.add_metadata(group=data_grp, name="config", data=config)
             self.add_metadata(group=data_grp, name="scene_file", data=scene_file)
 
+    def update_scene_file(self, scene_file=None):
+        """
+        Updates the scene file in the HDF5 file
+
+        Args:
+            scene_file (str): Path to the scene file to update. If None, will save the current scene file
+        """
+        scene_file = self.env.scene.save() if scene_file is None else scene_file
+        self.add_metadata(group=self.hdf5_file["data"], name="scene_file", data=scene_file)
+
     @property
     def should_save_current_episode(self):
         """
@@ -481,6 +491,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         self.checkpoint_rollback_trajs = dict() if keep_checkpoint_rollback_data else None
 
         self._is_recording = True
+        self._filter_current_frame = False
         self.use_vr = use_vr
 
         # Add callbacks on import / remove objects and systems
@@ -620,6 +631,14 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
     def is_recording(self, value: bool):
         self._is_recording = value
 
+    @property
+    def filter_current_frame(self):
+        return self._filter_current_frame
+
+    @filter_current_frame.setter
+    def filter_current_frame(self, value: bool):
+        self._filter_current_frame = value
+
     def _record_step_trajectory(self, action, obs, reward, terminated, truncated, info):
         if self.is_recording:
             super()._record_step_trajectory(action, obs, reward, terminated, truncated, info)
@@ -683,16 +702,18 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         for obj in self.scene.objects:
             obj.wake()
 
-        # Store this initial state as part of the trajectory
-        state = og.sim.dump_state(serialized=True)
-        step_data = {
-            "state": state,
-            "state_size": len(state),
-        }
-        self.current_traj_history.append(step_data)
+        # Store this initial state as part of the trajectory if recording
+        if self.is_recording:
+            state = og.sim.dump_state(serialized=True)
+            step_data = {
+                "state": state,
+                "state_size": len(state),
+                "filter_mask": 1 if self.filter_current_frame else 0,
+            }
+            self.current_traj_history.append(step_data)
 
-        # Update max state size
-        self.max_state_size = max(self.max_state_size, len(state))
+            # Update max state size
+            self.max_state_size = max(self.max_state_size, len(state))
 
         # Also store initial metadata not recorded in serialized state
         # This is simply serialized
@@ -723,6 +744,7 @@ class HDF5CollectionWrapper(HDF5DataWrapper):
         step_data["reward"] = reward
         step_data["terminated"] = terminated
         step_data["truncated"] = truncated
+        step_data["filter_mask"] = 1 if self.filter_current_frame else 0
 
         # Update max state size
         self.max_state_size = max(self.max_state_size, len(state))
@@ -800,6 +822,7 @@ class DataPlaybackWrapper(DataWrapper):
         input_path,
         output_path,
         robot_obs_modalities=tuple(),
+        robot_grasping_mode=None,
         robot_proprio_keys=None,
         robot_sensor_config=None,
         external_sensors_config=None,
@@ -828,6 +851,8 @@ class DataPlaybackWrapper(DataWrapper):
             input_path (str): Absolute path to the input hdf5 file containing the relevant collected data to playback
             output_path (str): Absolute path to the output hdf5 file that will contain the recorded observations from
                 the replayed data
+            robot_grasping_mode (None or str): If specified, the grasping mode to use for the robot. This will override the
+                grasping mode specified in the env config when the environment is loaded. Valid modes include: "physical", "assisted", "sticky".
             robot_obs_modalities (list): Robot observation modalities to use. This list is directly passed into
                 the robot_cfg (`obs_modalities` kwarg) when spawning the robot
             robot_proprio_keys (None or list of str): If specified, a list of proprioception keys to use for the robot.
@@ -939,6 +964,8 @@ class DataPlaybackWrapper(DataWrapper):
                 robot_cfg["proprio_obs"] = robot_proprio_keys
             if robot_sensor_config is not None:
                 robot_cfg["sensor_config"] = robot_sensor_config
+            if robot_grasping_mode is not None:
+                robot_cfg["grasping_mode"] = robot_grasping_mode
             # For robot obs, make sure sensor modalities key is removed so that the modalities are
             # auto-inferred from the set of robot obs modalities requested
             for sensor_cfg in robot_cfg["sensor_config"].values():
@@ -963,6 +990,11 @@ class DataPlaybackWrapper(DataWrapper):
                         setattr(sensor, kwarg, value)
             env.load_observation_space()
 
+        # Override grasping mode after environment creation if specified
+        if robot_grasping_mode is not None:
+            for robot in env.robots:
+                robot._grasping_mode = robot_grasping_mode
+
         # Optionally include the desired environment wrapper specified in the config
         if include_env_wrapper:
             env = create_wrapper(env=env)
@@ -985,6 +1017,7 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            robot_grasping_mode=robot_grasping_mode,
             **kwargs,
         )
 
@@ -1002,6 +1035,7 @@ class DataPlaybackWrapper(DataWrapper):
         load_room_instances=None,
         include_robot_control=True,
         include_contacts=True,
+        robot_grasping_mode=None,
         **kwargs,
     ):
         """
@@ -1023,8 +1057,15 @@ class DataPlaybackWrapper(DataWrapper):
             load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            robot_grasping_mode (None or str): If specified, the grasping mode to use for all robots. This will override
+                the grasping mode set during robot initialization. Valid modes include: "physical", "assisted", "sticky".
             kwargs (dict): Arguments to pass to super class
         """
+        # Override grasping mode for all robots if specified
+        if robot_grasping_mode is not None:
+            for robot in env.robots:
+                robot._grasping_mode = robot_grasping_mode
+
         # Make sure transition rules are DISABLED for playback since we manually propagate transitions
         assert not gm.ENABLE_TRANSITION_RULES, "Transition rules must be disabled for DataPlaybackWrapper env!"
 
@@ -1116,6 +1157,8 @@ class DataPlaybackWrapper(DataWrapper):
             reward = traj_grp["reward"]
             terminated = traj_grp["terminated"]
             truncated = traj_grp["truncated"]
+            # Load filter_mask if available (defaults to all zeros / unfiltered if not present)
+            filter_mask = traj_grp.get("filter_mask", th.zeros(len(state), dtype=th.int64))
         except KeyError as e:
             print(f"Got error when trying to load episode {episode_id}:")
             print(f"Error: {str(e)}")
@@ -1158,8 +1201,10 @@ class DataPlaybackWrapper(DataWrapper):
             self.current_obs, _, _, _, init_info = self.env.step(
                 action=action[0], n_render_iterations=self.n_render_iterations + first_time_load_n_iteration
             )
-            step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
-            self.current_traj_history.append(step_data)
+            # Only record initial observation if not filtered
+            if not filter_mask[0]:
+                step_data = {"obs": self._process_obs(obs=self.current_obs, info=init_info)}
+                self.current_traj_history.append(step_data)
 
         for i, (a, s, ss, r, te, tr) in enumerate(
             zip(action, state[1:], state_size[1:], reward, terminated, truncated)
@@ -1197,8 +1242,8 @@ class DataPlaybackWrapper(DataWrapper):
                         )
             self.current_obs, _, _, _, info = self.env.step(action=a, n_render_iterations=self.n_render_iterations)
 
-            # If recording, record data
-            if record_data:
+            # If recording, record data (skip if this frame is filtered)
+            if record_data and not filter_mask[i + 1]:
                 step_data = self._parse_step_data(
                     action=a,
                     obs=self.current_obs,
@@ -1532,6 +1577,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         load_room_instances=None,
         include_robot_control=True,
         include_contacts=True,
+        robot_grasping_mode=None,
         root_dir=HF_LEROBOT_HOME,
         robot_type=None,
         image_writer_threads=10,
@@ -1540,6 +1586,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         lerobot_version="v3.0",
         use_videos=True,
         include_multi_action_representation=False,
+        include_modalities=None,
     ):
         """
         Args:
@@ -1561,6 +1608,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             load_room_instances (None or str): If specified, the room instances to load for playback.
             include_robot_control (bool): Whether or not to include robot control. If False, will disable all joint control.
             include_contacts (bool): Whether or not to include (enable) contacts in the sim. If False, will set all objects to be visual_only
+            robot_grasping_mode (None or str): If specified, the grasping mode to use for all robots. This will override
+                the grasping mode set during robot initialization. Valid modes include: "physical", "assisted", "sticky".
             root_dir (str): Root directory to store output dataset files
             robot_type (None or str): Name of the robot within this dataset. If not specified, will be inferred
                 from environment
@@ -1573,12 +1622,18 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             use_videos (bool): Whether to save high dimensional image data as video or not
             include_multi_action_representation (bool): Whether to include multi action representation in the dataset. This will make the action entry a concatenation of multiple action representations, with
                 corresponding annotations written to modalities.json in the meta folder
+            include_modalities (None or list of str): If specified, only include these observation modalities in the
+                dataset. Valid modalities include: "rgb", "depth_linear", "proprio", "seg_semantic", etc.
+                If None, all modalities are included. Example: ["rgb", "depth_linear", "proprio"]
         """
         # Store variables
+        # For robot_type, if multiple robots, join their class names with "_"
+        if robot_type is None:
+            robot_type = "_".join(robot.__class__.__name__.lower() for robot in env.robots)
         self.lerobot_dataset_kwargs = {
             "repo_id": output_path,
             "root": f"{root_dir}/{output_path}",
-            "robot_type": env.robots[0].__class__.__name__.lower() if robot_type is None else robot_type,
+            "robot_type": robot_type,
             "image_writer_threads": image_writer_threads,
             "image_writer_processes": image_writer_processes,
         }
@@ -1598,6 +1653,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         self.include_multi_action_representation = include_multi_action_representation
         if self.include_multi_action_representation:
             assert include_robot_control, "Multi action representation requires robot control!"
+        
+        # Store modality filter - if specified, only include these modalities in the dataset
+        self.include_modalities = include_modalities
 
         # Infer task name
         if task_name is None:
@@ -1621,24 +1679,84 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             load_room_instances=load_room_instances,
             include_robot_control=include_robot_control,
             include_contacts=include_contacts,
+            robot_grasping_mode=robot_grasping_mode,
         )
 
     @classmethod
-    def get_lerobot_obs_mapping(cls, env, use_videos=True):
+    def get_lerobot_obs_mapping(cls, env, use_videos=True, include_modalities=None):
+        """
+        Generate observation mapping from OmniGibson to LeRobot format.
+        
+        Args:
+            env: The environment
+            use_videos (bool): Whether to use videos for image data
+            include_modalities (None or list of str): If specified, only include these modalities.
+                Valid modalities include: "rgb", "depth_linear", "proprio", "seg_semantic", etc.
+                If None, all modalities are included.
+                
+        Returns:
+            tuple: (obs_mapping, obs_features) dictionaries
+        """
         obs_mapping, obs_features = dict(), dict()
+        
+        # First pass: collect all proprio keys and compute total shape for multi-robot concatenation
+        proprio_keys = []
+        total_proprio_dim = 0
+        
         for key, gym_shape in env.observation_space.items():
             modality = key.split("::")[-1]
+            
+            # Filter by modality if include_modalities is specified
+            if include_modalities is not None:
+                modality_included = any(inc_mod in modality for inc_mod in include_modalities)
+                if not modality_included:
+                    continue
+            
+            if "proprio" in modality or "low_dim" in modality:
+                proprio_keys.append(key)
+                total_proprio_dim += gym_shape.shape[0]
+        
+        # Add concatenated proprio feature if any proprio keys exist
+        if proprio_keys:
+            obs_features["observation.state"] = {
+                "dtype": "float32",
+                "shape": (total_proprio_dim,),
+                "names": (None,),
+            }
+            # Map all proprio keys to the same observation.state (they will be concatenated)
+            for key in proprio_keys:
+                obs_mapping[key] = "observation.state"
+        
+        # Second pass: handle all other modalities
+        for key, gym_shape in env.observation_space.items():
+            modality = key.split("::")[-1]
+            
+            # Filter by modality if include_modalities is specified
+            if include_modalities is not None:
+                modality_included = any(inc_mod in modality for inc_mod in include_modalities)
+                if not modality_included:
+                    continue
+            
+            # Skip proprio keys (already handled above)
+            if "proprio" in modality or "low_dim" in modality:
+                continue
+            
             info = dict()
             # Parse the relevant name to assign
+            # For multi-robot support, we keep robot prefix in obs_name for disambiguation
             obs_name_strs = key.split("::")[-2].split(":")
+            robot_prefix = ""
             if "robot" in obs_name_strs[0]:
+                # Keep the robot prefix for multi-robot disambiguation
+                robot_prefix = obs_name_strs[0] + "_" if len(env.robots) > 1 else ""
                 # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
                 obs_name_strs = obs_name_strs[1:]
             # Join with "_" and make lowercase to make final name
             obs_name = "_".join(obs_name_strs).lower()
             if obs_name == "":
-                # e.g.: for proprio
                 obs_name = "robot"
+            # Add robot prefix for multi-robot environments
+            obs_name = robot_prefix.lower() + obs_name
             if "rgb" in modality:
                 info["dtype"] = "video" if use_videos else "image"
                 info["shape"] = gym_shape.shape[:-1] + (3,)
@@ -1658,37 +1776,66 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                         "shape": (7,),
                         "names": None,
                     }
-
-            elif "proprio" in modality or "low_dim" in modality:
-                info["dtype"] = "float32"
+            elif "seg_semantic" in modality:
+                info["dtype"] = "int32"
                 info["shape"] = gym_shape.shape
-                info["names"] = (None,)
+                info["names"] = ["height", "width"]
             else:
                 raise ValueError(f"Got LeRobot-incompatible observation modality: {modality}")
 
             # Add this key to features, and store the obs name mapping
-            lerobot_obs_name = "observation.state" if "proprio" in modality else f"observation.{modality}.{obs_name}"
+            lerobot_obs_name = f"observation.{modality}.{obs_name}"
             obs_features[lerobot_obs_name] = info
             obs_mapping[key] = lerobot_obs_name
 
         return obs_mapping, obs_features
 
     @classmethod
-    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping):
-        # Add tfs to flattened obs
-        # TODO: Currently overfit to a single robot
-        robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
-        for sensor_group in (env.external_sensors, env.robots[0].sensors):
-            if sensor_group is None:
-                continue
-            for name, sensor in sensor_group.items():
+    def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping, include_modalities=None):
+        """
+        Convert OmniGibson observations to LeRobot format.
+        
+        Args:
+            env: The environment
+            obs_flat (dict): Flattened observations from the environment
+            obs_mapping (dict): Mapping from OG observation names to LeRobot names
+            include_modalities (None or list of str): If specified, only include these modalities.
+                
+        Returns:
+            dict: Observations in LeRobot format
+        """
+        # Add tfs to flattened obs for each robot
+        # For multi-robot support, we compute relative poses wrt the first robot's frame
+        # (or each robot's own frame for its own sensors)
+        primary_robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
+        
+        # Add external sensor poses relative to primary robot
+        if env.external_sensors is not None:
+            for name, sensor in env.external_sensors.items():
+                obs_flat[f"{name}::rel_pose"] = th.cat(
+                    T.mat2pose(primary_robot_tf_inv @ T.pose2mat(sensor.get_position_orientation()))
+                )
+        
+        # Add each robot's sensor poses relative to that robot
+        for robot in env.robots:
+            robot_tf_inv = T.pose_inv(T.pose2mat(robot.get_position_orientation()))
+            for name, sensor in robot.sensors.items():
                 obs_flat[f"{name}::rel_pose"] = th.cat(
                     T.mat2pose(robot_tf_inv @ T.pose2mat(sensor.get_position_orientation()))
                 )
 
         # Compose lerobot format obs
         frame = dict()
+        n_robots = len(env.robots)
+        
+        # Collect proprio observations for concatenation (preserving order from observation_space)
+        proprio_obs_list = []
+        
         for name in env.observation_space.keys():
+            # Skip if not in obs_mapping (filtered out by include_modalities)
+            if name not in obs_mapping:
+                continue
+                
             obs = obs_flat[name]
             # Prune alpha channel if keeping RGB
             if "rgb" in name:
@@ -1698,20 +1845,28 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                 obs = obs.unsqueeze(-1)
                 # If we haven't already added the sensor pose obs, do so now
                 obs_name_strs = name.split("::")[-2].split(":")
+                robot_prefix = ""
                 if "robot" in obs_name_strs[0]:
+                    # Keep the robot prefix for multi-robot disambiguation
+                    robot_prefix = obs_name_strs[0] + "_" if n_robots > 1 else ""
                     # Remove the prefix (e.g. "robot_xxxxxx") and keep the remainder
                     obs_name_strs = obs_name_strs[1:]
                 # Join with "_" and make lowercase to make final name
-                obs_name = "_".join(obs_name_strs).lower()
+                obs_name = robot_prefix.lower() + "_".join(obs_name_strs).lower()
                 tf_name = f"observation.robot2cam_pose.{obs_name}"
                 if tf_name not in frame:
                     sensor_name = name.split("::")[-2]
                     frame[tf_name] = obs_flat[f"{sensor_name}::rel_pose"]
             elif "proprio" in name:
-                # Map float64 -> float32
-                obs = obs.float()
+                # Map float64 -> float32 and collect for concatenation
+                proprio_obs_list.append(obs.float())
+                continue  # Don't add individually, will concatenate below
             # Add the observation to the current frame
             frame[obs_mapping[name]] = obs
+
+        # Concatenate all proprio observations into a single state vector
+        if proprio_obs_list:
+            frame["observation.state"] = th.cat(proprio_obs_list, dim=0)
 
         return frame
 
@@ -1730,10 +1885,9 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             else:
                 raise ValueError(f"Found pre-existing LeRobot dataset at: {abs_output_path}")
 
-        # For now, we only support a single robot for the sake of deterministic mapping of
-        # robot obs
-        assert len(env.robots) == 1, "Only one robot supported for LeRobot dataset storage!"
-        robot = env.robots[0]
+        # Support multiple robots
+        n_robots = len(env.robots)
+        assert n_robots >= 1, "At least one robot must be present in the environment!"
 
         modality_info = {
             "annotation": {
@@ -1743,105 +1897,132 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             },
         }
 
-        # Add video modality info
+        # Add video modality info (filtered by include_modalities if specified)
         video_modality_info = dict()
         for i, (sensor_name, sensor) in enumerate(env.external_sensors.items()):
             if isinstance(sensor, VisionSensor):
                 for mod in ["rgb", "depth_linear"]:
                     if mod in sensor.modalities:
+                        # Skip if include_modalities is specified and this modality is not included
+                        if self.include_modalities is not None:
+                            if not any(inc_mod in mod for inc_mod in self.include_modalities):
+                                continue
                         mod_name = f"observation.{mod}.{sensor_name}"
                         key = f"exterior_image_{i}_{mod}"
                         video_modality_info[key] = {
                             "type": mod,
                             "original_key": mod_name,
                         }
-        for i, (sensor_name, sensor) in enumerate(robot.sensors.items()):
-            if isinstance(sensor, VisionSensor):
-                for mod in ["rgb", "depth_linear"]:
-                    if mod in sensor.modalities:
-                        remapped_sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
-                        mod_name = f"observation.{mod}.{remapped_sensor_name}"
-                        key = f"robot_image_{i}_{mod}"
-                        video_modality_info[key] = {
-                            "type": mod,
-                            "original_key": mod_name,
-                        }
+        
+        # Add video modality info for each robot's sensors
+        robot_sensor_idx = 0
+        for robot_idx, robot in enumerate(env.robots):
+            robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+            for i, (sensor_name, sensor) in enumerate(robot.sensors.items()):
+                if isinstance(sensor, VisionSensor):
+                    for mod in ["rgb", "depth_linear"]:
+                        if mod in sensor.modalities:
+                            # Skip if include_modalities is specified and this modality is not included
+                            if self.include_modalities is not None:
+                                if not any(inc_mod in mod for inc_mod in self.include_modalities):
+                                    continue
+                            remapped_sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
+                            # Add robot prefix for multi-robot disambiguation
+                            obs_name = f"{robot_prefix.lower()}{remapped_sensor_name}"
+                            mod_name = f"observation.{mod}.{obs_name}"
+                            key = f"robot{robot_idx}_image_{i}_{mod}" if n_robots > 1 else f"robot_image_{robot_sensor_idx}_{mod}"
+                            video_modality_info[key] = {
+                                "type": mod,
+                                "original_key": mod_name,
+                            }
+                            robot_sensor_idx += 1
         modality_info["video" if self.use_videos else "image"] = video_modality_info
 
         # If we are including multi action representation, run some additional sanity checks
         if self.include_multi_action_representation:
-            # Get start index for each controller
+            # Get start index for each controller across all robots
             self.controller_action_start_idxs = dict()
             cmd_start_idx = 0
-            for name, controller in robot.controllers.items():
-                self.controller_action_start_idxs[name] = cmd_start_idx
-                cmd_start_idx += controller.command_dim
+            for robot in env.robots:
+                robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+                for name, controller in robot.controllers.items():
+                    controller_key = f"{robot_prefix}{name}"
+                    self.controller_action_start_idxs[controller_key] = cmd_start_idx
+                    cmd_start_idx += controller.command_dim
+            
             action_modality_info = dict()
             idx = 0
             from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController
 
-            for arm in robot.arm_names:
-                arm_name = f"arm_{arm}"
-                arm_controller = robot.controllers[arm_name]
-                assert isinstance(
-                    arm_controller, InverseKinematicsController
-                ), "Only IKController supported for multi action representation!"
-                # assert arm_controller.command_input_limits is None
-                # assert arm_controller.command_output_limits is None
-                gripper_name = f"gripper_{arm}"
-                gripper_controller = robot.controllers[gripper_name]
-                assert isinstance(
-                    gripper_controller, MultiFingerGripperController
-                ), "Only MultiFingerGripperController supported for multi action representation!"
-                assert (
-                    gripper_controller.command_dim == 1
-                ), "Only binary gripper commands supported for multi action representation!"
-                assert gripper_controller._mode in {
-                    "smooth",
-                    "binary",
-                }, "Only smooth or binary gripper commands supported for multi action representation!"
-                assert (
-                    gripper_controller._motor_type == "position"
-                ), "Only position motor type supported for multi action representation!"
-                action_modality_info[f"{arm_name}_eef_pos"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_eef_aa"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_delta_eef_pos"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{arm_name}_delta_eef_aa"] = {
-                    "start": idx,
-                    "end": idx + 3,
-                }
-                idx += 3
-                action_modality_info[f"{gripper_name}_pos"] = {
-                    "start": idx,
-                    "end": idx + 1,
-                }
-                idx += 1
-                action_modality_info[f"{arm_name}_joint_pos"] = {
-                    "start": idx,
-                    "end": idx + arm_controller.control_dim,
-                }
-                idx += arm_controller.control_dim
-                action_modality_info[f"{arm_name}_delta_joint_pos"] = {
-                    "start": idx,
-                    "end": idx + arm_controller.control_dim,
-                }
-                idx += arm_controller.control_dim
+            for robot in env.robots:
+                robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+                for arm in robot.arm_names:
+                    arm_name = f"arm_{arm}"
+                    arm_controller = robot.controllers[arm_name]
+                    assert isinstance(
+                        arm_controller, InverseKinematicsController
+                    ), "Only IKController supported for multi action representation!"
+                    gripper_name = f"gripper_{arm}"
+                    gripper_controller = robot.controllers[gripper_name]
+                    assert isinstance(
+                        gripper_controller, MultiFingerGripperController
+                    ), "Only MultiFingerGripperController supported for multi action representation!"
+                    assert (
+                        gripper_controller.command_dim == 1
+                    ), "Only binary gripper commands supported for multi action representation!"
+                    assert gripper_controller._mode in {
+                        "smooth",
+                        "binary",
+                    }, "Only smooth or binary gripper commands supported for multi action representation!"
+                    assert (
+                        gripper_controller._motor_type == "position"
+                    ), "Only position motor type supported for multi action representation!"
+                    
+                    # Add robot prefix for multi-robot disambiguation
+                    prefixed_arm_name = f"{robot_prefix}{arm_name}"
+                    prefixed_gripper_name = f"{robot_prefix}{gripper_name}"
+                    
+                    action_modality_info[f"{prefixed_arm_name}_eef_pos"] = {
+                        "start": idx,
+                        "end": idx + 3,
+                    }
+                    idx += 3
+                    action_modality_info[f"{prefixed_arm_name}_eef_aa"] = {
+                        "start": idx,
+                        "end": idx + 3,
+                    }
+                    idx += 3
+                    action_modality_info[f"{prefixed_arm_name}_delta_eef_pos"] = {
+                        "start": idx,
+                        "end": idx + 3,
+                    }
+                    idx += 3
+                    action_modality_info[f"{prefixed_arm_name}_delta_eef_aa"] = {
+                        "start": idx,
+                        "end": idx + 3,
+                    }
+                    idx += 3
+                    action_modality_info[f"{prefixed_gripper_name}_pos"] = {
+                        "start": idx,
+                        "end": idx + 1,
+                    }
+                    idx += 1
+                    action_modality_info[f"{prefixed_arm_name}_joint_pos"] = {
+                        "start": idx,
+                        "end": idx + arm_controller.control_dim,
+                    }
+                    idx += arm_controller.control_dim
+                    action_modality_info[f"{prefixed_arm_name}_delta_joint_pos"] = {
+                        "start": idx,
+                        "end": idx + arm_controller.control_dim,
+                    }
+                    idx += arm_controller.control_dim
             modality_info["action"] = action_modality_info
             action_shape = (idx,)
         else:
-            action_shape = env.action_space[robot.name].shape
+            # Compute total action shape across all robots
+            total_action_dim = sum(env.action_space[robot.name].shape[0] for robot in env.robots)
+            action_shape = (total_action_dim,)
 
         # Extract relevant info from original source env config
         config = json.loads(self.input_hdf5["data"].attrs["config"])
@@ -1889,7 +2070,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             },
         }
 
-        obs_mapping, obs_features = self.get_lerobot_obs_mapping(env=env, use_videos=self.use_videos)
+        obs_mapping, obs_features = self.get_lerobot_obs_mapping(
+            env=env, 
+            use_videos=self.use_videos,
+            include_modalities=self.include_modalities,
+        )
         features.update(obs_features)
 
         if self.lerobot_version == "v2.1":
@@ -1906,33 +2091,47 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         )
         self.obs_mapping = obs_mapping
 
-        # Store proprio shape mapping
-        proprio_shape_mapping = dict()
-        proprio_dict = robot._get_proprioception_dict()
-        idx = 0
-        for obs in robot.proprio_obs:
-            obs_dim = len(proprio_dict[obs])
-            proprio_shape_mapping[obs] = {
-                "start": idx,
-                "end": idx + obs_dim,
-            }
-            idx += obs_dim
-        modality_info["state"] = proprio_shape_mapping
-        # self.dataset.set_omnigibson_metadata(key="proprio_shape_mapping", value=proprio_shape_mapping)
+        # Store proprio shape mapping for each robot (if proprio is included)
+        # For multiple robots, concatenate all proprio observations with continuous indices
+        proprio_included = self.include_modalities is None or any("proprio" in mod for mod in self.include_modalities)
+        if proprio_included:
+            proprio_shape_mapping = dict()
+            idx = 0  # Continuous index across all robots
+            for robot in env.robots:
+                robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+                proprio_dict = robot._get_proprioception_dict()
+                for obs in robot.proprio_obs:
+                    obs_dim = len(proprio_dict[obs])
+                    proprio_key = f"{robot_prefix}{obs}" if n_robots > 1 else obs
+                    proprio_shape_mapping[proprio_key] = {
+                        "start": idx,
+                        "end": idx + obs_dim,
+                    }
+                    idx += obs_dim
+            modality_info["state"] = proprio_shape_mapping
 
         # Add in camera K matrices
         cam_intrinsics = dict()
+
+        # Render to avoid degen intrinsic matrices
+        for _ in range(10):
+            og.sim.render()
 
         for sensor_name, sensor in env.external_sensors.items():
             if isinstance(sensor, VisionSensor):
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
-        for sensor_name, sensor in env.robots[0].sensors.items():
-            if isinstance(sensor, VisionSensor):
-                # Remove robot naming prefix
-                sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
-                K = sensor.intrinsic_matrix.cpu()
-                cam_intrinsics[sensor_name] = K.numpy().tolist()
+        
+        # Add camera intrinsics for each robot's sensors
+        for robot in env.robots:
+            robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+            for sensor_name, sensor in robot.sensors.items():
+                if isinstance(sensor, VisionSensor):
+                    # Remove robot naming prefix and add multi-robot prefix if needed
+                    remapped_sensor_name = "_".join(sensor_name.split(":")[1:]).lower()
+                    cam_key = f"{robot_prefix.lower()}{remapped_sensor_name}"
+                    K = sensor.intrinsic_matrix.cpu()
+                    cam_intrinsics[cam_key] = K.numpy().tolist()
         self.dataset.set_omnigibson_metadata(key="cam_intrinsics", value=cam_intrinsics)
 
         # Write modality data
@@ -1991,60 +2190,68 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         # Handle multi action representation
         if self.include_multi_action_representation:
             # Our action representation is composed of [eef_pos, eef_aa, delta_eef_pos, delta_eef_aa, gripper_pos, joint_pos, delta_joint_pos] for each arm
-            robot = self.env.robots[0]
+            # Support multiple robots
+            n_robots = len(self.env.robots)
             action = []
             is_first_action = self.last_actions is None
             if is_first_action:
                 self.last_actions = dict()
-            for arm in robot.arm_names:
-                arm_name = f"arm_{arm}"
-                arm_controller = robot.controllers[arm_name]
+            
+            for robot in self.env.robots:
+                robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
+                for arm in robot.arm_names:
+                    arm_name = f"arm_{arm}"
+                    arm_controller = robot.controllers[arm_name]
+                    
+                    # Key for storing last actions (includes robot prefix for multi-robot)
+                    action_key = f"{robot_prefix}{arm_name}"
 
-                # Add eef action
-                action.append(cb.to_torch(arm_controller.goal["target_pos"]))
-                action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(arm_controller.goal["target_ori_mat"]))))
+                    # Add eef action
+                    action.append(cb.to_torch(arm_controller.goal["target_pos"]))
+                    action.append(T.quat2axisangle(T.mat2quat(cb.to_torch(arm_controller.goal["target_ori_mat"]))))
 
-                # Add delta eef action
-                if is_first_action:
-                    action += [th.zeros(3), th.zeros(3)]  # zero delta commands
-                else:
-                    action.append(
-                        cb.to_torch(
-                            arm_controller.goal["target_pos"] - self.last_actions[arm_name]["goal"]["target_pos"]
+                    # Add delta eef action
+                    if is_first_action:
+                        action += [th.zeros(3), th.zeros(3)]  # zero delta commands
+                    else:
+                        action.append(
+                            cb.to_torch(
+                                arm_controller.goal["target_pos"] - self.last_actions[action_key]["goal"]["target_pos"]
+                            )
                         )
-                    )
-                    action.append(
-                        T.quat2axisangle(
-                            T.mat2quat(
-                                cb.to_torch(
-                                    self.last_actions[arm_name]["goal"]["target_ori_mat"].T
-                                    @ arm_controller.goal["target_ori_mat"]
+                        action.append(
+                            T.quat2axisangle(
+                                T.mat2quat(
+                                    cb.to_torch(
+                                        self.last_actions[action_key]["goal"]["target_ori_mat"].T
+                                        @ arm_controller.goal["target_ori_mat"]
+                                    )
                                 )
                             )
                         )
-                    )
 
-                # Add gripper action
-                gripper_name = f"gripper_{arm}"
-                gripper_controller = robot.controllers[gripper_name]
-                start_idx = self.controller_action_start_idxs[gripper_name]
-                end_idx = start_idx + gripper_controller.command_dim
-                action.append(step_data["action"][start_idx:end_idx])
+                    # Add gripper action
+                    gripper_name = f"gripper_{arm}"
+                    gripper_controller = robot.controllers[gripper_name]
+                    controller_key = f"{robot_prefix}{gripper_name}"
+                    start_idx = self.controller_action_start_idxs[controller_key]
+                    end_idx = start_idx + gripper_controller.command_dim
+                    action.append(step_data["action"][start_idx:end_idx])
 
-                # Add joint action
-                action.append(cb.to_torch(arm_controller.control))
+                    # Add joint action
+                    action.append(cb.to_torch(arm_controller.control))
 
-                # Add delta joint action
-                if is_first_action:
-                    action.append(th.zeros(arm_controller.control_dim))
-                else:
-                    action.append(cb.to_torch(arm_controller.control - self.last_actions[arm_name]["control"]))
+                    # Add delta joint action
+                    if is_first_action:
+                        action.append(th.zeros(arm_controller.control_dim))
+                    else:
+                        action.append(cb.to_torch(arm_controller.control - self.last_actions[action_key]["control"]))
 
-                # Update last actions
-                self.last_actions[arm_name] = {
-                    "goal": arm_controller.goal,
-                    "control": arm_controller.control,
-                }
+                    # Update last actions
+                    self.last_actions[action_key] = {
+                        "goal": arm_controller.goal,
+                        "control": arm_controller.control,
+                    }
 
             step_data["action"] = th.cat(action)
 
@@ -2055,7 +2262,12 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         obs = super()._process_obs(obs, info)
 
         # Convert to lerobot format
-        obs = self.og_to_lerobot_obs(env=self.env, obs_flat=obs, obs_mapping=self.obs_mapping)
+        obs = self.og_to_lerobot_obs(
+            env=self.env, 
+            obs_flat=obs, 
+            obs_mapping=self.obs_mapping,
+            include_modalities=self.include_modalities,
+        )
         return obs
 
     def postprocess_current_traj(self):
@@ -2076,7 +2288,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         # Remove the image directory
         abs_output_path = f"{self.lerobot_dataset_kwargs['root']}"
         images_dir = os.path.join(abs_output_path, "images")
-        shutil.rmtree(images_dir)
+        if os.path.exists(images_dir):
+            shutil.rmtree(images_dir)
 
     def allocate_traj(
         self,

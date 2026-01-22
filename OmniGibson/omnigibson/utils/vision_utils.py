@@ -199,11 +199,11 @@ class Remapper:
                 self.key_array[key] = new_key
 
         # Apply remapping
-        remapped_img = self.key_array[image]
+        remapped_img = self.key_array[image].to("cuda")
         # Make sure all values are correctly remapped and not equal to the default value
-        assert th.all(remapped_img != th.iinfo(th.int32).max), "Not all keys in the image are in the key array!"
+        assert th.all(remapped_img != th.iinfo(th.int32).max).item(), "Not all keys in the image are in the key array!"
         remapped_labels = {}
-        for key in th.unique(remapped_img):
+        for key in th.unique(remapped_img).cpu():
             remapped_labels[key.item()] = new_mapping[key.item()]
 
         return remapped_img, remapped_labels
