@@ -309,7 +309,7 @@ def test_grasping_mode():
 
         # Grasp the box
         gripper_controller.update_goal(cb.array([-1]), robot.get_control_dict())
-        for _ in range(10):
+        for _ in range(20):
             og.sim.step()
 
         curr_time = time.time()

@@ -7,10 +7,8 @@ import os
 import pandas as pd
 import torch as th
 import torchvision
-from torch.utils.data import Dataset, get_worker_info
-import torch.nn.functional as F
+from torch.utils.data import Dataset
 import packaging
-from packaging.version import Version
 import glob
 import PIL
 from lerobot.datasets.lerobot_dataset import (
@@ -18,6 +16,8 @@ from lerobot.datasets.lerobot_dataset import (
     LeRobotDatasetMetadata,
     CODEBASE_VERSION as LEROBOT_CODEBASE_VERSION,
 )
+
+import lerobot.datasets.image_writer as liw
 
 if LEROBOT_CODEBASE_VERSION == "v2.1":
     from lerobot.constants import HF_LEROBOT_HOME
@@ -36,7 +36,7 @@ from pathlib import Path
 from PIL import Image as PILImage
 from torchvision import transforms
 from torchvision.io import VideoReader
-from typing import Any, Dict, Tuple, Callable, List, Sequence
+from typing import Any, Dict, Tuple, Callable, Sequence
 from tqdm import tqdm
 import tempfile
 import shutil
@@ -52,8 +52,8 @@ from lerobot.datasets.utils import (
 )
 from lerobot.datasets.compute_stats import compute_episode_stats
 from lerobot.datasets.video_utils import decode_video_frames as native_decode_video_frames
-import datasets
 import concurrent.futures
+
 
 logger = create_module_logger("OmniGibsonLeRobotDataset")
 
@@ -249,13 +249,12 @@ def encode_video_frames(
         # Loop through input frames and encode them
         for input_data in input_list:
             with PIL.Image.open(input_data) as input_image:
-                input_image = input_image.convert("RGB")
-                input_frame = av.VideoFrame.from_image(input_image)
                 if OU.USE_DEPTH_RGB_ENCODING or mode == "rgb":
                     input_image = input_image.convert("RGB")
                     input_frame = av.VideoFrame.from_image(input_image)
                 elif mode == "depth":
-                    input_frame = av.VideoFrame.from_ndarray(np.array(input_image), format="gray16le")
+                    input_image = np.array(input_image, dtype=np.uint16)
+                    input_frame = av.VideoFrame.from_ndarray(input_image, format="gray16le")
                 packet = output_stream.encode(input_frame)
                 if packet:
                     output.mux(packet)
@@ -806,47 +805,6 @@ def generate_info_json(
     print(f"Generated info JSON for {len(info)} entries.")
 
 
-#
-#
-# class RGBVideoLoader(OU.VideoLoader):
-#     # def __init__(self, data_path: str, task_id: int, camera_id: str, demo_id: str, *args, **kwargs):
-#     #     super().__init__(path=data_path,
-#     #         *args,
-#     #         **kwargs,
-#     #     )
-#
-#     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
-#         rgb = frame.to_ndarray(format="rgb24")  # (H, W, 3)
-#         if self.output_size is None:
-#             return th.from_numpy(rgb).movedim(-1, -3).unsqueeze(0)
-#         rgb = F.interpolate(
-#             th.from_numpy(rgb).to(th.uint8).movedim(-1, -3).unsqueeze(0), size=self.output_size, mode="nearest-exact"
-#         )
-#         return rgb  # (1, 3, H, W)
-#
-#
-# class DepthVideoLoader(OU.VideoLoader):
-#     def __init__(self, path: str, *args, **kwargs):
-#         self.min_depth = kwargs.get("min_depth", OU.MIN_DEPTH)
-#         self.max_depth = kwargs.get("max_depth", OU.MAX_DEPTH)
-#         self.shift = kwargs.get("shift", OU.DEPTH_SHIFT)
-#         super().__init__(
-#             path=path,
-#             *args,
-#             **kwargs,
-#         )
-#
-#     def _process_single_frame(self, frame: av.VideoFrame) -> th.Tensor:
-#         # Decode Y (luma) channel only; YUV420 → grayscale image
-#         frame_gray16 = frame.reformat(format="gray16le").to_ndarray()  # (H, W)
-#         depth = OU.dequantize_depth(frame_gray16, min_depth=self.min_depth, max_depth=self.max_depth, shift=self.shift)
-#         depth = th.from_numpy(depth).unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-#         if self.output_size is not None:
-#             depth = F.interpolate(depth, size=self.output_size, mode="nearest-exact")
-#         return depth.squeeze(0)  # (1, H, W)
-#
-
-
 class OmniGibsonLeRobotDatasetMetadata(LeRobotDatasetMetadata):
     #
     # @classmethod
@@ -961,11 +919,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         # Set depth ranges
         cls.set_cls_depth_range(min_depth=min_depth, max_depth=max_depth, depth_shift=depth_shift)
 
-        # # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        # assert (
-        #     LEROBOT_CODEBASE_VERSION == "v2.1"
-        # ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
-
         ##############
         """Create a LeRobot Dataset from scratch in order to record data."""
         obj = cls.__new__(cls)
@@ -1011,21 +964,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
         ##############
 
-        # # Call super first
-        # obj = super().create(
-        #     repo_id=repo_id,
-        #     fps=fps,
-        #     features=features,
-        #     root=root,
-        #     robot_type=robot_type,
-        #     use_videos=use_videos,
-        #     tolerance_s=tolerance_s,
-        #     image_writer_processes=image_writer_processes,
-        #     image_writer_threads=image_writer_threads,
-        #     video_backend=video_backend,
-        #     batch_encoding_size=batch_encoding_size,
-        # )
-
         # Add og metadata dict
         obj.min_depth = min_depth
         obj.max_depth = max_depth
@@ -1047,19 +985,11 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
         download_videos: bool = True,
         video_backend: str | None = None,
         batch_encoding_size: int = 1,
-        # chunk_streaming_using_keyframe: bool = True,
-        # shuffle: bool = True,
-        # seed: int = 0,
         features: Sequence[str] | None = None,
         min_depth=None,
         max_depth=None,
         depth_shift=None,
     ):
-        # # Only compatible with 2.1 for now (because LeRobot code is not modular ): )
-        # assert (
-        #     LEROBOT_CODEBASE_VERSION == "v2.1"
-        # ), f"Cannot use omnigibson lerobot dataset with lerobot codebase version: {LEROBOT_CODEBASE_VERSION}. Must be v2.1!"
-
         ###################
         Dataset.__init__(self)
         self.repo_id = repo_id
@@ -1142,15 +1072,9 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
             self._absolute_to_relative_idx = None
             if self.episodes is not None:
                 self._absolute_to_relative_idx = {
-                    abs_idx.item() if isinstance(abs_idx, torch.Tensor) else abs_idx: rel_idx
+                    abs_idx.item() if isinstance(abs_idx, th.Tensor) else abs_idx: rel_idx
                     for rel_idx, abs_idx in enumerate(self.hf_dataset["index"])
                 }
-
-        # # Check timestamps
-        # timestamps = th.stack(self.hf_dataset["timestamp"]).numpy()
-        # episode_indices = th.stack(self.hf_dataset["episode_index"]).numpy()
-        # ep_data_index_np = {k: t.numpy() for k, t in self.episode_data_index.items()}
-        # check_timestamps_sync(timestamps, episode_indices, ep_data_index_np, self.fps, self.tolerance_s)
 
         # Setup delta_indices
         if self.delta_timestamps is not None:
@@ -1158,45 +1082,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
             self.delta_indices = get_delta_indices(self.delta_timestamps, self.fps)
 
         ###################
-
-        # # Call super
-        # super().__init__(
-        #     repo_id=repo_id,
-        #     root=root,
-        #     episodes=episodes,
-        #     image_transforms=image_transforms,
-        #     delta_timestamps=delta_timestamps,
-        #     tolerance_s=tolerance_s,
-        #     revision=revision,
-        #     force_cache_sync=force_cache_sync,
-        #     download_videos=download_videos,
-        #     video_backend=video_backend,
-        #     batch_encoding_size=batch_encoding_size,
-        # )
-
-        # # Handle chunking
-        # self.seed = seed
-        # self.current_streaming_chunk_idx = None
-        # self.current_streaming_frame_idx = None
-        # self.obs_loaders = None
-        # self._should_obs_loaders_reload = None
-        # self.chunks = None
-        # self._chunk_streaming_using_keyframe = chunk_streaming_using_keyframe
-        # if self._chunk_streaming_using_keyframe:
-        #     if not shuffle:
-        #         logger.warning(
-        #             "chunk_streaming_using_keyframe mode is enabled but shuffle is set to False. This may lead to less randomness in chunk selection."
-        #         )
-        #     self.chunks = self._get_keyframe_chunk_indices() #chunk_size=60)
-        #     # Now, we randomly permute the episodes if shuffle is True
-        #     if shuffle:
-        #         self.current_streaming_chunk_idx = None
-        #         self.current_streaming_frame_idx = None
-        #     else:
-        #         self.current_streaming_chunk_idx = 0
-        #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
-        #     self.obs_loaders = dict()
-        #     self._should_obs_loaders_reload = True
 
         # If depth values not set, load from dataset's meta info and set them internally
         og_info = self.meta.info.get("omnigibson", {})
@@ -1206,26 +1091,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
 
         # Update depth values
         self.set_depth_range(min_depth=self.min_depth, max_depth=self.max_depth, depth_shift=self.depth_shift)
-
-    # def _get_keyframe_chunk_indices(self, chunk_size=250) -> List[Tuple[int, int, int]]:
-    #     """
-    #     Divide each episode into chunks of data based on GOP of the data (here for B1K, GOP size is 250 frames).
-    #     Args:
-    #         chunk_size (int): size of each chunk in number of frames. Default is 250 for B1K. Should be the GOP size of the video data.
-    #     Returns:
-    #         List of tuples, where each tuple contains (start_index, end_index, local_start_index) for each chunk.
-    #     """
-    #     episode_lengths = {ep_idx: ep_dict["length"] for ep_idx, ep_dict in self.meta.episodes.items()}
-    #     # episode_lengths = [episode_lengths[ep_idx] for ep_idx in self.episodes]
-    #     chunks = []
-    #     offset = 0
-    #     for L in episode_lengths.values():
-    #         local_starts = list(range(0, L, chunk_size))
-    #         local_ends = local_starts[1:] + [L]
-    #         for ls, le in zip(local_starts, local_ends):
-    #             chunks.append((offset + ls, offset + le, ls))
-    #         offset += L
-    #     return chunks
 
     def __getitem__(self, idx) -> dict:
         item = super().__getitem__(idx)
@@ -1256,110 +1121,6 @@ class OmniGibsonLeRobotDataset(LeRobotDataset):
                 item[name] = val
 
         return item
-
-    # def __getitem__(self, idx) -> dict:
-    #     if not self._chunk_streaming_using_keyframe:
-    #         return super().__getitem__(idx)
-    #
-    #     # Streaming mode: we will load the episode at the current streaming index, and then increment the index for next call
-    #     # Randomize chunk index on first call
-    #     if self.current_streaming_chunk_idx is None:
-    #         worker_info = get_worker_info()
-    #         worker_id = 0 if worker_info is None else worker_info.id
-    #         rng = np.random.default_rng(self.seed + worker_id)
-    #         rng.shuffle(self.chunks)
-    #         self.current_streaming_chunk_idx = rng.integers(0, len(self.chunks)).item()
-    #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
-    #     # Current chunk iterated, move to next chunk
-    #     if self.current_streaming_frame_idx >= self.chunks[self.current_streaming_chunk_idx][1]:
-    #         self.current_streaming_chunk_idx += 1
-    #         # All data iterated, restart from beginning
-    #         if self.current_streaming_chunk_idx >= len(self.chunks):
-    #             self.current_streaming_chunk_idx = 0
-    #         self.current_streaming_frame_idx = self.chunks[self.current_streaming_chunk_idx][0]
-    #         self._should_obs_loaders_reload = True
-    #     item = self.hf_dataset[self.current_streaming_frame_idx]
-    #     ep_idx = item["episode_index"].item()
-    #
-    #     query_indices = None
-    #     if self.delta_indices is not None:
-    #         query_indices, padding = self._get_query_indices(self.current_streaming_frame_idx, ep_idx)
-    #         query_result = self._query_hf_dataset(query_indices)
-    #         item = {**item, **padding}
-    #         for key, val in query_result.items():
-    #             item[key] = val
-    #
-    #     current_ts = item["timestamp"].item()
-    #     query_timestamps = self._get_query_timestamps(current_ts, query_indices)
-    #
-    #     # TODO: Remove
-    #     query_timestamps = {k: v for k, v in query_timestamps.items() if "external_sensor0" in k}
-    #
-    #     if self._should_obs_loaders_reload:
-    #         for loader in self.obs_loaders.values():
-    #             loader.close()
-    #         self.obs_loaders = dict()
-    #         # reload video loaders for new episode
-    #         self.current_streaming_episode_idx = ep_idx
-    #         for vid_key in query_timestamps.keys():
-    #             kwargs = {}
-    #             # task_id = item["task_index"].item()
-    #             if "seg_instance_id" in vid_key:
-    #                 raise NotImplementedError
-    #                 # # load id list
-    #                 # with open(
-    #                 #     self.root / "meta/episodes" / f"task-{task_id:04d}" / f"episode_{ep_idx:08d}.json",
-    #                 #     "r",
-    #                 # ) as f:
-    #                 #     kwargs["id_list"] = th.tensor(
-    #                 #         json.load(f)[f"{ROBOT_CAMERA_NAMES['R1Pro'][vid_key.split('.')[-1]]}::unique_ins_ids"]
-    #                 #     )
-    #             video_path = self.root / self.meta.get_video_file_path(ep_idx, vid_key)
-    #             if "rgb" in vid_key:
-    #                 obs_loader_cls = RGBVideoLoader
-    #             elif "depth" in vid_key:
-    #                 obs_loader_cls = DepthVideoLoader
-    #                 kwargs["min_depth"] = self.MIN_DEPTH
-    #                 kwargs["max_depth"] = self.MAX_DEPTH
-    #                 kwargs["depth_shift"] = self.DEPTH_SHIFT
-    #             else:
-    #                 raise NotImplementedError
-    #             self.obs_loaders[vid_key] = iter(
-    #                 obs_loader_cls(
-    #                     path=str(video_path),
-    #                     start_idx=self.chunks[self.current_streaming_chunk_idx][2],
-    #                     start_idx_is_keyframe=False,  # TODO (Wensi): Change this to True after figuring out the correct keyframe indices
-    #                     batch_size=1, #len(query_timestamps), # TODO: Fix this -- currently just sanity checking shapes 1,
-    #                     stride=1,
-    #                     fps=self.fps,
-    #                     query_timestamps=query_timestamps[vid_key],  # Pass query timestamps
-    #                     tolerance_s=self.tolerance_s,
-    #                     **kwargs,
-    #                 )
-    #             )
-    #         self._should_obs_loaders_reload = False
-    #
-    #     else:
-    #         for vid_key in query_timestamps.keys(): #self.meta.video_keys:
-    #             # Update existing loader with new timestamps
-    #             self.obs_loaders[vid_key].update_query_timestamps(query_timestamps[vid_key])
-    #
-    #     # load visual observations
-    #     # TODO: Undo
-    #     for key in query_timestamps.keys(): #self.meta.video_keys:
-    #         item[key] = next(self.obs_loaders[key]) #[0]
-    #
-    #     if self.image_transforms is not None:
-    #         image_keys = self.meta.camera_keys
-    #         for cam in image_keys:
-    #             item[cam] = self.image_transforms(item[cam])
-    #
-    #     # Add task as a string
-    #     task_idx = item["task_index"].item()
-    #     item["task"] = self.meta.tasks[task_idx]
-    #     self.current_streaming_frame_idx += 1
-    #
-    #     return item
 
     @classmethod
     def set_cls_depth_range(cls, min_depth, max_depth, depth_shift):
@@ -1477,12 +1238,6 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
         max_depth=None,
         depth_shift=None,
     ):
-        # # Sanity check datasets version -- must use <= v0.36
-        # installed_version = Version(datasets.__version__)
-        # assert installed_version <= Version("3.6.0"), \
-        #     f"To use LeRobotV2 dataset, installed datasets package version must be <= 3.6.0, but found version: {installed_version}\n" + \
-        #     "To install compatible version, run `pip install 'datasets<=3.6'`"
-
         # Call super
         super().__init__(
             repo_id=repo_id,
@@ -1512,27 +1267,6 @@ class OmniGibsonLeRobotV2Dataset(OmniGibsonLeRobotDataset):
             if key not in self.meta.video_keys:
                 posted_data[key] = th.stack([self.hf_dataset[idx][key] for idx in indices])
         return posted_data
-
-    # def _query_hf_dataset(self, query_indices: dict[str, list[int]]) -> dict:
-    #     # See https://github.com/huggingface/lerobot/issues/93#issuecomment-3179916907
-    #     # Step 1: Combine all unique indices
-    #     all_indices = sorted({idx for indices in query_indices.values() for idx in indices})
-    #
-    #     # Step 2: Select all required data at once
-    #     selected_dataset = self.hf_dataset.select(all_indices).to_dict()
-    #     selected_dataset = {key: th.tensor(values) for key, values in selected_dataset.items()}
-    #
-    #     # Step 3: Map original indices to their positions in the selected dataset
-    #     index_map = {original_idx: i for i, original_idx in enumerate(all_indices)}
-    #
-    #     # Step 4: Build the result for each key
-    #     results = {}
-    #     for key, q_indices in query_indices.items():
-    #         if key not in self.meta.video_keys:
-    #             mapped_indices = [index_map[idx] for idx in q_indices]
-    #             results[key] = th.stack([selected_dataset[key][i] for i in mapped_indices])
-    #
-    #     return results
 
     def _get_query_timestamps(
         self,
@@ -1766,8 +1500,6 @@ class OmniGibsonLeRobotV3Dataset(OmniGibsonLeRobotDataset):
 
 
 # Save internal methods to force handling depth during image saving
-import lerobot.datasets.image_writer as liw
-
 liw.image_array_to_pil_image = OmniGibsonLeRobotDataset.image_array_to_pil_image
 
 

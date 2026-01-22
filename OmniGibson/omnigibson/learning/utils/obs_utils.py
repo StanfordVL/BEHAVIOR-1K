@@ -34,7 +34,7 @@ except ImportError:
 # Depth
 # ==============================================
 
-USE_DEPTH_RGB_ENCODING = True  # If False, will use 12bit grayscale encoding / decoding
+USE_DEPTH_RGB_ENCODING = False  # If False, will use 12bit grayscale encoding / decoding
 MIN_DEPTH = 0.01
 MAX_DEPTH = 10.0
 DEPTH_SHIFT = 3.5
