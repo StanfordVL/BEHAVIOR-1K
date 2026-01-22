@@ -1653,7 +1653,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         self.include_multi_action_representation = include_multi_action_representation
         if self.include_multi_action_representation:
             assert include_robot_control, "Multi action representation requires robot control!"
-        
+
         # Store modality filter - if specified, only include these modalities in the dataset
         self.include_modalities = include_modalities
 
@@ -1686,36 +1686,36 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
     def get_lerobot_obs_mapping(cls, env, use_videos=True, include_modalities=None):
         """
         Generate observation mapping from OmniGibson to LeRobot format.
-        
+
         Args:
             env: The environment
             use_videos (bool): Whether to use videos for image data
             include_modalities (None or list of str): If specified, only include these modalities.
                 Valid modalities include: "rgb", "depth_linear", "proprio", "seg_semantic", etc.
                 If None, all modalities are included.
-                
+
         Returns:
             tuple: (obs_mapping, obs_features) dictionaries
         """
         obs_mapping, obs_features = dict(), dict()
-        
+
         # First pass: collect all proprio keys and compute total shape for multi-robot concatenation
         proprio_keys = []
         total_proprio_dim = 0
-        
+
         for key, gym_shape in env.observation_space.items():
             modality = key.split("::")[-1]
-            
+
             # Filter by modality if include_modalities is specified
             if include_modalities is not None:
                 modality_included = any(inc_mod in modality for inc_mod in include_modalities)
                 if not modality_included:
                     continue
-            
+
             if "proprio" in modality or "low_dim" in modality:
                 proprio_keys.append(key)
                 total_proprio_dim += gym_shape.shape[0]
-        
+
         # Add concatenated proprio feature if any proprio keys exist
         if proprio_keys:
             obs_features["observation.state"] = {
@@ -1726,21 +1726,21 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             # Map all proprio keys to the same observation.state (they will be concatenated)
             for key in proprio_keys:
                 obs_mapping[key] = "observation.state"
-        
+
         # Second pass: handle all other modalities
         for key, gym_shape in env.observation_space.items():
             modality = key.split("::")[-1]
-            
+
             # Filter by modality if include_modalities is specified
             if include_modalities is not None:
                 modality_included = any(inc_mod in modality for inc_mod in include_modalities)
                 if not modality_included:
                     continue
-            
+
             # Skip proprio keys (already handled above)
             if "proprio" in modality or "low_dim" in modality:
                 continue
-            
+
             info = dict()
             # Parse the relevant name to assign
             # For multi-robot support, we keep robot prefix in obs_name for disambiguation
@@ -1794,13 +1794,13 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
     def og_to_lerobot_obs(cls, env, obs_flat, obs_mapping, include_modalities=None):
         """
         Convert OmniGibson observations to LeRobot format.
-        
+
         Args:
             env: The environment
             obs_flat (dict): Flattened observations from the environment
             obs_mapping (dict): Mapping from OG observation names to LeRobot names
             include_modalities (None or list of str): If specified, only include these modalities.
-                
+
         Returns:
             dict: Observations in LeRobot format
         """
@@ -1808,14 +1808,14 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         # For multi-robot support, we compute relative poses wrt the first robot's frame
         # (or each robot's own frame for its own sensors)
         primary_robot_tf_inv = T.pose_inv(T.pose2mat(env.robots[0].get_position_orientation()))
-        
+
         # Add external sensor poses relative to primary robot
         if env.external_sensors is not None:
             for name, sensor in env.external_sensors.items():
                 obs_flat[f"{name}::rel_pose"] = th.cat(
                     T.mat2pose(primary_robot_tf_inv @ T.pose2mat(sensor.get_position_orientation()))
                 )
-        
+
         # Add each robot's sensor poses relative to that robot
         for robot in env.robots:
             robot_tf_inv = T.pose_inv(T.pose2mat(robot.get_position_orientation()))
@@ -1827,15 +1827,15 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         # Compose lerobot format obs
         frame = dict()
         n_robots = len(env.robots)
-        
+
         # Collect proprio observations for concatenation (preserving order from observation_space)
         proprio_obs_list = []
-        
+
         for name in env.observation_space.keys():
             # Skip if not in obs_mapping (filtered out by include_modalities)
             if name not in obs_mapping:
                 continue
-                
+
             obs = obs_flat[name]
             # Prune alpha channel if keeping RGB
             if "rgb" in name:
@@ -1913,7 +1913,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                             "type": mod,
                             "original_key": mod_name,
                         }
-        
+
         # Add video modality info for each robot's sensors
         robot_sensor_idx = 0
         for robot_idx, robot in enumerate(env.robots):
@@ -1930,7 +1930,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                             # Add robot prefix for multi-robot disambiguation
                             obs_name = f"{robot_prefix.lower()}{remapped_sensor_name}"
                             mod_name = f"observation.{mod}.{obs_name}"
-                            key = f"robot{robot_idx}_image_{i}_{mod}" if n_robots > 1 else f"robot_image_{robot_sensor_idx}_{mod}"
+                            key = (
+                                f"robot{robot_idx}_image_{i}_{mod}"
+                                if n_robots > 1
+                                else f"robot_image_{robot_sensor_idx}_{mod}"
+                            )
                             video_modality_info[key] = {
                                 "type": mod,
                                 "original_key": mod_name,
@@ -1949,7 +1953,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                     controller_key = f"{robot_prefix}{name}"
                     self.controller_action_start_idxs[controller_key] = cmd_start_idx
                     cmd_start_idx += controller.command_dim
-            
+
             action_modality_info = dict()
             idx = 0
             from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController
@@ -1977,11 +1981,11 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
                     assert (
                         gripper_controller._motor_type == "position"
                     ), "Only position motor type supported for multi action representation!"
-                    
+
                     # Add robot prefix for multi-robot disambiguation
                     prefixed_arm_name = f"{robot_prefix}{arm_name}"
                     prefixed_gripper_name = f"{robot_prefix}{gripper_name}"
-                    
+
                     action_modality_info[f"{prefixed_arm_name}_eef_pos"] = {
                         "start": idx,
                         "end": idx + 3,
@@ -2071,7 +2075,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
         }
 
         obs_mapping, obs_features = self.get_lerobot_obs_mapping(
-            env=env, 
+            env=env,
             use_videos=self.use_videos,
             include_modalities=self.include_modalities,
         )
@@ -2121,7 +2125,7 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             if isinstance(sensor, VisionSensor):
                 K = sensor.intrinsic_matrix.cpu()
                 cam_intrinsics[sensor_name] = K.numpy().tolist()
-        
+
         # Add camera intrinsics for each robot's sensors
         for robot in env.robots:
             robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
@@ -2196,13 +2200,13 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
             is_first_action = self.last_actions is None
             if is_first_action:
                 self.last_actions = dict()
-            
+
             for robot in self.env.robots:
                 robot_prefix = f"{robot.name}_" if n_robots > 1 else ""
                 for arm in robot.arm_names:
                     arm_name = f"arm_{arm}"
                     arm_controller = robot.controllers[arm_name]
-                    
+
                     # Key for storing last actions (includes robot prefix for multi-robot)
                     action_key = f"{robot_prefix}{arm_name}"
 
@@ -2263,8 +2267,8 @@ class LeRobotPlaybackWrapper(DataPlaybackWrapper):
 
         # Convert to lerobot format
         obs = self.og_to_lerobot_obs(
-            env=self.env, 
-            obs_flat=obs, 
+            env=self.env,
+            obs_flat=obs,
             obs_mapping=self.obs_mapping,
             include_modalities=self.include_modalities,
         )
