@@ -12,6 +12,7 @@ import traceback
 from collections import defaultdict
 from contextlib import nullcontext
 from pathlib import Path
+from copy import deepcopy
 
 import torch as th
 
@@ -1641,7 +1642,8 @@ def _launch_simulator(*args, **kwargs):
                 self.stop()
                 for i, scene_file in enumerate(scene_files):
                     # Directly create and load the scene object
-                    if isinstance(scene_file, str):
+                    scene_file_is_str = isinstance(scene_file, str)
+                    if scene_file_is_str:
                         if not scene_file.endswith(".json"):
                             log.error(f"You have to define the full json_path to load from. Got: {scene_file}")
                             return
@@ -1650,7 +1652,7 @@ def _launch_simulator(*args, **kwargs):
                         with open(scene_file, "r") as f:
                             scene_info = json.load(f)
                     else:
-                        scene_info = scene_file
+                        scene_info = deepcopy(scene_file)
                     init_info = scene_info["init_info"]
                     # The saved state are lists, convert them to torch tensors
                     state = recursively_convert_to_torch(scene_info["state"])
