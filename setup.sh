@@ -371,7 +371,13 @@ fi
 if [ "$JOYLO" = true ]; then
     echo "Installing JoyLo..."
     [ ! -d "joylo" ] && { echo "ERROR: joylo directory not found"; exit 1; }
-    pip install -e "$WORKDIR/joylo"
+    # Constrain deps to keep OmniGibson / Isaac Sim compatible
+    JOYLO_CONSTRAINTS_FILE="/tmp/joylo-constraints.txt"
+    cat > "$JOYLO_CONSTRAINTS_FILE" << 'EOF'
+opencv-contrib-python<=4.11.0.86
+numpy<2
+EOF
+    pip install -e "$WORKDIR/joylo" -c "$JOYLO_CONSTRAINTS_FILE"
 fi
 
 # Install Eval
