@@ -624,7 +624,7 @@ class KeyboardRobotController:
         self.keypress_mapping = None  # Maps omni keybindings to information for controlling various parts of the robot
         self.current_keypress = None  # Current key that is being pressed
         self.active_action = None  # Current action information based on the current keypress
-        self._pending_release = False  # Whether a key release is pending (to handle batched events)
+        self._pending_release_key = None  # Which key has a pending release (to handle batched events)
         self.toggling_gripper = False  # Whether we should toggle the gripper during the next action
         self.custom_keymapping = None  # Dictionary mapping custom keys to custom callback functions / info
 
@@ -840,7 +840,7 @@ class KeyboardRobotController:
 
         # If we release a key, mark release as pending (don't clear immediately to handle batched events)
         elif event.type == lazy.carb.input.KeyboardEventType.KEY_RELEASE:
-            self._pending_release = True
+            self._pending_release_key = event.input
 
         # Callback always needs to return True
         return True
@@ -917,11 +917,11 @@ class KeyboardRobotController:
         # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         # sys.stdout.write("\033[F")
 
-        # Clear action after consuming if a key release was pending
-        if self._pending_release:
+        # Clear action after consuming if a key release was pending for the current key
+        if self._pending_release_key is not None and self._pending_release_key == self.current_keypress:
             self.active_action = None
             self.current_keypress = None
-            self._pending_release = False
+        self._pending_release_key = None
 
         # Return action
         return action
