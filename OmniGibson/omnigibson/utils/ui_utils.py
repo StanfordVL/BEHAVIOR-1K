@@ -917,7 +917,7 @@ class KeyboardRobotController:
         # print("Pressed {}. Action: {}".format(keypress_str, action.tolist()))
         # sys.stdout.write("\033[F")
 
-         # Clear action after consuming if a key release was pending
+        # Clear action after consuming if a key release was pending
         if self._pending_release:
             self.active_action = None
             self.current_keypress = None
