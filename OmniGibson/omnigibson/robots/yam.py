@@ -227,7 +227,7 @@ class Yam(ManipulationRobot):
     @property
     def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-math.pi, 0, 0])}
-    
+
     @property
     def _default_gripper_multi_finger_controller_configs(self):
         """

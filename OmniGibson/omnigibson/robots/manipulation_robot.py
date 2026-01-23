@@ -264,7 +264,7 @@ class ManipulationRobot(BaseRobot):
             self._infer_finger_properties()
         except AssertionError as e:
             log.warning(f"Could not infer relevant finger link properties because:\n\n{e}")
-        
+
         # For each grasping point, if we're in DEBUG mode, visualize with spheres
         if gm.DEBUG:
             for ag_points in (self.assisted_grasp_start_points, self.assisted_grasp_end_points):

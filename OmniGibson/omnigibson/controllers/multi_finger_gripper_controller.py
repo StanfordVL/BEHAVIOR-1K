@@ -331,9 +331,7 @@ class MultiFingerGripperController(GripperController):
 
                 # The gripper is in a valid grasping position if fingers are not near their fully open
                 # or fully closed positions (i.e., stopped somewhere in between due to grasping an object)
-                valid_grasp_pos = (
-                    dist_from_closed.mean() > m.POS_TOLERANCE and dist_from_open.mean() > m.POS_TOLERANCE
-                )
+                valid_grasp_pos = dist_from_closed.mean() > m.POS_TOLERANCE and dist_from_open.mean() > m.POS_TOLERANCE
 
                 # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
                 valid_grasp_vel = cb.all(cb.abs(finger_vel) < m.VEL_TOLERANCE)
