@@ -65,7 +65,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     def record_trajectory():
         if len(waypoints) < 3:
-            print(f"Need at least 3 waypoints to record a trajectory (currently have {len(waypoints)}). Press X to add waypoints.")
+            print(
+                f"Need at least 3 waypoints to record a trajectory (currently have {len(waypoints)}). Press X to add waypoints."
+            )
             return
         cam_mover.record_trajectory_from_waypoints(
             waypoints=th.stack(waypoints),
