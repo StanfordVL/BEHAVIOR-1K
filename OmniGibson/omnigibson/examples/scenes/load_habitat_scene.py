@@ -40,6 +40,70 @@ def convert_csv_to_dict(filepath):
 AI2_FIXEDNESS_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2thor-fixedness.csv"
 AI2_FIXEDNESS_MAPPING = {k: str(v).lower() == "true" for k, v in convert_csv_to_dict(AI2_FIXEDNESS_MAPPING_FN).items()}
 
+def _room_name_from_instance(room):
+    room_id = room.get("id")
+    if room_id is None:
+        room_id = room.get("room_id", room.get("roomId", room.get("room_index", room.get("roomIndex"))))
+    room_name = room.get("name")
+    if room_name is None:
+        room_name = room.get("room_name", room.get("roomName", room.get("room_type", room.get("roomType"))))
+    if room_name is None:
+        room_name = room.get("category")
+    if room_name is None and room_id is not None:
+        room_name = f"room_{room_id}"
+    return room_id, room_name
+
+
+def _build_room_map(scene_contents):
+    rooms = []
+    if isinstance(scene_contents.get("room_instances"), list):
+        rooms.extend(scene_contents["room_instances"])
+    if isinstance(scene_contents.get("rooms"), list):
+        rooms.extend(scene_contents["rooms"])
+    room_map = {}
+    for room in rooms:
+        if not isinstance(room, dict):
+            continue
+        room_id, room_name = _room_name_from_instance(room)
+        if room_id is None or room_name is None:
+            continue
+        room_map[str(room_id)] = str(room_name)
+    return room_map
+
+
+def _extract_in_rooms(obj_instance, room_map):
+    in_rooms = []
+    if not isinstance(obj_instance, dict):
+        return in_rooms
+
+    def add_rooms(values):
+        if isinstance(values, (list, tuple)):
+            candidates = values
+        else:
+            candidates = [values]
+        for candidate in candidates:
+            if candidate is None:
+                continue
+            if isinstance(candidate, str) and candidate:
+                in_rooms.append(candidate)
+                continue
+            mapped = room_map.get(str(candidate))
+            if mapped is None:
+                mapped = f"room_{candidate}"
+            in_rooms.append(str(mapped))
+
+    for key in ["room_id", "roomId", "room_index", "roomIndex", "room"]:
+        if key in obj_instance:
+            add_rooms(obj_instance[key])
+    for key in ["room_ids", "roomIds", "rooms", "room_instances", "roomInstances"]:
+        if key in obj_instance:
+            add_rooms(obj_instance[key])
+    for key in ["room_name", "roomName", "room_type", "roomType", "category"]:
+        if key in obj_instance:
+            add_rooms(obj_instance[key])
+
+    return list(dict.fromkeys([room for room in in_rooms if room]))
+
 
 def load_habitat_scene(dataset_name, scene_input_json):
     scene_input_json = pathlib.Path(scene_input_json)
@@ -52,6 +116,8 @@ def load_habitat_scene(dataset_name, scene_input_json):
     # Load the scene JSON
     scene_contents = json.loads(scene_input_json.read_text())
     assert scene_contents["translation_origin"] == "asset_local"
+
+    room_map = _build_room_map(scene_contents)
 
     # Load all the objects manually into a scene
     scene = Scene(use_floor_plane=True, floor_plane_visible=False)
@@ -80,6 +146,9 @@ def load_habitat_scene(dataset_name, scene_input_json):
             pos = th.as_tensor(obj_instance["translation"])
             orn = th.as_tensor(obj_instance["rotation"])[[1, 2, 3, 0]]
             scale = th.as_tensor(obj_instance["non_uniform_scale"])
+            if th.any(scale < 0):
+                log.warning(f"{category} {model} negative scale detected: {scale}")
+                scale = th.abs(scale)
 
             # Is the dataset ai2thor? If so, we don't trust its fixedness flag.
             if dataset_name == "ai2thor":
@@ -88,6 +157,7 @@ def load_habitat_scene(dataset_name, scene_input_json):
             else:
                 fixed_base = obj_instance["motion_type"] == "STATIC"
 
+            in_rooms = _extract_in_rooms(obj_instance, room_map)
             obj = DatasetObject(
                 name=f"{category}_{i}",
                 category=category,
@@ -95,6 +165,7 @@ def load_habitat_scene(dataset_name, scene_input_json):
                 scale=scale,
                 fixed_base=fixed_base,
                 dataset_name=dataset_name,
+                in_rooms=in_rooms,
             )
         except:
             print("Skipping object", obj_instance)

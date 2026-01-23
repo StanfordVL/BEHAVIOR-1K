@@ -1,22 +1,12 @@
-import csv
-import gzip
 import pathlib
 import json
 import traceback
-import os
 
-import numpy as np
 from omnigibson.scenes.scene_base import Scene
-from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.rigid_dynamic_prim import RigidDynamicPrim
-from omnigibson.utils.physx_utils import bind_material
 import torch as th
 from omnigibson.objects.dataset_object import DatasetObject
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import create_primitive_mesh, scene_relative_prim_path_to_absolute
-import omnigibson.lazy as lazy
-import trimesh
-import shapely
 from scipy.spatial.transform import Rotation as R
 
 import omnigibson as og
@@ -24,35 +14,17 @@ from omnigibson.macros import gm
 
 AI2_OBJECTS = json.loads((pathlib.Path(gm.DATA_PATH) / "ai2thor" / "object_name_mapping.json").read_text())
 SPOC_OBJECTS = json.loads((pathlib.Path(gm.DATA_PATH) / "spoc" / "object_name_mapping.json").read_text())
-MDL_MATERIAL_ROOT = "/fsx-siro/cgokmen/og-materials/Materials/2023_2_1"
 
-
-def convert_csv_to_dict(filepath):
-    """
-    Converts a 2-column CSV file into a key:value dictionary.
-
-    Args:
-        filepath (str): The path to the CSV file.
-
-    Returns:
-        dict: A dictionary created from the CSV data.
-    """
-    with open(filepath, mode="r", encoding="utf-8") as file:
-        reader = csv.reader(file)
-        # Use a dictionary comprehension for a clean and efficient conversion
-        return {row[0]: row[1] for row in reader}
-
-
-AI2_MDL_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2_nvidia_material_mapping.csv"
-AI2_MDL_MAPPING = convert_csv_to_dict(AI2_MDL_MAPPING_FN)
-MDL_PATHS_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/material_paths.csv"
-MDL_PATHS = convert_csv_to_dict(MDL_PATHS_FN)
 ROTATE_EVERYTHING_BY = th.as_tensor(R.from_euler("x", 90, degrees=True).as_quat())
-with open("/fsx-siro/cgokmen/procthor/assets/2023_07_28/annotations.json") as f:
+
+# Load SPOC object annotations for scale information
+SPOC_ANNOTATIONS_PATH = "/fsx-siro/cgokmen/procthor/assets/2023_07_28/annotations.json"
+with open(SPOC_ANNOTATIONS_PATH) as f:
     ANNOTATIONS = json.load(f)
 
 
-def load_object(mesh_name, fixed_base):
+def load_object(mesh_name, fixed_base, in_rooms=None):
+    """Load a regular object (furniture, etc.) from the dataset."""
     i = len(og.sim.scenes[0].objects)
     if mesh_name in AI2_OBJECTS:
         category, model = AI2_OBJECTS[mesh_name]
@@ -62,7 +34,7 @@ def load_object(mesh_name, fixed_base):
             model=model,
             fixed_base=fixed_base,
             dataset_name="ai2thor",
-            # scale=th.tensor([-1., 1., 1.])
+            in_rooms=in_rooms,
         )
     elif mesh_name in SPOC_OBJECTS:
         category, model = SPOC_OBJECTS[mesh_name]
@@ -74,6 +46,7 @@ def load_object(mesh_name, fixed_base):
             fixed_base=fixed_base,
             dataset_name="spoc",
             scale=scale,
+            in_rooms=in_rooms,
         )
     else:
         raise ValueError(f"Unknown mesh name: {mesh_name}")
@@ -83,76 +56,47 @@ def load_object(mesh_name, fixed_base):
     return obj
 
 
-def polygon_to_mesh(name, points, material_name, convex_hull=False):
+def load_structure_object(scene_id, struct_type, struct_idx, in_rooms=None):
     """
-    Create a trimesh object from a list of 3D points defining a planar polygon.
+    Load a pre-generated structure object (floor, wall, ceiling) as a DatasetObject.
+
+    The material is already baked into the USD during the import process via
+    import_spoc_scene_structures.py.
 
     Args:
-        points: List or array of 3D points [(x1,y1,z1), (x2,y2,z2), ...]
-                Points should be ordered around the polygon boundary.
+        scene_id: The SPOC scene identifier (e.g., "train_0")
+        struct_type: Type of structure ("floor", "wall", or "ceiling")
+        struct_idx: Index of this structure within the scene
+        in_rooms: Room assignment for this structure
 
     Returns:
-        trimesh.Trimesh: The triangulated mesh
+        DatasetObject: The loaded structure object
     """
-    points = np.copy(points)
-    points[:, 0] *= -1  # Invert x-coordinates
-    # Create a 3D path and then convert to mesh.
-    lines = list(range(len(points))) + [0]  # Close the polygon by connecting the last point to the first
-    path = trimesh.path.Path3D(entities=[trimesh.path.entities.Line(lines)], vertices=points, process=False)
+    # Map structure type to category
+    category_map = {
+        "floor": "floors",
+        "wall": "walls",
+        "ceiling": "ceilings",
+    }
+    category = category_map.get(struct_type, "structures")
 
-    # Convert path to 2D, triangulate, then back to 3D
-    planar, to_3D = path.to_2D()
+    # Model name matches what import_spoc_scene_structures.py generates
+    model = f"spoc_{scene_id}_{struct_type}_{struct_idx}".replace("-", "_")
 
-    # Get the convex hull
-    if convex_hull:
-        points_2d = planar.vertices
-        multipoint = shapely.MultiPoint(points_2d)
-        polygon = multipoint.convex_hull
-        points_convex = np.array(polygon.exterior.coords[:-1])
-        lines_convex = list(range(len(points_convex))) + [0]  # Close the polygon
-        planar = trimesh.path.Path2D(
-            entities=[trimesh.path.entities.Line(lines_convex)],
-            vertices=points_convex,
-            process=False,
-        )
-    verts_2d, faces = planar.triangulate()
-    points_3d = np.hstack((verts_2d, np.zeros((verts_2d.shape[0], 1))))  # Add z=0 for 3D mesh
-    mesh = trimesh.Trimesh(vertices=points_3d, faces=faces, process=False)
-    mesh.apply_transform(to_3D)
-
-    rel_prim_path = f"/{name}"
-    abs_prim_path = scene_relative_prim_path_to_absolute(og.sim.scenes[0], rel_prim_path)
-    create_primitive_mesh(abs_prim_path, "Plane")
-
-    xp = XFormPrim(rel_prim_path, name=name)
-    xp.load(og.sim.scenes[0])
-    xp.set_position_orientation(orientation=ROTATE_EVERYTHING_BY)
-    prim = xp.prim
-
-    # Convert that trimesh mesh to a mesh prim
-    # Update the mesh prim to store the new information. First update the non-configuration-
-    # dependent fields
-    face_vertex_counts = th.tensor([len(face) for face in mesh.faces], dtype=int).cpu().numpy()
-    prim.GetAttribute("points").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(mesh.vertices))
-    prim.GetAttribute("faceVertexCounts").Set(face_vertex_counts)
-    prim.GetAttribute("faceVertexIndices").Set(mesh.faces.flatten())
-    prim.GetAttribute("normals").Set(lazy.pxr.Vt.Vec3fArray.FromNumpy(mesh.vertex_normals))
-    prim.GetAttribute("primvars:st").Set(lazy.pxr.Vt.Vec2fArray.FromNumpy(verts_2d[:, :2][mesh.faces.flatten()]))
-
-    # Create and bind the material
-    assert material_name in AI2_MDL_MAPPING, f"Unknown material name: {material_name}"
-    mdl_material_name = AI2_MDL_MAPPING[material_name]
-    assert mdl_material_name, f"Unknown MDL material name for: {material_name}"
-    mdl_path = os.path.join(MDL_MATERIAL_ROOT, MDL_PATHS[mdl_material_name], f"{mdl_material_name}.mdl")
-    assert os.path.exists(mdl_path), f"MDL path does not exist: {mdl_path}"
-    lazy.omni.kit.commands.execute(
-        "CreateAndBindMdlMaterialFromLibrary",
-        mdl_name=mdl_path,
-        mtl_name=mdl_material_name,
-        bind_selected_prims=[prim.GetPath()],
+    i = len(og.sim.scenes[0].objects)
+    obj = DatasetObject(
+        name=f"{struct_type}_{i}",
+        category=category,
+        model=model,
+        fixed_base=True,
+        dataset_name="spoc",
+        in_rooms=in_rooms,
     )
 
-    return prim
+    og.sim.scenes[0].add_object(obj)
+    obj.set_position_orientation(orientation=ROTATE_EVERYTHING_BY)
+
+    return obj
 
 
 def unity_euler_to_rh_quaternion(unity_euler_degrees):
@@ -188,12 +132,14 @@ def unity_euler_to_rh_quaternion(unity_euler_degrees):
     return quaternion
 
 
-def process_objects(objects):
+def process_objects(objects, room_id=None):
+    """Process and load objects from the scene JSON."""
     for objinfo in objects:
         try:
             obj_name = objinfo["id"]
             model = objinfo["assetId"]
-            obj = load_object(model, objinfo["kinematic"])
+            in_rooms = [room_id] if room_id else None
+            obj = load_object(model, objinfo["kinematic"], in_rooms=in_rooms)
             position = th.tensor([-objinfo["position"]["x"], objinfo["position"]["y"], objinfo["position"]["z"]])
             orn = th.as_tensor(
                 unity_euler_to_rh_quaternion(
@@ -210,32 +156,56 @@ def process_objects(objects):
             print(f"Could not load {obj_name} ({model})", traceback.format_exc())
 
         if "children" in objinfo:
-            process_objects(objinfo["children"])  # global_transform)
+            process_objects(objinfo["children"], room_id=room_id)
 
 
-def process_scene(scene):
+def process_scene(scene, scene_id):
+    """
+    Process and load a SPOC scene.
+
+    Args:
+        scene: Parsed scene JSON data
+        scene_id: Unique scene identifier (e.g., "train_0")
+    """
     ogscene = Scene(use_floor_plane=True, floor_plane_visible=False)
     og.sim.import_scene(ogscene)
 
-    print("Processing rooms...")
-    for i, room in enumerate(scene["rooms"]):
-        polygon_to_mesh(
-            f"room_{i}_floor",
-            np.array([[pt["x"], pt["y"], pt["z"]] for pt in room["floorPolygon"]]),
-            room["floorMaterial"]["name"]
-            if "floorMaterial" in room and "name" in room["floorMaterial"]
-            else "Parquet_Floor",
-            convex_hull=False,
-        )
+    # Build room ID mapping
+    room_ids = {}
+    for i, room in enumerate(scene.get("rooms", [])):
+        room_id = room.get("id", f"room_{i}")
+        room_ids[i] = room_id
+
+    print("Processing floors...")
+    for i, room in enumerate(scene.get("rooms", [])):
+        if "floorPolygon" not in room:
+            continue
+        room_id = room_ids.get(i)
+        try:
+            load_structure_object(scene_id, "floor", i, in_rooms=[room_id] if room_id else None)
+        except Exception as e:
+            print(f"Could not load floor {i}: {traceback.format_exc()}")
 
     print("Processing walls...")
-    for i, wall in enumerate(scene["walls"]):
-        polygon_to_mesh(
-            f"wall_{i}",
-            np.array([[pt["x"], pt["y"], pt["z"]] for pt in wall["polygon"]]),
-            wall["material"]["name"] if "material" in wall and "name" in wall["material"] else "Plaster",
-            convex_hull=True,
-        )
+    for i, wall in enumerate(scene.get("walls", [])):
+        if "polygon" not in wall:
+            continue
+        # Try to get room info from wall if available
+        room_id = wall.get("roomId", None)
+        try:
+            load_structure_object(scene_id, "wall", i, in_rooms=[room_id] if room_id else None)
+        except Exception as e:
+            print(f"Could not load wall {i}: {traceback.format_exc()}")
+
+    print("Processing ceilings...")
+    for i, room in enumerate(scene.get("rooms", [])):
+        if "ceilingPolygon" not in room:
+            continue
+        room_id = room_ids.get(i)
+        try:
+            load_structure_object(scene_id, "ceiling", i, in_rooms=[room_id] if room_id else None)
+        except Exception as e:
+            print(f"Could not load ceiling {i}: {traceback.format_exc()}")
 
     print("Processing objects...")
     process_objects(scene["objects"])
@@ -258,30 +228,53 @@ def process_scene(scene):
         print("Warning: scene did not stabilize")
 
 
+def get_scene_id(split_path, index):
+    """Generate a unique scene ID from split path and index."""
+    split_name = pathlib.Path(split_path).stem
+    return f"{split_name}_{index}"
+
+
 def load_spoc_scene(scene_name):
+    """
+    Load a SPOC scene by name.
+
+    Args:
+        scene_name: Scene identifier in format "<split_path>_<index>"
+                    e.g., "/path/to/train.jsonl_42"
+    """
     split, i = scene_name.rsplit("_", 1)
     i = int(i)
-    raw_houses = []
+    scene_id = get_scene_id(split, i)
 
-    print("Seeking")
+    print(f"Loading SPOC scene: {scene_id}")
     with open(split, "r") as f:
         for j, line in enumerate(f):
             if j < i:
                 continue
             print("Found. Loading")
-            process_scene(json.loads(line))
+            process_scene(json.loads(line), scene_id)
             break
         else:
             raise ValueError(f"Scene {scene_name} not found.")
 
 
 if __name__ == "__main__":
+    import sys
+
+    if len(sys.argv) < 2:
+        print("Usage: python load_spoc_scene.py <scene_name>")
+        print("  scene_name: Path to JSONL file with index, e.g.:")
+        print("    /fsx-siro/cgokmen/procthor/houses/houses_2023_07_28/val.jsonl_3")
+        sys.exit(1)
+
+    scene_name = sys.argv[1]
+
     if og.sim:
         og.clear()
     else:
         og.launch()
 
-    load_spoc_scene("val_3")
+    load_spoc_scene(scene_name)
 
     while True:
         og.sim.render()
