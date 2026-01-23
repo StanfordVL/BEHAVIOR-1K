@@ -33,7 +33,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install BDDL
-        working-directory: bddl
+        working-directory: bddl3
         run: pip install -e .
 
       - name: Install
@@ -46,7 +46,7 @@ jobs:
       # # See if we need to rebuild the whole thing
       # - name: Get BDDL hash
       #   id: bddl-hash
-      #   working-directory: bddl
+      #   working-directory: bddl3
       #   run: echo hash=$(git rev-parse HEAD) >> "$GITHUB_OUTPUT"
 
       # - name: Get knowledgebase hash

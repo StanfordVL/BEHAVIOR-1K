@@ -11,19 +11,16 @@ import numpy as np
 import time
 import torch as th
 import traceback
+import websockets.asyncio.server as _server
 import websockets.sync.client
 import websockets
-
-try:
-    import websockets.asyncio.server as _server
-except ImportError:
-    # Fallback for websockets < 13.0
-    import websockets.server as _server
+import requests
 from copy import deepcopy
 from omnigibson.macros import gm
 from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 __all__ = ["WebsocketClientPolicy", "WebsocketPolicyServer"]
@@ -35,33 +32,69 @@ class WebsocketClientPolicy:
     See WebsocketPolicyServer for a corresponding server implementation.
     """
 
-    def __init__(self, host: str = "0.0.0.0", port: Optional[int] = None, api_key: Optional[str] = None) -> None:
-        self._uri = f"ws://{host}"
+    def __init__(
+        self,
+        host: str = "0.0.0.0",
+        port: Optional[int] = None,
+        api_key: Optional[str] = None,
+        allow_reconnect: bool = False,
+    ) -> None:
+        self._uri = f"wss://{host}" if int(port) == 443 else f"ws://{host}"
         if port is not None:
             self._uri += f":{port}"
         self._packer = Packer()
         self._api_key = api_key
-        self._ws, self._server_metadata = self._wait_for_server()
+        self._ws, self._server_metadata = None, None
+        self._allow_reconnect = allow_reconnect
 
     def get_server_metadata(self) -> Dict:
         return self._server_metadata
 
     def _wait_for_server(self) -> Tuple[websockets.sync.client.ClientConnection, Dict]:
-        logger.info(f"Waiting for server at {self._uri}...")
+        # TODO [Wensi]: use URL parser instead of this
+        # Extract host and port for health check
+        host_port = self._uri.replace("ws://", "").replace("wss://", "")
+        if ":" in host_port:
+            host, port = host_port.split(":")
+            health_url = f"https://{host}:{port}/healthz" if int(port) == 443 else f"http://{host}:{port}/healthz"
+        else:
+            health_url = f"http://{host_port}/healthz"
+
+        # First, wait for the health check to pass
+        while True:
+            try:
+                response = requests.get(health_url, timeout=2)
+                if response.ok:
+                    logger.info("Health check passed, attempting websocket connection...")
+                    break
+            except Exception:
+                pass
+            logger.info(f"Health check failed, waiting for server at {health_url}...")
+            time.sleep(5)
+
+        # Now attempt websocket connection (rest of the code remains the same)
         while True:
             try:
                 headers = {"Authorization": f"Api-Key {self._api_key}"} if self._api_key else None
                 conn = websockets.sync.client.connect(
-                    self._uri, compression=None, max_size=None, additional_headers=headers
+                    self._uri,
+                    compression=None,
+                    max_size=None,
+                    additional_headers=headers,
+                    ping_interval=60,
+                    ping_timeout=300,
                 )
                 metadata = unpackb(conn.recv())
                 logger.info("Connected to server!")
                 return conn, metadata
-            except ConnectionRefusedError:
-                logger.info("Still waiting for server...")
+            except (ConnectionRefusedError, websockets.exceptions.InvalidMessage, EOFError) as e:
+                logger.info(f"Websocket connection failed ({e}), retrying...")
                 time.sleep(5)
 
     def act(self, obs: Dict) -> th.Tensor:
+        if self._ws is None:
+            self._ws, self._server_metadata = self._wait_for_server()
+
         data = self._packer.pack(obs)
         while True:
             try:
@@ -69,17 +102,31 @@ class WebsocketClientPolicy:
                 response = self._ws.recv()
                 break
             except websockets.exceptions.ConnectionClosedError:
-                logger.warning("Connection to server lost, attempting to reconnect...")
-                self._ws, self._server_metadata = self._wait_for_server()
+                if self._allow_reconnect:
+                    logger.warning("Connection to server lost, attempting to reconnect...")
+                    self._ws, self._server_metadata = self._wait_for_server()
+                    continue
+                raise
         if isinstance(response, str):
             # we're expecting bytes; if the server sends a string, it's an error.
             raise RuntimeError(f"Error in inference server:\n{response}")
         action_dict = unpackb(response)
-        action_np = deepcopy(action_dict["action"])
+        try:
+            action_np = deepcopy(action_dict["action"])
+        except KeyError:
+            # We try getting action one more time before raising error
+            logger.warning("No action received from server, retrying one more time...")
+            self._ws.send(data)
+            response = self._ws.recv()
+            action_dict = unpackb(response)
+            action_np = deepcopy(action_dict["action"])
         action = th.from_numpy(action_np).to(th.float32)
         return action
 
     def reset(self) -> None:
+        if self._ws is None:
+            self._ws, self._server_metadata = self._wait_for_server()
+
         data = self._packer.pack({"reset": True})
         self._ws.send(data)
 
@@ -94,19 +141,19 @@ class WebsocketPolicyServer:
         self,
         policy: Any,
         host: str = "0.0.0.0",
-        port: int | None = None,
+        port: int = 8000,
         metadata: dict | None = None,
     ) -> None:
         self._policy = policy
         self._host = host
         self._port = port
         self._metadata = metadata or {}
-        logging.getLogger("websockets.server").setLevel(logging.INFO)
 
     def serve_forever(self) -> None:
         asyncio.run(self.run())
 
     async def run(self):
+        logger.info(f"Starting websocket server on {self._host}:{self._port}...")
         async with _server.serve(
             self._handler,
             self._host,
@@ -127,7 +174,7 @@ class WebsocketPolicyServer:
         while True:
             try:
                 start_time = time.monotonic()
-                result = unpackb(await websocket.recv())
+                result = unpackb(await websocket.recv(), strict_map_key=False)
                 if "reset" in result:
                     self._policy.reset()
                     continue

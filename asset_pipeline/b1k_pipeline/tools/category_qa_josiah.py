@@ -22,7 +22,11 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 import omnigibson.utils.transform_utils as T
 import omnigibson.lazy as lazy
 from omnigibson.utils.asset_utils import decrypted
-from omnigibson.utils.ui_utils import KeyboardEventHandler, draw_text, clear_debug_drawing
+from omnigibson.utils.ui_utils import (
+    KeyboardEventHandler,
+    draw_text,
+    clear_debug_drawing,
+)
 from omnigibson.macros import gm
 from nltk.corpus import wordnet
 
@@ -42,7 +46,18 @@ PI = th.tensor(th.pi)
 LOW_PRECISION_ANGLE_INCREMENT = PI / 4
 ANGLE_INCREMENT = PI / 90
 FIXED_Y_SPACING = 0.1
-INTERESTING_ABILITIES = {"fillable", "openable", "cloth", "heatSource", "coldSource", "particleApplier", "particleRemover", "toggleable", "particleSource", "particleSink"}
+INTERESTING_ABILITIES = {
+    "fillable",
+    "openable",
+    "cloth",
+    "heatSource",
+    "coldSource",
+    "particleApplier",
+    "particleRemover",
+    "toggleable",
+    "particleSource",
+    "particleSink",
+}
 JOINT_SECONDS_PER_CYCLE = 4.0
 
 ANNOTATION_TYPE_MAPPING = {
@@ -56,19 +71,31 @@ ANNOTATION_TYPE_MAPPING = {
 
 IGNORE_METALINK_TYPES = {"attachment"}
 CUSTOM_INCLUDE_METALINK_TYPES = {"fillable"}
-METALINK_STATES = [state for state in REGISTERED_OBJECT_STATES.values() if issubclass(state, LinkBasedStateMixin) and state.requires_meta_link]
-METALINK_TYPES = ({state.meta_link_type for state in METALINK_STATES} - IGNORE_METALINK_TYPES).union(CUSTOM_INCLUDE_METALINK_TYPES)
+METALINK_STATES = [
+    state
+    for state in REGISTERED_OBJECT_STATES.values()
+    if issubclass(state, LinkBasedStateMixin) and state.requires_meta_link
+]
+METALINK_TYPES = (
+    {state.meta_link_type for state in METALINK_STATES} - IGNORE_METALINK_TYPES
+).union(CUSTOM_INCLUDE_METALINK_TYPES)
+
 
 def add_keyboard_callback(key, callback_fn, description):
     KeyboardEventHandler.add_keyboard_callback(key=key, callback_fn=callback_fn)
     key_name = str(key).replace("KeyboardInput.", "").replace("_", " ")
     print(f"Press {key_name} to {description}.")
 
+
 class BatchQAViewer:
-    def __init__(self, record_path, your_id, total_ids, seed, pipeline_root, annotation_type):
+    def __init__(
+        self, record_path, your_id, total_ids, seed, pipeline_root, annotation_type
+    ):
         self.env = None
         self.pipeline_root = pipeline_root
-        assert annotation_type in ANNOTATION_TYPE_MAPPING, f"Got invalid annotation_type. Expected one of: {ANNOTATION_TYPE_MAPPING}"
+        assert (
+            annotation_type in ANNOTATION_TYPE_MAPPING
+        ), f"Got invalid annotation_type. Expected one of: {ANNOTATION_TYPE_MAPPING}"
         self.annotation_type = annotation_type
         self.taxonomy = bddl.object_taxonomy.ObjectTaxonomy()
         self.record_path = record_path + f"_{self.annotation_type}"
@@ -76,25 +103,33 @@ class BatchQAViewer:
         self.total_ids = total_ids
         self.seed = seed
         self.all_objs = {
-            (cat, model) for cat in get_all_object_categories()
+            (cat, model)
+            for cat in get_all_object_categories()
             for model in get_all_object_category_models(cat)
         }
         filtered_objs_by_id = {
-            this_id: sorted({
-                (cat, model) for cat, model in self.all_objs
-                if int(hashlib.md5((cat + self.seed).encode()).hexdigest(), 16) % self.total_ids == this_id
-            })
+            this_id: sorted(
+                {
+                    (cat, model)
+                    for cat, model in self.all_objs
+                    if int(hashlib.md5((cat + self.seed).encode()).hexdigest(), 16)
+                    % self.total_ids
+                    == this_id
+                }
+            )
             for this_id in range(self.total_ids)
         }
         # print("Filtered objects by id:", {k: len(v) for k, v in filtered_objs_by_id.items()})
         self.filtered_objs = filtered_objs_by_id[self.your_id]
         self.processed_objects = self.load_processed_objects()
-        print("-"*80)
+        print("-" * 80)
         print("IMPORTANT: VERIFY THIS NUMBER!")
         print("There are a total of", len(self.filtered_objs), "objects in this batch.")
-        print(f"You are running with annotation type: {self.annotation_type}: {ANNOTATION_TYPE_MAPPING[self.annotation_type]}")
+        print(
+            f"You are running with annotation type: {self.annotation_type}: {ANNOTATION_TYPE_MAPPING[self.annotation_type]}"
+        )
         print("You are running the 5.0.3 version of this script.")
-        print("-"*80)
+        print("-" * 80)
         input("Press Enter to continue...")
         self.complaint_handler = ObjectComplaintHandler(pipeline_root)
 
@@ -106,9 +141,9 @@ class BatchQAViewer:
         self.precision_mode = False
 
         # Camera parameters
-        self.pan = th.tensor(0.)
-        self.tilt = th.tensor(0.)
-        self.dist = th.tensor(3.)
+        self.pan = th.tensor(0.0)
+        self.tilt = th.tensor(0.0)
+        self.dist = th.tensor(3.0)
 
     @property
     def angle_increment(self):
@@ -116,7 +151,7 @@ class BatchQAViewer:
 
     @property
     def scale_increment(self):
-        return th.tensor(1.1) if self.precision_mode else th.tensor(10.)
+        return th.tensor(1.1) if self.precision_mode else th.tensor(10.0)
 
     def _toggle_precision(self):
         self.precision_mode = not self.precision_mode
@@ -132,7 +167,13 @@ class BatchQAViewer:
 
     @property
     def remaining_objects(self):
-        return sorted({(cat, model) for cat, model in self.filtered_objs if model not in self.processed_objects})
+        return sorted(
+            {
+                (cat, model)
+                for cat, model in self.filtered_objs
+                if model not in self.processed_objects
+            }
+        )
 
     def group_objects_by_category(self, objects):
         grouped_objs = {}
@@ -178,10 +219,21 @@ class BatchQAViewer:
                 y_coordinate += prev_obj_radius + FIXED_Y_SPACING + obj_radius
             obj_in_min = obj.get_position_orientation()[0] - obj.aabb[0]
 
-            obj.set_position_orientation(position=[obj_in_min[0], y_coordinate, obj_in_min[2] + 0.05])
+            obj.set_position_orientation(
+                position=[obj_in_min[0], y_coordinate, obj_in_min[2] + 0.05]
+            )
 
             if should_draw:
-                draw_text(obj.name.replace("obj_", ""), [0, y_coordinate, -0.1], T.euler2quat(th.tensor([th.pi / 2, 0, th.pi / 2])), color=(1.0, 0.0, 0.0, 1.0), line_size=3.0, anchor="topcenter", max_width=obj_radius, max_height=0.2)
+                draw_text(
+                    obj.name.replace("obj_", ""),
+                    [0, y_coordinate, -0.1],
+                    T.euler2quat(th.tensor([th.pi / 2, 0, th.pi / 2])),
+                    color=(1.0, 0.0, 0.0, 1.0),
+                    line_size=3.0,
+                    anchor="topcenter",
+                    max_width=obj_radius,
+                    max_height=0.2,
+                )
 
             prev_obj_radius = obj_radius
 
@@ -191,7 +243,15 @@ class BatchQAViewer:
         center_y = (min_y + max_y) / 2
         length_y = max_y - min_y
         if should_draw:
-            draw_text(obj.category, [0, center_y, -0.3], T.euler2quat(th.tensor([th.pi / 2, 0, th.pi / 2])), color=(1.0, 0.0, 0.0, 1.0), line_size=3.0, anchor="topcenter", max_width=length_y)
+            draw_text(
+                obj.category,
+                [0, center_y, -0.3],
+                T.euler2quat(th.tensor([th.pi / 2, 0, th.pi / 2])),
+                color=(1.0, 0.0, 0.0, 1.0),
+                line_size=3.0,
+                anchor="topcenter",
+                max_width=length_y,
+            )
         og.sim.step()
         og.sim.step()
         og.sim.step()
@@ -201,83 +261,101 @@ class BatchQAViewer:
         scale = obj.scale
         if not os.path.exists(os.path.join(self.record_path, obj.category)):
             os.makedirs(os.path.join(self.record_path, obj.category))
-        with open(os.path.join(self.record_path, obj.category, obj.model + ".json"), "w") as f:
-            json.dump({
-                "orientation": orientation.tolist(),
-                "scale": scale.tolist(),
-                "complaints": complaints,
-            }, f, indent=4)
+        with open(
+            os.path.join(self.record_path, obj.category, obj.model + ".json"), "w"
+        ) as f:
+            json.dump(
+                {
+                    "orientation": orientation.tolist(),
+                    "scale": scale.tolist(),
+                    "complaints": complaints,
+                },
+                f,
+                indent=4,
+            )
 
     def save_empty_results(self, category, model):
         if not os.path.exists(os.path.join(self.record_path, category)):
             os.makedirs(os.path.join(self.record_path, category))
         with open(os.path.join(self.record_path, category, model + ".json"), "w") as f:
-            json.dump({
-                "orientation": [0, 0, 0, 1],
-                "scale": [1, 1, 1],
-                "complaints": [],
-            }, f, indent=4)
+            json.dump(
+                {
+                    "orientation": [0, 0, 0, 1],
+                    "scale": [1, 1, 1],
+                    "complaints": [],
+                },
+                f,
+                indent=4,
+            )
 
-    def set_camera_bindings(self, default_dist = 3.):
-        self.pan, self.tilt, self.dist = PI, th.tensor(0.), th.tensor(default_dist)
+    def set_camera_bindings(self, default_dist=3.0):
+        self.pan, self.tilt, self.dist = PI, th.tensor(0.0), th.tensor(default_dist)
+
         def update_camera(d_pan, d_tilt, d_dist):
             self.pan = (self.pan + d_pan) % (2 * th.pi)
             self.tilt = th.clip(self.tilt + d_tilt, -th.pi / 2, th.pi / 2)
             self.dist = th.clip(self.dist + d_dist, 0, 100)
+
         def reset_camera():
-            self.pan, self.tilt, self.dist = PI, th.tensor(0.), th.tensor(default_dist)
+            self.pan, self.tilt, self.dist = PI, th.tensor(0.0), th.tensor(default_dist)
 
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.UP,
             callback_fn=lambda: update_camera(0, ANGLE_INCREMENT, 0),
-            description="tilt camera up"
+            description="tilt camera up",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.DOWN,
             callback_fn=lambda: update_camera(0, -ANGLE_INCREMENT, 0),
-            description="tilt camera down"
+            description="tilt camera down",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.LEFT,
             callback_fn=lambda: update_camera(-ANGLE_INCREMENT, 0, 0),
-            description="pan camera left"
+            description="pan camera left",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.RIGHT,
             callback_fn=lambda: update_camera(ANGLE_INCREMENT, 0, 0),
-            description="pan camera right"
+            description="pan camera right",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.PAGE_DOWN,
             callback_fn=lambda: update_camera(0, 0, 0.1),
-            description="zoom in"
+            description="zoom in",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.PAGE_UP,
             callback_fn=lambda: update_camera(0, 0, -0.1),
-            description="zoom out"
+            description="zoom out",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.END,
             callback_fn=lambda: reset_camera(),
-            description="reset camera"
+            description="reset camera",
         )
 
     def update_camera(self, target):
         # Get the camera position by starting at the target point and moving back by the distance
         # along the negative pan / tilt direction
-        camera_pos = target - self.dist * th.tensor([
-            th.cos(self.pan) * th.cos(self.tilt),
-            th.sin(self.pan) * th.cos(self.tilt),
-            -th.sin(self.tilt),
-        ])
+        camera_pos = target - self.dist * th.tensor(
+            [
+                th.cos(self.pan) * th.cos(self.tilt),
+                th.sin(self.pan) * th.cos(self.tilt),
+                -th.sin(self.tilt),
+            ]
+        )
         # Camera matrix: note that this is the OpenGL frame, so the camera is looking down the negative z-axis
         # and the up vector is the positive y-axis.
-        weird_camera_frame = T.mat2quat(th.tensor([
-            [0, 0, -1],
-            [-1, 0, 0],
-            [0, 1, 0],
-        ]))
+        weird_camera_frame = T.mat2quat(
+            th.tensor(
+                [
+                    [0, 0, -1],
+                    [-1, 0, 0],
+                    [0, 1, 0],
+                ]
+            )
+        )
         camera_orn = T.euler2quat(th.tensor([0.0, self.tilt, self.pan]))
         camera_orn = T.quat_multiply(camera_orn, weird_camera_frame)
         og.sim.viewer_camera.set_position_orientation(camera_pos, camera_orn)
@@ -292,7 +370,7 @@ class BatchQAViewer:
         y_max = th.max(th.tensor([obj.aabb[1][1] for obj in all_objects]))
         average_pos = th.mean(th.stack([obj.aabb_center for obj in all_objects]), dim=0)
 
-        offset = 0.
+        offset = 0.0
 
         def _set_done():
             nonlocal done
@@ -311,22 +389,22 @@ class BatchQAViewer:
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.ENTER,
             callback_fn=_set_done,
-            description="continue to object editing"
+            description="continue to object editing",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.HOME,
             callback_fn=_set_skip,
-            description="skip to next category"
+            description="skip to next category",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.LEFT_BRACKET,
             callback_fn=lambda: change_offset(-1),
-            description="pan camera left"
+            description="pan camera left",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.RIGHT_BRACKET,
             callback_fn=lambda: change_offset(1),
-            description="pan camera right"
+            description="pan camera right",
         )
 
         def _rotate_category(axis, angle):
@@ -335,7 +413,9 @@ class BatchQAViewer:
             rotation_delta["xyz".index(axis)] = angle
             new_rot = T.quat_multiply(T.euler2quat(rotation_delta), current_rot)
             # Round the new rotation to the nearest degree
-            rounded_rot = T.euler2quat(th.deg2rad(th.round(th.rad2deg(T.quat2euler(new_rot)))))
+            rounded_rot = T.euler2quat(
+                th.deg2rad(th.round(th.rad2deg(T.quat2euler(new_rot))))
+            )
 
             for obj in all_objects:
                 obj.set_position_orientation(orientation=rounded_rot)
@@ -347,38 +427,40 @@ class BatchQAViewer:
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.O,
             callback_fn=lambda: _rotate_category("z", self.angle_increment),
-            description="rotate category counterclockwise around z-axis"
+            description="rotate category counterclockwise around z-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.P,
             callback_fn=lambda: _rotate_category("z", -self.angle_increment),
-            description="rotate category clockwise around z-axis"
-
+            description="rotate category clockwise around z-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.K,
             callback_fn=lambda: _rotate_category("y", self.angle_increment),
-            description="rotate category counterclockwise around y-axis"
+            description="rotate category counterclockwise around y-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.L,
             callback_fn=lambda: _rotate_category("y", -self.angle_increment),
-            description="rotate category clockwise around y-axis"
+            description="rotate category clockwise around y-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.COMMA,
             callback_fn=lambda: _rotate_category("x", self.angle_increment),
-            description="rotate category counterclockwise around x-axis"
+            description="rotate category counterclockwise around x-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.PERIOD,
             callback_fn=lambda: _rotate_category("x", -self.angle_increment),
-            description="rotate category clockwise around x-axis"
+            description="rotate category clockwise around x-axis",
         )
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.BACKSLASH,
-            callback_fn=lambda: [obj.set_position_orientation(orientation=[0, 0, 0, 1]) for obj in all_objects],
-            description="reset category orientation"
+            callback_fn=lambda: [
+                obj.set_position_orientation(orientation=[0, 0, 0, 1])
+                for obj in all_objects
+            ],
+            description="reset category orientation",
         )
 
         while not done:
@@ -398,7 +480,7 @@ class BatchQAViewer:
         synset = self.taxonomy.get_synset_from_category(category=obj.category)
         terminate_early = False
         metalink_types = None
-        if self.annotation_type == 5 and obj.n_joints == 0:       # joints checking
+        if self.annotation_type == 5 and obj.n_joints == 0:  # joints checking
             terminate_early = True
         elif self.annotation_type == 6:
             metalink_types = set()
@@ -410,14 +492,16 @@ class BatchQAViewer:
             if len(metalink_types) == 0:
                 terminate_early = True
         elif self.annotation_type == 7:
-            previous_complaints = self.complaint_handler._get_existing_complaints(obj.model)
+            previous_complaints = self.complaint_handler._get_existing_complaints(
+                obj.model
+            )
             if len(previous_complaints) == 0:
                 terminate_early = True
 
         if terminate_early:
             self.save_empty_results(obj.category, obj.model)
             self.processed_objects.add(obj.name.replace("obj_", ""))
-            return          # skip this model
+            return  # skip this model
 
         KeyboardEventHandler.initialize()
         self.set_camera_bindings(default_dist=obj.aabb_extent[0] * 2.5)
@@ -438,13 +522,15 @@ class BatchQAViewer:
             done = True
 
         def _set_complaint(message):
-            quick_complaints.append({
-                "object": f"{obj.category}-{obj.model}",
-                "message": "QC: " + message,
-                "complaint": "quick complaint added during category & collision QA",
-                "processed": False,
-                "new": True,
-            })
+            quick_complaints.append(
+                {
+                    "object": f"{obj.category}-{obj.model}",
+                    "message": "QC: " + message,
+                    "complaint": "quick complaint added during category & collision QA",
+                    "processed": False,
+                    "new": True,
+                }
+            )
             print("Added", message, "complaint.\n")
 
         def _toggle_gravity():
@@ -455,6 +541,7 @@ class BatchQAViewer:
             self.position_reference_objects(target_y=obj.aabb_center[1])
 
         collision_visibility = True
+
         def _toggle_collision_visibility():
             # Disable all the visual meshes and enable all the collision ones
             nonlocal collision_visibility
@@ -464,10 +551,12 @@ class BatchQAViewer:
                     mesh.visible = not collision_visibility
                 for mesh in link.collision_meshes.values():
                     mesh.visible = collision_visibility
+
         # Warm this up
         _toggle_collision_visibility()
 
         meta_visibility = True
+
         def _toggle_meta_visibility():
             # Toggle the visibility of all the links
             nonlocal meta_visibility
@@ -479,11 +568,15 @@ class BatchQAViewer:
                     mesh.visible = meta_visibility
                 for mesh in link.collision_meshes.values():
                     mesh.visible = meta_visibility
+
         # Warm this up
         _toggle_meta_visibility()
 
-        joint_position_seed = th.tensor(0.)  # monotonically increasing, to be passed into th.sin
+        joint_position_seed = th.tensor(
+            0.0
+        )  # monotonically increasing, to be passed into th.sin
         joints_moving = False
+
         def _toggle_joints():
             nonlocal joints_moving
             joints_moving = not joints_moving
@@ -501,13 +594,18 @@ class BatchQAViewer:
                         mesh_points = mesh.prim.GetAttribute("points").Get()
                         pos, ori = mesh.get_position_orientation()
                         transform = T.pose2mat((pos, ori))
-                        if mesh_points is None or len(mesh_points)==0:
+                        if mesh_points is None or len(mesh_points) == 0:
                             continue
-                        points.append(trimesh.transformations.transform_points(mesh_points, transform))
+                        points.append(
+                            trimesh.transformations.transform_points(
+                                mesh_points, transform
+                            )
+                        )
                 points = th.concat(points, dim=0)
 
                 # Apply PCA to 3D points
                 from sklearn.decomposition import PCA
+
                 pca = PCA(n_components=3)
                 pca.fit(points)
 
@@ -542,7 +640,9 @@ class BatchQAViewer:
             rotation_delta["xyz".index(axis)] = angle
             new_rot = T.quat_multiply(T.euler2quat(rotation_delta), current_rot)
             # Round the new rotation to the nearest degree
-            rounded_rot = T.euler2quat(th.deg2rad(th.round(th.rad2deg(T.quat2euler(new_rot)))))
+            rounded_rot = T.euler2quat(
+                th.deg2rad(th.round(th.rad2deg(T.quat2euler(new_rot))))
+            )
             obj.set_position_orientation(orientation=rounded_rot)
 
             # Reposition everything
@@ -550,7 +650,9 @@ class BatchQAViewer:
             self.position_reference_objects(target_y=obj.aabb_center[1])
 
         def _set_scale(new_scale):
-            object_poses = {o: o.get_position_orientation() for o in self.env.scene.objects}
+            object_poses = {
+                o: o.get_position_orientation() for o in self.env.scene.objects
+            }
             og.sim.stop()
             obj.scale = new_scale
             og.sim.play()
@@ -562,7 +664,6 @@ class BatchQAViewer:
             self.position_reference_objects(target_y=obj.aabb_center[1])
             self.dist = obj.aabb_extent[0] * 2.5
 
-
         def _show_photo():
             nonlocal should_show_photo
             should_show_photo = True
@@ -571,7 +672,7 @@ class BatchQAViewer:
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.ENTER,
             callback_fn=_set_done,
-            description="continue to complaint process"
+            description="continue to complaint process",
         )
         # add_keyboard_callback(
         #     key=lazy.carb.input.KeyboardInput.NUMPAD_7,
@@ -588,127 +689,132 @@ class BatchQAViewer:
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.O,
                 callback_fn=lambda: _rotate_object("z", self.angle_increment),
-                description="rotate object counterclockwise around z-axis"
+                description="rotate object counterclockwise around z-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.P,
                 callback_fn=lambda: _rotate_object("z", -self.angle_increment),
-                description="rotate object clockwise around z-axis"
-
+                description="rotate object clockwise around z-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.K,
                 callback_fn=lambda: _rotate_object("y", self.angle_increment),
-                description="rotate object counterclockwise around y-axis"
+                description="rotate object counterclockwise around y-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.L,
                 callback_fn=lambda: _rotate_object("y", -self.angle_increment),
-                description="rotate object clockwise around y-axis"
+                description="rotate object clockwise around y-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.COMMA,
                 callback_fn=lambda: _rotate_object("x", self.angle_increment),
-                description="rotate object counterclockwise around x-axis"
+                description="rotate object counterclockwise around x-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.PERIOD,
                 callback_fn=lambda: _rotate_object("x", -self.angle_increment),
-                description="rotate object clockwise around x-axis"
+                description="rotate object clockwise around x-axis",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.BACKSLASH,
-                callback_fn=lambda: obj.set_position_orientation(orientation=[0, 0, 0, 1]),
-                description="reset object orientation"
+                callback_fn=lambda: obj.set_position_orientation(
+                    orientation=[0, 0, 0, 1]
+                ),
+                description="reset object orientation",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.G,
                 callback_fn=_toggle_gravity,
-                description="toggle gravity for selected object"
+                description="toggle gravity for selected object",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.T,
                 callback_fn=lambda: self._toggle_precision(),
-                description="toggle precision mode"
+                description="toggle precision mode",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.RIGHT_BRACKET,
                 callback_fn=lambda: scale_queue.append(self.scale_increment),
-                description="increase object scale"
+                description="increase object scale",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.LEFT_BRACKET,
                 callback_fn=lambda: scale_queue.append(1 / self.scale_increment),
-                description="decrease object scale"
+                description="decrease object scale",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_0,
                 callback_fn=lambda: scale_queue.append(th.tensor(0)),
-                description="reset object scale"
+                description="reset object scale",
             )
 
         elif self.annotation_type == 1:
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_1,
                 callback_fn=lambda: _set_complaint("category"),
-                description="add a category or synset complaint"
+                description="add a category or synset complaint",
             )
 
         elif self.annotation_type == 2:
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.C,
                 callback_fn=_toggle_collision_visibility,
-                description="toggle collision mesh visibility"
+                description="toggle collision mesh visibility",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_2,
                 callback_fn=lambda: _set_complaint("appearance"),
-                description="add a visual appearance complaint"
+                description="add a visual appearance complaint",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_3,
                 callback_fn=lambda: _set_complaint("handle"),
-                description="add a handle-specific collision mesh complaint"
+                description="add a handle-specific collision mesh complaint",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_4,
                 callback_fn=lambda: _set_complaint("collision"),
-                description="add a general collision complaint"
+                description="add a general collision complaint",
             )
 
         elif self.annotation_type == 5:
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.J,
                 callback_fn=_toggle_joints,
-                description="toggle joint movement"
+                description="toggle joint movement",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_5,
                 callback_fn=lambda: _set_complaint("joint"),
-                description="add a joint complaint"
+                description="add a joint complaint",
             )
         elif self.annotation_type == 6:
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.M,
                 callback_fn=_toggle_meta_visibility,
-                description="toggle meta link mesh visibility"
+                description="toggle meta link mesh visibility",
             )
             add_keyboard_callback(
                 key=lazy.carb.input.KeyboardInput.KEY_6,
                 callback_fn=lambda: _set_complaint("metalink"),
-                description="add a meta link complaint"
+                description="add a meta link complaint",
             )
 
         add_keyboard_callback(
             key=lazy.carb.input.KeyboardInput.KEY_7,
             callback_fn=lambda: _set_complaint("unknown"),
-            description="add a generic complaint to be re-examined by the team"
+            description="add a generic complaint to be re-examined by the team",
         )
         print("-" * 80)
 
         if self.annotation_type == 0:
-            print("\nEdit the currently selected object to match the realistic size of the category.")
-            print("It should also face the same way as the other objects, and should be stable in its")
+            print(
+                "\nEdit the currently selected object to match the realistic size of the category."
+            )
+            print(
+                "It should also face the same way as the other objects, and should be stable in its"
+            )
             print("canonical orientation.\n")
 
         # position reference objects to be next to the inspected object
@@ -722,19 +828,29 @@ class BatchQAViewer:
             if should_show_photo:
                 should_show_photo = False
                 # First, load the background image
-                background_path = os.path.join(self.pipeline_root, "b1k_pipeline", "tools", "background.jpg")
+                background_path = os.path.join(
+                    self.pipeline_root, "b1k_pipeline", "tools", "background.jpg"
+                )
                 background = Image.open(background_path).resize((800, 800))
 
                 # Open the zip file
-                zip_path = os.path.join(self.pipeline_root, "artifacts", "pipeline", "max_object_images.zip")
+                zip_path = os.path.join(
+                    self.pipeline_root, "artifacts", "pipeline", "max_object_images.zip"
+                )
                 with ZipFS(zip_path) as zip_fs:
                     # Find and show photos of this object.
-                    image_paths = sorted([x for x in zip_fs.listdir("/") if obj.name.replace("obj_", "") in x])
+                    image_paths = sorted(
+                        [
+                            x
+                            for x in zip_fs.listdir("/")
+                            if obj.name.replace("obj_", "") in x
+                        ]
+                    )
                     for image_path in image_paths:
                         with zip_fs.open(image_path, "rb") as f:
                             image = background.copy()
                             max_image = Image.open(f)
-                            image.paste(max_image, (0, 0),mask=max_image) 
+                            image.paste(max_image, (0, 0), mask=max_image)
                             image.show()
 
             # Apply any scale changes
@@ -750,19 +866,32 @@ class BatchQAViewer:
             # Apply joint motion
             if obj.n_dof > 0:
                 if joints_moving:
-                    joint_position_seed += 2 * th.pi * og.sim.get_rendering_dt() / JOINT_SECONDS_PER_CYCLE
+                    joint_position_seed += (
+                        2 * th.pi * og.sim.get_rendering_dt() / JOINT_SECONDS_PER_CYCLE
+                    )
                 joint_positions = th.ones(obj.n_dof) * th.sin(joint_position_seed)
-                obj.set_joint_positions(positions=joint_positions, normalized=True, drive=False)
+                obj.set_joint_positions(
+                    positions=joint_positions, normalized=True, drive=False
+                )
 
             self.update_camera(obj.aabb_center)
 
             if self.annotation_type == 0:
                 if step % 100 == 0:
-                        scale_str = f"{obj.scale[0]:.2f}, {obj.scale[1]:.2f}, {obj.scale[2]:.2f}"
-                        rotation = th.rad2deg(T.quat2euler(obj.get_position_orientation()[1]))
-                        rotation_str = f"{rotation[0]:.2f}, {rotation[1]:.2f}, {rotation[2]:.2f}"
-                        bbox_str = f"{obj.aabb_extent[0] * 100:.2f}cm, {obj.aabb_extent[1] * 100:.2f}cm, {obj.aabb_extent[2] * 100:.2f}cm"
-                        print(f"Bounding box extent: {bbox_str}. Scale: {scale_str}. Rotation: {rotation_str}              ", end="\r")
+                    scale_str = (
+                        f"{obj.scale[0]:.2f}, {obj.scale[1]:.2f}, {obj.scale[2]:.2f}"
+                    )
+                    rotation = th.rad2deg(
+                        T.quat2euler(obj.get_position_orientation()[1])
+                    )
+                    rotation_str = (
+                        f"{rotation[0]:.2f}, {rotation[1]:.2f}, {rotation[2]:.2f}"
+                    )
+                    bbox_str = f"{obj.aabb_extent[0] * 100:.2f}cm, {obj.aabb_extent[1] * 100:.2f}cm, {obj.aabb_extent[2] * 100:.2f}cm"
+                    print(
+                        f"Bounding box extent: {bbox_str}. Scale: {scale_str}. Rotation: {rotation_str}              ",
+                        end="\r",
+                    )
             elif self.annotation_type == 1:
                 if step == 0:
                     wordnet_synsets = wordnet.synsets(synset.split(".")[0])
@@ -778,7 +907,7 @@ class BatchQAViewer:
                     print(f"Object has metalinks: {metalink_types}")
             step += 1
         print()
-        print("-"*80)
+        print("-" * 80)
 
         # Now we're done with bbox and scale and orientation. Save the data.
         orientation = obj.get_position_orientation()[1]
@@ -800,8 +929,17 @@ class BatchQAViewer:
         handle_previous_complaints = self.annotation_type == 7
         complaint_process = multiprocessing.Process(
             target=self.complaint_handler.process_complaints,
-            args=[multiprocess_queue, obj.category, obj.name.replace("obj_", ""), questions, quick_complaints, sys.stdin.fileno(), handle_previous_complaints],
-            daemon=True)
+            args=[
+                multiprocess_queue,
+                obj.category,
+                obj.name.replace("obj_", ""),
+                questions,
+                quick_complaints,
+                sys.stdin.fileno(),
+                handle_previous_complaints,
+            ],
+            daemon=True,
+        )
         complaint_process.start()
 
         # Wait to receive the complaints
@@ -829,9 +967,13 @@ class BatchQAViewer:
         if complaint_process.is_alive():
             # Join the finished thread
             complaint_process.join()
-        assert complaint_process.exitcode == 0, "Complaint process exited with error code."
+        assert (
+            complaint_process.exitcode == 0
+        ), "Complaint process exited with error code."
 
-        assert not multiprocess_queue.empty(), "Complaint process did not return a message."
+        assert (
+            not multiprocess_queue.empty()
+        ), "Complaint process did not return a message."
         message = multiprocess_queue.get()
         complaints = json.loads(message)
 
@@ -847,18 +989,22 @@ class BatchQAViewer:
 
         # If we're checking joints or metalinks, skip this entire batch is no object has either joints nor metalinks
         if self.annotation_type in {5, 6, 7}:
-            if self.annotation_type == 5:       # joints checking
-                check_is_valid = lambda prim, category, model: Open.is_compatible_asset(prim)[0]
+            if self.annotation_type == 5:  # joints checking
+                check_is_valid = lambda prim, category, model: Open.is_compatible_asset(
+                    prim
+                )[0]
             elif self.annotation_type == 6:
-                def has_metalink_link(prim):
 
+                def has_metalink_link(prim):
                     def _find_prims_with_condition(condition, root_prim):
                         found_prims = []
                         if condition(root_prim):
                             found_prims.append(root_prim)
 
                         for child in root_prim.GetChildren():
-                            found_prims += _find_prims_with_condition(condition=condition, root_prim=child)
+                            found_prims += _find_prims_with_condition(
+                                condition=condition, root_prim=child
+                            )
 
                         return found_prims
 
@@ -886,7 +1032,12 @@ class BatchQAViewer:
                 check_is_valid = lambda prim, category, model: has_metalink_link(prim)
 
             elif self.annotation_type == 7:
-                check_is_valid = lambda prim, category, model: len(self.complaint_handler._get_existing_complaints(model)) > 0
+                check_is_valid = (
+                    lambda prim, category, model: len(
+                        self.complaint_handler._get_existing_complaints(model)
+                    )
+                    > 0
+                )
 
             else:
                 raise ValueError()
@@ -906,17 +1057,17 @@ class BatchQAViewer:
                 for model in batch:
                     self.save_empty_results(category, model)
                     self.processed_objects.add(model)
-                return False         # don't skip the rest of the category
+                return False  # don't skip the rest of the category
 
         all_objects = self.import_objects(category, batch)
         og.sim.step()
         self.position_objects(all_objects)
-        self.position_reference_objects(target_y=0.)
+        self.position_reference_objects(target_y=0.0)
 
         # Phase 1: Continuously pan across the full category to show the user all objects
         # Only need to show all objects for canonical orientation purposes
         skip = False
-        if self.annotation_type == 0:       # canonical orientation / scale checking
+        if self.annotation_type == 0:  # canonical orientation / scale checking
             skip = self.whole_batch_preview(all_objects)
 
         if not skip:
@@ -931,15 +1082,35 @@ class BatchQAViewer:
         return skip
 
     def position_reference_objects(self, target_y):
-        obj_in_center_frame = self.phone.get_position_orientation()[0] - self.phone.aabb_center
+        obj_in_center_frame = (
+            self.phone.get_position_orientation()[0] - self.phone.aabb_center
+        )
         obj_in_min_frame = self.phone.get_position_orientation()[0] - self.phone.aabb[0]
         obj_in_max_frame = self.phone.get_position_orientation()[0] - self.phone.aabb[1]
-        self.phone.set_position_orientation(position=[-0.05 + obj_in_max_frame[0], target_y + obj_in_center_frame[1], obj_in_min_frame[2]])
+        self.phone.set_position_orientation(
+            position=[
+                -0.05 + obj_in_max_frame[0],
+                target_y + obj_in_center_frame[1],
+                obj_in_min_frame[2],
+            ]
+        )
 
-        human_in_center_frame = self.human.get_position_orientation()[0] - self.human.aabb_center
-        human_in_min_frame = self.human.get_position_orientation()[0] - self.human.aabb[0]
-        human_in_max_frame = self.human.get_position_orientation()[0] - self.human.aabb[1]
-        self.human.set_position_orientation(position=[-0.1 + self.phone.aabb_extent[0] + human_in_max_frame[0], target_y + human_in_center_frame[1], human_in_min_frame[2]])
+        human_in_center_frame = (
+            self.human.get_position_orientation()[0] - self.human.aabb_center
+        )
+        human_in_min_frame = (
+            self.human.get_position_orientation()[0] - self.human.aabb[0]
+        )
+        human_in_max_frame = (
+            self.human.get_position_orientation()[0] - self.human.aabb[1]
+        )
+        self.human.set_position_orientation(
+            position=[
+                -0.1 + self.phone.aabb_extent[0] + human_in_max_frame[0],
+                target_y + human_in_center_frame[1],
+                human_in_min_frame[2],
+            ]
+        )
 
     def add_reference_objects(self):
         # Add a cellphone into the scene
@@ -952,16 +1123,22 @@ class BatchQAViewer:
         self.env.scene.add_object(phone)
         og.sim.step()
         phone.links["meta__base_link_togglebutton_0_0_link"].visible = False
-        phone.set_position_orientation(orientation=T.euler2quat(th.tensor([th.pi / 2, th.pi / 2, 0])))
+        phone.set_position_orientation(
+            orientation=T.euler2quat(th.tensor([th.pi / 2, th.pi / 2, 0]))
+        )
 
         # Add a human into the scene
         curr_dir = os.path.dirname(os.path.realpath(__file__))
         human_usd_path = os.path.join(curr_dir, "HumanFemale/HumanFemale.usd")
         human_prim_path = "/World/scene_0/human"
-        lazy.omni.isaac.core.utils.stage.add_reference_to_stage(usd_path=human_usd_path, prim_path=human_prim_path, prim_type="Xform")
+        lazy.omni.isaac.core.utils.stage.add_reference_to_stage(
+            usd_path=human_usd_path, prim_path=human_prim_path, prim_type="Xform"
+        )
         human_prim = XFormPrim(name="human", relative_prim_path="/human")
         human_prim.load(self.env.scene)
-        human_prim.set_position_orientation(orientation=T.euler2quat(th.tensor([0, 0, th.pi / 2])))
+        human_prim.set_position_orientation(
+            orientation=T.euler2quat(th.tensor([0, 0, th.pi / 2]))
+        )
         human_prim.scale = [0.012, 0.012, 0.012]
         og.sim.step()
 
@@ -972,7 +1149,9 @@ class BatchQAViewer:
             print("Invalid id!")
             sys.exit(1)
 
-        print(f"{len(self.processed_objects)}/{len(self.filtered_objs)} objects processed. {len(self.remaining_objects)} objects remaining.")
+        print(
+            f"{len(self.processed_objects)}/{len(self.filtered_objs)} objects processed. {len(self.remaining_objects)} objects remaining."
+        )
 
         # Load the environment and set the lighting parameters.
         cfg = {"scene": {"type": "Scene", "floor_plane_visible": False}}
@@ -992,12 +1171,14 @@ class BatchQAViewer:
             print(f"Processing category {cat}...")
             sorted_models = sorted(models)
             for batch_start in range(0, len(sorted_models), batch_size):
-                batch = sorted_models[batch_start:batch_start+batch_size]
+                batch = sorted_models[batch_start : batch_start + batch_size]
                 skip = self.evaluate_batch(batch, cat)
                 if skip:
                     print("Skipping the rest of the category", cat)
                     break
-                print(f"\n\n{len(self.processed_objects)}/{len(self.filtered_objs)} objects processed. {len(self.remaining_objects)} objects remaining.\n")
+                print(
+                    f"\n\n{len(self.processed_objects)}/{len(self.filtered_objs)} objects processed. {len(self.remaining_objects)} objects remaining.\n"
+                )
                 # time.sleep(0.1)
 
 
@@ -1032,14 +1213,29 @@ class ObjectComplaintHandler:
             filtered_complaints.append(complaint)
         return filtered_complaints
 
-    def process_complaints(self, queue, category, model, messages, quick_complaints, stdin_fileno, parse_existing_complaints):
+    def process_complaints(
+        self,
+        queue,
+        category,
+        model,
+        messages,
+        quick_complaints,
+        stdin_fileno,
+        parse_existing_complaints,
+    ):
         sys.stdin = os.fdopen(stdin_fileno)
 
         # Get existing complaints only if running the check on prior complaints
-        existing_complaints = self._get_existing_complaints(model) if parse_existing_complaints else []
+        existing_complaints = (
+            self._get_existing_complaints(model) if parse_existing_complaints else []
+        )
 
         # Take note of the unresolved ones.
-        unresolved_indices = [idx for idx, complaint in enumerate(existing_complaints) if not complaint["processed"]]
+        unresolved_indices = [
+            idx
+            for idx, complaint in enumerate(existing_complaints)
+            if not complaint["processed"]
+        ]
 
         # Mark all as resolved
         for complaint in existing_complaints:
@@ -1054,23 +1250,27 @@ class ObjectComplaintHandler:
                 print(f"Prompt: {complaint['message']}\n")
                 print(f"Complaint: {complaint['complaint']}\n")
 
-            print("\nALL complaints except the ones you enter below will be marked as RESOLVED.")
-            response = input("Enter complaint numbers to KEEP as UNRESOLVED (e.g., 1,2,3): ")
+            print(
+                "\nALL complaints except the ones you enter below will be marked as RESOLVED."
+            )
+            response = input(
+                "Enter complaint numbers to KEEP as UNRESOLVED (e.g., 1,2,3): "
+            )
             if response:
                 response = response.split(",")
                 for idx in response:
-                    complaint_idx = unresolved_indices[int(idx)-1]
+                    complaint_idx = unresolved_indices[int(idx) - 1]
                     existing_complaints[complaint_idx]["processed"] = False
         else:
             print("No unresolved complaints found.")
 
-        print("-"*80)
+        print("-" * 80)
 
         for message in messages:
             complaint = self._process_single_complaint(message, category, model)
             if complaint:
                 existing_complaints.append(complaint)
-            print("-"*80)
+            print("-" * 80)
 
         all_complaints = existing_complaints + quick_complaints
 
@@ -1121,7 +1321,10 @@ class ObjectComplaintHandler:
             return s.name(), s.definition()
         except:
             s = wn.synset(self.taxonomy.get_parents(synset)[0])
-            return f"{synset} (custom synset)", f"(hypernyms: {s.name()}): {s.definition()}"
+            return (
+                f"{synset} (custom synset)",
+                f"(hypernyms: {s.name()}): {s.definition()}",
+            )
 
     def _get_synset_question(self, obj):
         synset, definition = self._get_synset_and_definition(obj.category)
@@ -1153,9 +1356,20 @@ class ObjectComplaintHandler:
 
     def _get_substanceness_question(self, obj):
         _, abilities = self._get_synset_and_abilities(obj.category)
-        substance_types = set(abilities.keys()) & {"rigidBody", "liquid", "macroPhysicalSubstance", "microPhysicalSubstance", "visualSubstance", "cloth", "softBody", "rope"}
-        assert len(substance_types) == 1, f"Multiple substance types found for object {obj.name.replace('obj_', '')}"
-        substance_type, = substance_types
+        substance_types = set(abilities.keys()) & {
+            "rigidBody",
+            "liquid",
+            "macroPhysicalSubstance",
+            "microPhysicalSubstance",
+            "visualSubstance",
+            "cloth",
+            "softBody",
+            "rope",
+        }
+        assert (
+            len(substance_types) == 1
+        ), f"Multiple substance types found for object {obj.name.replace('obj_', '')}"
+        (substance_type,) = substance_types
         message = (
             "SUBSTANCE: Confirm if object should be a rigid body, cloth, or substance.\n"
             "If it's marked softBody or rope, that means it will be a rigid body for now, which is OK.\n\n"
@@ -1166,12 +1380,14 @@ class ObjectComplaintHandler:
 
     def _get_ability_question(self, obj):
         _, abilities = self._get_synset_and_abilities(obj.category)
-        interesting_abilities = [f"    {a}: {a in abilities}" for a in sorted(INTERESTING_ABILITIES)]
+        interesting_abilities = [
+            f"    {a}: {a in abilities}" for a in sorted(INTERESTING_ABILITIES)
+        ]
         message = (
             "ABILITIES: Confirm that this object can support all of the abilities seen below.\n\n"
             "Abilities to evaluate (subset of all abilities): \n"
         )
-        message += '\n'.join(sorted(interesting_abilities))
+        message += "\n".join(sorted(interesting_abilities))
         message += (
             "\n\nIf this object looks like it should have some of these abilities flipped, please\n"
             "list the abilities that we should flip for this object as a comma separated list.\n"
@@ -1180,9 +1396,7 @@ class ObjectComplaintHandler:
         return message
 
     def _get_single_rigid_body_question(self, obj):
-        message = (
-            "CONNECTED: Confirm object is a single body. An object cannot contain disconnected parts."
-        )
+        message = "CONNECTED: Confirm object is a single body. An object cannot contain disconnected parts."
         return message
 
     def _get_appearance_question(self, obj):
@@ -1223,10 +1437,13 @@ class ObjectComplaintHandler:
         return message
 
     def _get_meta_link_question(self, obj):
-        meta_links = sorted({
-            meta_name
-            for link_metas in obj.metadata["meta_links"].values()
-            for meta_name in link_metas})
+        meta_links = sorted(
+            {
+                meta_name
+                for link_metas in obj.metadata["meta_links"].values()
+                for meta_name in link_metas
+            }
+        )
         message = "Confirm object meta links listed below:\n"
         if len(meta_links) == 0:
             message += "- None\n"
@@ -1239,14 +1456,38 @@ class ObjectComplaintHandler:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process some integers.")
-    parser.add_argument('--record_path', type=str, required=True, help='The path to save recorded orientations and scales.')
-    parser.add_argument('--id', type=int, required=True, help=f'Your assigned id in range (0, total_ids-1).')
-    parser.add_argument('--total_ids', type=int, required=True, help=f'Total number of IDs.')
-    parser.add_argument('--seed', type=str, required=True, help=f'The shuffling seed.')
-    parser.add_argument('--annotation_type', type=int, required=True, help=f'Subtype of annotation: [{ANNOTATION_TYPE_MAPPING}]')
+    parser.add_argument(
+        "--record_path",
+        type=str,
+        required=True,
+        help="The path to save recorded orientations and scales.",
+    )
+    parser.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help=f"Your assigned id in range (0, total_ids-1).",
+    )
+    parser.add_argument(
+        "--total_ids", type=int, required=True, help=f"Total number of IDs."
+    )
+    parser.add_argument("--seed", type=str, required=True, help=f"The shuffling seed.")
+    parser.add_argument(
+        "--annotation_type",
+        type=int,
+        required=True,
+        help=f"Subtype of annotation: [{ANNOTATION_TYPE_MAPPING}]",
+    )
     args = parser.parse_args()
 
     pipeline_root = Path(__file__).resolve().parents[2]
-    viewer = BatchQAViewer(args.record_path, args.id, args.total_ids, args.seed, pipeline_root=str(pipeline_root), annotation_type=args.annotation_type)
+    viewer = BatchQAViewer(
+        args.record_path,
+        args.id,
+        args.total_ids,
+        args.seed,
+        pipeline_root=str(pipeline_root),
+        annotation_type=args.annotation_type,
+    )
     viewer.run()
     og.shutdown()

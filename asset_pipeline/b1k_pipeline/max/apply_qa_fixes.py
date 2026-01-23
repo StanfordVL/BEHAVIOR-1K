@@ -22,7 +22,7 @@ def rotate_pivot(tgt_obj, delta_rot_local):
     children = list(tgt_obj.children)
     for child in children:
         child.parent = None
-    
+
     delta_quat = rt.quat(*delta_rot_local.as_quat().tolist())
     coordsys = getattr(pymxs.runtime, "%coordsys_context")
     prev_coordsys = coordsys(local_coordsys, None)
@@ -30,7 +30,7 @@ def rotate_pivot(tgt_obj, delta_rot_local):
     tgt_obj.objectOffsetRot *= delta_quat
     tgt_obj.objectOffsetPos *= delta_quat
     coordsys(prev_coordsys, None)
-    
+
     # Reparent the children
     for child in children:
         child.parent = tgt_obj
@@ -55,14 +55,18 @@ def scale_pivot(tgt_obj, delta_scale):
 def apply_qa_fixes_in_open_file(apply_scale=True, apply_orientation=True):
     # Load the fixes
     fixes = defaultdict(dict)
-    with open(r"D:\BEHAVIOR-1K\asset_pipeline\metadata\orientation_and_scale_edits.json") as f:
+    with open(
+        r"D:\BEHAVIOR-1K\asset_pipeline\metadata\orientation_and_scale_edits.json"
+    ) as f:
         data = json.load(f)
         for model, orientation in data["orientations"].items():
             if not np.allclose(orientation, [0, 0, 0, 1], atol=1e-3):
                 fixes[model]["orientation"] = orientation
         for model, scale in data["scales"].items():
             if not np.allclose(scale, [1, 1, 1], atol=1e-3):
-                assert np.allclose(scale, scale[0], atol=1e-3), "Non-uniform scale not supported."
+                assert np.allclose(
+                    scale, scale[0], atol=1e-3
+                ), "Non-uniform scale not supported."
                 fixes[model]["scale"] = scale[0]
 
     # Prior to starting, let's get the minimum y value and add a bit of margin to it. This is
@@ -99,7 +103,11 @@ def apply_qa_fixes_in_open_file(apply_scale=True, apply_orientation=True):
         # Apply orientation fixes (the pivot needs to be rotated by the inverse of the fix)
         # Note that child links also get their pivots rotated here. Is that good? idk.
         # But we definitely don't want to rotate lights.
-        if apply_orientation and "orientation" in model_fixes and rt.ClassOf(obj) == rt.Editable_Poly:
+        if (
+            apply_orientation
+            and "orientation" in model_fixes
+            and rt.ClassOf(obj) == rt.Editable_Poly
+        ):
             rotate_pivot(obj, R.from_quat(model_fixes["orientation"]).inv())
 
         # Record the object for possible scale fixes. We're doing this only for root-level
@@ -115,14 +123,18 @@ def apply_qa_fixes_in_open_file(apply_scale=True, apply_orientation=True):
     # Make a pass for scales, only for object files
     if apply_scale and "objects" in pathlib.Path(rt.maxFilePath).parts:
         # Assert that all children have bases
-        assert set(base_links_by_model_and_id.keys()).issuperset(set(objects_by_model_and_id.keys())), "Not all objects have base links."
+        assert set(base_links_by_model_and_id.keys()).issuperset(
+            set(objects_by_model_and_id.keys())
+        ), "Not all objects have base links."
 
         # Go through the base links
         current_x = 0
-        align_y = max_y + 1000.
+        align_y = max_y + 1000.0
         for key, base_link in base_links_by_model_and_id.items():
             # If there are links, temporarily parent them under the base link
-            children = objects_by_model_and_id[key] if key in objects_by_model_and_id else []
+            children = (
+                objects_by_model_and_id[key] if key in objects_by_model_and_id else []
+            )
             for child in children:
                 child.parent = base_link
 
@@ -142,16 +154,23 @@ def apply_qa_fixes_in_open_file(apply_scale=True, apply_orientation=True):
                 base_link_wrt_bbox = np.array(base_link.position) - bbox_center
 
                 # Lay out the bbox
-                bbox_center_goal_position = np.array([current_x + bbox_extent[0] / 2, align_y + bbox_extent[1] / 2, bbox_extent[2] / 2])
+                bbox_center_goal_position = np.array(
+                    [
+                        current_x + bbox_extent[0] / 2,
+                        align_y + bbox_extent[1] / 2,
+                        bbox_extent[2] / 2,
+                    ]
+                )
                 base_link_goal_position = bbox_center_goal_position + base_link_wrt_bbox
                 base_link.position = rt.Point3(*base_link_goal_position.tolist())
 
                 # Move the current x
-                current_x += bbox_extent[0] + 1000.
+                current_x += bbox_extent[0] + 1000.0
 
             # Unparent all of the children
             for child in children:
                 child.parent = None
+
 
 if __name__ == "__main__":
     apply_qa_fixes_in_open_file()

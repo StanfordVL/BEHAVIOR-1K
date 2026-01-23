@@ -1,8 +1,9 @@
 import sys
 from dvc.repo import Repo, lock_repo
 
+
 def main():
-    stage_name, = sys.argv[1:]
+    (stage_name,) = sys.argv[1:]
     repo = Repo(".")
     stage_infos = repo.stage.collect_granular(stage_name, with_deps=True)
     stages = [si.stage for si in stage_infos]
@@ -21,6 +22,7 @@ def main():
     else:
         print(stage_name, "is NOT up-to-date. Please reproduce.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

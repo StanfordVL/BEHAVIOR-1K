@@ -12,9 +12,11 @@ import fs.path
 from fs.zipfs import ZipFS
 
 FILLABLE_DIR = pathlib.Path(r"D:\fillable-10-21")
-KEY_PATH = pathlib.Path(r"C:\Users\cgokmen\research\OmniGibson\omnigibson\data\omnigibson.key")
+KEY_PATH = pathlib.Path(
+    r"C:\Users\cgokmen\research\OmniGibson\omnigibson\data\omnigibson.key"
+)
 PIPELINE_ROOT = pathlib.Path(r"D:\BEHAVIOR-1K\asset_pipeline")
-MODE = "JSON"   # use one of "ATTRIBUTE", "USD" or "JSON"
+MODE = "JSON"  # use one of "ATTRIBUTE", "USD" or "JSON"
 
 
 def _set_xform_properties(prim, pos, quat):
@@ -92,11 +94,11 @@ def compute_bbox(prim: Usd.Prim) -> Gf.Range3d:
 
     Args:
         prim: A prim to compute the bounding box.
-    Returns: 
+    Returns:
         A range (i.e. bounding box), see more at: https://openusd.org/release/api/class_gf_range3d.html
     """
     imageable = UsdGeom.Imageable(prim)
-    time = Usd.TimeCode.Default() # The time at which we compute the bounding box
+    time = Usd.TimeCode.Default()  # The time at which we compute the bounding box
     bound = imageable.ComputeWorldBound(time, UsdGeom.Tokens.default_)
     bound_range = bound.ComputeAlignedBox()
     return np.array(bound_range.GetMin()), np.array(bound_range.GetMax())
@@ -105,10 +107,11 @@ def compute_bbox(prim: Usd.Prim) -> Gf.Range3d:
 def keep_paths_to_all_visuals(stage):
     """
     Keeps only the paths to all prims named 'visuals' and their ancestors.
-    
+
     Args:
         stage (Usd.Stage): The USD stage to modify.
     """
+
     # Find all prims named 'visuals'
     def find_visuals_prims(prim, visuals_paths):
         for child in prim.GetChildren():
@@ -119,7 +122,7 @@ def keep_paths_to_all_visuals(stage):
     visuals_paths = set()
     root_prim = stage.GetPseudoRoot()
     find_visuals_prims(root_prim, visuals_paths)
-    
+
     if not visuals_paths:
         print("No prims named 'visuals' found.")
         return
@@ -136,7 +139,7 @@ def keep_paths_to_all_visuals(stage):
     def traverse_and_prune(prim):
         for child in prim.GetChildren():
             traverse_and_prune(child)
-        
+
         # Remove the prim if its path is not in paths_to_keep
         if prim.GetPath() not in paths_to_keep:
             stage.RemovePrim(prim.GetPath())
@@ -155,30 +158,31 @@ def get_bounding_box_from_usd(input_usd, rotmat, tempdir):
     stage.Save()
 
     if MODE == "ATTRIBUTE":
-      base_link_size = np.array(prim.GetAttribute("ig:nativeBB").Get()) * 1000
-      base_link_offset = np.array(prim.GetAttribute("ig:offsetBaseLink").Get()) * 1000
+        base_link_size = np.array(prim.GetAttribute("ig:nativeBB").Get()) * 1000
+        base_link_offset = np.array(prim.GetAttribute("ig:offsetBaseLink").Get()) * 1000
 
-      # THIS IS INACCURATE FOR NON-AA ROTATIONS!
-      return (rotmat @ base_link_offset).tolist(), (rotmat @ base_link_size).tolist()
-    
+        # THIS IS INACCURATE FOR NON-AA ROTATIONS!
+        return (rotmat @ base_link_offset).tolist(), (rotmat @ base_link_size).tolist()
+
     elif MODE == "USD":
-      # Rotate the object by the rotmat and get the bounding box
-      _set_xform_properties(prim, np.zeros(3), R.from_matrix(rotmat).as_quat())
-      bb_min, bb_max = compute_bbox(prim)
-      center = ((bb_min + bb_max) / 2) * 1000
-      size = (bb_max - bb_min) * 1000
-      return center.tolist(), size.tolist()  
+        # Rotate the object by the rotmat and get the bounding box
+        _set_xform_properties(prim, np.zeros(3), R.from_matrix(rotmat).as_quat())
+        bb_min, bb_max = compute_bbox(prim)
+        center = ((bb_min + bb_max) / 2) * 1000
+        size = (bb_max - bb_min) * 1000
+        return center.tolist(), size.tolist()
 
     elif MODE == "JSON":
-      json_path = input_usd.parent.parent / "bbox.json"
-      with open(json_path, "r") as f:
-        data = json.load(f)
-      
-      size = np.array(data["bbox_extents"]) * 1000
-      center = (np.array(data["bbox_center"]) - np.array(data["base_pos"])) * 1000
-      return center.tolist(), size.tolist()
+        json_path = input_usd.parent.parent / "bbox.json"
+        with open(json_path, "r") as f:
+            data = json.load(f)
+
+        size = np.array(data["bbox_extents"]) * 1000
+        center = (np.array(data["bbox_center"]) - np.array(data["base_pos"])) * 1000
+        return center.tolist(), size.tolist()
 
     raise ValueError("Invalid mode.")
+
 
 def main():
     input_usds = list(FILLABLE_DIR.glob("objects/*/*/usd/*.usd"))
@@ -188,24 +192,29 @@ def main():
     # Scale up
     futures = {}
     with tempfile.TemporaryDirectory() as tempdir:
-      with ProcessPoolExecutor() as executor:
-          for input_usd in tqdm(input_usds, desc="Queueing up jobs"):
-              mdl = input_usd.parts[-3]
-              rot = R.identity()
-              euler = np.rad2deg(rot.as_euler("xyz"))
-              if not np.allclose(np.remainder(np.abs(euler), 90), 0, atol=5):
-                  print("Non-axis aligned rotation detected for", mdl, euler.tolist())
-              future = executor.submit(get_bounding_box_from_usd, input_usd, rot.as_matrix(), tempdir)
-              futures[future] = input_usd
+        with ProcessPoolExecutor() as executor:
+            for input_usd in tqdm(input_usds, desc="Queueing up jobs"):
+                mdl = input_usd.parts[-3]
+                rot = R.identity()
+                euler = np.rad2deg(rot.as_euler("xyz"))
+                if not np.allclose(np.remainder(np.abs(euler), 90), 0, atol=5):
+                    print("Non-axis aligned rotation detected for", mdl, euler.tolist())
+                future = executor.submit(
+                    get_bounding_box_from_usd, input_usd, rot.as_matrix(), tempdir
+                )
+                futures[future] = input_usd
 
-          # Gather the results (with a tqdm progress bar)
-          results = {}
-          for future in tqdm(as_completed(futures), total=len(futures), desc="Processing results"):
-              input_usd = futures[future]
-              results[input_usd.parts[-3]] = future.result()
+            # Gather the results (with a tqdm progress bar)
+            results = {}
+            for future in tqdm(
+                as_completed(futures), total=len(futures), desc="Processing results"
+            ):
+                input_usd = futures[future]
+                results[input_usd.parts[-3]] = future.result()
 
     with open(FILLABLE_DIR / "fillable_bboxes.json", "w") as f:
         json.dump(results, f)
+
 
 if __name__ == "__main__":
     main()

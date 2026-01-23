@@ -207,8 +207,8 @@ def _launch_app():
     icon_file_target = Path(exp_path) / "OmniGibson_logo.png"
 
     try:
-        shutil.copy(kit_file, kit_file_target)
-        shutil.copy(icon_file, icon_file_target)
+        shutil.copyfile(kit_file, kit_file_target)
+        shutil.copyfile(icon_file, icon_file_target)
     except Exception as e:
         raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
@@ -217,13 +217,18 @@ def _launch_app():
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 
-    artifacts_dir = Path("/tmp/omnigibson")
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.extend(["--portable-root", str(artifacts_dir)])
+    # Prepare the directories where Omniverse will store its appdata (logs, caches, etc.)
+    local_appdata = Path(gm.APPDATA_PATH) / "local"
+    local_appdata.mkdir(parents=True, exist_ok=True)
+    sys.argv.extend(["--portable-root", str(local_appdata)])
 
-    global_cache_dir = Path("/tmp/omniverse-global-cache")
+    global_cache_dir = Path(gm.APPDATA_PATH) / "global" / "cache"
     global_cache_dir.mkdir(parents=True, exist_ok=True)
-    sys.argv.append(f"--/app/tokens/omni_global_cache={str(global_cache_dir)}")
+    sys.argv.append(f"--/app/tokens/omni_global_cache={global_cache_dir}")
+
+    global_data_dir = Path(gm.APPDATA_PATH) / "global" / "data"
+    global_data_dir.mkdir(parents=True, exist_ok=True)
+    sys.argv.append(f"--/app/tokens/omni_global_data={str(global_data_dir)}")
 
     with launch_context(None):
         app = lazy.isaacsim.SimulationApp(config_kwargs, experience=str(kit_file_target.resolve(strict=True)))
