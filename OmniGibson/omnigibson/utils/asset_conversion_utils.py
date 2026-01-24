@@ -2458,7 +2458,7 @@ def bind_custom_mdl_material(prim, mdl_path, mdl_material_name):
 def import_og_asset_from_urdf(
     category,
     model,
-    dataset_root,
+    dataset_name="custom_dataset",
     urdf_path=None,
     collision_method="coacd",
     coacd_links=None,
@@ -2474,13 +2474,15 @@ def import_og_asset_from_urdf(
 ):
     """
     Imports an asset from URDF format into OmniGibson-compatible USD format. This will write the new USD
-    (and copy the URDF if it does not already exist within @dataset_root) to @dataset_root
+    to the dataset directory specified by @dataset_name.
 
     Args:
         category (str): Category to assign to imported asset
         model (str): Model name to assign to imported asset
+        dataset_name (str): Name of the dataset (e.g., "spoc", "custom_dataset"). The dataset root
+            will be computed as gm.DATA_PATH/dataset_name
         urdf_path (None or str): If specified, external URDF that should be copied into the dataset first before
-            converting into USD format. Otherwise, assumes that the urdf file already exists within @dataset_root dir
+            converting into USD format. Otherwise, assumes that the urdf file already exists within the dataset dir
         collision_method (None or str): If specified, collision decomposition method to use to generate
             OmniGibson-compatible collision meshes. Valid options are {"coacd", "convex"}
         coacd_links (None or list of str): If specified, links that should use CoACD to decompose collision meshes
@@ -2489,8 +2491,6 @@ def import_og_asset_from_urdf(
             decomposition applied. This will only use the convex hull
         visual_only_links (None or list of str): If specified, links that should have no colliders associated with it
         merge_fixed_joints (bool): Whether to merge fixed joints or not
-        dataset_root (str): Dataset root directory to use for writing imported USD file. Default is custom dataset
-            path set from the global macros
         hull_count (int): Maximum number of convex hulls to decompose individual visual meshes into.
             Only relevant if @collision_method is "coacd"
         overwrite (bool): If set, will overwrite any pre-existing files
@@ -2506,6 +2506,9 @@ def import_og_asset_from_urdf(
             - str: Absolute path to generated USD file
             - Usd.Prim: Generated root USD prim (currently on active stage)
     """
+    # Compute dataset root from dataset name
+    dataset_root = get_dataset_path(dataset_name)
+
     # Make sure all scaling is positive
     model_dir = os.path.join(dataset_root, "objects", category, model)
     os.makedirs(model_dir, exist_ok=overwrite)
@@ -2541,7 +2544,7 @@ def import_og_asset_from_urdf(
         urdf_path=urdf_path,
         obj_category=category,
         obj_model=model,
-        dataset_root=dataset_root,
+        dataset_name=dataset_name,
         use_omni_convex_decomp=False,  # We already pre-decomposed the values, so don' use omni convex decomp
         use_usda=use_usda,
         merge_fixed_joints=merge_fixed_joints,

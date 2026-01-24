@@ -28,10 +28,10 @@ from omnigibson.utils.asset_conversion_utils import (
 
 gm.HEADLESS = True
 
-RESTART_EVERY = 64
+RESTART_EVERY = 8
 
 # Material mapping paths
-MDL_MATERIAL_ROOT = "/fsx-siro/cgokmen/og-materials/Materials/2023_2_1"
+MDL_MATERIAL_ROOT = "/checkpoint/clear/cgokmen/og-materials/Materials/2023_2_1"
 AI2_MDL_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2_nvidia_material_mapping.csv"
 MDL_PATHS_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/material_paths.csv"
 
@@ -57,16 +57,21 @@ AI2_MDL_MAPPING = convert_csv_to_dict(AI2_MDL_MAPPING_FN)
 MDL_PATHS = convert_csv_to_dict(MDL_PATHS_FN)
 
 
-def polygon_to_trimesh(points, convex_hull=False):
+def polygon_to_trimesh(points, convex_hull=False, extrude_thickness=None, extrude_outward=False):
     """
     Create a trimesh object from a list of 3D points defining a planar polygon.
+    Optionally extrude the polygon to give it thickness.
 
     Args:
         points: numpy array of 3D points
         convex_hull: Whether to use convex hull of the polygon
+        extrude_thickness: If provided, extrude the polygon to this thickness (in meters)
+        extrude_outward: If True, keep the original (inner) surface in place and extrude
+                        away from the normal direction (for floors/ceilings). If False,
+                        center the extrusion around the original plane (for walls).
 
     Returns:
-        trimesh.Trimesh: The triangulated mesh
+        trimesh.Trimesh: The triangulated mesh (or extruded mesh if thickness specified)
     """
     points = np.copy(points)
     points[:, 0] *= -1  # Invert x-coordinates to match coordinate system
@@ -95,12 +100,36 @@ def polygon_to_trimesh(points, convex_hull=False):
             process=False,
         )
 
-    verts_2d, faces = planar.triangulate()
-    points_3d = np.hstack((verts_2d, np.zeros((verts_2d.shape[0], 1))))
-    mesh = trimesh.Trimesh(vertices=points_3d, faces=faces, process=False)
-    mesh.apply_transform(to_3D)
+    if extrude_thickness is not None and extrude_thickness > 0:
+        # Extrude the 2D polygon to give it thickness
+        # Get the shapely polygon from the path
+        if planar.polygons_full:
+            shapely_polygon = planar.polygons_full[0]
+        else:
+            # Fallback: create polygon from vertices
+            shapely_polygon = shapely.Polygon(planar.vertices)
 
-    return mesh
+        # Extrude along Z in 2D space
+        mesh = trimesh.creation.extrude_polygon(shapely_polygon, extrude_thickness)
+
+        # Adjust extrusion position based on mode
+        if extrude_outward:
+            # Keep inner surface in place, extrude away from normal direction
+            # (floors extrude down, ceilings extrude up)
+            mesh.vertices[:, 2] -= extrude_thickness
+        else:
+            # Center the extrusion around the original plane (for walls)
+            mesh.vertices[:, 2] -= extrude_thickness / 2.0
+
+        # Transform back to 3D world coordinates
+        mesh.apply_transform(to_3D)
+        return mesh
+    else:
+        verts_2d, faces = planar.triangulate()
+        points_3d = np.hstack((verts_2d, np.zeros((verts_2d.shape[0], 1))))
+        mesh = trimesh.Trimesh(vertices=points_3d, faces=faces, process=False)
+        mesh.apply_transform(to_3D)
+        return mesh
 
 
 def get_material_info(material_name):
@@ -151,7 +180,9 @@ def extract_scene_structures(scene_data):
 
             if len(points) >= 3:
                 try:
-                    mesh = polygon_to_trimesh(points, convex_hull=False)
+                    # Extrude floors to 30cm thickness, keeping inner surface in place
+                    # and extruding downward (outward from room interior)
+                    mesh = polygon_to_trimesh(points, convex_hull=False, extrude_thickness=0.30, extrude_outward=True)
                     structures[f"floor_{i}"] = (mesh, room_id, material_name)
                 except Exception as e:
                     print(f"Failed to create floor mesh {i}: {e}")
@@ -169,7 +200,8 @@ def extract_scene_structures(scene_data):
             points = np.array([[pt["x"], pt["y"], pt["z"]] for pt in wall["polygon"]])
             if len(points) >= 3:
                 try:
-                    mesh = polygon_to_trimesh(points, convex_hull=True)
+                    # Extrude walls to 1cm thickness centered around the planar position
+                    mesh = polygon_to_trimesh(points, convex_hull=True, extrude_thickness=0.01)
                     structures[f"wall_{i}"] = (mesh, room_id, material_name)
                 except Exception as e:
                     print(f"Failed to create wall mesh {i}: {e}")
@@ -186,7 +218,9 @@ def extract_scene_structures(scene_data):
             points = np.array([[pt["x"], pt["y"], pt["z"]] for pt in room["ceilingPolygon"]])
             if len(points) >= 3:
                 try:
-                    mesh = polygon_to_trimesh(points, convex_hull=False)
+                    # Extrude ceilings to 30cm thickness, keeping inner surface in place
+                    # and extruding upward (outward from room interior)
+                    mesh = polygon_to_trimesh(points, convex_hull=False, extrude_thickness=0.30, extrude_outward=True)
                     structures[f"ceiling_{i}"] = (mesh, room_id, material_name)
                 except Exception as e:
                     print(f"Failed to create ceiling mesh {i}: {e}")
@@ -198,7 +232,7 @@ def import_structure_object(
     mesh: trimesh.Trimesh,
     category: str,
     model: str,
-    dataset_root: pathlib.Path,
+    dataset_name: str,
     material_name: str = None,
 ):
     """
@@ -208,9 +242,10 @@ def import_structure_object(
         mesh: The trimesh object to import
         category: Object category (floors, walls, ceilings)
         model: Model name
-        dataset_root: Path to the dataset root
+        dataset_name: Name of the dataset (e.g., "spoc")
         material_name: Optional AI2-THOR material name to bind to the USD
     """
+    dataset_root = pathlib.Path(gm.DATA_PATH) / dataset_name
     model_root = dataset_root / "objects" / category / model
     success_file = model_root / "import.success"
 
@@ -246,7 +281,7 @@ def import_structure_object(
                 model=model,
                 urdf_path=str(urdf_path),
                 collision_method=None,
-                dataset_root=str(dataset_root),
+                dataset_name=dataset_name,
                 hull_count=1,
                 overwrite=False,
                 use_usda=False,
@@ -271,16 +306,15 @@ def main():
     parser.add_argument("task_id", type=int, help="Task ID (0-indexed)")
     parser.add_argument("total_tasks", type=int, help="Total number of tasks")
     parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
-    parser.add_argument("--spoc-houses-root", default="/fsx-siro/cgokmen/procthor/houses/houses_2023_07_28")
-    parser.add_argument("--dataset-root", default=None, help="Dataset root (defaults to gm.DATA_PATH/spoc)")
+    parser.add_argument("--spoc-houses-root", default="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28")
+    parser.add_argument("--dataset-name", default="spoc", help="Dataset name (defaults to 'spoc')")
     parser.add_argument("--restart-every", type=int, default=RESTART_EVERY)
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of scenes to process (for testing)")
     args = parser.parse_args()
 
     # Setup paths
-    if args.dataset_root:
-        dataset_root = pathlib.Path(args.dataset_root) / "spoc"
-    else:
-        dataset_root = pathlib.Path(gm.DATA_PATH) / "spoc"
+    dataset_name = args.dataset_name
+    dataset_root = pathlib.Path(gm.DATA_PATH) / dataset_name
     dataset_root.mkdir(exist_ok=True)
 
     errors_dir = dataset_root / "errors"
@@ -305,8 +339,13 @@ def main():
     rank = args.task_id
     world_size = args.total_tasks
 
+    # Get scenes for this task
+    task_scenes = scenes[rank::world_size]
+    if args.limit:
+        task_scenes = task_scenes[:args.limit]
+
     completed_count = 0
-    for split_path, scene_idx in tqdm(scenes[rank::world_size]):
+    for split_path, scene_idx in tqdm(task_scenes):
         scene_id = get_scene_id(split_path, scene_idx)
 
         # Check if all structures for this scene are already done
@@ -360,7 +399,7 @@ def main():
                         mesh=mesh,
                         category=category,
                         model=model,
-                        dataset_root=dataset_root,
+                        dataset_name=dataset_name,
                         material_name=material_name,
                     )
                 except Exception as e:

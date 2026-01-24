@@ -6,3 +6,4 @@ gha-creds-*.json
 # training
 outputs/
 /*.ipynb
+slurm/logs

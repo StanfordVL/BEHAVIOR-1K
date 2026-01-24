@@ -18,7 +18,7 @@ SPOC_OBJECTS = json.loads((pathlib.Path(gm.DATA_PATH) / "spoc" / "object_name_ma
 ROTATE_EVERYTHING_BY = th.as_tensor(R.from_euler("x", 90, degrees=True).as_quat())
 
 # Load SPOC object annotations for scale information
-SPOC_ANNOTATIONS_PATH = "/fsx-siro/cgokmen/procthor/assets/2023_07_28/annotations.json"
+SPOC_ANNOTATIONS_PATH = "/checkpoint/clear/cgokmen/procthor/assets/2023_07_28/annotations.json"
 with open(SPOC_ANNOTATIONS_PATH) as f:
     ANNOTATIONS = json.load(f)
 
@@ -173,8 +173,9 @@ def process_scene(scene, scene_id):
     # Build room ID mapping
     room_ids = {}
     for i, room in enumerate(scene.get("rooms", [])):
-        room_id = room.get("id", f"room_{i}")
-        room_ids[i] = room_id
+        room_id = room.get("id")
+        assert room_id, "Invalid room ID"
+        room_ids[i] = room_id.replace("|", "_")
 
     print("Processing floors...")
     for i, room in enumerate(scene.get("rooms", [])):
@@ -264,7 +265,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python load_spoc_scene.py <scene_name>")
         print("  scene_name: Path to JSONL file with index, e.g.:")
-        print("    /fsx-siro/cgokmen/procthor/houses/houses_2023_07_28/val.jsonl_3")
+        print("    /checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28/val.jsonl_3")
         sys.exit(1)
 
     scene_name = sys.argv[1]

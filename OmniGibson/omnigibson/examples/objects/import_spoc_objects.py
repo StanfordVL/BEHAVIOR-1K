@@ -22,7 +22,7 @@ from omnigibson.utils.asset_conversion_utils import (
 
 gm.HEADLESS = True
 
-DATASET_ROOT = pathlib.Path("/fsx-siro/cgokmen/behavior-data2/spoc")
+DATASET_ROOT = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data2/spoc")
 DATASET_ROOT.mkdir(exist_ok=True)
 ERRORS = DATASET_ROOT / "errors"
 ERRORS.mkdir(exist_ok=True)
@@ -87,7 +87,7 @@ def import_custom_object(
 
 
 def main():
-    spoc_root = pathlib.Path("/fsx-siro/cgokmen/procthor/assets/2023_07_28")
+    spoc_root = pathlib.Path("/checkpoint/clear/cgokmen/procthor/assets/2023_07_28")
     annots = json.loads((spoc_root / "annotations.json").read_text())
     models = sorted(spoc_root.glob("assets/*/*.glb"))
 

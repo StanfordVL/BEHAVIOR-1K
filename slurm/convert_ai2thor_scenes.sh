@@ -20,7 +20,7 @@ SCRIPT_NAME="convert_ai2thor_scenes"
 NUM_JOBS=${1:-8}
 TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
 DATASET_ROOT="/home/cgokmen/projects/BEHAVIOR-1K/datasets"
-SCENE_DIR="/fsx-siro/cgokmen/procthor/ai2thor/ai2thor-hab/configs/scenes"
+SCENE_DIR="/checkpoint/clear/cgokmen/procthor/ai2thor/ai2thor-hab/configs/scenes"
 SUCCESS_DIR="${DATASET_ROOT}/ai2thor/jobs"
 
 # --- Sanity Check ---

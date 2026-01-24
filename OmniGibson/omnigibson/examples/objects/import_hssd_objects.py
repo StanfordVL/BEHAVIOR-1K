@@ -22,7 +22,7 @@ from omnigibson.utils.asset_conversion_utils import (
 
 gm.HEADLESS = True
 
-DATASET_ROOT = pathlib.Path("/fsx-siro/cgokmen/behavior-data2/hssd")
+DATASET_ROOT = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data2/hssd")
 DATASET_ROOT.mkdir(exist_ok=True)
 ERRORS = DATASET_ROOT / "errors"
 ERRORS.mkdir(exist_ok=True)
@@ -84,8 +84,8 @@ def import_custom_object(
 
 
 def main():
-    hssd_root = pathlib.Path("/fsx-siro/cgokmen/habitat-data/scene_datasets/hssd-hab")
-    hssd_models_root = pathlib.Path("/fsx-siro/cgokmen/hssd-models")
+    hssd_root = pathlib.Path("/checkpoint/clear/cgokmen/habitat-data/scene_datasets/hssd-hab")
+    hssd_models_root = pathlib.Path("/checkpoint/clear/cgokmen/hssd-models")
     metadata = pd.read_csv(hssd_root / "metadata/hssd_obj_semantics_condensed.csv")
 
     models = sorted(

@@ -246,7 +246,7 @@ def generate_maps_for_current_scene(save_path):
                                 else None
                             )
                             semseg_val = (
-                                sem_to_id[hit_room_type] if hit_room_type else 0
+                                sem_to_id[hit_room_type] if hit_room_type and hit_room_type in sem_to_id else 0
                             )
                             map_arrays[SEMSEG_MAP_FNAME][row, col] = semseg_val
 

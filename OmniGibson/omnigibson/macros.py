@@ -131,7 +131,7 @@ gm.DATA_PATH = determine_data_path()
 # pointers for extensions, etc. - we default this to be in the OmniGibson directory for easy access
 # but on HPC clusters like SLURM you ideally want to put this in a local path rather than a networked
 # filesystem where read/writes are slow and race conditions can occur.
-gm.APPDATA_PATH = os.getenv("OMNIGIBSON_APPDATA_PATH", str(pathlib.Path(__file__).parents[1] / "appdata"))
+gm.APPDATA_PATH = "/tmp/omnigibson"
 
 # Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
 # integer or string-form integer

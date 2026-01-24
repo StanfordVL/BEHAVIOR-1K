@@ -9,6 +9,7 @@ import time
 import traceback
 
 from omnigibson.macros import gm
+from omnigibson.utils.asset_utils import get_dataset_path
 
 # Set OmniGibson macros before importing og
 gm.HEADLESS = True
@@ -51,36 +52,22 @@ def write_error(error_dir, scene_name, exc):
     error_path.write_text(str(exc))
 
 
-def strip_init_info(json_path):
-    with open(json_path, "r") as f:
-        scene_info = json.load(f)
-    scene_info.pop("init_info", None)
-    with open(json_path, "w") as f:
-        json.dump(scene_info, f, indent=4)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-name", required=True, choices=["hssd", "ai2thor"])
     parser.add_argument("--scene-dir", required=True, help="Directory containing *.scene_instance.json files")
     parser.add_argument("--scene-glob", default="**/*.scene_instance.json")
-    parser.add_argument("--dataset-root", required=True, help="Root folder containing datasets (e.g., .../datasets)")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
     parser.add_argument("--restart-every", type=int, default=0)
-    parser.add_argument("--keep-init-info", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
     args = parser.parse_args()
 
-    dataset_root = pathlib.Path(args.dataset_root)
-    output_root = dataset_root / args.dataset_name
+    output_root = pathlib.Path(get_dataset_path(args.dataset_name))
     scene_files = collect_scene_files(args.scene_dir, args.scene_glob)
     print(f"Found {len(scene_files)} scene files under {args.scene_dir}")
     scene_files.sort(key=lambda x: hashlib.md5((str(x) + "potato").encode()).hexdigest())
-
-    gm.DATA_PATH = str(dataset_root)
-    gm.DATASET_PATH = str(output_root)
 
     og.launch()
 
@@ -112,8 +99,6 @@ def main():
             load_habitat_scene(args.dataset_name, str(scene_path))
             og.sim.step()
             og.sim.save(json_paths=[str(json_path)])
-            if not args.keep_init_info:
-                strip_init_info(json_path)
 
             map_start = time.time()
             generate_maps_for_current_scene(str(layout_dir))

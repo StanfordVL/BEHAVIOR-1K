@@ -20,7 +20,7 @@ SCRIPT_NAME="convert_spoc_scenes"
 NUM_JOBS=${1:-8}
 TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
 DATASET_ROOT="/home/cgokmen/projects/BEHAVIOR-1K/datasets"
-SPOC_JSONL_DIR="/fsx-siro/cgokmen/procthor/houses/houses_2023_07_28"
+SPOC_JSONL_DIR="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28"
 SUCCESS_DIR="${DATASET_ROOT}/spoc/jobs"
 
 # --- Sanity Check ---

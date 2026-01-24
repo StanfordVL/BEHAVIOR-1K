@@ -36,7 +36,7 @@ manage_process() {
   # The unique integer ID for the process.
   local process_id=$1
   # The name of the file that signals successful completion.
-  local success_file="/fsx-siro/cgokmen/behavior-data2/hssd/jobs/${process_id}.success"
+  local success_file="/checkpoint/clear/cgokmen/behavior-data2/hssd/jobs/${process_id}.success"
   local log_file="logs/hssd_${process_id}.log"
 
   # If the success file already exists, remove the success file to start fresh.

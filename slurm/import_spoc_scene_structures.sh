@@ -4,6 +4,8 @@
 #SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
+#SBATCH --qos=h100_core_shared
+#SBATCH --account=clear
 #SBATCH --job-name=import_spoc_scene_structures
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_spoc_scene_structures-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_spoc_scene_structures-%A_%a.log

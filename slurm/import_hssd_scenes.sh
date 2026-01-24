@@ -36,7 +36,7 @@ manage_process() {
   # The unique integer ID for the process.
   local process_id=$1
   # The name of the file that signals successful completion.
-  local success_file="/fsx-siro/cgokmen/behavior-data2/hssd/jobs/${process_id}.success"
+  local success_file="/checkpoint/clear/cgokmen/behavior-data2/hssd/jobs/${process_id}.success"
   local log_file="logs/hssd_${process_id}.log"
 
   # If the success file already exists, remove the success file to start fresh.
@@ -53,7 +53,7 @@ manage_process() {
     echo "[$(date)] Launching process for ID: ${process_id} ${TOTAL_JOBS_IN_ARRAY}"
     
     # Execute the python script with the calculated ID as an argument.
-    python -u -m omnigibson.examples.scenes.import_habitat_scenes hssd '/fsx-siro/cgokmen/habitat-data/scene_datasets/hssd-hab/scenes/*.scene_instance.json' "${process_id}" "${TOTAL_JOBS_IN_ARRAY}" >> ${log_file} 2>&1
+    python -u -m omnigibson.examples.scenes.import_habitat_scenes hssd '/checkpoint/clear/cgokmen/habitat-data/scene_datasets/hssd-hab/scenes/*.scene_instance.json' "${process_id}" "${TOTAL_JOBS_IN_ARRAY}" >> ${log_file} 2>&1
   done
   
   echo "[$(date)] Success file found for ID: ${process_id}. Process complete."

@@ -22,7 +22,7 @@ from omnigibson.utils.asset_conversion_utils import (
 
 gm.HEADLESS = True
 
-DATASET_ROOT = pathlib.Path("/fsx-siro/cgokmen/behavior-data2/ai2thor")
+DATASET_ROOT = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data2/ai2thor")
 DATASET_ROOT.mkdir(exist_ok=True)
 ERRORS = DATASET_ROOT / "errors"
 ERRORS.mkdir(exist_ok=True)
@@ -84,9 +84,9 @@ def import_custom_object(
 
 
 def main():
-    hab_root = pathlib.Path("/fsx-siro/cgokmen/procthor/ai2thor/ai2thor-hab")
-    uc_root = pathlib.Path("/fsx-siro/cgokmen/procthor/ai2thor/ai2thorhab-uncompressed")
-    categories = pd.read_csv("/fsx-siro/cgokmen/procthor/ai2thor/ai2thor_categories.csv")
+    hab_root = pathlib.Path("/checkpoint/clear/cgokmen/procthor/ai2thor/ai2thor-hab")
+    uc_root = pathlib.Path("/checkpoint/clear/cgokmen/procthor/ai2thor/ai2thorhab-uncompressed")
+    categories = pd.read_csv("/checkpoint/clear/cgokmen/procthor/ai2thor/ai2thor_categories.csv")
     model2cat = dict(zip(categories["Model Name"], categories["Category"]))
 
     main_models = set(uc_root.glob("assets/objects/*.glb"))

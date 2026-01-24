@@ -10,6 +10,9 @@ import traceback
 
 from omnigibson.macros import gm
 
+import sys
+sys.path.append(str(pathlib.Path(__file__).parents[4] / "asset_pipeline"))
+
 # Set OmniGibson macros before importing og
 gm.HEADLESS = True
 gm.ENABLE_FLATCACHE = False
@@ -17,6 +20,7 @@ gm.USE_GPU_DYNAMICS = False
 gm.USE_ENCRYPTED_ASSETS = True
 
 import omnigibson as og
+from omnigibson.utils.asset_utils import get_dataset_path
 
 from omnigibson.examples.scenes.load_spoc_scene import load_spoc_scene
 from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scene
@@ -53,34 +57,20 @@ def iter_spoc_scenes(jsonl_paths):
                 yield f"{jsonl_path}_{i}"
 
 
-def strip_init_info(json_path):
-    with open(json_path, "r") as f:
-        scene_info = json.load(f)
-    scene_info.pop("init_info", None)
-    with open(json_path, "w") as f:
-        json.dump(scene_info, f, indent=4)
-
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--jsonl-dir", required=True, help="Directory containing SPOC .jsonl files")
-    parser.add_argument("--jsonl-glob", default="*.jsonl")
-    parser.add_argument("--dataset-root", required=True, help="Root folder containing datasets (e.g., .../datasets)")
+    parser.add_argument("--jsonl-dir", default="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28", help="Directory containing SPOC .jsonl files")
+    parser.add_argument("--jsonl-glob", default="train.jsonl")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
     parser.add_argument("--restart-every", type=int, default=0)
-    parser.add_argument("--keep-init-info", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
     args = parser.parse_args()
 
-    dataset_root = pathlib.Path(args.dataset_root)
-    output_root = dataset_root / "spoc"
+    output_root = pathlib.Path(get_dataset_path("spoc"))
     jsonl_paths = sorted(pathlib.Path(args.jsonl_dir).glob(args.jsonl_glob))
     print(f"Found {len(jsonl_paths)} jsonl files under {args.jsonl_dir}")
-
-    gm.DATA_PATH = str(dataset_root)
-    gm.DATASET_PATH = str(output_root)
 
     og.launch()
 
@@ -89,7 +79,7 @@ def main():
     ensure_dir(errors_dir)
     ensure_dir(jobs_dir)
     processed = 0
-    for scene_name in iter_spoc_scenes(jsonl_paths):
+    for scene_name in [f"{jsonl_paths[0]}_505"]: # iter_spoc_scenes(jsonl_paths):
         out_name = output_scene_name(scene_name)
         if not should_process(out_name, args.task_id, args.total_tasks):
             continue
@@ -112,8 +102,6 @@ def main():
             load_spoc_scene(scene_name)
             og.sim.step()
             og.sim.save(json_paths=[str(json_path)])
-            if not args.keep_init_info:
-                strip_init_info(json_path)
 
             map_start = time.time()
             generate_maps_for_current_scene(str(layout_dir))
