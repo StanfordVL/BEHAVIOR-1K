@@ -114,7 +114,7 @@ class InteractiveTraversableScene(TraversableScene):
             str: Absolute path to the desired scene file (.json) to load
         """
         if scene_instance is None:
-            scene_instance = f"{scene_model}_with_clutter"
+            scene_instance = f"{scene_model}_best"
 
         candidates = [
             os.path.join(self.scene_dir, "json", f"{scene_instance}.json"),

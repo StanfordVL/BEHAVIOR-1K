@@ -80,10 +80,9 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         )
 
     scene_cfg = dict()
-    scene_cfg["type"] = "Scene"
-    scene_cfg["scene_file"] = os.path.join(get_dataset_path("vid2room"), "scenes", "scene", "json", "scene_best.json")
-    # scene_cfg["scene_model"] = "scene"
-    # scene_cfg["dataset_name"] = "vid2room"
+    scene_cfg["type"] = "InteractiveTraversableScene"
+    scene_cfg["scene_model"] = "train_505"
+    scene_cfg["dataset_name"] = "spoc"
 
     # Add the robot we want to load
     robot0_cfg = dict()

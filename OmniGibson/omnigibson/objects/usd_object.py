@@ -1,6 +1,7 @@
 import glob
 import hashlib
 import os
+import shutil
 import tempfile
 import zipfile
 
@@ -127,6 +128,26 @@ class USDObject(StatefulObject):
             side_stage.Save()
             del side_stage
         else:
+            basename = os.path.basename(self._usd_path)
+            tempdir_path = tempfile.mkdtemp(basename, dir=og.tempdir)
+            usd_path = os.path.join(tempdir_path, f"{basename}.usd")
+            shutil.copyfile(self._usd_path, usd_path)
+
+            # Fix MDL paths
+            side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
+
+            def _update_path(asset_path):
+                if ".mdl" in asset_path and "Materials/2023_2_1/Base/" in asset_path:
+                    # If it contains the path "Materials/2023_2_1/Base/" then keep only the path after that
+                    old_asset_path = asset_path
+                    asset_path = asset_path.split("Materials/2023_2_1/Base/")[-1]
+                    print(f"Updating {old_asset_path} to {asset_path}")
+                return asset_path
+
+            lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
+            side_stage.Save()
+            del side_stage
+
             self.check_hash(usd_path)
 
         return usd_path
