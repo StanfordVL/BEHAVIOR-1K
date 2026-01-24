@@ -1,6 +1,7 @@
 """
 Convert SPOC scenes into BEHAVIOR-1K scene JSON + layout maps.
 """
+
 import argparse
 import hashlib
 import json
@@ -11,6 +12,7 @@ import traceback
 from omnigibson.macros import gm
 
 import sys
+
 sys.path.append(str(pathlib.Path(__file__).parents[4] / "asset_pipeline"))
 
 # Set OmniGibson macros before importing og
@@ -59,7 +61,11 @@ def iter_spoc_scenes(jsonl_paths):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--jsonl-dir", default="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28", help="Directory containing SPOC .jsonl files")
+    parser.add_argument(
+        "--jsonl-dir",
+        default="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28",
+        help="Directory containing SPOC .jsonl files",
+    )
     parser.add_argument("--jsonl-glob", default="train.jsonl")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
@@ -79,7 +85,7 @@ def main():
     ensure_dir(errors_dir)
     ensure_dir(jobs_dir)
     processed = 0
-    for scene_name in [f"{jsonl_paths[0]}_505"]: # iter_spoc_scenes(jsonl_paths):
+    for scene_name in [f"{jsonl_paths[0]}_505"]:  # iter_spoc_scenes(jsonl_paths):
         out_name = output_scene_name(scene_name)
         if not should_process(out_name, args.task_id, args.total_tasks):
             continue
@@ -122,10 +128,11 @@ def main():
 
     og.shutdown()
     print(f"Processed {processed} scenes")
-    success_filename = f"{args.success_prefix}_{args.task_id}.success" if args.success_prefix else f"{args.task_id}.success"
+    success_filename = (
+        f"{args.success_prefix}_{args.task_id}.success" if args.success_prefix else f"{args.task_id}.success"
+    )
     (jobs_dir / success_filename).touch()
 
 
 if __name__ == "__main__":
     main()
-

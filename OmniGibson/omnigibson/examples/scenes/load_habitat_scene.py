@@ -40,6 +40,7 @@ def convert_csv_to_dict(filepath):
 AI2_FIXEDNESS_MAPPING_FN = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/ai2thor-fixedness.csv"
 AI2_FIXEDNESS_MAPPING = {k: str(v).lower() == "true" for k, v in convert_csv_to_dict(AI2_FIXEDNESS_MAPPING_FN).items()}
 
+
 def _room_name_from_instance(room):
     room_id = room.get("id")
     if room_id is None:

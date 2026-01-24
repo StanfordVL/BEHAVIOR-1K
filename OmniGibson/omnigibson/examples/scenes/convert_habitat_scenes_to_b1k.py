@@ -1,6 +1,7 @@
 """
 Convert Habitat-style scenes (e.g., HSSD / AI2-THOR) into BEHAVIOR-1K scene JSON + layout maps.
 """
+
 import argparse
 import hashlib
 import json
@@ -119,10 +120,11 @@ def main():
 
     og.shutdown()
     print(f"Processed {processed} scenes")
-    success_filename = f"{args.success_prefix}_{args.task_id}.success" if args.success_prefix else f"{args.task_id}.success"
+    success_filename = (
+        f"{args.success_prefix}_{args.task_id}.success" if args.success_prefix else f"{args.task_id}.success"
+    )
     (jobs_dir / success_filename).touch()
 
 
 if __name__ == "__main__":
     main()
-
