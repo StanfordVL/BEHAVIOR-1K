@@ -213,7 +213,12 @@ def _launch_app():
         raise e from ValueError(f"Failed to copy {kit_file_name} or {icon_file.name} to Isaac Sim apps directory.")
 
     # Set the MDL search path so that our OmniGibsonVrayMtl can be found.
-    os.environ["MDL_USER_PATH"] = str((Path(__file__).parent / "materials").resolve())
+    path_splitter = ";" if os.name == "nt" else ":"
+    os.environ["MDL_USER_PATH"] = (
+        str((Path(__file__).parent / "materials").resolve())
+        + path_splitter
+        + str((Path(__file__).parents[2] / "datasets/ai2thor/materials").resolve())
+    )
 
     launch_context = nullcontext if gm.DEBUG else SuppressLogsUntilError if gm.NO_OMNI_LOGS else suppress_omni_log
 

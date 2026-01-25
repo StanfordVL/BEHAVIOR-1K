@@ -78,11 +78,7 @@ def polygon_to_trimesh(points, convex_hull=False, extrude_thickness=None, extrud
 
     # Create a 3D path and then convert to mesh
     lines = list(range(len(points))) + [0]  # Close the polygon
-    path = trimesh.path.Path3D(
-        entities=[trimesh.path.entities.Line(lines)],
-        vertices=points,
-        process=False
-    )
+    path = trimesh.path.Path3D(entities=[trimesh.path.entities.Line(lines)], vertices=points, process=False)
 
     # Convert path to 2D, triangulate, then back to 3D
     planar, to_3D = path.to_2D()
@@ -332,9 +328,7 @@ def main():
                 scenes.append((str(split_file), i))
 
     # Sort with fixed salt for deterministic ordering across runs
-    scenes.sort(
-        key=lambda x: hashlib.md5((f"{x[0]}_{x[1]}potato").encode()).hexdigest()
-    )
+    scenes.sort(key=lambda x: hashlib.md5((f"{x[0]}_{x[1]}potato").encode()).hexdigest())
 
     rank = args.task_id
     world_size = args.total_tasks
@@ -342,7 +336,7 @@ def main():
     # Get scenes for this task
     task_scenes = scenes[rank::world_size]
     if args.limit:
-        task_scenes = task_scenes[:args.limit]
+        task_scenes = task_scenes[: args.limit]
 
     completed_count = 0
     for split_path, scene_idx in tqdm(task_scenes):
@@ -432,4 +426,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

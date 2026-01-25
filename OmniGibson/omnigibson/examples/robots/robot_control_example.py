@@ -5,12 +5,14 @@ Options for random actions, as well as selection of robot action space
 """
 
 import torch as th
+import os
 
 import omnigibson as og
 import omnigibson.lazy as lazy
 from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import KeyboardRobotController, choose_from_options
+from omnigibson.utils.asset_utils import get_dataset_path
 
 CONTROL_MODES = dict(
     random="Use autonomous random actions (default)",
@@ -69,9 +71,6 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose scene to load
-    scene_model = "Rs_int"
-    if not quickstart:
-        scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 
     # Choose robot to create
     robot_name = "Fetch"
@@ -81,11 +80,9 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
         )
 
     scene_cfg = dict()
-    if scene_model == "empty":
-        scene_cfg["type"] = "Scene"
-    else:
-        scene_cfg["type"] = "InteractiveTraversableScene"
-        scene_cfg["scene_model"] = scene_model
+    scene_cfg["type"] = "InteractiveTraversableScene"
+    scene_cfg["scene_model"] = "102343992"
+    scene_cfg["dataset_name"] = "hssd"
 
     # Add the robot we want to load
     robot0_cfg = dict()
