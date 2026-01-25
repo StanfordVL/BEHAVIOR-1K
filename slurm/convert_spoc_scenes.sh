@@ -4,12 +4,12 @@
 #SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --qos=h200_core_shared
+#SBATCH --qos=h100_core_shared
 #SBATCH --account=clear
 #SBATCH --job-name=convert_spoc_scenes
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/convert_spoc_scenes-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/convert_spoc_scenes-%A_%a.log
-#SBATCH --array=0-255
+#SBATCH --array=0-127
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.
@@ -17,7 +17,7 @@
 
 # --- Configuration ---
 SCRIPT_NAME="convert_spoc_scenes"
-NUM_JOBS=${1:-8}
+NUM_JOBS=${1:-4}
 TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
 DATASET_ROOT="/home/cgokmen/projects/BEHAVIOR-1K/datasets"
 SPOC_JSONL_DIR="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28"
@@ -38,7 +38,7 @@ manage_process() {
   local process_id=$1
   # Namespace success file by script name and SLURM array job ID
   local success_file="${SUCCESS_DIR}/${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.success"
-  local log_file="/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
+  local log_file="/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/process-${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
 
   # Remove stale files from previous runs
   if [ -f "${success_file}" ]; then
@@ -54,9 +54,6 @@ manage_process() {
     
     cd /home/cgokmen/projects/BEHAVIOR-1K
     python -u -m omnigibson.examples.scenes.convert_spoc_scenes_to_b1k \
-      --jsonl-dir "${SPOC_JSONL_DIR}" \
-      --jsonl-glob "*.jsonl" \
-      --dataset-root "${DATASET_ROOT}" \
       --task-id "${process_id}" \
       --total-tasks "${TOTAL_JOBS_IN_ARRAY}" \
       --success-prefix "${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}" \

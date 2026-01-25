@@ -9,7 +9,7 @@
 #SBATCH --job-name=import_spoc_scene_structures
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_spoc_scene_structures-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_spoc_scene_structures-%A_%a.log
-#SBATCH --array=0-127
+#SBATCH --array=0-15
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.
@@ -37,7 +37,7 @@ manage_process() {
   local process_id=$1
   # Namespace success file by script name and SLURM array job ID
   local success_file="${SUCCESS_DIR}/${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.success"
-  local log_file="/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
+  local log_file="/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/process-${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
 
   # Remove stale files from previous runs
   if [ -f "${success_file}" ]; then

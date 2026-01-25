@@ -6,7 +6,8 @@ from tqdm.auto import tqdm
 pairs = [
   # ("/s3/profiles/fb-fair-siro-fsx-dra/cgokmen/behavior-data2", "/checkpoint/clear/cgokmen/behavior-data2"),
   # ("/s3/profiles/fb-fair-siro-fsx-dra/cgokmen/og-materials", "/checkpoint/clear/cgokmen/og-materials"),
-  ("/s3/profiles/fb-fair-siro-fsx-dra/cgokmen/procthor", "/checkpoint/clear/cgokmen/procthor"),
+  # ("/s3/profiles/fb-fair-siro-fsx-dra/cgokmen/procthor", "/checkpoint/clear/cgokmen/procthor"),
+  ("/s3/profiles/fb-fair-siro-fsx-dra/cgokmen/habitat-data", "/checkpoint/clear/cgokmen/habitat-data"),
 ]
 
 def copy_file(src, dst):

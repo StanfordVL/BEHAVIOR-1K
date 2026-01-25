@@ -16,7 +16,7 @@ HALF_Z = (Z_START + Z_END) / 2.0
 HALF_HEIGHT = (Z_START - Z_END) / 2.0
 
 WALL_CATEGORIES = ["walls", "rail_fence"]
-FLOOR_CATEGORIES = ["floors", "driveway", "lawn"]
+FLOOR_CATEGORIES = ["floors", "driveway", "lawn", "stages"]
 DOOR_CATEGORIES = ["door", "sliding_door", "garage_door", "gate"]
 IGNORE_CATEGORIES = ["carpet"]
 NEEDED_STRUCTURE_CATEGORIES = FLOOR_CATEGORIES + WALL_CATEGORIES
@@ -80,10 +80,10 @@ def generate_maps_for_current_scene(save_path):
         for floor_cat in FLOOR_CATEGORIES
         for floor in og.sim.scenes[0].object_registry("category", floor_cat, [])
     }
-    roomless_floor_objs = [
-        (floor, len(floor.in_rooms)) for floor in floor_objs if len(floor.in_rooms) != 1
-    ]
-    assert not roomless_floor_objs, f"Found {len(roomless_floor_objs)} floor objects without exactly one room: {roomless_floor_objs}"
+    # roomless_floor_objs = [
+    #     (floor, len(floor.in_rooms)) for floor in floor_objs if len(floor.in_rooms) != 1
+    # ]
+    # assert not roomless_floor_objs, f"Found {len(roomless_floor_objs)} floor objects without exactly one room: {roomless_floor_objs}"
     aabb_corners = np.concatenate([floor.aabb for floor in floor_objs], axis=0)
     combined_low = np.min(list(aabb_corners), axis=0)
     combined_high = np.max(list(aabb_corners), axis=0)

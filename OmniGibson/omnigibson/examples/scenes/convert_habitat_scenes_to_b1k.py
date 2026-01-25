@@ -8,6 +8,9 @@ import pathlib
 import time
 import traceback
 
+import sys
+sys.path.append(str(pathlib.Path(__file__).parents[4] / "asset_pipeline"))
+
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_dataset_path
 
@@ -54,8 +57,8 @@ def write_error(error_dir, scene_name, exc):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-name", required=True, choices=["hssd", "ai2thor"])
-    parser.add_argument("--scene-dir", required=True, help="Directory containing *.scene_instance.json files")
+    parser.add_argument("--dataset-name", default="hssd", choices=["hssd", "ai2thor"])
+    parser.add_argument("--scene-dir", default="/checkpoint/clear/cgokmen/habitat-data/scene_datasets/hssd-hab", help="Directory containing hssd-hab dataset.")
     parser.add_argument("--scene-glob", default="**/*.scene_instance.json")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
@@ -65,7 +68,7 @@ def main():
     args = parser.parse_args()
 
     output_root = pathlib.Path(get_dataset_path(args.dataset_name))
-    scene_files = collect_scene_files(args.scene_dir, args.scene_glob)
+    scene_files = collect_scene_files(args.scene_dir, args.scene_glob)[:1]
     print(f"Found {len(scene_files)} scene files under {args.scene_dir}")
     scene_files.sort(key=lambda x: hashlib.md5((str(x) + "potato").encode()).hexdigest())
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Create a one-scene sample zip of the spoc dataset.
+Create a one-scene sample zip of the a dataset.
 
 This script reads a scene JSON, extracts unique object categories, and zips:
-  - spoc/scenes/<scene_name>/
-  - spoc/objects/<category>/ for each used category
-Plus any top-level files in spoc/.
+  - <dataset_name>/scenes/<scene_name>/
+  - <dataset_name>/objects/<category>/ for each used category
+Plus any top-level files in <dataset_name>/.
 """
 
 import argparse
@@ -17,7 +17,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Create a one-scene spoc dataset sample zip."
+        description="Create a one-scene dataset sample zip."
     )
     parser.add_argument(
         "--datasets-dir",
@@ -40,8 +40,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default="spoc_sample.zip",
-        help="Output zip path. Defaults to ./spoc_sample.zip",
+        default="sample.zip",
+        help="Output zip path. Defaults to ./sample.zip",
     )
     return parser.parse_args()
 
@@ -106,11 +106,6 @@ def main() -> int:
     output_path = args.output
 
     with ZipFile(output_path, "w", compression=ZIP_DEFLATED) as zipf:
-        # # Include top-level files in spoc/
-        # for item in dataset_root.iterdir():
-        #     if item.is_file():
-        #         zipf.write(item, item.relative_to(base_parent))
-
         # Include the selected scene directory
         add_directory(zipf, scene_dir, datasets_dir)
 

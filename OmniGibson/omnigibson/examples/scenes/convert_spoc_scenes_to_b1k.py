@@ -22,7 +22,7 @@ gm.USE_ENCRYPTED_ASSETS = True
 import omnigibson as og
 from omnigibson.utils.asset_utils import get_dataset_path
 
-from omnigibson.examples.scenes.load_spoc_scene import load_spoc_scene
+from omnigibson.examples.scenes.load_spoc_scene import get_scene_id, load_spoc_scene
 from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scene
 
 
@@ -60,7 +60,7 @@ def iter_spoc_scenes(jsonl_paths):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--jsonl-dir", default="/checkpoint/clear/cgokmen/procthor/houses/houses_2023_07_28", help="Directory containing SPOC .jsonl files")
-    parser.add_argument("--jsonl-glob", default="train.jsonl")
+    parser.add_argument("--jsonl-glob", default="*.jsonl")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
     parser.add_argument("--restart-every", type=int, default=0)
@@ -79,9 +79,16 @@ def main():
     ensure_dir(errors_dir)
     ensure_dir(jobs_dir)
     processed = 0
-    for scene_name in [f"{jsonl_paths[0]}_505"]: # iter_spoc_scenes(jsonl_paths):
+    for scene_name in iter_spoc_scenes(jsonl_paths):
         out_name = output_scene_name(scene_name)
         if not should_process(out_name, args.task_id, args.total_tasks):
+            continue
+
+        split_path, scene_idx = scene_name.rsplit("_", 1)
+        scene_id = get_scene_id(split_path, int(scene_idx))
+        scene_success_file = output_root / "objects" / "spoc_structures" / f"{scene_id}.success"
+        if not scene_success_file.exists():
+            print(f"Skipping {out_name}: structures not imported")
             continue
 
         output_scene_dir = output_root / "scenes" / out_name
