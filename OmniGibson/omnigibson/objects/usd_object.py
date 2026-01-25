@@ -137,12 +137,16 @@ class USDObject(StatefulObject):
             side_stage = lazy.pxr.Usd.Stage.Open(usd_path)
 
             def _update_path(asset_path):
-                if ".mdl" in asset_path and "Materials/2023_2_1/Base/" in asset_path:
-                    # If it contains the path "Materials/2023_2_1/Base/" then keep only the path after that
-                    old_asset_path = asset_path
-                    asset_path = asset_path.split("Materials/2023_2_1/Base/")[-1]
-                    print(f"Updating {old_asset_path} to {asset_path}")
-                return asset_path
+                if ".mdl" in asset_path:
+                    # MDLs generally do not need to be updated except for the Isaac Sim materials
+                    if "Materials/2023_2_1/Base/" in asset_path:
+                        # If it contains the path "Materials/2023_2_1/Base/" then keep only the path after that
+                        old_asset_path = asset_path
+                        asset_path = asset_path.split("Materials/2023_2_1/Base/")[-1]
+                        print(f"Updating {old_asset_path} to {asset_path}")
+
+                    return asset_path
+                return os.path.join(os.path.dirname(self._usd_path), asset_path)
 
             lazy.pxr.UsdUtils.ModifyAssetPaths(side_stage.GetRootLayer(), _update_path)
             side_stage.Save()

@@ -81,8 +81,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
 
     scene_cfg = dict()
     scene_cfg["type"] = "InteractiveTraversableScene"
-    scene_cfg["scene_model"] = "train_505"
-    scene_cfg["dataset_name"] = "spoc"
+    scene_cfg["scene_model"] = "102343992"
+    scene_cfg["dataset_name"] = "hssd"
 
     # Add the robot we want to load
     robot0_cfg = dict()
