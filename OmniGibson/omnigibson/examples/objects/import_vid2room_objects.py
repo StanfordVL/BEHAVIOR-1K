@@ -155,12 +155,17 @@ def find_vid2room_objects(vid2room_root: pathlib.Path, mesh_subdir: str = "obj_m
         List of tuples: (glb_path, room_path, segment_name)
     """
     objects = []
-    
+
+    # Load the interesting scenes dict
+    with open("/home/cgokmen/projects/BEHAVIOR-1K/slurm/interesting_scenes.json", "r") as f:
+        interesting_scenes = {pathlib.Path(k) for k in json.load(f)}
+
     # Find all room directories with mesh outputs
-    for mesh_dir in vid2room_root.glob(f"*/rooms/*/{mesh_subdir}"):
-        room_path = mesh_dir.parent
-        
-        for glb_path in mesh_dir.glob("*.glb"):
+    for interesting_scene_root in interesting_scenes:
+        mesh_dir = interesting_scene_root / mesh_subdir
+        for json_path in mesh_dir.glob("*.json"):
+            glb_path = json_path.with_suffix(".glb")
+            
             segment_name = glb_path.stem
             
             # Skip structure categories

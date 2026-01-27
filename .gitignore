@@ -7,3 +7,5 @@ gha-creds-*.json
 outputs/
 /*.ipynb
 slurm/logs
+
+__pycache__
