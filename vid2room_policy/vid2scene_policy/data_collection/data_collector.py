@@ -90,11 +90,10 @@ class DataCollector:
             return False, observations, actions
         print("[Pick] Alignment OK, extending arm...", flush=True)
         obj_pos, _ = target_obj.get_position_orientation()
-        aabb = target_obj.aabb
-        bottom_z = aabb[0][2].item()
-        bbox_height = aabb[1][2].item() - bottom_z
-        grasp_z = bottom_z + bbox_height * 0.30
-        print(f"[Pick] Grasp height: bottom_z={bottom_z:.3f}, bbox_h={bbox_height:.3f}, grasp_z={grasp_z:.3f}", flush=True)
+        # Use object's actual center position (accounts for rotation)
+        obj_center = target_obj.aabb_center
+        grasp_z = obj_center[2].item()
+        print(f"[Pick] Grasp height: obj_center_z={grasp_z:.3f}", flush=True)
         grasp_pos = th.tensor([obj_pos[0].item(), obj_pos[1].item(), grasp_z])
         success, obs, acts = self.arm.align_to_object(grasp_pos, keep_gripper_open=True)
         observations.extend(obs)

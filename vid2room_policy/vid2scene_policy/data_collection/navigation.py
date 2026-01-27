@@ -12,8 +12,18 @@ logger = logging.getLogger(__name__)
 DEBUG_NAV = False
 
 
-def _astar_pathfind(floor_map, start_rc, goal_rc, max_iterations=50000):
-    """A* pathfinding on a binary floor map. Returns list of (row, col) or None."""
+def _astar_pathfind(floor_map, start_rc, goal_rc, cost_map=None, max_iterations=50000):
+    """A* pathfinding on a binary floor map with optional cost map.
+
+    Args:
+        floor_map: Binary map where 255=traversable, 0=obstacle
+        start_rc: (row, col) start position
+        goal_rc: (row, col) goal position
+        cost_map: Optional cost map where higher values = higher traversal cost.
+                  If None, uniform cost is used.
+
+    Returns: list of (row, col) or None
+    """
     rows, cols = floor_map.shape
     sr, sc = start_rc
     gr, gc = goal_rc
@@ -52,7 +62,13 @@ def _astar_pathfind(floor_map, start_rc, goal_rc, max_iterations=50000):
         for dr, dc in neighbors:
             nr, nc = r + dr, c + dc
             if 0 <= nr < rows and 0 <= nc < cols and floor_map[nr, nc] == 255 and (nr, nc) not in closed:
-                move_cost = 1.414 if dr != 0 and dc != 0 else 1.0
+                base_cost = 1.414 if dr != 0 and dc != 0 else 1.0
+                # Add proximity cost if cost_map provided
+                if cost_map is not None:
+                    proximity_cost = cost_map[nr, nc]
+                else:
+                    proximity_cost = 0
+                move_cost = base_cost + proximity_cost
                 new_g = g + move_cost
                 if (nr, nc) not in g_score or new_g < g_score[(nr, nc)]:
                     g_score[(nr, nc)] = new_g
@@ -63,6 +79,35 @@ def _astar_pathfind(floor_map, start_rc, goal_rc, max_iterations=50000):
     return None
 
 
+def _create_obstacle_cost_map(floor_map, max_cost=2.0, falloff_pixels=20):
+    """Create a cost map that penalizes cells near obstacles.
+
+    Uses distance transform to compute distance from each cell to nearest obstacle.
+    Cells closer to obstacles get higher cost, encouraging paths through open areas.
+
+    Args:
+        floor_map: Binary map (255=traversable, 0=obstacle)
+        max_cost: Maximum additional cost for cells adjacent to obstacles
+        falloff_pixels: Distance in pixels over which cost falls to zero
+
+    Returns:
+        Cost map (same shape as floor_map) with float values [0, max_cost]
+    """
+    import cv2
+
+    # Distance transform gives distance from each traversable cell to nearest obstacle
+    dist = cv2.distanceTransform(floor_map.astype(np.uint8), cv2.DIST_L2, 5)
+
+    # Invert: high cost near obstacles, zero cost far from obstacles
+    # Cost decreases linearly with distance, capped at falloff_pixels
+    cost = np.clip(1.0 - dist / falloff_pixels, 0, 1) * max_cost
+
+    # Zero cost for obstacles (they're not traversable anyway)
+    cost[floor_map == 0] = 0
+
+    return cost.astype(np.float32)
+
+
 class NavigationController:
     ANGLE_THRESHOLD = 0.10
     DIST_THRESHOLD = 0.15
@@ -71,6 +116,7 @@ class NavigationController:
         self.ctx = ctx
         self._eroded_map_cache = None
         self._raw_map_cache = None
+        self._cost_map_cache = None
         self._debug_counter = 0
 
     def _save_path_visualization(self, path: list, robot_pos: tuple, target_pos: tuple):
@@ -110,7 +156,7 @@ class NavigationController:
         if self._eroded_map_cache is None:
             import cv2
             trav_map = self.ctx.env.scene._trav_map
-            erosion_radius = 0.325
+            erosion_radius = 0.35
             radius_pixel = int(math.ceil(erosion_radius / trav_map.map_resolution))
             floor_map = trav_map.floor_map[0].clone()
             self._eroded_map_cache = th.tensor(cv2.erode(floor_map.cpu().numpy(), th.ones((radius_pixel, radius_pixel)).cpu().numpy()))
@@ -121,22 +167,37 @@ class NavigationController:
             self._raw_map_cache = self.ctx.env.scene._trav_map.floor_map[0]
         return self._raw_map_cache
 
+    def _get_cost_map(self):
+        """Get cost map that penalizes paths near obstacles."""
+        if self._cost_map_cache is None:
+            eroded_map = self._get_eroded_map()
+            eroded_np = eroded_map.cpu().numpy() if hasattr(eroded_map, 'cpu') else np.array(eroded_map)
+            trav_map = self.ctx.env.scene._trav_map
+            # falloff in meters -> pixels
+            falloff_meters = 0.5  # Cost falls to zero at 0.5m from obstacles
+            falloff_pixels = int(falloff_meters / trav_map.map_resolution)
+            self._cost_map_cache = _create_obstacle_cost_map(eroded_np, max_cost=3.0, falloff_pixels=falloff_pixels)
+        return self._cost_map_cache
+
     def invalidate_map_cache(self):
         self._eroded_map_cache = None
         self._raw_map_cache = None
+        self._cost_map_cache = None
 
     def _find_path_on_eroded_map(self, source_world, target_world):
-        """Find path using A* on our custom eroded map. Returns list of (x,y) world coords or None."""
+        """Find path using A* on our custom eroded map with obstacle avoidance costs.
+        Returns list of (x,y) world coords or None."""
         trav_map = self.ctx.env.scene._trav_map
         eroded_map = self._get_eroded_map()
         eroded_np = eroded_map.cpu().numpy() if hasattr(eroded_map, 'cpu') else np.array(eroded_map)
+        cost_map = self._get_cost_map()
 
         source_map = trav_map.world_to_map(th.tensor([source_world[0], source_world[1]]))
         target_map = trav_map.world_to_map(th.tensor([target_world[0], target_world[1]]))
         sr, sc = int(source_map[0].item()), int(source_map[1].item())
         tr, tc = int(target_map[0].item()), int(target_map[1].item())
 
-        path_rc = _astar_pathfind(eroded_np, (sr, sc), (tr, tc))
+        path_rc = _astar_pathfind(eroded_np, (sr, sc), (tr, tc), cost_map=cost_map)
         if path_rc is None:
             return None
 
@@ -263,6 +324,9 @@ class NavigationController:
 
     def _drive_forward(self, target_x: float, target_y: float, dist_threshold: float, max_steps: int, keep_gripper_closed: bool, mode: float) -> tuple[bool, list, list]:
         observations, actions = [], []
+        last_dist = float('inf')
+        stuck_count = 0
+        STUCK_LIMIT = 100
 
         for step in range(max_steps):
             robot_pos, _ = self.ctx.robot.get_position_orientation()
@@ -274,6 +338,16 @@ class NavigationController:
 
             if dist < dist_threshold:
                 return True, observations, actions
+
+            # Stuck detection
+            if dist < last_dist - 0.01:
+                stuck_count = 0
+                last_dist = dist
+            else:
+                stuck_count += 1
+                if stuck_count >= STUCK_LIMIT:
+                    print(f"[Drive] STUCK for {STUCK_LIMIT} steps at dist={dist:.2f}m", flush=True)
+                    return False, observations, actions
 
             yaw_error = self.ctx.normalize_angle(math.atan2(dy, dx) - self.ctx.get_robot_yaw())
 
