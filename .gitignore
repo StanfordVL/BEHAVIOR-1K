@@ -8,4 +8,4 @@ outputs/
 /*.ipynb
 slurm/logs
 
-__pycache__
+__pycache__/
