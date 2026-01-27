@@ -13,25 +13,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import LRScheduler
 
-from lerobot.configs.train import TrainPipelineConfig
-from lerobot.datasets.utils import load_json, write_json
-from lerobot.optim.optimizers import load_optimizer_state, save_optimizer_state
-from lerobot.optim.schedulers import load_scheduler_state, save_scheduler_state
-from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.processor import PolicyProcessorPipeline
-from lerobot.utils.constants import (
+from ..configs.train import TrainPipelineConfig
+from ..datasets.utils import load_json, write_json
+from .constants import (
     CHECKPOINTS_DIR,
     LAST_CHECKPOINT_LINK,
     PRETRAINED_MODEL_DIR,
     TRAINING_STATE_DIR,
     TRAINING_STEP,
 )
-from lerobot.utils.random_utils import load_rng_state, save_rng_state
+from .random_utils import load_rng_state, save_rng_state
+
+if TYPE_CHECKING:
+    from lerobot.policies.pretrained import PreTrainedPolicy
+    from lerobot.processor import PolicyProcessorPipeline
 
 
 def get_step_identifier(step: int, total_steps: int) -> str:
@@ -127,6 +130,9 @@ def save_training_state(
         scheduler (LRScheduler | None, optional): The scheduler from which to save the state_dict.
             Defaults to None.
     """
+    from lerobot.optim.optimizers import save_optimizer_state
+    from lerobot.optim.schedulers import save_scheduler_state
+
     save_dir = checkpoint_dir / TRAINING_STATE_DIR
     save_dir.mkdir(parents=True, exist_ok=True)
     save_training_step(train_step, save_dir)
@@ -156,6 +162,9 @@ def load_training_state(
         tuple[int, Optimizer, LRScheduler | None]: training step, optimizer and scheduler with their
             state_dict loaded.
     """
+    from lerobot.optim.optimizers import load_optimizer_state
+    from lerobot.optim.schedulers import load_scheduler_state
+
     training_state_dir = checkpoint_dir / TRAINING_STATE_DIR
     if not training_state_dir.is_dir():
         raise NotADirectoryError(training_state_dir)

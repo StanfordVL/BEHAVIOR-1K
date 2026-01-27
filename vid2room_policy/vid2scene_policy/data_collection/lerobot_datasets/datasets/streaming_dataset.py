@@ -21,8 +21,8 @@ import numpy as np
 import torch
 from datasets import load_dataset
 
-from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDatasetMetadata
-from lerobot.datasets.utils import (
+from .lerobot_dataset import CODEBASE_VERSION, LeRobotDatasetMetadata
+from .utils import (
     Backtrackable,
     LookAheadError,
     LookBackError,
@@ -33,11 +33,11 @@ from lerobot.datasets.utils import (
     item_to_torch,
     safe_shard,
 )
-from lerobot.datasets.video_utils import (
+from .video_utils import (
     VideoDecoderCache,
     decode_video_frames_torchcodec,
 )
-from lerobot.utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
+from ..utils.constants import HF_LEROBOT_HOME, LOOKAHEAD_BACKTRACKTABLE, LOOKBACK_BACKTRACKTABLE
 
 
 class StreamingLeRobotDataset(torch.utils.data.IterableDataset):

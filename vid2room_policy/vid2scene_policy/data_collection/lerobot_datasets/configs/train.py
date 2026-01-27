@@ -11,24 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import builtins
 import datetime as dt
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import draccus
 from huggingface_hub import hf_hub_download
 from huggingface_hub.errors import HfHubHTTPError
 
-from lerobot import envs
-from lerobot.configs import parser
-from lerobot.configs.default import DatasetConfig, EvalConfig, PeftConfig, WandBConfig
-from lerobot.configs.policies import PreTrainedConfig
-from lerobot.optim import OptimizerConfig
-from lerobot.optim.schedulers import LRSchedulerConfig
-from lerobot.utils.hub import HubMixin
+from . import parser
+from .default import DatasetConfig, EvalConfig, PeftConfig, WandBConfig
+from .policies import PreTrainedConfig
+from ..utils.hub import HubMixin
+
+if TYPE_CHECKING:
+    from lerobot import envs
+    from lerobot.optim import OptimizerConfig
+    from lerobot.optim.schedulers import LRSchedulerConfig
+else:
+    envs = None
+    OptimizerConfig = None
+    LRSchedulerConfig = None
 
 TRAIN_CONFIG_NAME = "train_config.json"
 
@@ -36,7 +44,7 @@ TRAIN_CONFIG_NAME = "train_config.json"
 @dataclass
 class TrainPipelineConfig(HubMixin):
     dataset: DatasetConfig
-    env: envs.EnvConfig | None = None
+    env: "envs.EnvConfig | None" = None
     policy: PreTrainedConfig | None = None
     # Set `dir` to where you would like to save all of the run outputs. If you run another training session
     # with the same value for `dir` its contents will be overwritten unless you set `resume` to true.
@@ -61,8 +69,8 @@ class TrainPipelineConfig(HubMixin):
     # Checkpoint is saved every `save_freq` training iterations and after the last training step.
     save_freq: int = 20_000
     use_policy_training_preset: bool = True
-    optimizer: OptimizerConfig | None = None
-    scheduler: LRSchedulerConfig | None = None
+    optimizer: "OptimizerConfig | None" = None
+    scheduler: "LRSchedulerConfig | None" = None
     eval: EvalConfig = field(default_factory=EvalConfig)
     wandb: WandBConfig = field(default_factory=WandBConfig)
     peft: PeftConfig | None = None

@@ -56,9 +56,9 @@ from datasets import Dataset, Features, Image
 from huggingface_hub import HfApi, snapshot_download
 from requests import HTTPError
 
-from lerobot.datasets.compute_stats import aggregate_stats
-from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset
-from lerobot.datasets.utils import (
+from ..compute_stats import aggregate_stats
+from ..lerobot_dataset import CODEBASE_VERSION, LeRobotDataset
+from ..utils import (
     DEFAULT_CHUNK_SIZE,
     DEFAULT_DATA_FILE_SIZE_IN_MB,
     DEFAULT_DATA_PATH,
@@ -79,9 +79,9 @@ from lerobot.datasets.utils import (
     write_stats,
     write_tasks,
 )
-from lerobot.datasets.video_utils import concatenate_video_files, get_video_duration_in_s
-from lerobot.utils.constants import HF_LEROBOT_HOME
-from lerobot.utils.utils import init_logging
+from ..video_utils import concatenate_video_files, get_video_duration_in_s
+from ...utils.constants import HF_LEROBOT_HOME
+from ...utils.utils import init_logging
 
 V21 = "v2.1"
 V30 = "v3.0"

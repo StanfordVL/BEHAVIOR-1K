@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 ########################################################################################
 # Utilities
@@ -22,18 +23,20 @@ import traceback
 from contextlib import nullcontext
 from copy import copy
 from functools import cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import torch
 from deepdiff import DeepDiff
 
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
-from lerobot.datasets.utils import DEFAULT_FEATURES
-from lerobot.policies.pretrained import PreTrainedPolicy
-from lerobot.policies.utils import prepare_observation_for_inference
-from lerobot.processor import PolicyAction, PolicyProcessorPipeline
-from lerobot.robots import Robot
+from ..datasets.lerobot_dataset import LeRobotDataset
+from ..datasets.utils import DEFAULT_FEATURES
+
+if TYPE_CHECKING:
+    from lerobot.policies.pretrained import PreTrainedPolicy
+    from lerobot.policies.utils import prepare_observation_for_inference
+    from lerobot.processor import PolicyAction, PolicyProcessorPipeline
+    from lerobot.robots import Robot
 
 
 @cache
@@ -97,6 +100,8 @@ def predict_action(
     Returns:
         A `torch.Tensor` containing the predicted action, ready for the robot.
     """
+    from lerobot.policies.utils import prepare_observation_for_inference
+
     observation = copy(observation)
     with (
         torch.inference_mode(),

@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import abc
 import builtins
 import json
@@ -19,19 +21,21 @@ import tempfile
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import draccus
 from huggingface_hub import hf_hub_download
 from huggingface_hub.constants import CONFIG_NAME
 from huggingface_hub.errors import HfHubHTTPError
 
-from lerobot.configs.types import FeatureType, PolicyFeature
-from lerobot.optim.optimizers import OptimizerConfig
-from lerobot.optim.schedulers import LRSchedulerConfig
-from lerobot.utils.constants import ACTION, OBS_STATE
-from lerobot.utils.hub import HubMixin
-from lerobot.utils.utils import auto_select_torch_device, is_amp_available, is_torch_device_available
+from .types import FeatureType, PolicyFeature
+from ..utils.constants import ACTION, OBS_STATE
+from ..utils.hub import HubMixin
+from ..utils.utils import auto_select_torch_device, is_amp_available, is_torch_device_available
+
+if TYPE_CHECKING:
+    from lerobot.optim.optimizers import OptimizerConfig
+    from lerobot.optim.schedulers import LRSchedulerConfig
 
 T = TypeVar("T", bound="PreTrainedConfig")
 logger = getLogger(__name__)
