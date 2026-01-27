@@ -7,8 +7,8 @@
 #SBATCH --qos=siro_high
 #SBATCH --account=siro
 #SBATCH --job-name=hssd_to_behavior1k
-#SBATCH --output=logs/%A_%a.out
-#SBATCH --error=logs/%A_%a.err
+#SBATCH --output=logs/import_hssd_objects_%A_%a.out
+#SBATCH --error=logs/import_hssd_objects_%A_%a.err
 #SBATCH --array=0-0
 
 # This script launches a configurable number of concurrent python processes.
@@ -37,7 +37,7 @@ manage_process() {
   local process_id=$1
   # The name of the file that signals successful completion.
   local success_file="/checkpoint/clear/cgokmen/behavior-data2/hssd/jobs/${process_id}.success"
-  local log_file="logs/hssd_${process_id}.log"
+  local log_file="logs/process-import_hssd_objects_${SLURM_ARRAY_JOB_ID}_${process_id}.log"
 
   # If the success file already exists, remove the success file to start fresh.
   if [ -f "${success_file}" ]; then
