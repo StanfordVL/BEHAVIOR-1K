@@ -11,16 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import numbers
 import os
+from typing import TYPE_CHECKING
 
 import numpy as np
 import rerun as rr
 
-from lerobot.processor import RobotAction, RobotObservation
-
 from .constants import ACTION, ACTION_PREFIX, OBS_PREFIX, OBS_STR
+
+if TYPE_CHECKING:
+    from lerobot.processor import RobotAction, RobotObservation
 
 
 def init_rerun(

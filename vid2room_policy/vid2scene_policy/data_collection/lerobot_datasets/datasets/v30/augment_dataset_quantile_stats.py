@@ -44,10 +44,10 @@ from huggingface_hub import HfApi
 from requests import HTTPError
 from tqdm import tqdm
 
-from lerobot.datasets.compute_stats import DEFAULT_QUANTILES, aggregate_stats, get_feature_stats
-from lerobot.datasets.lerobot_dataset import CODEBASE_VERSION, LeRobotDataset
-from lerobot.datasets.utils import write_stats
-from lerobot.utils.utils import init_logging
+from ..compute_stats import DEFAULT_QUANTILES, aggregate_stats, get_feature_stats
+from ..lerobot_dataset import CODEBASE_VERSION, LeRobotDataset
+from ..utils import write_stats
+from ...utils.utils import init_logging
 
 
 def has_quantile_stats(stats: dict[str, dict] | None, quantile_list_keys: list[str] | None = None) -> bool:

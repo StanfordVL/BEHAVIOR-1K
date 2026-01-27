@@ -28,7 +28,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from lerobot.datasets.lerobot_dataset import LeRobotDataset
+from .lerobot_dataset import LeRobotDataset
 
 
 def _make_memmap_safe(**kwargs) -> np.memmap:

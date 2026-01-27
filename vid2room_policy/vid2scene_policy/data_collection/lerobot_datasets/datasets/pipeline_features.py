@@ -16,10 +16,10 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from lerobot.configs.types import PipelineFeatureType
-from lerobot.datasets.utils import hw_to_dataset_features
-from lerobot.processor import DataProcessorPipeline, RobotAction, RobotObservation
-from lerobot.utils.constants import ACTION, OBS_IMAGES, OBS_STATE, OBS_STR
+from ..configs.types import PipelineFeatureType
+from .utils import hw_to_dataset_features
+from ..processor import DataProcessorPipeline, RobotAction, RobotObservation
+from ..utils.constants import ACTION, OBS_IMAGES, OBS_STATE, OBS_STR
 
 
 def create_initial_features(

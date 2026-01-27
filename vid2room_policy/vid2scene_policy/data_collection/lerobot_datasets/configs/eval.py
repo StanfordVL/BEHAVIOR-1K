@@ -11,16 +11,23 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import datetime as dt
 from dataclasses import dataclass, field
 from logging import getLogger
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from lerobot import envs, policies  # noqa: F401
-from lerobot.configs import parser
-from lerobot.configs.default import EvalConfig
-from lerobot.configs.policies import PreTrainedConfig
+from . import parser
+from .default import EvalConfig
+from .policies import PreTrainedConfig
+
+if TYPE_CHECKING:
+    from lerobot import envs, policies  # noqa: F401
+else:
+    envs = None
+    policies = None
 
 logger = getLogger(__name__)
 
@@ -30,7 +37,7 @@ class EvalPipelineConfig:
     # Either the repo ID of a model hosted on the Hub or a path to a directory containing weights
     # saved using `Policy.save_pretrained`. If not provided, the policy is initialized from scratch
     # (useful for debugging). This argument is mutually exclusive with `--config`.
-    env: envs.EnvConfig
+    env: "envs.EnvConfig"
     eval: EvalConfig = field(default_factory=EvalConfig)
     policy: PreTrainedConfig | None = None
     output_dir: Path | None = None

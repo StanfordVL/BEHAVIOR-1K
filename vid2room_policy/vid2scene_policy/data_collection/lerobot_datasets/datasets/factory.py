@@ -18,16 +18,16 @@ from pprint import pformat
 
 import torch
 
-from lerobot.configs.policies import PreTrainedConfig
-from lerobot.configs.train import TrainPipelineConfig
-from lerobot.datasets.lerobot_dataset import (
+from ..configs.policies import PreTrainedConfig
+from ..configs.train import TrainPipelineConfig
+from .lerobot_dataset import (
     LeRobotDataset,
     LeRobotDatasetMetadata,
     MultiLeRobotDataset,
 )
-from lerobot.datasets.streaming_dataset import StreamingLeRobotDataset
-from lerobot.datasets.transforms import ImageTransforms
-from lerobot.utils.constants import ACTION, OBS_PREFIX, REWARD
+from .streaming_dataset import StreamingLeRobotDataset
+from .transforms import ImageTransforms
+from ..utils.constants import ACTION, OBS_PREFIX, REWARD
 
 IMAGENET_STATS = {
     "mean": [[[0.485]], [[0.456]], [[0.406]]],  # (c,1,1)

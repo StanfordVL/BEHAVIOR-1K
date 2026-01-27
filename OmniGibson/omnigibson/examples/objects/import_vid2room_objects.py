@@ -166,7 +166,7 @@ def find_vid2room_objects(vid2room_root: pathlib.Path, mesh_subdir: str = "obj_m
         mesh_dir = interesting_scene_root / mesh_subdir
         for json_path in mesh_dir.glob("*.json"):
             glb_path = json_path.with_suffix(".glb")
-            
+
             segment_name = glb_path.stem
 
             # Skip structure categories

@@ -25,7 +25,7 @@ from typing import Any, TypeVar, cast
 
 import draccus
 
-from lerobot.utils.utils import has_method
+from ..utils.utils import has_method
 
 F = TypeVar("F", bound=Callable[..., object])
 
