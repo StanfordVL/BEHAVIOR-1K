@@ -4,7 +4,7 @@ from functools import cached_property
 import torch as th
 
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
-from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -44,7 +44,26 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        return th.tensor([0, 0, 0.5, 0, 0, 0, 0, 0, 0, 0.0, 0, 0, math.pi / 8, math.pi / 8])
+        # Custom pose: lift raised, gripper open, camera looking down
+        # Order matches actual joint order from robot.joints.keys()
+        return th.tensor(
+            [
+                -1.5764,  # joint_head_pan
+                0.0,  # joint_left_wheel
+                0.6893,  # joint_lift
+                0.0,  # joint_right_wheel
+                -0.5714,  # joint_head_tilt
+                0.0220,  # joint_arm_l3
+                0.0017,  # joint_arm_l2
+                0.0389,  # joint_arm_l1
+                0.0062,  # joint_arm_l0
+                -0.0649,  # joint_wrist_yaw
+                -0.0513,  # joint_wrist_pitch
+                -0.0315,  # joint_wrist_roll
+                0.6,  # joint_gripper_finger_left
+                0.6,  # joint_gripper_finger_right
+            ]
+        )
 
     @property
     def wheel_radius(self):
@@ -121,3 +140,23 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @cached_property
     def finger_joint_names(self):
         return {self.default_arm: ["joint_gripper_finger_right", "joint_gripper_finger_left"]}
+
+    @property
+    def _assisted_grasp_start_points(self):
+        """Grasping start points for assisted grasping raycast detection."""
+        return {
+            self.default_arm: [
+                # Use finger link with offset toward fingertip (along -X axis in finger frame)
+                GraspingPoint(link_name="link_gripper_finger_right", position=th.tensor([-0.15, 0.0, 0.0])),
+            ]
+        }
+
+    @property
+    def _assisted_grasp_end_points(self):
+        """Grasping end points for assisted grasping raycast detection."""
+        return {
+            self.default_arm: [
+                # Use finger link with offset toward fingertip (along +X axis in finger frame due to mirroring)
+                GraspingPoint(link_name="link_gripper_finger_left", position=th.tensor([0.15, 0.0, 0.0])),
+            ]
+        }

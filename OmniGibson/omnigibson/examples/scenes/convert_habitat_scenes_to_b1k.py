@@ -10,6 +10,7 @@ import time
 import traceback
 
 import sys
+
 sys.path.append(str(pathlib.Path(__file__).parents[4] / "asset_pipeline"))
 
 from omnigibson.macros import gm
@@ -59,7 +60,11 @@ def write_error(error_dir, scene_name, exc):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-name", default="hssd", choices=["hssd", "ai2thor"])
-    parser.add_argument("--scene-dir", default="/checkpoint/clear/cgokmen/habitat-data/scene_datasets/hssd-hab", help="Directory containing hssd-hab dataset.")
+    parser.add_argument(
+        "--scene-dir",
+        default="/checkpoint/clear/cgokmen/habitat-data/scene_datasets/hssd-hab",
+        help="Directory containing hssd-hab dataset.",
+    )
     parser.add_argument("--scene-glob", default="**/*.scene_instance.json")
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)

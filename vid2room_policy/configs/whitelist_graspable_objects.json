@@ -1,0 +1,23 @@
+{
+  "graspable_objects": [
+    "apple",
+    "orange",
+    "pear",
+    "mango",
+    "avocado",
+    "mug",
+    "tomato",
+    "bowl",
+    "bottle",
+    "box",
+    "phone",
+    "remote",
+    "tissue_box",
+    "spray_bottle",
+    "soap_bottle",
+    "salt_shaker",
+    "cup",
+    "can",
+    "jar"
+  ]
+}

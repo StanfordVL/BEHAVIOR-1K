@@ -137,11 +137,18 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
 
+    # # Register custom binding to reset the environment
+    # action_generator.register_custom_keymapping(
+    #     key=lazy.carb.input.KeyboardInput.R,
+    #     description="Reset the robot",
+    #     callback_fn=lambda: env.reset(),
+    # )
+
     # Register custom binding to reset the environment
     action_generator.register_custom_keymapping(
         key=lazy.carb.input.KeyboardInput.R,
-        description="Reset the robot",
-        callback_fn=lambda: env.reset(),
+        description="Get robot proprioception",
+        callback_fn=lambda: print(f"{robot._get_proprioception_dict()['joint_qpos']}"),
     )
 
     # Print out relevant keyboard info if using keyboard teleop
@@ -165,6 +172,8 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
             action = random_action
         else:
             action = action_generator.get_teleop_action()
+            if th.sum(th.abs(action[:-1])) > 0.01:
+                print(f"Step {step}: {action}")
         env.step(action=action)
         step += 1
 
