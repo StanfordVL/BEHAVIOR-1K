@@ -144,7 +144,7 @@ def main(random_selection=False, headless=False, short_exec=False, quickstart=Fa
     #     callback_fn=lambda: env.reset(),
     # )
 
-        # Register custom binding to reset the environment
+    # Register custom binding to reset the environment
     action_generator.register_custom_keymapping(
         key=lazy.carb.input.KeyboardInput.R,
         description="Get robot proprioception",
