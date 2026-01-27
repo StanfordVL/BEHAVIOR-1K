@@ -40,7 +40,7 @@ class ArmController:
         return horizontal_offset, vertical_offset
 
     def align_to_object(self, object_pos: th.Tensor, keep_gripper_open: bool = True) -> tuple[bool, list, list]:
-        """Position gripper at object using arm extension, lift, and base rotation."""
+        """Position gripper at object: first align z, then extend arm."""
         observations = []
         actions = []
 
@@ -63,13 +63,37 @@ class ArmController:
         target_eef_z = object_pos[2].item()
         print(f"[Arm] Target EEF: ({target_eef_x:.3f}, {target_eef_y:.3f}, {target_eef_z:.3f}), obj_z={object_pos[2].item():.3f}", flush=True)
 
+        # Phase 1: Align Z (lift) first
+        print("[Arm] Phase 1: Aligning Z...", flush=True)
+        for step in range(100):
+            eef_pos, _ = self.ctx.robot.get_eef_pose(self.ctx.arm)
+            height_error = target_eef_z - eef_pos[2].item()
+
+            if abs(height_error) < 0.02:
+                print(f"[Arm] Z aligned at step {step}, error={height_error:.3f}", flush=True)
+                break
+
+            action = self.ctx.empty_action(mode=MODE_MANIPULATION)
+            action[self.ctx.gripper_idx] = 1.0 if keep_gripper_open else -1.0
+            lift_delta = max(-0.008, min(0.008, height_error * 0.3))
+            action[self.ctx.arm_idx[0]] = lift_delta
+
+            obs, _, terminated, truncated, _ = self.ctx.env.step(action.numpy())
+            observations.append(obs)
+            actions.append(action.numpy())
+
+            if terminated or truncated:
+                return False, observations, actions
+
+        # Phase 2: Extend arm horizontally
+        print("[Arm] Phase 2: Extending arm...", flush=True)
         joint_extensions = [0.0, 0.0, 0.0, 0.0]
         last_dist = float('inf')
         min_dist = float('inf')
         stuck_count = 0
         STUCK_THRESHOLD = 50
 
-        for step in range(300):
+        for step in range(200):
             eef_pos, _ = self.ctx.robot.get_eef_pose(self.ctx.arm)
             robot_pos, _ = self.ctx.robot.get_position_orientation()
 
@@ -122,6 +146,7 @@ class ArmController:
             else:
                 h_err = 0.0
 
+            # Maintain Z while extending
             if abs(height_error) > 0.01:
                 lift_delta = max(-0.004, min(0.004, height_error * 0.2))
                 action[self.ctx.arm_idx[0]] = lift_delta

@@ -25,8 +25,8 @@ class DataCollectionConfig:
     approach_dist: float = 0.5
     angle_threshold: float = 0.1
     # Object filter method: "whitelist" or "classifier"
-    object_filter_method: str = "whitelist"
-    # Classifier paths (used when object_filter_method="classifier")
+    object_filter_method: str = "classifier"
+    # Classifier paths (used when object_filter_method="classifier", None uses defaults)
     classifier_embeddings_path: str | None = None
     classifier_models_dir: str | None = None
     classifier_threshold: float = 0.5

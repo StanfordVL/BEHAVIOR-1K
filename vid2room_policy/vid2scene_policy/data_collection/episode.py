@@ -453,13 +453,8 @@ def collect_episode(
     print(f"[Episode] Room {chosen_room}: {source_support.name} -> {target_support.name} "
           f"({len(pairs)} pairs, {len(room_support_list)} supports)", flush=True)
 
-    # Find robot start position in this room - get ground floor height
-    trav_map = scene._trav_map
-    floor_heights = trav_map.floor_heights if hasattr(trav_map, 'floor_heights') else [0.0]
-    # Use the lowest floor height (ground floor)
-    floor_z = min(floor_heights) if floor_heights else 0.0
-
-    # Try to get actual floor height from floor objects
+    # Find robot start position - get floor z from floor objects
+    # Group floors within 1.5m and choose the highest in the group
     floor_candidates = []
     for obj in scene.objects:
         cat = getattr(obj, 'category', '') or ''
@@ -471,13 +466,21 @@ def collect_episode(
             except Exception:
                 pass
 
+    floor_z = 0.0
     if floor_candidates:
         floor_candidates.sort()
-        # If two floors are within 1m of each other, use the upper one (double floor mechanism)
-        if len(floor_candidates) >= 2 and (floor_candidates[1] - floor_candidates[0]) < 1.0:
-            floor_z = floor_candidates[1]
-        else:
-            floor_z = floor_candidates[0]
+        # Group floors within 1.5m - find the highest in the lowest group
+        groups = []
+        current_group = [floor_candidates[0]]
+        for z in floor_candidates[1:]:
+            if z - current_group[0] < 1.5:
+                current_group.append(z)
+            else:
+                groups.append(current_group)
+                current_group = [z]
+        groups.append(current_group)
+        # Use the highest floor in the first (lowest) group
+        floor_z = max(groups[0])
 
     # Add offset to ensure robot doesn't clip into floor
     ROBOT_BASE_OFFSET = 0.02
