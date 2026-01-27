@@ -1,0 +1,22 @@
+{
+  "support_objects": [
+    "breakfast_table",
+    "coffee_table",
+    "desk",
+    "countertop",
+    "nightstand",
+    "table",
+    "counter",
+    "shelf",
+    "cabinet",
+    "rack",
+    "kitchen_shelf",
+    "kitchen_lower_cabinet",
+    "sink_cabinet",
+    "display_table",
+    "vanity",
+    "dining_table",
+    "sideboard",
+    "dresser"
+  ]
+}

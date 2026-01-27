@@ -1,0 +1,97 @@
+env:
+  action_frequency: 30                  # (int): environment executes action at the action_frequency rate
+  physics_frequency: 120                # (int): physics frequency (1 / physics_timestep for physx)
+  device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
+  automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
+  flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
+  flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
+  use_external_obs: false               # (bool): Whether to use external observations or not
+  external_sensors: null                # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: Rs_int
+  trav_map_resolution: 0.1
+  default_erosion_radius: 0.4    # Robot radius (~0.3m) + safety margin
+  trav_map_with_objects: true    # Include furniture in traversable map
+  num_waypoints: 50
+  waypoint_resolution: 0.1
+  load_object_categories: null
+  not_load_object_categories: [ottoman, straight_chair]   # Remove furniture that blocks navigation
+  load_room_types: null
+  load_room_instances: null
+  load_task_relevant_only: false
+  seg_map_resolution: 1.0
+  scene_source: OG
+  include_robots: false
+
+robots:
+  - type: Stretch
+    obs_modalities: [rgb, seg_instance, depth_linear]    # RGB + instance segmentation + depth
+    include_sensor_names: null
+    exclude_sensor_names: null
+    scale: 1.0
+    self_collisions: true
+    action_normalize: false
+    action_type: continuous
+    grasping_mode: sticky  # Sticky mode: magnetizes any object touching fingers
+    link_physics_materials:
+      link_right_wheel:
+        static_friction: 5.0
+        dynamic_friction: 5.0
+        restitution: 0.0
+      link_left_wheel:
+        static_friction: 5.0
+        dynamic_friction: 5.0
+        restitution: 0.0
+    reset_joint_pos: [
+      -0.0795,    # joint_head_pan
+      0.0,        # joint_left_wheel
+      1.0946,     # joint_lift (high up)
+      0.0,        # joint_right_wheel
+      -0.2367,    # joint_head_tilt
+      0.02,       # joint_arm_l3 (slightly extended)
+      0.0,        # joint_arm_l2 (retracted)
+      0.0,        # joint_arm_l1 (retracted)
+      0.0,        # joint_arm_l0 (retracted)
+      -0.1208,    # joint_wrist_yaw (keep fixed)
+      -0.5,       # joint_wrist_pitch (slightly lower)
+      -0.1133,    # joint_wrist_roll
+      0.3,        # joint_gripper_finger_left (slightly closed)
+      0.3,        # joint_gripper_finger_right (slightly closed)
+    ]
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 224
+          image_width: 224
+    controller_config:
+      base:
+        name: DifferentialDriveController
+        command_input_limits: null
+      camera:
+        name: NullJointController
+        motor_type: position
+      arm_0:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        use_delta_commands: true
+        use_impedances: false
+      gripper_0:
+        name: MultiFingerGripperController
+        motor_type: position
+        mode: binary                  # Binary mode: >= 0 opens, < 0 closes
+        # finger_joint_names order: [RIGHT, LEFT]
+        # Both fingers: +0.6 = open (spread apart), -0.6 = closed (together)
+        closed_qpos: [-0.6, -0.6]
+        open_qpos: [0.6, 0.6]
+
+objects: []
+
+task:
+  type: DummyTask
