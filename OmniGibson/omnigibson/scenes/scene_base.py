@@ -455,7 +455,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             og.sim.add_ground_plane(
                 floor_plane_visible=self._floor_plane_visible, floor_plane_color=self._floor_plane_color
             )
-        if True: # self._use_skybox:
+        if True:  # self._use_skybox:
             og.sim.add_skybox()
 
         # Go through whatever else loading the scene needs to do.
