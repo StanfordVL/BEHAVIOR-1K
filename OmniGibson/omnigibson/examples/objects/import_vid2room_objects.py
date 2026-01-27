@@ -174,7 +174,7 @@ def find_vid2room_objects(vid2room_root: pathlib.Path, mesh_subdir: str = "obj_m
             if base_category in SKIP_CATEGORIES:
                 continue
 
-            objects.append((glb_path, room_path, segment_name))
+            objects.append((glb_path, interesting_scene_root, segment_name))
 
     return objects
 
