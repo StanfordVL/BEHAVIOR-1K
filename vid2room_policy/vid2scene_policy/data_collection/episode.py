@@ -409,6 +409,8 @@ def collect_episode(
         (success, observations, actions, failed_obj_name)
         failed_obj_name is set if grasp failed, None otherwise
     """
+    # lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "RaytracedLighting")
+
     if failed_objects is None:
         failed_objects = {}
     # Move robot underground while we compute placement
@@ -567,6 +569,9 @@ def collect_episode(
 
     if wrapper is not None:
         wrapper.set_target_objects(target_obj, source_support)
+
+    # Switch now to path tracing mode
+    # lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "PathTracing")
 
     all_observations = []
     all_actions = []

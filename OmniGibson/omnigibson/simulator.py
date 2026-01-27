@@ -590,6 +590,10 @@ def _launch_simulator(*args, **kwargs):
             lazy.carb.settings.get_settings().set_bool("/app/renderer/skipMaterialLoading", False)
             lazy.carb.settings.get_settings().set_bool("/rtx/flow/enabled", True)
 
+            lazy.carb.settings.get_settings().set_bool("/rtx/useViewLightingMode", True)
+            lazy.carb.settings.get_settings().set_bool("/rtx/post/histogram/enabled", True)
+            lazy.carb.settings.get_settings().set_float("/rtx/post/histogram/whiteScale", 5.0)
+
             # disable texture streaming
             # lazy.carb.settings.get_settings().set_bool("/rtx-transient/resourcemanager/enableTextureStreaming", False)
 

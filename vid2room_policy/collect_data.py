@@ -26,7 +26,7 @@ def main():
     parser.add_argument("--scene", default="Rs_int", help="Scene model name")
     parser.add_argument("--dataset", default="behavior-1k-assets", help="Dataset name (behavior-1k-assets or spoc)")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes to collect")
-    parser.add_argument("--output", default="./lerobot_datasets", help="Output directory")
+    parser.add_argument("--output", default="/checkpoint/clear/cgokmen/lerobot_datasets", help="Output directory")
     parser.add_argument("--repo-id", default=None, help="Repository ID (default: {scene}_stretch_pick_place)")
     parser.add_argument("--max-nav-steps", type=int, default=1500, help="Max navigation steps per episode")
     parser.add_argument("--object-filter", default="classifier", choices=["whitelist", "classifier"],

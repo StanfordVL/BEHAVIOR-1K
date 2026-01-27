@@ -4,7 +4,7 @@
 #SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --qos=h200_lowest
+#SBATCH --qos=h100_lowest
 #SBATCH --account=clear
 #SBATCH --job-name=import_vid2room_objects
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_objects-%A_%a.log
@@ -56,7 +56,7 @@ manage_process() {
     echo "[$(date)] Launching process for ID: ${process_id} / ${TOTAL_JOBS_IN_ARRAY}"
     
     cd /home/cgokmen/projects/BEHAVIOR-1K
-    python -u -m omnigibson.examples.objects.import_vid2room_objects \
+    OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} python -u -m omnigibson.examples.objects.import_vid2room_objects \
       "${process_id}" "${TOTAL_JOBS_IN_ARRAY}" \
       --vid2room-root "${VID2ROOM_ROOT}" \
       --dataset-name "${DATASET_NAME}" \
