@@ -160,7 +160,7 @@ class DataCollector:
             return False, observations, actions
 
         sampled = sample_cuboid_for_predicate("onTop", target_support, grasped_obj.aabb_extent)
-        if sampled is None or len(sampled) == 0 or sampled[0] is None:
+        if sampled is None or len(sampled) == 0 or sampled[0] is None or sampled[0][0] is None:
             logger.info("Could not sample valid place position")
             return False, observations, actions
         sampled_pos = sampled[0][0]

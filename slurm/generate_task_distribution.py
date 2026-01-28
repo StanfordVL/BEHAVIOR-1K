@@ -20,7 +20,7 @@ config = {
                 "Wainscott_1_int",
                 "house_single_floor",
             ],
-            "episodes": 12000,
+            "episodes": 20000,
         },
         "val": {
             "scenes": [
@@ -29,23 +29,23 @@ config = {
                 "Benevolence_2_int",
                 "Beechwood_1_int",
             ],
-            "episodes": 1200,
+            "episodes": 2000,
         },
     },
 
     "spoc": {
         "train": {
             "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "train" in x]),
-            "episodes": 12000,
+            "episodes": 20000,
         },
         "val": {
             "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "val" in x]),
-            "episodes": 1200,
+            "episodes": 2000,
         },
     },
 }
 
-num_jobs = 256 * 4
+num_jobs = (1024 + 1024 + 256) * 4
 max_episodes_per_line = 10
 
 def main():
@@ -95,6 +95,7 @@ def main():
         smaller_batches.append(smaller_items_batch)
     
     # Save the batches to a json file
+    random.shuffle(smaller_batches)
     for i, batch in enumerate(smaller_batches):
         with open(f"rollout_jobs/{i}.csv", "w") as f:
             for item in batch:

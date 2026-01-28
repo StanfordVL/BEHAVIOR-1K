@@ -816,10 +816,10 @@ def run_data_collection(config: DataCollectionConfig):
     robot.reset()
     for _ in range(10):
         og.sim.step()
-    eef_pos, _ = robot.get_eef_pose(robot.arm_names[0])
+    # eef_pos, _ = robot.get_eef_pose(robot.arm_names[0])
     # initial_gripper_z = eef_pos[2].item()
     max_support_height = 1.0  # Support must be at least 10cm below gripper
-    logger.info("Initial gripper Z: %.3f, max support height: %.3f", initial_gripper_z, max_support_height)
+    logger.info("max support height: %.3f", max_support_height)
 
     sample_obs, _ = wrapper.reset_env()
     wrapper.start_recording()

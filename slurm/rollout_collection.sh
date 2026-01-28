@@ -4,20 +4,19 @@
 #SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --qos=h200_dev
+#SBATCH --qos=h100_core_shared
 #SBATCH --account=clear
 #SBATCH --job-name=rollout_collection
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/rollout_collection-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/rollout_collection-%A_%a.log
-#SBATCH --array=0-1
+#SBATCH --array=0-255
 
 # This script launches a configurable number of concurrent python processes.
 # Each process reads its job file and runs data collection for each row.
 
 # --- Configuration ---
 SCRIPT_NAME="rollout_collection"
-NUM_JOBS=${1:-1}
-TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
+NUM_JOBS=${1:-4}
 
 # Paths - adjust these as needed
 PROJECT_ROOT="/home/cgokmen/projects/BEHAVIOR-1K"
@@ -97,7 +96,7 @@ run_process() {
 echo "Starting rollout collection for SLURM_ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID} with ${NUM_JOBS} jobs"
 
 for (( i=0; i<NUM_JOBS; i++ )); do
-  task_id=$((SLURM_ARRAY_TASK_ID * NUM_JOBS + i))
+  task_id=$((SLURM_ARRAY_TASK_ID * NUM_JOBS + i + 8192))
   run_process "${task_id}" &
 done
 
