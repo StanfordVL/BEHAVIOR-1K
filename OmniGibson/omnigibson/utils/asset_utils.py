@@ -190,7 +190,11 @@ def get_all_object_categories(dataset_names=None):
     Returns:
         list: all object categories
     """
-    categories = {x.name for x in Path(gm.DATA_PATH).glob("*/objects/*") if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)}
+    categories = {
+        x.name
+        for x in Path(gm.DATA_PATH).glob("*/objects/*")
+        if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)
+    }
     return sorted(categories)
 
 
@@ -201,7 +205,13 @@ def get_all_object_models(dataset_names=None):
     Returns:
         list: all object model paths
     """
-    return sorted({str(x) for x in Path(gm.DATA_PATH).glob("*/objects/*/*") if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)})
+    return sorted(
+        {
+            str(x)
+            for x in Path(gm.DATA_PATH).glob("*/objects/*/*")
+            if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)
+        }
+    )
 
 
 def get_all_object_category_models(category, dataset_names=None):
@@ -214,7 +224,9 @@ def get_all_object_category_models(category, dataset_names=None):
     Returns:
         list of str: all object models belonging to @category
     """
-    categories_paths = [os.path.join(get_dataset_path(dataset_name), "objects", category) for dataset_name in dataset_names]
+    categories_paths = [
+        os.path.join(get_dataset_path(dataset_name), "objects", category) for dataset_name in dataset_names
+    ]
     categories_paths = [path for path in categories_paths if os.path.exists(path)]
     return sorted(x for category_path in categories_paths for x in os.listdir(category_path))
 

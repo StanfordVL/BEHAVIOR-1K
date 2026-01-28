@@ -91,7 +91,7 @@ def generate_urdf_with_precomputed_collision(
         up_axis (str): Up axis for the model ("y" or "z")
         scale (float): Scale factor for the mesh
         overwrite (bool): Whether to overwrite existing files
-    
+
     Returns:
         str: Path to the generated URDF file
     """
@@ -102,7 +102,9 @@ def generate_urdf_with_precomputed_collision(
         asset_path = pathlib.Path(asset_path)
 
     # Validate that the filename starts with a letter. Isaac 4.5 has issues if you don't do this.
-    assert asset_path.stem[0].isalpha(), f"Invalid asset path: {asset_path}. Isaac Sim expects the filename to start with a letter."
+    assert asset_path.stem[
+        0
+    ].isalpha(), f"Invalid asset path: {asset_path}. Isaac Sim expects the filename to start with a letter."
 
     # Create directory structure
     if not overwrite:
@@ -277,7 +279,7 @@ def find_vid2room_objects(vid2room_root: pathlib.Path):
     for interesting_scene_root in interesting_scenes:
         decimated_dir = interesting_scene_root / "obj_meshes_v9_pointmap_decimated"
         collision_dir = interesting_scene_root / "obj_meshes_v9_pointmap_collision"
-            
+
         for collision_path in collision_dir.glob("*.npz"):
             segment_name = collision_path.stem
             decimated_path = decimated_dir / f"{segment_name}.glb"
@@ -373,7 +375,9 @@ def main():
         except Exception as e:
             print(f"Error processing {decimated_path}: {e}")
             with open(errors_dir / f"{model}", "w") as f:
-                f.write(f"Decimated: {decimated_path}\nCollision: {collision_path}\nRoom: {room_path}\nSegment: {segment_name}\n\n")
+                f.write(
+                    f"Decimated: {decimated_path}\nCollision: {collision_path}\nRoom: {room_path}\nSegment: {segment_name}\n\n"
+                )
                 f.write(traceback.format_exc())
 
         if args.restart_every and completed_count >= args.restart_every:
