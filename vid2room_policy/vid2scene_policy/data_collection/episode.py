@@ -705,6 +705,11 @@ def collect_episode(
         spawned_obj = True
         print(f"[Episode] Spawned {target_obj.name} on {source_support.name}", flush=True)
 
+    # Remove all loose objects from the scene
+    for j, obj in enumerate(scene.objects):
+        if not obj.fixed_base and obj not in (target_obj, source_support, target_support):
+            obj.set_position_orientation(position=th.as_tensor([100 + j, 0, 10.]))
+
     if wrapper is not None:
         wrapper.set_target_objects(target_obj, source_support)
 
