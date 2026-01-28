@@ -14,8 +14,8 @@ MODE_MANIPULATION = 1.0
 
 
 class RobotContext:
-    KP_LIN_VEL = 0.5
-    KP_ANGLE_VEL = 2.85
+    KP_LIN_VEL = 0.6
+    KP_ANGLE_VEL = 2.95
     ANGLE_THRESHOLD = 0.10
 
     def __init__(self, env, robot, config: DataCollectionConfig):

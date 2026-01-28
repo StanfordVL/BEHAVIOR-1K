@@ -14,6 +14,7 @@ class DataCollectionConfig:
     num_episodes: int = 100
     max_steps_per_episode: int = 500
     max_navigation_steps: int = 2000
+    max_rotation_steps: int = 300
     max_grasp_steps: int = 100
     max_place_steps: int = 100
     fps: int = 30
@@ -57,11 +58,19 @@ def get_object_filters(config: DataCollectionConfig) -> tuple[Callable[[str], bo
             graspable_whitelist=graspable_whitelist,
         )
     elif config.object_filter_method == "classifier":
-        return get_object_filter(
+        # Combine whitelist + classifier: use both for more coverage
+        graspable_whitelist, support_whitelist = load_whitelists(config)
+        classifier_support_fn, classifier_graspable_fn = get_object_filter(
             method="classifier",
             embeddings_path=config.classifier_embeddings_path,
             models_dir=config.classifier_models_dir,
             threshold=config.classifier_threshold,
         )
+        # Return combined filter: whitelist OR classifier
+        def combined_support_fn(category: str) -> bool:
+            return category in support_whitelist or classifier_support_fn(category)
+        def combined_graspable_fn(category: str) -> bool:
+            return category in graspable_whitelist or classifier_graspable_fn(category)
+        return combined_support_fn, combined_graspable_fn
     else:
         raise ValueError(f"Unknown object_filter_method: {config.object_filter_method}")

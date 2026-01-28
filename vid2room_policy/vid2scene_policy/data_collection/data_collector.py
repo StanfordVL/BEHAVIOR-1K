@@ -1,8 +1,8 @@
 import math
 import logging
-import random
 
 import torch as th
+from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 
 from .config import DataCollectionConfig
 from .robot_context import RobotContext, MODE_MANIPULATION
@@ -31,7 +31,7 @@ class DataCollector:
         dist_to_obj = math.sqrt(dx*dx + dy*dy)
 
         robot_yaw = self.ctx.get_robot_yaw()
-        arm_direction = robot_yaw + math.pi / 2
+        arm_direction = robot_yaw - math.pi / 2  # Arm on right side of Stretch
 
         perp_direction = arm_direction + math.pi / 2
         perp_error = dx * math.cos(perp_direction) + dy * math.sin(perp_direction)
@@ -54,7 +54,7 @@ class DataCollector:
                     obj_pos[0].item(), obj_pos[1].item(), obj_pos[2].item())
 
         # Find approach point
-        APPROACH_DIST = 0.32
+        APPROACH_DIST = 0.50
         approach_point, use_eroded = self.nav.find_approach_point(obj_pos[:2], approach_dist=APPROACH_DIST, support=source_support)
         if approach_point is None:
             print("[Pick] FAIL: Could not find approach point", flush=True)
@@ -89,12 +89,10 @@ class DataCollector:
             print("[Pick] FAIL: Gripper alignment check failed", flush=True)
             return False, observations, actions
         print("[Pick] Alignment OK, extending arm...", flush=True)
-        obj_pos, _ = target_obj.get_position_orientation()
-        # Use object's actual center position (accounts for rotation)
+        # Use object's AABB center (accounts for orientation)
         obj_center = target_obj.aabb_center
-        grasp_z = obj_center[2].item()
-        print(f"[Pick] Grasp height: obj_center_z={grasp_z:.3f}", flush=True)
-        grasp_pos = th.tensor([obj_pos[0].item(), obj_pos[1].item(), grasp_z])
+        grasp_pos = th.tensor([obj_center[0].item(), obj_center[1].item(), obj_center[2].item()])
+        print(f"[Pick] Grasp target: ({grasp_pos[0].item():.3f}, {grasp_pos[1].item():.3f}, {grasp_pos[2].item():.3f})", flush=True)
         success, obs, acts = self.arm.align_to_object(grasp_pos, keep_gripper_open=True)
         observations.extend(obs)
         actions.extend(acts)
@@ -114,18 +112,8 @@ class DataCollector:
 
         obj_pos_before_lift, _ = target_obj.get_position_orientation()
 
-        # Initial lift
-        obs, acts = self.arm.lift_up(amount=0.15)
-        observations.extend(obs)
-        actions.extend(acts)
-
-        # Maximize lift for transport
-        obs, acts = self.arm.maximize_lift(max_steps=80)
-        observations.extend(obs)
-        actions.extend(acts)
-
-        # Contract arm for transport
-        obs, acts = self.arm.contract_arm()
+        # Lift and contract simultaneously
+        obs, acts = self.arm.lift_and_contract(max_steps=80)
         observations.extend(obs)
         actions.extend(acts)
 
@@ -166,17 +154,25 @@ class DataCollector:
         observations = []
         actions = []
 
-        # Randomize place position within table bounds
-        EDGE_MARGIN = 0.15
-        aabb = target_support.aabb
-        min_x = aabb[0][0].item() + EDGE_MARGIN
-        max_x = aabb[1][0].item() - EDGE_MARGIN
-        min_y = aabb[0][1].item() + EDGE_MARGIN
-        max_y = aabb[1][1].item() - EDGE_MARGIN
-        surface_z = aabb[1][2].item()  # Top of bbox = surface height
-        place_x = random.uniform(min_x, max_x)
-        place_y = random.uniform(min_y, max_y)
-        target_pos = th.tensor([place_x, place_y, surface_z])
+        grasped_obj = self.ctx.robot._ag_obj_in_hand.get(self.ctx.arm)
+        if grasped_obj is None:
+            logger.info("No object in hand for placing")
+            return False, observations, actions
+
+        sampled = sample_cuboid_for_predicate("onTop", target_support, grasped_obj.aabb_extent)
+        if sampled is None or len(sampled) == 0 or sampled[0] is None:
+            logger.info("Could not sample valid place position")
+            return False, observations, actions
+        sampled_pos = sampled[0][0]
+
+        # Place between center and sampled edge position (0.5 = middle)
+        support_center = target_support.aabb_center
+        blend = 0.5
+        target_pos = th.tensor([
+            support_center[0].item() * blend + sampled_pos[0].item() * (1 - blend),
+            support_center[1].item() * blend + sampled_pos[1].item() * (1 - blend),
+            sampled_pos[2].item()  # Keep sampled Z for correct height
+        ])
         logger.info("Placing at (%.2f, %.2f, %.2f) on %s",
                     target_pos[0].item(), target_pos[1].item(), target_pos[2].item(),
                     target_support.name)

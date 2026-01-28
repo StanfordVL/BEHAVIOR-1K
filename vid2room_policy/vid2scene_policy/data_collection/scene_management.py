@@ -1,13 +1,24 @@
+import json
 import logging
 import random
+from pathlib import Path
 
 import torch as th
 import omnigibson as og
 from omnigibson.objects import DatasetObject
 from omnigibson.object_states import OnTop
-from omnigibson.utils.asset_utils import get_all_object_category_models
 
 logger = logging.getLogger(__name__)
+
+_GRASPABLE_MODELS = None
+
+def _load_graspable_models():
+    global _GRASPABLE_MODELS
+    if _GRASPABLE_MODELS is None:
+        config_path = Path(__file__).parent.parent.parent / "configs" / "graspable_models.json"
+        with open(config_path) as f:
+            _GRASPABLE_MODELS = [tuple(x) for x in json.load(f)]
+    return _GRASPABLE_MODELS
 
 
 def get_scene_objects_by_category(scene, whitelist: list[str]) -> dict[str, list]:
@@ -19,20 +30,20 @@ def get_scene_objects_by_category(scene, whitelist: list[str]) -> dict[str, list
     return filtered
 
 
-def spawn_and_place_object(scene, category: str, support, robot_pos: th.Tensor = None) -> DatasetObject | None:
-    """Spawn object and place it on support surface, biased toward robot."""
+def spawn_and_place_object(scene, support, robot_pos: th.Tensor = None) -> DatasetObject | None:
+    """Spawn a random graspable object and place it on support surface."""
     EDGE_MARGIN = 0.15
 
-    models = get_all_object_category_models(category)
-    if not models:
-        return None
+    graspables = _load_graspable_models()
+    dataset_name, category, model = random.choice(graspables)
+    print(f"[Episode] Spawning {category}/{model}...", flush=True)
 
-    model = random.choice(models)
     try:
         obj = DatasetObject(
             name=f"spawned_{category}_{random.randint(0, 9999)}",
             category=category,
             model=model,
+            dataset_name=dataset_name,
         )
         scene.add_object(obj)
 

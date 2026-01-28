@@ -1,226 +1,182 @@
 import logging
 import math
 import random
-from collections import deque
 from pathlib import Path
 from typing import Callable
 
+import cv2
 import numpy as np
 import torch as th
 import yaml
-from PIL import Image
-from scipy.ndimage import label as scipy_label
 
 import omnigibson as og
 import omnigibson.lazy as lazy
-from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models
-
 from .config import DataCollectionConfig, get_object_filters
 from .data_collector import DataCollector
-from .scene_management import get_scene_objects_by_category, spawn_and_place_object, safe_remove_object
+from .scene_management import spawn_and_place_object, safe_remove_object
 from .omnigibson_lerobot_wrapper import OmniGibsonLeRobotWrapper, OmniGibsonLeRobotConfig
 
 logger = logging.getLogger(__name__)
 
+DEBUG_EPISODE = True
+DEBUG_OUTPUT_DIR = "/home/yalcintr/workspace/vid2scene_policy/vid2scene_policy"
+
 MIN_SUPPORT_HEIGHT = 0.3
-MAX_SUPPORT_HEIGHT = 1.2
-ROBOT_RADIUS_PIXELS = 40  # Robot footprint radius in map pixels (at 0.01m resolution)
-
-# Gripper size constraints
-MAX_GRIPPER_OPENING = 0.12  # 12cm - Stretch gripper max opening
-MIN_OBJECT_HEIGHT = 0.03    # 3cm minimum object height
+MAX_GRIPPER_OPENING = 0.12
+MIN_OBJECT_HEIGHT = 0.03
 
 
-def _find_rooms_from_no_obj_map(scene) -> tuple[np.ndarray, int, dict]:
-    """Find rooms from the no-object traversability map.
+def _find_nearest_traversable(trav_map, pos_2d: th.Tensor, robot, max_dist: float = 2.0) -> th.Tensor | None:
+    """Find nearest traversable point on the eroded map."""
+    floor_map = trav_map.floor_map[0].clone()
+    # Erode like get_shortest_path does
+    robot_chassis_extent = robot.reset_joint_pos_aabb_extent[:2]
+    radius = th.norm(robot_chassis_extent) / 2.0 + 0.5
+    radius_pixel = int(math.ceil(radius.item() / trav_map.map_resolution))
+    eroded = th.tensor(cv2.erode(floor_map.cpu().numpy(), th.ones((radius_pixel, radius_pixel)).cpu().numpy()))
 
-    Returns:
-        labeled_map: Array where each pixel has room ID (0=non-traversable, 1..N=room IDs)
-        num_rooms: Number of rooms found
-        map_info: Dict with 'resolution', 'offset' for world<->map coordinate conversion
-    """
-    trav_map = scene._trav_map
+    # Check if already traversable
+    map_pos = trav_map.world_to_map(pos_2d)
+    r, c = int(map_pos[0].item()), int(map_pos[1].item())
+    if 0 <= r < eroded.shape[0] and 0 <= c < eroded.shape[1] and eroded[r, c] == 255:
+        return pos_2d
 
-    # Get map directory from scene
-    map_dir = Path(scene.scene_dir) / "layout"
-    no_obj_path = map_dir / "floor_trav_no_obj_0.png"
-
-    if not no_obj_path.exists():
-        # Fallback to regular map if no-obj doesn't exist
-        no_obj_path = map_dir / "floor_trav_0.png"
-
-    no_obj_map = np.array(Image.open(no_obj_path))
-    traversable = (no_obj_map == 255).astype(np.uint8)
-
-    # Find connected components (rooms)
-    labeled, num_rooms = scipy_label(traversable)
-
-    # Get map info for coordinate conversion
-    # The map is at default resolution (0.01m per pixel), centered at world origin
-    map_info = {
-        'resolution': trav_map.map_default_resolution,  # 0.01m per pixel
-        'shape': no_obj_map.shape,
-    }
-
-    logger.info("Found %d rooms in no-object map (%dx%d)", num_rooms, *no_obj_map.shape)
-    return labeled, num_rooms, map_info
-
-
-def _world_to_no_obj_map(x, y, map_info) -> tuple[int, int]:
-    """Convert world coordinates to no-object map pixel coordinates.
-
-    The map is centered at world origin (0,0). Coordinate axes are flipped
-    between world and map frames (OmniGibson convention).
-    """
-    resolution = map_info['resolution']
-    shape = map_info['shape']
-
-    # World to map: flip axes and center
-    # world (x, y) -> map (col, row) with flip
-    col = int(x / resolution + shape[1] / 2)
-    row = int(y / resolution + shape[0] / 2)
-    return row, col
-
-
-def _no_obj_map_to_world(row, col, map_info) -> tuple[float, float]:
-    """Convert no-object map pixel coordinates to world coordinates."""
-    resolution = map_info['resolution']
-    shape = map_info['shape']
-
-    # Map to world: flip axes and uncenter
-    x = (col - shape[1] / 2) * resolution
-    y = (row - shape[0] / 2) * resolution
-    return x, y
-
-
-def _get_room_for_position(x, y, labeled_map, map_info) -> int:
-    """Get room ID for a world position. Returns 0 if not in any room."""
-    row, col = _world_to_no_obj_map(x, y, map_info)
-    h, w = labeled_map.shape
-    if 0 <= row < h and 0 <= col < w:
-        return labeled_map[row, col]
-    return 0
-
-
-def _map_supports_to_rooms(supports: list, labeled_map: np.ndarray, map_info: dict) -> dict[int, list]:
-    """Map support objects to their rooms.
-
-    Returns:
-        Dict mapping room_id -> list of supports in that room
-    """
-    room_supports = {}
-    for sup in supports:
-        pos, _ = sup.get_position_orientation()
-        x, y = pos[0].item(), pos[1].item()
-        room_id = _get_room_for_position(x, y, labeled_map, map_info)
-        if room_id > 0:  # Valid room
-            if room_id not in room_supports:
-                room_supports[room_id] = []
-            room_supports[room_id].append(sup)
-    return room_supports
-
-
-def _find_robot_square_with_bfs(labeled_map: np.ndarray, room_id: int,
-                                  start_row: int, start_col: int,
-                                  robot_radius: int = ROBOT_RADIUS_PIXELS) -> tuple[int, int] | None:
-    """Find a position where robot-sized square fits using BFS from start position.
-
-    Args:
-        labeled_map: Room-labeled map
-        room_id: Which room to search in
-        start_row, start_col: Starting pixel position
-        robot_radius: Half-size of robot square in pixels
-
-    Returns:
-        (row, col) of valid position center, or None if not found
-    """
-    h, w = labeled_map.shape
-
-    def square_fits(r, c):
-        """Check if robot square centered at (r,c) is entirely within the room."""
-        for dr in range(-robot_radius, robot_radius + 1):
-            for dc in range(-robot_radius, robot_radius + 1):
-                nr, nc = r + dr, c + dc
-                if not (0 <= nr < h and 0 <= nc < w):
-                    return False
-                if labeled_map[nr, nc] != room_id:
-                    return False
-        return True
-
-    # BFS to find nearest valid position
-    visited = set()
-    queue = deque([(start_row, start_col, 0)])  # (row, col, distance)
-    visited.add((start_row, start_col))
-
-    while queue:
-        r, c, dist = queue.popleft()
-
-        # Check if this position works
-        if square_fits(r, c):
-            return (r, c)
-
-        # Limit search radius
-        if dist > 200:  # ~2m at 0.01m resolution
-            continue
-
-        # Add neighbors
-        for dr, dc in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-            nr, nc = r + dr, c + dc
-            if (nr, nc) not in visited and 0 <= nr < h and 0 <= nc < w:
-                if labeled_map[nr, nc] == room_id:
-                    visited.add((nr, nc))
-                    queue.append((nr, nc, dist + 1))
-
+    # Search in expanding circles
+    for dist in [0.1, 0.2, 0.3, 0.5, 0.7, 1.0, 1.5, 2.0]:
+        if dist > max_dist:
+            break
+        for angle in range(0, 360, 15):
+            rad = math.radians(angle)
+            test_x = pos_2d[0].item() + dist * math.cos(rad)
+            test_y = pos_2d[1].item() + dist * math.sin(rad)
+            test_map = trav_map.world_to_map(th.tensor([test_x, test_y]))
+            tr, tc = int(test_map[0].item()), int(test_map[1].item())
+            if 0 <= tr < eroded.shape[0] and 0 <= tc < eroded.shape[1] and eroded[tr, tc] == 255:
+                return th.tensor([test_x, test_y])
     return None
 
 
-def _find_random_robot_start_in_room(labeled_map: np.ndarray, room_id: int,
-                                      map_info: dict, floor_z: float,
-                                      scene=None, robot=None,
-                                      max_attempts: int = 50) -> tuple | None:
-    """Find a random valid robot start position in a room.
+def _check_path_exists(scene, robot, source_pos_2d: th.Tensor, target_pos_2d: th.Tensor) -> bool:
+    """Check if a path exists between two points using trav_map.get_shortest_path.
 
-    Returns:
-        (x, y, z, yaw) or None if no valid position found
+    Finds nearest traversable points first (supports are on furniture = non-traversable).
     """
-    h, w = labeled_map.shape
+    trav_map = scene._trav_map
 
-    # Get all pixels in this room
-    room_pixels = np.argwhere(labeled_map == room_id)
-    if len(room_pixels) == 0:
+    # Find nearest traversable points (supports are on furniture)
+    src_trav = _find_nearest_traversable(trav_map, source_pos_2d, robot)
+    tgt_trav = _find_nearest_traversable(trav_map, target_pos_2d, robot)
+
+    if src_trav is None or tgt_trav is None:
+        return False
+
+    path, dist = trav_map.get_shortest_path(
+        floor=0,
+        source_world=src_trav,
+        target_world=tgt_trav,
+        entire_path=False,
+        robot=robot
+    )
+    return path is not None
+
+
+def _get_support_position_2d(support) -> th.Tensor:
+    """Get 2D position of a support surface."""
+    pos = support.get_position_orientation()[0]
+    return th.tensor([pos[0].item(), pos[1].item()])
+
+
+def _compute_room_connected_components(scene, room_ins_id: int) -> tuple[np.ndarray, int]:
+    """Compute connected components for traversable areas within a room.
+
+    Uses scene._seg_map.room_ins_map (already at trav_map resolution).
+    Uses same erosion (0.3m) and room mask as navigation.
+
+    Returns: (labels array at trav_map resolution, num_components)
+    """
+    trav_map = scene._trav_map
+    seg_map = scene._seg_map
+
+    floor_np = trav_map.floor_map[0].cpu().numpy().copy()
+    room_ins_np = seg_map.room_ins_map.cpu().numpy()
+
+    # Create room mask and AND with trav_map (already same resolution)
+    room_mask = ((room_ins_np == room_ins_id) * 255).astype(np.uint8)
+    room_trav = np.minimum(floor_np, room_mask)
+
+    # Apply 0.3m erosion (same as navigation)
+    erosion_radius_m = 0.35
+    erosion_radius_px = int(math.ceil(erosion_radius_m / trav_map.map_resolution))
+    if erosion_radius_px > 0:
+        kernel = np.ones((erosion_radius_px, erosion_radius_px), dtype=np.uint8)
+        room_trav = cv2.erode(room_trav, kernel)
+
+    # Compute connected components (binary: 0 or 1)
+    binary = (room_trav == 255).astype(np.uint8)
+    num_labels, labels = cv2.connectedComponents(binary)
+
+    return labels, num_labels
+
+
+def _get_support_component(support, labels: np.ndarray, trav_map, max_search_dist: float = 2.0) -> int:
+    """Find which connected component a support belongs to.
+
+    Searches for nearest traversable pixel since supports are on furniture (non-traversable).
+
+    Returns: component label (0 = no component found)
+    """
+    pos, _ = support.get_position_orientation()
+    x, y = pos[0].item(), pos[1].item()
+
+    # Convert to map coordinates
+    map_pos = trav_map.world_to_map(th.tensor([x, y]))
+    center_r, center_c = int(map_pos[0].item()), int(map_pos[1].item())
+
+    h, w = labels.shape
+
+    # Check center first
+    if 0 <= center_r < h and 0 <= center_c < w:
+        label = labels[center_r, center_c]
+        if label > 0:
+            return int(label)
+
+    # Search in expanding circles
+    max_dist_px = int(max_search_dist / trav_map.map_resolution)
+    for dist in range(1, max_dist_px + 1):
+        for dr in range(-dist, dist + 1):
+            for dc in range(-dist, dist + 1):
+                if abs(dr) != dist and abs(dc) != dist:
+                    continue  # Only check perimeter
+                r, c = center_r + dr, center_c + dc
+                if 0 <= r < h and 0 <= c < w:
+                    label = labels[r, c]
+                    if label > 0:
+                        return int(label)
+
+    return 0  # No component found
+
+
+def _find_robot_start_in_component(scene, robot, labels: np.ndarray, component_id: int,
+                                    floor_z: float, max_attempts: int = 100) -> tuple | None:
+    """Find a random robot start position within a specific connected component.
+
+    This guarantees the robot can reach any point in the same component.
+    """
+    trav_map = scene._trav_map
+
+    # Get all pixels in this component
+    component_pixels = np.argwhere(labels == component_id)
+    if len(component_pixels) == 0:
         return None
 
-    # Get runtime eroded map for validation
-    eroded_map = None
-    trav_map = None
-    if scene is not None:
-        trav_map = scene._trav_map
-        eroded_map = trav_map._erode_trav_map(trav_map.floor_map[0].clone(), robot=robot)
-
     for _ in range(max_attempts):
-        # Pick random pixel in room
-        idx = random.randint(0, len(room_pixels) - 1)
-        start_row, start_col = room_pixels[idx]
-
-        # Use BFS to find valid square position on no-obj map
-        valid_pos = _find_robot_square_with_bfs(labeled_map, room_id, start_row, start_col)
-        if valid_pos is None:
-            continue
+        # Sample random position in component
+        idx = random.randint(0, len(component_pixels) - 1)
+        r, c = component_pixels[idx]
 
         # Convert to world coordinates
-        x, y = _no_obj_map_to_world(valid_pos[0], valid_pos[1], map_info)
-
-        # Validate against runtime eroded map (with objects)
-        if eroded_map is not None and trav_map is not None:
-            runtime_map_pos = trav_map.world_to_map(th.tensor([x, y]))
-            rr, rc = int(runtime_map_pos[0].item()), int(runtime_map_pos[1].item())
-            if not (0 <= rr < eroded_map.shape[0] and 0 <= rc < eroded_map.shape[1]):
-                continue
-            val = eroded_map[rr, rc]
-            if hasattr(val, 'item'):
-                val = val.item()
-            if val != 255:
-                continue  # Position blocked by object in actual scene
+        world_pos = trav_map.map_to_world(th.tensor([r, c]))
+        x, y = world_pos[0].item(), world_pos[1].item()
 
         yaw = random.uniform(-math.pi, math.pi)
         return (x, y, floor_z, yaw)
@@ -228,54 +184,262 @@ def _find_random_robot_start_in_room(labeled_map: np.ndarray, room_id: int,
     return None
 
 
-def _get_valid_supports(scene, is_support_fn: Callable[[str], bool]) -> list:
-    """Get all support objects at valid heights using filter function."""
-    valid = []
+def _save_trav_map_raw(scene, room_supports: dict):
+    """Save raw traversability map with all supports marked (no path)."""
+    
+    try:
+        # Load both maps directly from files at original resolution (1692x1692)
+        layout_dir = Path(scene.scene_dir) / "layout"
+        trav_path = layout_dir / "floor_trav_0.png"
+        insseg_path = layout_dir / "floor_insseg_0.png"
 
+        floor_map = cv2.imread(str(trav_path), cv2.IMREAD_GRAYSCALE)
+        room_ins_map = cv2.imread(str(insseg_path), cv2.IMREAD_GRAYSCALE)
+        print(f"[Debug] Loaded floor_trav_0.png: shape={floor_map.shape}", flush=True)
+        print(f"[Debug] Loaded floor_insseg_0.png: shape={room_ins_map.shape}", flush=True)
+
+        # Create color image
+        img = np.zeros((floor_map.shape[0], floor_map.shape[1], 3), dtype=np.uint8)
+        img[floor_map == 0] = [0, 0, 100]  # Dark red for walls
+        img[floor_map == 255] = [200, 200, 200]  # Gray for traversable
+
+        # World to map conversion at original resolution (0.01m/pixel)
+        def world_to_map_cv(x, y):
+            resolution = 0.01
+            col = int(x / resolution + floor_map.shape[1] / 2)
+            row = int(y / resolution + floor_map.shape[0] / 2)
+            return col, row
+
+        # Mark all supports
+        for room_name, supports in room_supports.items():
+            for sup in supports:
+                pos = sup.get_position_orientation()[0]
+                col, row = world_to_map_cv(pos[0].item(), pos[1].item())
+                cv2.circle(img, (col, row), 8, (0, 0, 255), -1)
+                cv2.putText(img, f"{sup.name[:15]}({room_name[:10]})", (col + 10, row), cv2.FONT_HERSHEY_SIMPLEX, 0.25, (255, 255, 255), 1)
+
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_map_debug.png", img)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_map_raw.png", floor_map)
+
+        room_vis = (room_ins_map * 80).astype(np.uint8)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/room_segmap.png", room_vis)
+
+        # Logical AND of trav_map and room segmap
+        room_mask = (room_ins_map > 0).astype(np.uint8) * 255
+        trav_and_room = cv2.bitwise_and(floor_map, room_mask)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_and_room.png", trav_and_room)
+
+        # Combined visualization - each room gets a different color
+        combined = np.zeros((floor_map.shape[0], floor_map.shape[1], 3), dtype=np.uint8)
+        combined[floor_map == 0] = [50, 50, 50]  # Dark gray for walls
+        # Define distinct colors for rooms (BGR format)
+        room_colors = [
+            [0, 255, 0],    # Green
+            [255, 0, 0],    # Blue
+            [0, 255, 255],  # Yellow
+            [255, 0, 255],  # Magenta
+            [255, 255, 0],  # Cyan
+            [0, 165, 255],  # Orange
+            [147, 20, 255], # Pink
+            [0, 128, 0],    # Dark green
+        ]
+        unique_rooms = np.unique(room_ins_map)
+        for i, room_id in enumerate(unique_rooms):
+            if room_id == 0:
+                continue  # Skip background
+            color = room_colors[i % len(room_colors)]
+            # Only color traversable areas within this room
+            room_trav = (room_ins_map == room_id) & (floor_map == 255)
+            combined[room_trav] = color
+        # Mark non-traversable room areas darker
+        for i, room_id in enumerate(unique_rooms):
+            if room_id == 0:
+                continue
+            color = room_colors[i % len(room_colors)]
+            dark_color = [c // 3 for c in color]  # Darker version
+            room_non_trav = (room_ins_map == room_id) & (floor_map == 0)
+            combined[room_non_trav] = dark_color
+        # Mark supports
+        for room_name, supports in room_supports.items():
+            for sup in supports:
+                pos = sup.get_position_orientation()[0]
+                col, row = world_to_map_cv(pos[0].item(), pos[1].item())
+                cv2.circle(combined, (col, row), 4, (0, 0, 255), -1)
+                cv2.circle(combined, (col, row), 4, (255, 255, 255), 1)
+                cv2.putText(combined, f"{sup.name[:12]}({room_name[:8]})", (col + 6, row), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_combined.png", combined)
+
+        print(f"[TravMap] Saved to {DEBUG_OUTPUT_DIR}/trav_map_debug.png, trav_map_raw.png, room_segmap.png, trav_and_room.png, trav_combined.png", flush=True)
+    except Exception as e:
+        import traceback
+        print(f"[TravMap] Failed to save: {e}", flush=True)
+        traceback.print_exc()
+
+
+def _save_trav_map_visualization(scene, robot, room_supports: dict, source_support, target_support):
+    """Save traversability map with supports marked and path between selected pair."""
+    
+    try:
+        # Load both maps directly from files at original resolution (1692x1692)
+        layout_dir = Path(scene.scene_dir) / "layout"
+        trav_path = layout_dir / "floor_trav_0.png"
+        insseg_path = layout_dir / "floor_insseg_0.png"
+
+        floor_map = cv2.imread(str(trav_path), cv2.IMREAD_GRAYSCALE)
+        room_ins_map = cv2.imread(str(insseg_path), cv2.IMREAD_GRAYSCALE)
+        print(f"[Debug] Loaded floor_trav_0.png: shape={floor_map.shape}", flush=True)
+        print(f"[Debug] Loaded floor_insseg_0.png: shape={room_ins_map.shape}", flush=True)
+
+        # Create color image - walls/obstacles in dark red, traversable in gray
+        img = np.zeros((floor_map.shape[0], floor_map.shape[1], 3), dtype=np.uint8)
+        img[floor_map == 0] = [0, 0, 100]  # Dark red (BGR) for walls/obstacles
+        img[floor_map == 255] = [200, 200, 200]  # Gray for traversable
+
+        # World to map conversion at original resolution (0.01m/pixel)
+        def world_to_map_cv(x, y):
+            resolution = 0.01
+            col = int(x / resolution + floor_map.shape[1] / 2)
+            row = int(y / resolution + floor_map.shape[0] / 2)
+            return col, row
+
+        # Mark all supports
+        print(f"[TravMap] Supports by room:", flush=True)
+        for room_name, supports in room_supports.items():
+            for sup in supports:
+                pos = sup.get_position_orientation()[0]
+                x, y = pos[0].item(), pos[1].item()
+                col, row = world_to_map_cv(x, y)
+                cv2.circle(img, (col, row), 8, (0, 0, 255), -1)  # Red for supports
+                cv2.putText(img, sup.name[:15], (col + 10, row), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+
+        print(f"[TravMap] Selected pair: {source_support.name} -> {target_support.name}", flush=True)
+
+        # Save trav map
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_map_debug.png", img)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_map_raw.png", floor_map)
+
+        room_vis = (room_ins_map * 80).astype(np.uint8)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/room_segmap.png", room_vis)
+
+        # Logical AND of trav_map and room segmap
+        room_mask = (room_ins_map > 0).astype(np.uint8) * 255
+        trav_and_room = cv2.bitwise_and(floor_map, room_mask)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_and_room.png", trav_and_room)
+
+        # Combined visualization - each room gets a different color
+        combined = np.zeros((floor_map.shape[0], floor_map.shape[1], 3), dtype=np.uint8)
+        combined[floor_map == 0] = [50, 50, 50]  # Dark gray for walls
+        room_colors = [
+            [0, 255, 0],    # Green
+            [255, 0, 0],    # Blue
+            [0, 255, 255],  # Yellow
+            [255, 0, 255],  # Magenta
+            [255, 255, 0],  # Cyan
+            [0, 165, 255],  # Orange
+            [147, 20, 255], # Pink
+            [0, 128, 0],    # Dark green
+        ]
+        unique_rooms = np.unique(room_ins_map)
+        for i, room_id in enumerate(unique_rooms):
+            if room_id == 0:
+                continue
+            color = room_colors[i % len(room_colors)]
+            room_trav = (room_ins_map == room_id) & (floor_map == 255)
+            combined[room_trav] = color
+            dark_color = [c // 3 for c in color]
+            room_non_trav = (room_ins_map == room_id) & (floor_map == 0)
+            combined[room_non_trav] = dark_color
+        # Mark supports
+        for room_name, supports in room_supports.items():
+            for sup in supports:
+                pos = sup.get_position_orientation()[0]
+                col, row = world_to_map_cv(pos[0].item(), pos[1].item())
+                cv2.circle(combined, (col, row), 4, (0, 0, 255), -1)
+                cv2.circle(combined, (col, row), 4, (255, 255, 255), 1)
+                cv2.putText(combined, f"{sup.name[:12]}({room_name[:8]})", (col + 6, row), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
+        cv2.imwrite(f"{DEBUG_OUTPUT_DIR}/trav_combined.png", combined)
+
+        print(f"[TravMap] Saved to {DEBUG_OUTPUT_DIR}/trav_map_debug.png, trav_map_raw.png, room_segmap.png, trav_and_room.png, trav_combined.png", flush=True)
+
+    except Exception as e:
+        import traceback
+        print(f"[TravMap] Failed to save visualization: {e}", flush=True)
+        traceback.print_exc()
+
+
+def _map_supports_to_rooms(scene, supports: list) -> dict[int, list]:
+    """Map supports to rooms using scene._seg_map (BEHAVIOR-1K built-in).
+
+    Uses get_room_instance_by_point() which handles coordinate conversion internally.
+
+    Returns: room_supports dict keyed by room instance ID
+    """
+    seg_map = scene._seg_map
+    trav_map = scene._trav_map
+
+    # Get room_ins_map for ID lookup
+    room_ins_np = seg_map.room_ins_map.cpu().numpy()
+    unique_rooms = np.unique(room_ins_np)
+    print(f"[Debug] seg_map.room_ins_map: shape={room_ins_np.shape}, rooms={list(unique_rooms)}", flush=True)
+
+    room_supports = {}
+    for sup in supports:
+        pos, _ = sup.get_position_orientation()
+        x, y = pos[0].item(), pos[1].item()
+
+        # Use BEHAVIOR-1K's built-in function
+        room_name = seg_map.get_room_instance_by_point(th.tensor([x, y]))
+
+        if room_name is not None:
+            # Get room instance ID from name
+            room_ins_id = seg_map.room_ins_name_to_ins_id.get(room_name, 0)
+            if room_ins_id > 0:
+                print(f"[Debug] Support {sup.name} at ({x:.2f}, {y:.2f}) -> {room_name} (id={room_ins_id})", flush=True)
+                if room_ins_id not in room_supports:
+                    room_supports[room_ins_id] = []
+                room_supports[room_ins_id].append(sup)
+            else:
+                print(f"[Debug] Support {sup.name} at ({x:.2f}, {y:.2f}) -> {room_name} (invalid id)", flush=True)
+        else:
+            print(f"[Debug] Support {sup.name} at ({x:.2f}, {y:.2f}) -> outside rooms", flush=True)
+
+    return room_supports
+
+
+def _get_valid_supports(scene, is_support_fn: Callable[[str], bool], max_support_height: float) -> list:
+    valid = []
+    print(f"[Debug] Checking supports. Height range: {MIN_SUPPORT_HEIGHT} - {max_support_height:.2f}", flush=True)
     for obj in scene.objects:
         category = getattr(obj, 'category', None)
         if category is None:
             continue
-
-        if not is_support_fn(category):
-            continue
-
-        try:
-            aabb = obj.aabb
-            surface_height = aabb[1][2].item()
-            if MIN_SUPPORT_HEIGHT < surface_height < MAX_SUPPORT_HEIGHT:
-                valid.append(obj)
-        except Exception:
-            continue
-
+        is_support = is_support_fn(category)
+        if is_support:
+            try:
+                aabb = obj.aabb
+                surface_height = aabb[1][2].item()
+                height_ok = MIN_SUPPORT_HEIGHT < surface_height < max_support_height
+                print(f"[Debug] Support candidate: {obj.name} (cat={category}) height={surface_height:.2f} -> {'OK' if height_ok else 'REJECTED'}", flush=True)
+                if height_ok:
+                    valid.append(obj)
+            except Exception as e:
+                print(f"[Debug] Support candidate: {obj.name} (cat={category}) -> EXCEPTION: {e}", flush=True)
     return valid
 
 
 def _object_fits_gripper(obj) -> bool:
-    """Check if object dimensions fit gripper constraints.
-
-    Returns True if:
-    - min(X, Y) bbox dimension is <= MAX_GRIPPER_OPENING (gripper can grasp along longer axis)
-    - Z bbox dimension is >= MIN_OBJECT_HEIGHT (tall enough to grasp)
-    """
     try:
         aabb = obj.aabb
         size_x = aabb[1][0].item() - aabb[0][0].item()
         size_y = aabb[1][1].item() - aabb[0][1].item()
         size_z = aabb[1][2].item() - aabb[0][2].item()
-
-        # Smaller of X,Y must fit in gripper (grasp along longer axis), Z must be tall enough
         min_xy = min(size_x, size_y)
-        fits_gripper = min_xy <= MAX_GRIPPER_OPENING
-        tall_enough = size_z >= MIN_OBJECT_HEIGHT
-
-        return fits_gripper and tall_enough
+        return min_xy <= MAX_GRIPPER_OPENING and size_z >= MIN_OBJECT_HEIGHT
     except Exception:
         return False
 
 
 def _find_graspable_objects_on_support(scene, support, is_graspable_fn: Callable[[str], bool]) -> list:
-    """Find graspable objects that are on or near a support surface using filter function."""
     support_aabb = support.aabb
     support_min_x = support_aabb[0][0].item()
     support_max_x = support_aabb[1][0].item()
@@ -288,11 +452,8 @@ def _find_graspable_objects_on_support(scene, support, is_graspable_fn: Callable
         category = getattr(obj, 'category', None)
         if category is None:
             continue
-
         if not is_graspable_fn(category):
             continue
-
-        # Check if object fits gripper size constraints
         if not _object_fits_gripper(obj):
             continue
 
@@ -316,7 +477,6 @@ def _find_graspable_objects_on_support(scene, support, is_graspable_fn: Callable
 
 
 def _compute_object_approachability(obj, scene, robot) -> float:
-    """Compute how easy an object is to approach based on surrounding clearance."""
     trav_map = scene._trav_map
     eroded_map = trav_map._erode_trav_map(trav_map.floor_map[0].clone(), robot=robot)
 
@@ -324,13 +484,11 @@ def _compute_object_approachability(obj, scene, robot) -> float:
     obj_x = obj_pos[0].item()
     obj_y = obj_pos[1].item()
 
-    # Check clearance around the object at approach distance
     score = 0.0
     good_directions = 0
 
     for angle_deg in range(0, 360, 30):
         angle = math.radians(angle_deg)
-        # Check at typical approach distance
         for dist in [0.4, 0.5, 0.6]:
             check_x = obj_x + dist * math.cos(angle)
             check_y = obj_y + dist * math.sin(angle)
@@ -343,7 +501,6 @@ def _compute_object_approachability(obj, scene, robot) -> float:
                 if hasattr(val, 'item'):
                     val = val.item()
                 if val == 255:
-                    # Check further clearance at this position
                     clearance = 0
                     for clear_angle in range(0, 360, 45):
                         clear_rad = math.radians(clear_angle)
@@ -359,31 +516,26 @@ def _compute_object_approachability(obj, scene, robot) -> float:
                                 if cv == 255:
                                     clearance += 1
 
-                    if clearance >= 8:  # At least half the checks clear
+                    if clearance >= 8:
                         good_directions += 1
                         score += clearance
 
-    return score if good_directions >= 2 else 0  # Need at least 2 good approach directions
+    return score if good_directions >= 2 else 0
 
 
 def _select_best_graspable_object(objects: list, scene, robot) -> object:
-    """Select the object with the best approachability score."""
     if not objects:
         return None
-
     if len(objects) == 1:
         return objects[0]
 
-    # Score each object
     scored = []
     for obj in objects:
         score = _compute_object_approachability(obj, scene, robot)
         scored.append((obj, score))
 
-    # Sort by score descending
     scored.sort(key=lambda x: -x[1])
 
-    # Return best, or random from top 3 if multiple good options
     good_options = [s for s in scored if s[1] > 0]
     if good_options:
         top_options = good_options[:min(3, len(good_options))]
@@ -391,7 +543,6 @@ def _select_best_graspable_object(objects: list, scene, robot) -> object:
         print(f"[Episode] Object scores: {[(s[0].name, s[1]) for s in scored[:5]]}", flush=True)
         return chosen[0]
     else:
-        # Fallback to random if no good scores
         return random.choice(objects)
 
 
@@ -402,105 +553,119 @@ def collect_episode(
     wrapper: OmniGibsonLeRobotWrapper = None,
     failed_objects: dict[str, int] = None,
     max_object_failures: int = 3,
-) -> tuple[bool, list, list, str | None]:
-    """Collect one episode of pick and place using room-based logic.
-
-    Returns:
-        (success, observations, actions, failed_obj_name)
-        failed_obj_name is set if grasp failed, None otherwise
-    """
-    # lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "RaytracedLighting")
-
+    dataset_name: str = "behavior-1k-assets",
+    cached_pairs: list = None,
+    max_support_height: float = 1.0,
+) -> tuple[bool, list, list, str | None, list]:
+    """Returns (success, observations, actions, failed_obj_name, cached_pairs)"""
     if failed_objects is None:
         failed_objects = {}
-    # Move robot underground while we compute placement
+
     robot.set_position_orientation(position=[0, 0, -10], orientation=[0, 0, 0, 1])
     robot.keep_still()
-    og.sim.step()
+    for _ in range(5):
+        og.sim.step()
 
-    # Find rooms from structural map
-    labeled_map, num_rooms, map_info = _find_rooms_from_no_obj_map(scene)
-    if num_rooms == 0:
-        print(f"[Episode] No rooms found in scene", flush=True)
-        return False, [], [], None
+    # Use cached pairs if available, otherwise compute them
+    if cached_pairs is not None:
+        all_pairs = cached_pairs
+    else:
+        valid_supports = _get_valid_supports(scene, is_support_fn, max_support_height)
+        if len(valid_supports) < 2:
+            print(f"[Episode] Not enough valid supports: {len(valid_supports)}", flush=True)
+            return False, [], [], None, None
 
-    # Find valid supports
-    valid_supports = _get_valid_supports(scene, is_support_fn)
-    if len(valid_supports) < 2:
-        print(f"[Episode] Not enough valid supports: {len(valid_supports)}", flush=True)
-        return False, [], [], None
+        # Map supports to rooms using scene._seg_map (BEHAVIOR-1K built-in)
+        room_supports = _map_supports_to_rooms(scene, valid_supports)
 
-    # Map supports to rooms
-    room_supports = _map_supports_to_rooms(valid_supports, labeled_map, map_info)
-    print(f"[Episode] {num_rooms} rooms, supports by room: {[(r, len(s)) for r, s in room_supports.items()]}", flush=True)
+        num_rooms = len(room_supports)
+        print(f"[Episode] {num_rooms} rooms, supports by room: {[(r, len(s)) for r, s in room_supports.items()]}", flush=True)
 
-    # Find rooms with at least 2 supports (can form pairs)
-    valid_rooms = [r for r, supports in room_supports.items() if len(supports) >= 2]
-    if not valid_rooms:
-        print(f"[Episode] No room has 2+ supports for pairing", flush=True)
-        return False, [], [], None
+        if num_rooms == 0:
+            print(f"[Episode] No rooms found with supports - scene unsuitable", flush=True)
+            return False, [], [], "__SCENE_UNSUITABLE__", None
 
-    # Pick a random room with supports and create pairs within it
-    chosen_room = random.choice(valid_rooms)
-    room_support_list = room_supports[chosen_room]
+        # Pair supports in same room AND same connected component
+        # This ensures there's actually a traversable path between them
+        all_pairs = []
+        trav_map = scene._trav_map
+        print(f"[Episode] Pairing supports by connectivity...", flush=True)
 
-    # Create all pairs within this room
-    pairs = []
-    for i, s1 in enumerate(room_support_list):
-        for j, s2 in enumerate(room_support_list):
-            if i != j:
-                pairs.append((s1, s2))
+        for room_ins_id, supports in room_supports.items():
+            # Compute connected components for this room (uses 0.3m erosion + room mask)
+            labels, num_components = _compute_room_connected_components(scene, room_ins_id)
+            print(f"[Episode] Room {room_ins_id}: {num_components - 1} connected components", flush=True)
 
-    source_support, target_support = random.choice(pairs)
-    print(f"[Episode] Room {chosen_room}: {source_support.name} -> {target_support.name} "
-          f"({len(pairs)} pairs, {len(room_support_list)} supports)", flush=True)
+            # Map each support to its component
+            support_components = {}
+            for sup in supports:
+                comp = _get_support_component(sup, labels, trav_map)
+                support_components[sup.name] = comp
+                print(f"[Episode]   {sup.name} -> component {comp}", flush=True)
 
-    # Find robot start position - get floor z from floor objects
-    # Group floors within 1.5m and choose the highest in the group
-    floor_candidates = []
-    for obj in scene.objects:
-        cat = getattr(obj, 'category', '') or ''
-        name = getattr(obj, 'name', '') or ''
-        if ('floor' in cat.lower() or 'floor' in name.lower()) and hasattr(obj, 'aabb'):
-            try:
-                floor_top_z = obj.aabb[1][2].item()  # Top of floor bbox
-                floor_candidates.append(floor_top_z)
-            except Exception:
-                pass
+            # Group supports by component
+            component_supports = {}
+            for sup in supports:
+                comp = support_components[sup.name]
+                if comp > 0:  # Only include supports with valid components
+                    if comp not in component_supports:
+                        component_supports[comp] = []
+                    component_supports[comp].append(sup)
 
-    floor_z = 0.0
-    if floor_candidates:
-        floor_candidates.sort()
-        # Group floors within 1.5m - find the highest in the lowest group
-        groups = []
-        current_group = [floor_candidates[0]]
-        for z in floor_candidates[1:]:
-            if z - current_group[0] < 1.5:
-                current_group.append(z)
-            else:
-                groups.append(current_group)
-                current_group = [z]
-        groups.append(current_group)
-        # Use the highest floor in the first (lowest) group
-        floor_z = max(groups[0])
+            # Pair supports within same component - include labels for robot placement
+            for comp, comp_supports in component_supports.items():
+                if len(comp_supports) >= 2:
+                    for i, s1 in enumerate(comp_supports):
+                        for j, s2 in enumerate(comp_supports):
+                            if i < j:
+                                # Store (room_ins_id, comp_id, labels, s1, s2)
+                                all_pairs.append((room_ins_id, comp, labels, s1, s2))
+                                all_pairs.append((room_ins_id, comp, labels, s2, s1))
+                                print(f"[Episode] Connected pair (room={room_ins_id}, comp={comp}): {s1.name} <-> {s2.name}", flush=True)
 
-    # Add offset to ensure robot doesn't clip into floor
-    ROBOT_BASE_OFFSET = 0.02
-    floor_z = floor_z + ROBOT_BASE_OFFSET
-    print(f"[Episode] Floor Z: {floor_z:.3f}m (from {len(floor_candidates)} floor objects)", flush=True)
+        if not all_pairs:
+            print(f"[Episode] No valid pairs - scene unsuitable", flush=True)
+            if DEBUG_EPISODE:
+                # Convert room_supports to room_name keyed dict for visualization
+                room_supports_viz = {f"room_{k}": v for k, v in room_supports.items()}
+                _save_trav_map_raw(scene, room_supports_viz)
+            return False, [], [], "__SCENE_UNSUITABLE__", None
 
-    robot_start = _find_random_robot_start_in_room(
-        labeled_map, chosen_room, map_info, floor_z,
-        scene=scene, robot=robot
+        print(f"[Episode] Found {len(all_pairs)//2} valid support pairs (path existence guaranteed)", flush=True)
+
+    chosen_room_id, chosen_comp_id, chosen_labels, source_support, target_support = random.choice(all_pairs)
+    print(f"[Episode] Selected pair:", flush=True)
+    print(f"[Episode]   Room: {chosen_room_id}, Component: {chosen_comp_id}", flush=True)
+    print(f"[Episode]   Source: {source_support.name} -> Target: {target_support.name}", flush=True)
+    print(f"[Episode]   Path guaranteed: supports + robot will be in same component", flush=True)
+
+    if DEBUG_EPISODE and cached_pairs is None:
+        # Only visualize when pairs were just computed (room_supports is defined)
+        room_supports_viz = {f"room_{k}": v for k, v in room_supports.items()}
+        _save_trav_map_visualization(scene, robot, room_supports_viz, source_support, target_support)
+
+    floors = list(scene.object_registry("category", "floors"))
+    if floors:
+        floor_top_z = max([obj.aabb[1][2] for obj in floors])
+        floor_z = floor_top_z  # Robot at floor surface level
+        print(f"[Episode] Floor top Z: {floor_top_z:.3f}, robot Z: {floor_z:.3f}", flush=True)
+    else:
+        floor_z = 0.0
+        print(f"[Episode] No floors found, using floor_z={floor_z:.3f}", flush=True)
+
+    # Set room filter for navigation (uses room instance ID from seg_map)
+    collector.nav.set_room_filter(chosen_room_id)
+
+    robot_start = _find_robot_start_in_component(
+        scene, robot, chosen_labels, chosen_comp_id, floor_z
     )
     if robot_start is None:
-        print(f"[Episode] No valid robot position in room {chosen_room}", flush=True)
-        return False, [], [], None
+        print(f"[Episode] No valid robot position in component {chosen_comp_id}", flush=True)
+        return False, [], [], None, all_pairs
 
     start_x, start_y, start_z, facing_yaw = robot_start
-    print(f"[Episode] Robot start: ({start_x:.2f}, {start_y:.2f}, {start_z:.2f}) facing={math.degrees(facing_yaw):.0f}°", flush=True)
+    print(f"[Episode] Robot placed in component {chosen_comp_id}: ({start_x:.2f}, {start_y:.2f}, z={start_z:.2f})", flush=True)
 
-    # Place robot
     start_quat = [0, 0, math.sin(facing_yaw / 2), math.cos(facing_yaw / 2)]
     robot.set_position_orientation(position=[start_x, start_y, start_z], orientation=start_quat)
     robot.keep_still()
@@ -509,76 +674,45 @@ def collect_episode(
     for _ in range(10):
         og.sim.step()
 
-    # Check for existing graspable objects on source support
     spawned_obj = False
+
     existing_objects = _find_graspable_objects_on_support(scene, source_support, is_graspable_fn)
 
-    # Filter out objects that have failed too many times
     valid_objects = [
         obj for obj in existing_objects
         if failed_objects.get(obj.name, 0) < max_object_failures
     ]
+
     skipped = len(existing_objects) - len(valid_objects)
     if skipped > 0:
-        print(f"[Episode] Skipped {skipped} objects with {max_object_failures}+ failures", flush=True)
+        print(f"[Episode] Skipped {skipped} failed objects", flush=True)
 
     if valid_objects:
         target_obj = _select_best_graspable_object(valid_objects, scene, robot)
-        print(f"[Episode] Using {target_obj.name} on {source_support.name} ({len(valid_objects)} available)", flush=True)
+        print(f"[Episode] Using {target_obj.name} on {source_support.name}", flush=True)
     else:
-        # Spawn a new graspable object - get categories that pass the filter and have models
-        available_categories = []
-        for category in get_all_object_categories():
-            if is_graspable_fn(category):
-                models = get_all_object_category_models(category)
-                if models:
-                    available_categories.append(category)
-
-        if not available_categories:
-            print(f"[Episode] No graspable categories available", flush=True)
-            return False, [], [], None
-
-        # Try spawning objects until we find one that fits gripper constraints
-        random.shuffle(available_categories)
-        target_obj = None
         robot_pos, _ = robot.get_position_orientation()
-        for target_category in available_categories[:20]:  # Try up to 20 categories
-            print(f"[Episode] Spawning {target_category} on {source_support.name}...", flush=True)
-            spawned = spawn_and_place_object(scene, target_category, source_support, robot_pos=robot_pos)
-            if spawned is None:
-                continue
-
-            # Check if spawned object fits gripper size constraints
-            if _object_fits_gripper(spawned):
+        target_obj = None
+        for _ in range(20):
+            spawned = spawn_and_place_object(scene, source_support, robot_pos=robot_pos)
+            if spawned is not None:
                 target_obj = spawned
                 break
-            else:
-                # Object too big or too small, remove and try another
-                aabb = spawned.aabb
-                size_x = aabb[1][0].item() - aabb[0][0].item()
-                size_y = aabb[1][1].item() - aabb[0][1].item()
-                size_z = aabb[1][2].item() - aabb[0][2].item()
-                print(f"[Episode] {spawned.name} size ({size_x:.2f}x{size_y:.2f}x{size_z:.2f}) doesn't fit gripper, trying another", flush=True)
-                safe_remove_object(scene, spawned, robot)
 
         if target_obj is None:
-            print(f"[Episode] Failed to spawn object that fits gripper on {source_support.name}", flush=True)
-            return False, [], [], None
+            print(f"[Episode] Failed to spawn object on {source_support.name}", flush=True)
+            return False, [], [], None, all_pairs
         spawned_obj = True
-        print(f"[Episode] Spawned {target_obj.name}, starting pick...", flush=True)
+        print(f"[Episode] Spawned {target_obj.name} on {source_support.name}", flush=True)
 
     if wrapper is not None:
         wrapper.set_target_objects(target_obj, source_support)
 
-    # Switch now to path tracing mode
-    # lazy.carb.settings.get_settings().set_string("/rtx/rendermode", "PathTracing")
-
     all_observations = []
     all_actions = []
 
-    # Pick
     success, obs, acts = collector.pick_object(target_obj, source_support=source_support)
-    print(f"[Episode] Pick result: success={success}, steps={len(acts)}", flush=True)
+    print(f"[Episode] Pick: success={success}, steps={len(acts)}", flush=True)
     all_observations.extend(obs)
     all_actions.extend(acts)
 
@@ -586,12 +720,11 @@ def collect_episode(
         failed_obj_name = target_obj.name
         if spawned_obj:
             safe_remove_object(scene, target_obj, robot)
-        return False, all_observations, all_actions, failed_obj_name
+        return False, all_observations, all_actions, failed_obj_name, all_pairs
 
     if wrapper is not None:
         wrapper.set_target_objects(target_obj, target_support)
 
-    # Place
     success, obs, acts = collector.place_object(target_support)
     all_observations.extend(obs)
     all_actions.extend(acts)
@@ -600,11 +733,10 @@ def collect_episode(
         safe_remove_object(scene, target_obj, robot)
 
     print(f"[Episode] Complete: {len(all_actions)} steps, success={success}", flush=True)
-    return success, all_observations, all_actions, None if success else target_obj.name
+    return success, all_observations, all_actions, None if success else target_obj.name, all_pairs
 
 
 def run_data_collection(config: DataCollectionConfig):
-    """Main data collection loop."""
     is_support_fn, is_graspable_fn = get_object_filters(config)
     logger.info("Using object filter method: %s", config.object_filter_method)
 
@@ -614,16 +746,23 @@ def run_data_collection(config: DataCollectionConfig):
     og_config["scene"]["dataset_name"] = config.dataset_name
     og_config["scene"]["not_load_object_categories"] = ["ceilings", "armchair", "ottoman"]
 
-    # Non-BEHAVIOR-1K scenes use {scene_model}_best instead of {scene_model}_with_clutter
     if config.dataset_name != "behavior-1k-assets":
         og_config["scene"]["scene_instance"] = f"{config.scene_model}_best"
+
+    # For SPOC scenes, add floor plane
+    if config.dataset_name == "spoc":
+        og_config["scene"]["use_floor_plane"] = True
+        og_config["scene"]["floor_plane_visible"] = True
 
     env = og.Environment(configs=og_config)
     scene = env.scene
     robot = env.robots[0]
     logger.info("Environment created: scene=%s", config.scene_model)
 
-    # Apply friction to floor collision meshes
+    # Load segmentation map (not auto-loaded by OmniGibson)
+    scene._seg_map.load_map()
+    logger.info("Segmentation map loaded: %d rooms", len(scene._seg_map.room_ins_name_to_ins_id))
+
     for obj in scene.objects:
         if getattr(obj, 'category', '') == 'floors':
             for link in obj.links.values():
@@ -639,13 +778,11 @@ def run_data_collection(config: DataCollectionConfig):
                     mesh.apply_physics_material(physics_mat)
     logger.info("Floor friction applied")
 
-    # Increase robot base mass slightly for stability
     with og.sim.stopped():
         original_mass = robot.base_footprint_link.mass
         robot.base_footprint_link.mass = original_mass * 2.0
         logger.info("Robot base mass: %.1f -> %.1f kg", original_mass, robot.base_footprint_link.mass)
 
-    # Create LeRobot wrapper for recording
     wrapper_config = OmniGibsonLeRobotConfig(
         repo_id=config.repo_id,
         root=config.output_dir,
@@ -659,27 +796,45 @@ def run_data_collection(config: DataCollectionConfig):
     )
     wrapper = OmniGibsonLeRobotWrapper(env, wrapper_config)
 
+    # Run simulation steps to ensure robot articulation is initialized
+    for _ in range(30):
+        og.sim.step()
+
     collector = DataCollector(env, robot, config)
 
-    for _ in range(5):
+    for _ in range(10):
         og.sim.step()
 
     env.scene.update_initial_file()
     env.scene.reset()
 
+
     for _ in range(30):
         og.sim.step()
 
-    # Initialize wrapper observation structure
+    # Get gripper's initial Z at reset pose (for support height filtering)
+    robot.reset()
+    for _ in range(10):
+        og.sim.step()
+    eef_pos, _ = robot.get_eef_pose(robot.arm_names[0])
+    initial_gripper_z = eef_pos[2].item()
+    max_support_height = initial_gripper_z - 0.10  # Support must be at least 10cm below gripper
+    logger.info("Initial gripper Z: %.3f, max support height: %.3f", initial_gripper_z, max_support_height)
+
     sample_obs, _ = wrapper.reset_env()
     wrapper.start_recording()
+
+    
 
     successful_episodes = 0
     attempt = 0
     consecutive_failures = 0
     MAX_CONSECUTIVE_FAILURES = 20
-    failed_objects = {}  # Track failed grasp attempts per object name
-    MAX_OBJECT_FAILURES = 3
+    failed_objects = {}
+    MAX_OBJECT_FAILURES = 1
+    cached_pairs = None
+    position_failures = 0  # Track failures at current robot position
+    MAX_POSITION_FAILURES = 3  # After 3 failures, try new robot position
 
     try:
         while successful_episodes < config.num_episodes:
@@ -687,24 +842,49 @@ def run_data_collection(config: DataCollectionConfig):
             print(f"[Episode] Attempt {attempt}, success: {successful_episodes}/{config.num_episodes}", flush=True)
 
             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                print(f"[Episode] {MAX_CONSECUTIVE_FAILURES} consecutive failures - scene may be incompatible", flush=True)
+                print(f"[Episode] {MAX_CONSECUTIVE_FAILURES} consecutive failures", flush=True)
                 break
 
-            success, observations, actions, failed_obj_name = collect_episode(
+            if config.dataset_name == "spoc":
+                floors = list(env.scene.object_registry("category", "floors"))
+                for floor in floors:
+                    top_surface = floor.aabb[1][2].item()
+
+                    logger.info("SPOC: Floor %s top surface at Z=%.3f", floor.name, top_surface)
+                    if np.isclose(top_surface, 0, atol=0.1):
+                        continue
+                    floor_pos, floor_ori = floor.get_position_orientation()
+                    offset = -top_surface
+                    floor_pos[2] += offset
+                    logger.info("SPOC: Moving scene down by %.3f to align floor top at Z=0", -offset)
+                    floor.set_position_orientation(floor_pos, floor_ori)   
+
+            success, observations, actions, failed_obj_name, cached_pairs = collect_episode(
                 env, scene, robot, collector,
                 is_graspable_fn, is_support_fn,
                 wrapper=wrapper,
                 failed_objects=failed_objects,
                 max_object_failures=MAX_OBJECT_FAILURES,
+                dataset_name=config.dataset_name,
+                cached_pairs=cached_pairs,
+                max_support_height=max_support_height,
             )
 
-            # Track failed object
             if not success and failed_obj_name:
+                if failed_obj_name == "__SCENE_UNSUITABLE__":
+                    print(f"[Episode] Scene is unsuitable for pick-and-place, exiting", flush=True)
+                    break
                 failed_objects[failed_obj_name] = failed_objects.get(failed_obj_name, 0) + 1
-                print(f"[Episode] Object {failed_obj_name} failed {failed_objects[failed_obj_name]}/{MAX_OBJECT_FAILURES} times", flush=True)
+                position_failures += 1
+                print(f"[Episode] {failed_obj_name} failed {failed_objects[failed_obj_name]}/{MAX_OBJECT_FAILURES}, position failures: {position_failures}/{MAX_POSITION_FAILURES}", flush=True)
+
+                if position_failures >= MAX_POSITION_FAILURES:
+                    print(f"[Episode] {MAX_POSITION_FAILURES} failures at current position, trying new robot position", flush=True)
+                    failed_objects.clear()
+                    position_failures = 0
+
 
             if success and observations and actions:
-                # Record episode to LeRobot dataset
                 for i, (obs, action) in enumerate(zip(observations, actions)):
                     lerobot_obs = wrapper._convert_observation(obs)
                     is_last = (i == len(observations) - 1)
@@ -712,11 +892,11 @@ def run_data_collection(config: DataCollectionConfig):
                 wrapper.save_episode()
                 successful_episodes += 1
                 consecutive_failures = 0
+                position_failures = 0  # Reset on success
                 print(f"[Episode] Saved episode {successful_episodes} with {len(actions)} frames", flush=True)
             else:
                 consecutive_failures += 1
 
-            # Reset between episodes
             for arm in robot.arm_names:
                 if robot._ag_obj_in_hand.get(arm) is not None:
                     try:
@@ -726,9 +906,8 @@ def run_data_collection(config: DataCollectionConfig):
 
             robot.reset()
             env.scene.reset()
-            collector.nav.invalidate_map_cache()
 
-            for _ in range(30):
+            for _ in range(50):
                 og.sim.step()
 
     finally:
