@@ -16,7 +16,7 @@ scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
   trav_map_resolution: 0.1
-  default_erosion_radius: 0.4    # Robot radius (~0.3m) + safety margin
+  default_erosion_radius: 0.01   # Minimal (1cm), we handle real erosion ourselves (0.3m)
   trav_map_with_objects: true    # Include furniture in traversable map
   num_waypoints: 50
   waypoint_resolution: 0.1
@@ -25,7 +25,7 @@ scene:
   load_room_types: null
   load_room_instances: null
   load_task_relevant_only: false
-  seg_map_resolution: 1.0
+  seg_map_resolution: 0.1
   scene_source: OG
   include_robots: false
 
@@ -51,18 +51,18 @@ robots:
     reset_joint_pos: [
       -0.0795,    # joint_head_pan
       0.0,        # joint_left_wheel
-      1.0946,     # joint_lift (high up)
+      1.0946,     # joint_lift
       0.0,        # joint_right_wheel
-      -0.2367,    # joint_head_tilt
-      0.02,       # joint_arm_l3 (slightly extended)
-      0.0,        # joint_arm_l2 (retracted)
-      0.0,        # joint_arm_l1 (retracted)
-      0.0,        # joint_arm_l0 (retracted)
-      -0.1208,    # joint_wrist_yaw (keep fixed)
-      -0.5,       # joint_wrist_pitch (slightly lower)
+      -0.35,      # joint_head_tilt
+      0.02,       # joint_arm_l3
+      0.0,        # joint_arm_l2
+      0.0,        # joint_arm_l1
+      0.0,        # joint_arm_l0
+      -0.1208,    # joint_wrist_yaw
+      -0.5,       # joint_wrist_pitch
       -0.1133,    # joint_wrist_roll
-      0.3,        # joint_gripper_finger_left (slightly closed)
-      0.3,        # joint_gripper_finger_right (slightly closed)
+      0.3,        # joint_gripper_finger_left
+      0.3,        # joint_gripper_finger_right
     ]
     sensor_config:
       VisionSensor:

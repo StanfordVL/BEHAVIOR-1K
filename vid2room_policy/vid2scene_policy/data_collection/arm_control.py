@@ -7,7 +7,7 @@ from .robot_context import RobotContext, MODE_MANIPULATION
 
 logger = logging.getLogger(__name__)
 
-GRIPPER_OFFSET = -math.radians(100)
+GRIPPER_OFFSET = -math.radians(105)
 EXTEND_STEP = 0.006
 MAX_JOINT_EXTEND = 0.18
 YAW_THRESHOLD = 0.005
@@ -110,7 +110,7 @@ class ArmController:
             yaw_error = self.ctx.normalize_angle(target_yaw - current_yaw)
 
             if horiz_dist < 0.03 and abs(height_error) < 0.02:
-                logger.debug("EEF at target, step %d, dist=%.3f", step, horiz_dist)
+                print(f"[Arm] EEF at target at step {step}, horiz_dist={horiz_dist:.3f}, h_err={height_error:.3f}", flush=True)
                 return True, observations, actions
 
             if horiz_dist < min_dist:
@@ -123,14 +123,15 @@ class ArmController:
                 last_dist = horiz_dist
 
             if min_dist < 0.35 and horiz_dist > min_dist + 0.05:
-                logger.debug("Drifted from %.3f to %.3f - starting grasp", min_dist, horiz_dist)
+                print(f"[Arm] Drifted from {min_dist:.3f} to {horiz_dist:.3f} at step {step} - starting grasp", flush=True)
                 return True, observations, actions
 
             if stuck_count >= STUCK_THRESHOLD:
                 if horiz_dist < 0.15:
-                    logger.debug("Arm extended, close enough at %.3f", horiz_dist)
+                    print(f"[Arm] Stuck but close enough at {horiz_dist:.3f}, step {step}", flush=True)
                     return True, observations, actions
                 else:
+                    print(f"[Arm] Stuck at {horiz_dist:.3f} (step {step}), resetting stuck counter", flush=True)
                     stuck_count = 0
                     last_dist = horiz_dist
 
@@ -151,7 +152,8 @@ class ArmController:
                 lift_delta = max(-0.004, min(0.004, height_error * 0.2))
                 action[self.ctx.arm_idx[0]] = lift_delta
 
-            if horiz_dist > 0.02 and abs(yaw_error) < 0.2 and abs(h_err) < 0.4:
+            can_extend = horiz_dist > 0.02
+            if can_extend:
                 joint_order = [3, 2, 1, 0]
                 arm_indices = [4, 3, 2, 1]
                 for je_idx, arm_idx in zip(joint_order, arm_indices):
@@ -159,6 +161,9 @@ class ArmController:
                         action[self.ctx.arm_idx[arm_idx]] = EXTEND_STEP
                         joint_extensions[je_idx] += EXTEND_STEP
                         break
+                if step % 20 == 0:
+                    total_ext = sum(joint_extensions)
+                    print(f"[Arm] Step {step}: Extending - horiz_dist={horiz_dist:.3f}, total_ext={total_ext:.3f}", flush=True)
 
             action[self.ctx.base_idx[0]] = 0.0
             if abs(yaw_error) > YAW_THRESHOLD or abs(h_err) > 0.02:
@@ -173,6 +178,12 @@ class ArmController:
             if terminated or truncated:
                 return False, observations, actions
 
+        total_ext = sum(joint_extensions)
+        eef_pos, _ = self.ctx.robot.get_eef_pose(self.ctx.arm)
+        final_dx = target_eef_x - eef_pos[0].item()
+        final_dy = target_eef_y - eef_pos[1].item()
+        final_dist = math.sqrt(final_dx * final_dx + final_dy * final_dy)
+        print(f"[Arm] Phase 2 complete: total_extension={total_ext:.3f}, final_dist={final_dist:.3f}", flush=True)
         return True, observations, actions
 
     def lift_up(self, amount: float = 0.2) -> tuple[list, list]:
@@ -279,7 +290,7 @@ class ArmController:
         actions = []
 
         CONTRACTION_STEPS = 60
-        DELTA = -0.005  # Slower contraction
+        DELTA = -0.005
 
         for step in range(CONTRACTION_STEPS):
             action = self.ctx.empty_action(mode=MODE_MANIPULATION)
@@ -298,14 +309,52 @@ class ArmController:
 
         return observations, actions
 
+    def lift_and_contract(self, max_steps: int = 80) -> tuple[list, list]:
+        observations = []
+        actions = []
+
+        LIFT_UPPER_LIMIT = 1.05
+        lift_joint_idx = list(self.ctx.robot.joints.keys()).index("joint_lift")
+        CONTRACT_DELTA = -0.006
+
+        for step in range(max_steps):
+            lift_pos = self.ctx.robot.get_joint_positions()[lift_joint_idx].item()
+            lift_done = lift_pos >= LIFT_UPPER_LIMIT
+
+            action = self.ctx.empty_action(mode=MODE_MANIPULATION)
+            if not lift_done:
+                action[self.ctx.arm_idx[0]] = 0.015
+            action[self.ctx.arm_idx[1]] = CONTRACT_DELTA
+            action[self.ctx.arm_idx[2]] = CONTRACT_DELTA
+            action[self.ctx.arm_idx[3]] = CONTRACT_DELTA
+            action[self.ctx.arm_idx[4]] = CONTRACT_DELTA
+            action[self.ctx.gripper_idx] = -1.0
+
+            obs, _, terminated, truncated, _ = self.ctx.env.step(action.numpy())
+            observations.append(obs)
+            actions.append(action.numpy())
+
+            if terminated or truncated:
+                break
+
+        return observations, actions
+
     def extend_arm_for_place(self, target_pos: th.Tensor) -> tuple[list, list]:
         observations = []
         actions = []
 
-        EXTENSION_STEPS = 80
+        MAX_STEPS = 120
         DELTA = 0.005
+        DIST_THRESHOLD = 0.15
 
-        for step in range(EXTENSION_STEPS):
+        for step in range(MAX_STEPS):
+            eef_pos, _ = self.ctx.robot.eef_links[self.ctx.arm].get_position_orientation()
+            dist = math.sqrt((eef_pos[0].item() - target_pos[0].item())**2 +
+                           (eef_pos[1].item() - target_pos[1].item())**2)
+
+            if dist < DIST_THRESHOLD:
+                break
+
             action = self.ctx.empty_action(mode=MODE_MANIPULATION)
             action[self.ctx.arm_idx[1]] = DELTA
             action[self.ctx.arm_idx[2]] = DELTA

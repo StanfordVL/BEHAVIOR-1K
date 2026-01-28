@@ -44,24 +44,24 @@ class Stretch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def _default_joint_pos(self):
-        # Custom pose: lift raised, gripper open, camera looking down
+        # Custom pose: lift raised high, gripper slightly closed, camera forward and down
         # Order matches actual joint order from robot.joints.keys()
         return th.tensor(
             [
-                -1.5764,  # joint_head_pan
+                -0.0795,  # joint_head_pan (looking forward)
                 0.0,  # joint_left_wheel
-                0.6893,  # joint_lift
+                1.0946,  # joint_lift (high up)
                 0.0,  # joint_right_wheel
-                -0.5714,  # joint_head_tilt
-                0.0220,  # joint_arm_l3
-                0.0017,  # joint_arm_l2
-                0.0389,  # joint_arm_l1
-                0.0062,  # joint_arm_l0
-                -0.0649,  # joint_wrist_yaw
-                -0.0513,  # joint_wrist_pitch
-                -0.0315,  # joint_wrist_roll
-                0.6,  # joint_gripper_finger_left
-                0.6,  # joint_gripper_finger_right
+                -0.35,  # joint_head_tilt (tilted down)
+                0.02,  # joint_arm_l3 (slightly extended)
+                0.0,  # joint_arm_l2 (retracted)
+                0.0,  # joint_arm_l1 (retracted)
+                0.0,  # joint_arm_l0 (retracted)
+                -0.1208,  # joint_wrist_yaw
+                -0.5,  # joint_wrist_pitch (angled down)
+                -0.1133,  # joint_wrist_roll
+                0.3,  # joint_gripper_finger_left (slightly closed)
+                0.3,  # joint_gripper_finger_right (slightly closed)
             ]
         )
 

@@ -288,7 +288,7 @@ class OmniGibsonLeRobotWrapper(gym.Wrapper):
         
         self.current_step = 0
         self.episode_start_time = time.perf_counter()
-        
+
         return lerobot_obs, info
     
     def step(self, action: np.ndarray) -> tuple[dict, float, bool, bool, dict]:
