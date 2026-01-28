@@ -707,7 +707,7 @@ def collect_episode(
 
     # Remove all loose objects from the scene
     for j, obj in enumerate(scene.objects):
-        if not obj.fixed_base and obj not in (target_obj, source_support, target_support):
+        if not obj.fixed_base and obj not in (target_obj, source_support, target_support, robot):
             obj.set_position_orientation(position=th.as_tensor([100 + j, 0, 10.]))
 
     if wrapper is not None:
