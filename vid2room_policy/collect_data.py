@@ -26,9 +26,10 @@ def main():
     parser.add_argument("--scene", default="Rs_int", help="Scene model name")
     parser.add_argument("--dataset", default="behavior-1k-assets", help="Dataset name (behavior-1k-assets or spoc)")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes to collect")
-    parser.add_argument("--output", default="/checkpoint/clear/cgokmen/lerobot_datasets", help="Output directory")
+    parser.add_argument("--output", default="./lerobot_datasets", help="Output directory")
     parser.add_argument("--repo-id", default=None, help="Repository ID (default: {scene}_stretch_pick_place)")
     parser.add_argument("--max-nav-steps", type=int, default=1500, help="Max navigation steps per episode")
+    parser.add_argument("--max-rotation-steps", type=int, default=300, help="Max steps for rotation")
     parser.add_argument("--object-filter", default="classifier", choices=["whitelist", "classifier"],
                         help="Object filter method (default: classifier)")
     parser.add_argument("--classifier-embeddings", default=None, help="Path to classifier embeddings")
@@ -47,6 +48,7 @@ def main():
         whitelist_graspable_path="configs/whitelist_graspable_objects.json",
         whitelist_support_path="configs/whitelist_support_objects.json",
         max_navigation_steps=args.max_nav_steps,
+        max_rotation_steps=args.max_rotation_steps,
         max_grasp_steps=100,
         max_place_steps=100,
         object_filter_method=args.object_filter,
