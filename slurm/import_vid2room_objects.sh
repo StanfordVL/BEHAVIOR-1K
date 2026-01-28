@@ -4,12 +4,12 @@
 #SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --qos=h100_lowest
+#SBATCH --qos=h200_core_shared
 #SBATCH --account=clear
 #SBATCH --job-name=import_vid2room_objects
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_objects-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_objects-%A_%a.log
-#SBATCH --array=0-1023
+#SBATCH --array=0-255
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.

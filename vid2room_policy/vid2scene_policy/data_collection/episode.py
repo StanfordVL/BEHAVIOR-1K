@@ -18,7 +18,7 @@ from .omnigibson_lerobot_wrapper import OmniGibsonLeRobotWrapper, OmniGibsonLeRo
 
 logger = logging.getLogger(__name__)
 
-DEBUG_EPISODE = True
+DEBUG_EPISODE = False
 DEBUG_OUTPUT_DIR = "/home/yalcintr/workspace/vid2scene_policy/vid2scene_policy"
 
 MIN_SUPPORT_HEIGHT = 0.3
@@ -817,8 +817,8 @@ def run_data_collection(config: DataCollectionConfig):
     for _ in range(10):
         og.sim.step()
     eef_pos, _ = robot.get_eef_pose(robot.arm_names[0])
-    initial_gripper_z = eef_pos[2].item()
-    max_support_height = initial_gripper_z - 0.10  # Support must be at least 10cm below gripper
+    # initial_gripper_z = eef_pos[2].item()
+    max_support_height = 1.0  # Support must be at least 10cm below gripper
     logger.info("Initial gripper Z: %.3f, max support height: %.3f", initial_gripper_z, max_support_height)
 
     sample_obs, _ = wrapper.reset_env()
