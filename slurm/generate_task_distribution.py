@@ -46,6 +46,7 @@ config = {
 }
 
 num_jobs = 256 * 4
+max_episodes_per_line = 10
 
 def main():
     all_episodes = []
@@ -74,8 +75,27 @@ def main():
         batch_counter = Counter(this_batch)
         batches.append([(*k, v) for k, v in batch_counter.items()])
 
+    # Divide each batch into max_episodes_per_line
+    smaller_batches = []
+    for batch in batches:
+        smaller_items_batch = []
+        for item in batch:
+            # Convert this item to multiple items if its count is greater than max_episodes_per_line
+            if item[3] > max_episodes_per_line:
+                total_remaining = item[3]
+                while total_remaining > 0:
+                    smaller_items_batch.append((item[0], item[1], item[2], min(total_remaining, max_episodes_per_line)))
+                    total_remaining -= max_episodes_per_line
+            else:
+                smaller_items_batch.append(item)
+
+        # Shuffle the batch
+        random.shuffle(smaller_items_batch)
+
+        smaller_batches.append(smaller_items_batch)
+    
     # Save the batches to a json file
-    for i, batch in enumerate(batches):
+    for i, batch in enumerate(smaller_batches):
         with open(f"rollout_jobs/{i}.csv", "w") as f:
             for item in batch:
                 f.write(f"{item[0]},{item[1]},{item[2]},{item[3]}\n")

@@ -528,9 +528,9 @@ def collect_episode(
     else:
         # Spawn a new graspable object - get categories that pass the filter and have models
         available_categories = []
-        for category in get_all_object_categories():
+        for category in get_all_object_categories(dataset_names=("behavior-1k-assets", "spoc")):
             if is_graspable_fn(category):
-                models = get_all_object_category_models(category)
+                models = get_all_object_category_models(category, dataset_names=("behavior-1k-assets", "spoc"))
                 if models:
                     available_categories.append(category)
 

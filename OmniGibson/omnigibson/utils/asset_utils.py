@@ -183,28 +183,28 @@ def get_all_system_categories(include_cloth=False):
     return sorted(categories)
 
 
-def get_all_object_categories():
+def get_all_object_categories(dataset_names=None):
     """
     Get OmniGibson all object categories
 
     Returns:
         list: all object categories
     """
-    categories = {x.name for x in Path(gm.DATA_PATH).glob("*/objects/*") if x.is_dir() and not is_dot_file(x.name)}
+    categories = {x.name for x in Path(gm.DATA_PATH).glob("*/objects/*") if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)}
     return sorted(categories)
 
 
-def get_all_object_models():
+def get_all_object_models(dataset_names=None):
     """
     Get OmniGibson all object models
 
     Returns:
         list: all object model paths
     """
-    return sorted({str(x) for x in Path(gm.DATA_PATH).glob("*/objects/*/*") if x.is_dir() and not is_dot_file(x.name)})
+    return sorted({str(x) for x in Path(gm.DATA_PATH).glob("*/objects/*/*") if x.is_dir() and not is_dot_file(x.name) and (dataset_names is None or x.parts[-3] in dataset_names)})
 
 
-def get_all_object_category_models(category):
+def get_all_object_category_models(category, dataset_names=None):
     """
     Get all object models from @category
 
@@ -214,9 +214,9 @@ def get_all_object_category_models(category):
     Returns:
         list of str: all object models belonging to @category
     """
-    behavior_1k_assets_path = get_dataset_path("behavior-1k-assets")
-    categories_path = os.path.join(behavior_1k_assets_path, "objects", category)
-    return sorted(os.listdir(categories_path)) if os.path.exists(categories_path) else []
+    categories_paths = [os.path.join(get_dataset_path(dataset_name), "objects", category) for dataset_name in dataset_names]
+    categories_paths = [path for path in categories_paths if os.path.exists(path)]
+    return sorted(x for category_path in categories_paths for x in os.listdir(category_path))
 
 
 def get_all_object_category_models_with_abilities(category, abilities):
