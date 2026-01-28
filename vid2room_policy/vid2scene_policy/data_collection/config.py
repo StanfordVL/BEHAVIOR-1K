@@ -68,7 +68,7 @@ def get_object_filters(config: DataCollectionConfig) -> tuple[Callable[[str], bo
         )
         # Return combined filter: whitelist OR classifier
         def combined_support_fn(category: str) -> bool:
-            return category in support_whitelist or classifier_support_fn(category)
+            return (category in support_whitelist or classifier_support_fn(category)) and category not in ("bottom_cabinet_no_top", "top_cabinet")
         def combined_graspable_fn(category: str) -> bool:
             return category in graspable_whitelist or classifier_graspable_fn(category)
         return combined_support_fn, combined_graspable_fn
