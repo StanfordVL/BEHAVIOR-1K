@@ -28,76 +28,76 @@ COLLISION_THRESHOLD = 0.30
 
 def snap_rotation(rot, threshold_degrees=15):
     # 1. Create rotation object
-    matrix = rot.as_matrix() # 3x3 matrix: columns are Local X, Y, Z
-    
+    matrix = rot.as_matrix()  # 3x3 matrix: columns are Local X, Y, Z
+
     # Extract basis vectors (columns)
     # X=0, Y=1, Z=2
     axes = [matrix[:, 0], matrix[:, 1], matrix[:, 2]]
-    
+
     best_axis_idx = -1
     closest_dot = 0
     sign = 1
-    
+
     # 2. Find which local axis is closest to World Up (0,0,1)
     # We check dot product with (0,0,1), which is just the z-component of the vector
     for i, axis in enumerate(axes):
-        z_component = axis[2] 
+        z_component = axis[2]
         if abs(z_component) > abs(closest_dot):
             closest_dot = z_component
             best_axis_idx = i
             # Is it pointing Up (+1) or Down (-1)?
             sign = 1 if z_component > 0 else -1
-            
+
     # 3. Check Threshold
-    # Dot product of 1.0 = 0 degrees. 
+    # Dot product of 1.0 = 0 degrees.
     # We need to convert degrees to dot product threshold.
     # cos(10 degrees) ~= 0.9848
     threshold_dot = np.cos(np.deg2rad(threshold_degrees))
-    
+
     if abs(closest_dot) < threshold_dot:
-        return rot # Not close enough to snap
-        
+        return rot  # Not close enough to snap
+
     # 4. Construct Snapped Basis
     # The 'vertical' axis is forced to be exactly World Z
     new_vertical = np.array([0.0, 0.0, float(sign)])
-    
+
     # We need a 'horizontal' axis to preserve the Yaw.
     # We pick a different axis (e.g., if Z is vertical, pick X)
     # If X (idx 0) is vertical, pick Y (idx 1).
     horizontal_idx = (best_axis_idx + 1) % 3
     raw_horizontal = axes[horizontal_idx].copy()
-    
+
     # Flatten horizontal axis to XY plane and normalize
-    raw_horizontal[2] = 0 
+    raw_horizontal[2] = 0
     new_horizontal = raw_horizontal / np.linalg.norm(raw_horizontal)
-    
+
     # Compute the third axis using Cross Product
     # Order depends on which slot we are filling to maintain Right-Hand Rule
     # We have two known vectors, we need to arrange them into a matrix
-    
-    new_matrix = np.zeros((3,3))
-    
+
+    new_matrix = np.zeros((3, 3))
+
     # Place the vertical axis
     new_matrix[:, best_axis_idx] = new_vertical
-    
+
     # Place the horizontal axis
     new_matrix[:, horizontal_idx] = new_horizontal
-    
+
     # Calculate the remaining axis via cross product
     # To determine cross order (A x B vs B x A), recall: X x Y = Z.
-    # It is safer to re-cross depending on indices, 
-    # but a simple trick is to fill the matrix and use SVD or QR to orthonormalize, 
+    # It is safer to re-cross depending on indices,
+    # but a simple trick is to fill the matrix and use SVD or QR to orthonormalize,
     # OR just cross manually:
-    
+
     # Simplified Cross Logic:
     # If we snapped Local Z (2) and used Local X (0): Local Y (1) = Z cross X
-    if best_axis_idx == 2: # Z is vertical
+    if best_axis_idx == 2:  # Z is vertical
         # Y = Z cross X
         new_matrix[:, 1] = np.cross(new_vertical, new_horizontal)
-    elif best_axis_idx == 0: # X is vertical
+    elif best_axis_idx == 0:  # X is vertical
         # Z = X cross Y (Horizontal was Y)
         new_matrix[:, 2] = np.cross(new_vertical, new_horizontal)
-    elif best_axis_idx == 1: # Y is vertical
+    elif best_axis_idx == 1:  # Y is vertical
         # X = Y cross Z (Horizontal was Z)
         new_matrix[:, 0] = np.cross(new_vertical, new_horizontal)
 
@@ -150,7 +150,7 @@ def parse_object_meshes(scene_dir: pathlib.Path) -> dict:
         if not collision_path.exists():
             continue
         collision_meshes = load_collision_meshes_from_npz(collision_path)
-        
+
         # Load pose information
         with open(pose_json, "r") as f:
             frame_data = json.load(f)
@@ -166,18 +166,21 @@ def parse_object_meshes(scene_dir: pathlib.Path) -> dict:
             frame_info["translation"] = frame_info["post_postprocess"]["translation"]
 
             scale = np.array(frame_info["scale"]).reshape(-1).tolist()
-            scale = np.array(scale + [1]) 
+            scale = np.array(scale + [1])
             scale_transform = np.diag(scale)
             rotation_transform = np.eye(4)
-            rotation_transform[:3, :3] = R.from_quat(np.array(frame_info["rotation"]).reshape(-1), scalar_first=True).as_matrix().T
+            rotation_transform[:3, :3] = (
+                R.from_quat(np.array(frame_info["rotation"]).reshape(-1), scalar_first=True).as_matrix().T
+            )
             translation_transform = np.eye(4)
             translation_transform[:3, 3] = np.array(frame_info["translation"])
-            transform = PYTORCH_TO_OPENCV_4 @ translation_transform @ rotation_transform @ scale_transform @ Z_UP_TO_Y_UP_4
-            
+            transform = (
+                PYTORCH_TO_OPENCV_4 @ translation_transform @ rotation_transform @ scale_transform @ Z_UP_TO_Y_UP_4
+            )
+
             frame_info["obj_in_cam"] = transform
             frame_info["obj_in_world"] = frame_info["camera_pose"] @ transform
-            
-            
+
             frame_info["world_position"] = frame_info["obj_in_world"][:3, 3]
             frame_info["world_rotation"] = frame_info["obj_in_world"][:3, :3] / frame_info["scale"]
 
@@ -190,7 +193,6 @@ def parse_object_meshes(scene_dir: pathlib.Path) -> dict:
         }
         meshes[mesh_path.stem] = data
 
-
     # Load the walls
     floorplan_path = scene_dir / "floorplan" / "room_parameters.json"
     scene_data = json.loads(floorplan_path.read_text())
@@ -200,7 +202,7 @@ def parse_object_meshes(scene_dir: pathlib.Path) -> dict:
 
     # 1. Define your vertices (a list of [x, y] tuples)
     vertices = [x[:2] for x in scene_data["boundary3d"]]
-    vertices = vertices[:len(vertices)//2]  # Use only the first half, the second are just the ceiling
+    vertices = vertices[: len(vertices) // 2]  # Use only the first half, the second are just the ceiling
     vertices = np.array(vertices)
 
     wall_thickness = 0.1
@@ -380,10 +382,10 @@ def load_structure_objects(room_dir):
 def get_scene_id(room_dir):
     """
     Generate a unique scene ID from scene path.
-    
+
     For vid2room scenes, the path structure is typically:
     .../vid_XXXXX/rooms/room_type_N
-    
+
     We want to create a unique ID like: vid_XXXXX_room_type_N
     """
     room_name = room_dir.name  # e.g., "living_room_0"
@@ -409,7 +411,9 @@ def load_vid2room_scene(room_dir):
 
     for mesh_name, data in object_data.items():
         obj = load_object(room_dir, mesh_name, data["scale"])
-        obj.set_position_orientation(position=th.as_tensor(data["position"]), orientation=th.as_tensor(data["rotation"]))
+        obj.set_position_orientation(
+            position=th.as_tensor(data["position"]), orientation=th.as_tensor(data["rotation"])
+        )
 
     og.sim.play()
 

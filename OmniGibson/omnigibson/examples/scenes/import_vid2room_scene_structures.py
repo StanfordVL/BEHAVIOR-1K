@@ -97,22 +97,22 @@ DEFAULT_FLOOR_THICKNESS = 0.3
 def get_floor_mdl_material(floor_material_type):
     """
     Get a random MDL material path for a given VLM floor material type.
-    
+
     Args:
-        floor_material_type: One of "dark_wood", "light_wood", "light_tile", 
+        floor_material_type: One of "dark_wood", "light_wood", "light_tile",
                             "dark_tile", "concrete", "carpet"
-    
+
     Returns:
         tuple: (mdl_material_name, mdl_path) or (None, None) if not found
     """
     if floor_material_type not in FLOOR_MATERIAL_MDL_MAPPING:
         # Default to light_wood if unknown
         floor_material_type = "light_wood"
-    
+
     materials = FLOOR_MATERIAL_MDL_MAPPING[floor_material_type]
     mdl_name, relative_path = random.choice(materials)
     mdl_path = os.path.join(MDL_MATERIAL_ROOT, relative_path + ".mdl")
-    
+
     assert os.path.exists(mdl_path), f"MDL material path does not exist: {mdl_path}"
     return mdl_name, mdl_path
 
@@ -120,18 +120,18 @@ def get_floor_mdl_material(floor_material_type):
 def create_omnipbr_material_with_color(prim, color_rgb, material_name="wall_material"):
     """
     Create an OmniPBR material with a specific diffuse color and bind it to a prim.
-    
+
     Args:
         prim: The USD prim to bind the material to
         color_rgb: List of [R, G, B] values (0-255)
         material_name: Name for the material
-        
+
     Returns:
         bool: True if successful
     """
     # Normalize color to 0-1 range
     color_normalized = [c / 255.0 for c in color_rgb]
-    
+
     # Create the OmniPBR material
     mtl_created_list = []
     lazy.omni.kit.commands.execute(
@@ -140,33 +140,30 @@ def create_omnipbr_material_with_color(prim, color_rgb, material_name="wall_mate
         mtl_name="OmniPBR",
         mtl_created_list=mtl_created_list,
     )
-    
+
     if not mtl_created_list:
         print(f"Failed to create OmniPBR material")
         return False
-    
+
     pbr_mat = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
-    
+
     # Set the diffuse color constant
     lazy.omni.usd.create_material_input(
-        pbr_mat, 
-        "diffuse_color_constant", 
-        lazy.pxr.Gf.Vec3f(*color_normalized), 
-        lazy.pxr.Sdf.ValueTypeNames.Color3f
+        pbr_mat, "diffuse_color_constant", lazy.pxr.Gf.Vec3f(*color_normalized), lazy.pxr.Sdf.ValueTypeNames.Color3f
     )
-    
+
     # Bind the material to the prim
     shader = lazy.pxr.UsdShade.Material(pbr_mat)
-    
+
     # Find all mesh prims to bind to
     bound_count = 0
     for child in prim.GetChildren():
         visuals_prim_path = f"{child.GetPrimPath().pathString}/visuals"
         visuals_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(visuals_prim_path)
-        
+
         if not visuals_prim or not visuals_prim.IsValid():
             continue
-        
+
         if visuals_prim.GetTypeName() == "Mesh":
             lazy.pxr.UsdShade.MaterialBindingAPI(visuals_prim).Bind(
                 shader, lazy.pxr.UsdShade.Tokens.strongerThanDescendants
@@ -179,11 +176,11 @@ def create_omnipbr_material_with_color(prim, color_rgb, material_name="wall_mate
                         shader, lazy.pxr.UsdShade.Tokens.strongerThanDescendants
                     )
                     bound_count += 1
-    
+
     if bound_count > 0:
         prim.GetStage().Save()
         return True
-    
+
     return False
 
 
@@ -199,11 +196,11 @@ def loop_cum_lengths(loop_xy):
 def point_at_u(loop_xy, u):
     """
     Get the 2D point and direction at a normalized position u along the polygon loop.
-    
+
     Args:
         loop_xy: Nx2 array of polygon vertices
         u: Normalized position along the polygon (0-1)
-        
+
     Returns:
         tuple: (center_2d, direction_2d) - the point and tangent direction at u
     """
@@ -226,7 +223,7 @@ def point_at_u(loop_xy, u):
 def point_to_box_params(center_2d, y_dir, width, height, wall_thickness, sill=0.0):
     """
     Convert a 2D point and direction to a 3D box transform and extents for openings.
-    
+
     Args:
         center_2d: 2D center point on the wall
         y_dir: 2D direction along the wall
@@ -234,7 +231,7 @@ def point_to_box_params(center_2d, y_dir, width, height, wall_thickness, sill=0.
         height: Height of the opening
         wall_thickness: Thickness of the wall (for depth of opening box)
         sill: Height of the sill (for windows)
-        
+
     Returns:
         tuple: (transform_4x4, extents_3d)
     """
@@ -257,13 +254,13 @@ def point_to_box_params(center_2d, y_dir, width, height, wall_thickness, sill=0.
 def generate_openings(boundary_points, door_openings, window_openings, wall_thickness):
     """
     Generate door and window opening boxes from opening specifications.
-    
+
     Args:
         boundary_points: Nx3 array of boundary vertices
         door_openings: List of door opening dicts with 'u', 'width', 'height'
         window_openings: List of window opening dicts with 'u', 'width', 'height', 'sill'
         wall_thickness: Thickness of walls
-        
+
     Returns:
         tuple: (doors, windows) - lists of (transform, extents) tuples
     """
@@ -277,7 +274,9 @@ def generate_openings(boundary_points, door_openings, window_openings, wall_thic
     if window_openings:
         for w in window_openings:
             center_2d, y_dir = point_at_u(boundary_points[:, :2], w["u"])
-            windows.append(point_to_box_params(center_2d, y_dir, w["width"], w["height"], wall_thickness, w.get("sill", 0.0)))
+            windows.append(
+                point_to_box_params(center_2d, y_dir, w["width"], w["height"], wall_thickness, w.get("sill", 0.0))
+            )
 
     return doors, windows
 
@@ -293,7 +292,7 @@ def extract_vid2room_scene_structures(
     Extract floor, wall, and ceiling meshes from a vid2room scene.
 
     Args:
-        scene_data: Parsed JSON scene data containing 'boundary3d', 'door_openings', 
+        scene_data: Parsed JSON scene data containing 'boundary3d', 'door_openings',
                     'window_openings', 'ceiling_height', and optionally VLM analysis data
                     like 'wall_color_rgb' and 'floor_material'
         wall_thickness: Thickness of walls in meters
@@ -325,7 +324,7 @@ def extract_vid2room_scene_structures(
 
     # Use only the first half of boundary points (floor vertices, not ceiling)
     vertices = np.array([x[:2] for x in boundary3d])
-    vertices = vertices[:len(vertices) // 2]
+    vertices = vertices[: len(vertices) // 2]
 
     if len(vertices) < 3:
         print(f"Not enough vertices to form a polygon: {len(vertices)}")
@@ -389,7 +388,7 @@ def extract_vid2room_scene_structures(
         "wall_color_rgb": wall_color_rgb,
     }
     for i, wall_mesh in enumerate(wall_meshes):
-        if wall_mesh is not None and hasattr(wall_mesh, 'vertices') and len(wall_mesh.vertices) > 0:
+        if wall_mesh is not None and hasattr(wall_mesh, "vertices") and len(wall_mesh.vertices) > 0:
             structures[f"wall_{i}"] = (wall_mesh, wall_material_info)
 
     # Generate floor mesh with floor material info
@@ -401,12 +400,12 @@ def extract_vid2room_scene_structures(
         floor_mesh = trimesh.creation.extrude_polygon(outer_polygon, height=floor_thickness)
         # Move floor down so top surface is at z=0
         floor_mesh.vertices -= np.array([0, 0, floor_thickness])
-        
+
         # Add UV coordinates based on world XY position (for proper texture tiling)
         # Each vertex's UV = its XY world coordinates
         uv_coords = floor_mesh.vertices[:, :2].copy()  # Use X, Y as U, V
         floor_mesh.visual = trimesh.visual.TextureVisuals(uv=uv_coords)
-        
+
         structures["floor_0"] = (floor_mesh, floor_material_info)
     except Exception as e:
         print(f"Failed to create floor mesh: {e}")
@@ -456,21 +455,21 @@ def import_structure_object(
     mdl_material_name, mdl_path = None, None
     wall_color_rgb = None
     ceiling_color_rgb = None
-    
+
     if material_info:
         material_type = material_info.get("type")
-        
+
         if material_type == "floor_mdl":
             # Get random MDL material for the floor type
-            floor_material = "light_wood" # material_info.get("floor_material", "light_wood")
+            floor_material = "light_wood"  # material_info.get("floor_material", "light_wood")
             mdl_material_name, mdl_path = get_floor_mdl_material(floor_material)
             print(f"  Floor material: {floor_material} -> {mdl_material_name}")
-            
+
         elif material_type == "ceiling_color":
             # Get ceiling color for OmniPBR material (applied after USD import)
             ceiling_color_rgb = material_info.get("ceiling_color_rgb", DEFAULT_CEILING_COLOR_RGB)
             print(f"  Ceiling color: RGB{ceiling_color_rgb}")
-            
+
         elif material_type == "wall_color":
             # Get wall color for OmniPBR material (applied after USD import)
             wall_color_rgb = material_info.get("wall_color_rgb", DEFAULT_WALL_COLOR_RGB)
@@ -528,10 +527,10 @@ def import_structure_object(
 def get_scene_id(scene_path):
     """
     Generate a unique scene ID from scene path.
-    
+
     For vid2room scenes, the path structure is typically:
     .../vid_XXXXX/rooms/room_type_N
-    
+
     We want to create a unique ID like: vid_XXXXX_room_type_N
     """
     scene_path = pathlib.Path(scene_path)
@@ -545,32 +544,32 @@ def get_scene_id(scene_path):
 def load_scene_data(scene_dir):
     """
     Load scene data from a vid2room scene directory.
-    
+
     Args:
         scene_dir: Path to the scene directory containing room_parameters.json
                    and optionally vlm_analysis.json
-        
+
     Returns:
         dict: Combined scene data with boundary, openings, and ceiling height
     """
     scene_dir = pathlib.Path(scene_dir)
-    
+
     # Load room parameters (boundary, openings)
     floorplan_path = scene_dir / "floorplan" / "room_parameters.json"
     if not floorplan_path.exists():
         floorplan_path = scene_dir / "room_parameters.json"
-    
+
     if not floorplan_path.exists():
         raise FileNotFoundError(f"No room_parameters.json found in {scene_dir}")
-    
+
     scene_data = json.loads(floorplan_path.read_text())
-    
+
     # Load VLM analysis for ceiling height (optional)
     vlm_analysis_path = scene_dir / "vlm_analysis.json"
     if vlm_analysis_path.exists():
         vlm_data = json.loads(vlm_analysis_path.read_text())
         scene_data["ceiling_height"] = vlm_data.get("ceiling_height", 2.7)
-    
+
     return scene_data
 
 
@@ -581,12 +580,16 @@ def main():
     parser.add_argument("--success-prefix", default="", help="Prefix for success files (e.g., scriptname_jobid)")
     parser.add_argument("--dataset-name", default="vid2room", help="Dataset name (defaults to 'vid2room')")
     parser.add_argument("--restart-every", type=int, default=RESTART_EVERY)
-    parser.add_argument("--wall-thickness", type=float, default=DEFAULT_WALL_THICKNESS, 
-                        help="Wall thickness in meters")
-    parser.add_argument("--floor-thickness", type=float, default=DEFAULT_FLOOR_THICKNESS,
-                        help="Floor thickness in meters")
-    parser.add_argument("--scene-list", type=str, default=DEFAULT_INTERESTING_SCENES_JSON,
-                        help="Path to JSON file with list of scene directories to process")
+    parser.add_argument("--wall-thickness", type=float, default=DEFAULT_WALL_THICKNESS, help="Wall thickness in meters")
+    parser.add_argument(
+        "--floor-thickness", type=float, default=DEFAULT_FLOOR_THICKNESS, help="Floor thickness in meters"
+    )
+    parser.add_argument(
+        "--scene-list",
+        type=str,
+        default=DEFAULT_INTERESTING_SCENES_JSON,
+        help="Path to JSON file with list of scene directories to process",
+    )
     args = parser.parse_args()
 
     # Setup paths
@@ -606,23 +609,22 @@ def main():
     print("Finding rooms...")
     with open(args.scene_list, "r") as f:
         room_dirs = json.load(f)
-    
+
     # Convert to pathlib paths
     room_dirs = [pathlib.Path(k) for k in room_dirs]
     # room_dirs = [pathlib.Path("/checkpoint/clear/cgokmen/vid2room/RealEstate10K/vid_1vdXN7X4Af4/rooms/living_room_0")]
-    
+
     # Exclude bathrooms
     room_dirs = [x for x in room_dirs if "bathroom" not in str(x)]
-    
+
     # Filter to only rooms where floorplan.success exists (floorplan generation is complete)
     room_dirs = [x for x in room_dirs if (x / "floorplan.success").exists()]
-    
+
     print(f"Found {len(room_dirs)} rooms with completed floorplans")
-    
+
     # Distribute scenes across tasks using hash-based assignment (same as floorplan script)
     task_scenes = [
-        x for x in room_dirs 
-        if int(hashlib.md5((str(x) + "cucumber").encode()).hexdigest(), 16) % world_size == rank
+        x for x in room_dirs if int(hashlib.md5((str(x) + "cucumber").encode()).hexdigest(), 16) % world_size == rank
     ]
 
     print(f"Task {rank}/{world_size}: Processing {len(task_scenes)} rooms")
@@ -714,4 +716,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
