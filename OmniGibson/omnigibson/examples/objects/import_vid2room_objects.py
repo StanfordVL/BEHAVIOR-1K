@@ -324,7 +324,7 @@ def main():
     print(f"Found {len(objects)} pre-processed objects")
 
     # Re-sort jobs differently per run with a fixed salt for consistency
-    objects.sort(key=lambda x: hashlib.md5((str(x[0]) + "potato").encode()).hexdigest())
+    objects.sort(key=lambda x: hashlib.md5((str(x[0]) + "cucumber").encode()).hexdigest())
 
     rank = args.task_id
     world_size = args.total_tasks

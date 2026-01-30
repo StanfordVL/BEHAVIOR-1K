@@ -2415,9 +2415,7 @@ def bind_custom_mdl_material(prim, mdl_path, mdl_material_name):
         mtl_created_list=mtl_created_list,
     )
 
-    if not mtl_created_list:
-        log.warning(f"Failed to create MDL material: {mdl_material_name}")
-        return False
+    assert mtl_created_list, f"Failed to create MDL material: {mdl_material_name}"
 
     mat_prim = lazy.isaacsim.core.utils.prims.get_prim_at_path(mtl_created_list[0])
     shader = lazy.pxr.UsdShade.Material(mat_prim)
