@@ -270,7 +270,7 @@ def main():
     logging.info(f"Starting training for {args.steps} steps (from step {start_step})")
 
     wandb.init(
-        project="vid2room-policies",
+        project="vid2room-policies-bigrun",
         name=args.run_name,
         dir=output_dir,
         config=vars(args),

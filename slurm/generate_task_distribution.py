@@ -56,7 +56,7 @@ config = {
     }
 }
 
-num_jobs = (1024) * 1
+num_jobs = (256) * 1
 max_episodes_per_line = 10
 
 def main():

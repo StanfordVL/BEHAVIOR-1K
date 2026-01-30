@@ -9,6 +9,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+import json
 
 import gymnasium as gym
 import numpy as np
@@ -402,7 +403,11 @@ class OmniGibsonLeRobotWrapper(gym.Wrapper):
             return
             
         logger.info(f"Saving episode {self.current_episode} ({self.current_step} steps)")
-        self.dataset.save_episode(episode_metadata=episode_metadata)
+        self.dataset.save_episode()
+
+        with open(self.dataset.root / f"meta/episode_metadata_{self.current_episode}.json", "w") as f:
+            json.dump(episode_metadata, f)
+
         self.current_episode += 1
 
     @property

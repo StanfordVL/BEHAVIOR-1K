@@ -646,7 +646,7 @@ def collect_episode(
 
     floors = list(scene.object_registry("category", "floors"))
     if floors:
-        floor_top_z = max([obj.aabb[1][2] for obj in floors])
+        floor_top_z = max([obj.aabb[1][2].item() for obj in floors])
         floor_z = floor_top_z  # Robot at floor surface level
         print(f"[Episode] Floor top Z: {floor_top_z:.3f}, robot Z: {floor_z:.3f}", flush=True)
     else:
@@ -740,6 +740,8 @@ def collect_episode(
 
     print(f"[Episode] Complete: {len(all_actions)} steps, success={success}", flush=True)
     metadata = {
+        "dataset_name": dataset_name,
+        "scene_name": scene.scene_model,
         "source_support_name": source_support.name,
         "target_support_name": target_support.name,
         "robot_start_x_y_z_theta": list(robot_start),

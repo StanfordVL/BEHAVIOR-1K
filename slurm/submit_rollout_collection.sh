@@ -9,7 +9,7 @@ ROLLOUT_SCRIPT="${SCRIPT_DIR}/rollout_collection.sh"
 
 # --- QOS Configuration ---
 QOS_LIST=(
-    "h200_lowest:1024"
+    "h200_lowest:256"
     # "h100_lowest:1024"
     # "h100_core_shared:256"
 )

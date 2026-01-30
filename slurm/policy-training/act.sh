@@ -6,26 +6,32 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --qos=h200_core_shared
 #SBATCH --account=clear
-#SBATCH --job-name=policy-act-spoc
-#SBATCH --output=logs/policy-act-spoc-%A.log
-#SBATCH --error=logs/policy-act-spoc-%A.log
+#SBATCH --job-name=policy-act
+#SBATCH --output=logs-bigrun/policy-act-%A_%a.log
+#SBATCH --error=logs-bigrun/policy-act-%A_%a.log
+#SBATCH --array=0-3
 
-echo "Copying dataset to /tmp/spoc-train"
-cp -R /checkpoint/clear/cgokmen/merged_lerobot_datasets/spoc-train /tmp/spoc-train
-echo "Dataset copied to /tmp/spoc-train"
+# Dataset combinations
+COMBINATIONS=("bpv" "bp" "bv" "b")
+DATASET=${COMBINATIONS[$SLURM_ARRAY_TASK_ID]}
+
+echo "Copying dataset to /tmp/${DATASET}"
+cp -R /checkpoint/clear/cgokmen/merged_lerobot_datasets_2/${DATASET} /tmp/${DATASET}
+echo "Dataset copied to /tmp/${DATASET}"
 
 lerobot-train \
-  --dataset.repo_id=spoc-train \
-  --dataset.root=/tmp/spoc-train \
-  --output_dir=/checkpoint/clear/cgokmen/policies/act-spoc-${SLURM_JOB_ID} \
-  --job_name=act-spoc-${SLURM_JOB_ID} \
+  --dataset.repo_id=${DATASET} \
+  --dataset.root=/tmp/${DATASET} \
+  --output_dir=/checkpoint/clear/cgokmen/policies-bigrun/act-${DATASET}-${SLURM_JOB_ID} \
+  --job_name=act-${DATASET}-${SLURM_JOB_ID} \
   --policy.type=act \
-  --policy.repo_id=act-spoc-${SLURM_JOB_ID} \
+  --policy.repo_id=act-${DATASET}-${SLURM_JOB_ID} \
   --policy.use_amp=true \
   --policy.push_to_hub=false \
   --save_freq=1000 \
   --steps=100000 \
+  --num_workers=32 \
   --policy.device=cuda \
   --wandb.enable=true \
-  --wandb.project=vid2room-policies \
-  --batch_size=512
+  --wandb.project=vid2room-policies-bigrun \
+  --batch_size=128

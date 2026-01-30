@@ -6,15 +6,27 @@ def check_dir(obj_dir: pathlib.Path):
     success_file = obj_dir / "import.success"
     if not success_file.exists():
         print(f"Success file not found for {obj_dir}")
+        return False
+    return True
 
 def main():
-    dataset_root = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data-2") / "vid2room"
+    dataset_root = pathlib.Path("/checkpoint/clear/cgokmen/behavior-data2") / "vid2room"
 
-    scenes_dir = dataset_root / "scenes"
-    for scene_dir in scenes_dir.iterdir():
-        check_dir(scene_dir)
+    with ProcessPoolExecutor(max_workers=10) as executor:
+        futures = {}
+        scenes_dir = dataset_root / "scenes"
+        for scene_dir in scenes_dir.iterdir():
+            future = executor.submit(check_dir, scene_dir)
+            futures[future] = scene_dir
 
-    objects_dir = dataset_root / "objects"
-    for category_dir in objects_dir.iterdir():
-        for obj_dir in category_dir.iterdir():
-            check_dir(obj_dir)
+        objects_dir = dataset_root / "objects"
+        for category_dir in objects_dir.iterdir():
+            for obj_dir in category_dir.iterdir():
+                future = executor.submit(check_dir, obj_dir)
+                futures[future] = obj_dir
+
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Checking directories"):
+            future.result()
+
+if __name__ == "__main__":
+    main()
