@@ -29,6 +29,7 @@ from b1k_pipeline.usd_conversion.make_maps import generate_maps_for_current_scen
 
 DEFAULT_INTERESTING_SCENES_JSON = "/home/cgokmen/projects/BEHAVIOR-1K/slurm/interesting_scenes.json"
 
+
 def should_process(room_dir, task_id, total_tasks, seed="potato"):
     if total_tasks <= 1:
         return True
@@ -49,14 +50,14 @@ def write_error(error_dir, scene_name, exc):
 def iter_vid2room_scenes(scene_list):
     with open(scene_list, "r") as f:
         room_dirs = json.load(f)
-    
+
     # Convert to pathlib paths
     room_dirs = [pathlib.Path(k) for k in room_dirs]
     # room_dirs = [pathlib.Path("/checkpoint/clear/cgokmen/vid2room/RealEstate10K/vid_1vdXN7X4Af4/rooms/living_room_0")]
-    
+
     # Exclude bathrooms
     room_dirs = [x for x in room_dirs if "bathroom" not in str(x)]
-    
+
     # Filter to only rooms where floorplan.success exists (floorplan generation is complete)
     room_dirs = [x for x in room_dirs if (x / "floorplan.success").exists()]
 
@@ -65,8 +66,12 @@ def iter_vid2room_scenes(scene_list):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scene-list", type=str, default=DEFAULT_INTERESTING_SCENES_JSON,
-                        help="Path to JSON file with list of scene directories to process")
+    parser.add_argument(
+        "--scene-list",
+        type=str,
+        default=DEFAULT_INTERESTING_SCENES_JSON,
+        help="Path to JSON file with list of scene directories to process",
+    )
     parser.add_argument("--task-id", type=int, default=0)
     parser.add_argument("--total-tasks", type=int, default=1)
     parser.add_argument("--restart-every", type=int, default=16)
