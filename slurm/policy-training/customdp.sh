@@ -23,5 +23,5 @@ python /home/cgokmen/projects/BEHAVIOR-1K/vid2room_policy/vid2scene_policy/polic
   --val_dataset_path /tmp/spoc-val \
   --output_dir /checkpoint/clear/cgokmen/policies/customdp-spoc-${SLURM_JOB_ID} \
   --run_name customdp-spoc-${SLURM_JOB_ID} \
-  --batch_size 256 \
-  --num_workers 128
+  --batch_size 128 \
+  --num_workers 64

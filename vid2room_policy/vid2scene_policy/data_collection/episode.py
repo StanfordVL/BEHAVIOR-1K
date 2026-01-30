@@ -573,7 +573,7 @@ def collect_episode(
         valid_supports = _get_valid_supports(scene, is_support_fn, max_support_height)
         if len(valid_supports) < 2:
             print(f"[Episode] Not enough valid supports: {len(valid_supports)}", flush=True)
-            return False, [], [], None, None
+            return False, [], [], {}, None, None
 
         # Map supports to rooms using scene._seg_map (BEHAVIOR-1K built-in)
         room_supports = _map_supports_to_rooms(scene, valid_supports)
@@ -583,7 +583,7 @@ def collect_episode(
 
         if num_rooms == 0:
             print(f"[Episode] No rooms found with supports - scene unsuitable", flush=True)
-            return False, [], [], "__SCENE_UNSUITABLE__", None
+            return False, [], [], {}, "__SCENE_UNSUITABLE__", None
 
         # Pair supports in same room AND same connected component
         # This ensures there's actually a traversable path between them
@@ -629,7 +629,7 @@ def collect_episode(
                 # Convert room_supports to room_name keyed dict for visualization
                 room_supports_viz = {f"room_{k}": v for k, v in room_supports.items()}
                 _save_trav_map_raw(scene, room_supports_viz)
-            return False, [], [], "__SCENE_UNSUITABLE__", None
+            return False, [], [], {}, "__SCENE_UNSUITABLE__", None
 
         print(f"[Episode] Found {len(all_pairs)//2} valid support pairs (path existence guaranteed)", flush=True)
 
@@ -877,7 +877,7 @@ def run_data_collection(config: DataCollectionConfig):
                     logger.info("SPOC: Moving scene down by %.3f to align floor top at Z=0", -offset)
                     floor.set_position_orientation(floor_pos, floor_ori)   
 
-            success, observations, actions, metadata, failed_obj_name, cached_pairs = collect_episode(
+            success, observations, actions, episode_metadata, failed_obj_name, cached_pairs = collect_episode(
                 env, scene, robot, collector,
                 is_graspable_fn, is_support_fn,
                 wrapper=wrapper,

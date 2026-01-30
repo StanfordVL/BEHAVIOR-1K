@@ -402,7 +402,7 @@ class OmniGibsonLeRobotWrapper(gym.Wrapper):
             return
             
         logger.info(f"Saving episode {self.current_episode} ({self.current_step} steps)")
-        self.dataset.save_episode(episode_metadata=metadata)
+        self.dataset.save_episode(episode_metadata=episode_metadata)
         self.current_episode += 1
 
     @property

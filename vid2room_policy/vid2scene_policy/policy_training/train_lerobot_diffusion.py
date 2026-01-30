@@ -245,16 +245,16 @@ def main():
         num_workers=args.num_workers,
         pin_memory=True,
         drop_last=True,
-        prefetch_factor=4,  # Queue up more batches to hide network latency
+        prefetch_factor=2,  # Queue up more batches to hide network latency
         persistent_workers=True,  # Keep workers alive to avoid respawn overhead
     )
     val_loader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=args.num_workers,
+        num_workers=16,
         pin_memory=True,
-        prefetch_factor=4,
+        prefetch_factor=2,
         persistent_workers=True,
     )
 
