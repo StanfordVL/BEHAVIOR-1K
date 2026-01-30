@@ -29,14 +29,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-name",
         type=str,
-        default="spoc",
+        default="vid2room",
         help="Name of the dataset to sample the scene from.",
     )
     parser.add_argument(
         "--num-scenes",
         "-n",
         type=int,
-        default=10,
+        default=1,
         help="Number of scenes to randomly sample (default: 10).",
     )
     parser.add_argument(
@@ -48,7 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default="sample.zip",
+        default="vid2room_sample.zip",
         help="Output zip path. Defaults to ./sample.zip",
     )
     return parser.parse_args()

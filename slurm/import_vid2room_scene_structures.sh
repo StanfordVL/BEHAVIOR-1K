@@ -6,25 +6,21 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --qos=h200_core_shared
 #SBATCH --account=clear
-#SBATCH --job-name=import_vid2room_objects
-#SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_objects-%A_%a.log
-#SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_objects-%A_%a.log
-#SBATCH --array=0-16
+#SBATCH --job-name=import_vid2room_scene_structures
+#SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
+#SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/logs/import_vid2room_scene_structures-%A_%a.log
+#SBATCH --array=0-0
 
 # This script launches a configurable number of concurrent python processes.
 # Each process is managed by a separate function call running in the background.
 # The script will re-launch a process if it terminates, until a success file is found.
 
 # --- Configuration ---
-SCRIPT_NAME="import_vid2room_objects"
+SCRIPT_NAME="import_vid2room_scene_structures"
 NUM_JOBS=${1:-1}
 TOTAL_JOBS_IN_ARRAY=$((NUM_JOBS * SLURM_ARRAY_TASK_COUNT))
-
-# Paths - adjust these as needed
-VID2ROOM_ROOT="/checkpoint/clear/cgokmen/vid2room/RealEstate10K"
-DATASET_NAME="vid2room"
 DATASET_ROOT="/home/cgokmen/projects/BEHAVIOR-1K/datasets"
-SUCCESS_DIR="${DATASET_ROOT}/${DATASET_NAME}/jobs"
+SUCCESS_DIR="${DATASET_ROOT}/vid2room/jobs"
 
 # --- Sanity Check ---
 if [ -z "${SLURM_ARRAY_TASK_ID}" ]; then
@@ -56,10 +52,8 @@ manage_process() {
     echo "[$(date)] Launching process for ID: ${process_id} / ${TOTAL_JOBS_IN_ARRAY}"
     
     cd /home/cgokmen/projects/BEHAVIOR-1K
-    OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} python -u -m omnigibson.examples.objects.import_vid2room_objects \
+    OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} OMNIGIBSON_HEADLESS=1 python -u -m omnigibson.examples.scenes.import_vid2room_scene_structures \
       "${process_id}" "${TOTAL_JOBS_IN_ARRAY}" \
-      --vid2room-root "${VID2ROOM_ROOT}" \
-      --dataset-name "${DATASET_NAME}" \
       --success-prefix "${SCRIPT_NAME}_${SLURM_ARRAY_JOB_ID}" \
       >> "${log_file}" 2>&1
   done
@@ -78,4 +72,3 @@ done
 echo "Waiting for all ${NUM_JOBS} background processes to complete..."
 wait
 echo "All processes finished successfully. Exiting."
-

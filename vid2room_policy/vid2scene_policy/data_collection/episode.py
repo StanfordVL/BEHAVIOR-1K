@@ -556,7 +556,7 @@ def collect_episode(
     dataset_name: str = "behavior-1k-assets",
     cached_pairs: list = None,
     max_support_height: float = 1.0,
-) -> tuple[bool, list, list, str | None, list]:
+) -> tuple[bool, list, list, dict, str | None, list]:
     """Returns (success, observations, actions, failed_obj_name, cached_pairs)"""
     if failed_objects is None:
         failed_objects = {}
@@ -661,7 +661,7 @@ def collect_episode(
     )
     if robot_start is None:
         print(f"[Episode] No valid robot position in component {chosen_comp_id}", flush=True)
-        return False, [], [], None, all_pairs
+        return False, [], [], {}, None, all_pairs
 
     start_x, start_y, start_z, facing_yaw = robot_start
     print(f"[Episode] Robot placed in component {chosen_comp_id}: ({start_x:.2f}, {start_y:.2f}, z={start_z:.2f})", flush=True)
@@ -701,8 +701,9 @@ def collect_episode(
 
         if target_obj is None:
             print(f"[Episode] Failed to spawn object on {source_support.name}", flush=True)
-            return False, [], [], None, all_pairs
+            return False, [], [], {}, None, all_pairs
         spawned_obj = True
+        spawned_obj_position, spawned_obj_orientation = target_obj.get_position_orientation()
         print(f"[Episode] Spawned {target_obj.name} on {source_support.name}", flush=True)
 
     # Remove all loose objects from the scene
@@ -725,7 +726,7 @@ def collect_episode(
         failed_obj_name = target_obj.name
         if spawned_obj:
             safe_remove_object(scene, target_obj, robot)
-        return False, all_observations, all_actions, failed_obj_name, all_pairs
+        return False, all_observations, all_actions, {}, failed_obj_name, all_pairs
 
     if wrapper is not None:
         wrapper.set_target_objects(target_obj, target_support)
@@ -738,7 +739,19 @@ def collect_episode(
         safe_remove_object(scene, target_obj, robot)
 
     print(f"[Episode] Complete: {len(all_actions)} steps, success={success}", flush=True)
-    return success, all_observations, all_actions, None if success else target_obj.name, all_pairs
+    metadata = {
+        "source_support_name": source_support.name,
+        "target_support_name": target_support.name,
+        "robot_start_x_y_z_theta": list(robot_start),
+        "spawned_target_object": spawned_obj,
+        "target_object_name": target_obj.name,
+        "spawned_target_object_position": spawned_obj_position.numpy().tolist(),
+        "spawned_target_object_orientation": spawned_obj_orientation.numpy().tolist(),
+        "spawned_target_object_category": target_obj.category,
+        "spawned_target_object_model": target_obj.model,
+        "spawned_target_object_dataset_name": target_obj.dataset_name,
+    }
+    return success, all_observations, all_actions, metadata, None if success else target_obj.name, all_pairs
 
 
 def run_data_collection(config: DataCollectionConfig):
@@ -864,7 +877,7 @@ def run_data_collection(config: DataCollectionConfig):
                     logger.info("SPOC: Moving scene down by %.3f to align floor top at Z=0", -offset)
                     floor.set_position_orientation(floor_pos, floor_ori)   
 
-            success, observations, actions, failed_obj_name, cached_pairs = collect_episode(
+            success, observations, actions, metadata, failed_obj_name, cached_pairs = collect_episode(
                 env, scene, robot, collector,
                 is_graspable_fn, is_support_fn,
                 wrapper=wrapper,
@@ -894,7 +907,7 @@ def run_data_collection(config: DataCollectionConfig):
                     lerobot_obs = wrapper._convert_observation(obs)
                     is_last = (i == len(observations) - 1)
                     wrapper.record_frame(lerobot_obs, np.array(action, dtype=np.float32), 1.0 if is_last else 0.0, is_last)
-                wrapper.save_episode()
+                wrapper.save_episode(episode_metadata=episode_metadata)
                 successful_episodes += 1
                 consecutive_failures = 0
                 position_failures = 0  # Reset on success

@@ -5,24 +5,24 @@ import json
 
 config = {
     "behavior-1k-assets": {
-        "train": {
-            "scenes": [
-                "Beechwood_0_int",
-                "Benevolence_1_int",
-                "Ihlen_0_int",
-                "Ihlen_1_int",
-                "Merom_0_int",
-                "Merom_1_int",
-                "Pomaria_1_int",
-                "Pomaria_2_int",
-                "Rs_int",
-                "Wainscott_0_int",
-                "Wainscott_1_int",
-                "house_single_floor",
-            ],
-            "episodes": 20000,
-        },
-        "val": {
+        # "train": {
+        #     "scenes": [
+        #         "Beechwood_0_int",
+        #         "Benevolence_1_int",
+        #         "Ihlen_0_int",
+        #         "Ihlen_1_int",
+        #         "Merom_0_int",
+        #         "Merom_1_int",
+        #         "Pomaria_1_int",
+        #         "Pomaria_2_int",
+        #         "Rs_int",
+        #         "Wainscott_0_int",
+        #         "Wainscott_1_int",
+        #         "house_single_floor",
+        #     ],
+        #     "episodes": 20000,
+        # },
+        "val2": {
             "scenes": [
                 "house_double_floor_lower",
                 "Pomaria_0_int",
@@ -34,18 +34,29 @@ config = {
     },
 
     "spoc": {
-        "train": {
-            "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "train" in x]),
-            "episodes": 20000,
-        },
-        "val": {
+        # "train": {
+        #     "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "train" in x]),
+        #     "episodes": 20000,
+        # },
+        "val2": {
             "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "val" in x]),
             "episodes": 2000,
         },
     },
+
+    "vid2room": {
+        # "train": {
+        #     "scenes": json.load(open("successful_scenes_train.json")),
+        #     "episodes": 20000,
+        # },
+        "val2": {
+            "scenes": json.load(open("successful_scenes_val.json")),
+            "episodes": 2000,
+        },
+    }
 }
 
-num_jobs = (1024 + 1024 + 256) * 4
+num_jobs = (1024) * 1
 max_episodes_per_line = 10
 
 def main():

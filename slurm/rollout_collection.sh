@@ -16,7 +16,8 @@
 
 # --- Configuration ---
 SCRIPT_NAME="rollout_collection"
-NUM_JOBS=${1:-4}
+NUM_JOBS=1
+START_FROM=${1:-0}
 
 # Paths - adjust these as needed
 PROJECT_ROOT="/home/cgokmen/projects/BEHAVIOR-1K"
@@ -78,7 +79,7 @@ run_process() {
       --episodes "${count}" \
       --output "${output_path}" \
       --repo-id "${scene}-${uuid}" \
-      >> "${log_file}" 2>&1
+      < /dev/null >> "${log_file}" 2>&1
 
     exit_code=$?
     if [ ${exit_code} -ne 0 ]; then
@@ -96,7 +97,7 @@ run_process() {
 echo "Starting rollout collection for SLURM_ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID} with ${NUM_JOBS} jobs"
 
 for (( i=0; i<NUM_JOBS; i++ )); do
-  task_id=$((SLURM_ARRAY_TASK_ID * NUM_JOBS + i + 8192))
+  task_id=$((SLURM_ARRAY_TASK_ID * NUM_JOBS + i + START_FROM))
   run_process "${task_id}" &
 done
 

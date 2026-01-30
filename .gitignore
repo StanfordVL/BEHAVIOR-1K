@@ -6,7 +6,8 @@ gha-creds-*.json
 # training
 outputs/
 /*.ipynb
-slurm/logs
-slurm/rollout_jobs
+slurm/logs*
+slurm/rollout_jobs*
+slurm/policy-training/logs*
 
 __pycache__/
