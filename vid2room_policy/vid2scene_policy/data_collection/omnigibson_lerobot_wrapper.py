@@ -396,13 +396,13 @@ class OmniGibsonLeRobotWrapper(gym.Wrapper):
         }
         self.dataset.add_frame(frame)
         
-    def save_episode(self):
+    def save_episode(self, episode_metadata: dict):
         """Save the current episode buffer to disk."""
         if not self.is_recording or self.dataset is None:
             return
             
         logger.info(f"Saving episode {self.current_episode} ({self.current_step} steps)")
-        self.dataset.save_episode()
+        self.dataset.save_episode(episode_metadata=metadata)
         self.current_episode += 1
 
     @property

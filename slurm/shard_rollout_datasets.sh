@@ -26,6 +26,6 @@ TASK_ID=${SLURM_ARRAY_TASK_ID}
 
 echo "Task ${TASK_ID}/${TOTAL_JOBS} starting."
 
-python -u shard_rollout_datasets.py /checkpoint/clear/cgokmen/lerobot_datasets/spoc-train ${TASK_ID} ${TOTAL_JOBS}
+python -u shard_rollout_datasets.py ${1} ${TASK_ID} ${TOTAL_JOBS}
 
 echo "Task ${TASK_ID} has finished sharding rollout datasets and completed its work."

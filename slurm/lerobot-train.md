@@ -65,3 +65,11 @@ lerobot-train \
   --wandb.enable=true \
   --wandb.project=vid2room-policies \
   --batch_size=256
+
+
+python vid2room_policy/vid2scene_policy/policy_training/train_lerobot_diffusion.py \
+  --train_dataset_path /tmp/spoc-train \
+  --val_dataset_path /tmp/spoc-val \
+  --output_dir /checkpoint/clear/cgokmen/policies/customdp-spoc \
+  --run_name customdp-spoc \
+  --batch_size 512
