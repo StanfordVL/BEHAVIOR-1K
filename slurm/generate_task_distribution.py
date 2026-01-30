@@ -33,27 +33,27 @@ config = {
         },
     },
 
-    "spoc": {
-        # "train": {
-        #     "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "train" in x]),
-        #     "episodes": 20000,
-        # },
-        "val2": {
-            "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "val" in x]),
-            "episodes": 2000,
-        },
-    },
+    # "spoc": {
+    #     # "train": {
+    #     #     "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "train" in x]),
+    #     #     "episodes": 20000,
+    #     # },
+    #     "val2": {
+    #         "scenes": sorted([x for x in os.listdir("/checkpoint/clear/cgokmen/behavior-data2/spoc/scenes") if "val" in x]),
+    #         "episodes": 2000,
+    #     },
+    # },
 
-    "vid2room": {
-        # "train": {
-        #     "scenes": json.load(open("successful_scenes_train.json")),
-        #     "episodes": 20000,
-        # },
-        "val2": {
-            "scenes": json.load(open("successful_scenes_val.json")),
-            "episodes": 2000,
-        },
-    }
+    # "vid2room": {
+    #     # "train": {
+    #     #     "scenes": json.load(open("successful_scenes_train.json")),
+    #     #     "episodes": 20000,
+    #     # },
+    #     "val2": {
+    #         "scenes": json.load(open("successful_scenes_val.json")),
+    #         "episodes": 2000,
+    #     },
+    # }
 }
 
 num_jobs = (256) * 1

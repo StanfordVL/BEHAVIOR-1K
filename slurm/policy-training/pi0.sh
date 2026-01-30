@@ -7,22 +7,19 @@
 #SBATCH --qos=h200_core_shared
 #SBATCH --account=clear
 #SBATCH --job-name=policy-pi05
-#SBATCH --output=logs-bigrun/policy-pi05-%A_%a.log
-#SBATCH --error=logs-bigrun/policy-pi05-%A_%a.log
+#SBATCH --output=logs-bigrun2/policy-pi05-%A_%a.log
+#SBATCH --error=logs-bigrun2/policy-pi05-%A_%a.log
 #SBATCH --array=0-3
 
 # Dataset combinations
 COMBINATIONS=("bpv" "bp" "bv" "b")
 DATASET=${COMBINATIONS[$SLURM_ARRAY_TASK_ID]}
 
-echo "Copying dataset to /tmp/${DATASET}"
-cp -R /checkpoint/clear/cgokmen/merged_lerobot_datasets_2/${DATASET} /tmp/${DATASET}
-echo "Dataset copied to /tmp/${DATASET}"
-
 lerobot-train \
   --dataset.repo_id=${DATASET} \
-  --dataset.root=/tmp/${DATASET} \
-  --output_dir=/checkpoint/clear/cgokmen/policies-bigrun/pi05-${DATASET}-${SLURM_JOB_ID} \
+  --dataset.root=/checkpoint/clear/cgokmen/merged_lerobot_datasets_2/${DATASET} \
+  --dataset.video_backend=pyav \
+  --output_dir=/checkpoint/clear/cgokmen/policies-bigrun2/pi05-${DATASET}-${SLURM_JOB_ID} \
   --job_name=pi05-${DATASET}-${SLURM_JOB_ID} \
   --policy.type=pi05 \
   --policy.repo_id=pi05-${DATASET}-${SLURM_JOB_ID} \
@@ -33,9 +30,9 @@ lerobot-train \
   --policy.train_expert_only=false \
   --policy.push_to_hub=false \
   --save_freq=1000 \
-  --steps=100000 \
+  --steps=1000000 \
   --policy.device=cuda \
   --wandb.enable=true \
-  --wandb.project=vid2room-policies-bigrun \
+  --wandb.project=vid2room-policies-bigrun2 \
   --batch_size=64 \
   --num_workers=64

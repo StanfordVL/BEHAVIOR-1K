@@ -9,8 +9,12 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import wandb
 
+from accelerate import Accelerator
+from accelerate.utils import DistributedDataParallelKwargs
+
 from lerobot.datasets.lerobot_dataset import LeRobotDataset, LeRobotDatasetMetadata
 from lerobot.datasets.sampler import EpisodeAwareSampler
+from lerobot.datasets.utils import cycle
 from lerobot.policies.diffusion.configuration_diffusion import DiffusionConfig
 from lerobot.policies.factory import make_policy, make_pre_post_processors
 from lerobot.policies.pretrained import PreTrainedPolicy
@@ -65,6 +69,7 @@ def make_dataset_with_custom_timestamps(
         episodes=episodes,
         delta_timestamps=delta_timestamps,
         tolerance_s=tolerance_s,
+        video_backend="pyav",
     )
     for key in dataset.meta.camera_keys:
         for stats_type, stats in IMAGENET_STATS.items():
@@ -135,41 +140,90 @@ def main():
     parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint directory to resume from (e.g. output_dir/checkpoints/005000 or output_dir/checkpoints/last)")
     args = parser.parse_args()
 
+    # Create Accelerator for distributed training
+    # It automatically detects if running in distributed mode or single-process mode
+    # When run with `python script.py`, it works as single-GPU
+    # When run with `accelerate launch script.py`, it enables DDP
+    ddp_kwargs = DistributedDataParallelKwargs(find_unused_parameters=True)
+    accelerator = Accelerator(
+        step_scheduler_with_optimizer=False,
+        kwargs_handlers=[ddp_kwargs],
+    )
+
+    # Determine if this is the main process (for logging and checkpointing)
+    # In single-process mode, this is always True
+    is_main_process = accelerator.is_main_process
+
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s", force=True)
     logging.getLogger().handlers[0].flush = lambda: None
+    
+    # Only log on main process to avoid duplicate outputs in DDP mode
+    if not is_main_process:
+        logging.getLogger().setLevel(logging.WARNING)
+    
     torch.manual_seed(args.seed)
 
+    # Use accelerator's device - in single-process mode this respects CUDA_VISIBLE_DEVICES
+    # or defaults to cuda:0 if available, otherwise CPU
+    device = accelerator.device
+    
+    if is_main_process:
+        logging.info(f"Running with {accelerator.num_processes} process(es) on device: {device}")
+
     output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if is_main_process:
+        output_dir.mkdir(parents=True, exist_ok=True)
 
     train_dataset_path = Path(args.train_dataset_path)
     val_dataset_path = Path(args.val_dataset_path)
     train_repo_id = train_dataset_path.name
     val_repo_id = val_dataset_path.name
 
-    train_ds_meta = LeRobotDatasetMetadata(train_repo_id, root=str(train_dataset_path.resolve()))
-    val_ds_meta = LeRobotDatasetMetadata(val_repo_id, root=str(val_dataset_path.resolve()))
-    fps = train_ds_meta.fps
-    logging.info(f"Train Dataset: {train_repo_id}, FPS: {fps}, Total episodes: {train_ds_meta.total_episodes}")
-    logging.info(f"Val Dataset: {val_repo_id}, FPS: {fps}, Total episodes: {val_ds_meta.total_episodes}")
+    # Dataset loading synchronization: main process loads first to avoid race conditions
+    if is_main_process:
+        train_ds_meta = LeRobotDatasetMetadata(train_repo_id, root=str(train_dataset_path.resolve()))
+        val_ds_meta = LeRobotDatasetMetadata(val_repo_id, root=str(val_dataset_path.resolve()))
+        fps = train_ds_meta.fps
+        logging.info(f"Train Dataset: {train_repo_id}, FPS: {fps}, Total episodes: {train_ds_meta.total_episodes}")
+        logging.info(f"Val Dataset: {val_repo_id}, FPS: {fps}, Total episodes: {val_ds_meta.total_episodes}")
 
-    logging.info("Loading train dataset...")
-    train_dataset = make_dataset_with_custom_timestamps(
-        repo_id=train_repo_id,
-        root=str(train_dataset_path.resolve()),
-        fps=fps,
-        tolerance_s=0.1,
-    )
-    logging.info(f"Train dataset: {len(train_dataset)} frames")
+        logging.info("Loading train dataset...")
+        train_dataset = make_dataset_with_custom_timestamps(
+            repo_id=train_repo_id,
+            root=str(train_dataset_path.resolve()),
+            fps=fps,
+            tolerance_s=0.1,
+        )
+        logging.info(f"Train dataset: {len(train_dataset)} frames")
 
-    logging.info("Loading val dataset...")
-    val_dataset = make_dataset_with_custom_timestamps(
-        repo_id=val_repo_id,
-        root=str(val_dataset_path.resolve()),
-        fps=fps,
-        tolerance_s=0.1,
-    )
-    logging.info(f"Val dataset: {len(val_dataset)} frames")
+        logging.info("Loading val dataset...")
+        val_dataset = make_dataset_with_custom_timestamps(
+            repo_id=val_repo_id,
+            root=str(val_dataset_path.resolve()),
+            fps=fps,
+            tolerance_s=0.1,
+        )
+        logging.info(f"Val dataset: {len(val_dataset)} frames")
+
+    accelerator.wait_for_everyone()
+
+    # Now all other processes can safely load the dataset
+    if not is_main_process:
+        train_ds_meta = LeRobotDatasetMetadata(train_repo_id, root=str(train_dataset_path.resolve()))
+        val_ds_meta = LeRobotDatasetMetadata(val_repo_id, root=str(val_dataset_path.resolve()))
+        fps = train_ds_meta.fps
+        train_dataset = make_dataset_with_custom_timestamps(
+            repo_id=train_repo_id,
+            root=str(train_dataset_path.resolve()),
+            fps=fps,
+            tolerance_s=0.1,
+        )
+        val_dataset = make_dataset_with_custom_timestamps(
+            repo_id=val_repo_id,
+            root=str(val_dataset_path.resolve()),
+            fps=fps,
+            tolerance_s=0.1,
+        )
 
     # Create a minimal TrainPipelineConfig for checkpointing
     dataset_cfg = DatasetConfig(
@@ -189,7 +243,8 @@ def main():
         save_freq=args.save_freq,
     )
 
-    logging.info("Creating policy...")
+    if is_main_process:
+        logging.info("Creating policy...")
     config = create_policy_config(train_ds_meta)
 
     # Handle checkpoint resumption - load policy first before creating optimizer
@@ -202,14 +257,16 @@ def main():
         if not resume_path.exists():
             raise FileNotFoundError(f"Checkpoint path does not exist: {resume_path}")
         
-        logging.info(f"Resuming from checkpoint: {resume_path}")
+        if is_main_process:
+            logging.info(f"Resuming from checkpoint: {resume_path}")
         
         # Load policy weights from checkpoint
         pretrained_path = resume_path / PRETRAINED_MODEL_DIR
         if pretrained_path.exists():
             policy = PreTrainedPolicy.from_pretrained(pretrained_path)
-            policy.to(args.device)
-            logging.info(f"Loaded policy weights from {pretrained_path}")
+            policy.to(device)
+            if is_main_process:
+                logging.info(f"Loaded policy weights from {pretrained_path}")
         else:
             raise FileNotFoundError(f"Pretrained model not found at {pretrained_path}")
     else:
@@ -218,7 +275,7 @@ def main():
             cfg=config,
             ds_meta=train_dataset.meta,
         )
-        policy.to(args.device)
+        policy.to(device)
 
     preprocessor, postprocessor = make_pre_post_processors(
         policy_cfg=config,
@@ -228,7 +285,8 @@ def main():
 
     num_params = sum(p.numel() for p in policy.parameters())
     num_trainable = sum(p.numel() for p in policy.parameters() if p.requires_grad)
-    logging.info(f"Policy params: {num_params:,} total, {num_trainable:,} trainable")
+    if is_main_process:
+        logging.info(f"Policy params: {num_params:,} total, {num_trainable:,} trainable")
 
     drop_n_last_frames = config.drop_n_last_frames
     train_sampler = EpisodeAwareSampler(
@@ -243,7 +301,7 @@ def main():
         batch_size=args.batch_size,
         sampler=train_sampler,
         num_workers=args.num_workers,
-        pin_memory=True,
+        pin_memory=device.type == "cuda",
         drop_last=True,
         prefetch_factor=2,  # Queue up more batches to hide network latency
         persistent_workers=True,  # Keep workers alive to avoid respawn overhead
@@ -253,7 +311,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=16,
-        pin_memory=True,
+        pin_memory=device.type == "cuda",
         prefetch_factor=2,
         persistent_workers=True,
     )
@@ -265,18 +323,31 @@ def main():
     # Load optimizer/scheduler state if resuming
     if resume_path is not None:
         start_step, optimizer, scheduler = load_training_state(resume_path, optimizer, scheduler)
-        logging.info(f"Resuming from step {start_step}")
+        if is_main_process:
+            logging.info(f"Resuming from step {start_step}")
 
-    logging.info(f"Starting training for {args.steps} steps (from step {start_step})")
-
-    wandb.init(
-        project="vid2room-policies-bigrun",
-        name=args.run_name,
-        dir=output_dir,
-        config=vars(args),
-        save_code=False,
-        # job_type="train",
+    # Prepare everything with accelerator for distributed training
+    accelerator.wait_for_everyone()
+    policy, optimizer, train_loader, scheduler = accelerator.prepare(
+        policy, optimizer, train_loader, scheduler
     )
+    dl_iter = cycle(train_loader)
+
+    # Calculate effective batch size for distributed training
+    effective_batch_size = args.batch_size * accelerator.num_processes
+    if is_main_process:
+        logging.info(f"Starting training for {args.steps} steps (from step {start_step})")
+        logging.info(f"Effective batch size: {args.batch_size} x {accelerator.num_processes} = {effective_batch_size}")
+
+    # Initialize wandb only on main process
+    if is_main_process:
+        wandb.init(
+            project="vid2room-policies-bigrun2",
+            name=args.run_name,
+            dir=output_dir,
+            config={**vars(args), "effective_batch_size": effective_batch_size, "num_processes": accelerator.num_processes},
+            save_code=False,
+        )
 
     policy.train()
     step = start_step
@@ -286,24 +357,34 @@ def main():
     last_log_start_time = time.time()
     last_log_step = step
 
-    logging.info("Starting training loop, fetching first batch...")
+    if is_main_process:
+        logging.info("Starting training loop, fetching first batch...")
+    
     batch_start_time = time.time()
-    for batch in train_loader:
+    
+    for _ in range(step, args.steps):
+        batch = next(dl_iter)
         data_time = time.time() - batch_start_time
         total_data_time += data_time
         
-        if step == start_step:
+        if step == start_step and is_main_process:
             logging.info(f"First batch loaded in {data_time:.2f}s, beginning training...")
         
         model_start_time = time.time()
         batch = preprocessor(batch)
-        batch = {k: v.to(args.device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
 
         optimizer.zero_grad()
-        loss, _ = policy.forward(batch)
-        loss.backward()
+        
+        # Use accelerator's autocast for mixed precision
+        with accelerator.autocast():
+            loss, _ = policy.forward(batch)
 
-        grad_norm = torch.nn.utils.clip_grad_norm_(policy.parameters(), 10.0)
+        # Use accelerator's backward for proper gradient handling
+        accelerator.backward(loss)
+
+        # Use accelerator's gradient clipping
+        grad_norm = accelerator.clip_grad_norm_(policy.parameters(), 10.0)
+        
         optimizer.step()
         scheduler.step()
         
@@ -313,7 +394,7 @@ def main():
         running_loss += loss.item()
         step += 1
 
-        if step % args.log_freq == 0:
+        if step % args.log_freq == 0 and is_main_process:
             avg_loss = running_loss / args.log_freq
             avg_data_time = total_data_time / args.log_freq
             avg_model_time = total_model_time / args.log_freq
@@ -348,31 +429,36 @@ def main():
             with torch.no_grad():
                 for val_batch in val_loader:
                     val_batch = preprocessor(val_batch)
-                    val_batch = {k: v.to(args.device) if isinstance(v, torch.Tensor) else v for k, v in val_batch.items()}
-                    loss, _ = policy.forward(val_batch)
+                    val_batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in val_batch.items()}
+                    with accelerator.autocast():
+                        loss, _ = accelerator.unwrap_model(policy).forward(val_batch)
                     val_loss += loss.item()
                     val_count += 1
                     if val_count >= 10:
                         break
             val_loss /= max(val_count, 1)
-            logging.info(f"Step {step} | Val Loss: {val_loss:.4f}")
-            wandb.log({"val/loss": val_loss}, step=step)
+            if is_main_process:
+                logging.info(f"Step {step} | Val Loss: {val_loss:.4f}")
+                wandb.log({"val/loss": val_loss}, step=step)
             policy.train()
 
         if step % args.save_freq == 0:
-            checkpoint_dir = get_step_checkpoint_dir(output_dir, args.steps, step)
-            save_checkpoint(
-                checkpoint_dir=checkpoint_dir,
-                step=step,
-                cfg=train_cfg,
-                policy=policy,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                preprocessor=preprocessor,
-                postprocessor=postprocessor,
-            )
-            update_last_checkpoint(checkpoint_dir)
-            logging.info(f"Saved checkpoint: {checkpoint_dir}")
+            if is_main_process:
+                checkpoint_dir = get_step_checkpoint_dir(output_dir, args.steps, step)
+                save_checkpoint(
+                    checkpoint_dir=checkpoint_dir,
+                    step=step,
+                    cfg=train_cfg,
+                    policy=accelerator.unwrap_model(policy),
+                    optimizer=optimizer,
+                    scheduler=scheduler,
+                    preprocessor=preprocessor,
+                    postprocessor=postprocessor,
+                )
+                update_last_checkpoint(checkpoint_dir)
+                logging.info(f"Saved checkpoint: {checkpoint_dir}")
+            
+            accelerator.wait_for_everyone()
 
         if step >= args.steps:
             break
@@ -380,20 +466,25 @@ def main():
         batch_start_time = time.time()
 
     # Save final checkpoint
-    final_checkpoint_dir = get_step_checkpoint_dir(output_dir, args.steps, step)
-    save_checkpoint(
-        checkpoint_dir=final_checkpoint_dir,
-        step=step,
-        cfg=train_cfg,
-        policy=policy,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        preprocessor=preprocessor,
-        postprocessor=postprocessor,
-    )
-    update_last_checkpoint(final_checkpoint_dir)
-    logging.info(f"Training complete. Final model: {final_checkpoint_dir}")
-    wandb.finish()
+    if is_main_process:
+        final_checkpoint_dir = get_step_checkpoint_dir(output_dir, args.steps, step)
+        save_checkpoint(
+            checkpoint_dir=final_checkpoint_dir,
+            step=step,
+            cfg=train_cfg,
+            policy=accelerator.unwrap_model(policy),
+            optimizer=optimizer,
+            scheduler=scheduler,
+            preprocessor=preprocessor,
+            postprocessor=postprocessor,
+        )
+        update_last_checkpoint(final_checkpoint_dir)
+        logging.info(f"Training complete. Final model: {final_checkpoint_dir}")
+        wandb.finish()
+
+    # Properly clean up the distributed process group
+    accelerator.wait_for_everyone()
+    accelerator.end_training()
 
 
 if __name__ == "__main__":

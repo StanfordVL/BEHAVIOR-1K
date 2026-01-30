@@ -31,6 +31,8 @@ class EpisodeMetadata:
 
     This matches the format produced by data collection.
     """
+    dataset_name: str
+    scene_name: str
     source_support_name: str
     target_support_name: str
     robot_start_x_y_z_theta: list[float]
@@ -165,8 +167,8 @@ class OmniGibsonEvalEnv(gym.Env):
             },
             "scene": {
                 "type": "InteractiveTraversableScene",
-                "scene_model": self.config.scene_model,
-                "dataset_name": self.config.dataset_name,
+                "scene_model": self.episode_metadata.scene_name,
+                "dataset_name": self.episode_metadata.dataset_name,
                 "trav_map_resolution": 0.1,
                 "default_erosion_radius": 0.01,
                 "trav_map_with_objects": True,
@@ -231,13 +233,13 @@ class OmniGibsonEvalEnv(gym.Env):
         }
 
         # Handle SPOC scenes
-        if self.config.dataset_name == "spoc":
+        if self.episode_metadata.dataset_name == "spoc":
             config["scene"]["use_floor_plane"] = True
             config["scene"]["floor_plane_visible"] = True
 
         # Handle non-standard dataset names
-        if self.config.dataset_name != "behavior-1k-assets":
-            config["scene"]["scene_instance"] = f"{self.config.scene_model}_best"
+        if self.episode_metadata.dataset_name != "behavior-1k-assets":
+            config["scene"]["scene_instance"] = f"{self.episode_metadata.scene_name}_best"
 
         return config
 
@@ -655,4 +657,4 @@ class OmniGibsonEvalEnv(gym.Env):
     @property
     def task(self) -> str:
         """Return task description."""
-        return f"pick_and_place_{self.config.scene_model}"
+        return f"pick_and_place_{self.episode_metadata.scene_name}"

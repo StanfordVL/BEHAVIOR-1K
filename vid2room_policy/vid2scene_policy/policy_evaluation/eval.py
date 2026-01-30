@@ -7,17 +7,9 @@ for pick-and-place tasks. Supports any LeRobot-compatible policy.
 Usage:
     python -m vid2scene_policy.policy_evaluation.eval \
         --policy.path=outputs/train/diffusion_pusht/checkpoints/final/pretrained_model \
-        --scene_model Rs_int \
         --episodes_file episodes.json \
         --eval.n_episodes=10 \
         --output_dir eval_results
-
-Or with direct metadata:
-    python -m vid2scene_policy.policy_evaluation.eval \
-        --policy.path=lerobot/diffusion_pusht \
-        --scene_model Rs_int \
-        --metadata '{"source_support_name": "table_1", ...}' \
-        --eval.n_episodes=1
 """
 
 import argparse
@@ -57,8 +49,6 @@ class EvalConfig:
     use_amp: bool = False
 
     # Environment
-    scene_model: str = "Rs_int"
-    dataset_name: str = "behavior-1k-assets"
     max_steps: int = 500
     fps: int = 30
     image_height: int = 224
@@ -67,7 +57,6 @@ class EvalConfig:
     # Evaluation
     n_episodes: int = 10
     episodes_file: str | None = None
-    metadata: str | None = None  # Single episode JSON metadata
     seed: int = 42
     max_episodes_rendered: int = 5
 
@@ -327,7 +316,7 @@ def evaluate_policy(
     Args:
         config: Evaluation configuration
         episodes: Optional list of episode metadata. If not provided,
-                  loads from config.episodes_file or config.metadata.
+                  loads from config.episodes_file
 
     Returns:
         Dictionary with evaluation results
@@ -351,8 +340,8 @@ def evaluate_policy(
 
     # Create environment
     env_config = EnvConfig(
-        scene_model=config.scene_model,
-        dataset_name=config.dataset_name,
+        scene_model=episodes[0].scene_name,
+        dataset_name=episodes[0].dataset_name,
         max_steps=config.max_steps,
         fps=config.fps,
         image_height=config.image_height,
@@ -452,7 +441,6 @@ def evaluate_policy(
         "eval_time_per_episode_s": eval_time / n_eval,
         "config": {
             "policy_path": config.policy_path,
-            "scene_model": config.scene_model,
             "max_steps": config.max_steps,
             "seed": config.seed,
         },
@@ -500,16 +488,7 @@ def _load_episodes(config: EvalConfig) -> list[EpisodeMetadata | None]:
         else:
             logger.warning("Episodes file not found: %s", episodes_path)
 
-    if config.metadata:
-        try:
-            meta_dict = json.loads(config.metadata)
-            episodes.append(EpisodeMetadata.from_dict(meta_dict))
-        except json.JSONDecodeError as e:
-            logger.error("Failed to parse metadata JSON: %s", e)
-
-    # If no episodes specified, create None entries for random initialization
-    if not episodes:
-        episodes = [None] * config.n_episodes
+    assert episodes, "Could not find episodes file: %s" % config.episodes_file
 
     return episodes
 
@@ -536,26 +515,21 @@ def main():
                        help="Path to policy checkpoint or HuggingFace model ID")
     parser.add_argument("--policy_device", type=str, default="cuda:0",
                        help="Device for policy inference")
-    parser.add_argument("--use_amp", action="store_true",
+    parser.add_argument("--use_amp", default=True,
+                        type=bool,
                        help="Use automatic mixed precision")
 
     # Environment arguments
-    parser.add_argument("--scene_model", type=str, default="Rs_int",
-                       help="Scene model name")
-    parser.add_argument("--dataset_name", type=str, default="behavior-1k-assets",
-                       help="Dataset name for scene")
     parser.add_argument("--max_steps", type=int, default=500,
                        help="Maximum steps per episode")
     parser.add_argument("--fps", type=int, default=30,
                        help="Environment FPS")
 
     # Evaluation arguments
-    parser.add_argument("--n_episodes", type=int, default=10,
+    parser.add_argument("--n_episodes", type=int, default=1,
                        help="Number of episodes to evaluate")
     parser.add_argument("--episodes_file", type=str, default=None,
                        help="JSON file with episode metadata")
-    parser.add_argument("--metadata", type=str, default=None,
-                       help="Single episode metadata as JSON string")
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed")
     parser.add_argument("--max_episodes_rendered", type=int, default=5,
@@ -573,13 +547,10 @@ def main():
         policy_path=args.policy_path,
         policy_device=args.policy_device,
         use_amp=args.use_amp,
-        scene_model=args.scene_model,
-        dataset_name=args.dataset_name,
         max_steps=args.max_steps,
         fps=args.fps,
         n_episodes=args.n_episodes,
         episodes_file=args.episodes_file,
-        metadata=args.metadata,
         seed=args.seed,
         max_episodes_rendered=args.max_episodes_rendered,
         output_dir=args.output_dir,

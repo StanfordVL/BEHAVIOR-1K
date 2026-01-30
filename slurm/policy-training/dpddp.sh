@@ -7,22 +7,19 @@
 #SBATCH --qos=h200_core_shared
 #SBATCH --account=clear
 #SBATCH --job-name=policy-dpddp
-#SBATCH --output=logs-bigrun/policy-dpddp-%A_%a.log
-#SBATCH --error=logs-bigrun/policy-dpddp-%A_%a.log
+#SBATCH --output=logs-bigrun2/policy-dpddp-%A_%a.log
+#SBATCH --error=logs-bigrun2/policy-dpddp-%A_%a.log
 #SBATCH --array=0-3
 
 # Dataset combinations
 COMBINATIONS=("bpv" "bp" "bv" "b")
 DATASET=${COMBINATIONS[$SLURM_ARRAY_TASK_ID]}
 
-echo "Copying dataset to /tmp/${DATASET}"
-cp -R /checkpoint/clear/cgokmen/merged_lerobot_datasets_2/${DATASET} /tmp/${DATASET}
-echo "Dataset copied to /tmp/${DATASET}"
-
 accelerate launch $(which lerobot-train) \
   --dataset.repo_id=${DATASET} \
-  --dataset.root=/tmp/${DATASET} \
-  --output_dir=/checkpoint/clear/cgokmen/policies-bigrun/dpddp-${DATASET}-${SLURM_JOB_ID} \
+  --dataset.root=/checkpoint/clear/cgokmen/merged_lerobot_datasets_2/${DATASET} \
+  --dataset.video_backend=pyav \
+  --output_dir=/checkpoint/clear/cgokmen/policies-bigrun2/dpddp-${DATASET}-${SLURM_JOB_ID} \
   --job_name=dpddp-${DATASET}-${SLURM_JOB_ID} \
   --policy.type=diffusion \
   --policy.repo_id=dpddp-${DATASET}-${SLURM_JOB_ID} \
@@ -32,6 +29,6 @@ accelerate launch $(which lerobot-train) \
   --steps=100000 \
   --policy.device=cuda \
   --wandb.enable=true \
-  --wandb.project=vid2room-policies-bigrun \
-  --batch_size=128 \
+  --wandb.project=vid2room-policies-bigrun2 \
+  --batch_size=64 \
   --num_workers=16

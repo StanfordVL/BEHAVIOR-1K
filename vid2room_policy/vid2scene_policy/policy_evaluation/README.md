@@ -7,7 +7,6 @@ Evaluate trained LeRobot policies in OmniGibson environments.
 ```bash
 python -m vid2room_policy.vid2scene_policy.policy_evaluation.eval \
     --policy_path /path/to/checkpoint/pretrained_model \
-    --scene_model Rs_int \
     --n_episodes 1 \
     --output_dir ./eval_results \
     --max_steps 100
@@ -18,7 +17,6 @@ python -m vid2room_policy.vid2scene_policy.policy_evaluation.eval \
 | Argument | Description | Default |
 |----------|-------------|---------|
 | `--policy_path` | Path to policy checkpoint (required) | - |
-| `--scene_model` | OmniGibson scene name | `Rs_int` |
 | `--n_episodes` | Number of episodes to evaluate | `10` |
 | `--max_steps` | Maximum steps per episode | `500` |
 | `--output_dir` | Output directory for results | `./eval_results` |
@@ -34,24 +32,12 @@ You can specify episode configuration via `--metadata` (single episode) or `--ep
 ### Single Episode via `--metadata`
 
 ```bash
-python -m vid2room_policy.vid2scene_policy.policy_evaluation.eval \
-    --policy_path /path/to/checkpoint/pretrained_model \
-    --scene_model house_double_floor_lower \
+OMNIGIBSON_HEADLESS=1 python -m vid2room_policy.vid2scene_policy.policy_evaluation.eval \
+    --policy_path /checkpoint/clear/cgokmen/policies/pi05-spoc/checkpoints/006000/pretrained_model \
     --n_episodes 1 \
     --output_dir ./eval_results \
-    --max_steps 100 \
-    --metadata '{
-        "source_support_name": "coffee_table_koagbh_0",
-        "target_support_name": "bottom_cabinet_rhdbzv_0",
-        "robot_start_x_y_z_theta": [2.25, 3.85, 0.014, 2.604],
-        "spawned_target_object": true,
-        "target_object_name": "spawned_helmet_6693",
-        "spawned_target_object_position": [3.29, 4.81, 0.45],
-        "spawned_target_object_orientation": [-0.13, 0.015, 0.59, 0.80],
-        "spawned_target_object_category": "helmet",
-        "spawned_target_object_model": "model_id",
-        "spawned_target_object_dataset_name": "behavior-1k-assets"
-    }'
+    --max_steps 3000 \
+    --episodes_file "/home/cgokmen/projects/BEHAVIOR-1K/slurm/eval-starts/Beechwood_1_int-0.json"
 ```
 
 ### Multiple Episodes via `--episodes_file`
@@ -90,7 +76,6 @@ Then run:
 ```bash
 python -m vid2room_policy.vid2scene_policy.policy_evaluation.eval \
     --policy_path /path/to/checkpoint/pretrained_model \
-    --scene_model house_double_floor_lower \
     --episodes_file episodes.json \
     --output_dir ./eval_results
 ```
