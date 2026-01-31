@@ -9,7 +9,7 @@
 #SBATCH --job-name=run_eval
 #SBATCH --output=/home/cgokmen/projects/BEHAVIOR-1K/slurm/eval_logs/run_eval-%A_%a.log
 #SBATCH --error=/home/cgokmen/projects/BEHAVIOR-1K/slurm/eval_logs/run_eval-%A_%a.log
-#SBATCH --array=0-349
+#SBATCH --array=0-155
 
 # This script launches a configurable number of concurrent python processes.
 # Each process reads its job file and runs data collection for each row.
@@ -69,7 +69,7 @@ run_process() {
     echo "[$(date)] Running evaluation: checkpoint=${checkpoint}, target_episodes_file=${target_episodes_file}, output_path=${output_path}" | tee -a "${log_file}"
 
     cd "${PROJECT_ROOT}/vid2room_policy"
-    OMNIGIBSON_HEADLESS=1 OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} python /home/cgokmen/projects/BEHAVIOR-1K/vid2room_policy/vid2scene_policy/policy_evaluation/eval.py \
+    OMNIGIBSON_HEADLESS=1 OMNIGIBSON_APPDATA_PATH=/tmp/omnigibson/${process_id} python -m vid2scene_policy.policy_evaluation.eval \
     --policy_path "${checkpoint}" \
     --n_episodes 1 \
     --output_dir "${output_path}" \

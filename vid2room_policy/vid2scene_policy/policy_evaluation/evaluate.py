@@ -16,7 +16,7 @@ gm.ENABLE_FLATCACHE = True
 gm.USE_GPU_DYNAMICS = True
 
 
-def load_policy(checkpoint_path, policy_type, device="cuda:0"):
+def load_policy(checkpoint_path, policy_type, device="cuda"):
     pretrained_path = Path(checkpoint_path) / "pretrained_model"
 
     if policy_type == "act":
@@ -31,7 +31,7 @@ def load_policy(checkpoint_path, policy_type, device="cuda:0"):
     return policy
 
 
-def prepare_batch(obs, env, config, device="cuda:0"):
+def prepare_batch(obs, env, config, device="cuda"):
     batch = {}
     robot = env.robots[0]
     proprio_dict = robot._get_proprioception_dict()
@@ -115,7 +115,7 @@ def main():
     parser.add_argument("--policy_architecture", type=str, required=True, choices=["act", "diffusion"])
     parser.add_argument("--checkpoint_path", type=str, required=True)
     parser.add_argument("--num_steps", type=int, default=1000)
-    parser.add_argument("--device", type=str, default="cuda:0")
+    parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--save_dir", type=str, default="rollouts")
     args = parser.parse_args()
 

@@ -16,7 +16,7 @@ policy_paths = {
     "dpddp-b": "/checkpoint/clear/cgokmen/policies-bigrun2/dpddp-b-2123185/checkpoints/004000/pretrained_model",
 }
 
-num_jobs = (350) * 1
+num_jobs = (156) * 1
 max_eval_instances = 50
 outputs_path = pathlib.Path("/checkpoint/clear/cgokmen/eval-results")
 
@@ -33,6 +33,8 @@ def main():
         policy_output_path.mkdir(parents=True, exist_ok=True)
         for eval_json_file in eval_json_files:
             target_output_path = policy_output_path / eval_json_file.stem
+            if (target_output_path / "eval_results.json").exists():
+                continue
             all_episodes.append((policy_checkpoint_path, str(eval_json_file), str(target_output_path)))
     
     # Divide up the episodes into num_jobs

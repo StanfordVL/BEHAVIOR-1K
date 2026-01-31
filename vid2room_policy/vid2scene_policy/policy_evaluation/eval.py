@@ -45,8 +45,8 @@ class EvalConfig:
     """Configuration for policy evaluation."""
     # Policy
     policy_path: str = ""
-    policy_device: str = "cuda:0"
-    use_amp: bool = False
+    policy_device: str = "cuda"
+    use_amp: bool = True
 
     # Environment
     max_steps: int = 500
@@ -67,7 +67,7 @@ class EvalConfig:
 
 def load_policy(
     policy_path: str,
-    device: str = "cuda:0",
+    device: str = "cuda",
     dataset_stats: dict | None = None,
 ) -> tuple[PreTrainedPolicy, Any, Any]:
     """Load any LeRobot policy from checkpoint or hub.
@@ -180,7 +180,7 @@ def rollout_episode(
     episode_metadata: EpisodeMetadata | None = None,
     seed: int | None = None,
     return_frames: bool = False,
-    device: str = "cuda:0",
+    device: str = "cuda",
 ) -> dict:
     """Run a single rollout episode.
 
@@ -513,9 +513,9 @@ def main():
     # Policy arguments
     parser.add_argument("--policy_path", type=str, required=True,
                        help="Path to policy checkpoint or HuggingFace model ID")
-    parser.add_argument("--policy_device", type=str, default="cuda:0",
+    parser.add_argument("--policy_device", type=str, default="cuda",
                        help="Device for policy inference")
-    parser.add_argument("--use_amp", default=True,
+    parser.add_argument("--use_amp", default=False,
                         type=bool,
                        help="Use automatic mixed precision")
 
