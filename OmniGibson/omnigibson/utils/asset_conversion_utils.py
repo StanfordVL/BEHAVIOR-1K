@@ -792,11 +792,13 @@ def import_obj_metadata(
     # Manually modify metadata
     if "openable_joint_ids" in data["metadata"]:
         # Convert list format [[idx, name], [idx, name, direction]] to dict format
-        # output format: {joint_id: [joint_name]} or {joint_id: [joint_name, direction]}
-        data["metadata"]["openable_joint_ids"] = {
-            str(open_metadata[0]): list(open_metadata[1:]) 
-            for open_metadata in data["metadata"]["openable_joint_ids"]
-        }
+        # Format: {joint_id: [joint_name]} or {joint_id: [joint_name, direction_str]}
+        converted = {}
+        for open_metadata in data["metadata"]["openable_joint_ids"]:
+            key = str(open_metadata[0])
+            value = [str(x) for x in open_metadata[1:]]
+            converted[key] = value
+        data["metadata"]["openable_joint_ids"] = converted
 
     # Grab light info if any
     meta_links = data["metadata"].get("meta_links", dict())

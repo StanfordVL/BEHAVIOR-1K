@@ -109,7 +109,8 @@ def _get_relevant_joints(obj):
         value = joint_metadata[joint_id]
         if isinstance(value, list):
             joint_names.append(value[0])
-            joint_directions.append(value[1] if len(value) > 1 else 1)
+            direction = int(value[1]) if len(value) > 1 else 1
+            joint_directions.append(direction)
         else:
             # Legacy format: value is just the joint name string
             joint_names.append(value)
